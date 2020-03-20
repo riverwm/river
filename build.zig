@@ -15,6 +15,11 @@ pub fn build(b: *Builder) void {
     exe.setTarget(target);
     exe.setBuildMode(mode);
     exe.linkLibC();
+    exe.linkSystemLibrary("pixman");
+    exe.linkSystemLibrary("wayland-server");
+    exe.linkSystemLibrary("wlroots");
+    exe.linkSystemLibrary("xkbcommon");
+    exe.addIncludeDir("protocol");
     exe.install();
 
     const run_cmd = exe.run();
