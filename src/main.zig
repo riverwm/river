@@ -566,9 +566,14 @@ pub fn main() !void {
     if (c.setenv("WAYLAND_DISPLAY", socket, 1) == -1) {
         return ZagError.CantSetEnv;
     }
+
+    const argv = [_][]const u8{ "/bin/sh", "-c", "alacritty" };
+    var child = try std.ChildProcess.init(&argv, std.heap.c_allocator);
+    try std.ChildProcess.spawn(child);
     //if (startup_cmd) {
     //if (std.os.linux.fork() == 0) {
-    //execl("/bin/sh", "/bin/sh", "-c", startup_cmd, (void *)NULL);
+    //    execl("/bin/sh", "/bin/sh", "-c", startup_cmd, (void *)NULL);
+    //    std.os.linux.execve("/bin/sh",
     //}
     //}
 

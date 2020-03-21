@@ -14,12 +14,13 @@ pub fn build(b: *Builder) void {
     const exe = b.addExecutable("zag", "src/main.zig");
     exe.setTarget(target);
     exe.setBuildMode(mode);
+    exe.addIncludeDir("protocol");
     exe.linkLibC();
-    exe.linkSystemLibrary("pixman");
+    exe.addIncludeDir("/usr/include/pixman-1");
+    //exe.linkSystemLibrary("pixman");
     exe.linkSystemLibrary("wayland-server");
     exe.linkSystemLibrary("wlroots");
     exe.linkSystemLibrary("xkbcommon");
-    exe.addIncludeDir("protocol");
     exe.install();
 
     const run_cmd = exe.run();
