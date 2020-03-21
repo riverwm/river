@@ -6,10 +6,9 @@ const Server = struct {
     wl_display: *c.wl_display,
     backend: *c.wlr_backend,
     renderer: *c.wlr_renderer,
-
     xdg_shell: *c.wlr_xdg_shell,
     new_xdg_surface: c.wl_listener,
-    views: c.wl_list,
+    views: std.ArrayList(View),
 
     cursor: *c.wlr_cursor,
     cursor_mgr: *c.wlr_xcursor_manager,
@@ -32,19 +31,17 @@ const Server = struct {
     resize_edges: u32,
 
     output_layout: *c.wlr_output_layout,
-    outputs: c.wl_list,
+    outputs: std.ArrayList(Output),
     new_output: c.wl_listener,
 };
 
 const Output = struct {
-    link: c.wl_list,
     server: *Server,
     wlr_output: *c.wlr_output,
     frame: c.wl_listener,
 };
 
 const View = struct {
-    link: c.wl_list,
     server: *Server,
     xdg_surface: *c.wlr_xdg_surface,
     map: c.wl_listener,
@@ -175,11 +172,7 @@ fn output_frame(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
 
     // Each subsequent window we render is rendered on top of the last. Because
     //  our view list is ordered front-to-back, we iterate over it backwards.
-    // wl_list_for_each_reverse(view, &output.*.server.*.views, link) {
-
-    var view = @fieldParentPtr(View, "link", output.*.server.*.views.prev);
-
-    while (&view.*.link != &output.*.server.*.views) {
+    for (output.*.server.views.span()) |*view| {
         if (!view.*.mapped) {
             // An unmapped view should not be rendered.
             continue;
@@ -193,9 +186,6 @@ fn output_frame(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This calls our render_surface function for each surface among the
         // xdg_surface's toplevel and popups.
         c.wlr_xdg_surface_for_each_surface(view.*.xdg_surface, render_surface, &rdata);
-
-        // Move to next item in list
-        view = @fieldParentPtr(View, "link", view.*.link.prev);
     }
 
     // Hardware cursors are rendered by the GPU on a separate plane, and can be
@@ -234,13 +224,18 @@ fn server_new_output(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) v
     }
 
     // Allocates and configures our state for this output
-    var output = std.heap.c_allocator.create(Output) catch unreachable;
+    server.*.outputs.append(Output{
+        .server = undefined,
+        .wlr_output = undefined,
+        .frame = undefined,
+    }) catch unreachable;
+    var output = &server.*.outputs.span()[server.*.outputs.span().len - 1];
     output.*.wlr_output = wlr_output;
     output.*.server = server;
+
     // Sets up a listener for the frame notify event.
     output.*.frame.notify = output_frame;
     c.wl_signal_add(&wlr_output.*.events.frame, &output.*.frame);
-    c.wl_list_insert(&server.*.outputs, &output.*.link);
 
     // Adds this to the output layout. The add_auto function arranges outputs
     // from left-to-right in the order they appear. A more sophisticated
@@ -272,18 +267,26 @@ fn focus_view(view: *View, surface: *c.wlr_surface) void {
         _ = c.wlr_xdg_toplevel_set_activated(prev_xdg_surface, false);
     }
 
+    // Find the index
+    const idx = for (server.*.views.span()) |*v, i| {
+        if (v == view) {
+            break i;
+        }
+    } else unreachable;
+
     // Move the view to the front
-    c.wl_list_remove(&view.*.link);
-    c.wl_list_insert(&server.*.views, &view.*.link);
+    server.*.views.append(server.*.views.orderedRemove(idx)) catch unreachable;
+
+    var moved_view = &server.*.views.span()[server.*.views.span().len - 1];
 
     // Activate the new surface
-    _ = c.wlr_xdg_toplevel_set_activated(view.*.xdg_surface, true);
+    _ = c.wlr_xdg_toplevel_set_activated(moved_view.*.xdg_surface, true);
 
     // Tell the seat to have the keyboard enter this surface. wlroots will keep
     // track of this and automatically send key events to the appropriate
     // clients without additional work on your part.
     var keyboard = c.wlr_seat_get_keyboard(seat);
-    c.wlr_seat_keyboard_notify_enter(seat, view.*.xdg_surface.*.surface, &keyboard.*.keycodes, keyboard.*.num_keycodes, &keyboard.*.modifiers);
+    c.wlr_seat_keyboard_notify_enter(seat, moved_view.*.xdg_surface.*.surface, &keyboard.*.keycodes, keyboard.*.num_keycodes, &keyboard.*.modifiers);
 }
 
 fn xdg_surface_map(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -294,14 +297,19 @@ fn xdg_surface_map(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) voi
 }
 
 fn xdg_surface_unmap(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
-    var view = @fieldParentPtr(View, "map", listener);
+    var view = @fieldParentPtr(View, "unmap", listener);
     view.*.mapped = false;
 }
 
 fn xdg_surface_destroy(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
-    var view = @fieldParentPtr(View, "map", listener);
-    c.wl_list_remove(&view.*.link);
-    // TODO: free the memory
+    var view = @fieldParentPtr(View, "destroy", listener);
+    var server = view.*.server;
+    const idx = for (server.*.views.span()) |*v, i| {
+        if (v == view) {
+            break i;
+        }
+    } else return;
+    _ = server.*.views.orderedRemove(idx);
 }
 
 fn xdg_toplevel_request_move(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -323,7 +331,9 @@ fn server_new_xdg_surface(listener: [*c]c.wl_listener, data: ?*c_void) callconv(
     }
 
     // Allocate a View for this surface
-    var view = std.heap.c_allocator.create(View) catch unreachable;
+    server.*.views.append(undefined) catch unreachable;
+    var view = &server.*.views.span()[server.*.views.span().len - 1];
+
     view.*.server = server;
     view.*.xdg_surface = xdg_surface;
 
@@ -343,9 +353,6 @@ fn server_new_xdg_surface(listener: [*c]c.wl_listener, data: ?*c_void) callconv(
 
     view.*.request_resize.notify = xdg_toplevel_request_resize;
     c.wl_signal_add(&toplevel.*.events.request_resize, &view.*.request_resize);
-
-    // Add it to the list of views.
-    c.wl_list_insert(&server.*.views, &view.*.link);
 }
 
 fn keyboard_handle_modifiers(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -373,14 +380,14 @@ fn handle_keybinding(server: *Server, sym: c.xkb_keysym_t) bool {
         c.XKB_KEY_Escape => c.wl_display_terminate(server.*.wl_display),
         c.XKB_KEY_F1 => {
             // Cycle to the next view
-            if (c.wl_list_length(&server.*.views) > 1) {
-                const current_view = @fieldParentPtr(View, "link", server.*.views.next);
-                const next_view = @fieldParentPtr(View, "link", current_view.*.link.next);
-                focus_view(next_view, next_view.*.xdg_surface.*.surface);
-                // Move the previous view to the end of the list
-                c.wl_list_remove(&current_view.*.link);
-                c.wl_list_insert(server.*.views.prev, &current_view.*.link);
-            }
+            //if (c.wl_list_length(&server.*.views) > 1) {
+            //    const current_view = @fieldParentPtr(View, "link", server.*.views.next);
+            //    const next_view = @fieldParentPtr(View, "link", current_view.*.link.next);
+            //    focus_view(next_view, next_view.*.xdg_surface.*.surface);
+            //    // Move the previous view to the end of the list
+            //    c.wl_list_remove(&current_view.*.link);
+            //    c.wl_list_insert(server.*.views.prev, &current_view.*.link);
+            //}
         },
         else => return false,
     }
@@ -536,15 +543,10 @@ fn view_at(view: *View, lx: f64, ly: f64, surface: *?*c.wlr_surface, sx: *f64, s
 fn desktop_view_at(server: *Server, lx: f64, ly: f64, surface: *?*c.wlr_surface, sx: *f64, sy: *f64) ?*View {
     // This iterates over all of our surfaces and attempts to find one under the
     // cursor. This relies on server.*.views being ordered from top-to-bottom.
-
-    //wl_list_for_each(view, &server->views, link) {
-    var view = @fieldParentPtr(View, "link", server.*.views.next);
-    while (&view.*.link != &server.*.views) {
+    for (server.*.views.span()) |*view| {
         if (view_at(view, lx, ly, surface, sx, sy)) {
             return view;
         }
-
-        view = @fieldParentPtr(View, "link", view.*.link.next);
     }
     return null;
 }
@@ -755,7 +757,8 @@ pub fn main() !void {
     // Creates an output layout, which a wlroots utility for working with an
     // arrangement of screens in a physical layout.
     server.output_layout = c.wlr_output_layout_create();
-    c.wl_list_init(&server.outputs);
+
+    server.outputs = std.ArrayList(Output).init(std.heap.c_allocator);
 
     // Configure a listener to be notified when new outputs are available on the
     // backend.
@@ -765,7 +768,7 @@ pub fn main() !void {
     // Set up our list of views and the xdg-shell. The xdg-shell is a Wayland
     // protocol which is used for application windows.
     // https://drewdevault.com/2018/07/29/Wayland-shells.html
-    c.wl_list_init(&server.views);
+    server.views = std.ArrayList(View).init(std.heap.c_allocator);
     server.xdg_shell = c.wlr_xdg_shell_create(server.wl_display);
     server.new_xdg_surface.notify = server_new_xdg_surface;
     c.wl_signal_add(&server.xdg_shell.*.events.new_surface, &server.new_xdg_surface);
