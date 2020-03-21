@@ -17,6 +17,8 @@ pub fn build(b: *Builder) void {
     exe.addIncludeDir("protocol");
     exe.linkLibC();
     exe.addIncludeDir("/usr/include/pixman-1");
+    exe.addCSourceFile("include/render.c", &[_][]const u8{"-std=c99"});
+    exe.addIncludeDir(".");
     //exe.linkSystemLibrary("pixman");
     exe.linkSystemLibrary("wayland-server");
     exe.linkSystemLibrary("wlroots");
