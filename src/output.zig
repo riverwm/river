@@ -1,6 +1,9 @@
 const std = @import("std");
 const c = @import("c.zig").c;
 
+const Server = @import("server.zig").Server;
+const View = @import("view.zig").View;
+
 const RenderData = struct {
     output: *c.wlr_output,
     renderer: *c.wlr_renderer,
@@ -8,7 +11,7 @@ const RenderData = struct {
     when: *c.struct_timespec,
 };
 
-const Output = struct {
+pub const Output = struct {
     server: *Server,
     wlr_output: *c.wlr_output,
     listen_frame: c.wl_listener,
@@ -40,13 +43,13 @@ const Output = struct {
         };
 
         // Sets up a listener for the frame notify event.
-        c.wl_signal_add(&wlr_output.*.events.frame, &output.*.listen_frame);
+        c.wl_signal_add(&wlr_output.events.frame, &output.listen_frame);
 
         // Add the new output to the layout. The add_auto function arranges outputs
         // from left-to-right in the order they appear. A more sophisticated
         // compositor would let the user configure the arrangement of outputs in the
         // layout.
-        c.wlr_output_layout_add_auto(server.output_layout, wlr_output);
+        c.wlr_output_layout_add_auto(server.wlr_output_layout, wlr_output);
 
         // Creating the global adds a wl_output global to the display, which Wayland
         // clients can see to find out information about the output (such as
@@ -59,8 +62,8 @@ const Output = struct {
     fn handle_frame(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This function is called every time an output is ready to display a frame,
         // generally at the output's refresh rate (e.g. 60Hz).
-        var output = @fieldParentPtr(Output, "frame", listener);
-        var renderer = output.*.server.*.renderer;
+        var output = @fieldParentPtr(Output, "listen_frame", listener);
+        var renderer = output.server.wlr_renderer;
 
         var now: c.struct_timespec = undefined;
         _ = c.clock_gettime(c.CLOCK_MONOTONIC, &now);
@@ -93,7 +96,7 @@ const Output = struct {
             };
             // This calls our render_surface function for each surface among the
             // xdg_surface's toplevel and popups.
-            c.wlr_xdg_surface_for_each_surface(view.*.xdg_surface, render_surface, &rdata);
+            c.wlr_xdg_surface_for_each_surface(view.*.wlr_xdg_surface, render_surface, &rdata);
         }
 
         // Hardware cursors are rendered by the GPU on a separate plane, and can be
@@ -133,7 +136,7 @@ const Output = struct {
         // output-local coordinates, or (2000 - 1920).
         var ox: f64 = 0.0;
         var oy: f64 = 0.0;
-        c.wlr_output_layout_output_coords(view.*.server.*.output_layout, output, &ox, &oy);
+        c.wlr_output_layout_output_coords(view.server.wlr_output_layout, output, &ox, &oy);
         ox += @intToFloat(f64, view.*.x + sx);
         oy += @intToFloat(f64, view.*.y + sy);
 

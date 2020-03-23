@@ -1,6 +1,8 @@
 const std = @import("std");
 const c = @import("c.zig").c;
 
+const Server = @import("server.zig").Server;
+
 pub const View = struct {
     server: *Server,
     wlr_xdg_surface: *c.wlr_xdg_surface,
@@ -39,12 +41,15 @@ pub const View = struct {
             //     .link = undefined,
             //     .notify = handle_request_resize,
             // },
+            .mapped = false,
+            .x = 0,
+            .y = 0,
         };
 
         // Listen to the various events it can emit
-        c.wl_signal_add(&xdg_surface.*.events.map, &view.*.listen_map);
-        c.wl_signal_add(&xdg_surface.*.events.unmap, &view.*.listen_unmap);
-        c.wl_signal_add(&xdg_surface.*.events.destroy, &view.*.listen_destroy);
+        c.wl_signal_add(&view.wlr_xdg_surface.events.map, &view.listen_map);
+        c.wl_signal_add(&view.wlr_xdg_surface.events.unmap, &view.listen_unmap);
+        c.wl_signal_add(&view.wlr_xdg_surface.events.destroy, &view.listen_destroy);
 
         // var toplevel = xdg_surface.*.unnamed_160.toplevel;
         // c.wl_signal_add(&toplevel.*.events.request_move, &view.*.request_move);
@@ -55,18 +60,18 @@ pub const View = struct {
 
     fn handle_map(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
         // Called when the surface is mapped, or ready to display on-screen.
-        var view = @fieldParentPtr(View, "map", listener);
-        view.*.mapped = true;
-        focus_view(view, view.*.xdg_surface.*.surface);
+        var view = @fieldParentPtr(View, "listen_map", listener);
+        view.mapped = true;
+        view.focus(view.wlr_xdg_surface.surface);
     }
 
     fn handle_unmap(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
-        var view = @fieldParentPtr(View, "unmap", listener);
+        var view = @fieldParentPtr(View, "listen_unmap", listener);
         view.*.mapped = false;
     }
 
     fn handle_destroy(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
-        var view = @fieldParentPtr(View, "destroy", listener);
+        var view = @fieldParentPtr(View, "listen_destroy", listener);
         var server = view.*.server;
         const idx = for (server.*.views.span()) |*v, i| {
             if (v == view) {
@@ -84,10 +89,10 @@ pub const View = struct {
     //     // ignore for now
     // }
 
-    fn focus_view(view: *View, surface: *c.wlr_surface) void {
-        const server = view.server;
-        const seat = server.*.seat;
-        const prev_surface = seat.*.keyboard_state.focused_surface;
+    fn focus(self: *@This(), surface: *c.wlr_surface) void {
+        const server = self.server;
+        const wlr_seat = server.seat.wlr_seat;
+        const prev_surface = wlr_seat.keyboard_state.focused_surface;
 
         if (prev_surface == surface) {
             // Don't re-focus an already focused surface.
@@ -103,25 +108,31 @@ pub const View = struct {
         }
 
         // Find the index
-        const idx = for (server.*.views.span()) |*v, i| {
-            if (v == view) {
+        const idx = for (server.views.span()) |*v, i| {
+            if (self == v) {
                 break i;
             }
         } else unreachable;
 
         // Move the view to the front
-        server.*.views.append(server.*.views.orderedRemove(idx)) catch unreachable;
+        server.views.append(server.views.orderedRemove(idx)) catch unreachable;
 
-        var moved_view = &server.*.views.span()[server.*.views.span().len - 1];
+        var moved_self = &server.views.span()[server.views.span().len - 1];
 
         // Activate the new surface
-        _ = c.wlr_xdg_toplevel_set_activated(moved_view.*.xdg_surface, true);
+        _ = c.wlr_xdg_toplevel_set_activated(moved_self.wlr_xdg_surface, true);
 
         // Tell the seat to have the keyboard enter this surface. wlroots will keep
         // track of this and automatically send key events to the appropriate
         // clients without additional work on your part.
-        var keyboard = c.wlr_seat_get_keyboard(seat);
-        c.wlr_seat_keyboard_notify_enter(seat, moved_view.*.xdg_surface.*.surface, &keyboard.*.keycodes, keyboard.*.num_keycodes, &keyboard.*.modifiers);
+        var keyboard = c.wlr_seat_get_keyboard(wlr_seat);
+        c.wlr_seat_keyboard_notify_enter(
+            wlr_seat,
+            moved_self.wlr_xdg_surface.surface,
+            &keyboard.*.keycodes,
+            keyboard.*.num_keycodes,
+            &keyboard.*.modifiers,
+        );
     }
 
     fn is_at(self: *@This(), lx: f64, ly: f64, surface: *?*c.wlr_surface, sx: *f64, sy: *f64) bool {
@@ -130,15 +141,15 @@ pub const View = struct {
         // coordinates lx and ly (in output Layout Coordinates). If so, it sets the
         // surface pointer to that wlr_surface and the sx and sy coordinates to the
         // coordinates relative to that surface's top-left corner.
-        var view_sx = lx - @intToFloat(f64, view.*.x);
-        var view_sy = ly - @intToFloat(f64, view.*.y);
+        var view_sx = lx - @intToFloat(f64, self.x);
+        var view_sy = ly - @intToFloat(f64, self.y);
 
         // This variable seems to have been unsued in TinyWL
         // struct wlr_surface_state *state = &view->xdg_surface->surface->current;
 
         var _sx: f64 = undefined;
         var _sy: f64 = undefined;
-        var _surface = c.wlr_xdg_surface_surface_at(view.*.xdg_surface, view_sx, view_sy, &_sx, &_sy);
+        var _surface = c.wlr_xdg_surface_surface_at(self.wlr_xdg_surface, view_sx, view_sy, &_sx, &_sy);
 
         if (_surface) |surface_at| {
             sx.* = _sx;

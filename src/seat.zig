@@ -1,6 +1,10 @@
 const std = @import("std");
 const c = @import("c.zig").c;
 
+const Cursor = @import("cursor.zig").Cursor;
+const Keyboard = @import("keyboard.zig").Keyboard;
+const Server = @import("server.zig").Server;
+
 // TODO: InputManager and multi-seat support
 pub const Seat = struct {
     server: *Server,
@@ -13,7 +17,7 @@ pub const Seat = struct {
     // Mulitple keyboards are handled separately
     keyboards: std.ArrayList(Keyboard),
 
-    pub fn init(server: *Server, allocator: *std.mem.Allocator) @This() {
+    pub fn init(server: *Server, allocator: *std.mem.Allocator) !@This() {
         var seat = @This(){
             .server = server,
             // This seems to be the default seat name used by compositors
@@ -27,16 +31,18 @@ pub const Seat = struct {
             },
         };
 
-        seat.cursor = cursor.Cursor.init(server);
+        seat.cursor = try Cursor.init(&seat);
 
         // Set up handler for all new input devices made available. This
         // includes keyboards, pointers, touch, etc.
-        c.wl_signal_add(&server.*.backend.*.events.new_input, &seat.new_input);
+        c.wl_signal_add(&server.wlr_backend.events.new_input, &seat.listen_new_input);
+
+        return seat;
     }
 
-    fn add_keyboard(self: *@This(), device: *c.wlr_input_device) void {
-        self.keyboards.append(Keyboard.init(self, device));
-        c.wlr_seat_set_keyboard(self, device);
+    fn add_keyboard(self: *@This(), device: *c.wlr_input_device) !void {
+        try self.keyboards.append(Keyboard.init(self, device));
+        c.wlr_seat_set_keyboard(self.wlr_seat, device);
     }
 
     fn add_pointer(self: *@This(), device: *c.struct_wlr_input_device) void {
@@ -53,7 +59,7 @@ pub const Seat = struct {
         var device = @ptrCast(*c.wlr_input_device, @alignCast(@alignOf(*c.wlr_input_device), data));
 
         switch (device.*.type) {
-            .WLR_INPUT_DEVICE_KEYBOARD => seat.add_keyboard(device),
+            .WLR_INPUT_DEVICE_KEYBOARD => seat.add_keyboard(device) catch unreachable,
             .WLR_INPUT_DEVICE_POINTER => seat.add_pointer(device),
             else => {},
         }
@@ -63,9 +69,9 @@ pub const Seat = struct {
         // there are no pointer devices, so we always include that capability.
         var caps: u32 = @intCast(u32, c.WL_SEAT_CAPABILITY_POINTER);
         // if list not empty
-        if (c.wl_list_empty(&server.*.keyboards) == 0) {
+        if (seat.keyboards.span().len > 0) {
             caps |= @intCast(u32, c.WL_SEAT_CAPABILITY_KEYBOARD);
         }
-        c.wlr_seat_set_capabilities(server.*.seat, caps);
+        c.wlr_seat_set_capabilities(seat.wlr_seat, caps);
     }
 };

@@ -1,6 +1,10 @@
 const std = @import("std");
 const c = @import("c.zig").c;
 
+const Output = @import("output.zig").Output;
+const Seat = @import("seat.zig").Seat;
+const View = @import("view.zig").View;
+
 pub const Server = struct {
     wl_display: *c.wl_display,
     wlr_backend: *c.wlr_backend,
@@ -17,8 +21,10 @@ pub const Server = struct {
     // Must stay ordered bottom to top
     views: std.ArrayList(View),
 
+    seat: Seat,
+
     pub fn init(allocator: *std.mem.Allocator) !@This() {
-        var server = undefined;
+        var server: @This() = undefined;
 
         // The Wayland display is managed by libwayland. It handles accepting
         // clients from the Unix socket, manging Wayland globals, and so on.
@@ -31,19 +37,20 @@ pub const Server = struct {
         // a tty or wayland if WAYLAND_DISPLAY is set.
         //
         // This frees itself when the wl_display is destroyed.
-        server.wlr_backend = c.wlr_backend_autocreate(server.wl_display) orelse
+        server.wlr_backend = c.zag_wlr_backend_autocreate(server.wl_display) orelse
             return error.CantCreateWlrBackend;
 
         // If we don't provide a renderer, autocreate makes a GLES2 renderer for us.
         // The renderer is responsible for defining the various pixel formats it
         // supports for shared memory, this configures that for clients.
-        server.wlr_renderer = c.wlr_backend_get_renderer(server.backend) orelse
+        server.wlr_renderer = c.zag_wlr_backend_get_renderer(server.wlr_backend) orelse
             return error.CantGetWlrRenderer;
-        c.wlr_renderer_init_wl_display(server.wlr_renderer, server.wl_display) orelse
-            return error.CantInitWlDisplay;
+        // TODO: Handle failure after https://github.com/swaywm/wlroots/pull/2080
+        c.wlr_renderer_init_wl_display(server.wlr_renderer, server.wl_display);// orelse
+        //    return error.CantInitWlDisplay;
 
         // These both free themselves when the wl_display is destroyed
-        _ = c.wlr_compositor_create(server.wl_display, server.renderer) orelse
+        _ = c.wlr_compositor_create(server.wl_display, server.wlr_renderer) orelse
             return error.CantCreateWlrCompositor;
         _ = c.wlr_data_device_manager_create(server.wl_display) orelse
             return error.CantCreateWlrDataDeviceManager;
@@ -57,7 +64,7 @@ pub const Server = struct {
         server.outputs = std.ArrayList(Output).init(std.heap.c_allocator);
 
         // Setup a listener for new outputs
-        server.listen_new_output = handle_new_output;
+        server.listen_new_output.notify = handle_new_output;
         c.wl_signal_add(&server.wlr_backend.*.events.new_output, &server.listen_new_output);
 
         // Set up our list of views and the xdg-shell. The xdg-shell is a Wayland
@@ -67,7 +74,9 @@ pub const Server = struct {
         server.wlr_xdg_shell = c.wlr_xdg_shell_create(server.wl_display) orelse
             return error.CantCreateWlrXdgShell;
         server.listen_new_xdg_surface.notify = handle_new_xdg_surface;
-        c.wl_signal_add(&server.xdg_shell.*.events.new_surface, &server.listen_new_xdg_surface);
+        c.wl_signal_add(&server.wlr_xdg_shell.*.events.new_surface, &server.listen_new_xdg_surface);
+
+        server.seat = try Seat.init(&server, std.heap.c_allocator);
 
         return server;
     }
@@ -87,8 +96,7 @@ pub const Server = struct {
 
         // Start the backend. This will enumerate outputs and inputs, become the DRM
         // master, etc
-        if (!c.wlr_backend_start(self.wlr_backend)) {
-            c.wlr_backend_destroy(self.wlr_backend);
+        if (!c.zag_wlr_backend_start(self.wlr_backend)) {
             return error.CantStartBackend;
         }
 
@@ -101,7 +109,7 @@ pub const Server = struct {
 
     /// Enter the wayland event loop and block until the compositor is exited
     pub fn run(self: @This()) void {
-        c.wl_display_run(server.wl_display);
+        c.wl_display_run(self.wl_display);
     }
 
     pub fn handle_keybinding(self: *@This(), sym: c.xkb_keysym_t) bool {
@@ -111,7 +119,7 @@ pub const Server = struct {
         //
         // This function assumes the proper modifier is held down.
         switch (sym) {
-            c.XKB_KEY_Escape => c.wl_display_terminate(server.*.wl_display),
+            c.XKB_KEY_Escape => c.wl_display_terminate(self.wl_display),
             c.XKB_KEY_F1 => {
                 // Cycle to the next view
                 //if (c.wl_list_length(&server.*.views) > 1) {
@@ -129,11 +137,11 @@ pub const Server = struct {
     }
 
     fn handle_new_output(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
-        var server = @fieldParentPtr(Server, "new_output", listener);
+        var server = @fieldParentPtr(Server, "listen_new_output", listener);
         var wlr_output = @ptrCast(*c.wlr_output, @alignCast(@alignOf(*c.wlr_output), data));
 
         // TODO: Handle failure
-        server.outputs.append(Output.init(server, wlr_output) catch unreachable);
+        server.outputs.append(Output.init(server, wlr_output) catch unreachable) catch unreachable;
     }
 
     fn handle_new_xdg_surface(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -153,7 +161,7 @@ pub const Server = struct {
     /// Finds the top most view under the output layout coordinates lx, ly
     /// returns the view if found, and a pointer to the wlr_surface as well as the surface coordinates
     pub fn desktop_view_at(self: *@This(), lx: f64, ly: f64, surface: *?*c.wlr_surface, sx: *f64, sy: *f64) ?*View {
-        for (server.*.views.span()) |*view| {
+        for (self.views.span()) |*view| {
             if (view.is_at(lx, ly, surface, sx, sy)) {
                 return view;
             }

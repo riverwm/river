@@ -1,5 +1,3 @@
-// Functions that couldn't be automatically translated
-
 pub const c = @cImport({
     @cDefine("WLR_USE_UNSTABLE", {});
     @cInclude("time.h");
@@ -22,11 +20,7 @@ pub const c = @cImport({
     @cInclude("wlr/util/log.h");
     @cInclude("xkbcommon/xkbcommon.h");
 
+    // Contains a subset of functions from wlr/backend.h and wlr/render/wlr_renderer.h
+    // that can be automatically imported
     @cInclude("include/render.h");
 });
-
-pub const manual = struct {
-    pub inline fn xkb_map_new_from_names(context: var, names: var, flags: var) ?*c.struct_xkb_keymap {
-        return c.xkb_keymap_new_from_names(context, names, flags);
-    }
-};

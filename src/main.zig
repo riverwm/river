@@ -1,6 +1,8 @@
 const std = @import("std");
 const c = @import("c.zig").c;
 
+const Server = @import("server.zig").Server;
+
 pub fn main() !void {
     std.debug.warn("Starting up.\n", .{});
 
