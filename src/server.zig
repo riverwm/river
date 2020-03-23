@@ -69,7 +69,7 @@ pub const Server = struct {
     /// Create the socket, set WAYLAND_DISPLAY, and start the backend
     pub fn start(self: @This()) !void {
         // Add a Unix socket to the Wayland display.
-        const socket = c.wl_display_add_socket_auto(self.wl_display) orelse;
+        const socket = c.wl_display_add_socket_auto(self.wl_display) orelse
             return error.CantAddSocket;
 
         // Start the backend. This will enumerate outputs and inputs, become the DRM
@@ -113,5 +113,13 @@ pub const Server = struct {
             else => return false,
         }
         return true;
+    }
+
+    fn handle_new_output(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
+        var server = @fieldParentPtr(Server, "new_output", listener);
+        var wlr_output = @ptrCast(*c.wlr_output, @alignCast(@alignOf(*c.wlr_output), data));
+
+        // TODO: Handle failure
+        server.outputs.append(Output.init(server, wlr_output) orelse return);
     }
 };
