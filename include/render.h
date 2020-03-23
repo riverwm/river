@@ -18,10 +18,9 @@ struct wlr_backend {
 	} events;
 };
 
-struct wlr_backend *zag_wlr_backend_autocreate(struct wl_display *display);
-struct wlr_renderer *zag_wlr_backend_get_renderer(struct wlr_backend *backend);
-bool zag_wlr_backend_start(struct wlr_backend *backend);
-void zag_wlr_backend_destroy(struct wlr_backend *backend);
+struct wlr_backend *wlr_backend_autocreate(struct wl_display *display);
+struct wlr_renderer *wlr_backend_get_renderer(struct wlr_backend *backend);
+bool wlr_backend_start(struct wlr_backend *backend);
 
 
 #endif
