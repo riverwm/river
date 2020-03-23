@@ -8,41 +8,48 @@ const Server = @import("server.zig").Server;
 // TODO: InputManager and multi-seat support
 pub const Seat = struct {
     server: *Server,
-
     wlr_seat: *c.wlr_seat,
     listen_new_input: c.wl_listener,
 
     // Multiple mice are handled by the same Cursor
     cursor: Cursor,
     // Mulitple keyboards are handled separately
-    keyboards: std.ArrayList(Keyboard),
+    keyboards: std.TailQueue(Keyboard),
 
-    pub fn init(server: *Server, allocator: *std.mem.Allocator) !@This() {
+    pub fn create(server: *Server) !@This() {
         var seat = @This(){
             .server = server,
-            // This seems to be the default seat name used by compositors
-            .wlr_seat = c.wlr_seat_create(server.*.wl_display, "seat0"),
-            .cursor = undefined,
-            .keyboards = std.ArrayList(Keyboard).init(allocator),
-
+            .wlr_seat = undefined,
             .listen_new_input = c.wl_listener{
                 .link = undefined,
                 .notify = handle_new_input,
             },
+            .cursor = undefined,
+            .keyboards = std.TailQueue(Keyboard).init(),
         };
 
-        seat.cursor = try Cursor.init(&seat);
-
-        // Set up handler for all new input devices made available. This
-        // includes keyboards, pointers, touch, etc.
-        c.wl_signal_add(&server.wlr_backend.events.new_input, &seat.listen_new_input);
+        // This seems to be the default seat name used by compositors
+        seat.wlr_seat = c.wlr_seat_create(server.*.wl_display, "seat0") orelse
+            return error.CantCreateWlrSeat;
 
         return seat;
     }
 
+    pub fn init(self: *@This()) !void {
+        self.cursor = try Cursor.create(self);
+        self.cursor.init();
+
+        // Set up handler for all new input devices made available. This
+        // includes keyboards, pointers, touch, etc.
+        c.wl_signal_add(&self.server.wlr_backend.events.new_input, &self.listen_new_input);
+    }
+
     fn add_keyboard(self: *@This(), device: *c.wlr_input_device) !void {
-        try self.keyboards.append(Keyboard.init(self, device));
         c.wlr_seat_set_keyboard(self.wlr_seat, device);
+
+        var node = try self.keyboards.allocateNode(self.server.allocator);
+        try node.data.init(self, device);
+        self.keyboards.append(node);
     }
 
     fn add_pointer(self: *@This(), device: *c.struct_wlr_input_device) void {
@@ -69,7 +76,7 @@ pub const Seat = struct {
         // there are no pointer devices, so we always include that capability.
         var caps: u32 = @intCast(u32, c.WL_SEAT_CAPABILITY_POINTER);
         // if list not empty
-        if (seat.keyboards.span().len > 0) {
+        if (seat.keyboards.len > 0) {
             caps |= @intCast(u32, c.WL_SEAT_CAPABILITY_KEYBOARD);
         }
         c.wlr_seat_set_capabilities(seat.wlr_seat, caps);

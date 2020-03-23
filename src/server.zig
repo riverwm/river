@@ -6,25 +6,28 @@ const Seat = @import("seat.zig").Seat;
 const View = @import("view.zig").View;
 
 pub const Server = struct {
+    allocator: *std.mem.Allocator,
+
     wl_display: *c.wl_display,
     wlr_backend: *c.wlr_backend,
     wlr_renderer: *c.wlr_renderer,
 
     wlr_output_layout: *c.wlr_output_layout,
-    outputs: std.ArrayList(Output),
+    outputs: std.TailQueue(Output),
 
     listen_new_output: c.wl_listener,
 
     wlr_xdg_shell: *c.wlr_xdg_shell,
     listen_new_xdg_surface: c.wl_listener,
 
-    // Must stay ordered bottom to top
-    views: std.ArrayList(View),
+    // Must stay ordered, first in list is "on top" visually
+    views: std.TailQueue(View),
 
     seat: Seat,
 
-    pub fn init(allocator: *std.mem.Allocator) !@This() {
+    pub fn create(allocator: *std.mem.Allocator) !@This() {
         var server: @This() = undefined;
+        server.allocator = allocator;
 
         // The Wayland display is managed by libwayland. It handles accepting
         // clients from the Unix socket, manging Wayland globals, and so on.
@@ -36,7 +39,7 @@ pub const Server = struct {
         // the best option based on the environment, for example DRM when run from
         // a tty or wayland if WAYLAND_DISPLAY is set.
         //
-        // This frees itself when the wl_display is destroyed.
+        // This frees itserver.when the wl_display is destroyed.
         server.wlr_backend = c.zag_wlr_backend_autocreate(server.wl_display) orelse
             return error.CantCreateWlrBackend;
 
@@ -46,7 +49,7 @@ pub const Server = struct {
         server.wlr_renderer = c.zag_wlr_backend_get_renderer(server.wlr_backend) orelse
             return error.CantGetWlrRenderer;
         // TODO: Handle failure after https://github.com/swaywm/wlroots/pull/2080
-        c.wlr_renderer_init_wl_display(server.wlr_renderer, server.wl_display);// orelse
+        c.wlr_renderer_init_wl_display(server.wlr_renderer, server.wl_display); // orelse
         //    return error.CantInitWlDisplay;
 
         // These both free themselves when the wl_display is destroyed
@@ -61,24 +64,28 @@ pub const Server = struct {
             return error.CantCreateWlrOutputLayout;
         errdefer c.wlr_output_layout_destroy(server.wlr_output_layout);
 
-        server.outputs = std.ArrayList(Output).init(std.heap.c_allocator);
-
-        // Setup a listener for new outputs
+        // Don't register the wl_listeners yet as they must first be pointer-stable
+        server.outputs = std.TailQueue(Output).init();
         server.listen_new_output.notify = handle_new_output;
-        c.wl_signal_add(&server.wlr_backend.*.events.new_output, &server.listen_new_output);
 
-        // Set up our list of views and the xdg-shell. The xdg-shell is a Wayland
-        // protocol which is used for application windows.
-        // https://drewdevault.com/2018/07/29/Wayland-shells.html
-        server.views = std.ArrayList(View).init(std.heap.c_allocator);
+        server.views = std.TailQueue(View).init();
         server.wlr_xdg_shell = c.wlr_xdg_shell_create(server.wl_display) orelse
             return error.CantCreateWlrXdgShell;
         server.listen_new_xdg_surface.notify = handle_new_xdg_surface;
-        c.wl_signal_add(&server.wlr_xdg_shell.*.events.new_surface, &server.listen_new_xdg_surface);
-
-        server.seat = try Seat.init(&server, std.heap.c_allocator);
 
         return server;
+    }
+
+    pub fn init(self: *@This()) !void {
+        self.seat = try Seat.create(self);
+        try self.seat.init();
+
+        // Register our listeners for new outputs and xdg_surfaces.
+        // This can't be done in create() as wl_signal_add() creates a pointer
+        // to the wl_list link in our wl_listener, a pointer that would be
+        // broken when returning from create();
+        c.wl_signal_add(&self.wlr_backend.*.events.new_output, &self.listen_new_output);
+        c.wl_signal_add(&self.wlr_xdg_shell.*.events.new_surface, &self.listen_new_xdg_surface);
     }
 
     /// Free allocated memory and clean up
@@ -141,7 +148,9 @@ pub const Server = struct {
         var wlr_output = @ptrCast(*c.wlr_output, @alignCast(@alignOf(*c.wlr_output), data));
 
         // TODO: Handle failure
-        server.outputs.append(Output.init(server, wlr_output) catch unreachable) catch unreachable;
+        var node = server.outputs.allocateNode(server.allocator) catch unreachable;
+        node.data.init(server, wlr_output) catch unreachable;
+        server.outputs.append(node);
     }
 
     fn handle_new_xdg_surface(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -154,16 +163,19 @@ pub const Server = struct {
             return;
         }
 
-        // Init a View to handle this surface
-        server.*.views.append(View.init(server, wlr_xdg_surface)) catch unreachable;
+        // Create a View to handle this toplevel surface
+        var node = server.views.allocateNode(server.allocator) catch unreachable;
+        node.data.init(server, wlr_xdg_surface);
+        server.views.append(node);
     }
 
     /// Finds the top most view under the output layout coordinates lx, ly
     /// returns the view if found, and a pointer to the wlr_surface as well as the surface coordinates
     pub fn desktop_view_at(self: *@This(), lx: f64, ly: f64, surface: *?*c.wlr_surface, sx: *f64, sy: *f64) ?*View {
-        for (self.views.span()) |*view| {
-            if (view.is_at(lx, ly, surface, sx, sy)) {
-                return view;
+        var it = self.views.last;
+        while (it) |node| : (it = node.prev) {
+            if (node.data.is_at(lx, ly, surface, sx, sy)) {
+                return &node.data;
             }
         }
         return null;

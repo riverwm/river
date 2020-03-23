@@ -16,7 +16,7 @@ pub const Output = struct {
     wlr_output: *c.wlr_output,
     listen_frame: c.wl_listener,
 
-    pub fn init(server: *Server, wlr_output: *c.wlr_output) !@This() {
+    pub fn init(self: *@This(), server: *Server, wlr_output: *c.wlr_output) !void {
         // Some backends don't have modes. DRM+KMS does, and we need to set a mode
         // before we can use the output. The mode is a tuple of (width, height,
         // refresh rate), and each monitor supports only a specific set of modes. We
@@ -33,17 +33,12 @@ pub const Output = struct {
             }
         }
 
-        var output = @This(){
-            .server = server,
-            .wlr_output = wlr_output,
-            .listen_frame = c.wl_listener{
-                .link = undefined,
-                .notify = handle_frame,
-            },
-        };
+        self.server = server;
+        self.wlr_output = wlr_output;
 
         // Sets up a listener for the frame notify event.
-        c.wl_signal_add(&wlr_output.events.frame, &output.listen_frame);
+        self.listen_frame.notify = handle_frame;
+        c.wl_signal_add(&wlr_output.events.frame, &self.listen_frame);
 
         // Add the new output to the layout. The add_auto function arranges outputs
         // from left-to-right in the order they appear. A more sophisticated
@@ -55,8 +50,6 @@ pub const Output = struct {
         // clients can see to find out information about the output (such as
         // DPI, scale factor, manufacturer, etc).
         c.wlr_output_create_global(wlr_output);
-
-        return output;
     }
 
     fn handle_frame(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -83,8 +76,11 @@ pub const Output = struct {
         c.wlr_renderer_clear(renderer, &color);
 
         // Each subsequent view is rendered on top of the last.
-        for (output.*.server.views.span()) |*view| {
-            if (!view.*.mapped) {
+        // The first view in the list is "on top" so iterate in reverse.
+        var it = output.server.views.last;
+        while (it) |node| : (it = node.prev) {
+            var view = &node.data;
+            if (!view.mapped) {
                 // An unmapped view should not be rendered.
                 continue;
             }

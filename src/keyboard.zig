@@ -10,20 +10,9 @@ pub const Keyboard = struct {
     listen_modifiers: c.wl_listener,
     listen_key: c.wl_listener,
 
-    pub fn init(seat: *Seat, device: *c.wlr_input_device) @This() {
-        var keyboard = @This(){
-            .seat = seat,
-            .device = device,
-
-            .listen_modifiers = c.wl_listener{
-                .link = undefined,
-                .notify = handle_modifiers,
-            },
-            .listen_key = c.wl_listener{
-                .link = undefined,
-                .notify = handle_key,
-            },
-        };
+    pub fn init(self: *@This(), seat: *Seat, device: *c.wlr_input_device) !void {
+        self.seat = seat;
+        self.device = device;
 
         // We need to prepare an XKB keymap and assign it to the keyboard. This
         // assumes the defaults (e.g. layout = "us").
@@ -34,25 +23,29 @@ pub const Keyboard = struct {
             .variant = null,
             .options = null,
         };
-        const context = c.xkb_context_new(c.enum_xkb_context_flags.XKB_CONTEXT_NO_FLAGS);
+        const context = c.xkb_context_new(c.enum_xkb_context_flags.XKB_CONTEXT_NO_FLAGS) orelse
+            return error.CantCreateXkbContext;
         defer c.xkb_context_unref(context);
 
         const keymap = c.xkb_keymap_new_from_names(
             context,
             &rules,
             c.enum_xkb_keymap_compile_flags.XKB_KEYMAP_COMPILE_NO_FLAGS,
-        );
+        ) orelse
+            return error.CantCreateXkbKeymap;
         defer c.xkb_keymap_unref(keymap);
 
-        var keyboard_device = device.*.unnamed_37.keyboard;
+        var keyboard_device = self.device.unnamed_37.keyboard;
+        // TODO: handle failure after https://github.com/swaywm/wlroots/pull/2081
         c.wlr_keyboard_set_keymap(keyboard_device, keymap);
         c.wlr_keyboard_set_repeat_info(keyboard_device, 25, 600);
 
         // Setup listeners for keyboard events
-        c.wl_signal_add(&keyboard_device.*.events.modifiers, &keyboard.listen_modifiers);
-        c.wl_signal_add(&keyboard_device.*.events.key, &keyboard.listen_key);
+        self.listen_modifiers.notify = handle_modifiers;
+        c.wl_signal_add(&keyboard_device.*.events.modifiers, &self.listen_modifiers);
 
-        return keyboard;
+        self.listen_key.notify = handle_key;
+        c.wl_signal_add(&keyboard_device.*.events.key, &self.listen_key);
     }
 
     fn handle_modifiers(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {

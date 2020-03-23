@@ -2,6 +2,7 @@ const std = @import("std");
 const c = @import("c.zig").c;
 
 const Seat = @import("seat.zig").Seat;
+const Server = @import("server.zig").Server;
 const View = @import("view.zig").View;
 
 const CursorMode = enum {
@@ -12,7 +13,6 @@ const CursorMode = enum {
 
 pub const Cursor = struct {
     seat: *Seat,
-
     wlr_cursor: *c.wlr_cursor,
     wlr_xcursor_manager: *c.wlr_xcursor_manager,
 
@@ -32,11 +32,13 @@ pub const Cursor = struct {
     grab_height: c_int,
     resize_edges: u32,
 
-    pub fn init(seat: *Seat) !@This() {
+    pub fn create(seat: *Seat) !@This() {
         var cursor = @This(){
             .seat = seat,
 
             // Creates a wlroots utility for tracking the cursor image shown on screen.
+            //
+            // TODO: free this, it allocates!
             .wlr_cursor = c.wlr_cursor_create() orelse
                 return error.CantCreateWlrCursor,
 
@@ -44,6 +46,8 @@ pub const Cursor = struct {
             // Xcursor themes to source cursor images from and makes sure that cursor
             // images are available at all scale factors on the screen (necessary for
             // HiDPI support). We add a cursor theme at scale factor 1 to begin with.
+            //
+            // TODO: free this, it allocates!
             .wlr_xcursor_manager = c.wlr_xcursor_manager_create(null, 24) orelse
                 return error.CantCreateWlrXCursorManager,
 
@@ -86,22 +90,24 @@ pub const Cursor = struct {
         c.wlr_cursor_attach_output_layout(cursor.wlr_cursor, seat.server.wlr_output_layout);
         _ = c.wlr_xcursor_manager_load(cursor.wlr_xcursor_manager, 1);
 
+        return cursor;
+    }
+
+    pub fn init(self: *@This()) void {
         // wlr_cursor *only* displays an image on screen. It does not move around
         // when the pointer moves. However, we can attach input devices to it, and
         // it will generate aggregate events for all of them. In these events, we
         // can choose how we want to process them, forwarding them to clients and
         // moving the cursor around. See following post for more detail:
         // https://drewdevault.com/2018/07/17/Input-handling-in-wlroots.html
-        c.wl_signal_add(&cursor.wlr_cursor.*.events.motion, &cursor.listen_motion);
-        c.wl_signal_add(&cursor.wlr_cursor.*.events.motion_absolute, &cursor.listen_motion_absolute);
-        c.wl_signal_add(&cursor.wlr_cursor.*.events.button, &cursor.listen_button);
-        c.wl_signal_add(&cursor.wlr_cursor.*.events.axis, &cursor.listen_axis);
-        c.wl_signal_add(&cursor.wlr_cursor.*.events.frame, &cursor.listen_frame);
+        c.wl_signal_add(&self.wlr_cursor.*.events.motion, &self.listen_motion);
+        c.wl_signal_add(&self.wlr_cursor.*.events.motion_absolute, &self.listen_motion_absolute);
+        c.wl_signal_add(&self.wlr_cursor.*.events.button, &self.listen_button);
+        c.wl_signal_add(&self.wlr_cursor.*.events.axis, &self.listen_axis);
+        c.wl_signal_add(&self.wlr_cursor.*.events.frame, &self.listen_frame);
 
         // This listens for clients requesting a specific cursor image
-        c.wl_signal_add(&seat.wlr_seat.events.request_set_cursor, &cursor.listen_request_set_cursor);
-
-        return cursor;
+        c.wl_signal_add(&self.seat.wlr_seat.events.request_set_cursor, &self.listen_request_set_cursor);
     }
 
     fn process_move(self: *@This(), time: u32) void {
