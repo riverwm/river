@@ -52,7 +52,7 @@ pub const Keyboard = struct {
     fn handle_modifiers(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is raised when a modifier key, such as shift or alt, is
         // pressed. We simply communicate this to the client. */
-        var keyboard = @fieldParentPtr(Keyboard, "listen_modifiers", listener.?);
+        const keyboard = @fieldParentPtr(Keyboard, "listen_modifiers", listener.?);
 
         // A seat can only have one keyboard, but this is a limitation of the
         // Wayland protocol - not wlroots. We assign all connected keyboards to the

@@ -55,8 +55,8 @@ pub const Output = struct {
     fn handle_frame(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This function is called every time an output is ready to display a frame,
         // generally at the output's refresh rate (e.g. 60Hz).
-        var output = @fieldParentPtr(Output, "listen_frame", listener.?);
-        var renderer = output.server.wlr_renderer;
+        const output = @fieldParentPtr(Output, "listen_frame", listener.?);
+        const renderer = output.server.wlr_renderer;
 
         var now: c.struct_timespec = undefined;
         _ = c.clock_gettime(c.CLOCK_MONOTONIC, &now);
@@ -79,7 +79,7 @@ pub const Output = struct {
         // The first view in the list is "on top" so iterate in reverse.
         var it = output.server.views.last;
         while (it) |node| : (it = node.prev) {
-            var view = &node.data;
+            const view = &node.data;
             if (!view.mapped) {
                 // An unmapped view should not be rendered.
                 continue;
@@ -112,18 +112,18 @@ pub const Output = struct {
 
     fn render_surface(opt_surface: ?*c.wlr_surface, sx: c_int, sy: c_int, data: ?*c_void) callconv(.C) void {
         // wlroots says this will never be null
-        var surface = opt_surface.?;
+        const surface = opt_surface.?;
         // This function is called for every surface that needs to be rendered.
-        var rdata = @ptrCast(*RenderData, @alignCast(@alignOf(RenderData), data));
-        var view = rdata.view;
-        var output = rdata.output;
+        const rdata = @ptrCast(*RenderData, @alignCast(@alignOf(RenderData), data));
+        const view = rdata.view;
+        const output = rdata.output;
 
         // We first obtain a wlr_texture, which is a GPU resource. wlroots
         // automatically handles negotiating these with the client. The underlying
         // resource could be an opaque handle passed from the client, or the client
         // could have sent a pixel buffer which we copied to the GPU, or a few other
         // means. You don't have to worry about this, wlroots takes care of it.
-        var texture = c.wlr_surface_get_texture(surface);
+        const texture = c.wlr_surface_get_texture(surface);
         if (texture == null) {
             return;
         }
@@ -140,7 +140,7 @@ pub const Output = struct {
 
         // We also have to apply the scale factor for HiDPI outputs. This is only
         // part of the puzzle, TinyWL does not fully support HiDPI.
-        var box = c.wlr_box{
+        const box = c.wlr_box{
             .x = @floatToInt(c_int, ox * output.scale),
             .y = @floatToInt(c_int, oy * output.scale),
             .width = @floatToInt(c_int, @intToFloat(f32, surface.current.width) * output.scale),
@@ -157,7 +157,7 @@ pub const Output = struct {
         // Naturally you can do this any way you like, for example to make a 3D
         // compositor.
         var matrix: [9]f32 = undefined;
-        var transform = c.wlr_output_transform_invert(surface.current.transform);
+        const transform = c.wlr_output_transform_invert(surface.current.transform);
         c.wlr_matrix_project_box(&matrix, &box, transform, 0.0, &output.transform_matrix);
 
         // This takes our matrix, the texture, and an alpha, and performs the actual

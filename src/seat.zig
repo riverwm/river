@@ -47,7 +47,7 @@ pub const Seat = struct {
     fn add_keyboard(self: *@This(), device: *c.wlr_input_device) !void {
         c.wlr_seat_set_keyboard(self.wlr_seat, device);
 
-        var node = try self.keyboards.allocateNode(self.server.allocator);
+        const node = try self.keyboards.allocateNode(self.server.allocator);
         try node.data.init(self, device);
         self.keyboards.append(node);
     }
@@ -62,8 +62,8 @@ pub const Seat = struct {
 
     fn handle_new_input(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is raised by the backend when a new input device becomes available.
-        var seat = @fieldParentPtr(Seat, "listen_new_input", listener.?);
-        var device = @ptrCast(*c.wlr_input_device, @alignCast(@alignOf(*c.wlr_input_device), data));
+        const seat = @fieldParentPtr(Seat, "listen_new_input", listener.?);
+        const device = @ptrCast(*c.wlr_input_device, @alignCast(@alignOf(*c.wlr_input_device), data));
 
         switch (device.type) {
             .WLR_INPUT_DEVICE_KEYBOARD => seat.add_keyboard(device) catch unreachable,

@@ -33,7 +33,7 @@ pub const Cursor = struct {
     resize_edges: u32,
 
     pub fn create(seat: *Seat) !@This() {
-        var cursor = @This(){
+        const cursor = @This(){
             .seat = seat,
 
             // Creates a wlroots utility for tracking the cursor image shown on screen.
@@ -127,15 +127,17 @@ pub const Cursor = struct {
         // commit any movement that was prepared.
 
         // TODO: Handle null view
-        var view = self.grabbed_view;
+        const view = self.grabbed_view;
 
-        var dx: f64 = self.wlr_cursor.x - self.grab_x;
-        var dy: f64 = self.wlr_cursor.y - self.grab_y;
+        const dx: f64 = self.wlr_cursor.x - self.grab_x;
+        const dy: f64 = self.wlr_cursor.y - self.grab_y;
+
         var x: f64 = @intToFloat(f64, view.?.x);
         var y: f64 = @intToFloat(f64, view.?.y);
 
         var width = @intToFloat(f64, self.grab_width);
         var height = @intToFloat(f64, self.grab_height);
+
         if (self.resize_edges & @intCast(u32, c.WLR_EDGE_TOP) != 0) {
             y = self.grab_y + dy;
             height -= dy;
@@ -177,7 +179,7 @@ pub const Cursor = struct {
         var sx: f64 = undefined;
         var sy: f64 = undefined;
         var opt_surface: ?*c.wlr_surface = null;
-        var view = self.seat.server.desktop_view_at(
+        const view = self.seat.server.desktop_view_at(
             self.wlr_cursor.x,
             self.wlr_cursor.y,
             &opt_surface,
@@ -196,7 +198,7 @@ pub const Cursor = struct {
             );
         }
 
-        var wlr_seat = self.seat.wlr_seat;
+        const wlr_seat = self.seat.wlr_seat;
         if (opt_surface) |surface| {
             const focus_changed = wlr_seat.pointer_state.focused_surface != surface;
             // "Enter" the surface if necessary. This lets the client know that the
@@ -221,8 +223,8 @@ pub const Cursor = struct {
     fn handle_motion(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is forwarded by the cursor when a pointer emits a _relative_
         // pointer motion event (i.e. a delta)
-        var cursor = @fieldParentPtr(Cursor, "listen_motion", listener.?);
-        var event = @ptrCast(
+        const cursor = @fieldParentPtr(Cursor, "listen_motion", listener.?);
+        const event = @ptrCast(
             *c.wlr_event_pointer_motion,
             @alignCast(@alignOf(*c.wlr_event_pointer_motion), data),
         );
@@ -242,8 +244,8 @@ pub const Cursor = struct {
         // move the mouse over the window. You could enter the window from any edge,
         // so we have to warp the mouse there. There is also some hardware which
         // emits these events.
-        var cursor = @fieldParentPtr(Cursor, "listen_motion_absolute", listener.?);
-        var event = @ptrCast(
+        const cursor = @fieldParentPtr(Cursor, "listen_motion_absolute", listener.?);
+        const event = @ptrCast(
             *c.wlr_event_pointer_motion_absolute,
             @alignCast(@alignOf(*c.wlr_event_pointer_motion_absolute), data),
         );
@@ -254,8 +256,8 @@ pub const Cursor = struct {
     fn handle_button(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is forwarded by the cursor when a pointer emits a button
         // event.
-        var cursor = @fieldParentPtr(Cursor, "listen_button", listener.?);
-        var event = @ptrCast(
+        const cursor = @fieldParentPtr(Cursor, "listen_button", listener.?);
+        const event = @ptrCast(
             *c.wlr_event_pointer_button,
             @alignCast(@alignOf(*c.wlr_event_pointer_button), data),
         );
@@ -271,7 +273,7 @@ pub const Cursor = struct {
         var sy: f64 = undefined;
 
         var surface: ?*c.wlr_surface = null;
-        var view = cursor.seat.server.desktop_view_at(
+        const view = cursor.seat.server.desktop_view_at(
             cursor.wlr_cursor.x,
             cursor.wlr_cursor.y,
             &surface,
@@ -293,8 +295,8 @@ pub const Cursor = struct {
     fn handle_axis(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is forwarded by the cursor when a pointer emits an axis event,
         // for example when you move the scroll wheel.
-        var cursor = @fieldParentPtr(Cursor, "listen_axis", listener.?);
-        var event = @ptrCast(
+        const cursor = @fieldParentPtr(Cursor, "listen_axis", listener.?);
+        const event = @ptrCast(
             *c.wlr_event_pointer_axis,
             @alignCast(@alignOf(*c.wlr_event_pointer_axis), data),
         );
@@ -315,15 +317,15 @@ pub const Cursor = struct {
         // event. Frame events are sent after regular pointer events to group
         // multiple events together. For instance, two axis events may happen at the
         // same time, in which case a frame event won't be sent in between.
-        var cursor = @fieldParentPtr(Cursor, "listen_frame", listener.?);
+        const cursor = @fieldParentPtr(Cursor, "listen_frame", listener.?);
         // Notify the client with pointer focus of the frame event.
         c.wlr_seat_pointer_notify_frame(cursor.seat.wlr_seat);
     }
 
     fn handle_request_set_cursor(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is rasied by the seat when a client provides a cursor image
-        var cursor = @fieldParentPtr(Cursor, "listen_request_set_cursor", listener.?);
-        var event = @ptrCast(
+        const cursor = @fieldParentPtr(Cursor, "listen_request_set_cursor", listener.?);
+        const event = @ptrCast(
             *c.wlr_seat_pointer_request_set_cursor_event,
             @alignCast(@alignOf(*c.wlr_seat_pointer_request_set_cursor_event), data),
         );
