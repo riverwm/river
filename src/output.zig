@@ -24,7 +24,7 @@ pub const Output = struct {
         // would let the user configure it.
 
         // if not empty
-        if (c.wl_list_empty(&wlr_output.*.modes) == 0) {
+        if (c.wl_list_empty(&wlr_output.modes) == 0) {
             const mode = c.wlr_output_preferred_mode(wlr_output);
             c.wlr_output_set_mode(wlr_output, mode);
             c.wlr_output_enable(wlr_output, true);
@@ -62,13 +62,13 @@ pub const Output = struct {
         _ = c.clock_gettime(c.CLOCK_MONOTONIC, &now);
 
         // wlr_output_attach_render makes the OpenGL context current.
-        if (!c.wlr_output_attach_render(output.*.wlr_output, null)) {
+        if (!c.wlr_output_attach_render(output.wlr_output, null)) {
             return;
         }
         // The "effective" resolution can change if you rotate your outputs.
         var width: c_int = undefined;
         var height: c_int = undefined;
-        c.wlr_output_effective_resolution(output.*.wlr_output, &width, &height);
+        c.wlr_output_effective_resolution(output.wlr_output, &width, &height);
         // Begin the renderer (calls glViewport and some other GL sanity checks)
         c.wlr_renderer_begin(renderer, width, height);
 
@@ -85,14 +85,14 @@ pub const Output = struct {
                 continue;
             }
             var rdata = RenderData{
-                .output = output.*.wlr_output,
+                .output = output.wlr_output,
                 .view = view,
                 .renderer = renderer,
                 .when = &now,
             };
             // This calls our render_surface function for each surface among the
             // xdg_surface's toplevel and popups.
-            c.wlr_xdg_surface_for_each_surface(view.*.wlr_xdg_surface, render_surface, &rdata);
+            c.wlr_xdg_surface_for_each_surface(view.wlr_xdg_surface, render_surface, &rdata);
         }
 
         // Hardware cursors are rendered by the GPU on a separate plane, and can be
@@ -101,13 +101,13 @@ pub const Output = struct {
         // reason, wlroots provides a software fallback, which we ask it to render
         // here. wlr_cursor handles configuring hardware vs software cursors for you,
         // and this function is a no-op when hardware cursors are in use.
-        c.wlr_output_render_software_cursors(output.*.wlr_output, null);
+        c.wlr_output_render_software_cursors(output.wlr_output, null);
 
         // Conclude rendering and swap the buffers, showing the final frame
         // on-screen.
         c.wlr_renderer_end(renderer);
         // TODO: handle failure
-        _ = c.wlr_output_commit(output.*.wlr_output);
+        _ = c.wlr_output_commit(output.wlr_output);
     }
 
     fn render_surface(opt_surface: ?*c.wlr_surface, sx: c_int, sy: c_int, data: ?*c_void) callconv(.C) void {
@@ -115,8 +115,8 @@ pub const Output = struct {
         var surface = opt_surface.?;
         // This function is called for every surface that needs to be rendered.
         var rdata = @ptrCast(*RenderData, @alignCast(@alignOf(RenderData), data));
-        var view = rdata.*.view;
-        var output = rdata.*.output;
+        var view = rdata.view;
+        var output = rdata.output;
 
         // We first obtain a wlr_texture, which is a GPU resource. wlroots
         // automatically handles negotiating these with the client. The underlying
@@ -135,16 +135,16 @@ pub const Output = struct {
         var ox: f64 = 0.0;
         var oy: f64 = 0.0;
         c.wlr_output_layout_output_coords(view.server.wlr_output_layout, output, &ox, &oy);
-        ox += @intToFloat(f64, view.*.x + sx);
-        oy += @intToFloat(f64, view.*.y + sy);
+        ox += @intToFloat(f64, view.x + sx);
+        oy += @intToFloat(f64, view.y + sy);
 
         // We also have to apply the scale factor for HiDPI outputs. This is only
         // part of the puzzle, TinyWL does not fully support HiDPI.
         var box = c.wlr_box{
-            .x = @floatToInt(c_int, ox * output.*.scale),
-            .y = @floatToInt(c_int, oy * output.*.scale),
-            .width = @floatToInt(c_int, @intToFloat(f32, surface.*.current.width) * output.*.scale),
-            .height = @floatToInt(c_int, @intToFloat(f32, surface.*.current.height) * output.*.scale),
+            .x = @floatToInt(c_int, ox * output.scale),
+            .y = @floatToInt(c_int, oy * output.scale),
+            .width = @floatToInt(c_int, @intToFloat(f32, surface.current.width) * output.scale),
+            .height = @floatToInt(c_int, @intToFloat(f32, surface.current.height) * output.scale),
         };
 
         // Those familiar with OpenGL are also familiar with the role of matricies
@@ -157,15 +157,15 @@ pub const Output = struct {
         // Naturally you can do this any way you like, for example to make a 3D
         // compositor.
         var matrix: [9]f32 = undefined;
-        var transform = c.wlr_output_transform_invert(surface.*.current.transform);
-        c.wlr_matrix_project_box(&matrix, &box, transform, 0.0, &output.*.transform_matrix);
+        var transform = c.wlr_output_transform_invert(surface.current.transform);
+        c.wlr_matrix_project_box(&matrix, &box, transform, 0.0, &output.transform_matrix);
 
         // This takes our matrix, the texture, and an alpha, and performs the actual
         // rendering on the GPU.
-        _ = c.wlr_render_texture_with_matrix(rdata.*.renderer, texture, &matrix, 1.0);
+        _ = c.wlr_render_texture_with_matrix(rdata.renderer, texture, &matrix, 1.0);
 
         // This lets the client know that we've displayed that frame and it can
         // prepare another one now if it likes.
-        c.wlr_surface_send_frame_done(surface, rdata.*.when);
+        c.wlr_surface_send_frame_done(surface, rdata.when);
     }
 };

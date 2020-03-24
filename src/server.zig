@@ -84,8 +84,8 @@ pub const Server = struct {
         // This can't be done in create() as wl_signal_add() creates a pointer
         // to the wl_list link in our wl_listener, a pointer that would be
         // broken when returning from create();
-        c.wl_signal_add(&self.wlr_backend.*.events.new_output, &self.listen_new_output);
-        c.wl_signal_add(&self.wlr_xdg_shell.*.events.new_surface, &self.listen_new_xdg_surface);
+        c.wl_signal_add(&self.wlr_backend.events.new_output, &self.listen_new_output);
+        c.wl_signal_add(&self.wlr_xdg_shell.events.new_surface, &self.listen_new_xdg_surface);
     }
 
     /// Free allocated memory and clean up
@@ -129,13 +129,13 @@ pub const Server = struct {
             c.XKB_KEY_Escape => c.wl_display_terminate(self.wl_display),
             c.XKB_KEY_F1 => {
                 // Cycle to the next view
-                //if (c.wl_list_length(&server.*.views) > 1) {
-                //    const current_view = @fieldParentPtr(View, "link", server.*.views.next);
-                //    const next_view = @fieldParentPtr(View, "link", current_view.*.link.next);
-                //    focus_view(next_view, next_view.*.xdg_surface.*.surface);
+                //if (c.wl_list_length(&server.views) > 1) {
+                //    const current_view = @fieldParentPtr(View, "link", server.views.next);
+                //    const next_view = @fieldParentPtr(View, "link", current_view.link.next);
+                //    focus_view(next_view, next_view.xdg_surface.surface);
                 //    // Move the previous view to the end of the list
-                //    c.wl_list_remove(&current_view.*.link);
-                //    c.wl_list_insert(server.*.views.prev, &current_view.*.link);
+                //    c.wl_list_remove(&current_view.link);
+                //    c.wl_list_insert(server.views.prev, &current_view.link);
                 //}
             },
             else => return false,

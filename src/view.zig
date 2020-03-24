@@ -34,9 +34,9 @@ pub const View = struct {
         self.listen_destroy.notify = handle_destroy;
         c.wl_signal_add(&self.wlr_xdg_surface.events.destroy, &self.listen_destroy);
 
-        // var toplevel = xdg_surface.*.unnamed_160.toplevel;
-        // c.wl_signal_add(&toplevel.*.events.request_move, &view.*.request_move);
-        // c.wl_signal_add(&toplevel.*.events.request_resize, &view.*.request_resize);
+        // var toplevel = xdg_surface.unnamed_160.toplevel;
+        // c.wl_signal_add(&toplevel.events.request_move, &view.request_move);
+        // c.wl_signal_add(&toplevel.events.request_resize, &view.request_resize);
     }
 
     fn handle_map(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -48,7 +48,7 @@ pub const View = struct {
 
     fn handle_unmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         var view = @fieldParentPtr(View, "listen_unmap", listener.?);
-        view.*.mapped = false;
+        view.mapped = false;
     }
 
     fn handle_destroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -110,13 +110,13 @@ pub const View = struct {
         // Tell the seat to have the keyboard enter this surface. wlroots will keep
         // track of this and automatically send key events to the appropriate
         // clients without additional work on your part.
-        var keyboard = c.wlr_seat_get_keyboard(wlr_seat);
+        var keyboard: *c.wlr_keyboard = c.wlr_seat_get_keyboard(wlr_seat);
         c.wlr_seat_keyboard_notify_enter(
             wlr_seat,
             self.wlr_xdg_surface.surface,
-            &keyboard.*.keycodes,
-            keyboard.*.num_keycodes,
-            &keyboard.*.modifiers,
+            &keyboard.keycodes,
+            keyboard.num_keycodes,
+            &keyboard.modifiers,
         );
     }
 

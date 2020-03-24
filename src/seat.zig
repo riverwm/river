@@ -29,7 +29,7 @@ pub const Seat = struct {
         };
 
         // This seems to be the default seat name used by compositors
-        seat.wlr_seat = c.wlr_seat_create(server.*.wl_display, "seat0") orelse
+        seat.wlr_seat = c.wlr_seat_create(server.wl_display, "seat0") orelse
             return error.CantCreateWlrSeat;
 
         return seat;
@@ -65,7 +65,7 @@ pub const Seat = struct {
         var seat = @fieldParentPtr(Seat, "listen_new_input", listener.?);
         var device = @ptrCast(*c.wlr_input_device, @alignCast(@alignOf(*c.wlr_input_device), data));
 
-        switch (device.*.type) {
+        switch (device.type) {
             .WLR_INPUT_DEVICE_KEYBOARD => seat.add_keyboard(device) catch unreachable,
             .WLR_INPUT_DEVICE_POINTER => seat.add_pointer(device),
             else => {},

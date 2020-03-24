@@ -100,11 +100,11 @@ pub const Cursor = struct {
         // can choose how we want to process them, forwarding them to clients and
         // moving the cursor around. See following post for more detail:
         // https://drewdevault.com/2018/07/17/Input-handling-in-wlroots.html
-        c.wl_signal_add(&self.wlr_cursor.*.events.motion, &self.listen_motion);
-        c.wl_signal_add(&self.wlr_cursor.*.events.motion_absolute, &self.listen_motion_absolute);
-        c.wl_signal_add(&self.wlr_cursor.*.events.button, &self.listen_button);
-        c.wl_signal_add(&self.wlr_cursor.*.events.axis, &self.listen_axis);
-        c.wl_signal_add(&self.wlr_cursor.*.events.frame, &self.listen_frame);
+        c.wl_signal_add(&self.wlr_cursor.events.motion, &self.listen_motion);
+        c.wl_signal_add(&self.wlr_cursor.events.motion_absolute, &self.listen_motion_absolute);
+        c.wl_signal_add(&self.wlr_cursor.events.button, &self.listen_button);
+        c.wl_signal_add(&self.wlr_cursor.events.axis, &self.listen_axis);
+        c.wl_signal_add(&self.wlr_cursor.events.frame, &self.listen_frame);
 
         // This listens for clients requesting a specific cursor image
         c.wl_signal_add(&self.seat.wlr_seat.events.request_set_cursor, &self.listen_request_set_cursor);
@@ -112,8 +112,8 @@ pub const Cursor = struct {
 
     fn process_move(self: *@This(), time: u32) void {
         // Move the grabbed view to the new position.
-        self.grabbed_view.?.*.x = @floatToInt(c_int, self.wlr_cursor.x - self.grab_x);
-        self.grabbed_view.?.*.y = @floatToInt(c_int, self.wlr_cursor.y - self.grab_y);
+        self.grabbed_view.?.x = @floatToInt(c_int, self.wlr_cursor.x - self.grab_x);
+        self.grabbed_view.?.y = @floatToInt(c_int, self.wlr_cursor.y - self.grab_y);
     }
 
     fn process_resize(self: *@This(), time: u32) void {
@@ -279,7 +279,7 @@ pub const Cursor = struct {
             &sy,
         );
 
-        if (event.*.state == c.enum_wlr_button_state.WLR_BUTTON_RELEASED) {
+        if (event.state == c.enum_wlr_button_state.WLR_BUTTON_RELEASED) {
             // If you released any buttons, we exit interactive move/resize mode.
             cursor.mode = CursorMode.Passthrough;
         } else {
@@ -331,7 +331,7 @@ pub const Cursor = struct {
 
         // This can be sent by any client, so we check to make sure this one is
         // actually has pointer focus first.
-        if (focused_client == event.*.seat_client) {
+        if (focused_client == event.seat_client) {
             // Once we've vetted the client, we can tell the cursor to use the
             // provided surface as the cursor image. It will set the hardware cursor
             // on the output that it's currently on and continue to do so as the
