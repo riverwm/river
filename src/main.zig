@@ -9,9 +9,9 @@ pub fn main() !void {
     c.wlr_log_init(c.enum_wlr_log_importance.WLR_DEBUG, null);
 
     var server = try Server.create(std.heap.c_allocator);
+    defer server.destroy();
 
     try server.init();
-    defer server.deinit();
 
     try server.start();
 
