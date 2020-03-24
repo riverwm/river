@@ -44,14 +44,14 @@ pub const Keyboard = struct {
         c.wlr_keyboard_set_repeat_info(self.wlr_keyboard, 25, 600);
 
         // Setup listeners for keyboard events
-        self.listen_modifiers.notify = handle_modifiers;
+        self.listen_modifiers.notify = handleModifiers;
         c.wl_signal_add(&self.wlr_keyboard.events.modifiers, &self.listen_modifiers);
 
-        self.listen_key.notify = handle_key;
+        self.listen_key.notify = handleKey;
         c.wl_signal_add(&self.wlr_keyboard.events.key, &self.listen_key);
     }
 
-    fn handle_modifiers(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    fn handleModifiers(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is raised when a modifier key, such as shift or alt, is
         // pressed. We simply communicate this to the client. */
         const keyboard = @fieldParentPtr(Keyboard, "listen_modifiers", listener.?);
@@ -69,7 +69,7 @@ pub const Keyboard = struct {
         );
     }
 
-    fn handle_key(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    fn handleKey(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is raised when a key is pressed or released.
         const keyboard = @fieldParentPtr(Keyboard, "listen_key", listener.?);
         const event = @ptrCast(

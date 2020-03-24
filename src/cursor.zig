@@ -55,28 +55,28 @@ pub const Cursor = struct {
 
             .listen_motion = c.wl_listener{
                 .link = undefined,
-                .notify = handle_motion,
+                .notify = handleMotion,
             },
             .listen_motion_absolute = c.wl_listener{
                 .link = undefined,
-                .notify = handle_motion_absolute,
+                .notify = handleMotionAbsolute,
             },
             .listen_button = c.wl_listener{
                 .link = undefined,
-                .notify = handle_button,
+                .notify = handleButton,
             },
             .listen_axis = c.wl_listener{
                 .link = undefined,
-                .notify = handle_axis,
+                .notify = handleAxis,
             },
             .listen_frame = c.wl_listener{
                 .link = undefined,
-                .notify = handle_frame,
+                .notify = handleFrame,
             },
 
             .listen_request_set_cursor = c.wl_listener{
                 .link = undefined,
-                .notify = handle_request_set_cursor,
+                .notify = handleRequestSetCursor,
             },
 
             .mode = CursorMode.Passthrough,
@@ -112,7 +112,7 @@ pub const Cursor = struct {
         c.wl_signal_add(&self.seat.wlr_seat.events.request_set_cursor, &self.listen_request_set_cursor);
     }
 
-    fn process_move(self: *Self, time: u32) void {
+    fn processMove(self: *Self, time: u32) void {
         // Move the grabbed view to the new position.
         // TODO: log on null
         if (self.grabbed_view) |view| {
@@ -121,7 +121,7 @@ pub const Cursor = struct {
         }
     }
 
-    fn process_resize(self: *Self, time: u32) void {
+    fn processsResize(self: *Self, time: u32) void {
         // Resizing the grabbed view can be a little bit complicated, because we
         // could be resizing from any corner or edge. This not only resizes the view
         // on one or two axes, but can also move the view if you resize from the top
@@ -170,13 +170,13 @@ pub const Cursor = struct {
         );
     }
 
-    fn process_motion(self: *Self, time: u32) void {
+    fn processMotion(self: *Self, time: u32) void {
         // If the mode is non-passthrough, delegate to those functions.
         if (self.mode == CursorMode.Move) {
-            self.process_move(time);
+            self.processMove(time);
             return;
         } else if (self.mode == CursorMode.Resize) {
-            self.process_resize(time);
+            self.processsResize(time);
             return;
         }
 
@@ -225,7 +225,7 @@ pub const Cursor = struct {
         }
     }
 
-    fn handle_motion(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    fn handleMotion(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is forwarded by the cursor when a pointer emits a _relative_
         // pointer motion event (i.e. a delta)
         const cursor = @fieldParentPtr(Cursor, "listen_motion", listener.?);
@@ -239,10 +239,10 @@ pub const Cursor = struct {
         // generated the event. You can pass NULL for the device if you want to move
         // the cursor around without any input.
         c.wlr_cursor_move(cursor.wlr_cursor, event.device, event.delta_x, event.delta_y);
-        cursor.process_motion(event.time_msec);
+        cursor.processMotion(event.time_msec);
     }
 
-    fn handle_motion_absolute(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    fn handleMotionAbsolute(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is forwarded by the cursor when a pointer emits an _absolute_
         // motion event, from 0..1 on each axis. This happens, for example, when
         // wlroots is running under a Wayland window rather than KMS+DRM, and you
@@ -255,10 +255,10 @@ pub const Cursor = struct {
             @alignCast(@alignOf(*c.wlr_event_pointer_motion_absolute), data),
         );
         c.wlr_cursor_warp_absolute(cursor.wlr_cursor, event.device, event.x, event.y);
-        cursor.process_motion(event.time_msec);
+        cursor.processMotion(event.time_msec);
     }
 
-    fn handle_button(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    fn handleButton(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is forwarded by the cursor when a pointer emits a button
         // event.
         const cursor = @fieldParentPtr(Cursor, "listen_button", listener.?);
@@ -297,7 +297,7 @@ pub const Cursor = struct {
         }
     }
 
-    fn handle_axis(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    fn handleAxis(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is forwarded by the cursor when a pointer emits an axis event,
         // for example when you move the scroll wheel.
         const cursor = @fieldParentPtr(Cursor, "listen_axis", listener.?);
@@ -317,7 +317,7 @@ pub const Cursor = struct {
         );
     }
 
-    fn handle_frame(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    fn handleFrame(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is forwarded by the cursor when a pointer emits an frame
         // event. Frame events are sent after regular pointer events to group
         // multiple events together. For instance, two axis events may happen at the
@@ -327,7 +327,7 @@ pub const Cursor = struct {
         c.wlr_seat_pointer_notify_frame(cursor.seat.wlr_seat);
     }
 
-    fn handle_request_set_cursor(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    fn handleRequestSetCursor(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is rasied by the seat when a client provides a cursor image
         const cursor = @fieldParentPtr(Cursor, "listen_request_set_cursor", listener.?);
         const event = @ptrCast(

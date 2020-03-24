@@ -176,7 +176,7 @@ pub const Server = struct {
     pub fn desktop_view_at(self: *Self, lx: f64, ly: f64, surface: *?*c.wlr_surface, sx: *f64, sy: *f64) ?*View {
         var it = self.views.last;
         while (it) |node| : (it = node.prev) {
-            if (node.data.is_at(lx, ly, surface, sx, sy)) {
+            if (node.data.isAt(lx, ly, surface, sx, sy)) {
                 return &node.data;
             }
         }

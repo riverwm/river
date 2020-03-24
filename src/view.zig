@@ -27,13 +27,13 @@ pub const View = struct {
         self.x = 0;
         self.y = 0;
 
-        self.listen_map.notify = handle_map;
+        self.listen_map.notify = handleMap;
         c.wl_signal_add(&self.wlr_xdg_surface.events.map, &self.listen_map);
 
-        self.listen_unmap.notify = handle_unmap;
+        self.listen_unmap.notify = handleUnmap;
         c.wl_signal_add(&self.wlr_xdg_surface.events.unmap, &self.listen_unmap);
 
-        self.listen_destroy.notify = handle_destroy;
+        self.listen_destroy.notify = handleDestroy;
         c.wl_signal_add(&self.wlr_xdg_surface.events.destroy, &self.listen_destroy);
 
         // const toplevel = xdg_surface.unnamed_160.toplevel;
@@ -41,19 +41,19 @@ pub const View = struct {
         // c.wl_signal_add(&toplevel.events.request_resize, &view.request_resize);
     }
 
-    fn handle_map(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // Called when the surface is mapped, or ready to display on-screen.
         const view = @fieldParentPtr(View, "listen_map", listener.?);
         view.mapped = true;
         view.focus(view.wlr_xdg_surface.surface);
     }
 
-    fn handle_unmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         const view = @fieldParentPtr(View, "listen_unmap", listener.?);
         view.mapped = false;
     }
 
-    fn handle_destroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         const view = @fieldParentPtr(View, "listen_destroy", listener.?);
         const server = view.server;
 
@@ -68,11 +68,11 @@ pub const View = struct {
         server.views.destroyNode(target, server.allocator);
     }
 
-    // fn xdg_toplevel_request_move(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    // fn xdgToplevelRequestMove(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     //     // ignore for now
     // }
 
-    // fn xdg_toplevel_request_resize(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    // fn xdgToplevelRequestResize(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     //     // ignore for now
     // }
 
@@ -122,7 +122,7 @@ pub const View = struct {
         );
     }
 
-    fn is_at(self: *Self, lx: f64, ly: f64, surface: *?*c.wlr_surface, sx: *f64, sy: *f64) bool {
+    fn isAt(self: *Self, lx: f64, ly: f64, surface: *?*c.wlr_surface, sx: *f64, sy: *f64) bool {
         // XDG toplevels may have nested surfaces, such as popup windows for context
         // menus or tooltips. This function tests if any of those are underneath the
         // coordinates lx and ly (in output Layout Coordinates). If so, it sets the

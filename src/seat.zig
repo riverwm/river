@@ -24,7 +24,7 @@ pub const Seat = struct {
             .wlr_seat = undefined,
             .listen_new_input = c.wl_listener{
                 .link = undefined,
-                .notify = handle_new_input,
+                .notify = handleNewInput,
             },
             .cursor = undefined,
             .keyboards = std.TailQueue(Keyboard).init(),
@@ -46,7 +46,7 @@ pub const Seat = struct {
         c.wl_signal_add(&self.server.wlr_backend.events.new_input, &self.listen_new_input);
     }
 
-    fn add_keyboard(self: *Self, device: *c.wlr_input_device) !void {
+    fn addKeyboard(self: *Self, device: *c.wlr_input_device) !void {
         c.wlr_seat_set_keyboard(self.wlr_seat, device);
 
         const node = try self.keyboards.allocateNode(self.server.allocator);
@@ -54,7 +54,7 @@ pub const Seat = struct {
         self.keyboards.append(node);
     }
 
-    fn add_pointer(self: *Self, device: *c.struct_wlr_input_device) void {
+    fn addPointer(self: *Self, device: *c.struct_wlr_input_device) void {
         // We don't do anything special with pointers. All of our pointer handling
         // is proxied through wlr_cursor. On another compositor, you might take this
         // opportunity to do libinput configuration on the device to set
@@ -62,14 +62,14 @@ pub const Seat = struct {
         c.wlr_cursor_attach_input_device(self.cursor.wlr_cursor, device);
     }
 
-    fn handle_new_input(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    fn handleNewInput(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is raised by the backend when a new input device becomes available.
         const seat = @fieldParentPtr(Seat, "listen_new_input", listener.?);
         const device = @ptrCast(*c.wlr_input_device, @alignCast(@alignOf(*c.wlr_input_device), data));
 
         switch (device.type) {
-            .WLR_INPUT_DEVICE_KEYBOARD => seat.add_keyboard(device) catch unreachable,
-            .WLR_INPUT_DEVICE_POINTER => seat.add_pointer(device),
+            .WLR_INPUT_DEVICE_KEYBOARD => seat.addKeyboard(device) catch unreachable,
+            .WLR_INPUT_DEVICE_POINTER => seat.addPointer(device),
             else => {},
         }
 

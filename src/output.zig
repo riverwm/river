@@ -39,7 +39,7 @@ pub const Output = struct {
         self.wlr_output = wlr_output;
 
         // Sets up a listener for the frame notify event.
-        self.listen_frame.notify = handle_frame;
+        self.listen_frame.notify = handleFrame;
         c.wl_signal_add(&wlr_output.events.frame, &self.listen_frame);
 
         // Add the new output to the layout. The add_auto function arranges outputs
@@ -54,7 +54,7 @@ pub const Output = struct {
         c.wlr_output_create_global(wlr_output);
     }
 
-    fn handle_frame(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    fn handleFrame(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This function is called every time an output is ready to display a frame,
         // generally at the output's refresh rate (e.g. 60Hz).
         const output = @fieldParentPtr(Output, "listen_frame", listener.?);
@@ -94,7 +94,7 @@ pub const Output = struct {
             };
             // This calls our render_surface function for each surface among the
             // xdg_surface's toplevel and popups.
-            c.wlr_xdg_surface_for_each_surface(view.wlr_xdg_surface, render_surface, &rdata);
+            c.wlr_xdg_surface_for_each_surface(view.wlr_xdg_surface, renderSurface, &rdata);
         }
 
         // Hardware cursors are rendered by the GPU on a separate plane, and can be
@@ -112,7 +112,7 @@ pub const Output = struct {
         _ = c.wlr_output_commit(output.wlr_output);
     }
 
-    fn render_surface(opt_surface: ?*c.wlr_surface, sx: c_int, sy: c_int, data: ?*c_void) callconv(.C) void {
+    fn renderSurface(opt_surface: ?*c.wlr_surface, sx: c_int, sy: c_int, data: ?*c_void) callconv(.C) void {
         // wlroots says this will never be null
         const surface = opt_surface.?;
         // This function is called for every surface that needs to be rendered.
