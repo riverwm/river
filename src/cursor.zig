@@ -218,10 +218,10 @@ pub const Cursor = struct {
         }
     }
 
-    fn handle_motion(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
+    fn handle_motion(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is forwarded by the cursor when a pointer emits a _relative_
         // pointer motion event (i.e. a delta)
-        var cursor = @fieldParentPtr(Cursor, "listen_motion", listener);
+        var cursor = @fieldParentPtr(Cursor, "listen_motion", listener.?);
         var event = @ptrCast(
             *c.wlr_event_pointer_motion,
             @alignCast(@alignOf(*c.wlr_event_pointer_motion), data),
@@ -235,14 +235,14 @@ pub const Cursor = struct {
         cursor.process_motion(event.time_msec);
     }
 
-    fn handle_motion_absolute(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
+    fn handle_motion_absolute(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is forwarded by the cursor when a pointer emits an _absolute_
         // motion event, from 0..1 on each axis. This happens, for example, when
         // wlroots is running under a Wayland window rather than KMS+DRM, and you
         // move the mouse over the window. You could enter the window from any edge,
         // so we have to warp the mouse there. There is also some hardware which
         // emits these events.
-        var cursor = @fieldParentPtr(Cursor, "listen_motion_absolute", listener);
+        var cursor = @fieldParentPtr(Cursor, "listen_motion_absolute", listener.?);
         var event = @ptrCast(
             *c.wlr_event_pointer_motion_absolute,
             @alignCast(@alignOf(*c.wlr_event_pointer_motion_absolute), data),
@@ -251,10 +251,10 @@ pub const Cursor = struct {
         cursor.process_motion(event.time_msec);
     }
 
-    fn handle_button(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
+    fn handle_button(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is forwarded by the cursor when a pointer emits a button
         // event.
-        var cursor = @fieldParentPtr(Cursor, "listen_button", listener);
+        var cursor = @fieldParentPtr(Cursor, "listen_button", listener.?);
         var event = @ptrCast(
             *c.wlr_event_pointer_button,
             @alignCast(@alignOf(*c.wlr_event_pointer_button), data),
@@ -290,10 +290,10 @@ pub const Cursor = struct {
         }
     }
 
-    fn handle_axis(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
+    fn handle_axis(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is forwarded by the cursor when a pointer emits an axis event,
         // for example when you move the scroll wheel.
-        var cursor = @fieldParentPtr(Cursor, "listen_axis", listener);
+        var cursor = @fieldParentPtr(Cursor, "listen_axis", listener.?);
         var event = @ptrCast(
             *c.wlr_event_pointer_axis,
             @alignCast(@alignOf(*c.wlr_event_pointer_axis), data),
@@ -310,19 +310,19 @@ pub const Cursor = struct {
         );
     }
 
-    fn handle_frame(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
+    fn handle_frame(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is forwarded by the cursor when a pointer emits an frame
         // event. Frame events are sent after regular pointer events to group
         // multiple events together. For instance, two axis events may happen at the
         // same time, in which case a frame event won't be sent in between.
-        var cursor = @fieldParentPtr(Cursor, "listen_frame", listener);
+        var cursor = @fieldParentPtr(Cursor, "listen_frame", listener.?);
         // Notify the client with pointer focus of the frame event.
         c.wlr_seat_pointer_notify_frame(cursor.seat.wlr_seat);
     }
 
-    fn handle_request_set_cursor(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
+    fn handle_request_set_cursor(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is rasied by the seat when a client provides a cursor image
-        var cursor = @fieldParentPtr(Cursor, "listen_request_set_cursor", listener);
+        var cursor = @fieldParentPtr(Cursor, "listen_request_set_cursor", listener.?);
         var event = @ptrCast(
             *c.wlr_seat_pointer_request_set_cursor_event,
             @alignCast(@alignOf(*c.wlr_seat_pointer_request_set_cursor_event), data),

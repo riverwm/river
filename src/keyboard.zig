@@ -48,10 +48,10 @@ pub const Keyboard = struct {
         c.wl_signal_add(&keyboard_device.*.events.key, &self.listen_key);
     }
 
-    fn handle_modifiers(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
+    fn handle_modifiers(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is raised when a modifier key, such as shift or alt, is
         // pressed. We simply communicate this to the client. */
-        var keyboard = @fieldParentPtr(Keyboard, "listen_modifiers", listener);
+        var keyboard = @fieldParentPtr(Keyboard, "listen_modifiers", listener.?);
 
         // A seat can only have one keyboard, but this is a limitation of the
         // Wayland protocol - not wlroots. We assign all connected keyboards to the
@@ -63,9 +63,9 @@ pub const Keyboard = struct {
         c.wlr_seat_keyboard_notify_modifiers(keyboard.seat.wlr_seat, &keyboard.*.device.*.unnamed_37.keyboard.*.modifiers);
     }
 
-    fn handle_key(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
+    fn handle_key(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is raised when a key is pressed or released.
-        const keyboard = @fieldParentPtr(Keyboard, "listen_key", listener);
+        const keyboard = @fieldParentPtr(Keyboard, "listen_key", listener.?);
         const event = @ptrCast(
             *c.wlr_event_keyboard_key,
             @alignCast(@alignOf(*c.wlr_event_keyboard_key), data),

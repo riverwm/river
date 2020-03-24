@@ -39,20 +39,20 @@ pub const View = struct {
         // c.wl_signal_add(&toplevel.*.events.request_resize, &view.*.request_resize);
     }
 
-    fn handle_map(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
+    fn handle_map(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // Called when the surface is mapped, or ready to display on-screen.
-        var view = @fieldParentPtr(View, "listen_map", listener);
+        var view = @fieldParentPtr(View, "listen_map", listener.?);
         view.mapped = true;
         view.focus(view.wlr_xdg_surface.surface);
     }
 
-    fn handle_unmap(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
-        var view = @fieldParentPtr(View, "listen_unmap", listener);
+    fn handle_unmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+        var view = @fieldParentPtr(View, "listen_unmap", listener.?);
         view.*.mapped = false;
     }
 
-    fn handle_destroy(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
-        var view = @fieldParentPtr(View, "listen_destroy", listener);
+    fn handle_destroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+        var view = @fieldParentPtr(View, "listen_destroy", listener.?);
         var server = view.server;
 
         var it = server.views.first;
@@ -66,11 +66,11 @@ pub const View = struct {
         server.views.destroyNode(target, server.allocator);
     }
 
-    // fn xdg_toplevel_request_move(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
+    // fn xdg_toplevel_request_move(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     //     // ignore for now
     // }
 
-    // fn xdg_toplevel_request_resize(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
+    // fn xdg_toplevel_request_resize(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     //     // ignore for now
     // }
 

@@ -143,8 +143,8 @@ pub const Server = struct {
         return true;
     }
 
-    fn handle_new_output(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
-        var server = @fieldParentPtr(Server, "listen_new_output", listener);
+    fn handle_new_output(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+        var server = @fieldParentPtr(Server, "listen_new_output", listener.?);
         var wlr_output = @ptrCast(*c.wlr_output, @alignCast(@alignOf(*c.wlr_output), data));
 
         // TODO: Handle failure
@@ -153,10 +153,10 @@ pub const Server = struct {
         server.outputs.append(node);
     }
 
-    fn handle_new_xdg_surface(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
+    fn handle_new_xdg_surface(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is raised when wlr_xdg_shell receives a new xdg surface from a
         // client, either a toplevel (application window) or popup.
-        var server = @fieldParentPtr(Server, "listen_new_xdg_surface", listener);
+        var server = @fieldParentPtr(Server, "listen_new_xdg_surface", listener.?);
         var wlr_xdg_surface = @ptrCast(*c.wlr_xdg_surface, @alignCast(@alignOf(*c.wlr_xdg_surface), data));
 
         if (wlr_xdg_surface.role != c.enum_wlr_xdg_surface_role.WLR_XDG_SURFACE_ROLE_TOPLEVEL) {

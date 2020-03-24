@@ -60,9 +60,9 @@ pub const Seat = struct {
         c.wlr_cursor_attach_input_device(self.cursor.wlr_cursor, device);
     }
 
-    fn handle_new_input(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
+    fn handle_new_input(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is raised by the backend when a new input device becomes available.
-        var seat = @fieldParentPtr(Seat, "listen_new_input", listener);
+        var seat = @fieldParentPtr(Seat, "listen_new_input", listener.?);
         var device = @ptrCast(*c.wlr_input_device, @alignCast(@alignOf(*c.wlr_input_device), data));
 
         switch (device.*.type) {

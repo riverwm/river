@@ -52,10 +52,10 @@ pub const Output = struct {
         c.wlr_output_create_global(wlr_output);
     }
 
-    fn handle_frame(listener: [*c]c.wl_listener, data: ?*c_void) callconv(.C) void {
+    fn handle_frame(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This function is called every time an output is ready to display a frame,
         // generally at the output's refresh rate (e.g. 60Hz).
-        var output = @fieldParentPtr(Output, "listen_frame", listener);
+        var output = @fieldParentPtr(Output, "listen_frame", listener.?);
         var renderer = output.server.wlr_renderer;
 
         var now: c.struct_timespec = undefined;
@@ -110,7 +110,9 @@ pub const Output = struct {
         _ = c.wlr_output_commit(output.*.wlr_output);
     }
 
-    fn render_surface(surface: [*c]c.wlr_surface, sx: c_int, sy: c_int, data: ?*c_void) callconv(.C) void {
+    fn render_surface(opt_surface: ?*c.wlr_surface, sx: c_int, sy: c_int, data: ?*c_void) callconv(.C) void {
+        // wlroots says this will never be null
+        var surface = opt_surface.?;
         // This function is called for every surface that needs to be rendered.
         var rdata = @ptrCast(*RenderData, @alignCast(@alignOf(RenderData), data));
         var view = rdata.*.view;
