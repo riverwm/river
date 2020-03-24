@@ -4,6 +4,8 @@ const c = @import("c.zig").c;
 const Seat = @import("seat.zig").Seat;
 
 pub const Keyboard = struct {
+    const Self = @This();
+
     seat: *Seat,
     device: *c.wlr_input_device,
     wlr_keyboard: *c.wlr_keyboard,
@@ -11,7 +13,7 @@ pub const Keyboard = struct {
     listen_modifiers: c.wl_listener,
     listen_key: c.wl_listener,
 
-    pub fn init(self: *@This(), seat: *Seat, device: *c.wlr_input_device) !void {
+    pub fn init(self: *Self, seat: *Seat, device: *c.wlr_input_device) !void {
         self.seat = seat;
         self.device = device;
         self.wlr_keyboard = device.unnamed_37.keyboard;

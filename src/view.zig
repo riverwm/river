@@ -4,6 +4,8 @@ const c = @import("c.zig").c;
 const Server = @import("server.zig").Server;
 
 pub const View = struct {
+    const Self = @This();
+
     server: *Server,
     wlr_xdg_surface: *c.wlr_xdg_surface,
 
@@ -17,7 +19,7 @@ pub const View = struct {
     // listen_request_move: c.wl_listener,
     // listen_request_resize: c.wl_listener,
 
-    pub fn init(self: *@This(), server: *Server, wlr_xdg_surface: *c.wlr_xdg_surface) void {
+    pub fn init(self: *Self, server: *Server, wlr_xdg_surface: *c.wlr_xdg_surface) void {
         self.server = server;
         self.wlr_xdg_surface = wlr_xdg_surface;
 
@@ -74,7 +76,7 @@ pub const View = struct {
     //     // ignore for now
     // }
 
-    fn focus(self: *@This(), surface: *c.wlr_surface) void {
+    fn focus(self: *Self, surface: *c.wlr_surface) void {
         const server = self.server;
         const wlr_seat = server.seat.wlr_seat;
         const prev_surface = wlr_seat.keyboard_state.focused_surface;
@@ -120,7 +122,7 @@ pub const View = struct {
         );
     }
 
-    fn is_at(self: *@This(), lx: f64, ly: f64, surface: *?*c.wlr_surface, sx: *f64, sy: *f64) bool {
+    fn is_at(self: *Self, lx: f64, ly: f64, surface: *?*c.wlr_surface, sx: *f64, sy: *f64) bool {
         // XDG toplevels may have nested surfaces, such as popup windows for context
         // menus or tooltips. This function tests if any of those are underneath the
         // coordinates lx and ly (in output Layout Coordinates). If so, it sets the

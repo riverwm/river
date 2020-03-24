@@ -12,6 +12,8 @@ const CursorMode = enum {
 };
 
 pub const Cursor = struct {
+    const Self = @This();
+
     seat: *Seat,
     wlr_cursor: *c.wlr_cursor,
     wlr_xcursor_manager: *c.wlr_xcursor_manager,
@@ -32,8 +34,8 @@ pub const Cursor = struct {
     grab_height: c_int,
     resize_edges: u32,
 
-    pub fn create(seat: *Seat) !@This() {
-        const cursor = @This(){
+    pub fn create(seat: *Seat) !Self {
+        const cursor = Self{
             .seat = seat,
 
             // Creates a wlroots utility for tracking the cursor image shown on screen.
@@ -53,28 +55,28 @@ pub const Cursor = struct {
 
             .listen_motion = c.wl_listener{
                 .link = undefined,
-                .notify = @This().handle_motion,
+                .notify = handle_motion,
             },
             .listen_motion_absolute = c.wl_listener{
                 .link = undefined,
-                .notify = @This().handle_motion_absolute,
+                .notify = handle_motion_absolute,
             },
             .listen_button = c.wl_listener{
                 .link = undefined,
-                .notify = @This().handle_button,
+                .notify = handle_button,
             },
             .listen_axis = c.wl_listener{
                 .link = undefined,
-                .notify = @This().handle_axis,
+                .notify = handle_axis,
             },
             .listen_frame = c.wl_listener{
                 .link = undefined,
-                .notify = @This().handle_frame,
+                .notify = handle_frame,
             },
 
             .listen_request_set_cursor = c.wl_listener{
                 .link = undefined,
-                .notify = @This().handle_request_set_cursor,
+                .notify = handle_request_set_cursor,
             },
 
             .mode = CursorMode.Passthrough,
@@ -93,7 +95,7 @@ pub const Cursor = struct {
         return cursor;
     }
 
-    pub fn init(self: *@This()) void {
+    pub fn init(self: *Self) void {
         // wlr_cursor *only* displays an image on screen. It does not move around
         // when the pointer moves. However, we can attach input devices to it, and
         // it will generate aggregate events for all of them. In these events, we
@@ -110,7 +112,7 @@ pub const Cursor = struct {
         c.wl_signal_add(&self.seat.wlr_seat.events.request_set_cursor, &self.listen_request_set_cursor);
     }
 
-    fn process_move(self: *@This(), time: u32) void {
+    fn process_move(self: *Self, time: u32) void {
         // Move the grabbed view to the new position.
         // TODO: log on null
         if (self.grabbed_view) |view| {
@@ -119,7 +121,7 @@ pub const Cursor = struct {
         }
     }
 
-    fn process_resize(self: *@This(), time: u32) void {
+    fn process_resize(self: *Self, time: u32) void {
         // Resizing the grabbed view can be a little bit complicated, because we
         // could be resizing from any corner or edge. This not only resizes the view
         // on one or two axes, but can also move the view if you resize from the top
@@ -168,7 +170,7 @@ pub const Cursor = struct {
         );
     }
 
-    fn process_motion(self: *@This(), time: u32) void {
+    fn process_motion(self: *Self, time: u32) void {
         // If the mode is non-passthrough, delegate to those functions.
         if (self.mode == CursorMode.Move) {
             self.process_move(time);

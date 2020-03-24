@@ -7,6 +7,8 @@ const Server = @import("server.zig").Server;
 
 // TODO: InputManager and multi-seat support
 pub const Seat = struct {
+    const Self = @This();
+
     server: *Server,
     wlr_seat: *c.wlr_seat,
     listen_new_input: c.wl_listener,
@@ -16,8 +18,8 @@ pub const Seat = struct {
     // Mulitple keyboards are handled separately
     keyboards: std.TailQueue(Keyboard),
 
-    pub fn create(server: *Server) !@This() {
-        var seat = @This(){
+    pub fn create(server: *Server) !Self {
+        var seat = Self{
             .server = server,
             .wlr_seat = undefined,
             .listen_new_input = c.wl_listener{
@@ -35,7 +37,7 @@ pub const Seat = struct {
         return seat;
     }
 
-    pub fn init(self: *@This()) !void {
+    pub fn init(self: *Self) !void {
         self.cursor = try Cursor.create(self);
         self.cursor.init();
 
@@ -44,7 +46,7 @@ pub const Seat = struct {
         c.wl_signal_add(&self.server.wlr_backend.events.new_input, &self.listen_new_input);
     }
 
-    fn add_keyboard(self: *@This(), device: *c.wlr_input_device) !void {
+    fn add_keyboard(self: *Self, device: *c.wlr_input_device) !void {
         c.wlr_seat_set_keyboard(self.wlr_seat, device);
 
         const node = try self.keyboards.allocateNode(self.server.allocator);
@@ -52,7 +54,7 @@ pub const Seat = struct {
         self.keyboards.append(node);
     }
 
-    fn add_pointer(self: *@This(), device: *c.struct_wlr_input_device) void {
+    fn add_pointer(self: *Self, device: *c.struct_wlr_input_device) void {
         // We don't do anything special with pointers. All of our pointer handling
         // is proxied through wlr_cursor. On another compositor, you might take this
         // opportunity to do libinput configuration on the device to set

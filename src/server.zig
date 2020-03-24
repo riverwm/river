@@ -6,6 +6,8 @@ const Seat = @import("seat.zig").Seat;
 const View = @import("view.zig").View;
 
 pub const Server = struct {
+    const Self = @This();
+
     allocator: *std.mem.Allocator,
 
     wl_display: *c.wl_display,
@@ -25,8 +27,8 @@ pub const Server = struct {
 
     seat: Seat,
 
-    pub fn create(allocator: *std.mem.Allocator) !@This() {
-        var server: @This() = undefined;
+    pub fn create(allocator: *std.mem.Allocator) !Self {
+        var server: Self = undefined;
         server.allocator = allocator;
 
         // The Wayland display is managed by libwayland. It handles accepting
@@ -76,7 +78,7 @@ pub const Server = struct {
         return server;
     }
 
-    pub fn init(self: *@This()) !void {
+    pub fn init(self: *Self) !void {
         self.seat = try Seat.create(self);
         try self.seat.init();
 
@@ -89,14 +91,14 @@ pub const Server = struct {
     }
 
     /// Free allocated memory and clean up
-    pub fn deinit(self: @This()) void {
+    pub fn deinit(self: Self) void {
         c.wl_display_destroy_clients(self.wl_display);
         c.wl_display_destroy(self.wl_display);
         c.wlr_output_layout_destroy(self.wlr_output_layout);
     }
 
     /// Create the socket, set WAYLAND_DISPLAY, and start the backend
-    pub fn start(self: @This()) !void {
+    pub fn start(self: Self) !void {
         // Add a Unix socket to the Wayland display.
         const socket = c.wl_display_add_socket_auto(self.wl_display) orelse
             return error.CantAddSocket;
@@ -115,11 +117,11 @@ pub const Server = struct {
     }
 
     /// Enter the wayland event loop and block until the compositor is exited
-    pub fn run(self: @This()) void {
+    pub fn run(self: Self) void {
         c.wl_display_run(self.wl_display);
     }
 
-    pub fn handle_keybinding(self: *@This(), sym: c.xkb_keysym_t) bool {
+    pub fn handle_keybinding(self: *Self, sym: c.xkb_keysym_t) bool {
         // Here we handle compositor keybindings. This is when the compositor is
         // processing keys, rather than passing them on to the client for its own
         // processing.
@@ -171,7 +173,7 @@ pub const Server = struct {
 
     /// Finds the top most view under the output layout coordinates lx, ly
     /// returns the view if found, and a pointer to the wlr_surface as well as the surface coordinates
-    pub fn desktop_view_at(self: *@This(), lx: f64, ly: f64, surface: *?*c.wlr_surface, sx: *f64, sy: *f64) ?*View {
+    pub fn desktop_view_at(self: *Self, lx: f64, ly: f64, surface: *?*c.wlr_surface, sx: *f64, sy: *f64) ?*View {
         var it = self.views.last;
         while (it) |node| : (it = node.prev) {
             if (node.data.is_at(lx, ly, surface, sx, sy)) {

@@ -12,11 +12,13 @@ const RenderData = struct {
 };
 
 pub const Output = struct {
+    const Self = @This();
+
     server: *Server,
     wlr_output: *c.wlr_output,
     listen_frame: c.wl_listener,
 
-    pub fn init(self: *@This(), server: *Server, wlr_output: *c.wlr_output) !void {
+    pub fn init(self: *Self, server: *Server, wlr_output: *c.wlr_output) !void {
         // Some backends don't have modes. DRM+KMS does, and we need to set a mode
         // before we can use the output. The mode is a tuple of (width, height,
         // refresh rate), and each monitor supports only a specific set of modes. We
