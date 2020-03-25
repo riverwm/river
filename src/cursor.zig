@@ -89,7 +89,7 @@ pub const Cursor = struct {
             .resize_edges = 0,
         };
 
-        c.wlr_cursor_attach_output_layout(cursor.wlr_cursor, seat.server.wlr_output_layout);
+        c.wlr_cursor_attach_output_layout(cursor.wlr_cursor, seat.server.root.wlr_output_layout);
         _ = c.wlr_xcursor_manager_load(cursor.wlr_xcursor_manager, 1);
 
         return cursor;
@@ -184,7 +184,7 @@ pub const Cursor = struct {
         var sx: f64 = undefined;
         var sy: f64 = undefined;
         var opt_surface: ?*c.wlr_surface = null;
-        const view = self.seat.server.desktop_view_at(
+        const view = self.seat.server.root.viewAt(
             self.wlr_cursor.x,
             self.wlr_cursor.y,
             &opt_surface,
@@ -278,7 +278,7 @@ pub const Cursor = struct {
         var sy: f64 = undefined;
 
         var surface: ?*c.wlr_surface = null;
-        const view = cursor.seat.server.desktop_view_at(
+        const view = cursor.seat.server.root.viewAt(
             cursor.wlr_cursor.x,
             cursor.wlr_cursor.y,
             &surface,

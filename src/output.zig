@@ -1,6 +1,7 @@
 const std = @import("std");
 const c = @import("c.zig").c;
 
+const Root = @import("root.zig").Root;
 const Server = @import("server.zig").Server;
 const View = @import("view.zig").View;
 
@@ -14,11 +15,11 @@ const RenderData = struct {
 pub const Output = struct {
     const Self = @This();
 
-    server: *Server,
+    root: *Root,
     wlr_output: *c.wlr_output,
     listen_frame: c.wl_listener,
 
-    pub fn init(self: *Self, server: *Server, wlr_output: *c.wlr_output) !void {
+    pub fn init(self: *Self, root: *Root, wlr_output: *c.wlr_output) !void {
         // Some backends don't have modes. DRM+KMS does, and we need to set a mode
         // before we can use the output. The mode is a tuple of (width, height,
         // refresh rate), and each monitor supports only a specific set of modes. We
@@ -27,6 +28,7 @@ pub const Output = struct {
 
         // if not empty
         if (c.wl_list_empty(&wlr_output.modes) == 0) {
+            // TODO: handle failure
             const mode = c.wlr_output_preferred_mode(wlr_output);
             c.wlr_output_set_mode(wlr_output, mode);
             c.wlr_output_enable(wlr_output, true);
@@ -35,7 +37,7 @@ pub const Output = struct {
             }
         }
 
-        self.server = server;
+        self.root = root;
         self.wlr_output = wlr_output;
 
         // Sets up a listener for the frame notify event.
@@ -46,7 +48,7 @@ pub const Output = struct {
         // from left-to-right in the order they appear. A more sophisticated
         // compositor would let the user configure the arrangement of outputs in the
         // layout.
-        c.wlr_output_layout_add_auto(server.wlr_output_layout, wlr_output);
+        c.wlr_output_layout_add_auto(root.wlr_output_layout, wlr_output);
 
         // Creating the global adds a wl_output global to the display, which Wayland
         // clients can see to find out information about the output (such as
@@ -58,7 +60,7 @@ pub const Output = struct {
         // This function is called every time an output is ready to display a frame,
         // generally at the output's refresh rate (e.g. 60Hz).
         const output = @fieldParentPtr(Output, "listen_frame", listener.?);
-        const renderer = output.server.wlr_renderer;
+        const renderer = output.root.server.wlr_renderer;
 
         var now: c.struct_timespec = undefined;
         _ = c.clock_gettime(c.CLOCK_MONOTONIC, &now);
@@ -79,7 +81,7 @@ pub const Output = struct {
 
         // Each subsequent view is rendered on top of the last.
         // The first view in the list is "on top" so iterate in reverse.
-        var it = output.server.views.last;
+        var it = output.root.views.last;
         while (it) |node| : (it = node.prev) {
             const view = &node.data;
             if (!view.mapped) {
@@ -136,7 +138,7 @@ pub const Output = struct {
         // output-local coordinates, or (2000 - 1920).
         var ox: f64 = 0.0;
         var oy: f64 = 0.0;
-        c.wlr_output_layout_output_coords(view.server.wlr_output_layout, output, &ox, &oy);
+        c.wlr_output_layout_output_coords(view.root.wlr_output_layout, output, &ox, &oy);
         ox += @intToFloat(f64, view.x + sx);
         oy += @intToFloat(f64, view.y + sy);
 

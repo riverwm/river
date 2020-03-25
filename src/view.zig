@@ -1,12 +1,12 @@
 const std = @import("std");
 const c = @import("c.zig").c;
 
-const Server = @import("server.zig").Server;
+const Root = @import("root.zig").Root;
 
 pub const View = struct {
     const Self = @This();
 
-    server: *Server,
+    root: *Root,
     wlr_xdg_surface: *c.wlr_xdg_surface,
 
     mapped: bool,
@@ -19,8 +19,8 @@ pub const View = struct {
     // listen_request_move: c.wl_listener,
     // listen_request_resize: c.wl_listener,
 
-    pub fn init(self: *Self, server: *Server, wlr_xdg_surface: *c.wlr_xdg_surface) void {
-        self.server = server;
+    pub fn init(self: *Self, root: *Root, wlr_xdg_surface: *c.wlr_xdg_surface) void {
+        self.root = root;
         self.wlr_xdg_surface = wlr_xdg_surface;
 
         self.mapped = false;
@@ -55,17 +55,17 @@ pub const View = struct {
 
     fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         const view = @fieldParentPtr(View, "listen_destroy", listener.?);
-        const server = view.server;
+        const root = view.root;
 
-        var it = server.views.first;
+        var it = root.views.first;
         const target = while (it) |node| : (it = node.next) {
             if (&node.data == view) {
                 break node;
             }
         } else unreachable;
 
-        server.views.remove(target);
-        server.views.destroyNode(target, server.allocator);
+        root.views.remove(target);
+        root.views.destroyNode(target, root.server.allocator);
     }
 
     // fn xdgToplevelRequestMove(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -77,8 +77,8 @@ pub const View = struct {
     // }
 
     fn focus(self: *Self, surface: *c.wlr_surface) void {
-        const server = self.server;
-        const wlr_seat = server.seat.wlr_seat;
+        const root = self.root;
+        const wlr_seat = root.server.seat.wlr_seat;
         const prev_surface = wlr_seat.keyboard_state.focused_surface;
 
         if (prev_surface == surface) {
@@ -95,7 +95,7 @@ pub const View = struct {
         }
 
         // Find the node
-        var it = server.views.first;
+        var it = root.views.first;
         const target = while (it) |node| : (it = node.next) {
             if (&node.data == self) {
                 break node;
@@ -103,8 +103,8 @@ pub const View = struct {
         } else unreachable;
 
         // Move the view to the front
-        server.views.remove(target);
-        server.views.prepend(target);
+        root.views.remove(target);
+        root.views.prepend(target);
 
         // Activate the new surface
         _ = c.wlr_xdg_toplevel_set_activated(self.wlr_xdg_surface, true);
