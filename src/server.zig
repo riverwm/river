@@ -63,10 +63,10 @@ pub const Server = struct {
         try self.seat.init(self);
 
         // Register our listeners for new outputs and xdg_surfaces.
-        self.listen_new_output.notify = handle_new_output;
+        self.listen_new_output.notify = handleNewOutput;
         c.wl_signal_add(&self.wlr_backend.events.new_output, &self.listen_new_output);
 
-        self.listen_new_xdg_surface.notify = handle_new_xdg_surface;
+        self.listen_new_xdg_surface.notify = handleNewXdgSurface;
         c.wl_signal_add(&self.wlr_xdg_shell.events.new_surface, &self.listen_new_xdg_surface);
     }
 
@@ -101,7 +101,7 @@ pub const Server = struct {
         c.wl_display_run(self.wl_display);
     }
 
-    pub fn handle_keybinding(self: *Self, sym: c.xkb_keysym_t) bool {
+    pub fn handleKeybinding(self: *Self, sym: c.xkb_keysym_t) bool {
         // Here we handle compositor keybindings. This is when the compositor is
         // processing keys, rather than passing them on to the client for its own
         // processing.
@@ -125,13 +125,13 @@ pub const Server = struct {
         return true;
     }
 
-    fn handle_new_output(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    fn handleNewOutput(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         const server = @fieldParentPtr(Server, "listen_new_output", listener.?);
         const wlr_output = @ptrCast(*c.wlr_output, @alignCast(@alignOf(*c.wlr_output), data));
         server.root.addOutput(wlr_output);
     }
 
-    fn handle_new_xdg_surface(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    fn handleNewXdgSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is raised when wlr_xdg_shell receives a new xdg surface from a
         // client, either a toplevel (application window) or popup.
         const server = @fieldParentPtr(Server, "listen_new_xdg_surface", listener.?);

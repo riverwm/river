@@ -94,7 +94,7 @@ pub const Keyboard = struct {
             // process it as a compositor keybinding.
             var i: usize = 0;
             while (i < nsyms) {
-                handled = keyboard.seat.server.handle_keybinding(syms.?[i]);
+                handled = keyboard.seat.server.handleKeybinding(syms.?[i]);
                 if (handled) {
                     break;
                 }
