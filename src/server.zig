@@ -60,8 +60,7 @@ pub const Server = struct {
 
         try self.root.init(self);
 
-        self.seat = try Seat.create(self);
-        try self.seat.init();
+        try self.seat.init(self);
 
         // Register our listeners for new outputs and xdg_surfaces.
         self.listen_new_output.notify = handle_new_output;

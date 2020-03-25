@@ -34,82 +34,64 @@ pub const Cursor = struct {
     grab_height: c_int,
     resize_edges: u32,
 
-    pub fn create(seat: *Seat) !Self {
-        const cursor = Self{
-            .seat = seat,
+    pub fn init(self: *Self, seat: *Seat) !void {
+        self.seat = seat;
 
-            // Creates a wlroots utility for tracking the cursor image shown on screen.
-            //
-            // TODO: free this, it allocates!
-            .wlr_cursor = c.wlr_cursor_create() orelse
-                return error.CantCreateWlrCursor,
+        // Creates a wlroots utility for tracking the cursor image shown on screen.
+        //
+        // TODO: free this, it allocates!
+        self.wlr_cursor = c.wlr_cursor_create() orelse
+            return error.CantCreateWlrCursor;
 
-            // Creates an xcursor manager, another wlroots utility which loads up
-            // Xcursor themes to source cursor images from and makes sure that cursor
-            // images are available at all scale factors on the screen (necessary for
-            // HiDPI support). We add a cursor theme at scale factor 1 to begin with.
-            //
-            // TODO: free this, it allocates!
-            .wlr_xcursor_manager = c.wlr_xcursor_manager_create(null, 24) orelse
-                return error.CantCreateWlrXCursorManager,
+        // Creates an xcursor manager, another wlroots utility which loads up
+        // Xcursor themes to source cursor images from and makes sure that cursor
+        // images are available at all scale factors on the screen (necessary for
+        // HiDPI support). We add a cursor theme at scale factor 1 to begin with.
+        //
+        // TODO: free this, it allocates!
+        self.wlr_xcursor_manager = c.wlr_xcursor_manager_create(null, 24) orelse
+            return error.CantCreateWlrXCursorManager;
 
-            .listen_motion = c.wl_listener{
-                .link = undefined,
-                .notify = handleMotion,
-            },
-            .listen_motion_absolute = c.wl_listener{
-                .link = undefined,
-                .notify = handleMotionAbsolute,
-            },
-            .listen_button = c.wl_listener{
-                .link = undefined,
-                .notify = handleButton,
-            },
-            .listen_axis = c.wl_listener{
-                .link = undefined,
-                .notify = handleAxis,
-            },
-            .listen_frame = c.wl_listener{
-                .link = undefined,
-                .notify = handleFrame,
-            },
+        c.wlr_cursor_attach_output_layout(self.wlr_cursor, seat.server.root.wlr_output_layout);
+        _ = c.wlr_xcursor_manager_load(self.wlr_xcursor_manager, 1);
 
-            .listen_request_set_cursor = c.wl_listener{
-                .link = undefined,
-                .notify = handleRequestSetCursor,
-            },
+        self.mode = CursorMode.Passthrough;
+        self.grabbed_view = null;
+        self.grab_x = 0.0;
+        self.grab_y = 0.0;
+        self.grab_width = 0;
+        self.grab_height = 0;
+        self.resize_edges = 0;
 
-            .mode = CursorMode.Passthrough,
-
-            .grabbed_view = null,
-            .grab_x = 0.0,
-            .grab_y = 0.0,
-            .grab_width = 0,
-            .grab_height = 0,
-            .resize_edges = 0,
-        };
-
-        c.wlr_cursor_attach_output_layout(cursor.wlr_cursor, seat.server.root.wlr_output_layout);
-        _ = c.wlr_xcursor_manager_load(cursor.wlr_xcursor_manager, 1);
-
-        return cursor;
-    }
-
-    pub fn init(self: *Self) void {
         // wlr_cursor *only* displays an image on screen. It does not move around
         // when the pointer moves. However, we can attach input devices to it, and
         // it will generate aggregate events for all of them. In these events, we
         // can choose how we want to process them, forwarding them to clients and
         // moving the cursor around. See following post for more detail:
         // https://drewdevault.com/2018/07/17/Input-handling-in-wlroots.html
+        self.listen_motion.notify = handleMotion;
         c.wl_signal_add(&self.wlr_cursor.events.motion, &self.listen_motion);
+
+        self.listen_motion_absolute.notify = handleMotionAbsolute;
         c.wl_signal_add(&self.wlr_cursor.events.motion_absolute, &self.listen_motion_absolute);
+
+        self.listen_button.notify = handleButton;
         c.wl_signal_add(&self.wlr_cursor.events.button, &self.listen_button);
+
+        self.listen_axis.notify = handleAxis;
         c.wl_signal_add(&self.wlr_cursor.events.axis, &self.listen_axis);
+
+        self.listen_frame.notify = handleFrame;
         c.wl_signal_add(&self.wlr_cursor.events.frame, &self.listen_frame);
 
         // This listens for clients requesting a specific cursor image
+        self.listen_request_set_cursor.notify = handleRequestSetCursor;
         c.wl_signal_add(&self.seat.wlr_seat.events.request_set_cursor, &self.listen_request_set_cursor);
+    }
+
+    pub fn destroy(self: *Self) void {
+        c.wlr_xcursor_manager_destroy(self.wlr_xcursor_manager);
+        c.wlr_cursor_destroy(self.wlr_cursor);
     }
 
     fn processMove(self: *Self, time: u32) void {
@@ -215,7 +197,7 @@ pub const Cursor = struct {
             c.wlr_seat_pointer_notify_enter(wlr_seat, surface, sx, sy);
             if (!focus_changed) {
                 // The enter event contains coordinates, so we only need to notify
-                // on motion if the focus did not change.
+                //on motion if the focus did not change.
                 c.wlr_seat_pointer_notify_motion(wlr_seat, time, sx, sy);
             }
         } else {

@@ -18,32 +18,27 @@ pub const Seat = struct {
     // Mulitple keyboards are handled separately
     keyboards: std.TailQueue(Keyboard),
 
-    pub fn create(server: *Server) !Self {
-        var seat = Self{
-            .server = server,
-            .wlr_seat = undefined,
-            .listen_new_input = c.wl_listener{
-                .link = undefined,
-                .notify = handleNewInput,
-            },
-            .cursor = undefined,
-            .keyboards = std.TailQueue(Keyboard).init(),
-        };
+    pub fn init(self: *Self, server: *Server) !void {
+        self.server = server;
 
         // This seems to be the default seat name used by compositors
-        seat.wlr_seat = c.wlr_seat_create(server.wl_display, "seat0") orelse
+        // This will be automatically destroyed when the display is destroyed
+        self.wlr_seat = c.wlr_seat_create(server.wl_display, "seat0") orelse
             return error.CantCreateWlrSeat;
 
-        return seat;
-    }
+        try self.cursor.init(self);
+        errdefer self.cursor.destroy();
 
-    pub fn init(self: *Self) !void {
-        self.cursor = try Cursor.create(self);
-        self.cursor.init();
+        self.keyboards = std.TailQueue(Keyboard).init();
 
         // Set up handler for all new input devices made available. This
         // includes keyboards, pointers, touch, etc.
+        self.listen_new_input.notify = handleNewInput;
         c.wl_signal_add(&self.server.wlr_backend.events.new_input, &self.listen_new_input);
+    }
+
+    pub fn destroy(self: *Self) void {
+        self.cursor.destroy();
     }
 
     fn addKeyboard(self: *Self, device: *c.wlr_input_device) !void {
