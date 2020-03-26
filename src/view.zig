@@ -107,31 +107,32 @@ pub const View = struct {
         const view = @fieldParentPtr(View, "listen_map", listener.?);
         view.mapped = true;
         view.focus(view.wlr_xdg_surface.surface);
-        view.root.arrange();
 
         const node = @fieldParentPtr(std.TailQueue(View).Node, "data", view);
         view.root.unmapped_views.remove(node);
         view.root.views.prepend(node);
+
+        view.root.arrange();
     }
 
     fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         const view = @fieldParentPtr(View, "listen_unmap", listener.?);
         view.mapped = false;
+
+        const node = @fieldParentPtr(std.TailQueue(View).Node, "data", view);
+        view.root.views.remove(node);
+        view.root.unmapped_views.prepend(node);
+
+        view.root.arrange();
     }
 
     fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         const view = @fieldParentPtr(View, "listen_destroy", listener.?);
         const root = view.root;
 
-        var it = root.views.first;
-        const target = while (it) |node| : (it = node.next) {
-            if (&node.data == view) {
-                break node;
-            }
-        } else unreachable;
-
-        root.views.remove(target);
-        root.views.destroyNode(target, root.server.allocator);
+        const node = @fieldParentPtr(std.TailQueue(View).Node, "data", view);
+        root.unmapped_views.remove(node);
+        root.unmapped_views.destroyNode(node, root.server.allocator);
     }
 
     fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
