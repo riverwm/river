@@ -5,8 +5,9 @@ pub const c = @cImport({
     @cInclude("wayland-server-core.h");
     //@cInclude("wlr/backend.h");
     //@cInclude("wlr/render/wlr_renderer.h");
-    @cInclude("wlr/types/wlr_cursor.h");
+    @cInclude("wlr/types/wlr_buffer.h");
     @cInclude("wlr/types/wlr_compositor.h");
+    @cInclude("wlr/types/wlr_cursor.h");
     @cInclude("wlr/types/wlr_data_device.h");
     @cInclude("wlr/types/wlr_input_device.h");
     @cInclude("wlr/types/wlr_keyboard.h");

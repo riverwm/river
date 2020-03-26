@@ -98,8 +98,8 @@ pub const Cursor = struct {
         // Move the grabbed view to the new position.
         // TODO: log on null
         if (self.grabbed_view) |view| {
-            view.x = @floatToInt(c_int, self.wlr_cursor.x - self.grab_x);
-            view.y = @floatToInt(c_int, self.wlr_cursor.y - self.grab_y);
+            view.current_state.x = @floatToInt(c_int, self.wlr_cursor.x - self.grab_x);
+            view.current_state.y = @floatToInt(c_int, self.wlr_cursor.y - self.grab_y);
         }
     }
 
@@ -119,8 +119,8 @@ pub const Cursor = struct {
         const dx: f64 = self.wlr_cursor.x - self.grab_x;
         const dy: f64 = self.wlr_cursor.y - self.grab_y;
 
-        var x: f64 = @intToFloat(f64, view.x);
-        var y: f64 = @intToFloat(f64, view.y);
+        var x: f64 = @intToFloat(f64, view.current_state.x);
+        var y: f64 = @intToFloat(f64, view.current_state.y);
 
         var width = @intToFloat(f64, self.grab_width);
         var height = @intToFloat(f64, self.grab_height);
@@ -143,8 +143,8 @@ pub const Cursor = struct {
         } else if (self.resize_edges & @intCast(u32, c.WLR_EDGE_RIGHT) != 0) {
             width += dx;
         }
-        view.x = @floatToInt(c_int, x);
-        view.y = @floatToInt(c_int, y);
+        view.current_state.x = @floatToInt(c_int, x);
+        view.current_state.y = @floatToInt(c_int, y);
         _ = c.wlr_xdg_toplevel_set_size(
             view.wlr_xdg_surface,
             @floatToInt(u32, width),

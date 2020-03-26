@@ -84,19 +84,12 @@ pub const Output = struct {
         var it = output.root.views.last;
         while (it) |node| : (it = node.prev) {
             const view = &node.data;
+            // TODO: remove this check and move unmaped views back to unmaped TailQueue
             if (!view.mapped) {
                 // An unmapped view should not be rendered.
                 continue;
             }
-            var rdata = RenderData{
-                .output = output.wlr_output,
-                .view = view,
-                .renderer = renderer,
-                .when = &now,
-            };
-            // This calls our render_surface function for each surface among the
-            // xdg_surface's toplevel and popups.
-            c.wlr_xdg_surface_for_each_surface(view.wlr_xdg_surface, renderSurface, &rdata);
+            output.renderView(view, &now);
         }
 
         // Hardware cursors are rendered by the GPU on a separate plane, and can be
@@ -114,9 +107,56 @@ pub const Output = struct {
         _ = c.wlr_output_commit(output.wlr_output);
     }
 
-    fn renderSurface(opt_surface: ?*c.wlr_surface, sx: c_int, sy: c_int, data: ?*c_void) callconv(.C) void {
+    fn renderView(self: *Self, view: *View, now: *c.struct_timespec) void {
+        // If we have a stashed buffer, we are in the middle of a transaction
+        // and need to render that buffer until the transaction is complete.
+        if (view.stashed_buffer) |buffer| {
+            var box = c.wlr_box{
+                .x = view.current_state.x,
+                .y = view.current_state.y,
+                .width = @intCast(c_int, view.current_state.width),
+                .height = @intCast(c_int, view.current_state.height),
+            };
+
+            // Scale the box to the output's current scaling factor
+            scaleBox(&box, self.wlr_output.scale);
+
+            var matrix: [9]f32 = undefined;
+            c.wlr_matrix_project_box(
+                &matrix,
+                &box,
+                c.enum_wl_output_transform.WL_OUTPUT_TRANSFORM_NORMAL,
+                0.0,
+                &self.wlr_output.transform_matrix,
+            );
+
+            // This takes our matrix, the texture, and an alpha, and performs the actual
+            // rendering on the GPU.
+            _ = c.wlr_render_texture_with_matrix(
+                self.root.server.wlr_renderer,
+                buffer.texture,
+                &matrix,
+                1.0,
+            );
+        } else {
+            // Since there is no stashed buffer, we are not in the middle of
+            // a transaction and may simply render each toplevel surface.
+            var rdata = RenderData{
+                .output = self.wlr_output,
+                .view = view,
+                .renderer = self.root.server.wlr_renderer,
+                .when = now,
+            };
+
+            // This calls our render_surface function for each surface among the
+            // xdg_surface's toplevel and popups.
+            c.wlr_xdg_surface_for_each_surface(view.wlr_xdg_surface, renderSurface, &rdata);
+        }
+    }
+
+    fn renderSurface(_surface: ?*c.wlr_surface, sx: c_int, sy: c_int, data: ?*c_void) callconv(.C) void {
         // wlroots says this will never be null
-        const surface = opt_surface.?;
+        const surface = _surface.?;
         // This function is called for every surface that needs to be rendered.
         const rdata = @ptrCast(*RenderData, @alignCast(@alignOf(RenderData), data));
         const view = rdata.view;
@@ -139,27 +179,23 @@ pub const Output = struct {
         var ox: f64 = 0.0;
         var oy: f64 = 0.0;
         c.wlr_output_layout_output_coords(view.root.wlr_output_layout, output, &ox, &oy);
-        ox += @intToFloat(f64, view.x + sx);
-        oy += @intToFloat(f64, view.y + sy);
+        ox += @intToFloat(f64, view.current_state.x + sx);
+        oy += @intToFloat(f64, view.current_state.y + sy);
 
-        // We also have to apply the scale factor for HiDPI outputs. This is only
-        // part of the puzzle, TinyWL does not fully support HiDPI.
-        const box = c.wlr_box{
-            .x = @floatToInt(c_int, ox * output.scale),
-            .y = @floatToInt(c_int, oy * output.scale),
-            .width = @floatToInt(c_int, @intToFloat(f32, surface.current.width) * output.scale),
-            .height = @floatToInt(c_int, @intToFloat(f32, surface.current.height) * output.scale),
+        var box = c.wlr_box{
+            .x = @floatToInt(c_int, ox),
+            .y = @floatToInt(c_int, oy),
+            .width = @intCast(c_int, surface.current.width),
+            .height = @intCast(c_int, surface.current.height),
         };
 
-        // Those familiar with OpenGL are also familiar with the role of matricies
-        // in graphics programming. We need to prepare a matrix to render the view
-        // with. wlr_matrix_project_box is a helper which takes a box with a desired
+        // Scale the box to the output's current scaling factor
+        scaleBox(&box, output.scale);
+
+        // wlr_matrix_project_box is a helper which takes a box with a desired
         // x, y coordinates, width and height, and an output geometry, then
         // prepares an orthographic projection and multiplies the necessary
         // transforms to produce a model-view-projection matrix.
-        //
-        // Naturally you can do this any way you like, for example to make a 3D
-        // compositor.
         var matrix: [9]f32 = undefined;
         const transform = c.wlr_output_transform_invert(surface.current.transform);
         c.wlr_matrix_project_box(&matrix, &box, transform, 0.0, &output.transform_matrix);
@@ -173,3 +209,19 @@ pub const Output = struct {
         c.wlr_surface_send_frame_done(surface, rdata.when);
     }
 };
+
+/// Scale a wlr_box, taking the possibility of fractional scaling into account.
+fn scaleBox(box: *c.wlr_box, scale: f64) void {
+    box.x = @floatToInt(c_int, @round(@intToFloat(f64, box.x) * scale));
+    box.y = @floatToInt(c_int, @round(@intToFloat(f64, box.y) * scale));
+    box.width = scaleLength(box.width, box.x, scale);
+    box.height = scaleLength(box.height, box.x, scale);
+}
+
+/// Scales a width/height.
+///
+/// This might seem overly complex, but it needs to work for fractional scaling.
+fn scaleLength(length: c_int, offset: c_int, scale: f64) c_int {
+    return @floatToInt(c_int, @round(@intToFloat(f64, offset + length) * scale) -
+        @round(@intToFloat(f64, offset) * scale));
+}

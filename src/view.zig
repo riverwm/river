@@ -3,6 +3,13 @@ const c = @import("c.zig").c;
 
 const Root = @import("root.zig").Root;
 
+pub const ViewState = struct {
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+};
+
 pub const View = struct {
     const Self = @This();
 
@@ -10,12 +17,20 @@ pub const View = struct {
     wlr_xdg_surface: *c.wlr_xdg_surface,
 
     mapped: bool,
-    x: c_int,
-    y: c_int,
+
+    current_state: ViewState,
+    // TODO: make this a ?ViewState
+    pending_state: ViewState,
+
+    pending_serial: ?u32,
+
+    // This is what we render while a transaction is in progress
+    stashed_buffer: ?*c.wlr_buffer,
 
     listen_map: c.wl_listener,
     listen_unmap: c.wl_listener,
     listen_destroy: c.wl_listener,
+    listen_commit: c.wl_listener,
     // listen_request_move: c.wl_listener,
     // listen_request_resize: c.wl_listener,
 
@@ -24,8 +39,13 @@ pub const View = struct {
         self.wlr_xdg_surface = wlr_xdg_surface;
 
         self.mapped = false;
-        self.x = 0;
-        self.y = 0;
+        self.current_state = ViewState{
+            .x = 0,
+            .y = 0,
+            .height = 0,
+            .width = 0,
+        };
+        self.stashed_buffer = null;
 
         self.listen_map.notify = handleMap;
         c.wl_signal_add(&self.wlr_xdg_surface.events.map, &self.listen_map);
@@ -36,9 +56,50 @@ pub const View = struct {
         self.listen_destroy.notify = handleDestroy;
         c.wl_signal_add(&self.wlr_xdg_surface.events.destroy, &self.listen_destroy);
 
+        self.listen_commit.notify = handleCommit;
+        c.wl_signal_add(&self.wlr_xdg_surface.surface.*.events.commit, &self.listen_commit);
+
         // const toplevel = xdg_surface.unnamed_160.toplevel;
         // c.wl_signal_add(&toplevel.events.request_move, &view.request_move);
         // c.wl_signal_add(&toplevel.events.request_resize, &view.request_resize);
+    }
+
+    pub fn needsConfigure(self: *const Self) bool {
+        return self.pending_state.width != self.current_state.width or
+            self.pending_state.height != self.current_state.height;
+    }
+
+    pub fn configurePending(self: *Self) void {
+        self.pending_serial = c.wlr_xdg_toplevel_set_size(
+            self.wlr_xdg_surface,
+            self.pending_state.width,
+            self.pending_state.height,
+        );
+    }
+
+    pub fn sendFrameDone(self: *Self) void {
+        var now: c.struct_timespec = undefined;
+        _ = c.clock_gettime(c.CLOCK_MONOTONIC, &now);
+        c.wlr_surface_send_frame_done(self.wlr_xdg_surface.surface, &now);
+    }
+
+    pub fn dropStashedBuffer(self: *Self) void {
+        std.debug.warn("drop stashed\n", .{});
+        // TODO: log debug error
+        if (self.stashed_buffer) |buffer| {
+            c.wlr_buffer_unref(buffer);
+            std.debug.warn("drop stashed\n", .{});
+            self.stashed_buffer = null;
+        }
+    }
+
+    pub fn stashBuffer(self: *Self) void {
+        // TODO: log debug error if there is already a saved buffer
+        const wlr_surface = self.wlr_xdg_surface.surface;
+        if (c.wlr_surface_has_buffer(wlr_surface)) {
+            _ = c.wlr_buffer_ref(wlr_surface.*.buffer);
+            self.stashed_buffer = wlr_surface.*.buffer;
+        }
     }
 
     fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -46,6 +107,11 @@ pub const View = struct {
         const view = @fieldParentPtr(View, "listen_map", listener.?);
         view.mapped = true;
         view.focus(view.wlr_xdg_surface.surface);
+        view.root.arrange();
+
+        const node = @fieldParentPtr(std.TailQueue(View).Node, "data", view);
+        view.root.unmapped_views.remove(node);
+        view.root.views.prepend(node);
     }
 
     fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -66,6 +132,17 @@ pub const View = struct {
 
         root.views.remove(target);
         root.views.destroyNode(target, root.server.allocator);
+    }
+
+    fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+        const view = @fieldParentPtr(View, "listen_commit", listener.?);
+        if (view.pending_serial) |s| {
+            if (s == view.wlr_xdg_surface.configure_serial) {
+                view.root.notifyConfigured();
+                view.pending_serial = null;
+            }
+        }
+        // TODO: check for unexpected change in size and react as needed
     }
 
     // fn xdgToplevelRequestMove(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -94,17 +171,17 @@ pub const View = struct {
             _ = c.wlr_xdg_toplevel_set_activated(prev_xdg_surface, false);
         }
 
-        // Find the node
-        var it = root.views.first;
-        const target = while (it) |node| : (it = node.next) {
-            if (&node.data == self) {
-                break node;
-            }
-        } else unreachable;
+        //// Find the node
+        //var it = root.views.first;
+        //const target = while (it) |node| : (it = node.next) {
+        //    if (&node.data == self) {
+        //        break node;
+        //    }
+        //} else unreachable;
 
-        // Move the view to the front
-        root.views.remove(target);
-        root.views.prepend(target);
+        //// Move the view to the front
+        //root.views.remove(target);
+        //root.views.prepend(target);
 
         // Activate the new surface
         _ = c.wlr_xdg_toplevel_set_activated(self.wlr_xdg_surface, true);
@@ -128,8 +205,8 @@ pub const View = struct {
         // coordinates lx and ly (in output Layout Coordinates). If so, it sets the
         // surface pointer to that wlr_surface and the sx and sy coordinates to the
         // coordinates relative to that surface's top-left corner.
-        const view_sx = lx - @intToFloat(f64, self.x);
-        const view_sy = ly - @intToFloat(f64, self.y);
+        const view_sx = lx - @intToFloat(f64, self.current_state.x);
+        const view_sy = ly - @intToFloat(f64, self.current_state.y);
 
         // This variable seems to have been unsued in TinyWL
         // struct wlr_surface_state *state = &view->xdg_surface->surface->current;
