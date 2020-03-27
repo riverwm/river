@@ -109,17 +109,8 @@ pub const Server = struct {
         // This function assumes the proper modifier is held down.
         switch (sym) {
             c.XKB_KEY_Escape => c.wl_display_terminate(self.wl_display),
-            c.XKB_KEY_F1 => {
-                // Cycle to the next view
-                //if (c.wl_list_length(&server.views) > 1) {
-                //    const current_view = @fieldParentPtr(View, "link", server.views.next);
-                //    const next_view = @fieldParentPtr(View, "link", current_view.link.next);
-                //    focus_view(next_view, next_view.xdg_surface.surface);
-                //    // Move the previous view to the end of the list
-                //    c.wl_list_remove(&current_view.link);
-                //    c.wl_list_insert(server.views.prev, &current_view.link);
-                //}
-            },
+            c.XKB_KEY_j => self.root.focusNextView(),
+            c.XKB_KEY_k => self.root.focusPrevView(),
             else => return false,
         }
         return true;

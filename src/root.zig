@@ -19,13 +19,14 @@ pub const Root = struct {
     views: std.TailQueue(View),
     unmapped_views: std.TailQueue(View),
 
+    focused_view: ?*View,
+
     // Number of pending configures sent in the current transaction.
     // A value of 0 means there is no current transaction.
     pending_count: u32,
 
     pub fn init(self: *Self, server: *Server) !void {
         self.server = server;
-        self.pending_count = 0;
 
         // Create an output layout, which a wlroots utility for working with an
         // arrangement of screens in a physical layout.
@@ -34,8 +35,13 @@ pub const Root = struct {
         errdefer c.wlr_output_layout_destroy(self.wlr_output_layout);
 
         self.outputs = std.TailQueue(Output).init();
+
         self.views = std.TailQueue(View).init();
         self.unmapped_views = std.TailQueue(View).init();
+
+        self.focused_view = null;
+
+        self.pending_count = 0;
     }
 
     pub fn destroy(self: *Self) void {
@@ -55,7 +61,7 @@ pub const Root = struct {
         self.unmapped_views.append(node);
     }
 
-    /// Finds the top most view under the output layout coordinates lx, ly
+    /// Finds the topmost view under the output layout coordinates lx, ly
     /// returns the view if found, and a pointer to the wlr_surface as well as the surface coordinates
     pub fn viewAt(self: *Self, lx: f64, ly: f64, surface: *?*c.wlr_surface, sx: *f64, sy: *f64) ?*View {
         var it = self.views.last;
@@ -65,6 +71,46 @@ pub const Root = struct {
             }
         }
         return null;
+    }
+
+    /// Focus the next view in the stack, wrapping if needed. Does nothing
+    /// if there is only one view in the stack.
+    pub fn focusNextView(self: *Self) void {
+        if (self.focused_view) |current_focus| {
+            // If there is a currently focused view, focus the next view in the stack.
+            const node = @fieldParentPtr(std.TailQueue(View).Node, "data", current_focus);
+            if (node.next) |next_node| {
+                const view = &next_node.data;
+                view.focus(view.wlr_xdg_surface.surface);
+                return;
+            }
+        }
+        // There is either no currently focused view or the last view in the
+        // stack is focused and we need to wrap.
+        if (self.views.first) |first_node| {
+            const view = &first_node.data;
+            view.focus(view.wlr_xdg_surface.surface);
+        }
+    }
+
+    /// Focus the previous view in the stack, wrapping if needed. Does nothing
+    /// if there is only one view in the stack.
+    pub fn focusPrevView(self: *Self) void {
+        if (self.focused_view) |current_focus| {
+            // If there is a currently focused view, focus the previous view in the stack.
+            const node = @fieldParentPtr(std.TailQueue(View).Node, "data", current_focus);
+            if (node.prev) |prev_node| {
+                const view = &prev_node.data;
+                view.focus(view.wlr_xdg_surface.surface);
+                return;
+            }
+        }
+        // There is either no currently focused view or the first view in the
+        // stack is focused and we need to wrap.
+        if (self.views.last) |last_node| {
+            const view = &last_node.data;
+            view.focus(view.wlr_xdg_surface.surface);
+        }
     }
 
     pub fn arrange(self: *Self) void {

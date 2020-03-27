@@ -106,24 +106,41 @@ pub const View = struct {
         // Called when the surface is mapped, or ready to display on-screen.
         const view = @fieldParentPtr(View, "listen_map", listener.?);
         view.mapped = true;
+
         view.focus(view.wlr_xdg_surface.surface);
 
         const node = @fieldParentPtr(std.TailQueue(View).Node, "data", view);
         view.root.unmapped_views.remove(node);
-        view.root.views.prepend(node);
+        view.root.views.append(node);
 
         view.root.arrange();
     }
 
     fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         const view = @fieldParentPtr(View, "listen_unmap", listener.?);
+        const root = view.root;
         view.mapped = false;
 
-        const node = @fieldParentPtr(std.TailQueue(View).Node, "data", view);
-        view.root.views.remove(node);
-        view.root.unmapped_views.prepend(node);
+        if (root.focused_view) |current_focus| {
+            // If the view being unmapped is focused
+            if (current_focus == view) {
+                // If there are more views
+                if (root.views.len > 1) {
+                    // Focus the next view.
+                    root.focusNextView();
+                } else {
+                    // Otherwise clear the focus
+                    root.focused_view = null;
+                    _ = c.wlr_xdg_toplevel_set_activated(view.wlr_xdg_surface, false);
+                }
+            }
+        }
 
-        view.root.arrange();
+        const node = @fieldParentPtr(std.TailQueue(View).Node, "data", view);
+        root.views.remove(node);
+        root.unmapped_views.append(node);
+
+        root.arrange();
     }
 
     fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -161,8 +178,11 @@ pub const View = struct {
 
         if (prev_surface == surface) {
             // Don't re-focus an already focused surface.
+            // TODO: debug message?
             return;
         }
+
+        root.focused_view = self;
 
         if (prev_surface != null) {
             // Deactivate the previously focused surface. This lets the client know
@@ -171,18 +191,6 @@ pub const View = struct {
             const prev_xdg_surface = c.wlr_xdg_surface_from_wlr_surface(prev_surface);
             _ = c.wlr_xdg_toplevel_set_activated(prev_xdg_surface, false);
         }
-
-        //// Find the node
-        //var it = root.views.first;
-        //const target = while (it) |node| : (it = node.next) {
-        //    if (&node.data == self) {
-        //        break node;
-        //    }
-        //} else unreachable;
-
-        //// Move the view to the front
-        //root.views.remove(target);
-        //root.views.prepend(target);
 
         // Activate the new surface
         _ = c.wlr_xdg_toplevel_set_activated(self.wlr_xdg_surface, true);
