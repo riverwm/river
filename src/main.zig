@@ -14,11 +14,5 @@ pub fn main() !void {
 
     try server.start();
 
-    // Spawn an instance of alacritty
-    // const argv = [_][]const u8{ "/bin/sh", "-c", "WAYLAND_DEBUG=1 alacritty" };
-    const argv = [_][]const u8{ "/bin/sh", "-c", "alacritty" };
-    const child = try std.ChildProcess.init(&argv, std.heap.c_allocator);
-    try std.ChildProcess.spawn(child);
-
     server.run();
 }
