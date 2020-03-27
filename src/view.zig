@@ -84,11 +84,9 @@ pub const View = struct {
     }
 
     pub fn dropStashedBuffer(self: *Self) void {
-        std.debug.warn("drop stashed\n", .{});
         // TODO: log debug error
         if (self.stashed_buffer) |buffer| {
             c.wlr_buffer_unref(buffer);
-            std.debug.warn("drop stashed\n", .{});
             self.stashed_buffer = null;
         }
     }
