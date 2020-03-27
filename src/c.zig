@@ -17,6 +17,7 @@ pub const c = @cImport({
     @cInclude("wlr/types/wlr_pointer.h");
     @cInclude("wlr/types/wlr_seat.h");
     @cInclude("wlr/types/wlr_xcursor_manager.h");
+    @cInclude("wlr/types/wlr_xdg_decoration_v1.h");
     @cInclude("wlr/types/wlr_xdg_shell.h");
     @cInclude("wlr/util/log.h");
     @cInclude("xkbcommon/xkbcommon.h");

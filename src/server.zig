@@ -1,6 +1,7 @@
 const std = @import("std");
 const c = @import("c.zig").c;
 
+const DecorationManager = @import("decoration_manager.zig").DecorationManager;
 const Output = @import("output.zig").Output;
 const Root = @import("root.zig").Root;
 const Seat = @import("seat.zig").Seat;
@@ -11,16 +12,17 @@ pub const Server = struct {
 
     allocator: *std.mem.Allocator,
 
-    root: Root,
-    seat: Seat,
-
     wl_display: *c.wl_display,
     wlr_backend: *c.wlr_backend,
     wlr_renderer: *c.wlr_renderer,
 
-    listen_new_output: c.wl_listener,
-
     wlr_xdg_shell: *c.wlr_xdg_shell,
+
+    decoration_manager: DecorationManager,
+    root: Root,
+    seat: Seat,
+
+    listen_new_output: c.wl_listener,
     listen_new_xdg_surface: c.wl_listener,
 
     pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
@@ -57,6 +59,8 @@ pub const Server = struct {
 
         self.wlr_xdg_shell = c.wlr_xdg_shell_create(self.wl_display) orelse
             return error.CantCreateWlrXdgShell;
+
+        try self.decoration_manager.init(self);
 
         try self.root.init(self);
 
