@@ -105,24 +105,34 @@ pub const Server = struct {
         c.wl_display_run(self.wl_display);
     }
 
-    pub fn handleKeybinding(self: *Self, sym: c.xkb_keysym_t) bool {
-        // Here we handle compositor keybindings. This is when the compositor is
-        // processing keys, rather than passing them on to the client for its own
-        // processing.
-        //
+    pub fn handleKeybinding(self: *Self, sym: c.xkb_keysym_t, modifiers: u32) bool {
         // This function assumes the proper modifier is held down.
-        switch (sym) {
-            c.XKB_KEY_Escape => c.wl_display_terminate(self.wl_display),
-            c.XKB_KEY_j => self.root.focusNextView(),
-            c.XKB_KEY_k => self.root.focusPrevView(),
-            c.XKB_KEY_Return => {
-                // Spawn an instance of alacritty
-                // const argv = [_][]const u8{ "/bin/sh", "-c", "WAYLAND_DEBUG=1 alacritty" };
-                const argv = [_][]const u8{ "/bin/sh", "-c", "alacritty" };
-                const child = std.ChildProcess.init(&argv, std.heap.c_allocator) catch unreachable;
-                std.ChildProcess.spawn(child) catch unreachable;
-            },
-            else => return false,
+        if (modifiers & @intCast(u32, c.WLR_MODIFIER_SHIFT) != 0) {
+            switch (sym) {
+                c.XKB_KEY_Return => {
+                    if (self.root.focused_view) |current_focus| {
+                        const node = @fieldParentPtr(std.TailQueue(View).Node, "data", current_focus);
+                        self.root.views.remove(node);
+                        self.root.views.prepend(node);
+                        self.root.arrange();
+                    }
+                },
+                else => return false,
+            }
+        } else {
+            switch (sym) {
+                c.XKB_KEY_e => c.wl_display_terminate(self.wl_display),
+                c.XKB_KEY_j => self.root.focusNextView(),
+                c.XKB_KEY_k => self.root.focusPrevView(),
+                c.XKB_KEY_Return => {
+                    // Spawn an instance of alacritty
+                    // const argv = [_][]const u8{ "/bin/sh", "-c", "WAYLAND_DEBUG=1 alacritty" };
+                    const argv = [_][]const u8{ "/bin/sh", "-c", "alacritty" };
+                    const child = std.ChildProcess.init(&argv, std.heap.c_allocator) catch unreachable;
+                    std.ChildProcess.spawn(child) catch unreachable;
+                },
+                else => return false,
+            }
         }
         return true;
     }
