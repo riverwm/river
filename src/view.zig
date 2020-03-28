@@ -124,8 +124,8 @@ pub const View = struct {
             if (current_focus == view) {
                 // If there are more views
                 if (root.views.len > 1) {
-                    // Focus the next view.
-                    root.focusNextView();
+                    // Focus the previous view.
+                    root.focusPrevView();
                 } else {
                     // Otherwise clear the focus
                     root.focused_view = null;
