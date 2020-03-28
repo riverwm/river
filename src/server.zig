@@ -105,6 +105,8 @@ pub const Server = struct {
         c.wl_display_run(self.wl_display);
     }
 
+    /// Handle all compositor keybindings
+    /// Note: this is a hacky initial implementation for testing and will be rewritten eventually
     pub fn handleKeybinding(self: *Self, sym: c.xkb_keysym_t, modifiers: u32) bool {
         // This function assumes the proper modifier is held down.
         if (modifiers & @intCast(u32, c.WLR_MODIFIER_SHIFT) != 0) {
@@ -124,6 +126,18 @@ pub const Server = struct {
                 c.XKB_KEY_e => c.wl_display_terminate(self.wl_display),
                 c.XKB_KEY_j => self.root.focusNextView(),
                 c.XKB_KEY_k => self.root.focusPrevView(),
+                c.XKB_KEY_h => {
+                    if (self.root.master_count < self.root.views.len) {
+                        self.root.master_count += 1;
+                        self.root.arrange();
+                    }
+                },
+                c.XKB_KEY_l => {
+                    if (self.root.master_count > 0) {
+                        self.root.master_count -= 1;
+                        self.root.arrange();
+                    }
+                },
                 c.XKB_KEY_Return => {
                     // Spawn an instance of alacritty
                     // const argv = [_][]const u8{ "/bin/sh", "-c", "WAYLAND_DEBUG=1 alacritty" };
