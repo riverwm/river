@@ -67,7 +67,7 @@ pub const Root = struct {
     pub fn addView(self: *Self, wlr_xdg_surface: *c.wlr_xdg_surface) void {
         const node = self.views.allocateNode(self.server.allocator) catch unreachable;
         node.data.init(self, wlr_xdg_surface);
-        self.unmapped_views.append(node);
+        self.unmapped_views.prepend(node);
     }
 
     /// Finds the topmost view under the output layout coordinates lx, ly

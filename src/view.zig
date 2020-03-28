@@ -109,7 +109,7 @@ pub const View = struct {
 
         const node = @fieldParentPtr(std.TailQueue(View).Node, "data", view);
         view.root.unmapped_views.remove(node);
-        view.root.views.append(node);
+        view.root.views.prepend(node);
 
         view.root.arrange();
     }
