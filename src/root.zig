@@ -188,11 +188,17 @@ pub const Root = struct {
     /// Initiate an atomic change to the layout. This change will not be
     /// applied until all affected clients ack a configure and commit a buffer.
     fn startTransaction(self: *Self) void {
-        std.debug.assert(self.pending_count == 0);
+        // If a new transaction is started while another is in progress, we need
+        // to reset the pending count to 0 and clear serials from the views
+        self.pending_count = 0;
 
         var it = self.views.first;
         while (it) |node| : (it = node.next) {
             const view = &node.data;
+
+            // Clear the serial in case this transaction is interrupting a prior one.
+            view.pending_serial = null;
+
             if (view.needsConfigure()) {
                 view.configurePending();
                 self.pending_count += 1;
@@ -202,7 +208,12 @@ pub const Root = struct {
                 // redrawing.
                 view.sendFrameDone();
             }
-            view.stashBuffer();
+
+            // If there is a saved buffer present, then this transaction is interrupting
+            // a previous transaction and we should keep the old buffer.
+            if (view.stashed_buffer == null) {
+                view.stashBuffer();
+            }
         }
 
         // TODO: start a timer and handle timeout waiting for all clients to ack
