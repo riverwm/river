@@ -39,13 +39,13 @@ pub const Server = struct {
         // a tty or wayland if WAYLAND_DISPLAY is set.
         //
         // This frees itself.when the wl_display is destroyed.
-        self.wlr_backend = c.zag_wlr_backend_autocreate(self.wl_display) orelse
+        self.wlr_backend = c.river_wlr_backend_autocreate(self.wl_display) orelse
             return error.CantCreateWlrBackend;
 
         // If we don't provide a renderer, autocreate makes a GLES2 renderer for us.
         // The renderer is responsible for defining the various pixel formats it
         // supports for shared memory, this configures that for clients.
-        self.wlr_renderer = c.zag_wlr_backend_get_renderer(self.wlr_backend) orelse
+        self.wlr_renderer = c.river_wlr_backend_get_renderer(self.wlr_backend) orelse
             return error.CantGetWlrRenderer;
         // TODO: Handle failure after https://github.com/swaywm/wlroots/pull/2080
         c.wlr_renderer_init_wl_display(self.wlr_renderer, self.wl_display); // orelse
@@ -89,7 +89,7 @@ pub const Server = struct {
 
         // Start the backend. This will enumerate outputs and inputs, become the DRM
         // master, etc
-        if (!c.zag_wlr_backend_start(self.wlr_backend)) {
+        if (!c.river_wlr_backend_start(self.wlr_backend)) {
             return error.CantStartBackend;
         }
 
