@@ -1,5 +1,5 @@
-#ifndef ZAG_RENDER_H
-#define ZAG_RENDER_H
+#ifndef RIVER_RENDER_H
+#define RIVER_RENDER_H
 
 #include <wlr/backend/session.h>
 /*
