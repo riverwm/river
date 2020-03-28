@@ -38,6 +38,11 @@ pub const View = struct {
         self.root = root;
         self.wlr_xdg_surface = wlr_xdg_surface;
 
+        // Inform the xdg toplevel that it is tiled.
+        // For example this prevents firefox from drawing shadows around itself
+        _ = c.wlr_xdg_toplevel_set_tiled(self.wlr_xdg_surface, c.WLR_EDGE_LEFT |
+            c.WLR_EDGE_RIGHT | c.WLR_EDGE_TOP | c.WLR_EDGE_BOTTOM);
+
         self.mapped = false;
         self.current_state = ViewState{
             .x = 0,
