@@ -21,6 +21,12 @@ pub const Root = struct {
 
     focused_view: ?*View,
 
+    /// Number of views in "master" section of the screen.
+    master_count: u32,
+
+    /// Percentage of the total screen that the master section takes up.
+    master_factor: f64,
+
     // Number of pending configures sent in the current transaction.
     // A value of 0 means there is no current transaction.
     pending_count: u32,
@@ -40,6 +46,9 @@ pub const Root = struct {
         self.unmapped_views = std.TailQueue(View).init();
 
         self.focused_view = null;
+
+        self.master_count = 1;
+        self.master_factor = 0.6;
 
         self.pending_count = 0;
     }
@@ -117,26 +126,60 @@ pub const Root = struct {
         if (self.views.len == 0) {
             return;
         }
-        // Super basic vertical layout for now, no master/slave stuff
-        // This can't return null if pass null as the reference
+
+        const slave_count = if (self.master_count > self.views.len) 0 else @intCast(u32, self.views.len) - self.master_count;
+
+        // This can't return null if we pass null as the reference
         const output_box: *c.wlr_box = c.wlr_output_layout_get_box(self.wlr_output_layout, null);
-        const new_height = output_box.height;
-        // Allow for a 10px gap
-        const num_views = @intCast(c_int, self.views.len);
-        const new_width = @divTrunc(output_box.width, num_views) - (num_views - 1) * 10;
+        var master_column_width: u32 = undefined;
+        var slave_column_width: u32 = undefined;
+        if (self.master_count > 0 and slave_count > 0) {
+            // If both master and slave views are present
+            master_column_width = @floatToInt(u32, @round(@intToFloat(f64, output_box.width) * self.master_factor));
+            slave_column_width = @intCast(u32, output_box.width) - master_column_width;
+        } else if (self.master_count > 0) {
+            master_column_width = @intCast(u32, output_box.width);
+            slave_column_width = 0;
+        } else {
+            slave_column_width = @intCast(u32, output_box.width);
+            master_column_width = 0;
+        }
 
-        var x: c_int = 0;
-        var y: c_int = 0;
-
+        var i: u32 = 0;
         var it = self.views.first;
-        while (it) |node| : (it = node.next) {
-            const view = &node.data;
-            view.pending_state.x = x;
-            view.pending_state.y = y;
-            view.pending_state.width = @intCast(u32, new_width);
-            view.pending_state.height = @intCast(u32, new_height);
+        while (it) |node| : ({
+            i += 1;
+            it = node.next;
+        }) {
+            if (i < self.master_count) {
+                const view = &node.data;
 
-            x += new_width + 10;
+                // Add the remainder to the first master to ensure every pixel of height is used
+                const master_height = @divTrunc(@intCast(u32, output_box.height), self.master_count);
+                const master_height_rem = @intCast(u32, output_box.height) % self.master_count;
+
+                view.pending_state.x = 0;
+                view.pending_state.y = @intCast(i32, i * master_height +
+                    if (i > 0) master_height_rem else 0);
+
+                view.pending_state.width = master_column_width;
+                view.pending_state.height = master_height +
+                    if (i == 0) master_height_rem else 0;
+            } else {
+                const view = &node.data;
+
+                // Add the remainder to the first slave to ensure every pixel of height is used
+                const slave_height = @divTrunc(@intCast(u32, output_box.height), slave_count);
+                const slave_height_rem = @intCast(u32, output_box.height) % slave_count;
+
+                view.pending_state.x = @intCast(i32, master_column_width);
+                view.pending_state.y = @intCast(i32, (i - self.master_count) * slave_height +
+                    if (i > self.master_count) slave_height_rem else 0);
+
+                view.pending_state.width = slave_column_width;
+                view.pending_state.height = slave_height +
+                    if (i == self.master_count) slave_height_rem else 0;
+            }
         }
 
         self.startTransaction();
