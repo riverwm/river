@@ -3,10 +3,10 @@ const std = @import("std");
 pub const Log = enum {
     const Self = @This();
 
-    Silent,
-    Error,
-    Info,
-    Debug,
+    Silent = 0,
+    Error = 1,
+    Info = 2,
+    Debug = 3,
 
     var verbosity = Self.Error;
 
