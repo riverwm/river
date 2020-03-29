@@ -53,7 +53,7 @@ pub const Root = struct {
         self.pending_count = 0;
     }
 
-    pub fn destroy(self: *Self) void {
+    pub fn destroy(self: Self) void {
         c.wlr_output_layout_destroy(self.wlr_output_layout);
     }
 
@@ -72,7 +72,7 @@ pub const Root = struct {
 
     /// Finds the topmost view under the output layout coordinates lx, ly
     /// returns the view if found, and a pointer to the wlr_surface as well as the surface coordinates
-    pub fn viewAt(self: *Self, lx: f64, ly: f64, surface: *?*c.wlr_surface, sx: *f64, sy: *f64) ?*View {
+    pub fn viewAt(self: Self, lx: f64, ly: f64, surface: *?*c.wlr_surface, sx: *f64, sy: *f64) ?*View {
         var it = self.views.last;
         while (it) |node| : (it = node.prev) {
             if (node.data.isAt(lx, ly, surface, sx, sy)) {
@@ -84,7 +84,7 @@ pub const Root = struct {
 
     /// Focus the next view in the stack, wrapping if needed. Does nothing
     /// if there is only one view in the stack.
-    pub fn focusNextView(self: *Self) void {
+    pub fn focusNextView(self: Self) void {
         if (self.focused_view) |current_focus| {
             // If there is a currently focused view, focus the next view in the stack.
             const node = @fieldParentPtr(std.TailQueue(View).Node, "data", current_focus);
@@ -104,7 +104,7 @@ pub const Root = struct {
 
     /// Focus the previous view in the stack, wrapping if needed. Does nothing
     /// if there is only one view in the stack.
-    pub fn focusPrevView(self: *Self) void {
+    pub fn focusPrevView(self: Self) void {
         if (self.focused_view) |current_focus| {
             // If there is a currently focused view, focus the previous view in the stack.
             const node = @fieldParentPtr(std.TailQueue(View).Node, "data", current_focus);

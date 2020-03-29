@@ -76,7 +76,7 @@ pub const Server = struct {
     }
 
     /// Free allocated memory and clean up
-    pub fn destroy(self: *Self) void {
+    pub fn destroy(self: Self) void {
         c.wl_display_destroy_clients(self.wl_display);
         c.wl_display_destroy(self.wl_display);
         self.root.destroy();

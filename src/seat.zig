@@ -37,7 +37,7 @@ pub const Seat = struct {
         c.wl_signal_add(&self.server.wlr_backend.events.new_input, &self.listen_new_input);
     }
 
-    pub fn destroy(self: *Self) void {
+    pub fn destroy(self: Self) void {
         self.cursor.destroy();
     }
 
@@ -49,7 +49,7 @@ pub const Seat = struct {
         self.keyboards.append(node);
     }
 
-    fn addPointer(self: *Self, device: *c.struct_wlr_input_device) void {
+    fn addPointer(self: Self, device: *c.struct_wlr_input_device) void {
         // We don't do anything special with pointers. All of our pointer handling
         // is proxied through wlr_cursor. On another compositor, you might take this
         // opportunity to do libinput configuration on the device to set

@@ -89,12 +89,12 @@ pub const Cursor = struct {
         c.wl_signal_add(&self.seat.wlr_seat.events.request_set_cursor, &self.listen_request_set_cursor);
     }
 
-    pub fn destroy(self: *Self) void {
+    pub fn destroy(self: Self) void {
         c.wlr_xcursor_manager_destroy(self.wlr_xcursor_manager);
         c.wlr_cursor_destroy(self.wlr_cursor);
     }
 
-    fn processMove(self: *Self, time: u32) void {
+    fn processMove(self: Self, time: u32) void {
         // Move the grabbed view to the new position.
         // TODO: log on null
         if (self.grabbed_view) |view| {
@@ -103,7 +103,7 @@ pub const Cursor = struct {
         }
     }
 
-    fn processsResize(self: *Self, time: u32) void {
+    fn processsResize(self: Self, time: u32) void {
         // Resizing the grabbed view can be a little bit complicated, because we
         // could be resizing from any corner or edge. This not only resizes the view
         // on one or two axes, but can also move the view if you resize from the top
@@ -152,7 +152,7 @@ pub const Cursor = struct {
         );
     }
 
-    fn processMotion(self: *Self, time: u32) void {
+    fn processMotion(self: Self, time: u32) void {
         // If the mode is non-passthrough, delegate to those functions.
         if (self.mode == CursorMode.Move) {
             self.processMove(time);

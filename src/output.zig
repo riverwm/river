@@ -107,7 +107,7 @@ pub const Output = struct {
         _ = c.wlr_output_commit(output.wlr_output);
     }
 
-    fn renderView(self: *Self, view: *View, now: *c.struct_timespec) void {
+    fn renderView(self: Self, view: *View, now: *c.struct_timespec) void {
         // If we have a stashed buffer, we are in the middle of a transaction
         // and need to render that buffer until the transaction is complete.
         if (view.stashed_buffer) |buffer| {

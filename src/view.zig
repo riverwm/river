@@ -69,7 +69,7 @@ pub const View = struct {
         // c.wl_signal_add(&toplevel.events.request_resize, &view.request_resize);
     }
 
-    pub fn needsConfigure(self: *const Self) bool {
+    pub fn needsConfigure(self: Self) bool {
         return self.pending_state.width != self.current_state.width or
             self.pending_state.height != self.current_state.height;
     }
@@ -82,7 +82,7 @@ pub const View = struct {
         );
     }
 
-    pub fn sendFrameDone(self: *Self) void {
+    pub fn sendFrameDone(self: Self) void {
         var now: c.struct_timespec = undefined;
         _ = c.clock_gettime(c.CLOCK_MONOTONIC, &now);
         c.wlr_surface_send_frame_done(self.wlr_xdg_surface.surface, &now);
@@ -211,7 +211,7 @@ pub const View = struct {
         );
     }
 
-    fn isAt(self: *Self, lx: f64, ly: f64, surface: *?*c.wlr_surface, sx: *f64, sy: *f64) bool {
+    fn isAt(self: Self, lx: f64, ly: f64, surface: *?*c.wlr_surface, sx: *f64, sy: *f64) bool {
         // XDG toplevels may have nested surfaces, such as popup windows for context
         // menus or tooltips. This function tests if any of those are underneath the
         // coordinates lx and ly (in output Layout Coordinates). If so, it sets the
