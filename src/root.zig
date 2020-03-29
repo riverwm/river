@@ -31,6 +31,9 @@ pub const Root = struct {
     // A value of 0 means there is no current transaction.
     pending_count: u32,
 
+    /// Handles timeout of transactions
+    transaction_timer: ?*c.wl_event_source,
+
     pub fn init(self: *Self, server: *Server) !void {
         self.server = server;
 
@@ -216,7 +219,27 @@ pub const Root = struct {
             }
         }
 
-        // TODO: start a timer and handle timeout waiting for all clients to ack
+        if (self.pending_count > 0) {
+            // TODO: log failure to create timer and commit immediately
+            self.transaction_timer = c.wl_event_loop_add_timer(
+                self.server.wl_event_loop,
+                handle_timeout,
+                self,
+            );
+            // Set timeout to 200ms
+            if (c.wl_event_source_timer_update(self.transaction_timer, 200) == -1) {
+                // TODO: handle failure
+            }
+        }
+    }
+
+    fn handle_timeout(data: ?*c_void) callconv(.C) c_int {
+        const root = @ptrCast(*Root, @alignCast(@alignOf(*Root), data));
+
+        // TODO: log warning
+        root.commitTransaction();
+
+        return 0;
     }
 
     pub fn notifyConfigured(self: *Self) void {
@@ -228,15 +251,20 @@ pub const Root = struct {
 
     /// Apply the pending state and drop stashed buffers. This means that
     /// the next frame drawn will be the post-transaction state of the
-    /// layout. Must only be called after all clients have configured for
-    /// the new layout.
+    /// layout. Should only be called after all clients have configured for
+    /// the new layout. If called early imperfect frames may be drawn.
     fn commitTransaction(self: *Self) void {
         // TODO: apply damage properly
+
+        // Ensure this is set to 0 to avoid entering invalid state (e.g. if called due to timeout)
+        self.pending_count = 0;
+
         var it = self.views.first;
         while (it) |node| : (it = node.next) {
             const view = &node.data;
 
-            // TODO: handle views that timed out
+            // Ensure that all pending state is cleared
+            view.pending_serial = null;
             view.current_state = view.pending_state;
             view.dropStashedBuffer();
         }

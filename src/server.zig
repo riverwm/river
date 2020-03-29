@@ -14,6 +14,7 @@ pub const Server = struct {
     allocator: *std.mem.Allocator,
 
     wl_display: *c.wl_display,
+    wl_event_loop: *c.wl_event_loop,
     wlr_backend: *c.wlr_backend,
     wlr_renderer: *c.wlr_renderer,
 
@@ -30,10 +31,14 @@ pub const Server = struct {
         self.allocator = allocator;
 
         // The Wayland display is managed by libwayland. It handles accepting
-        // clients from the Unix socket, manging Wayland globals, and so on.
+        // clients from the Unix socket, managing Wayland globals, and so on.
         self.wl_display = c.wl_display_create() orelse
             return error.CantCreateWlDisplay;
         errdefer c.wl_display_destroy(self.wl_display);
+
+        // Should never return null if the display was created successfully
+        self.wl_event_loop = c.wl_display_get_event_loop(self.wl_display) orelse
+            return error.CantGetEventLoop;
 
         // The wlr_backend abstracts the input/output hardware. Autocreate chooses
         // the best option based on the environment, for example DRM when run from
