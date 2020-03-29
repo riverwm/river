@@ -1,5 +1,6 @@
 const std = @import("std");
 const c = @import("c.zig").c;
+const util = @import("util.zig");
 
 const Output = @import("output.zig").Output;
 const Server = @import("server.zig").Server;
@@ -130,17 +131,18 @@ pub const Root = struct {
             return;
         }
 
-        const slave_count = if (self.master_count > self.views.len) 0 else @intCast(u32, self.views.len) - self.master_count;
+        const master_count = util.min(u32, self.master_count, @intCast(u32, self.views.len));
+        const slave_count = if (master_count >= self.views.len) 0 else @intCast(u32, self.views.len) - master_count;
 
         // This can't return null if we pass null as the reference
         const output_box: *c.wlr_box = c.wlr_output_layout_get_box(self.wlr_output_layout, null);
         var master_column_width: u32 = undefined;
         var slave_column_width: u32 = undefined;
-        if (self.master_count > 0 and slave_count > 0) {
+        if (master_count > 0 and slave_count > 0) {
             // If both master and slave views are present
             master_column_width = @floatToInt(u32, @round(@intToFloat(f64, output_box.width) * self.master_factor));
             slave_column_width = @intCast(u32, output_box.width) - master_column_width;
-        } else if (self.master_count > 0) {
+        } else if (master_count > 0) {
             master_column_width = @intCast(u32, output_box.width);
             slave_column_width = 0;
         } else {
@@ -154,12 +156,12 @@ pub const Root = struct {
             i += 1;
             it = node.next;
         }) {
-            if (i < self.master_count) {
+            if (i < master_count) {
                 const view = &node.data;
 
                 // Add the remainder to the first master to ensure every pixel of height is used
-                const master_height = @divTrunc(@intCast(u32, output_box.height), self.master_count);
-                const master_height_rem = @intCast(u32, output_box.height) % self.master_count;
+                const master_height = @divTrunc(@intCast(u32, output_box.height), master_count);
+                const master_height_rem = @intCast(u32, output_box.height) % master_count;
 
                 view.pending_state.x = 0;
                 view.pending_state.y = @intCast(i32, i * master_height +
@@ -176,12 +178,12 @@ pub const Root = struct {
                 const slave_height_rem = @intCast(u32, output_box.height) % slave_count;
 
                 view.pending_state.x = @intCast(i32, master_column_width);
-                view.pending_state.y = @intCast(i32, (i - self.master_count) * slave_height +
-                    if (i > self.master_count) slave_height_rem else 0);
+                view.pending_state.y = @intCast(i32, (i - master_count) * slave_height +
+                    if (i > master_count) slave_height_rem else 0);
 
                 view.pending_state.width = slave_column_width;
                 view.pending_state.height = slave_height +
-                    if (i == self.master_count) slave_height_rem else 0;
+                    if (i == master_count) slave_height_rem else 0;
             }
         }
 
