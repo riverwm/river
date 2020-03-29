@@ -112,16 +112,6 @@ pub const Server = struct {
         // This function assumes the proper modifier is held down.
         if (modifiers & @intCast(u32, c.WLR_MODIFIER_SHIFT) != 0) {
             switch (sym) {
-                c.XKB_KEY_Return => {
-                    if (self.root.focused_view) |current_focus| {
-                        const node = @fieldParentPtr(std.TailQueue(View).Node, "data", current_focus);
-                        if (node != self.root.views.first) {
-                            self.root.views.remove(node);
-                            self.root.views.prepend(node);
-                            self.root.arrange();
-                        }
-                    }
-                },
                 c.XKB_KEY_H => {
                     if (self.root.master_count < self.root.views.len) {
                         self.root.master_count += 1;
@@ -133,6 +123,13 @@ pub const Server = struct {
                         self.root.master_count -= 1;
                         self.root.arrange();
                     }
+                },
+                c.XKB_KEY_Return => {
+                    // Spawn an instance of alacritty
+                    // const argv = [_][]const u8{ "/bin/sh", "-c", "WAYLAND_DEBUG=1 alacritty" };
+                    const argv = [_][]const u8{ "/bin/sh", "-c", "alacritty" };
+                    const child = std.ChildProcess.init(&argv, std.heap.c_allocator) catch unreachable;
+                    std.ChildProcess.spawn(child) catch unreachable;
                 },
                 else => return false,
             }
@@ -154,11 +151,14 @@ pub const Server = struct {
                     }
                 },
                 c.XKB_KEY_Return => {
-                    // Spawn an instance of alacritty
-                    // const argv = [_][]const u8{ "/bin/sh", "-c", "WAYLAND_DEBUG=1 alacritty" };
-                    const argv = [_][]const u8{ "/bin/sh", "-c", "alacritty" };
-                    const child = std.ChildProcess.init(&argv, std.heap.c_allocator) catch unreachable;
-                    std.ChildProcess.spawn(child) catch unreachable;
+                    if (self.root.focused_view) |current_focus| {
+                        const node = @fieldParentPtr(std.TailQueue(View).Node, "data", current_focus);
+                        if (node != self.root.views.first) {
+                            self.root.views.remove(node);
+                            self.root.views.prepend(node);
+                            self.root.arrange();
+                        }
+                    }
                 },
                 else => return false,
             }
