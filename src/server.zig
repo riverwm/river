@@ -1,5 +1,6 @@
 const std = @import("std");
 const c = @import("c.zig").c;
+const util = @import("util.zig");
 
 const DecorationManager = @import("decoration_manager.zig").DecorationManager;
 const Output = @import("output.zig").Output;
@@ -119,6 +120,18 @@ pub const Server = struct {
                         self.root.arrange();
                     }
                 },
+                c.XKB_KEY_H => {
+                    if (self.root.master_count < self.root.views.len) {
+                        self.root.master_count += 1;
+                        self.root.arrange();
+                    }
+                },
+                c.XKB_KEY_L => {
+                    if (self.root.master_count > 0) {
+                        self.root.master_count -= 1;
+                        self.root.arrange();
+                    }
+                },
                 else => return false,
             }
         } else {
@@ -127,14 +140,14 @@ pub const Server = struct {
                 c.XKB_KEY_j => self.root.focusNextView(),
                 c.XKB_KEY_k => self.root.focusPrevView(),
                 c.XKB_KEY_h => {
-                    if (self.root.master_count < self.root.views.len) {
-                        self.root.master_count += 1;
+                    if (self.root.master_factor > 0.05) {
+                        self.root.master_factor = util.max(f64, self.root.master_factor - 0.05, 0.05);
                         self.root.arrange();
                     }
                 },
                 c.XKB_KEY_l => {
-                    if (self.root.master_count > 0) {
-                        self.root.master_count -= 1;
+                    if (self.root.master_factor < 0.95) {
+                        self.root.master_factor = util.min(f64, self.root.master_factor + 0.05, 0.95);
                         self.root.arrange();
                     }
                 },
