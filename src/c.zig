@@ -1,4 +1,4 @@
-pub const c = @cImport({
+pub usingnamespace @cImport({
     @cDefine("WLR_USE_UNSTABLE", {});
     @cInclude("time.h");
     @cInclude("stdlib.h");

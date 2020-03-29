@@ -1,5 +1,5 @@
 const std = @import("std");
-const c = @import("c.zig").c;
+const c = @import("c.zig");
 
 const Seat = @import("seat.zig").Seat;
 

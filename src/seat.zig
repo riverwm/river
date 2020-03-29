@@ -1,5 +1,5 @@
 const std = @import("std");
-const c = @import("c.zig").c;
+const c = @import("c.zig");
 
 const Cursor = @import("cursor.zig").Cursor;
 const Keyboard = @import("keyboard.zig").Keyboard;
