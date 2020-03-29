@@ -115,9 +115,11 @@ pub const Server = struct {
                 c.XKB_KEY_Return => {
                     if (self.root.focused_view) |current_focus| {
                         const node = @fieldParentPtr(std.TailQueue(View).Node, "data", current_focus);
-                        self.root.views.remove(node);
-                        self.root.views.prepend(node);
-                        self.root.arrange();
+                        if (node != self.root.views.first) {
+                            self.root.views.remove(node);
+                            self.root.views.prepend(node);
+                            self.root.arrange();
+                        }
                     }
                 },
                 c.XKB_KEY_H => {
