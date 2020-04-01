@@ -2,6 +2,7 @@ const std = @import("std");
 const c = @import("c.zig");
 const util = @import("util.zig");
 
+const Log = @import("log.zig").Log;
 const Output = @import("output.zig").Output;
 const Server = @import("server.zig").Server;
 const Seat = @import("seat.zig").Seat;
@@ -171,10 +172,6 @@ pub const Root = struct {
 
         const visible_count = self.visibleCount(tags);
 
-        if (visible_count == 0) {
-            return;
-        }
-
         const master_count = util.min(u32, self.master_count, visible_count);
         const slave_count = if (master_count >= visible_count) 0 else visible_count - master_count;
 
@@ -284,6 +281,8 @@ pub const Root = struct {
             if (c.wl_event_source_timer_update(self.transaction_timer, 200) == -1) {
                 // TODO: handle failure
             }
+        } else {
+            self.commitTransaction();
         }
     }
 
@@ -315,6 +314,7 @@ pub const Root = struct {
 
         // If there were pending focused tags, make them the current focus
         if (self.pending_focused_tags) |tags| {
+            Log.Debug.log("changing current focus: {b:0>10} to {b:0>10}\n", .{ self.current_focused_tags, tags });
             self.current_focused_tags = tags;
             self.pending_focused_tags = null;
         }

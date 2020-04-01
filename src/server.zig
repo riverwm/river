@@ -165,6 +165,30 @@ pub const Server = struct {
                         }
                     }
                 },
+                c.XKB_KEY_1 => {
+                    self.root.pending_focused_tags = 1 << 0;
+                    self.root.arrange();
+                },
+                c.XKB_KEY_2 => {
+                    self.root.pending_focused_tags = 1 << 1;
+                    self.root.arrange();
+                },
+                c.XKB_KEY_3 => {
+                    self.root.pending_focused_tags = 1 << 2;
+                    self.root.arrange();
+                },
+                c.XKB_KEY_4 => {
+                    self.root.pending_focused_tags = 1 << 3;
+                    self.root.arrange();
+                },
+                c.XKB_KEY_5 => {
+                    self.root.pending_focused_tags = 1 << 4;
+                    self.root.arrange();
+                },
+                c.XKB_KEY_6 => {
+                    self.root.pending_focused_tags = 1 << 5;
+                    self.root.arrange();
+                },
                 else => return false,
             }
         }
