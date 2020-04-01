@@ -84,6 +84,12 @@ pub const Output = struct {
         var it = output.root.views.last;
         while (it) |node| : (it = node.prev) {
             const view = &node.data;
+
+            // Only render currently visible views
+            if (!view.isVisible(output.root.current_focused_tags)) {
+                continue;
+            }
+
             // TODO: remove this check and move unmaped views back to unmaped TailQueue
             if (!view.mapped) {
                 // An unmapped view should not be rendered.

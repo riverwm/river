@@ -3,13 +3,6 @@ const c = @import("c.zig");
 
 const Root = @import("root.zig").Root;
 
-pub const ViewState = struct {
-    x: i32,
-    y: i32,
-    width: u32,
-    height: u32,
-};
-
 pub const View = struct {
     const Self = @This();
 
@@ -18,9 +11,16 @@ pub const View = struct {
 
     mapped: bool,
 
-    current_state: ViewState,
-    // TODO: make this a ?ViewState
-    pending_state: ViewState,
+    pub const State = struct {
+        x: i32,
+        y: i32,
+        width: u32,
+        height: u32,
+        tags: u32,
+    };
+
+    current_state: State,
+    pending_state: ?State,
 
     pending_serial: ?u32,
 
@@ -34,7 +34,7 @@ pub const View = struct {
     // listen_request_move: c.wl_listener,
     // listen_request_resize: c.wl_listener,
 
-    pub fn init(self: *Self, root: *Root, wlr_xdg_surface: *c.wlr_xdg_surface) void {
+    pub fn init(self: *Self, root: *Root, wlr_xdg_surface: *c.wlr_xdg_surface, tags: u32) void {
         self.root = root;
         self.wlr_xdg_surface = wlr_xdg_surface;
 
@@ -44,12 +44,18 @@ pub const View = struct {
             c.WLR_EDGE_RIGHT | c.WLR_EDGE_TOP | c.WLR_EDGE_BOTTOM);
 
         self.mapped = false;
-        self.current_state = ViewState{
+
+        self.current_state = State{
             .x = 0,
             .y = 0,
             .height = 0,
             .width = 0,
+            .tags = tags,
         };
+        self.pending_state = null;
+
+        self.pending_serial = null;
+
         self.stashed_buffer = null;
 
         self.listen_map.notify = handleMap;
@@ -70,16 +76,24 @@ pub const View = struct {
     }
 
     pub fn needsConfigure(self: Self) bool {
-        return self.pending_state.width != self.current_state.width or
-            self.pending_state.height != self.current_state.height;
+        if (self.pending_state) |pending_state| {
+            return pending_state.width != self.current_state.width or
+                pending_state.height != self.current_state.height;
+        } else {
+            return false;
+        }
     }
 
     pub fn configurePending(self: *Self) void {
-        self.pending_serial = c.wlr_xdg_toplevel_set_size(
-            self.wlr_xdg_surface,
-            self.pending_state.width,
-            self.pending_state.height,
-        );
+        if (self.pending_state) |pending_state| {
+            self.pending_serial = c.wlr_xdg_toplevel_set_size(
+                self.wlr_xdg_surface,
+                pending_state.width,
+                pending_state.height,
+            );
+        } else {
+            // TODO: log warning
+        }
     }
 
     pub fn sendFrameDone(self: Self) void {
@@ -117,6 +131,11 @@ pub const View = struct {
         view.root.views.prepend(node);
 
         view.root.arrange();
+    }
+
+    /// Returns true if the view is shown given the current state of tags
+    pub fn isVisible(self: Self, tags: u32) bool {
+        return tags & self.current_state.tags != 0;
     }
 
     fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {

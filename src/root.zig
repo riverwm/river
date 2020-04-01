@@ -22,6 +22,10 @@ pub const Root = struct {
 
     focused_view: ?*View,
 
+    /// A bit field of focused tags
+    current_focused_tags: u32,
+    pending_focused_tags: ?u32,
+
     /// Number of views in "master" section of the screen.
     master_count: u32,
 
@@ -30,7 +34,7 @@ pub const Root = struct {
 
     // Number of pending configures sent in the current transaction.
     // A value of 0 means there is no current transaction.
-    pending_count: u32,
+    pending_configures: u32,
 
     /// Handles timeout of transactions
     transaction_timer: ?*c.wl_event_source,
@@ -51,10 +55,16 @@ pub const Root = struct {
 
         self.focused_view = null;
 
+        self.current_focused_tags = 1 << 0;
+        self.pending_focused_tags = null;
+
         self.master_count = 1;
+
         self.master_factor = 0.6;
 
-        self.pending_count = 0;
+        self.pending_configures = 0;
+
+        self.transaction_timer = null;
     }
 
     pub fn destroy(self: Self) void {
@@ -70,7 +80,7 @@ pub const Root = struct {
 
     pub fn addView(self: *Self, wlr_xdg_surface: *c.wlr_xdg_surface) void {
         const node = self.views.allocateNode(self.server.allocator) catch unreachable;
-        node.data.init(self, wlr_xdg_surface);
+        node.data.init(self, wlr_xdg_surface, self.current_focused_tags);
         self.unmapped_views.prepend(node);
     }
 
@@ -86,23 +96,30 @@ pub const Root = struct {
         return null;
     }
 
-    /// Focus the next view in the stack, wrapping if needed. Does nothing
-    /// if there is only one view in the stack.
+    /// Focus the next visible view in the stack, wrapping if needed. Does
+    /// nothing if there is only one view in the stack.
     pub fn focusNextView(self: Self) void {
         if (self.focused_view) |current_focus| {
-            // If there is a currently focused view, focus the next view in the stack.
-            const node = @fieldParentPtr(std.TailQueue(View).Node, "data", current_focus);
-            if (node.next) |next_node| {
-                const view = &next_node.data;
+            // If there is a currently focused view, focus the next visible view in the stack.
+            var it = @fieldParentPtr(std.TailQueue(View).Node, "data", current_focus).next;
+            while (it) |node| : (it = node.next) {
+                const view = &node.data;
+                if (view.isVisible(self.current_focused_tags)) {
+                    view.focus(view.wlr_xdg_surface.surface);
+                    return;
+                }
+            }
+        }
+
+        // There is either no currently focused view or the last visible view in the
+        // stack is focused and we need to wrap.
+        var it = self.views.first;
+        while (it) |node| : (it = node.next) {
+            const view = &node.data;
+            if (view.isVisible(self.current_focused_tags)) {
                 view.focus(view.wlr_xdg_surface.surface);
                 return;
             }
-        }
-        // There is either no currently focused view or the last view in the
-        // stack is focused and we need to wrap.
-        if (self.views.first) |first_node| {
-            const view = &first_node.data;
-            view.focus(view.wlr_xdg_surface.surface);
         }
     }
 
@@ -110,29 +127,56 @@ pub const Root = struct {
     /// if there is only one view in the stack.
     pub fn focusPrevView(self: Self) void {
         if (self.focused_view) |current_focus| {
-            // If there is a currently focused view, focus the previous view in the stack.
-            const node = @fieldParentPtr(std.TailQueue(View).Node, "data", current_focus);
-            if (node.prev) |prev_node| {
-                const view = &prev_node.data;
+            // If there is a currently focused view, focus the previous visible view in the stack.
+            var it = @fieldParentPtr(std.TailQueue(View).Node, "data", current_focus).prev;
+            while (it) |node| : (it = node.prev) {
+                const view = &node.data;
+                if (view.isVisible(self.current_focused_tags)) {
+                    view.focus(view.wlr_xdg_surface.surface);
+                    return;
+                }
+            }
+        }
+
+        // There is either no currently focused view or the first visible view in the
+        // stack is focused and we need to wrap.
+        var it = self.views.last;
+        while (it) |node| : (it = node.prev) {
+            const view = &node.data;
+            if (view.isVisible(self.current_focused_tags)) {
                 view.focus(view.wlr_xdg_surface.surface);
                 return;
             }
         }
-        // There is either no currently focused view or the first view in the
-        // stack is focused and we need to wrap.
-        if (self.views.last) |last_node| {
-            const view = &last_node.data;
-            view.focus(view.wlr_xdg_surface.surface);
+    }
+
+    // TODO: obsolete this function by using a better data structure
+    pub fn visibleCount(self: Self, tags: u32) u32 {
+        var count: u32 = 0;
+        var it = self.views.first;
+        while (it) |node| : (it = node.next) {
+            const view = &node.data;
+            if (view.isVisible(tags)) {
+                count += 1;
+            }
         }
+        return count;
     }
 
     pub fn arrange(self: *Self) void {
-        if (self.views.len == 0) {
+        const tags = if (self.pending_focused_tags) |tags|
+            tags
+        else
+            self.current_focused_tags;
+
+        const visible_count = self.visibleCount(tags);
+
+        if (visible_count == 0) {
             return;
         }
 
-        const master_count = util.min(u32, self.master_count, @intCast(u32, self.views.len));
-        const slave_count = if (master_count >= self.views.len) 0 else @intCast(u32, self.views.len) - master_count;
+        const master_count = util.min(u32, self.master_count, visible_count);
+        const slave_count = if (master_count >= visible_count) 0 else visible_count - master_count;
 
         // This can't return null if we pass null as the reference
         const output_box: *c.wlr_box = c.wlr_output_layout_get_box(self.wlr_output_layout, null);
@@ -152,39 +196,47 @@ pub const Root = struct {
 
         var i: u32 = 0;
         var it = self.views.first;
-        while (it) |node| : ({
-            i += 1;
-            it = node.next;
-        }) {
-            if (i < master_count) {
-                const view = &node.data;
+        while (it) |node| : (it = node.next) {
+            const view = &node.data;
 
+            if (!view.isVisible(tags)) {
+                continue;
+            }
+
+            if (i < master_count) {
                 // Add the remainder to the first master to ensure every pixel of height is used
                 const master_height = @divTrunc(@intCast(u32, output_box.height), master_count);
                 const master_height_rem = @intCast(u32, output_box.height) % master_count;
 
-                view.pending_state.x = 0;
-                view.pending_state.y = @intCast(i32, i * master_height +
-                    if (i > 0) master_height_rem else 0);
+                view.pending_state = View.State{
+                    .x = 0,
+                    .y = @intCast(i32, i * master_height +
+                        if (i > 0) master_height_rem else 0),
 
-                view.pending_state.width = master_column_width;
-                view.pending_state.height = master_height +
-                    if (i == 0) master_height_rem else 0;
+                    .width = master_column_width,
+                    .height = master_height + if (i == 0) master_height_rem else 0,
+
+                    .tags = view.current_state.tags,
+                };
             } else {
-                const view = &node.data;
-
                 // Add the remainder to the first slave to ensure every pixel of height is used
                 const slave_height = @divTrunc(@intCast(u32, output_box.height), slave_count);
                 const slave_height_rem = @intCast(u32, output_box.height) % slave_count;
 
-                view.pending_state.x = @intCast(i32, master_column_width);
-                view.pending_state.y = @intCast(i32, (i - master_count) * slave_height +
-                    if (i > master_count) slave_height_rem else 0);
+                view.pending_state = View.State{
+                    .x = @intCast(i32, master_column_width),
+                    .y = @intCast(i32, (i - master_count) * slave_height +
+                        if (i > master_count) slave_height_rem else 0),
 
-                view.pending_state.width = slave_column_width;
-                view.pending_state.height = slave_height +
-                    if (i == master_count) slave_height_rem else 0;
+                    .width = slave_column_width,
+                    .height = slave_height +
+                        if (i == master_count) slave_height_rem else 0,
+
+                    .tags = view.current_state.tags,
+                };
             }
+
+            i += 1;
         }
 
         self.startTransaction();
@@ -195,7 +247,7 @@ pub const Root = struct {
     fn startTransaction(self: *Self) void {
         // If a new transaction is started while another is in progress, we need
         // to reset the pending count to 0 and clear serials from the views
-        self.pending_count = 0;
+        self.pending_configures = 0;
 
         var it = self.views.first;
         while (it) |node| : (it = node.next) {
@@ -206,7 +258,7 @@ pub const Root = struct {
 
             if (view.needsConfigure()) {
                 view.configurePending();
-                self.pending_count += 1;
+                self.pending_configures += 1;
 
                 // We save the current buffer, so we can send an early
                 // frame done event to give the client a head start on
@@ -221,7 +273,7 @@ pub const Root = struct {
             }
         }
 
-        if (self.pending_count > 0) {
+        if (self.pending_configures > 0) {
             // TODO: log failure to create timer and commit immediately
             self.transaction_timer = c.wl_event_loop_add_timer(
                 self.server.wl_event_loop,
@@ -245,8 +297,8 @@ pub const Root = struct {
     }
 
     pub fn notifyConfigured(self: *Self) void {
-        self.pending_count -= 1;
-        if (self.pending_count == 0) {
+        self.pending_configures -= 1;
+        if (self.pending_configures == 0) {
             self.commitTransaction();
         }
     }
@@ -259,7 +311,13 @@ pub const Root = struct {
         // TODO: apply damage properly
 
         // Ensure this is set to 0 to avoid entering invalid state (e.g. if called due to timeout)
-        self.pending_count = 0;
+        self.pending_configures = 0;
+
+        // If there were pending focused tags, make them the current focus
+        if (self.pending_focused_tags) |tags| {
+            self.current_focused_tags = tags;
+            self.pending_focused_tags = null;
+        }
 
         var it = self.views.first;
         while (it) |node| : (it = node.next) {
@@ -267,7 +325,10 @@ pub const Root = struct {
 
             // Ensure that all pending state is cleared
             view.pending_serial = null;
-            view.current_state = view.pending_state;
+            if (view.pending_state) |state| {
+                view.current_state = state;
+                view.pending_state = null;
+            }
             view.dropStashedBuffer();
         }
     }
