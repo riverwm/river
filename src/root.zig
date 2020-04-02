@@ -105,7 +105,7 @@ pub const Root = struct {
             var it = @fieldParentPtr(std.TailQueue(View).Node, "data", current_focus).next;
             while (it) |node| : (it = node.next) {
                 const view = &node.data;
-                if (view.isVisible(self.current_focused_tags)) {
+                if (view.current_tags & self.current_focused_tags != 0) {
                     view.focus(view.wlr_xdg_surface.surface);
                     return;
                 }
@@ -117,7 +117,7 @@ pub const Root = struct {
         var it = self.views.first;
         while (it) |node| : (it = node.next) {
             const view = &node.data;
-            if (view.isVisible(self.current_focused_tags)) {
+            if (view.current_tags & self.current_focused_tags != 0) {
                 view.focus(view.wlr_xdg_surface.surface);
                 return;
             }
@@ -132,7 +132,7 @@ pub const Root = struct {
             var it = @fieldParentPtr(std.TailQueue(View).Node, "data", current_focus).prev;
             while (it) |node| : (it = node.prev) {
                 const view = &node.data;
-                if (view.isVisible(self.current_focused_tags)) {
+                if (view.current_tags & self.current_focused_tags != 0) {
                     view.focus(view.wlr_xdg_surface.surface);
                     return;
                 }
@@ -144,7 +144,7 @@ pub const Root = struct {
         var it = self.views.last;
         while (it) |node| : (it = node.prev) {
             const view = &node.data;
-            if (view.isVisible(self.current_focused_tags)) {
+            if (view.current_tags & self.current_focused_tags != 0) {
                 view.focus(view.wlr_xdg_surface.surface);
                 return;
             }
@@ -152,12 +152,12 @@ pub const Root = struct {
     }
 
     // TODO: obsolete this function by using a better data structure
-    pub fn visibleCount(self: Self, tags: u32) u32 {
+    fn visibleCount(self: Self, tags: u32) u32 {
         var count: u32 = 0;
         var it = self.views.first;
         while (it) |node| : (it = node.next) {
             const view = &node.data;
-            if (view.isVisible(tags)) {
+            if (view.current_tags & tags != 0) {
                 count += 1;
             }
         }
@@ -165,12 +165,12 @@ pub const Root = struct {
     }
 
     pub fn arrange(self: *Self) void {
-        const tags = if (self.pending_focused_tags) |tags|
+        const root_tags = if (self.pending_focused_tags) |tags|
             tags
         else
             self.current_focused_tags;
 
-        const visible_count = self.visibleCount(tags);
+        const visible_count = self.visibleCount(root_tags);
 
         const master_count = util.min(u32, self.master_count, visible_count);
         const slave_count = if (master_count >= visible_count) 0 else visible_count - master_count;
@@ -196,7 +196,11 @@ pub const Root = struct {
         while (it) |node| : (it = node.next) {
             const view = &node.data;
 
-            if (!view.isVisible(tags)) {
+            if (view.pending_tags) |tags| {
+                if (root_tags & tags == 0) {
+                    continue;
+                }
+            } else if (view.current_tags & root_tags == 0) {
                 continue;
             }
 
@@ -205,22 +209,20 @@ pub const Root = struct {
                 const master_height = @divTrunc(@intCast(u32, output_box.height), master_count);
                 const master_height_rem = @intCast(u32, output_box.height) % master_count;
 
-                view.pending_state = View.State{
+                view.pending_box = View.Box{
                     .x = 0,
                     .y = @intCast(i32, i * master_height +
                         if (i > 0) master_height_rem else 0),
 
                     .width = master_column_width,
                     .height = master_height + if (i == 0) master_height_rem else 0,
-
-                    .tags = view.current_state.tags,
                 };
             } else {
                 // Add the remainder to the first slave to ensure every pixel of height is used
                 const slave_height = @divTrunc(@intCast(u32, output_box.height), slave_count);
                 const slave_height_rem = @intCast(u32, output_box.height) % slave_count;
 
-                view.pending_state = View.State{
+                view.pending_box = View.Box{
                     .x = @intCast(i32, master_column_width),
                     .y = @intCast(i32, (i - master_count) * slave_height +
                         if (i > master_count) slave_height_rem else 0),
@@ -228,8 +230,6 @@ pub const Root = struct {
                     .width = slave_column_width,
                     .height = slave_height +
                         if (i == master_count) slave_height_rem else 0,
-
-                    .tags = view.current_state.tags,
                 };
             }
 
@@ -314,7 +314,7 @@ pub const Root = struct {
 
         // If there were pending focused tags, make them the current focus
         if (self.pending_focused_tags) |tags| {
-            Log.Debug.log("changing current focus: {b:0>10} to {b:0>10}\n", .{ self.current_focused_tags, tags });
+            Log.Debug.log("changing current focus: {b:0>10} to {b:0>10}", .{ self.current_focused_tags, tags });
             self.current_focused_tags = tags;
             self.pending_focused_tags = null;
         }
@@ -325,10 +325,16 @@ pub const Root = struct {
 
             // Ensure that all pending state is cleared
             view.pending_serial = null;
-            if (view.pending_state) |state| {
-                view.current_state = state;
-                view.pending_state = null;
+            if (view.pending_box) |state| {
+                view.current_box = state;
+                view.pending_box = null;
             }
+
+            if (view.pending_tags) |tags| {
+                view.current_tags = tags;
+                view.pending_tags = null;
+            }
+
             view.dropStashedBuffer();
         }
     }

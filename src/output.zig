@@ -86,7 +86,7 @@ pub const Output = struct {
             const view = &node.data;
 
             // Only render currently visible views
-            if (!view.isVisible(output.root.current_focused_tags)) {
+            if (view.current_tags & output.root.current_focused_tags == 0) {
                 continue;
             }
 
@@ -118,10 +118,10 @@ pub const Output = struct {
         // and need to render that buffer until the transaction is complete.
         if (view.stashed_buffer) |buffer| {
             var box = c.wlr_box{
-                .x = view.current_state.x,
-                .y = view.current_state.y,
-                .width = @intCast(c_int, view.current_state.width),
-                .height = @intCast(c_int, view.current_state.height),
+                .x = view.current_box.x,
+                .y = view.current_box.y,
+                .width = @intCast(c_int, view.current_box.width),
+                .height = @intCast(c_int, view.current_box.height),
             };
 
             // Scale the box to the output's current scaling factor
@@ -185,8 +185,8 @@ pub const Output = struct {
         var ox: f64 = 0.0;
         var oy: f64 = 0.0;
         c.wlr_output_layout_output_coords(view.root.wlr_output_layout, output, &ox, &oy);
-        ox += @intToFloat(f64, view.current_state.x + sx);
-        oy += @intToFloat(f64, view.current_state.y + sy);
+        ox += @intToFloat(f64, view.current_box.x + sx);
+        oy += @intToFloat(f64, view.current_box.y + sy);
 
         var box = c.wlr_box{
             .x = @floatToInt(c_int, ox),

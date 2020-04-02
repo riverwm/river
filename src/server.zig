@@ -136,6 +136,42 @@ pub const Server = struct {
                     const child = std.ChildProcess.init(&argv, std.heap.c_allocator) catch unreachable;
                     std.ChildProcess.spawn(child) catch unreachable;
                 },
+                c.XKB_KEY_1 => {
+                    if (self.root.focused_view) |view| {
+                        view.pending_tags = 1 << 0;
+                        self.root.arrange();
+                    }
+                },
+                c.XKB_KEY_2 => {
+                    if (self.root.focused_view) |view| {
+                        view.pending_tags = 1 << 1;
+                        self.root.arrange();
+                    }
+                },
+                c.XKB_KEY_3 => {
+                    if (self.root.focused_view) |view| {
+                        view.pending_tags = 1 << 2;
+                        self.root.arrange();
+                    }
+                },
+                c.XKB_KEY_4 => {
+                    if (self.root.focused_view) |view| {
+                        view.pending_tags = 1 << 3;
+                        self.root.arrange();
+                    }
+                },
+                c.XKB_KEY_5 => {
+                    if (self.root.focused_view) |view| {
+                        view.pending_tags = 1 << 4;
+                        self.root.arrange();
+                    }
+                },
+                c.XKB_KEY_6 => {
+                    if (self.root.focused_view) |view| {
+                        view.pending_tags = 1 << 5;
+                        self.root.arrange();
+                    }
+                },
                 else => return false,
             }
         } else {

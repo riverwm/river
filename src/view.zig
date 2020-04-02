@@ -11,16 +11,18 @@ pub const View = struct {
 
     mapped: bool,
 
-    pub const State = struct {
+    pub const Box = struct {
         x: i32,
         y: i32,
         width: u32,
         height: u32,
-        tags: u32,
     };
 
-    current_state: State,
-    pending_state: ?State,
+    current_box: Box,
+    pending_box: ?Box,
+
+    current_tags: u32,
+    pending_tags: ?u32,
 
     pending_serial: ?u32,
 
@@ -45,14 +47,16 @@ pub const View = struct {
 
         self.mapped = false;
 
-        self.current_state = State{
+        self.current_box = Box{
             .x = 0,
             .y = 0,
             .height = 0,
             .width = 0,
-            .tags = tags,
         };
-        self.pending_state = null;
+        self.pending_box = null;
+
+        self.current_tags = tags;
+        self.pending_tags = null;
 
         self.pending_serial = null;
 
@@ -76,20 +80,20 @@ pub const View = struct {
     }
 
     pub fn needsConfigure(self: Self) bool {
-        if (self.pending_state) |pending_state| {
-            return pending_state.width != self.current_state.width or
-                pending_state.height != self.current_state.height;
+        if (self.pending_box) |pending_box| {
+            return pending_box.width != self.current_box.width or
+                pending_box.height != self.current_box.height;
         } else {
             return false;
         }
     }
 
     pub fn configurePending(self: *Self) void {
-        if (self.pending_state) |pending_state| {
+        if (self.pending_box) |pending_box| {
             self.pending_serial = c.wlr_xdg_toplevel_set_size(
                 self.wlr_xdg_surface,
-                pending_state.width,
-                pending_state.height,
+                pending_box.width,
+                pending_box.height,
             );
         } else {
             // TODO: log warning
@@ -131,11 +135,6 @@ pub const View = struct {
         view.root.views.prepend(node);
 
         view.root.arrange();
-    }
-
-    /// Returns true if the view is shown given the current state of tags
-    pub fn isVisible(self: Self, tags: u32) bool {
-        return tags & self.current_state.tags != 0;
     }
 
     fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -236,11 +235,11 @@ pub const View = struct {
         // coordinates lx and ly (in output Layout Coordinates). If so, it sets the
         // surface pointer to that wlr_surface and the sx and sy coordinates to the
         // coordinates relative to that surface's top-left corner.
-        const view_sx = lx - @intToFloat(f64, self.current_state.x);
-        const view_sy = ly - @intToFloat(f64, self.current_state.y);
+        const view_sx = lx - @intToFloat(f64, self.current_box.x);
+        const view_sy = ly - @intToFloat(f64, self.current_box.y);
 
         // This variable seems to have been unsued in TinyWL
-        // struct wlr_surface_state *state = &view->xdg_surface->surface->current;
+        // struct wlr_surface_box *state = &view->xdg_surface->surface->current;
 
         var _sx: f64 = undefined;
         var _sy: f64 = undefined;

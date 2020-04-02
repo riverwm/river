@@ -81,11 +81,29 @@ pub const Keyboard = struct {
 
         // Translate libinput keycode -> xkbcommon
         const keycode = event.keycode + 8;
-        // Get a list of keysyms based on the keymap for this keyboard
-        var syms: ?[*]c.xkb_keysym_t = undefined;
-        const nsyms = c.xkb_state_key_get_syms(wlr_keyboard.xkb_state, keycode, &syms);
+
+        // Get a list of keysyms as xkb reports them
+        var translated_keysyms: ?[*]c.xkb_keysym_t = undefined;
+        const translated_keysyms_len = c.xkb_state_key_get_syms(
+            wlr_keyboard.xkb_state,
+            keycode,
+            &translated_keysyms,
+        );
+
+        // Get a list of keysyms ignoring modifiers (e.g. 1 instead of !)
+        // Important for bindings like Mod+Shift+1
+        var raw_keysyms: ?[*]c.xkb_keysym_t = undefined;
+        const layout_index = c.xkb_state_key_get_layout(wlr_keyboard.xkb_state, keycode);
+        const raw_keysyms_len = c.xkb_keymap_key_get_syms_by_level(
+            wlr_keyboard.keymap,
+            keycode,
+            layout_index,
+            0,
+            &raw_keysyms,
+        );
 
         var handled = false;
+        // TODO: These modifiers aren't properly handled, see sway's code
         const modifiers = c.wlr_keyboard_get_modifiers(wlr_keyboard);
         if (modifiers & @intCast(u32, c.WLR_MODIFIER_LOGO) != 0 and
             event.state == c.enum_wlr_key_state.WLR_KEY_PRESSED)
@@ -93,12 +111,20 @@ pub const Keyboard = struct {
             // If mod is held down and this button was _pressed_, we attempt to
             // process it as a compositor keybinding.
             var i: usize = 0;
-            while (i < nsyms) {
-                handled = keyboard.seat.server.handleKeybinding(syms.?[i], modifiers);
-                if (handled) {
+            while (i < translated_keysyms_len) : (i += 1) {
+                if (keyboard.seat.server.handleKeybinding(translated_keysyms.?[i], modifiers)) {
+                    handled = true;
                     break;
                 }
-                i += 1;
+            }
+            if (!handled) {
+                i = 0;
+                while (i < raw_keysyms_len) : (i += 1) {
+                    if (keyboard.seat.server.handleKeybinding(raw_keysyms.?[i], modifiers)) {
+                        handled = true;
+                        break;
+                    }
+                }
             }
         }
 
