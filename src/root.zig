@@ -314,7 +314,10 @@ pub const Root = struct {
 
         // If there were pending focused tags, make them the current focus
         if (self.pending_focused_tags) |tags| {
-            Log.Debug.log("changing current focus: {b:0>10} to {b:0>10}", .{ self.current_focused_tags, tags });
+            Log.Debug.log(
+                "changing current focus: {b:0>10} to {b:0>10}",
+                .{ self.current_focused_tags, tags },
+            );
             self.current_focused_tags = tags;
             self.pending_focused_tags = null;
         }
@@ -330,9 +333,20 @@ pub const Root = struct {
                 view.pending_box = null;
             }
 
+            // Apply possible pending tags
             if (view.pending_tags) |tags| {
                 view.current_tags = tags;
                 view.pending_tags = null;
+
+                // If the pending tags caused the currently focused view to no
+                // longer be visible, focus the next view.
+                if (self.focused_view) |focus| {
+                    if (focus == view and
+                        view.current_tags & self.current_focused_tags == 0)
+                    {
+                        self.focusNextView();
+                    }
+                }
             }
 
             view.dropStashedBuffer();
