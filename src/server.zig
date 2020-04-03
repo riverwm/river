@@ -7,6 +7,7 @@ const Output = @import("output.zig").Output;
 const Root = @import("root.zig").Root;
 const Seat = @import("seat.zig").Seat;
 const View = @import("view.zig").View;
+const ViewStack = @import("view_stack.zig").ViewStack;
 
 pub const Server = struct {
     const Self = @This();
@@ -193,10 +194,10 @@ pub const Server = struct {
                 },
                 c.XKB_KEY_Return => {
                     if (self.root.focused_view) |current_focus| {
-                        const node = @fieldParentPtr(std.TailQueue(View).Node, "data", current_focus);
+                        const node = @fieldParentPtr(ViewStack.Node, "view", current_focus);
                         if (node != self.root.views.first) {
                             self.root.views.remove(node);
-                            self.root.views.prepend(node);
+                            self.root.views.push(node);
                             self.root.arrange();
                         }
                     }

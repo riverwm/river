@@ -2,6 +2,7 @@ const std = @import("std");
 const c = @import("c.zig");
 
 const Root = @import("root.zig").Root;
+const ViewStack = @import("view_stack.zig").ViewStack;
 
 pub const View = struct {
     const Self = @This();
@@ -127,13 +128,7 @@ pub const View = struct {
         // Called when the surface is mapped, or ready to display on-screen.
         const view = @fieldParentPtr(View, "listen_map", listener.?);
         view.mapped = true;
-
         view.focus(view.wlr_xdg_surface.surface);
-
-        const node = @fieldParentPtr(std.TailQueue(View).Node, "data", view);
-        view.root.unmapped_views.remove(node);
-        view.root.views.prepend(node);
-
         view.root.arrange();
     }
 
@@ -145,21 +140,10 @@ pub const View = struct {
         if (root.focused_view) |current_focus| {
             // If the view being unmapped is focused
             if (current_focus == view) {
-                // If there are more views
-                if (root.views.len > 1) {
-                    // Focus the previous view.
-                    root.focusPrevView();
-                } else {
-                    // Otherwise clear the focus
-                    root.focused_view = null;
-                    _ = c.wlr_xdg_toplevel_set_activated(view.wlr_xdg_surface, false);
-                }
+                // Focus the previous view. This clears the focus if there are no visible views.
+                root.focusPrevView();
             }
         }
-
-        const node = @fieldParentPtr(std.TailQueue(View).Node, "data", view);
-        root.views.remove(node);
-        root.unmapped_views.append(node);
 
         root.arrange();
     }
@@ -168,9 +152,9 @@ pub const View = struct {
         const view = @fieldParentPtr(View, "listen_destroy", listener.?);
         const root = view.root;
 
-        const node = @fieldParentPtr(std.TailQueue(View).Node, "data", view);
-        root.unmapped_views.remove(node);
-        root.unmapped_views.destroyNode(node, root.server.allocator);
+        const node = @fieldParentPtr(ViewStack.Node, "view", view);
+        root.views.remove(node);
+        root.server.allocator.destroy(node);
     }
 
     fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {

@@ -28,6 +28,22 @@ pub fn build(b: *Builder) void {
     const run_cmd = exe.run();
     run_cmd.step.dependOn(b.getInstallStep());
 
-    const run_step = b.step("run", "Run the app");
+    const run_step = b.step("run", "Run the compositor");
     run_step.dependOn(&run_cmd.step);
+
+    const test_exe = b.addTest("src/test_main.zig");
+    test_exe.setTarget(target);
+    test_exe.setBuildMode(mode);
+    test_exe.addIncludeDir("protocol");
+    test_exe.linkLibC();
+    test_exe.addIncludeDir("/usr/include/pixman-1");
+    test_exe.addCSourceFile("include/render.c", &[_][]const u8{"-std=c99"});
+    test_exe.addIncludeDir(".");
+    //test_exe.linkSystemLibrary("pixman");
+    test_exe.linkSystemLibrary("wayland-server");
+    test_exe.linkSystemLibrary("wlroots");
+    test_exe.linkSystemLibrary("xkbcommon");
+
+    const test_step = b.step("test", "Run the tests");
+    test_step.dependOn(&test_exe.step);
 }

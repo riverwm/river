@@ -4,6 +4,7 @@ const c = @import("c.zig");
 const Root = @import("root.zig").Root;
 const Server = @import("server.zig").Server;
 const View = @import("view.zig").View;
+const ViewStack = @import("view_stack.zig").ViewStack;
 
 const RenderData = struct {
     output: *c.wlr_output,
@@ -79,22 +80,12 @@ pub const Output = struct {
         const color = [_]f32{ 0.3, 0.3, 0.3, 1.0 };
         c.wlr_renderer_clear(renderer, &color);
 
-        // Each subsequent view is rendered on top of the last.
         // The first view in the list is "on top" so iterate in reverse.
-        var it = output.root.views.last;
-        while (it) |node| : (it = node.prev) {
-            const view = &node.data;
-
-            // Only render currently visible views
-            if (view.current_tags & output.root.current_focused_tags == 0) {
-                continue;
-            }
-
-            // TODO: remove this check and move unmaped views back to unmaped TailQueue
-            if (!view.mapped) {
-                // An unmapped view should not be rendered.
-                continue;
-            }
+        var it = ViewStack.reverseIterator(
+            output.root.views.first,
+            output.root.current_focused_tags,
+        );
+        while (it.next()) |view| {
             output.renderView(view, &now);
         }
 
