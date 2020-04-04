@@ -109,10 +109,10 @@ pub const Output = struct {
         // and need to render that buffer until the transaction is complete.
         if (view.stashed_buffer) |buffer| {
             var box = c.wlr_box{
-                .x = view.current_box.x,
-                .y = view.current_box.y,
-                .width = @intCast(c_int, view.current_box.width),
-                .height = @intCast(c_int, view.current_box.height),
+                .x = view.current_box.x + @intCast(i32, view.root.border_width),
+                .y = view.current_box.y + @intCast(i32, view.root.border_width),
+                .width = @intCast(c_int, view.current_box.width - view.root.border_width * 2),
+                .height = @intCast(c_int, view.current_box.height - view.root.border_width * 2),
             };
 
             // Scale the box to the output's current scaling factor
@@ -176,14 +176,14 @@ pub const Output = struct {
         var ox: f64 = 0.0;
         var oy: f64 = 0.0;
         c.wlr_output_layout_output_coords(view.root.wlr_output_layout, output, &ox, &oy);
-        ox += @intToFloat(f64, view.current_box.x + sx);
-        oy += @intToFloat(f64, view.current_box.y + sy);
+        ox += @intToFloat(f64, view.current_box.x + @intCast(i32, view.root.border_width) + sx);
+        oy += @intToFloat(f64, view.current_box.y + @intCast(i32, view.root.border_width) + sy);
 
         var box = c.wlr_box{
             .x = @floatToInt(c_int, ox),
             .y = @floatToInt(c_int, oy),
-            .width = @intCast(c_int, surface.current.width),
-            .height = @intCast(c_int, surface.current.height),
+            .width = surface.current.width,
+            .height = surface.current.height,
         };
 
         // Scale the box to the output's current scaling factor

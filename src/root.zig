@@ -34,6 +34,9 @@ pub const Root = struct {
     /// Percentage of the total screen that the master section takes up.
     master_factor: f64,
 
+    /// Width of borders in pixels
+    border_width: u32,
+
     /// Number of pending configures sent in the current transaction.
     /// A value of 0 means there is no current transaction.
     pending_configures: u32,
@@ -62,6 +65,8 @@ pub const Root = struct {
         self.master_count = 1;
 
         self.master_factor = 0.6;
+
+        self.border_width = 4;
 
         self.pending_configures = 0;
 
