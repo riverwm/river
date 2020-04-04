@@ -292,6 +292,10 @@ pub const Root = struct {
     pub fn notifyConfigured(self: *Self) void {
         self.pending_configures -= 1;
         if (self.pending_configures == 0) {
+            // Stop the timer, as we didn't timeout
+            if (c.wl_event_source_timer_update(self.transaction_timer, 0) == -1) {
+                // TODO: handle failure
+            }
             self.commitTransaction();
         }
     }
