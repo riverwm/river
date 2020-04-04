@@ -82,7 +82,7 @@ pub const Output = struct {
 
         // The first view in the list is "on top" so iterate in reverse.
         var it = ViewStack.reverseIterator(
-            output.root.views.first,
+            output.root.views.last,
             output.root.current_focused_tags,
         );
         while (it.next()) |view| {
