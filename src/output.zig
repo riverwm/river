@@ -86,6 +86,11 @@ pub const Output = struct {
             output.root.current_focused_tags,
         );
         while (it.next()) |view| {
+            // This check prevents a race condition when a frame is requested
+            // between mapping of a view and the first configure being handled.
+            if (view.current_box.width == 0 or view.current_box.height == 0) {
+                continue;
+            }
             output.renderView(view, &now);
         }
 
