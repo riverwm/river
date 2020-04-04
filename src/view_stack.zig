@@ -140,15 +140,15 @@ test "push/remove" {
     var views: ViewStack = undefined;
     views.init();
 
-    var one = try allocator.create(ViewStack.Node);
+    const one = try allocator.create(ViewStack.Node);
     defer allocator.destroy(one);
-    var two = try allocator.create(ViewStack.Node);
+    const two = try allocator.create(ViewStack.Node);
     defer allocator.destroy(two);
-    var three = try allocator.create(ViewStack.Node);
+    const three = try allocator.create(ViewStack.Node);
     defer allocator.destroy(three);
-    var four = try allocator.create(ViewStack.Node);
+    const four = try allocator.create(ViewStack.Node);
     defer allocator.destroy(four);
-    var five = try allocator.create(ViewStack.Node);
+    const five = try allocator.create(ViewStack.Node);
     defer allocator.destroy(five);
 
     testing.expect(views.len == 0);
@@ -276,38 +276,43 @@ test "iteration" {
     var views: ViewStack = undefined;
     views.init();
 
-    var one_a_pb = try allocator.create(ViewStack.Node);
+    const one_a_pb = try allocator.create(ViewStack.Node);
     defer allocator.destroy(one_a_pb);
     one_a_pb.view.mapped = true;
     one_a_pb.view.current_tags = 1 << 0;
     one_a_pb.view.pending_tags = 1 << 1;
 
-    var two_a = try allocator.create(ViewStack.Node);
+    const two_a = try allocator.create(ViewStack.Node);
     defer allocator.destroy(two_a);
     two_a.view.mapped = true;
     two_a.view.current_tags = 1 << 0;
 
-    var three_b_pa = try allocator.create(ViewStack.Node);
+    const three_b_pa = try allocator.create(ViewStack.Node);
     defer allocator.destroy(three_b_pa);
     three_b_pa.view.mapped = true;
     three_b_pa.view.current_tags = 1 << 1;
     three_b_pa.view.pending_tags = 1 << 0;
 
-    var four_b = try allocator.create(ViewStack.Node);
+    const four_b = try allocator.create(ViewStack.Node);
     defer allocator.destroy(four_b);
     four_b.view.mapped = true;
     four_b.view.current_tags = 1 << 1;
 
-    var five_b = try allocator.create(ViewStack.Node);
+    const five_b = try allocator.create(ViewStack.Node);
     defer allocator.destroy(five_b);
     five_b.view.mapped = true;
     five_b.view.current_tags = 1 << 1;
 
+    const unmapped_1 = try allocator.create(ViewStack.Node);
+    defer allocator.destroy(unmapped_1);
+    unmapped_1.view.mapped = false;
+
     views.push(three_b_pa); // {3}
     views.push(one_a_pb); // {1, 3}
-    views.push(four_b); // {4, 1, 3}
-    views.push(five_b); // {5, 4, 1, 3}
-    views.push(two_a); // {2, 5, 4, 1, 3}
+    views.push(unmapped_1); // {u, 1, 3}
+    views.push(four_b); // {4, u, 1, 3}
+    views.push(five_b); // {5, 4, u, 1, 3}
+    views.push(two_a); // {2, 5, 4, u, 1, 3}
 
     // Iteration over all tags
     {
