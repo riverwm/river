@@ -258,6 +258,11 @@ pub const Root = struct {
             }
         }
 
+        Log.Debug.log(
+            "Started transaction with {} pending configures.",
+            .{self.pending_configures},
+        );
+
         if (self.pending_configures > 0) {
             // TODO: log failure to create timer and commit immediately
             self.transaction_timer = c.wl_event_loop_add_timer(
@@ -277,7 +282,8 @@ pub const Root = struct {
     fn handle_timeout(data: ?*c_void) callconv(.C) c_int {
         const root = @ptrCast(*Root, @alignCast(@alignOf(*Root), data));
 
-        // TODO: log warning
+        Log.Error.log("Transaction timed out. Some imperfect frames may be shown.", .{});
+
         root.commitTransaction();
 
         return 0;
