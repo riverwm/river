@@ -337,6 +337,12 @@ test "iteration" {
         testing.expect(it.next() == null);
     }
 
+    // Iteration over tags that aren't present
+    {
+        var it = ViewStack.iterator(views.first, 1 << 2);
+        testing.expect(it.next() == null);
+    }
+
     // Reverse iteration over all tags
     {
         var it = ViewStack.reverseIterator(views.last, 0xFFFFFFFF);
@@ -365,6 +371,12 @@ test "iteration" {
         testing.expect(it.next() == null);
     }
 
+    // Reverse iteration over tags that aren't present
+    {
+        var it = ViewStack.reverseIterator(views.first, 1 << 2);
+        testing.expect(it.next() == null);
+    }
+
     // Iteration over (pending) 'a' tags
     {
         var it = ViewStack.pendingIterator(views.first, 1 << 0);
@@ -379,6 +391,12 @@ test "iteration" {
         testing.expect(it.next() == &five_b.view);
         testing.expect(it.next() == &four_b.view);
         testing.expect(it.next() == &one_a_pb.view);
+        testing.expect(it.next() == null);
+    }
+
+    // Iteration over (pending) tags that aren't present
+    {
+        var it = ViewStack.pendingIterator(views.first, 1 << 2);
         testing.expect(it.next() == null);
     }
 }
