@@ -18,14 +18,10 @@ pub const ViewStack = struct {
     first: ?*Node,
     last: ?*Node,
 
-    /// Total number of views
-    len: u32,
-
     /// Initialize an undefined stack
     pub fn init(self: *Self) void {
         self.first = null;
         self.last = null;
-        self.len = 0;
     }
 
     /// Add a node to the top of the stack.
@@ -43,9 +39,8 @@ pub const ViewStack = struct {
             self.last = new_node;
         }
 
-        // Set the first pointer to the new node and increment length
+        // Set the first pointer to the new node
         self.first = new_node;
-        self.len += 1;
     }
 
     /// Remove a node from the view stack. This removes it from the stack of
@@ -64,8 +59,6 @@ pub const ViewStack = struct {
         } else {
             self.last = target_node.prev;
         }
-
-        self.len -= 1;
     }
 
     const Iterator = struct {
@@ -151,13 +144,11 @@ test "push/remove" {
     const five = try allocator.create(ViewStack.Node);
     defer allocator.destroy(five);
 
-    testing.expect(views.len == 0);
     views.push(three); // {3}
     views.push(one); // {1, 3}
     views.push(four); // {4, 1, 3}
     views.push(five); // {5, 4, 1, 3}
     views.push(two); // {2, 5, 4, 1, 3}
-    testing.expect(views.len == 5);
 
     // Simple insertion
     {
@@ -174,7 +165,6 @@ test "push/remove" {
         it = it.?.next;
 
         testing.expect(it == null);
-        testing.expect(views.len == 5);
 
         testing.expect(views.first == two);
         testing.expect(views.last == three);
@@ -194,7 +184,6 @@ test "push/remove" {
         it = it.?.next;
 
         testing.expect(it == null);
-        testing.expect(views.len == 4);
 
         testing.expect(views.first == five);
         testing.expect(views.last == three);
@@ -212,7 +201,6 @@ test "push/remove" {
         it = it.?.next;
 
         testing.expect(it == null);
-        testing.expect(views.len == 3);
 
         testing.expect(views.first == five);
         testing.expect(views.last == one);
@@ -228,7 +216,6 @@ test "push/remove" {
         it = it.?.next;
 
         testing.expect(it == null);
-        testing.expect(views.len == 2);
 
         testing.expect(views.first == five);
         testing.expect(views.last == one);
@@ -252,7 +239,6 @@ test "push/remove" {
         it = it.?.next;
 
         testing.expect(it == null);
-        testing.expect(views.len == 5);
 
         testing.expect(views.first == four);
         testing.expect(views.last == one);
@@ -267,7 +253,6 @@ test "push/remove" {
 
     testing.expect(views.first == null);
     testing.expect(views.last == null);
-    testing.expect(views.len == 0);
 }
 
 test "iteration" {

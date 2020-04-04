@@ -119,16 +119,16 @@ pub const Server = struct {
         if (modifiers & @intCast(u32, c.WLR_MODIFIER_SHIFT) != 0) {
             switch (sym) {
                 c.XKB_KEY_H => {
-                    if (self.root.master_count < self.root.views.len) {
-                        self.root.master_count += 1;
-                        self.root.arrange();
-                    }
+                    //if (self.root.master_count < self.root.views.len) {
+                    self.root.master_count += 1;
+                    self.root.arrange();
+                    //}
                 },
                 c.XKB_KEY_L => {
-                    if (self.root.master_count > 0) {
-                        self.root.master_count -= 1;
-                        self.root.arrange();
-                    }
+                    //if (self.root.master_count > 0) {
+                    self.root.master_count -= 1;
+                    self.root.arrange();
+                    //}
                 },
                 c.XKB_KEY_Return => {
                     // Spawn an instance of alacritty
