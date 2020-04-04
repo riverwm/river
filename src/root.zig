@@ -318,6 +318,9 @@ pub const Root = struct {
             );
             self.current_focused_tags = tags;
             self.pending_focused_tags = null;
+
+            self.focused_view = null;
+            self.focusNextView();
         }
 
         var it = ViewStack.iterator(self.views.first, 0xFFFFFFFF);
