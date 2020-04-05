@@ -11,6 +11,8 @@ const RenderData = struct {
     renderer: *c.wlr_renderer,
     view: *View,
     when: *c.struct_timespec,
+    ox: f64,
+    oy: f64,
 };
 
 pub const Output = struct {
@@ -80,6 +82,19 @@ pub const Output = struct {
         const color = [_]f32{ 0.3, 0.3, 0.3, 1.0 };
         c.wlr_renderer_clear(renderer, &color);
 
+        // The view has a position in layout coordinates. If you have two displays,
+        // one next to the other, both 1080p, a view on the rightmost display might
+        // have layout coordinates of 2000,100. We need to translate that to
+        // output-local coordinates, or (2000 - 1920).
+        var ox: f64 = 0.0;
+        var oy: f64 = 0.0;
+        c.wlr_output_layout_output_coords(
+            output.root.wlr_output_layout,
+            output.wlr_output,
+            &ox,
+            &oy,
+        );
+
         // The first view in the list is "on top" so iterate in reverse.
         var it = ViewStack.reverseIterator(
             output.root.views.last,
@@ -91,7 +106,8 @@ pub const Output = struct {
             if (view.current_box.width == 0 or view.current_box.height == 0) {
                 continue;
             }
-            output.renderView(view, &now);
+            output.renderView(view, &now, ox, oy);
+            output.renderBorders(view, &now, ox, oy);
         }
 
         // Hardware cursors are rendered by the GPU on a separate plane, and can be
@@ -109,7 +125,7 @@ pub const Output = struct {
         _ = c.wlr_output_commit(output.wlr_output);
     }
 
-    fn renderView(self: Self, view: *View, now: *c.struct_timespec) void {
+    fn renderView(self: Self, view: *View, now: *c.struct_timespec, ox: f64, oy: f64) void {
         // If we have a stashed buffer, we are in the middle of a transaction
         // and need to render that buffer until the transaction is complete.
         if (view.stashed_buffer) |buffer| {
@@ -148,6 +164,8 @@ pub const Output = struct {
                 .view = view,
                 .renderer = self.root.server.wlr_renderer,
                 .when = now,
+                .ox = ox,
+                .oy = oy,
             };
 
             // This calls our render_surface function for each surface among the
@@ -174,19 +192,11 @@ pub const Output = struct {
             return;
         }
 
-        // The view has a position in layout coordinates. If you have two displays,
-        // one next to the other, both 1080p, a view on the rightmost display might
-        // have layout coordinates of 2000,100. We need to translate that to
-        // output-local coordinates, or (2000 - 1920).
-        var ox: f64 = 0.0;
-        var oy: f64 = 0.0;
-        c.wlr_output_layout_output_coords(view.root.wlr_output_layout, output, &ox, &oy);
-        ox += @intToFloat(f64, view.current_box.x + @intCast(i32, view.root.border_width) + sx);
-        oy += @intToFloat(f64, view.current_box.y + @intCast(i32, view.root.border_width) + sy);
-
         var box = c.wlr_box{
-            .x = @floatToInt(c_int, ox),
-            .y = @floatToInt(c_int, oy),
+            .x = @floatToInt(c_int, rdata.ox) + view.current_box.x + sx +
+                @intCast(c_int, view.root.border_width),
+            .y = @floatToInt(c_int, rdata.oy) + view.current_box.y + sy +
+                @intCast(c_int, view.root.border_width),
             .width = surface.current.width,
             .height = surface.current.height,
         };
@@ -209,6 +219,68 @@ pub const Output = struct {
         // This lets the client know that we've displayed that frame and it can
         // prepare another one now if it likes.
         c.wlr_surface_send_frame_done(surface, rdata.when);
+    }
+
+    fn renderBorders(self: Self, view: *View, now: *c.struct_timespec, ox: f64, oy: f64) void {
+        var border: c.wlr_box = undefined;
+        const color = [_]f32{ 0.34509804, 0.43137255, 0.45882353, 1.0 }; // Solarized base01
+        const border_width = self.root.border_width;
+
+        // left border
+        border.x = @floatToInt(c_int, ox) + view.current_box.x;
+        border.y = @floatToInt(c_int, oy) + view.current_box.y;
+        border.width = @intCast(c_int, border_width);
+        border.height = @intCast(c_int, view.current_box.height);
+        scaleBox(&border, self.wlr_output.scale);
+        c.wlr_render_rect(
+            self.root.server.wlr_renderer,
+            &border,
+            &color,
+            &self.wlr_output.transform_matrix,
+        );
+
+        // right border
+        border.x = @floatToInt(c_int, ox) + view.current_box.x +
+            @intCast(c_int, view.current_box.width - border_width);
+        border.y = @floatToInt(c_int, oy) + view.current_box.y;
+        border.width = @intCast(c_int, border_width);
+        border.height = @intCast(c_int, view.current_box.height);
+        scaleBox(&border, self.wlr_output.scale);
+        c.wlr_render_rect(
+            self.root.server.wlr_renderer,
+            &border,
+            &color,
+            &self.wlr_output.transform_matrix,
+        );
+
+        // top border
+        border.x = @floatToInt(c_int, ox) + view.current_box.x +
+            @intCast(c_int, border_width);
+        border.y = @floatToInt(c_int, oy) + view.current_box.y;
+        border.width = @intCast(c_int, view.current_box.width);
+        border.height = @intCast(c_int, border_width);
+        scaleBox(&border, self.wlr_output.scale);
+        c.wlr_render_rect(
+            self.root.server.wlr_renderer,
+            &border,
+            &color,
+            &self.wlr_output.transform_matrix,
+        );
+
+        // bottom border
+        border.x = @floatToInt(c_int, ox) + view.current_box.x +
+            @intCast(c_int, border_width);
+        border.y = @floatToInt(c_int, oy) + view.current_box.y +
+            @intCast(c_int, view.current_box.height - border_width);
+        border.width = @intCast(c_int, view.current_box.width);
+        border.height = @intCast(c_int, border_width);
+        scaleBox(&border, self.wlr_output.scale);
+        c.wlr_render_rect(
+            self.root.server.wlr_renderer,
+            &border,
+            &color,
+            &self.wlr_output.transform_matrix,
+        );
     }
 };
 
