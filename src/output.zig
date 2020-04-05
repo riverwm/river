@@ -260,7 +260,7 @@ pub const Output = struct {
         border.x = @floatToInt(c_int, ox) + view.current_box.x +
             @intCast(c_int, border_width);
         border.y = @floatToInt(c_int, oy) + view.current_box.y;
-        border.width = @intCast(c_int, view.current_box.width);
+        border.width = @intCast(c_int, view.current_box.width - border_width * 2);
         border.height = @intCast(c_int, border_width);
         scaleBox(&border, self.wlr_output.scale);
         c.wlr_render_rect(
@@ -275,7 +275,7 @@ pub const Output = struct {
             @intCast(c_int, border_width);
         border.y = @floatToInt(c_int, oy) + view.current_box.y +
             @intCast(c_int, view.current_box.height - border_width);
-        border.width = @intCast(c_int, view.current_box.width);
+        border.width = @intCast(c_int, view.current_box.width - border_width * 2);
         border.height = @intCast(c_int, border_width);
         scaleBox(&border, self.wlr_output.scale);
         c.wlr_render_rect(
