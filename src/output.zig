@@ -223,7 +223,10 @@ pub const Output = struct {
 
     fn renderBorders(self: Self, view: *View, now: *c.struct_timespec, ox: f64, oy: f64) void {
         var border: c.wlr_box = undefined;
-        const color = [_]f32{ 0.34509804, 0.43137255, 0.45882353, 1.0 }; // Solarized base01
+        const color = if (self.root.focused_view == view)
+            [_]f32{ 0.57647059, 0.63137255, 0.63137255, 1.0 } // Solarized base1
+        else
+            [_]f32{ 0.34509804, 0.43137255, 0.45882353, 1.0 }; // Solarized base01
         const border_width = self.root.border_width;
 
         // left border
