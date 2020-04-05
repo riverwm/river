@@ -79,7 +79,7 @@ pub const Output = struct {
         // Begin the renderer (calls glViewport and some other GL sanity checks)
         c.wlr_renderer_begin(renderer, width, height);
 
-        const color = [_]f32{ 0.3, 0.3, 0.3, 1.0 };
+        const color = [_]f32{ 0.0, 0.16862745, 0.21176471, 1.0 };
         c.wlr_renderer_clear(renderer, &color);
 
         // The view has a position in layout coordinates. If you have two displays,
@@ -129,11 +129,13 @@ pub const Output = struct {
         // If we have a stashed buffer, we are in the middle of a transaction
         // and need to render that buffer until the transaction is complete.
         if (view.stashed_buffer) |buffer| {
+            const border_width = view.root.border_width;
+            const inner_gap_width = view.root.inner_gap_width;
             var box = c.wlr_box{
-                .x = view.current_box.x + @intCast(i32, view.root.border_width),
-                .y = view.current_box.y + @intCast(i32, view.root.border_width),
-                .width = @intCast(c_int, view.current_box.width - view.root.border_width * 2),
-                .height = @intCast(c_int, view.current_box.height - view.root.border_width * 2),
+                .x = view.current_box.x + @intCast(i32, border_width + inner_gap_width),
+                .y = view.current_box.y + @intCast(i32, border_width + inner_gap_width),
+                .width = @intCast(c_int, view.current_box.width - border_width * 2 - inner_gap_width * 2),
+                .height = @intCast(c_int, view.current_box.height - border_width * 2 - inner_gap_width * 2),
             };
 
             // Scale the box to the output's current scaling factor
@@ -194,9 +196,9 @@ pub const Output = struct {
 
         var box = c.wlr_box{
             .x = @floatToInt(c_int, rdata.ox) + view.current_box.x + sx +
-                @intCast(c_int, view.root.border_width),
+                @intCast(c_int, view.root.border_width + view.root.inner_gap_width),
             .y = @floatToInt(c_int, rdata.oy) + view.current_box.y + sy +
-                @intCast(c_int, view.root.border_width),
+                @intCast(c_int, view.root.border_width + view.root.inner_gap_width),
             .width = surface.current.width,
             .height = surface.current.height,
         };
@@ -228,12 +230,13 @@ pub const Output = struct {
         else
             [_]f32{ 0.34509804, 0.43137255, 0.45882353, 1.0 }; // Solarized base01
         const border_width = self.root.border_width;
+        const inner_gap_width = self.root.inner_gap_width;
 
         // left border
-        border.x = @floatToInt(c_int, ox) + view.current_box.x;
-        border.y = @floatToInt(c_int, oy) + view.current_box.y;
+        border.x = @floatToInt(c_int, ox) + view.current_box.x + @intCast(c_int, inner_gap_width);
+        border.y = @floatToInt(c_int, oy) + view.current_box.y + @intCast(c_int, inner_gap_width);
         border.width = @intCast(c_int, border_width);
-        border.height = @intCast(c_int, view.current_box.height);
+        border.height = @intCast(c_int, view.current_box.height - inner_gap_width * 2);
         scaleBox(&border, self.wlr_output.scale);
         c.wlr_render_rect(
             self.root.server.wlr_renderer,
@@ -244,10 +247,10 @@ pub const Output = struct {
 
         // right border
         border.x = @floatToInt(c_int, ox) + view.current_box.x +
-            @intCast(c_int, view.current_box.width - border_width);
-        border.y = @floatToInt(c_int, oy) + view.current_box.y;
+            @intCast(c_int, view.current_box.width - border_width - inner_gap_width);
+        border.y = @floatToInt(c_int, oy) + view.current_box.y + @intCast(c_int, inner_gap_width);
         border.width = @intCast(c_int, border_width);
-        border.height = @intCast(c_int, view.current_box.height);
+        border.height = @intCast(c_int, view.current_box.height - inner_gap_width * 2);
         scaleBox(&border, self.wlr_output.scale);
         c.wlr_render_rect(
             self.root.server.wlr_renderer,
@@ -258,9 +261,11 @@ pub const Output = struct {
 
         // top border
         border.x = @floatToInt(c_int, ox) + view.current_box.x +
-            @intCast(c_int, border_width);
-        border.y = @floatToInt(c_int, oy) + view.current_box.y;
-        border.width = @intCast(c_int, view.current_box.width - border_width * 2);
+            @intCast(c_int, border_width + inner_gap_width);
+        border.y = @floatToInt(c_int, oy) + view.current_box.y +
+            @intCast(c_int, inner_gap_width);
+        border.width = @intCast(c_int, view.current_box.width -
+            border_width * 2 - inner_gap_width * 2);
         border.height = @intCast(c_int, border_width);
         scaleBox(&border, self.wlr_output.scale);
         c.wlr_render_rect(
@@ -272,10 +277,11 @@ pub const Output = struct {
 
         // bottom border
         border.x = @floatToInt(c_int, ox) + view.current_box.x +
-            @intCast(c_int, border_width);
+            @intCast(c_int, border_width + inner_gap_width);
         border.y = @floatToInt(c_int, oy) + view.current_box.y +
-            @intCast(c_int, view.current_box.height - border_width);
-        border.width = @intCast(c_int, view.current_box.width - border_width * 2);
+            @intCast(c_int, view.current_box.height - border_width - inner_gap_width);
+        border.width = @intCast(c_int, view.current_box.width -
+            border_width * 2 - inner_gap_width * 2);
         border.height = @intCast(c_int, border_width);
         scaleBox(&border, self.wlr_output.scale);
         c.wlr_render_rect(

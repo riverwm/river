@@ -37,6 +37,9 @@ pub const Root = struct {
     /// Width of borders in pixels
     border_width: u32,
 
+    /// Width of inner gaps in pixels
+    inner_gap_width: u32,
+
     /// Number of pending configures sent in the current transaction.
     /// A value of 0 means there is no current transaction.
     pending_configures: u32,
@@ -67,6 +70,8 @@ pub const Root = struct {
         self.master_factor = 0.6;
 
         self.border_width = 4;
+
+        self.inner_gap_width = 10;
 
         self.pending_configures = 0;
 
