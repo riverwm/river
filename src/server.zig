@@ -115,7 +115,9 @@ pub const Server = struct {
     /// Handle all compositor keybindings
     /// Note: this is a hacky initial implementation for testing and will be rewritten eventually
     pub fn handleKeybinding(self: *Self, sym: c.xkb_keysym_t, modifiers: u32) bool {
-        // This function assumes the proper modifier is held down.
+        if (modifiers & @intCast(u32, c.WLR_MODIFIER_LOGO) == 0) {
+            return false;
+        }
         if (modifiers & @intCast(u32, c.WLR_MODIFIER_SHIFT) != 0) {
             switch (sym) {
                 c.XKB_KEY_H => {

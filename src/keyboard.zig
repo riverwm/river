@@ -1,6 +1,7 @@
 const std = @import("std");
 const c = @import("c.zig");
 
+const Log = @import("log.zig").Log;
 const Seat = @import("seat.zig").Seat;
 
 pub const Keyboard = struct {
@@ -105,14 +106,13 @@ pub const Keyboard = struct {
         var handled = false;
         // TODO: These modifiers aren't properly handled, see sway's code
         const modifiers = c.wlr_keyboard_get_modifiers(wlr_keyboard);
-        if (modifiers & @intCast(u32, c.WLR_MODIFIER_LOGO) != 0 and
-            event.state == c.enum_wlr_key_state.WLR_KEY_PRESSED)
-        {
-            // If mod is held down and this button was _pressed_, we attempt to
-            // process it as a compositor keybinding.
+        if (event.state == c.enum_wlr_key_state.WLR_KEY_PRESSED) {
             var i: usize = 0;
             while (i < translated_keysyms_len) : (i += 1) {
-                if (keyboard.seat.server.handleKeybinding(translated_keysyms.?[i], modifiers)) {
+                if (keyboard.handleBuiltinKeybind(translated_keysyms.?[i])) {
+                    handled = true;
+                    break;
+                } else if (keyboard.seat.server.handleKeybinding(translated_keysyms.?[i], modifiers)) {
                     handled = true;
                     break;
                 }
@@ -120,7 +120,10 @@ pub const Keyboard = struct {
             if (!handled) {
                 i = 0;
                 while (i < raw_keysyms_len) : (i += 1) {
-                    if (keyboard.seat.server.handleKeybinding(raw_keysyms.?[i], modifiers)) {
+                    if (keyboard.handleBuiltinKeybind(raw_keysyms.?[i])) {
+                        handled = true;
+                        break;
+                    } else if (keyboard.seat.server.handleKeybinding(raw_keysyms.?[i], modifiers)) {
                         handled = true;
                         break;
                     }
@@ -139,5 +142,23 @@ pub const Keyboard = struct {
                 @intCast(u32, @enumToInt(event.state)),
             );
         }
+    }
+
+    /// Handle any builtin, harcoded compsitor bindings such as VT switching.
+    /// Returns true if the keysym was handled.
+    fn handleBuiltinKeybind(self: Self, keysym: c.xkb_keysym_t) bool {
+        if (keysym >= c.XKB_KEY_XF86Switch_VT_1 and keysym <= c.XKB_KEY_XF86Switch_VT_12) {
+            Log.Debug.log("Switch VT keysym received", .{});
+            const wlr_backend = self.seat.server.wlr_backend;
+            if (c.river_wlr_backend_is_multi(wlr_backend)) {
+                if (c.river_wlr_backend_get_session(wlr_backend)) |session| {
+                    const vt = keysym - c.XKB_KEY_XF86Switch_VT_1 + 1;
+                    Log.Debug.log("Switching to VT {}", .{vt});
+                    _ = c.wlr_session_change_vt(session, vt);
+                }
+            }
+            return true;
+        }
+        return false;
     }
 };
