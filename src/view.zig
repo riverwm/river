@@ -91,10 +91,12 @@ pub const View = struct {
 
     pub fn configurePending(self: *Self) void {
         if (self.pending_box) |pending_box| {
+            const border_width = self.root.server.config.border_width;
+            const view_padding = self.root.server.config.view_padding;
             self.pending_serial = c.wlr_xdg_toplevel_set_size(
                 self.wlr_xdg_surface,
-                pending_box.width - self.root.border_width * 2 - self.root.view_padding * 2,
-                pending_box.height - self.root.border_width * 2 - self.root.view_padding * 2,
+                pending_box.width - border_width * 2 - view_padding * 2,
+                pending_box.height - border_width * 2 - view_padding * 2,
             );
         } else {
             // TODO: log warning

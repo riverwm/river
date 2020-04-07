@@ -2,6 +2,7 @@ const std = @import("std");
 const c = @import("c.zig");
 const command = @import("command.zig");
 
+const Config = @import("config.zig").Config;
 const DecorationManager = @import("decoration_manager.zig").DecorationManager;
 const Output = @import("output.zig").Output;
 const Root = @import("root.zig").Root;
@@ -24,6 +25,8 @@ pub const Server = struct {
     decoration_manager: DecorationManager,
     root: Root,
     seat: Seat,
+
+    config: Config,
 
     listen_new_output: c.wl_listener,
     listen_new_xdg_surface: c.wl_listener,
@@ -73,6 +76,8 @@ pub const Server = struct {
 
         try self.seat.init(self);
 
+        try self.config.init(self.allocator);
+
         // Register our listeners for new outputs and xdg_surfaces.
         self.listen_new_output.notify = handleNewOutput;
         c.wl_signal_add(&self.wlr_backend.events.new_output, &self.listen_new_output);
@@ -110,45 +115,6 @@ pub const Server = struct {
     /// Enter the wayland event loop and block until the compositor is exited
     pub fn run(self: Self) void {
         c.wl_display_run(self.wl_display);
-    }
-
-    /// Handle all compositor keybindings
-    /// Note: this is a hacky initial implementation for testing and will be rewritten eventually
-    pub fn handleKeybinding(self: *Self, sym: c.xkb_keysym_t, modifiers: u32) bool {
-        if (modifiers & @intCast(u32, c.WLR_MODIFIER_LOGO) == 0) {
-            return false;
-        }
-        if (modifiers & @intCast(u32, c.WLR_MODIFIER_SHIFT) != 0) {
-            switch (sym) {
-                c.XKB_KEY_H => command.modifyMasterCount(self, 1),
-                c.XKB_KEY_L => command.modifyMasterCount(self, -1),
-                c.XKB_KEY_Return => command.spawn(self),
-                c.XKB_KEY_1 => command.setFocusedViewTags(self, 1 << 0),
-                c.XKB_KEY_2 => command.setFocusedViewTags(self, 1 << 1),
-                c.XKB_KEY_3 => command.setFocusedViewTags(self, 1 << 2),
-                c.XKB_KEY_4 => command.setFocusedViewTags(self, 1 << 3),
-                c.XKB_KEY_5 => command.setFocusedViewTags(self, 1 << 4),
-                c.XKB_KEY_6 => command.setFocusedViewTags(self, 1 << 5),
-                else => return false,
-            }
-        } else {
-            switch (sym) {
-                c.XKB_KEY_e => command.exitCompositor(self),
-                c.XKB_KEY_j => command.focusNextView(self),
-                c.XKB_KEY_k => command.focusPrevView(self),
-                c.XKB_KEY_h => command.modifyMasterFactor(self, 0.05),
-                c.XKB_KEY_l => command.modifyMasterFactor(self, -0.05),
-                c.XKB_KEY_Return => command.zoom(self),
-                c.XKB_KEY_1 => command.focusTags(self, 1 << 0),
-                c.XKB_KEY_2 => command.focusTags(self, 1 << 1),
-                c.XKB_KEY_3 => command.focusTags(self, 1 << 2),
-                c.XKB_KEY_4 => command.focusTags(self, 1 << 3),
-                c.XKB_KEY_5 => command.focusTags(self, 1 << 4),
-                c.XKB_KEY_6 => command.focusTags(self, 1 << 5),
-                else => return false,
-            }
-        }
-        return true;
     }
 
     fn handleNewOutput(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {

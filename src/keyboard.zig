@@ -112,7 +112,7 @@ pub const Keyboard = struct {
                 if (keyboard.handleBuiltinKeybind(translated_keysyms.?[i])) {
                     handled = true;
                     break;
-                } else if (keyboard.seat.server.handleKeybinding(translated_keysyms.?[i], modifiers)) {
+                } else if (keyboard.seat.handleKeybinding(translated_keysyms.?[i], modifiers)) {
                     handled = true;
                     break;
                 }
@@ -123,7 +123,7 @@ pub const Keyboard = struct {
                     if (keyboard.handleBuiltinKeybind(raw_keysyms.?[i])) {
                         handled = true;
                         break;
-                    } else if (keyboard.seat.server.handleKeybinding(raw_keysyms.?[i], modifiers)) {
+                    } else if (keyboard.seat.handleKeybinding(raw_keysyms.?[i], modifiers)) {
                         handled = true;
                         break;
                     }

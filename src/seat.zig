@@ -41,6 +41,19 @@ pub const Seat = struct {
         self.cursor.destroy();
     }
 
+    /// Handle any user-defined keybinding for the passed keysym and modifiers
+    /// Returns true if the key was handled
+    pub fn handleKeybinding(self: Self, keysym: c.xkb_keysym_t, modifiers: u32) bool {
+        for (self.server.config.keybinds.items) |keybind| {
+            if (modifiers == keybind.modifiers and keysym == keybind.keysym) {
+                // Execute the bound command
+                keybind.command(self.server, keybind.arg);
+                return true;
+            }
+        }
+        return false;
+    }
+
     fn addKeyboard(self: *Self, device: *c.wlr_input_device) !void {
         c.wlr_seat_set_keyboard(self.wlr_seat, device);
 

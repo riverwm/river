@@ -129,8 +129,8 @@ pub const Output = struct {
         // If we have a stashed buffer, we are in the middle of a transaction
         // and need to render that buffer until the transaction is complete.
         if (view.stashed_buffer) |buffer| {
-            const border_width = view.root.border_width;
-            const view_padding = view.root.view_padding;
+            const border_width = view.root.server.config.border_width;
+            const view_padding = view.root.server.config.view_padding;
             var box = c.wlr_box{
                 .x = view.current_box.x + @intCast(i32, border_width + view_padding),
                 .y = view.current_box.y + @intCast(i32, border_width + view_padding),
@@ -194,11 +194,13 @@ pub const Output = struct {
             return;
         }
 
+        const border_width = view.root.server.config.border_width;
+        const view_padding = view.root.server.config.view_padding;
         var box = c.wlr_box{
             .x = @floatToInt(c_int, rdata.ox) + view.current_box.x + sx +
-                @intCast(c_int, view.root.border_width + view.root.view_padding),
+                @intCast(c_int, border_width + view_padding),
             .y = @floatToInt(c_int, rdata.oy) + view.current_box.y + sy +
-                @intCast(c_int, view.root.border_width + view.root.view_padding),
+                @intCast(c_int, border_width + view_padding),
             .width = surface.current.width,
             .height = surface.current.height,
         };
@@ -229,8 +231,8 @@ pub const Output = struct {
             [_]f32{ 0.57647059, 0.63137255, 0.63137255, 1.0 } // Solarized base1
         else
             [_]f32{ 0.34509804, 0.43137255, 0.45882353, 1.0 }; // Solarized base01
-        const border_width = self.root.border_width;
-        const view_padding = self.root.view_padding;
+        const border_width = self.root.server.config.border_width;
+        const view_padding = self.root.server.config.view_padding;
 
         // left border
         border.x = @floatToInt(c_int, ox) + view.current_box.x + @intCast(c_int, view_padding);
