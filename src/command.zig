@@ -71,6 +71,16 @@ pub fn focusTags(server: *Server, arg: Arg) void {
     server.root.arrange();
 }
 
+/// Toggle focus of the passsed tags.
+pub fn toggleTags(server: *Server, arg: Arg) void {
+    const tags = arg.uint;
+    const new_focused_tags = server.root.current_focused_tags ^ tags;
+    if (new_focused_tags != 0) {
+        server.root.pending_focused_tags = new_focused_tags;
+        server.root.arrange();
+    }
+}
+
 /// Set the tags of the focused view.
 pub fn setFocusedViewTags(server: *Server, arg: Arg) void {
     const tags = arg.uint;
