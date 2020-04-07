@@ -37,8 +37,8 @@ pub const Root = struct {
     /// Width of borders in pixels
     border_width: u32,
 
-    /// Width of inner gaps in pixels
-    inner_gap_width: u32,
+    /// Amount of view padding in pixels
+    view_padding: u32,
 
     /// Number of pending configures sent in the current transaction.
     /// A value of 0 means there is no current transaction.
@@ -71,7 +71,7 @@ pub const Root = struct {
 
         self.border_width = 4;
 
-        self.inner_gap_width = 10;
+        self.view_padding = 10;
 
         self.pending_configures = 0;
 

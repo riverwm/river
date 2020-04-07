@@ -93,8 +93,8 @@ pub const View = struct {
         if (self.pending_box) |pending_box| {
             self.pending_serial = c.wlr_xdg_toplevel_set_size(
                 self.wlr_xdg_surface,
-                pending_box.width - self.root.border_width * 2 - self.root.inner_gap_width * 2,
-                pending_box.height - self.root.border_width * 2 - self.root.inner_gap_width * 2,
+                pending_box.width - self.root.border_width * 2 - self.root.view_padding * 2,
+                pending_box.height - self.root.border_width * 2 - self.root.view_padding * 2,
             );
         } else {
             // TODO: log warning
