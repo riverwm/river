@@ -1,6 +1,6 @@
 const std = @import("std");
 const c = @import("c.zig");
-const util = @import("util.zig");
+const command = @import("command.zig");
 
 const DecorationManager = @import("decoration_manager.zig").DecorationManager;
 const Output = @import("output.zig").Output;
@@ -120,114 +120,31 @@ pub const Server = struct {
         }
         if (modifiers & @intCast(u32, c.WLR_MODIFIER_SHIFT) != 0) {
             switch (sym) {
-                c.XKB_KEY_H => {
-                    //if (self.root.master_count < self.root.views.len) {
-                    self.root.master_count += 1;
-                    self.root.arrange();
-                    //}
-                },
-                c.XKB_KEY_L => {
-                    //if (self.root.master_count > 0) {
-                    self.root.master_count -= 1;
-                    self.root.arrange();
-                    //}
-                },
-                c.XKB_KEY_Return => {
-                    // Spawn an instance of alacritty
-                    // const argv = [_][]const u8{ "/bin/sh", "-c", "WAYLAND_DEBUG=1 alacritty" };
-                    const argv = [_][]const u8{ "/bin/sh", "-c", "alacritty" };
-                    const child = std.ChildProcess.init(&argv, std.heap.c_allocator) catch unreachable;
-                    std.ChildProcess.spawn(child) catch unreachable;
-                },
-                c.XKB_KEY_1 => {
-                    if (self.root.focused_view) |view| {
-                        view.pending_tags = 1 << 0;
-                        self.root.arrange();
-                    }
-                },
-                c.XKB_KEY_2 => {
-                    if (self.root.focused_view) |view| {
-                        view.pending_tags = 1 << 1;
-                        self.root.arrange();
-                    }
-                },
-                c.XKB_KEY_3 => {
-                    if (self.root.focused_view) |view| {
-                        view.pending_tags = 1 << 2;
-                        self.root.arrange();
-                    }
-                },
-                c.XKB_KEY_4 => {
-                    if (self.root.focused_view) |view| {
-                        view.pending_tags = 1 << 3;
-                        self.root.arrange();
-                    }
-                },
-                c.XKB_KEY_5 => {
-                    if (self.root.focused_view) |view| {
-                        view.pending_tags = 1 << 4;
-                        self.root.arrange();
-                    }
-                },
-                c.XKB_KEY_6 => {
-                    if (self.root.focused_view) |view| {
-                        view.pending_tags = 1 << 5;
-                        self.root.arrange();
-                    }
-                },
+                c.XKB_KEY_H => command.modifyMasterCount(self, 1),
+                c.XKB_KEY_L => command.modifyMasterCount(self, -1),
+                c.XKB_KEY_Return => command.spawn(self),
+                c.XKB_KEY_1 => command.setFocusedViewTags(self, 1 << 0),
+                c.XKB_KEY_2 => command.setFocusedViewTags(self, 1 << 1),
+                c.XKB_KEY_3 => command.setFocusedViewTags(self, 1 << 2),
+                c.XKB_KEY_4 => command.setFocusedViewTags(self, 1 << 3),
+                c.XKB_KEY_5 => command.setFocusedViewTags(self, 1 << 4),
+                c.XKB_KEY_6 => command.setFocusedViewTags(self, 1 << 5),
                 else => return false,
             }
         } else {
             switch (sym) {
-                c.XKB_KEY_e => c.wl_display_terminate(self.wl_display),
-                c.XKB_KEY_j => self.root.focusNextView(),
-                c.XKB_KEY_k => self.root.focusPrevView(),
-                c.XKB_KEY_h => {
-                    if (self.root.master_factor > 0.05) {
-                        self.root.master_factor = util.max(f64, self.root.master_factor - 0.05, 0.05);
-                        self.root.arrange();
-                    }
-                },
-                c.XKB_KEY_l => {
-                    if (self.root.master_factor < 0.95) {
-                        self.root.master_factor = util.min(f64, self.root.master_factor + 0.05, 0.95);
-                        self.root.arrange();
-                    }
-                },
-                c.XKB_KEY_Return => {
-                    if (self.root.focused_view) |current_focus| {
-                        const node = @fieldParentPtr(ViewStack.Node, "view", current_focus);
-                        if (node != self.root.views.first) {
-                            self.root.views.remove(node);
-                            self.root.views.push(node);
-                            self.root.arrange();
-                        }
-                    }
-                },
-                c.XKB_KEY_1 => {
-                    self.root.pending_focused_tags = 1 << 0;
-                    self.root.arrange();
-                },
-                c.XKB_KEY_2 => {
-                    self.root.pending_focused_tags = 1 << 1;
-                    self.root.arrange();
-                },
-                c.XKB_KEY_3 => {
-                    self.root.pending_focused_tags = 1 << 2;
-                    self.root.arrange();
-                },
-                c.XKB_KEY_4 => {
-                    self.root.pending_focused_tags = 1 << 3;
-                    self.root.arrange();
-                },
-                c.XKB_KEY_5 => {
-                    self.root.pending_focused_tags = 1 << 4;
-                    self.root.arrange();
-                },
-                c.XKB_KEY_6 => {
-                    self.root.pending_focused_tags = 1 << 5;
-                    self.root.arrange();
-                },
+                c.XKB_KEY_e => command.exitCompositor(self),
+                c.XKB_KEY_j => command.focusNextView(self),
+                c.XKB_KEY_k => command.focusPrevView(self),
+                c.XKB_KEY_h => command.modifyMasterFactor(self, 0.05),
+                c.XKB_KEY_l => command.modifyMasterFactor(self, -0.05),
+                c.XKB_KEY_Return => command.zoom(self),
+                c.XKB_KEY_1 => command.focusTags(self, 1 << 0),
+                c.XKB_KEY_2 => command.focusTags(self, 1 << 1),
+                c.XKB_KEY_3 => command.focusTags(self, 1 << 2),
+                c.XKB_KEY_4 => command.focusTags(self, 1 << 3),
+                c.XKB_KEY_5 => command.focusTags(self, 1 << 4),
+                c.XKB_KEY_6 => command.focusTags(self, 1 << 5),
                 else => return false,
             }
         }
