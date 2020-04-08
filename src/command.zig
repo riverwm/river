@@ -1,6 +1,7 @@
 const std = @import("std");
 const c = @import("c.zig");
 
+const Log = @import("log.zig").Log;
 const Server = @import("server.zig").Server;
 const ViewStack = @import("view_stack.zig").ViewStack;
 
@@ -8,6 +9,7 @@ pub const Arg = union {
     int: i32,
     uint: u32,
     float: f64,
+    cstr: [*:0]const u8,
     none: void,
 };
 
@@ -107,9 +109,13 @@ pub fn toggleFocusedViewTags(server: *Server, arg: Arg) void {
 /// Spawn a program.
 /// TODO: make this take a program as a paramter and spawn that
 pub fn spawn(server: *Server, arg: Arg) void {
-    const argv = [_][]const u8{ "/bin/sh", "-c", "alacritty" };
-    const child = std.ChildProcess.init(&argv, std.heap.c_allocator) catch unreachable;
-    std.ChildProcess.spawn(child) catch unreachable;
+    const cmd = arg.cstr;
+    if (c.fork() == 0) {
+        const terminator: ?*u8 = null;
+        if (c.execl("/bin/sh", "/bin/sh", "-c", cmd, terminator) == -1) {
+            Log.Error.log("Failed to execute command {}", .{cmd});
+        }
+    }
 }
 
 /// Close the focused view, if any.

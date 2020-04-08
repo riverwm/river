@@ -4,6 +4,7 @@ const command = @import("command.zig");
 
 const Config = @import("config.zig").Config;
 const DecorationManager = @import("decoration_manager.zig").DecorationManager;
+const Log = @import("log.zig").Log;
 const Output = @import("output.zig").Output;
 const Root = @import("root.zig").Root;
 const Seat = @import("seat.zig").Seat;
@@ -105,8 +106,7 @@ pub const Server = struct {
             return error.CantStartBackend;
         }
 
-        // Set the WAYLAND_DISPLAY environment variable to our socket and run the
-        // startup command if requested. */
+        // Set the WAYLAND_DISPLAY environment variable to our socket
         if (c.setenv("WAYLAND_DISPLAY", socket, 1) == -1) {
             return error.CantSetEnv;
         }

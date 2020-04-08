@@ -2,6 +2,7 @@ pub usingnamespace @cImport({
     @cDefine("WLR_USE_UNSTABLE", {});
     @cInclude("time.h");
     @cInclude("stdlib.h");
+    @cInclude("unistd.h");
     @cInclude("wayland-server-core.h");
     //@cInclude("wlr/backend.h");
     //@cInclude("wlr/render/wlr_renderer.h");

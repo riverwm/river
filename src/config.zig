@@ -50,7 +50,7 @@ pub const Config = struct {
         try self.keybinds.append(Keybind{ .keysym = c.XKB_KEY_h, .modifiers = mod | c.WLR_MODIFIER_SHIFT, .command = command.modifyMasterCount, .arg = .{ .int = 1 } });
         try self.keybinds.append(Keybind{ .keysym = c.XKB_KEY_l, .modifiers = mod | c.WLR_MODIFIER_SHIFT, .command = command.modifyMasterCount, .arg = .{ .int = -1 } });
 
-        try self.keybinds.append(Keybind{ .keysym = c.XKB_KEY_Return, .modifiers = mod | c.WLR_MODIFIER_SHIFT, .command = command.spawn, .arg = .{ .none = {} } });
+        try self.keybinds.append(Keybind{ .keysym = c.XKB_KEY_Return, .modifiers = mod | c.WLR_MODIFIER_SHIFT, .command = command.spawn, .arg = .{ .cstr = "alacritty" } });
 
         try self.keybinds.append(Keybind{ .keysym = c.XKB_KEY_1, .modifiers = mod | c.WLR_MODIFIER_SHIFT, .command = command.setFocusedViewTags, .arg = .{ .uint = 1 << 0 } });
         try self.keybinds.append(Keybind{ .keysym = c.XKB_KEY_2, .modifiers = mod | c.WLR_MODIFIER_SHIFT, .command = command.setFocusedViewTags, .arg = .{ .uint = 1 << 1 } });
