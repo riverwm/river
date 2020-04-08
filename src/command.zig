@@ -92,6 +92,18 @@ pub fn setFocusedViewTags(server: *Server, arg: Arg) void {
     }
 }
 
+/// Toggle the passed tags of the focused view
+pub fn toggleFocusedViewTags(server: *Server, arg: Arg) void {
+    const tags = arg.uint;
+    if (server.root.focused_view) |view| {
+        const new_tags = view.current_tags ^ tags;
+        if (new_tags != 0) {
+            view.pending_tags = new_tags;
+            server.root.arrange();
+        }
+    }
+}
+
 /// Spawn a program.
 /// TODO: make this take a program as a paramter and spawn that
 pub fn spawn(server: *Server, arg: Arg) void {

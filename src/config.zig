@@ -65,5 +65,12 @@ pub const Config = struct {
         try self.keybinds.append(Keybind{ .keysym = c.XKB_KEY_4, .modifiers = mod | c.WLR_MODIFIER_CTRL, .command = command.toggleTags, .arg = .{ .uint = 1 << 3 } });
         try self.keybinds.append(Keybind{ .keysym = c.XKB_KEY_5, .modifiers = mod | c.WLR_MODIFIER_CTRL, .command = command.toggleTags, .arg = .{ .uint = 1 << 4 } });
         try self.keybinds.append(Keybind{ .keysym = c.XKB_KEY_6, .modifiers = mod | c.WLR_MODIFIER_CTRL, .command = command.toggleTags, .arg = .{ .uint = 1 << 5 } });
+
+        try self.keybinds.append(Keybind{ .keysym = c.XKB_KEY_1, .modifiers = mod | c.WLR_MODIFIER_CTRL | c.WLR_MODIFIER_SHIFT, .command = command.toggleFocusedViewTags, .arg = .{ .uint = 1 << 0 } });
+        try self.keybinds.append(Keybind{ .keysym = c.XKB_KEY_2, .modifiers = mod | c.WLR_MODIFIER_CTRL | c.WLR_MODIFIER_SHIFT, .command = command.toggleFocusedViewTags, .arg = .{ .uint = 1 << 1 } });
+        try self.keybinds.append(Keybind{ .keysym = c.XKB_KEY_3, .modifiers = mod | c.WLR_MODIFIER_CTRL | c.WLR_MODIFIER_SHIFT, .command = command.toggleFocusedViewTags, .arg = .{ .uint = 1 << 2 } });
+        try self.keybinds.append(Keybind{ .keysym = c.XKB_KEY_4, .modifiers = mod | c.WLR_MODIFIER_CTRL | c.WLR_MODIFIER_SHIFT, .command = command.toggleFocusedViewTags, .arg = .{ .uint = 1 << 3 } });
+        try self.keybinds.append(Keybind{ .keysym = c.XKB_KEY_5, .modifiers = mod | c.WLR_MODIFIER_CTRL | c.WLR_MODIFIER_SHIFT, .command = command.toggleFocusedViewTags, .arg = .{ .uint = 1 << 4 } });
+        try self.keybinds.append(Keybind{ .keysym = c.XKB_KEY_6, .modifiers = mod | c.WLR_MODIFIER_CTRL | c.WLR_MODIFIER_SHIFT, .command = command.toggleFocusedViewTags, .arg = .{ .uint = 1 << 5 } });
     }
 };
