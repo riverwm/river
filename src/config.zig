@@ -13,6 +13,9 @@ pub const Config = struct {
     /// Amount of view padding in pixels
     view_padding: u32,
 
+    /// Amount of padding arount the outer edge of the layout in pixels
+    outer_padding: u32,
+
     const Keybind = struct {
         keysym: c.xkb_keysym_t,
         modifiers: u32,
@@ -25,7 +28,8 @@ pub const Config = struct {
 
     pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
         self.border_width = 2;
-        self.view_padding = 10;
+        self.view_padding = 8;
+        self.outer_padding = 8;
 
         self.keybinds = std.ArrayList(Keybind).init(allocator);
 

@@ -177,17 +177,23 @@ pub const Root = struct {
 
         // This can't return null if we pass null as the reference
         const output_box: *c.wlr_box = c.wlr_output_layout_get_box(self.wlr_output_layout, null);
+
+        const outer_padding = self.server.config.outer_padding;
+
+        const layout_width = @intCast(u32, output_box.width) - outer_padding * 2;
+        const layout_height = @intCast(u32, output_box.height) - outer_padding * 2;
+
         var master_column_width: u32 = undefined;
         var slave_column_width: u32 = undefined;
         if (master_count > 0 and slave_count > 0) {
             // If both master and slave views are present
-            master_column_width = @floatToInt(u32, @round(@intToFloat(f64, output_box.width) * self.master_factor));
-            slave_column_width = @intCast(u32, output_box.width) - master_column_width;
+            master_column_width = @floatToInt(u32, @round(@intToFloat(f64, layout_width) * self.master_factor));
+            slave_column_width = layout_width - master_column_width;
         } else if (master_count > 0) {
-            master_column_width = @intCast(u32, output_box.width);
+            master_column_width = layout_width;
             slave_column_width = 0;
         } else {
-            slave_column_width = @intCast(u32, output_box.width);
+            slave_column_width = layout_width;
             master_column_width = 0;
         }
 
@@ -196,12 +202,12 @@ pub const Root = struct {
         while (it.next()) |view| {
             if (i < master_count) {
                 // Add the remainder to the first master to ensure every pixel of height is used
-                const master_height = @divTrunc(@intCast(u32, output_box.height), master_count);
-                const master_height_rem = @intCast(u32, output_box.height) % master_count;
+                const master_height = @divTrunc(layout_height, master_count);
+                const master_height_rem = layout_height % master_count;
 
                 view.pending_box = View.Box{
-                    .x = 0,
-                    .y = @intCast(i32, i * master_height +
+                    .x = @intCast(i32, outer_padding),
+                    .y = @intCast(i32, outer_padding + i * master_height +
                         if (i > 0) master_height_rem else 0),
 
                     .width = master_column_width,
@@ -209,12 +215,12 @@ pub const Root = struct {
                 };
             } else {
                 // Add the remainder to the first slave to ensure every pixel of height is used
-                const slave_height = @divTrunc(@intCast(u32, output_box.height), slave_count);
-                const slave_height_rem = @intCast(u32, output_box.height) % slave_count;
+                const slave_height = @divTrunc(layout_height, slave_count);
+                const slave_height_rem = layout_height % slave_count;
 
                 view.pending_box = View.Box{
-                    .x = @intCast(i32, master_column_width),
-                    .y = @intCast(i32, (i - master_count) * slave_height +
+                    .x = @intCast(i32, outer_padding + master_column_width),
+                    .y = @intCast(i32, outer_padding + (i - master_count) * slave_height +
                         if (i > master_count) slave_height_rem else 0),
 
                     .width = slave_column_width,
