@@ -111,3 +111,10 @@ pub fn spawn(server: *Server, arg: Arg) void {
     const child = std.ChildProcess.init(&argv, std.heap.c_allocator) catch unreachable;
     std.ChildProcess.spawn(child) catch unreachable;
 }
+
+/// Close the focused view, if any.
+pub fn close(server: *Server, arg: Arg) void {
+    if (server.root.focused_view) |view| {
+        view.close();
+    }
+}
