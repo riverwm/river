@@ -72,5 +72,8 @@ pub const Config = struct {
         try self.keybinds.append(Keybind{ .keysym = c.XKB_KEY_4, .modifiers = mod | c.WLR_MODIFIER_CTRL | c.WLR_MODIFIER_SHIFT, .command = command.toggleFocusedViewTags, .arg = .{ .uint = 1 << 3 } });
         try self.keybinds.append(Keybind{ .keysym = c.XKB_KEY_5, .modifiers = mod | c.WLR_MODIFIER_CTRL | c.WLR_MODIFIER_SHIFT, .command = command.toggleFocusedViewTags, .arg = .{ .uint = 1 << 4 } });
         try self.keybinds.append(Keybind{ .keysym = c.XKB_KEY_6, .modifiers = mod | c.WLR_MODIFIER_CTRL | c.WLR_MODIFIER_SHIFT, .command = command.toggleFocusedViewTags, .arg = .{ .uint = 1 << 5 } });
+
+        try self.keybinds.append(Keybind{ .keysym = c.XKB_KEY_0, .modifiers = mod, .command = command.focusTags, .arg = .{ .uint = 0xFFFFFFFF } });
+        try self.keybinds.append(Keybind{ .keysym = c.XKB_KEY_0, .modifiers = mod | c.WLR_MODIFIER_SHIFT, .command = command.setFocusedViewTags, .arg = .{ .uint = 0xFFFFFFFF } });
     }
 };
