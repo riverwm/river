@@ -8,10 +8,10 @@ pub const Config = struct {
     const Self = @This();
 
     /// Width of borders in pixels
-    border_width: u32 = 2,
+    border_width: u32,
 
     /// Amount of view padding in pixels
-    view_padding: u32 = 10,
+    view_padding: u32,
 
     const Keybind = struct {
         keysym: c.xkb_keysym_t,
