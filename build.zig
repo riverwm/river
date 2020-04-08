@@ -14,15 +14,17 @@ pub fn build(b: *Builder) void {
     const exe = b.addExecutable("river", "src/main.zig");
     exe.setTarget(target);
     exe.setBuildMode(mode);
-    exe.addIncludeDir("protocol");
-    exe.linkLibC();
-    exe.addIncludeDir("/usr/include/pixman-1");
-    exe.addCSourceFile("include/render.c", &[_][]const u8{"-std=c99"});
+
     exe.addIncludeDir(".");
-    //exe.linkSystemLibrary("pixman");
+    exe.addIncludeDir("protocol");
+    exe.addCSourceFile("include/render.c", &[_][]const u8{"-std=c99"});
+
+    exe.linkLibC();
+    exe.linkSystemLibrary("pixman-1");
     exe.linkSystemLibrary("wayland-server");
     exe.linkSystemLibrary("wlroots");
     exe.linkSystemLibrary("xkbcommon");
+
     exe.install();
 
     const run_cmd = exe.run();
@@ -34,12 +36,13 @@ pub fn build(b: *Builder) void {
     const test_exe = b.addTest("src/test_main.zig");
     test_exe.setTarget(target);
     test_exe.setBuildMode(mode);
-    test_exe.addIncludeDir("protocol");
-    test_exe.linkLibC();
-    test_exe.addIncludeDir("/usr/include/pixman-1");
-    test_exe.addCSourceFile("include/render.c", &[_][]const u8{"-std=c99"});
+
     test_exe.addIncludeDir(".");
-    //test_exe.linkSystemLibrary("pixman");
+    test_exe.addIncludeDir("protocol");
+    test_exe.addCSourceFile("include/render.c", &[_][]const u8{"-std=c99"});
+
+    test_exe.linkLibC();
+    test_exe.linkSystemLibrary("pixman-1");
     test_exe.linkSystemLibrary("wayland-server");
     test_exe.linkSystemLibrary("wlroots");
     test_exe.linkSystemLibrary("xkbcommon");
