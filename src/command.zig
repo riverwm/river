@@ -9,7 +9,7 @@ pub const Arg = union {
     int: i32,
     uint: u32,
     float: f64,
-    cstr: [*:0]const u8,
+    str: []const u8,
     none: void,
 };
 
@@ -109,13 +109,17 @@ pub fn toggleFocusedViewTags(server: *Server, arg: Arg) void {
 /// Spawn a program.
 /// TODO: make this take a program as a paramter and spawn that
 pub fn spawn(server: *Server, arg: Arg) void {
-    const cmd = arg.cstr;
-    if (c.fork() == 0) {
-        const terminator: ?*u8 = null;
-        if (c.execl("/bin/sh", "/bin/sh", "-c", cmd, terminator) == -1) {
-            Log.Error.log("Failed to execute command {}", .{cmd});
-        }
-    }
+    const cmd = arg.str;
+
+    const argv = [_][]const u8{ "/bin/sh", "-c", cmd };
+    const child = std.ChildProcess.init(&argv, std.heap.c_allocator) catch |err| {
+        Log.Error.log("Failed to execute {}: {}", .{ cmd, err });
+        return;
+    };
+    std.ChildProcess.spawn(child) catch |err| {
+        Log.Error.log("Failed to execute {}: {}", .{ cmd, err });
+        return;
+    };
 }
 
 /// Close the focused view, if any.
