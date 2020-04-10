@@ -1,9 +1,9 @@
-# River
+# river
 
-River is a dynamic wayland compositor that takes inspiration from
+river is a dynamic wayland compositor that takes inspiration from
 [dwm](https://dwm.suckless.org) and [bspwm](https://github.com/baskerville/bspwm).
 
-*Note: River is currently very early in development and not ready for end users*
+*Note: river is currently early in development and not yet ready for the average end user*
 
 ## Design goals
 
@@ -14,7 +14,10 @@ binary, `riverctl`, like bspwm.
 
 ## Development
 
-If you'd like to participate in the development of river, please join our matrix channel:
+Check out the [roadmap](https://github.com/ifreund/river/issues/1) if you'd like to see
+what has been done and what is left to do.
+
+If you are interested in the development of river, please join our matrix channel:
 [#river](https://matrix.to/#/!BQgAgeafraCtMiVbSX:matrix.org?via=matrix.org).
 
 I can often be found in the `#sway-devel` IRC channel with the nick `ifreund`
