@@ -22,6 +22,7 @@ pub const Server = struct {
     wlr_renderer: *c.wlr_renderer,
 
     wlr_xdg_shell: *c.wlr_xdg_shell,
+    wlr_layer_shell: *c.wlr_layer_shell_v1,
 
     decoration_manager: DecorationManager,
     root: Root,
@@ -31,6 +32,7 @@ pub const Server = struct {
 
     listen_new_output: c.wl_listener,
     listen_new_xdg_surface: c.wl_listener,
+    listen_new_layer_surface: c.wl_listener,
 
     pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
         self.allocator = allocator;
@@ -71,6 +73,9 @@ pub const Server = struct {
         self.wlr_xdg_shell = c.wlr_xdg_shell_create(self.wl_display) orelse
             return error.CantCreateWlrXdgShell;
 
+        self.wlr_layer_shell = c.wlr_layer_shell_v1_create(self.wl_display) orelse
+            return error.CantCreateWlrLayerShell;
+
         try self.decoration_manager.init(self);
 
         try self.root.init(self);
@@ -79,12 +84,15 @@ pub const Server = struct {
 
         try self.config.init(self.allocator);
 
-        // Register our listeners for new outputs and xdg_surfaces.
+        // Register listeners for events on our globals
         self.listen_new_output.notify = handleNewOutput;
         c.wl_signal_add(&self.wlr_backend.events.new_output, &self.listen_new_output);
 
         self.listen_new_xdg_surface.notify = handleNewXdgSurface;
         c.wl_signal_add(&self.wlr_xdg_shell.events.new_surface, &self.listen_new_xdg_surface);
+
+        self.listen_new_layer_surface.notify = handleNewLayerSurface;
+        c.wl_signal_add(&self.wlr_layer_shell.events.new_surface, &self.listen_new_layer_surface);
     }
 
     /// Free allocated memory and clean up
@@ -136,5 +144,45 @@ pub const Server = struct {
 
         // toplevel surfaces are tracked and managed by the root
         server.root.addView(wlr_xdg_surface);
+    }
+
+    /// This event is raised when the layer_shell recieves a new surface from a client.
+    fn handleNewLayerSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+        const server = @fieldParentPtr(Server, "listen_new_layer_surface", listener.?);
+        const wlr_layer_surface = @ptrCast(
+            *c.wlr_layer_surface_v1,
+            @alignCast(@alignOf(*c.wlr_layer_surface_v1), data),
+        );
+
+        Log.Debug.log(
+            "New layer surface: namespace {}, layer {}, anchor {}, size {}x{}, margin ({},{},{},{})",
+            .{
+                wlr_layer_surface.namespace,
+                wlr_layer_surface.client_pending.layer,
+                wlr_layer_surface.client_pending.anchor,
+                wlr_layer_surface.client_pending.desired_width,
+                wlr_layer_surface.client_pending.desired_height,
+                wlr_layer_surface.client_pending.margin.top,
+                wlr_layer_surface.client_pending.margin.right,
+                wlr_layer_surface.client_pending.margin.bottom,
+                wlr_layer_surface.client_pending.margin.left,
+            },
+        );
+
+        // TODO: this is insufficent for multi output support
+        if (server.root.outputs.first) |node| {
+            const output = &node.data;
+            if (wlr_layer_surface.output == null) {
+                wlr_layer_surface.output = output.wlr_output;
+            }
+
+            output.addLayerSurface(wlr_layer_surface) catch unreachable;
+        } else {
+            Log.Error.log(
+                "No output available for layer surface '{}' autoassign",
+                .{wlr_layer_surface.namespace},
+            );
+            c.wlr_layer_surface_v1_close(wlr_layer_surface);
+        }
     }
 };

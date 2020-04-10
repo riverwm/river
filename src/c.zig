@@ -11,6 +11,7 @@ pub usingnamespace @cImport({
     @cInclude("wlr/types/wlr_data_device.h");
     @cInclude("wlr/types/wlr_input_device.h");
     @cInclude("wlr/types/wlr_keyboard.h");
+    @cInclude("wlr/types/wlr_layer_shell_v1.h");
     @cInclude("wlr/types/wlr_matrix.h");
     @cInclude("wlr/types/wlr_output.h");
     @cInclude("wlr/types/wlr_output_layout.h");

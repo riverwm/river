@@ -1,15 +1,26 @@
 const std = @import("std");
 const c = @import("c.zig");
 
+const Box = @import("box.zig").Box;
+const LayerSurface = @import("layer_surface.zig").LayerSurface;
 const Root = @import("root.zig").Root;
 const Server = @import("server.zig").Server;
 const View = @import("view.zig").View;
 const ViewStack = @import("view_stack.zig").ViewStack;
 
-const RenderData = struct {
+const ViewRenderData = struct {
     output: *c.wlr_output,
     renderer: *c.wlr_renderer,
     view: *View,
+    when: *c.struct_timespec,
+    ox: f64,
+    oy: f64,
+};
+
+const LayerSurfaceRenderData = struct {
+    output: *c.wlr_output,
+    renderer: *c.wlr_renderer,
+    layer_surface: *LayerSurface,
     when: *c.struct_timespec,
     ox: f64,
     oy: f64,
@@ -20,6 +31,9 @@ pub const Output = struct {
 
     root: *Root,
     wlr_output: *c.wlr_output,
+
+    layers: [4]std.TailQueue(LayerSurface),
+
     listen_frame: c.wl_listener,
 
     pub fn init(self: *Self, root: *Root, wlr_output: *c.wlr_output) !void {
@@ -43,6 +57,10 @@ pub const Output = struct {
         self.root = root;
         self.wlr_output = wlr_output;
 
+        for (self.layers) |*layer| {
+            layer.* = std.TailQueue(LayerSurface).init();
+        }
+
         // Sets up a listener for the frame notify event.
         self.listen_frame.notify = handleFrame;
         c.wl_signal_add(&wlr_output.events.frame, &self.listen_frame);
@@ -57,6 +75,91 @@ pub const Output = struct {
         // clients can see to find out information about the output (such as
         // DPI, scale factor, manufacturer, etc).
         c.wlr_output_create_global(wlr_output);
+    }
+
+    /// Add a newly created layer surface to the output.
+    pub fn addLayerSurface(self: *Self, wlr_layer_surface: *c.wlr_layer_surface_v1) !void {
+        const layer = wlr_layer_surface.client_pending.layer;
+        const node = try self.layers[@intCast(usize, @enumToInt(layer))].allocateNode(self.root.server.allocator);
+        node.data.init(self, wlr_layer_surface, layer);
+        self.layers[@intCast(usize, @enumToInt(layer))].append(node);
+        self.arrangeLayers();
+    }
+
+    /// Arrange all layer surfaces of this output and addjust the usable aread
+    pub fn arrangeLayers(self: *Self) void {
+        // TODO: handle exclusive zones
+        const bounds = blk: {
+            var width: c_int = undefined;
+            var height: c_int = undefined;
+            c.wlr_output_effective_resolution(self.wlr_output, &width, &height);
+            break :blk Box{
+                .x = 0,
+                .y = 0,
+                .width = @intCast(u32, width),
+                .height = @intCast(u32, height),
+            };
+        };
+
+        for (self.layers) |layer| {
+            self.arrangeLayer(layer, bounds);
+        }
+
+        // TODO: handle seat focus
+    }
+
+    /// Arrange the layer surfaces of a given layer
+    fn arrangeLayer(self: *Self, layer: std.TailQueue(LayerSurface), bounds: Box) void {
+        var it = layer.first;
+        while (it) |node| : (it = node.next) {
+            const layer_surface = &node.data;
+            const current_state = layer_surface.wlr_layer_surface.current;
+
+            var new_box: Box = undefined;
+
+            // Horizontal alignment
+            if (current_state.anchor & (@intCast(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT) |
+                @intCast(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT)) != 0 and
+                current_state.desired_width == 0)
+            {
+                new_box.x = bounds.x + @intCast(i32, current_state.margin.left);
+                new_box.width = bounds.width -
+                    (current_state.margin.left + current_state.margin.right);
+            } else if (current_state.anchor & @intCast(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT) != 0) {
+                new_box.x = bounds.x + @intCast(i32, current_state.margin.left);
+                new_box.width = current_state.desired_width;
+            } else if (current_state.anchor & @intCast(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT) != 0) {
+                new_box.x = bounds.x + @intCast(i32, bounds.width - current_state.desired_width -
+                    current_state.margin.right);
+                new_box.width = current_state.desired_width;
+            } else {
+                new_box.x = bounds.x + @intCast(i32, bounds.width / 2 - current_state.desired_width / 2);
+                new_box.width = current_state.desired_width;
+            }
+
+            // Vertical alignment
+            if (current_state.anchor & (@intCast(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP) |
+                @intCast(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM)) != 0 and
+                current_state.desired_height == 0)
+            {
+                new_box.y = bounds.y + @intCast(i32, current_state.margin.top);
+                new_box.height = bounds.height -
+                    (current_state.margin.top + current_state.margin.bottom);
+            } else if (current_state.anchor & @intCast(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP) != 0) {
+                new_box.y = bounds.y + @intCast(i32, current_state.margin.top);
+                new_box.height = current_state.desired_height;
+            } else if (current_state.anchor & @intCast(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM) != 0) {
+                new_box.y = bounds.y + @intCast(i32, bounds.height - current_state.desired_height -
+                    current_state.margin.bottom);
+                new_box.height = current_state.desired_height;
+            } else {
+                new_box.y = bounds.y + @intCast(i32, bounds.height / 2 - current_state.desired_height / 2);
+                new_box.height = current_state.desired_height;
+            }
+
+            layer_surface.box = new_box;
+            layer_surface.sendConfigure();
+        }
     }
 
     fn handleFrame(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -95,6 +198,9 @@ pub const Output = struct {
             &oy,
         );
 
+        output.renderLayer(output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND], &now, ox, oy);
+        output.renderLayer(output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM], &now, ox, oy);
+
         // The first view in the list is "on top" so iterate in reverse.
         var it = ViewStack.reverseIterator(
             output.root.views.last,
@@ -110,6 +216,9 @@ pub const Output = struct {
             output.renderBorders(view, &now, ox, oy);
         }
 
+        output.renderLayer(output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_TOP], &now, ox, oy);
+        output.renderLayer(output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY], &now, ox, oy);
+
         // Hardware cursors are rendered by the GPU on a separate plane, and can be
         // moved around without re-rendering what's beneath them - which is more
         // efficient. However, not all hardware supports hardware cursors. For this
@@ -123,6 +232,74 @@ pub const Output = struct {
         c.wlr_renderer_end(renderer);
         // TODO: handle failure
         _ = c.wlr_output_commit(output.wlr_output);
+    }
+
+    /// Render all surfaces on the passed layer
+    fn renderLayer(self: Self, layer: std.TailQueue(LayerSurface), now: *c.struct_timespec, ox: f64, oy: f64) void {
+        var it = layer.first;
+        while (it) |node| : (it = node.next) {
+            const layer_surface = &node.data;
+            var rdata = LayerSurfaceRenderData{
+                .output = self.wlr_output,
+                .renderer = self.root.server.wlr_renderer,
+                .layer_surface = layer_surface,
+                .when = now,
+                .ox = ox,
+                .oy = oy,
+            };
+            c.wlr_layer_surface_v1_for_each_surface(
+                layer_surface.wlr_layer_surface,
+                renderLayerSurface,
+                &rdata,
+            );
+        }
+    }
+
+    /// This function is called for every layer surface and popup that needs to be rendered.
+    /// TODO: refactor this to reduce code duplication
+    fn renderLayerSurface(_surface: ?*c.wlr_surface, sx: c_int, sy: c_int, data: ?*c_void) callconv(.C) void {
+        // wlroots says this will never be null
+        const surface = _surface.?;
+        // This function is called for every surface that needs to be rendered.
+        const rdata = @ptrCast(*LayerSurfaceRenderData, @alignCast(@alignOf(LayerSurfaceRenderData), data));
+        const layer_surface = rdata.layer_surface;
+        const output = rdata.output;
+
+        // We first obtain a wlr_texture, which is a GPU resource. wlroots
+        // automatically handles negotiating these with the client. The underlying
+        // resource could be an opaque handle passed from the client, or the client
+        // could have sent a pixel buffer which we copied to the GPU, or a few other
+        // means. You don't have to worry about this, wlroots takes care of it.
+        const texture = c.wlr_surface_get_texture(surface);
+        if (texture == null) {
+            return;
+        }
+
+        var box = c.wlr_box{
+            .x = @floatToInt(c_int, rdata.ox) + layer_surface.box.x + sx,
+            .y = @floatToInt(c_int, rdata.oy) + layer_surface.box.y + sy,
+            .width = surface.current.width,
+            .height = surface.current.height,
+        };
+
+        // Scale the box to the output's current scaling factor
+        scaleBox(&box, output.scale);
+
+        // wlr_matrix_project_box is a helper which takes a box with a desired
+        // x, y coordinates, width and height, and an output geometry, then
+        // prepares an orthographic projection and multiplies the necessary
+        // transforms to produce a model-view-projection matrix.
+        var matrix: [9]f32 = undefined;
+        const transform = c.wlr_output_transform_invert(surface.current.transform);
+        c.wlr_matrix_project_box(&matrix, &box, transform, 0.0, &output.transform_matrix);
+
+        // This takes our matrix, the texture, and an alpha, and performs the actual
+        // rendering on the GPU.
+        _ = c.wlr_render_texture_with_matrix(rdata.renderer, texture, &matrix, 1.0);
+
+        // This lets the client know that we've displayed that frame and it can
+        // prepare another one now if it likes.
+        c.wlr_surface_send_frame_done(surface, rdata.when);
     }
 
     fn renderView(self: Self, view: *View, now: *c.struct_timespec, ox: f64, oy: f64) void {
@@ -161,7 +338,7 @@ pub const Output = struct {
         } else {
             // Since there is no stashed buffer, we are not in the middle of
             // a transaction and may simply render each toplevel surface.
-            var rdata = RenderData{
+            var rdata = ViewRenderData{
                 .output = self.wlr_output,
                 .view = view,
                 .renderer = self.root.server.wlr_renderer,
@@ -176,11 +353,11 @@ pub const Output = struct {
         }
     }
 
+    /// This function is called for every toplevel and popup surface that needs to be rendered.
     fn renderSurface(_surface: ?*c.wlr_surface, sx: c_int, sy: c_int, data: ?*c_void) callconv(.C) void {
         // wlroots says this will never be null
         const surface = _surface.?;
-        // This function is called for every surface that needs to be rendered.
-        const rdata = @ptrCast(*RenderData, @alignCast(@alignOf(RenderData), data));
+        const rdata = @ptrCast(*ViewRenderData, @alignCast(@alignOf(ViewRenderData), data));
         const view = rdata.view;
         const output = rdata.output;
 

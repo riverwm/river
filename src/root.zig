@@ -2,6 +2,7 @@ const std = @import("std");
 const c = @import("c.zig");
 const util = @import("util.zig");
 
+const Box = @import("box.zig").Box;
 const Log = @import("log.zig").Log;
 const Output = @import("output.zig").Output;
 const Server = @import("server.zig").Server;
@@ -205,7 +206,7 @@ pub const Root = struct {
                 const master_height = @divTrunc(layout_height, master_count);
                 const master_height_rem = layout_height % master_count;
 
-                view.pending_box = View.Box{
+                view.pending_box = Box{
                     .x = @intCast(i32, outer_padding),
                     .y = @intCast(i32, outer_padding + i * master_height +
                         if (i > 0) master_height_rem else 0),
@@ -218,7 +219,7 @@ pub const Root = struct {
                 const slave_height = @divTrunc(layout_height, slave_count);
                 const slave_height_rem = layout_height % slave_count;
 
-                view.pending_box = View.Box{
+                view.pending_box = Box{
                     .x = @intCast(i32, outer_padding + master_column_width),
                     .y = @intCast(i32, outer_padding + (i - master_count) * slave_height +
                         if (i > master_count) slave_height_rem else 0),

@@ -1,6 +1,7 @@
 const std = @import("std");
 const c = @import("c.zig");
 
+const Box = @import("box.zig").Box;
 const Root = @import("root.zig").Root;
 const ViewStack = @import("view_stack.zig").ViewStack;
 
@@ -11,13 +12,6 @@ pub const View = struct {
     wlr_xdg_surface: *c.wlr_xdg_surface,
 
     mapped: bool,
-
-    pub const Box = struct {
-        x: i32,
-        y: i32,
-        width: u32,
-        height: u32,
-    };
 
     current_box: Box,
     pending_box: ?Box,
