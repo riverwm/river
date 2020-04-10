@@ -64,12 +64,6 @@ pub const Server = struct {
         c.wlr_renderer_init_wl_display(self.wlr_renderer, self.wl_display); // orelse
         //    return error.CantInitWlDisplay;
 
-        // These both free themselves when the wl_display is destroyed
-        _ = c.wlr_compositor_create(self.wl_display, self.wlr_renderer) orelse
-            return error.CantCreateWlrCompositor;
-        _ = c.wlr_data_device_manager_create(self.wl_display) orelse
-            return error.CantCreateWlrDataDeviceManager;
-
         self.wlr_xdg_shell = c.wlr_xdg_shell_create(self.wl_display) orelse
             return error.CantCreateWlrXdgShell;
 
@@ -83,6 +77,14 @@ pub const Server = struct {
         try self.seat.init(self);
 
         try self.config.init(self.allocator);
+
+        // These all free themselves when the wl_display is destroyed
+        _ = c.wlr_compositor_create(self.wl_display, self.wlr_renderer) orelse
+            return error.CantCreateWlrCompositor;
+        _ = c.wlr_data_device_manager_create(self.wl_display) orelse
+            return error.CantCreateWlrDataDeviceManager;
+        _ = c.wlr_xdg_output_manager_v1_create(self.wl_display, self.root.wlr_output_layout) orelse
+            return error.CantCreateWlrOutputManager;
 
         // Register listeners for events on our globals
         self.listen_new_output.notify = handleNewOutput;
