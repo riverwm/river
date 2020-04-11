@@ -44,10 +44,7 @@ pub fn renderOutput(output: *Output) void {
     renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM], &now, ox, oy);
 
     // The first view in the list is "on top" so iterate in reverse.
-    var it = ViewStack.reverseIterator(
-        output.root.views.last,
-        output.root.current_focused_tags,
-    );
+    var it = ViewStack.reverseIterator(output.views.last, output.current_focused_tags);
     while (it.next()) |view| {
         // This check prevents a race condition when a frame is requested
         // between mapping of a view and the first configure being handled.
@@ -166,8 +163,8 @@ fn renderView(output: Output, view: *View, now: *c.struct_timespec, ox: f64, oy:
     // If we have a stashed buffer, we are in the middle of a transaction
     // and need to render that buffer until the transaction is complete.
     if (view.stashed_buffer) |buffer| {
-        const border_width = view.root.server.config.border_width;
-        const view_padding = view.root.server.config.view_padding;
+        const border_width = view.output.root.server.config.border_width;
+        const view_padding = view.output.root.server.config.view_padding;
         var box = c.wlr_box{
             .x = view.current_box.x + @intCast(i32, border_width + view_padding),
             .y = view.current_box.y + @intCast(i32, border_width + view_padding),
@@ -231,8 +228,8 @@ fn renderSurface(_surface: ?*c.wlr_surface, sx: c_int, sy: c_int, data: ?*c_void
         return;
     }
 
-    const border_width = view.root.server.config.border_width;
-    const view_padding = view.root.server.config.view_padding;
+    const border_width = view.output.root.server.config.border_width;
+    const view_padding = view.output.root.server.config.view_padding;
     var box = c.wlr_box{
         .x = @floatToInt(c_int, rdata.ox) + view.current_box.x + sx +
             @intCast(c_int, border_width + view_padding),

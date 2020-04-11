@@ -144,8 +144,7 @@ pub const Server = struct {
             return;
         }
 
-        // toplevel surfaces are tracked and managed by the root
-        server.root.addView(wlr_xdg_surface);
+        server.root.focusedOutput().addView(wlr_xdg_surface);
     }
 
     /// This event is raised when the layer_shell recieves a new surface from a client.

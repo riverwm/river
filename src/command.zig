@@ -33,22 +33,24 @@ pub fn focusPrevView(server: *Server, arg: Arg) void {
 /// Modify the number of master views
 pub fn modifyMasterCount(server: *Server, arg: Arg) void {
     const delta = arg.int;
-    server.root.master_count = @intCast(u32, std.math.max(
-        0,
-        @intCast(i32, server.root.master_count) + delta,
-    ));
+    const output = server.root.focusedOutput();
+    output.master_count = @intCast(
+        u32,
+        std.math.max(0, @intCast(i32, output.master_count) + delta),
+    );
     server.root.arrange();
 }
 
 /// Modify the percent of the width of the screen that the master views occupy.
 pub fn modifyMasterFactor(server: *Server, arg: Arg) void {
     const delta = arg.float;
+    const output = server.root.focusedOutput();
     const new_master_factor = std.math.min(
-        std.math.max(server.root.master_factor + delta, 0.05),
+        std.math.max(output.master_factor + delta, 0.05),
         0.95,
     );
-    if (new_master_factor != server.root.master_factor) {
-        server.root.master_factor = new_master_factor;
+    if (new_master_factor != output.master_factor) {
+        output.master_factor = new_master_factor;
         server.root.arrange();
     }
 }
@@ -57,10 +59,11 @@ pub fn modifyMasterFactor(server: *Server, arg: Arg) void {
 /// TODO: if the top of the stack is focused, bump the next visible view.
 pub fn zoom(server: *Server, arg: Arg) void {
     if (server.root.focused_view) |current_focus| {
+        const output = server.root.focusedOutput();
         const node = @fieldParentPtr(ViewStack.Node, "view", current_focus);
-        if (node != server.root.views.first) {
-            server.root.views.remove(node);
-            server.root.views.push(node);
+        if (node != output.views.first) {
+            output.views.remove(node);
+            output.views.push(node);
             server.root.arrange();
         }
     }
@@ -69,16 +72,18 @@ pub fn zoom(server: *Server, arg: Arg) void {
 /// Switch focus to the passed tags.
 pub fn focusTags(server: *Server, arg: Arg) void {
     const tags = arg.uint;
-    server.root.pending_focused_tags = tags;
+    const output = server.root.focusedOutput();
+    output.pending_focused_tags = tags;
     server.root.arrange();
 }
 
 /// Toggle focus of the passsed tags.
 pub fn toggleTags(server: *Server, arg: Arg) void {
     const tags = arg.uint;
-    const new_focused_tags = server.root.current_focused_tags ^ tags;
+    const output = server.root.focusedOutput();
+    const new_focused_tags = output.current_focused_tags ^ tags;
     if (new_focused_tags != 0) {
-        server.root.pending_focused_tags = new_focused_tags;
+        output.pending_focused_tags = new_focused_tags;
         server.root.arrange();
     }
 }

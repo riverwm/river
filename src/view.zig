@@ -2,13 +2,14 @@ const std = @import("std");
 const c = @import("c.zig");
 
 const Box = @import("box.zig").Box;
+const Output = @import("output.zig").Output;
 const Root = @import("root.zig").Root;
 const ViewStack = @import("view_stack.zig").ViewStack;
 
 pub const View = struct {
     const Self = @This();
 
-    root: *Root,
+    output: *Output,
     wlr_xdg_surface: *c.wlr_xdg_surface,
 
     mapped: bool,
@@ -31,8 +32,8 @@ pub const View = struct {
     // listen_request_move: c.wl_listener,
     // listen_request_resize: c.wl_listener,
 
-    pub fn init(self: *Self, root: *Root, wlr_xdg_surface: *c.wlr_xdg_surface, tags: u32) void {
-        self.root = root;
+    pub fn init(self: *Self, output: *Output, wlr_xdg_surface: *c.wlr_xdg_surface, tags: u32) void {
+        self.output = output;
         self.wlr_xdg_surface = wlr_xdg_surface;
 
         // Inform the xdg toplevel that it is tiled.
@@ -85,8 +86,8 @@ pub const View = struct {
 
     pub fn configurePending(self: *Self) void {
         if (self.pending_box) |pending_box| {
-            const border_width = self.root.server.config.border_width;
-            const view_padding = self.root.server.config.view_padding;
+            const border_width = self.output.root.server.config.border_width;
+            const view_padding = self.output.root.server.config.view_padding;
             self.pending_serial = c.wlr_xdg_toplevel_set_size(
                 self.wlr_xdg_surface,
                 pending_box.width - border_width * 2 - view_padding * 2,
@@ -132,12 +133,12 @@ pub const View = struct {
         const view = @fieldParentPtr(View, "listen_map", listener.?);
         view.mapped = true;
         view.focus(view.wlr_xdg_surface.surface);
-        view.root.arrange();
+        view.output.root.arrange();
     }
 
     fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         const view = @fieldParentPtr(View, "listen_unmap", listener.?);
-        const root = view.root;
+        const root = view.output.root;
         view.mapped = false;
 
         if (root.focused_view) |current_focus| {
@@ -153,18 +154,18 @@ pub const View = struct {
 
     fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         const view = @fieldParentPtr(View, "listen_destroy", listener.?);
-        const root = view.root;
+        const output = view.output;
 
         const node = @fieldParentPtr(ViewStack.Node, "view", view);
-        root.views.remove(node);
-        root.server.allocator.destroy(node);
+        output.views.remove(node);
+        output.root.server.allocator.destroy(node);
     }
 
     fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         const view = @fieldParentPtr(View, "listen_commit", listener.?);
         if (view.pending_serial) |s| {
             if (s == view.wlr_xdg_surface.configure_serial) {
-                view.root.notifyConfigured();
+                view.output.root.notifyConfigured();
                 view.pending_serial = null;
             }
         }
@@ -180,7 +181,7 @@ pub const View = struct {
     // }
 
     fn focus(self: *Self, surface: *c.wlr_surface) void {
-        const root = self.root;
+        const root = self.output.root;
         const wlr_seat = root.server.seat.wlr_seat;
         const prev_surface = wlr_seat.keyboard_state.focused_surface;
 

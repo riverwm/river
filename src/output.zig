@@ -4,7 +4,9 @@ const render = @import("render.zig");
 
 const Box = @import("box.zig").Box;
 const LayerSurface = @import("layer_surface.zig").LayerSurface;
+const Log = @import("log.zig").Log;
 const Root = @import("root.zig").Root;
+const ViewStack = @import("view_stack.zig").ViewStack;
 
 pub const Output = struct {
     const Self = @This();
@@ -12,7 +14,25 @@ pub const Output = struct {
     root: *Root,
     wlr_output: *c.wlr_output,
 
+    /// All layer surfaces on the output, indexed by the layer enum.
     layers: [4]std.TailQueue(LayerSurface),
+
+    /// The area left for views and other layer surfaces after applying the
+    /// exclusive zones of exclusive layer surfaces.
+    usable_box: Box,
+
+    /// The top of the stack is the "most important" view.
+    views: ViewStack,
+
+    /// A bit field of focused tags
+    current_focused_tags: u32,
+    pending_focused_tags: ?u32,
+
+    /// Number of views in "master" section of the screen.
+    master_count: u32,
+
+    /// Percentage of the total screen that the master section takes up.
+    master_factor: f64,
 
     listen_frame: c.wl_listener,
 
@@ -41,6 +61,17 @@ pub const Output = struct {
             layer.* = std.TailQueue(LayerSurface).init();
         }
 
+        self.usable_box = undefined;
+
+        self.views.init();
+
+        self.current_focused_tags = 1 << 0;
+        self.pending_focused_tags = null;
+
+        self.master_count = 1;
+
+        self.master_factor = 0.6;
+
         // Sets up a listener for the frame notify event.
         self.listen_frame.notify = handleFrame;
         c.wl_signal_add(&wlr_output.events.frame, &self.listen_frame);
@@ -57,6 +88,14 @@ pub const Output = struct {
         c.wlr_output_create_global(wlr_output);
     }
 
+    /// Add a new view to the output. arrangeViews() will be called by the view
+    /// when it is mapped.
+    pub fn addView(self: *Self, wlr_xdg_surface: *c.wlr_xdg_surface) void {
+        const node = self.root.server.allocator.create(ViewStack.Node) catch unreachable;
+        node.view.init(self, wlr_xdg_surface, self.current_focused_tags);
+        self.views.push(node);
+    }
+
     /// Add a newly created layer surface to the output.
     pub fn addLayerSurface(self: *Self, wlr_layer_surface: *c.wlr_layer_surface_v1) !void {
         const layer = wlr_layer_surface.client_pending.layer;
@@ -64,6 +103,86 @@ pub const Output = struct {
         node.data.init(self, wlr_layer_surface, layer);
         self.layers[@intCast(usize, @enumToInt(layer))].append(node);
         self.arrangeLayers();
+    }
+
+    pub fn arrange(self: *Self) void {
+        // TODO: properly handle output events instead of calling arrangeLayers() here
+        self.arrangeLayers();
+        self.arrangeViews();
+    }
+
+    /// Arrange all views on the output for the current layout. Modifies only
+    /// pending state, the changes are not appplied until a transaction is started
+    /// and completed.
+    fn arrangeViews(self: *Self) void {
+        const output_tags = if (self.pending_focused_tags) |tags|
+            tags
+        else
+            self.current_focused_tags;
+
+        const visible_count = blk: {
+            var count: u32 = 0;
+            var it = ViewStack.pendingIterator(self.views.first, output_tags);
+            while (it.next() != null) count += 1;
+            break :blk count;
+        };
+
+        const master_count = std.math.min(self.master_count, visible_count);
+        const slave_count = if (master_count >= visible_count) 0 else visible_count - master_count;
+
+        const outer_padding = self.root.server.config.outer_padding;
+
+        const layout_width = @intCast(u32, self.usable_box.width) - outer_padding * 2;
+        const layout_height = @intCast(u32, self.usable_box.height) - outer_padding * 2;
+
+        var master_column_width: u32 = undefined;
+        var slave_column_width: u32 = undefined;
+        if (master_count > 0 and slave_count > 0) {
+            // If both master and slave views are present
+            master_column_width = @floatToInt(u32, @round(@intToFloat(f64, layout_width) * self.master_factor));
+            slave_column_width = layout_width - master_column_width;
+        } else if (master_count > 0) {
+            master_column_width = layout_width;
+            slave_column_width = 0;
+        } else {
+            slave_column_width = layout_width;
+            master_column_width = 0;
+        }
+
+        var i: u32 = 0;
+        var it = ViewStack.pendingIterator(self.views.first, output_tags);
+        while (it.next()) |view| {
+            if (i < master_count) {
+                // Add the remainder to the first master to ensure every pixel of height is used
+                const master_height = @divTrunc(layout_height, master_count);
+                const master_height_rem = layout_height % master_count;
+
+                view.pending_box = Box{
+                    .x = @intCast(i32, outer_padding),
+                    .y = @intCast(i32, outer_padding + i * master_height +
+                        if (i > 0) master_height_rem else 0),
+
+                    .width = master_column_width,
+                    .height = master_height + if (i == 0) master_height_rem else 0,
+                };
+            } else {
+                // Add the remainder to the first slave to ensure every pixel of height is used
+                const slave_height = @divTrunc(layout_height, slave_count);
+                const slave_height_rem = layout_height % slave_count;
+
+                view.pending_box = Box{
+                    .x = @intCast(i32, outer_padding + master_column_width),
+                    .y = @intCast(i32, outer_padding + (i - master_count) * slave_height +
+                        if (i > master_count) slave_height_rem else 0),
+
+                    .width = slave_column_width,
+                    .height = slave_height +
+                        if (i == master_count) slave_height_rem else 0,
+                };
+            }
+
+            i += 1;
+        }
     }
 
     /// Arrange all layer surfaces of this output and addjust the usable aread
@@ -84,6 +203,8 @@ pub const Output = struct {
         for (self.layers) |layer| {
             self.arrangeLayer(layer, bounds);
         }
+
+        self.usable_box = bounds;
 
         // TODO: handle seat focus
     }
