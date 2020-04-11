@@ -20,7 +20,6 @@ pub fn build(b: *Builder) void {
     exe.addCSourceFile("include/render.c", &[_][]const u8{"-std=c99"});
 
     exe.linkLibC();
-    exe.linkSystemLibrary("pixman-1");
     exe.linkSystemLibrary("wayland-server");
     exe.linkSystemLibrary("wlroots");
     exe.linkSystemLibrary("xkbcommon");
@@ -42,7 +41,6 @@ pub fn build(b: *Builder) void {
     test_exe.addCSourceFile("include/render.c", &[_][]const u8{"-std=c99"});
 
     test_exe.linkLibC();
-    test_exe.linkSystemLibrary("pixman-1");
     test_exe.linkSystemLibrary("wayland-server");
     test_exe.linkSystemLibrary("wlroots");
     test_exe.linkSystemLibrary("xkbcommon");
