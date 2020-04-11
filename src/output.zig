@@ -242,12 +242,20 @@ pub const Output = struct {
             // Horizontal alignment
             const anchor_left = @intCast(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT);
             const anchor_right = @intCast(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT);
-            if (current_state.anchor & (anchor_left | anchor_right) != 0 and
-                current_state.desired_width == 0)
-            {
-                new_box.x = bounds.x + @intCast(i32, current_state.margin.left);
-                new_box.width = bounds.width -
-                    (current_state.margin.left + current_state.margin.right);
+            if (current_state.desired_width == 0) {
+                const anchor_left_right = anchor_left | anchor_right;
+                if (current_state.anchor & anchor_left_right == anchor_left_right) {
+                    new_box.x = bounds.x + @intCast(i32, current_state.margin.left);
+                    new_box.width = bounds.width -
+                        (current_state.margin.left + current_state.margin.right);
+                } else {
+                    Log.Error.log(
+                        "Protocol Error: layer surface '{}' requested width 0 without anchoring to opposite edges.",
+                        .{layer_surface.wlr_layer_surface.namespace},
+                    );
+                    c.wlr_layer_surface_v1_close(layer_surface.wlr_layer_surface);
+                    continue;
+                }
             } else if (current_state.anchor & anchor_left != 0) {
                 new_box.x = bounds.x + @intCast(i32, current_state.margin.left);
                 new_box.width = current_state.desired_width;
@@ -263,12 +271,20 @@ pub const Output = struct {
             // Vertical alignment
             const anchor_top = @intCast(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP);
             const anchor_bottom = @intCast(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM);
-            if (current_state.anchor & (anchor_top | anchor_bottom) != 0 and
-                current_state.desired_height == 0)
-            {
-                new_box.y = bounds.y + @intCast(i32, current_state.margin.top);
-                new_box.height = bounds.height -
-                    (current_state.margin.top + current_state.margin.bottom);
+            if (current_state.desired_height == 0) {
+                const anchor_top_bottom = anchor_top | anchor_bottom;
+                if (current_state.anchor & anchor_top_bottom == anchor_top_bottom) {
+                    new_box.y = bounds.y + @intCast(i32, current_state.margin.top);
+                    new_box.height = bounds.height -
+                        (current_state.margin.top + current_state.margin.bottom);
+                } else {
+                    Log.Error.log(
+                        "Protocol Error: layer surface '{}' requested height 0 without anchoring to opposite edges.",
+                        .{layer_surface.wlr_layer_surface.namespace},
+                    );
+                    c.wlr_layer_surface_v1_close(layer_surface.wlr_layer_surface);
+                    continue;
+                }
             } else if (current_state.anchor & anchor_top != 0) {
                 new_box.y = bounds.y + @intCast(i32, current_state.margin.top);
                 new_box.height = current_state.desired_height;
