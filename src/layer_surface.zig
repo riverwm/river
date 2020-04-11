@@ -73,6 +73,8 @@ pub const LayerSurface = struct {
         const node = @fieldParentPtr(std.TailQueue(LayerSurface).Node, "data", layer_surface);
         layer_surface.output.layers[@intCast(usize, @enumToInt(layer_surface.layer))].remove(node);
         layer_surface.output.root.server.allocator.destroy(node);
+
+        layer_surface.output.arrangeLayers();
     }
 
     fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
