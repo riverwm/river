@@ -29,6 +29,7 @@ pub const LayerSurface = struct {
         self.output = output;
         self.wlr_layer_surface = wlr_layer_surface;
 
+        self.box = undefined;
         self.layer = layer;
 
         self.listen_map.notify = handleMap;
@@ -58,6 +59,7 @@ pub const LayerSurface = struct {
             layer_surface.wlr_layer_surface.surface,
             layer_surface.wlr_layer_surface.output,
         );
+        layer_surface.output.arrangeLayers();
     }
 
     fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -75,8 +77,10 @@ pub const LayerSurface = struct {
 
     fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         const layer_surface = @fieldParentPtr(LayerSurface, "listen_commit", listener.?);
+        const wlr_layer_surface = layer_surface.wlr_layer_surface;
 
         if (layer_surface.wlr_layer_surface.output == null) {
+            Log.Error.log("Layer surface committed with null output", .{});
             return;
         }
 
@@ -92,6 +96,10 @@ pub const LayerSurface = struct {
             const new_layer_idx = @intCast(usize, @enumToInt(layer_surface.layer));
             layer_surface.output.layers[new_layer_idx].append(node);
         }
+
+        // TODO: only reconfigure if things haven't changed
+        // https://github.com/swaywm/wlroots/issues/1079
+        layer_surface.output.arrangeLayers();
     }
 
     fn handleNewPopup(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {

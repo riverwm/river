@@ -35,6 +35,7 @@ pub const Output = struct {
     master_factor: f64,
 
     listen_frame: c.wl_listener,
+    listen_mode: c.wl_listener,
 
     pub fn init(self: *Self, root: *Root, wlr_output: *c.wlr_output) !void {
         // Some backends don't have modes. DRM+KMS does, and we need to set a mode
@@ -61,7 +62,12 @@ pub const Output = struct {
             layer.* = std.TailQueue(LayerSurface).init();
         }
 
-        self.usable_box = undefined;
+        self.usable_box = .{
+            .x = 0,
+            .y = 0,
+            .width = 1920,
+            .height = 1080,
+        };
 
         self.views.init();
 
@@ -72,9 +78,12 @@ pub const Output = struct {
 
         self.master_factor = 0.6;
 
-        // Sets up a listener for the frame notify event.
+        // Set up listeners
         self.listen_frame.notify = handleFrame;
         c.wl_signal_add(&wlr_output.events.frame, &self.listen_frame);
+
+        self.listen_mode.notify = handleMode;
+        c.wl_signal_add(&wlr_output.events.mode, &self.listen_mode);
 
         // Add the new output to the layout. The add_auto function arranges outputs
         // from left-to-right in the order they appear. A more sophisticated
@@ -106,8 +115,6 @@ pub const Output = struct {
     }
 
     pub fn arrange(self: *Self) void {
-        // TODO: properly handle output events instead of calling arrangeLayers() here
-        self.arrangeLayers();
         self.arrangeViews();
     }
 
@@ -187,8 +194,7 @@ pub const Output = struct {
 
     /// Arrange all layer surfaces of this output and addjust the usable aread
     pub fn arrangeLayers(self: *Self) void {
-        // TODO: handle exclusive zones
-        const bounds = blk: {
+        var bounds = blk: {
             var width: c_int = undefined;
             var height: c_int = undefined;
             c.wlr_output_effective_resolution(self.wlr_output, &width, &height);
@@ -200,36 +206,52 @@ pub const Output = struct {
             };
         };
 
-        for (self.layers) |layer| {
-            self.arrangeLayer(layer, bounds);
+        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY)], &bounds, true);
+        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_TOP)], &bounds, true);
+        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM)], &bounds, true);
+        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND)], &bounds, true);
+
+        if (self.usable_box.width != bounds.width or self.usable_box.height != bounds.height) {
+            self.usable_box = bounds;
+            self.root.arrange();
         }
 
-        self.usable_box = bounds;
+        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY)], &bounds, false);
+        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_TOP)], &bounds, false);
+        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM)], &bounds, false);
+        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND)], &bounds, false);
 
         // TODO: handle seat focus
     }
 
     /// Arrange the layer surfaces of a given layer
-    fn arrangeLayer(self: *Self, layer: std.TailQueue(LayerSurface), bounds: Box) void {
+    fn arrangeLayer(self: *Self, layer: std.TailQueue(LayerSurface), bounds: *Box, exclusive: bool) void {
         var it = layer.first;
         while (it) |node| : (it = node.next) {
             const layer_surface = &node.data;
             const current_state = layer_surface.wlr_layer_surface.current;
 
+            // If the value of exclusive_zone is greater than zero, then it exclusivly
+            // occupies some area of the screen.
+            if (exclusive != (current_state.exclusive_zone > 0)) {
+                continue;
+            }
+
             var new_box: Box = undefined;
 
             // Horizontal alignment
-            if (current_state.anchor & (@intCast(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT) |
-                @intCast(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT)) != 0 and
+            const anchor_left = @intCast(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT);
+            const anchor_right = @intCast(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT);
+            if (current_state.anchor & (anchor_left | anchor_right) != 0 and
                 current_state.desired_width == 0)
             {
                 new_box.x = bounds.x + @intCast(i32, current_state.margin.left);
                 new_box.width = bounds.width -
                     (current_state.margin.left + current_state.margin.right);
-            } else if (current_state.anchor & @intCast(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT) != 0) {
+            } else if (current_state.anchor & anchor_left != 0) {
                 new_box.x = bounds.x + @intCast(i32, current_state.margin.left);
                 new_box.width = current_state.desired_width;
-            } else if (current_state.anchor & @intCast(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT) != 0) {
+            } else if (current_state.anchor & anchor_right != 0) {
                 new_box.x = bounds.x + @intCast(i32, bounds.width - current_state.desired_width -
                     current_state.margin.right);
                 new_box.width = current_state.desired_width;
@@ -239,17 +261,18 @@ pub const Output = struct {
             }
 
             // Vertical alignment
-            if (current_state.anchor & (@intCast(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP) |
-                @intCast(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM)) != 0 and
+            const anchor_top = @intCast(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP);
+            const anchor_bottom = @intCast(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM);
+            if (current_state.anchor & (anchor_top | anchor_bottom) != 0 and
                 current_state.desired_height == 0)
             {
                 new_box.y = bounds.y + @intCast(i32, current_state.margin.top);
                 new_box.height = bounds.height -
                     (current_state.margin.top + current_state.margin.bottom);
-            } else if (current_state.anchor & @intCast(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP) != 0) {
+            } else if (current_state.anchor & anchor_top != 0) {
                 new_box.y = bounds.y + @intCast(i32, current_state.margin.top);
                 new_box.height = current_state.desired_height;
-            } else if (current_state.anchor & @intCast(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM) != 0) {
+            } else if (current_state.anchor & anchor_bottom != 0) {
                 new_box.y = bounds.y + @intCast(i32, bounds.height - current_state.desired_height -
                     current_state.margin.bottom);
                 new_box.height = current_state.desired_height;
@@ -259,6 +282,54 @@ pub const Output = struct {
             }
 
             layer_surface.box = new_box;
+
+            // Apply the exclusive zone to the current bounds
+            const edges = [4]struct {
+                anchors: u32,
+                to_increase: ?*i32,
+                to_decrease: ?*u32,
+                margin: u32,
+            }{
+                .{
+                    .anchors = anchor_left | anchor_right | anchor_top,
+                    .to_increase = &bounds.y,
+                    .to_decrease = &bounds.height,
+                    .margin = current_state.margin.top,
+                },
+                .{
+                    .anchors = anchor_left | anchor_right | anchor_bottom,
+                    .to_increase = null,
+                    .to_decrease = &bounds.height,
+                    .margin = current_state.margin.bottom,
+                },
+                .{
+                    .anchors = anchor_left | anchor_top | anchor_bottom,
+                    .to_increase = &bounds.x,
+                    .to_decrease = &bounds.width,
+                    .margin = current_state.margin.left,
+                },
+                .{
+                    .anchors = anchor_right | anchor_top | anchor_bottom,
+                    .to_increase = null,
+                    .to_decrease = &bounds.width,
+                    .margin = current_state.margin.right,
+                },
+            };
+
+            for (edges) |edge| {
+                if (current_state.anchor & edge.anchors == edge.anchors and
+                    current_state.exclusive_zone + @intCast(i32, edge.margin) > 0)
+                {
+                    const delta = current_state.exclusive_zone + @intCast(i32, edge.margin);
+                    if (edge.to_increase) |value| {
+                        value.* += delta;
+                    }
+                    if (edge.to_decrease) |value| {
+                        value.* -= @intCast(u32, delta);
+                    }
+                }
+            }
+
             layer_surface.sendConfigure();
         }
     }
@@ -268,5 +339,11 @@ pub const Output = struct {
         // generally at the output's refresh rate (e.g. 60Hz).
         const output = @fieldParentPtr(Output, "listen_frame", listener.?);
         render.renderOutput(output);
+    }
+
+    fn handleMode(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+        const output = @fieldParentPtr(Output, "listen_mode", listener.?);
+        output.arrangeLayers();
+        output.root.arrange();
     }
 };

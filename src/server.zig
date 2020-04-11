@@ -156,7 +156,7 @@ pub const Server = struct {
         );
 
         Log.Debug.log(
-            "New layer surface: namespace {}, layer {}, anchor {}, size {}x{}, margin ({},{},{},{})",
+            "New layer surface: namespace {}, layer {}, anchor {}, size {}x{}, margin ({},{},{},{}), exclusive_zone {}",
             .{
                 wlr_layer_surface.namespace,
                 wlr_layer_surface.client_pending.layer,
@@ -167,6 +167,7 @@ pub const Server = struct {
                 wlr_layer_surface.client_pending.margin.right,
                 wlr_layer_surface.client_pending.margin.bottom,
                 wlr_layer_surface.client_pending.margin.left,
+                wlr_layer_surface.client_pending.exclusive_zone,
             },
         );
 
