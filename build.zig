@@ -16,18 +16,7 @@ pub fn build(b: *std.build.Builder) !void {
     const exe = b.addExecutable("river", "src/main.zig");
     exe.setTarget(target);
     exe.setBuildMode(mode);
-
-    exe.step.dependOn(&scan_protocols.step);
-    exe.addIncludeDir("protocol");
-
-    exe.addCSourceFile("include/render.c", &[_][]const u8{"-std=c99"});
-    exe.addIncludeDir(".");
-
-    exe.linkLibC();
-    exe.linkSystemLibrary("wayland-server");
-    exe.linkSystemLibrary("wlroots");
-    exe.linkSystemLibrary("xkbcommon");
-
+    addDeps(exe, &scan_protocols.step);
     exe.install();
 
     const run_cmd = exe.run();
@@ -39,20 +28,23 @@ pub fn build(b: *std.build.Builder) !void {
     const test_exe = b.addTest("src/test_main.zig");
     test_exe.setTarget(target);
     test_exe.setBuildMode(mode);
-
-    test_exe.step.dependOn(&scan_protocols.step);
-    test_exe.addIncludeDir("protocol");
-
-    test_exe.addCSourceFile("include/render.c", &[_][]const u8{"-std=c99"});
-    test_exe.addIncludeDir(".");
-
-    test_exe.linkLibC();
-    test_exe.linkSystemLibrary("wayland-server");
-    test_exe.linkSystemLibrary("wlroots");
-    test_exe.linkSystemLibrary("xkbcommon");
+    addDeps(test_exe, &scan_protocols.step);
 
     const test_step = b.step("test", "Run the tests");
     test_step.dependOn(&test_exe.step);
+}
+
+fn addDeps(exe: *std.build.LibExeObjStep, protocol_step: *std.build.Step) void {
+    exe.step.dependOn(protocol_step);
+    exe.addIncludeDir("protocol");
+
+    exe.addCSourceFile("include/render.c", &[_][]const u8{"-std=c99"});
+    exe.addIncludeDir(".");
+
+    exe.linkLibC();
+    exe.linkSystemLibrary("wayland-server");
+    exe.linkSystemLibrary("wlroots");
+    exe.linkSystemLibrary("xkbcommon");
 }
 
 const ScanProtocolsStep = struct {
