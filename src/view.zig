@@ -182,7 +182,8 @@ pub const View = struct {
 
     fn focus(self: *Self, surface: *c.wlr_surface) void {
         const root = self.output.root;
-        const wlr_seat = root.server.seat.wlr_seat;
+        // TODO: remove this hack
+        const wlr_seat = root.server.input_manager.seats.first.?.data.wlr_seat;
         const prev_surface = wlr_seat.keyboard_state.focused_surface;
 
         if (prev_surface == surface) {

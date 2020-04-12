@@ -149,7 +149,7 @@ pub const Keyboard = struct {
     fn handleBuiltinKeybind(self: Self, keysym: c.xkb_keysym_t) bool {
         if (keysym >= c.XKB_KEY_XF86Switch_VT_1 and keysym <= c.XKB_KEY_XF86Switch_VT_12) {
             Log.Debug.log("Switch VT keysym received", .{});
-            const wlr_backend = self.seat.server.wlr_backend;
+            const wlr_backend = self.seat.input_manager.server.wlr_backend;
             if (c.river_wlr_backend_is_multi(wlr_backend)) {
                 if (c.river_wlr_backend_get_session(wlr_backend)) |session| {
                     const vt = keysym - c.XKB_KEY_XF86Switch_VT_1 + 1;

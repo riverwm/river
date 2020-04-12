@@ -2,7 +2,6 @@ const std = @import("std");
 const c = @import("c.zig");
 
 const Seat = @import("seat.zig").Seat;
-const Server = @import("server.zig").Server;
 const View = @import("view.zig").View;
 
 const CursorMode = enum {
@@ -52,7 +51,7 @@ pub const Cursor = struct {
         self.wlr_xcursor_manager = c.wlr_xcursor_manager_create(null, 24) orelse
             return error.CantCreateWlrXCursorManager;
 
-        c.wlr_cursor_attach_output_layout(self.wlr_cursor, seat.server.root.wlr_output_layout);
+        c.wlr_cursor_attach_output_layout(self.wlr_cursor, seat.input_manager.server.root.wlr_output_layout);
         _ = c.wlr_xcursor_manager_load(self.wlr_xcursor_manager, 1);
 
         self.mode = CursorMode.Passthrough;
@@ -166,7 +165,7 @@ pub const Cursor = struct {
         var sx: f64 = undefined;
         var sy: f64 = undefined;
         var opt_surface: ?*c.wlr_surface = null;
-        const view = self.seat.server.root.viewAt(
+        const view = self.seat.input_manager.server.root.viewAt(
             self.wlr_cursor.x,
             self.wlr_cursor.y,
             &opt_surface,
@@ -260,7 +259,7 @@ pub const Cursor = struct {
         var sy: f64 = undefined;
 
         var surface: ?*c.wlr_surface = null;
-        const view = cursor.seat.server.root.viewAt(
+        const view = cursor.seat.input_manager.server.root.viewAt(
             cursor.wlr_cursor.x,
             cursor.wlr_cursor.y,
             &surface,

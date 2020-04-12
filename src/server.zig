@@ -1,13 +1,12 @@
 const std = @import("std");
 const c = @import("c.zig");
-const command = @import("command.zig");
 
 const Config = @import("config.zig").Config;
 const DecorationManager = @import("decoration_manager.zig").DecorationManager;
+const InputManager = @import("input_manager.zig").InputManager;
 const Log = @import("log.zig").Log;
 const Output = @import("output.zig").Output;
 const Root = @import("root.zig").Root;
-const Seat = @import("seat.zig").Seat;
 const View = @import("view.zig").View;
 const ViewStack = @import("view_stack.zig").ViewStack;
 
@@ -25,9 +24,8 @@ pub const Server = struct {
     wlr_layer_shell: *c.wlr_layer_shell_v1,
 
     decoration_manager: DecorationManager,
+    input_manager: InputManager,
     root: Root,
-    seat: Seat,
-
     config: Config,
 
     listen_new_output: c.wl_listener,
@@ -71,11 +69,9 @@ pub const Server = struct {
             return error.CantCreateWlrLayerShell;
 
         try self.decoration_manager.init(self);
-
         try self.root.init(self);
-
-        try self.seat.init(self);
-
+        // Must be called after root is initialized
+        try self.input_manager.init(self);
         try self.config.init(self.allocator);
 
         // These all free themselves when the wl_display is destroyed
