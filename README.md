@@ -32,9 +32,9 @@ River can either be run nested in an X11/wayland session or directly
 from a tty using KMS/DRM.
 
 Keybinds are similar to the defaults of dwm, but using the "logo key"
-instead of alt. Check out [config.zig](src/config.zig) for a complete list
-of bindings. Note that the terminal emulator is currently hardcoded to
-[alacritty](https://github.com/alacritty/alacritty).
+instead of alt. Check out the comments in [config.zig](src/config.zig) for
+a complete list of bindings. Note that the terminal emulator is currently
+hardcoded to [alacritty](https://github.com/alacritty/alacritty).
 
 ## Development
 
