@@ -30,6 +30,15 @@ pub const InputManager = struct {
         c.wl_signal_add(&self.server.wlr_backend.events.new_input, &self.listen_new_input);
     }
 
+    /// Must be called whenever a view is unmapped.
+    pub fn handleViewUnmap(self: Self, view: *View) void {
+        var it = self.seats.first;
+        while (it) |node| : (it = node.next) {
+            const seat = &node.data;
+            seat.handleViewUnmap(view);
+        }
+    }
+
     /// This event is raised by the backend when a new input device becomes available.
     fn handleNewInput(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         const input_manager = @fieldParentPtr(InputManager, "listen_new_input", listener.?);

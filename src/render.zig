@@ -262,7 +262,7 @@ fn renderSurface(_surface: ?*c.wlr_surface, sx: c_int, sy: c_int, data: ?*c_void
 
 fn renderBorders(output: Output, view: *View, now: *c.struct_timespec, ox: f64, oy: f64) void {
     var border: c.wlr_box = undefined;
-    const color = if (output.root.focused_view == view)
+    const color = if (view.wlr_xdg_surface.unnamed_163.toplevel.*.current.activated)
         [_]f32{ 0.57647059, 0.63137255, 0.63137255, 1.0 } // Solarized base1
     else
         [_]f32{ 0.34509804, 0.43137255, 0.45882353, 1.0 }; // Solarized base01

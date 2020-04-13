@@ -19,10 +19,6 @@ pub const Root = struct {
     wlr_output_layout: *c.wlr_output_layout,
     outputs: std.TailQueue(Output),
 
-    /// The view that has seat focus, if any.
-    /// TODO: move this to Seat
-    focused_view: ?*View,
-
     /// Number of pending configures sent in the current transaction.
     /// A value of 0 means there is no current transaction.
     pending_configures: u32,
@@ -40,8 +36,6 @@ pub const Root = struct {
         errdefer c.wlr_output_layout_destroy(self.wlr_output_layout);
 
         self.outputs = std.TailQueue(Output).init();
-
-        self.focused_view = null;
 
         self.pending_configures = 0;
 
@@ -188,8 +182,8 @@ pub const Root = struct {
 
         // Iterate over all views of all outputs
         var output_it = self.outputs.first;
-        while (output_it) |node| : (output_it = node.next) {
-            const output = &node.data;
+        while (output_it) |output_node| : (output_it = output_node.next) {
+            const output = &output_node.data;
 
             // If there were pending focused tags, make them the current focus
             if (output.pending_focused_tags) |tags| {
@@ -199,9 +193,6 @@ pub const Root = struct {
                 );
                 output.current_focused_tags = tags;
                 output.pending_focused_tags = null;
-
-                self.focused_view = null;
-                Log.Error.log("FIXME: this needs to iterate over all seats and focus(null)", .{});
             }
 
             var view_it = ViewStack(View).iterator(output.views.first, 0xFFFFFFFF);
@@ -218,20 +209,16 @@ pub const Root = struct {
                 if (view.pending_tags) |tags| {
                     view.current_tags = tags;
                     view.pending_tags = null;
-
-                    // If the pending tags caused the currently focused view to no
-                    // longer be visible, focus the next view.
-                    if (self.focused_view) |focus| {
-                        if (focus == view and
-                            view.current_tags & output.current_focused_tags == 0)
-                        {
-                            Log.Error.log("FIXME: this needs to iterate over all seats and focus(null)", .{});
-                        }
-                    }
                 }
 
                 view.dropStashedBuffer();
             }
+        }
+
+        // Iterate over all seats and update focus
+        var it = self.server.input_manager.seats.first;
+        while (it) |seat_node| : (it = seat_node.next) {
+            seat_node.data.focus(null);
         }
     }
 };

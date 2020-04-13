@@ -131,8 +131,10 @@ pub const View = struct {
     fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // Called when the surface is mapped, or ready to display on-screen.
         const view = @fieldParentPtr(View, "listen_map", listener.?);
+        const root = view.output.root;
         view.mapped = true;
-        view.focus(view.wlr_xdg_surface.surface);
+        // TODO: remove this hack
+        root.server.input_manager.seats.first.?.data.focus(view);
         view.output.root.arrange();
     }
 
@@ -141,13 +143,11 @@ pub const View = struct {
         const root = view.output.root;
         view.mapped = false;
 
-        if (root.focused_view) |current_focus| {
-            // If the view being unmapped is focused
-            if (current_focus == view) {
-                // Focus the previous view. This clears the focus if there are no visible views.
-                // FIXME: must be fixed in next commit adding focus stack
-                //root.focusPrevView();
-            }
+        // Inform all seats that the view has been unmapped so they can handle focus
+        var it = root.server.input_manager.seats.first;
+        while (it) |node| : (it = node.next) {
+            const seat = &node.data;
+            seat.handleViewUnmap(view);
         }
 
         root.arrange();
@@ -181,42 +181,9 @@ pub const View = struct {
     //     // ignore for now
     // }
 
-    fn focus(self: *Self, surface: *c.wlr_surface) void {
-        const root = self.output.root;
-        // TODO: remove this hack
-        const wlr_seat = root.server.input_manager.seats.first.?.data.wlr_seat;
-        const prev_surface = wlr_seat.keyboard_state.focused_surface;
-
-        if (prev_surface == surface) {
-            // Don't re-focus an already focused surface.
-            // TODO: debug message?
-            return;
-        }
-
-        root.focused_view = self;
-
-        if (prev_surface != null) {
-            // Deactivate the previously focused surface. This lets the client know
-            // it no longer has focus and the client will repaint accordingly, e.g.
-            // stop displaying a caret.
-            const prev_xdg_surface = c.wlr_xdg_surface_from_wlr_surface(prev_surface);
-            _ = c.wlr_xdg_toplevel_set_activated(prev_xdg_surface, false);
-        }
-
-        // Activate the new surface
-        _ = c.wlr_xdg_toplevel_set_activated(self.wlr_xdg_surface, true);
-
-        // Tell the seat to have the keyboard enter this surface. wlroots will keep
-        // track of this and automatically send key events to the appropriate
-        // clients without additional work on your part.
-        const keyboard: *c.wlr_keyboard = c.wlr_seat_get_keyboard(wlr_seat);
-        c.wlr_seat_keyboard_notify_enter(
-            wlr_seat,
-            self.wlr_xdg_surface.surface,
-            &keyboard.keycodes,
-            keyboard.num_keycodes,
-            &keyboard.modifiers,
-        );
+    /// Set the active state of the view to the passed bool
+    pub fn setActivated(self: Self, activated: bool) void {
+        _ = c.wlr_xdg_toplevel_set_activated(self.wlr_xdg_surface, activated);
     }
 
     fn isAt(self: Self, lx: f64, ly: f64, surface: *?*c.wlr_surface, sx: *f64, sy: *f64) bool {

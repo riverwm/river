@@ -273,7 +273,7 @@ pub const Cursor = struct {
         } else {
             // Focus that client if the button was _pressed_
             if (view) |v| {
-                v.focus(surface.?);
+                cursor.seat.focus(v);
             }
         }
     }

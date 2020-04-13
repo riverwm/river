@@ -21,62 +21,46 @@ pub fn exitCompositor(seat: *Seat, arg: Arg) void {
     c.wl_display_terminate(seat.input_manager.server.wl_display);
 }
 
+/// Focus either the next or the previous visible view, depending on the bool
+/// passed.
+fn focusNextPrevView(seat: *Seat, next: bool) void {
+    const output = seat.input_manager.server.root.focusedOutput();
+    if (seat.focused_view) |current_focus| {
+        // If there is a currently focused view, focus the next visible view in the stack.
+        const focused_node = @fieldParentPtr(ViewStack(View).Node, "view", current_focus);
+        var it = if (next)
+            ViewStack(View).iterator(focused_node, output.current_focused_tags)
+        else
+            ViewStack(View).reverseIterator(focused_node, output.current_focused_tags);
+
+        // Skip past the focused node
+        _ = it.next();
+        // Focus the next visible node if there is one
+        if (it.next()) |node| {
+            seat.focus(&node.view);
+            return;
+        }
+    }
+
+    // There is either no currently focused view or the last visible view in the
+    // stack is focused and we need to wrap.
+    var it = if (next)
+        ViewStack(View).iterator(output.views.first, output.current_focused_tags)
+    else
+        ViewStack(View).reverseIterator(output.views.last, output.current_focused_tags);
+    seat.focus(if (it.next()) |node| &node.view else null);
+}
+
 /// Focus the next visible view in the stack, wrapping if needed. Does
 /// nothing if there is only one view in the stack.
 pub fn focusNextView(seat: *Seat, arg: Arg) void {
-    // FIXME: this need to be rewritten the next commit adding a focus stack
-    //const output = self.focusedOutput();
-    //if (self.focused_view) |current_focus| {
-    //    // If there is a currently focused view, focus the next visible view in the stack.
-    //    const current_node = @fieldParentPtr(ViewStack(View).Node, "view", current_focus);
-    //    var it = ViewStack(View).iterator(current_node, output.current_focused_tags);
-    //    // Skip past the current node
-    //    _ = it.next();
-    //    // Focus the next visible node if there is one
-    //    if (it.next()) |node| {
-    //        node.view.focus(node.view.wlr_xdg_surface.surface);
-    //        return;
-    //    }
-    //}
-
-    //// There is either no currently focused view or the last visible view in the
-    //// stack is focused and we need to wrap.
-    //var it = ViewStack(View).iterator(output.views.first, output.current_focused_tags);
-    //if (it.next()) |node| {
-    //    node.view.focus(node.view.wlr_xdg_surface.surface);
-    //} else {
-    //    // Otherwise clear the focus since there are no visible views
-    //    self.clearFocus();
-    //}
+    focusNextPrevView(seat, true);
 }
 
 /// Focus the previous view in the stack, wrapping if needed. Does nothing
 /// if there is only one view in the stack.
 pub fn focusPrevView(seat: *Seat, arg: Arg) void {
-    // FIXME: this need to be rewritten the next commit adding a focus stack
-    //const output = self.focusedOutput();
-    //if (self.focused_view) |current_focus| {
-    //    // If there is a currently focused view, focus the previous visible view in the stack.
-    //    const current_node = @fieldParentPtr(ViewStack(View).Node, "view", current_focus);
-    //    var it = ViewStack(View).reverseIterator(current_node, output.current_focused_tags);
-    //    // Skip past the current node
-    //    _ = it.next();
-    //    // Focus the previous visible node if there is one
-    //    if (it.next()) |node| {
-    //        node.view.focus(node.view.wlr_xdg_surface.surface);
-    //        return;
-    //    }
-    //}
-
-    //// There is either no currently focused view or the first visible view in the
-    //// stack is focused and we need to wrap.
-    //var it = ViewStack(View).reverseIterator(output.views.last, output.current_focused_tags);
-    //if (it.next()) |node| {
-    //    node.view.focus(node.view.wlr_xdg_surface.surface);
-    //} else {
-    //    // Otherwise clear the focus since there are no visible views
-    //    self.clearFocus();
-    //}
+    focusNextPrevView(seat, false);
 }
 
 /// Modify the number of master views
@@ -109,16 +93,16 @@ pub fn modifyMasterFactor(seat: *Seat, arg: Arg) void {
 /// Bump the focused view to the top of the stack.
 /// TODO: if the top of the stack is focused, bump the next visible view.
 pub fn zoom(seat: *Seat, arg: Arg) void {
-    // FIXME rewrite after next commit adding focus stack
-    //if (server.root.focused_view) |current_focus| {
-    //    const output = server.root.focusedOutput();
-    //    const node = @fieldParentPtr(ViewStack(View).Node, "view", current_focus);
-    //    if (node != output.views.first) {
-    //        output.views.remove(node);
-    //        output.views.push(node);
-    //        server.root.arrange();
-    //    }
-    //}
+    if (seat.focused_view) |current_focus| {
+        const root = &seat.input_manager.server.root;
+        const output = root.focusedOutput();
+        const node = @fieldParentPtr(ViewStack(View).Node, "view", current_focus);
+        if (node != output.views.first) {
+            output.views.remove(node);
+            output.views.push(node);
+            root.arrange();
+        }
+    }
 }
 
 /// Switch focus to the passed tags.
@@ -144,31 +128,28 @@ pub fn toggleTags(seat: *Seat, arg: Arg) void {
 
 /// Set the tags of the focused view.
 pub fn setFocusedViewTags(seat: *Seat, arg: Arg) void {
-    // FIXME
-    //const tags = arg.uint;
-    //if (server.root.focused_view) |view| {
-    //    if (view.current_tags != tags) {
-    //        view.pending_tags = tags;
-    //        server.root.arrange();
-    //    }
-    //}
+    const tags = arg.uint;
+    if (seat.focused_view) |view| {
+        if (view.current_tags != tags) {
+            view.pending_tags = tags;
+            seat.input_manager.server.root.arrange();
+        }
+    }
 }
 
 /// Toggle the passed tags of the focused view
 pub fn toggleFocusedViewTags(seat: *Seat, arg: Arg) void {
-    // FIXME: rewrite afet next commit adding focus stack
-    //const tags = arg.uint;
-    //if (server.root.focused_view) |view| {
-    //    const new_tags = view.current_tags ^ tags;
-    //    if (new_tags != 0) {
-    //        view.pending_tags = new_tags;
-    //        server.root.arrange();
-    //    }
-    //}
+    const tags = arg.uint;
+    if (seat.focused_view) |view| {
+        const new_tags = view.current_tags ^ tags;
+        if (new_tags != 0) {
+            view.pending_tags = new_tags;
+            seat.input_manager.server.root.arrange();
+        }
+    }
 }
 
 /// Spawn a program.
-/// TODO: make this take a program as a paramter and spawn that
 pub fn spawn(seat: *Seat, arg: Arg) void {
     const cmd = arg.str;
 
@@ -185,8 +166,7 @@ pub fn spawn(seat: *Seat, arg: Arg) void {
 
 /// Close the focused view, if any.
 pub fn close(seat: *Seat, arg: Arg) void {
-    // FIXME: see above
-    //if (server.root.focused_view) |view| {
-    //    view.close();
-    //}
+    if (seat.focused_view) |view| {
+        view.close();
+    }
 }
