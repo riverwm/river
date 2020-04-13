@@ -156,7 +156,7 @@ pub const View = struct {
         const view = @fieldParentPtr(View, "listen_destroy", listener.?);
         const output = view.output;
 
-        const node = @fieldParentPtr(ViewStack.Node, "view", view);
+        const node = @fieldParentPtr(ViewStack(View).Node, "view", view);
         output.views.remove(node);
         output.root.server.allocator.destroy(node);
     }

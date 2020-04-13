@@ -71,10 +71,10 @@ pub const Root = struct {
         var output_it = self.outputs.first;
         while (output_it) |node| : (output_it = node.next) {
             const output = &node.data;
-            var view_it = ViewStack.iterator(output.views.first, 0xFFFFFFFF);
-            while (view_it.next()) |view| {
-                if (view.isAt(lx, ly, surface, sx, sy)) {
-                    return view;
+            var view_it = ViewStack(View).iterator(output.views.first, 0xFFFFFFFF);
+            while (view_it.next()) |view_node| {
+                if (view_node.view.isAt(lx, ly, surface, sx, sy)) {
+                    return &view_node.view;
                 }
             }
         }
@@ -95,22 +95,22 @@ pub const Root = struct {
         const output = self.focusedOutput();
         if (self.focused_view) |current_focus| {
             // If there is a currently focused view, focus the next visible view in the stack.
-            const current_node = @fieldParentPtr(ViewStack.Node, "view", current_focus);
-            var it = ViewStack.iterator(current_node, output.current_focused_tags);
+            const current_node = @fieldParentPtr(ViewStack(View).Node, "view", current_focus);
+            var it = ViewStack(View).iterator(current_node, output.current_focused_tags);
             // Skip past the current node
             _ = it.next();
             // Focus the next visible node if there is one
-            if (it.next()) |view| {
-                view.focus(view.wlr_xdg_surface.surface);
+            if (it.next()) |node| {
+                node.view.focus(node.view.wlr_xdg_surface.surface);
                 return;
             }
         }
 
         // There is either no currently focused view or the last visible view in the
         // stack is focused and we need to wrap.
-        var it = ViewStack.iterator(output.views.first, output.current_focused_tags);
-        if (it.next()) |view| {
-            view.focus(view.wlr_xdg_surface.surface);
+        var it = ViewStack(View).iterator(output.views.first, output.current_focused_tags);
+        if (it.next()) |node| {
+            node.view.focus(node.view.wlr_xdg_surface.surface);
         } else {
             // Otherwise clear the focus since there are no visible views
             self.clearFocus();
@@ -123,22 +123,22 @@ pub const Root = struct {
         const output = self.focusedOutput();
         if (self.focused_view) |current_focus| {
             // If there is a currently focused view, focus the previous visible view in the stack.
-            const current_node = @fieldParentPtr(ViewStack.Node, "view", current_focus);
-            var it = ViewStack.reverseIterator(current_node, output.current_focused_tags);
+            const current_node = @fieldParentPtr(ViewStack(View).Node, "view", current_focus);
+            var it = ViewStack(View).reverseIterator(current_node, output.current_focused_tags);
             // Skip past the current node
             _ = it.next();
             // Focus the previous visible node if there is one
-            if (it.next()) |view| {
-                view.focus(view.wlr_xdg_surface.surface);
+            if (it.next()) |node| {
+                node.view.focus(node.view.wlr_xdg_surface.surface);
                 return;
             }
         }
 
         // There is either no currently focused view or the first visible view in the
         // stack is focused and we need to wrap.
-        var it = ViewStack.reverseIterator(output.views.last, output.current_focused_tags);
-        if (it.next()) |view| {
-            view.focus(view.wlr_xdg_surface.surface);
+        var it = ViewStack(View).reverseIterator(output.views.last, output.current_focused_tags);
+        if (it.next()) |node| {
+            node.view.focus(node.view.wlr_xdg_surface.surface);
         } else {
             // Otherwise clear the focus since there are no visible views
             self.clearFocus();
@@ -166,8 +166,9 @@ pub const Root = struct {
         var output_it = self.outputs.first;
         while (output_it) |node| : (output_it = node.next) {
             const output = &node.data;
-            var view_it = ViewStack.iterator(output.views.first, 0xFFFFFFFF);
-            while (view_it.next()) |view| {
+            var view_it = ViewStack(View).iterator(output.views.first, 0xFFFFFFFF);
+            while (view_it.next()) |view_node| {
+                const view = &view_node.view;
                 // Clear the serial in case this transaction is interrupting a prior one.
                 view.pending_serial = null;
 
@@ -259,8 +260,9 @@ pub const Root = struct {
                 self.focusNextView();
             }
 
-            var view_it = ViewStack.iterator(output.views.first, 0xFFFFFFFF);
-            while (view_it.next()) |view| {
+            var view_it = ViewStack(View).iterator(output.views.first, 0xFFFFFFFF);
+            while (view_it.next()) |view_node| {
+                const view = &view_node.view;
                 // Ensure that all pending state is cleared
                 view.pending_serial = null;
                 if (view.pending_box) |state| {

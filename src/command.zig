@@ -3,6 +3,7 @@ const c = @import("c.zig");
 
 const Log = @import("log.zig").Log;
 const Server = @import("server.zig").Server;
+const View = @import("view.zig").View;
 const ViewStack = @import("view_stack.zig").ViewStack;
 
 pub const Arg = union {
@@ -60,7 +61,7 @@ pub fn modifyMasterFactor(server: *Server, arg: Arg) void {
 pub fn zoom(server: *Server, arg: Arg) void {
     if (server.root.focused_view) |current_focus| {
         const output = server.root.focusedOutput();
-        const node = @fieldParentPtr(ViewStack.Node, "view", current_focus);
+        const node = @fieldParentPtr(ViewStack(View).Node, "view", current_focus);
         if (node != output.views.first) {
             output.views.remove(node);
             output.views.push(node);

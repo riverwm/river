@@ -6,6 +6,7 @@ const Box = @import("box.zig").Box;
 const LayerSurface = @import("layer_surface.zig").LayerSurface;
 const Log = @import("log.zig").Log;
 const Root = @import("root.zig").Root;
+const View = @import("view.zig").View;
 const ViewStack = @import("view_stack.zig").ViewStack;
 
 pub const Output = struct {
@@ -22,7 +23,7 @@ pub const Output = struct {
     usable_box: Box,
 
     /// The top of the stack is the "most important" view.
-    views: ViewStack,
+    views: ViewStack(View),
 
     /// A bit field of focused tags
     current_focused_tags: u32,
@@ -100,7 +101,7 @@ pub const Output = struct {
     /// Add a new view to the output. arrangeViews() will be called by the view
     /// when it is mapped.
     pub fn addView(self: *Self, wlr_xdg_surface: *c.wlr_xdg_surface) void {
-        const node = self.root.server.allocator.create(ViewStack.Node) catch unreachable;
+        const node = self.root.server.allocator.create(ViewStack(View).Node) catch unreachable;
         node.view.init(self, wlr_xdg_surface, self.current_focused_tags);
         self.views.push(node);
     }
@@ -129,7 +130,7 @@ pub const Output = struct {
 
         const visible_count = blk: {
             var count: u32 = 0;
-            var it = ViewStack.pendingIterator(self.views.first, output_tags);
+            var it = ViewStack(View).pendingIterator(self.views.first, output_tags);
             while (it.next() != null) count += 1;
             break :blk count;
         };
@@ -157,8 +158,9 @@ pub const Output = struct {
         }
 
         var i: u32 = 0;
-        var it = ViewStack.pendingIterator(self.views.first, output_tags);
-        while (it.next()) |view| {
+        var it = ViewStack(View).pendingIterator(self.views.first, output_tags);
+        while (it.next()) |node| {
+            const view = &node.view;
             if (i < master_count) {
                 // Add the remainder to the first master to ensure every pixel of height is used
                 const master_height = @divTrunc(layout_height, master_count);
