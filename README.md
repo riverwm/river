@@ -20,8 +20,7 @@ binary, `riverctl`, like bspwm.
 To compile river first ensure that you have the following dependencies
 installed:
 
-- [zig](https://github.com/ziglang/zig) master (will depend on 0.6.0
-after that is released)
+- [zig](https://github.com/ziglang/zig) 0.6.0
 - wayland
 - wayland-protocols
 - [wlroots](https://github.com/swaywm/wlroots) 0.10.1
@@ -31,6 +30,11 @@ Then simply use `zig build` to build and `zig build run` to run.
 
 River can either be run nested in an X11/wayland session or directly
 from a tty using KMS/DRM.
+
+Keybinds are similar to the defaults of dwm, but using the "logo key"
+instead of alt. Check out [config.zig](src/config.zig) for a complete list
+of bindings. Note that the terminal emulator is currently hardcoded to
+[alacritty](https://github.com/alacritty/alacritty).
 
 ## Development
 
