@@ -145,7 +145,8 @@ pub const View = struct {
             // If the view being unmapped is focused
             if (current_focus == view) {
                 // Focus the previous view. This clears the focus if there are no visible views.
-                root.focusPrevView();
+                // FIXME: must be fixed in next commit adding focus stack
+                //root.focusPrevView();
             }
         }
 

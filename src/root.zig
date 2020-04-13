@@ -89,62 +89,6 @@ pub const Root = struct {
         self.focused_view = null;
     }
 
-    /// Focus the next visible view in the stack, wrapping if needed. Does
-    /// nothing if there is only one view in the stack.
-    pub fn focusNextView(self: *Self) void {
-        const output = self.focusedOutput();
-        if (self.focused_view) |current_focus| {
-            // If there is a currently focused view, focus the next visible view in the stack.
-            const current_node = @fieldParentPtr(ViewStack(View).Node, "view", current_focus);
-            var it = ViewStack(View).iterator(current_node, output.current_focused_tags);
-            // Skip past the current node
-            _ = it.next();
-            // Focus the next visible node if there is one
-            if (it.next()) |node| {
-                node.view.focus(node.view.wlr_xdg_surface.surface);
-                return;
-            }
-        }
-
-        // There is either no currently focused view or the last visible view in the
-        // stack is focused and we need to wrap.
-        var it = ViewStack(View).iterator(output.views.first, output.current_focused_tags);
-        if (it.next()) |node| {
-            node.view.focus(node.view.wlr_xdg_surface.surface);
-        } else {
-            // Otherwise clear the focus since there are no visible views
-            self.clearFocus();
-        }
-    }
-
-    /// Focus the previous view in the stack, wrapping if needed. Does nothing
-    /// if there is only one view in the stack.
-    pub fn focusPrevView(self: *Self) void {
-        const output = self.focusedOutput();
-        if (self.focused_view) |current_focus| {
-            // If there is a currently focused view, focus the previous visible view in the stack.
-            const current_node = @fieldParentPtr(ViewStack(View).Node, "view", current_focus);
-            var it = ViewStack(View).reverseIterator(current_node, output.current_focused_tags);
-            // Skip past the current node
-            _ = it.next();
-            // Focus the previous visible node if there is one
-            if (it.next()) |node| {
-                node.view.focus(node.view.wlr_xdg_surface.surface);
-                return;
-            }
-        }
-
-        // There is either no currently focused view or the first visible view in the
-        // stack is focused and we need to wrap.
-        var it = ViewStack(View).reverseIterator(output.views.last, output.current_focused_tags);
-        if (it.next()) |node| {
-            node.view.focus(node.view.wlr_xdg_surface.surface);
-        } else {
-            // Otherwise clear the focus since there are no visible views
-            self.clearFocus();
-        }
-    }
-
     /// Arrange all outputs and then a transaction.
     pub fn arrange(self: *Self) void {
         var it = self.outputs.first;
@@ -257,7 +201,7 @@ pub const Root = struct {
                 output.pending_focused_tags = null;
 
                 self.focused_view = null;
-                self.focusNextView();
+                Log.Error.log("FIXME: this needs to iterate over all seats and focus(null)", .{});
             }
 
             var view_it = ViewStack(View).iterator(output.views.first, 0xFFFFFFFF);
@@ -281,7 +225,7 @@ pub const Root = struct {
                         if (focus == view and
                             view.current_tags & output.current_focused_tags == 0)
                         {
-                            self.focusNextView();
+                            Log.Error.log("FIXME: this needs to iterate over all seats and focus(null)", .{});
                         }
                     }
                 }

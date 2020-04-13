@@ -36,11 +36,11 @@ pub const Seat = struct {
 
     /// Handle any user-defined keybinding for the passed keysym and modifiers
     /// Returns true if the key was handled
-    pub fn handleKeybinding(self: Self, keysym: c.xkb_keysym_t, modifiers: u32) bool {
+    pub fn handleKeybinding(self: *Self, keysym: c.xkb_keysym_t, modifiers: u32) bool {
         for (self.input_manager.server.config.keybinds.items) |keybind| {
             if (modifiers == keybind.modifiers and keysym == keybind.keysym) {
                 // Execute the bound command
-                keybind.command(self.input_manager.server, keybind.arg);
+                keybind.command(self, keybind.arg);
                 return true;
             }
         }
