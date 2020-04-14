@@ -19,6 +19,9 @@ pub const Root = struct {
     wlr_output_layout: *c.wlr_output_layout,
     outputs: std.TailQueue(Output),
 
+    /// This output is used when no real outputs are available.
+    noop_output: Output,
+
     /// Number of pending configures sent in the current transaction.
     /// A value of 0 means there is no current transaction.
     pending_configures: u32,
@@ -36,6 +39,10 @@ pub const Root = struct {
         errdefer c.wlr_output_layout_destroy(self.wlr_output_layout);
 
         self.outputs = std.TailQueue(Output).init();
+
+        const noop_wlr_output = c.river_wlr_noop_add_output(server.noop_backend) orelse
+            return error.CantAddNoopOutput;
+        try self.noop_output.init(self, noop_wlr_output);
 
         self.pending_configures = 0;
 

@@ -18,6 +18,7 @@ pub const Server = struct {
     wl_display: *c.wl_display,
     wl_event_loop: *c.wl_event_loop,
     wlr_backend: *c.wlr_backend,
+    noop_backend: *c.wlr_backend,
     wlr_renderer: *c.wlr_renderer,
 
     wlr_xdg_shell: *c.wlr_xdg_shell,
@@ -47,11 +48,15 @@ pub const Server = struct {
 
         // The wlr_backend abstracts the input/output hardware. Autocreate chooses
         // the best option based on the environment, for example DRM when run from
-        // a tty or wayland if WAYLAND_DISPLAY is set.
-        //
-        // This frees itself.when the wl_display is destroyed.
+        // a tty or wayland if WAYLAND_DISPLAY is set. This frees itself when the
+        // wl_display is destroyed.
         self.wlr_backend = c.river_wlr_backend_autocreate(self.wl_display) orelse
             return error.CantCreateWlrBackend;
+
+        // This backend is used to create a noop output for use when no actual
+        // outputs are available. This frees itself when the wl_display is destroyed.
+        self.noop_backend = c.river_wlr_noop_backend_create(self.wl_display) orelse
+            return error.CantCreateNoopBackend;
 
         // If we don't provide a renderer, autocreate makes a GLES2 renderer for us.
         // The renderer is responsible for defining the various pixel formats it

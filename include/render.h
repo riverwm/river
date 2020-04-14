@@ -27,5 +27,7 @@ struct wlr_renderer *river_wlr_backend_get_renderer(struct wlr_backend *backend)
 bool river_wlr_backend_start(struct wlr_backend *backend);
 bool river_wlr_backend_is_multi(struct wlr_backend *backend);
 struct wlr_session *river_wlr_backend_get_session(struct wlr_backend *backend);
+struct wlr_backend *river_wlr_noop_backend_create(struct wl_display *display);
+struct wlr_output *river_wlr_noop_add_output(struct wlr_backend *backend);
 
 #endif
