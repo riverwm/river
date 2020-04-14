@@ -7,7 +7,7 @@ const Server = @import("server.zig").Server;
 pub const InputManager = struct {
     const Self = @This();
 
-    const default_seat = "seat0";
+    const default_seat_name = "default";
 
     server: *Server,
 
@@ -21,7 +21,7 @@ pub const InputManager = struct {
         self.seats = std.TailQueue(Seat).init();
 
         const seat_node = try server.allocator.create(std.TailQueue(Seat).Node);
-        try seat_node.data.init(self, default_seat);
+        try seat_node.data.init(self, default_seat_name);
         self.seats.prepend(seat_node);
 
         // Set up handler for all new input devices made available. This
