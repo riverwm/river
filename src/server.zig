@@ -172,20 +172,27 @@ pub const Server = struct {
             },
         );
 
-        // TODO: this is insufficent for multi output support
-        if (server.root.outputs.first) |node| {
-            const output = &node.data;
-            if (wlr_layer_surface.output == null) {
+        // If the new layer surface does not have an output assigned to it, use the
+        // first output or close the surface if none are available.
+        if (wlr_layer_surface.output == null) {
+            if (server.root.outputs.first) |node| {
+                const output = &node.data;
+                Log.Debug.log(
+                    "New layer surface had null output, assigning it to output {}",
+                    .{output.wlr_output.name},
+                );
                 wlr_layer_surface.output = output.wlr_output;
+            } else {
+                Log.Error.log(
+                    "No output available for layer surface '{}'",
+                    .{wlr_layer_surface.namespace},
+                );
+                c.wlr_layer_surface_v1_close(wlr_layer_surface);
+                return;
             }
-
-            output.addLayerSurface(wlr_layer_surface) catch unreachable;
-        } else {
-            Log.Error.log(
-                "No output available for layer surface '{}' autoassign",
-                .{wlr_layer_surface.namespace},
-            );
-            c.wlr_layer_surface_v1_close(wlr_layer_surface);
         }
+
+        const output = @ptrCast(*Output, @alignCast(@alignOf(*Output), wlr_layer_surface.output.*.data));
+        output.addLayerSurface(wlr_layer_surface) catch unreachable;
     }
 };

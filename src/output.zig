@@ -58,6 +58,7 @@ pub const Output = struct {
 
         self.root = root;
         self.wlr_output = wlr_output;
+        wlr_output.data = self;
 
         for (self.layers) |*layer| {
             layer.* = std.TailQueue(LayerSurface).init();
