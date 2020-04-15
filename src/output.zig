@@ -194,7 +194,7 @@ pub const Output = struct {
 
     /// Arrange all layer surfaces of this output and addjust the usable aread
     pub fn arrangeLayers(self: *Self) void {
-        var bounds = blk: {
+        const full_box = blk: {
             var width: c_int = undefined;
             var height: c_int = undefined;
             c.wlr_output_effective_resolution(self.wlr_output, &width, &height);
@@ -206,26 +206,35 @@ pub const Output = struct {
             };
         };
 
-        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY)], &bounds, true);
-        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_TOP)], &bounds, true);
-        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM)], &bounds, true);
-        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND)], &bounds, true);
+        // This box is modified as exclusive zones are applied
+        var usable_box = full_box;
 
-        if (self.usable_box.width != bounds.width or self.usable_box.height != bounds.height) {
-            self.usable_box = bounds;
+        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY)], full_box, &usable_box, true);
+        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_TOP)], full_box, &usable_box, true);
+        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM)], full_box, &usable_box, true);
+        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND)], full_box, &usable_box, true);
+
+        if (self.usable_box.width != usable_box.width or self.usable_box.height != usable_box.height) {
+            self.usable_box = usable_box;
             self.root.arrange();
         }
 
-        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY)], &bounds, false);
-        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_TOP)], &bounds, false);
-        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM)], &bounds, false);
-        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND)], &bounds, false);
+        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY)], full_box, &usable_box, false);
+        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_TOP)], full_box, &usable_box, false);
+        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM)], full_box, &usable_box, false);
+        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND)], full_box, &usable_box, false);
 
         // TODO: handle seat focus
     }
 
     /// Arrange the layer surfaces of a given layer
-    fn arrangeLayer(self: *Self, layer: std.TailQueue(LayerSurface), bounds: *Box, exclusive: bool) void {
+    fn arrangeLayer(
+        self: *Self,
+        layer: std.TailQueue(LayerSurface),
+        full_box: Box,
+        usable_box: *Box,
+        exclusive: bool,
+    ) void {
         var it = layer.first;
         while (it) |node| : (it = node.next) {
             const layer_surface = &node.data;
@@ -236,6 +245,10 @@ pub const Output = struct {
             if (exclusive != (current_state.exclusive_zone > 0)) {
                 continue;
             }
+
+            // If the exclusive zone is set to -1, this means the the client would like
+            // to ignore any exclusive zones and use the full area of the output.
+            const bounds = if (current_state.exclusive_zone == -1) &full_box else usable_box;
 
             var new_box: Box = undefined;
 
@@ -308,26 +321,26 @@ pub const Output = struct {
             }{
                 .{
                     .anchors = anchor_left | anchor_right | anchor_top,
-                    .to_increase = &bounds.y,
-                    .to_decrease = &bounds.height,
+                    .to_increase = &usable_box.y,
+                    .to_decrease = &usable_box.height,
                     .margin = current_state.margin.top,
                 },
                 .{
                     .anchors = anchor_left | anchor_right | anchor_bottom,
                     .to_increase = null,
-                    .to_decrease = &bounds.height,
+                    .to_decrease = &usable_box.height,
                     .margin = current_state.margin.bottom,
                 },
                 .{
                     .anchors = anchor_left | anchor_top | anchor_bottom,
-                    .to_increase = &bounds.x,
-                    .to_decrease = &bounds.width,
+                    .to_increase = &usable_box.x,
+                    .to_decrease = &usable_box.width,
                     .margin = current_state.margin.left,
                 },
                 .{
                     .anchors = anchor_right | anchor_top | anchor_bottom,
                     .to_increase = null,
-                    .to_decrease = &bounds.width,
+                    .to_decrease = &usable_box.width,
                     .margin = current_state.margin.right,
                 },
             };
