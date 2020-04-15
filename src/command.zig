@@ -2,6 +2,7 @@ const std = @import("std");
 const c = @import("c.zig");
 
 const Log = @import("log.zig").Log;
+const Output = @import("output.zig").Output;
 const Seat = @import("seat.zig").Seat;
 const View = @import("view.zig").View;
 const ViewStack = @import("view_stack.zig").ViewStack;
@@ -61,6 +62,36 @@ pub fn focusNextView(seat: *Seat, arg: Arg) void {
 /// if there is only one view in the stack.
 pub fn focusPrevView(seat: *Seat, arg: Arg) void {
     focusNextPrevView(seat, false);
+}
+
+/// Focus either the next or the previous output, depending on the bool passed.
+fn focusNextPrevOutput(seat: *Seat, next: bool) void {
+    const root = &seat.input_manager.server.root;
+    // If the noop output is focused, there are no other outputs to switch to
+    if (seat.focused_output == &root.noop_output) {
+        std.debug.assert(root.outputs.len == 0);
+        return;
+    }
+
+    const focused_node = @fieldParentPtr(std.TailQueue(Output).Node, "data", seat.focused_output);
+    seat.focused_output = if (if (next) focused_node.next else focused_node.prev) |output_node|
+    // Focus the next/prev output in the list if there is one
+        &output_node.data
+    else if (next) &root.outputs.first.?.data else &root.outputs.last.?.data;
+
+    seat.focus(null);
+}
+
+/// Focus the next output, wrapping if needed. Does nothing if there is
+/// only one output.
+pub fn focusNextOutput(seat: *Seat, arg: Arg) void {
+    focusNextPrevOutput(seat, true);
+}
+
+/// Focus the previous output, wrapping if needed. Does nothing if there is
+/// only one output.
+pub fn focusPrevOutput(seat: *Seat, arg: Arg) void {
+    focusNextPrevOutput(seat, false);
 }
 
 /// Modify the number of master views

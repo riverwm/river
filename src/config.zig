@@ -96,5 +96,9 @@ pub const Config = struct {
 
         // Mod+Shift+0 to tag focused view with all tags
         try self.keybinds.append(Keybind{ .keysym = c.XKB_KEY_0, .modifiers = mod | c.WLR_MODIFIER_SHIFT, .command = command.setFocusedViewTags, .arg = .{ .uint = 0xFFFFFFFF } });
+
+        // Mod+Period and Mod+Comma to focus the next/previous output
+        try self.keybinds.append(Keybind{ .keysym = c.XKB_KEY_period, .modifiers = mod, .command = command.focusNextOutput, .arg = .{ .none = {} } });
+        try self.keybinds.append(Keybind{ .keysym = c.XKB_KEY_comma, .modifiers = mod, .command = command.focusPrevOutput, .arg = .{ .none = {} } });
     }
 };
