@@ -65,11 +65,16 @@ pub const Seat = struct {
                 v.current_tags & self.focused_output.current_focused_tags == 0
         else
             true) {
-            // Set view to the first currently visible view in the focus stack if any
-            view = if (ViewStack(*View).iterator(
+            // Set view to the first currently visible view on in the focus stack if any
+            var it = ViewStack(*View).iterator(
                 self.focus_stack.first,
                 self.focused_output.current_focused_tags,
-            ).next()) |node| node.view else null;
+            );
+            view = while (it.next()) |node| {
+                if (node.view.output == self.focused_output) {
+                    break node.view;
+                }
+            } else null;
         }
 
         if (self.focused_view) |current_focus| {
