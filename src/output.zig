@@ -209,20 +209,25 @@ pub const Output = struct {
         // This box is modified as exclusive zones are applied
         var usable_box = full_box;
 
-        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY)], full_box, &usable_box, true);
-        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_TOP)], full_box, &usable_box, true);
-        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM)], full_box, &usable_box, true);
-        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND)], full_box, &usable_box, true);
+        const layers = [_]usize{
+            c.ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY,
+            c.ZWLR_LAYER_SHELL_V1_LAYER_TOP,
+            c.ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM,
+            c.ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND,
+        };
+
+        for (layers) |layer| {
+            self.arrangeLayer(self.layers[layer], full_box, &usable_box, true);
+        }
 
         if (self.usable_box.width != usable_box.width or self.usable_box.height != usable_box.height) {
             self.usable_box = usable_box;
             self.root.arrange();
         }
 
-        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY)], full_box, &usable_box, false);
-        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_TOP)], full_box, &usable_box, false);
-        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM)], full_box, &usable_box, false);
-        self.arrangeLayer(self.layers[@intCast(usize, c.ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND)], full_box, &usable_box, false);
+        for (layers) |layer| {
+            self.arrangeLayer(self.layers[layer], full_box, &usable_box, false);
+        }
 
         // TODO: handle seat focus
     }
