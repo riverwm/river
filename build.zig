@@ -38,7 +38,7 @@ fn addDeps(exe: *std.build.LibExeObjStep, protocol_step: *std.build.Step) void {
     exe.step.dependOn(protocol_step);
     exe.addIncludeDir("protocol");
 
-    exe.addCSourceFile("include/render.c", &[_][]const u8{"-std=c99"});
+    exe.addCSourceFile("include/bindings.c", &[_][]const u8{"-std=c99"});
     exe.addIncludeDir(".");
 
     exe.linkLibC();

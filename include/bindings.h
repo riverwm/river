@@ -1,7 +1,8 @@
-#ifndef RIVER_RENDER_H
-#define RIVER_RENDER_H
+#ifndef RIVER_BINDINGS_H
+#define RIVER_BINDINGS_H
 
 #include <wlr/backend/session.h>
+
 /*
  * This header is needed since zig cannot yet translate flexible arrays.
  * See https://github.com/ziglang/zig/issues/4775
@@ -31,4 +32,4 @@ struct wlr_backend *river_wlr_noop_backend_create(struct wl_display *display);
 struct wlr_output *river_wlr_noop_add_output(struct wlr_backend *backend);
 bool river_wlr_output_is_noop(struct wlr_output *output);
 
-#endif
+#endif // RIVER_BINDINGS_H

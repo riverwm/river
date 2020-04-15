@@ -26,5 +26,5 @@ pub usingnamespace @cImport({
 
     // Contains a subset of functions from wlr/backend.h and wlr/render/wlr_renderer.h
     // that can be automatically imported
-    @cInclude("include/render.h");
+    @cInclude("include/bindings.h");
 });
