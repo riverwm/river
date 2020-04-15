@@ -27,21 +27,8 @@ pub fn renderOutput(output: *Output) void {
     const color = [_]f32{ 0.0, 0.16862745, 0.21176471, 1.0 };
     c.wlr_renderer_clear(renderer, &color);
 
-    // The view has a position in layout coordinates. If you have two displays,
-    // one next to the other, both 1080p, a view on the rightmost display might
-    // have layout coordinates of 2000,100. We need to translate that to
-    // output-local coordinates, or (2000 - 1920).
-    var ox: f64 = 0.0;
-    var oy: f64 = 0.0;
-    c.wlr_output_layout_output_coords(
-        output.root.wlr_output_layout,
-        output.wlr_output,
-        &ox,
-        &oy,
-    );
-
-    renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND], &now, ox, oy);
-    renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM], &now, ox, oy);
+    renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND], &now);
+    renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM], &now);
 
     // The first view in the list is "on top" so iterate in reverse.
     var it = ViewStack(View).reverseIterator(output.views.last, output.current_focused_tags);
@@ -52,12 +39,12 @@ pub fn renderOutput(output: *Output) void {
         if (view.current_box.width == 0 or view.current_box.height == 0) {
             continue;
         }
-        renderView(output.*, view, &now, ox, oy);
-        renderBorders(output.*, view, &now, ox, oy);
+        renderView(output.*, view, &now);
+        renderBorders(output.*, view, &now);
     }
 
-    renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_TOP], &now, ox, oy);
-    renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY], &now, ox, oy);
+    renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_TOP], &now);
+    renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY], &now);
 
     // Hardware cursors are rendered by the GPU on a separate plane, and can be
     // moved around without re-rendering what's beneath them - which is more
@@ -79,12 +66,10 @@ const LayerSurfaceRenderData = struct {
     renderer: *c.wlr_renderer,
     layer_surface: *LayerSurface,
     when: *c.struct_timespec,
-    ox: f64,
-    oy: f64,
 };
 
 /// Render all surfaces on the passed layer
-fn renderLayer(output: Output, layer: std.TailQueue(LayerSurface), now: *c.struct_timespec, ox: f64, oy: f64) void {
+fn renderLayer(output: Output, layer: std.TailQueue(LayerSurface), now: *c.struct_timespec) void {
     var it = layer.first;
     while (it) |node| : (it = node.next) {
         const layer_surface = &node.data;
@@ -93,8 +78,6 @@ fn renderLayer(output: Output, layer: std.TailQueue(LayerSurface), now: *c.struc
             .renderer = output.root.server.wlr_renderer,
             .layer_surface = layer_surface,
             .when = now,
-            .ox = ox,
-            .oy = oy,
         };
         c.wlr_layer_surface_v1_for_each_surface(
             layer_surface.wlr_layer_surface,
@@ -125,8 +108,8 @@ fn renderLayerSurface(_surface: ?*c.wlr_surface, sx: c_int, sy: c_int, data: ?*c
     }
 
     var box = c.wlr_box{
-        .x = @floatToInt(c_int, rdata.ox) + layer_surface.box.x + sx,
-        .y = @floatToInt(c_int, rdata.oy) + layer_surface.box.y + sy,
+        .x = layer_surface.box.x + sx,
+        .y = layer_surface.box.y + sy,
         .width = surface.current.width,
         .height = surface.current.height,
     };
@@ -156,11 +139,9 @@ const ViewRenderData = struct {
     renderer: *c.wlr_renderer,
     view: *View,
     when: *c.struct_timespec,
-    ox: f64,
-    oy: f64,
 };
 
-fn renderView(output: Output, view: *View, now: *c.struct_timespec, ox: f64, oy: f64) void {
+fn renderView(output: Output, view: *View, now: *c.struct_timespec) void {
     // If we have a stashed buffer, we are in the middle of a transaction
     // and need to render that buffer until the transaction is complete.
     if (view.stashed_buffer) |buffer| {
@@ -201,8 +182,6 @@ fn renderView(output: Output, view: *View, now: *c.struct_timespec, ox: f64, oy:
             .view = view,
             .renderer = output.root.server.wlr_renderer,
             .when = now,
-            .ox = ox,
-            .oy = oy,
         };
 
         // This calls our render_surface function for each surface among the
@@ -232,10 +211,8 @@ fn renderSurface(_surface: ?*c.wlr_surface, sx: c_int, sy: c_int, data: ?*c_void
     const border_width = view.output.root.server.config.border_width;
     const view_padding = view.output.root.server.config.view_padding;
     var box = c.wlr_box{
-        .x = @floatToInt(c_int, rdata.ox) + view.current_box.x + sx +
-            @intCast(c_int, border_width + view_padding),
-        .y = @floatToInt(c_int, rdata.oy) + view.current_box.y + sy +
-            @intCast(c_int, border_width + view_padding),
+        .x = view.current_box.x + sx + @intCast(c_int, border_width + view_padding),
+        .y = view.current_box.y + sy + @intCast(c_int, border_width + view_padding),
         .width = surface.current.width,
         .height = surface.current.height,
     };
@@ -260,7 +237,7 @@ fn renderSurface(_surface: ?*c.wlr_surface, sx: c_int, sy: c_int, data: ?*c_void
     c.wlr_surface_send_frame_done(surface, rdata.when);
 }
 
-fn renderBorders(output: Output, view: *View, now: *c.struct_timespec, ox: f64, oy: f64) void {
+fn renderBorders(output: Output, view: *View, now: *c.struct_timespec) void {
     var border: c.wlr_box = undefined;
     const color = if (view.wlr_xdg_surface.unnamed_163.toplevel.*.current.activated)
         [_]f32{ 0.57647059, 0.63137255, 0.63137255, 1.0 } // Solarized base1
@@ -270,8 +247,8 @@ fn renderBorders(output: Output, view: *View, now: *c.struct_timespec, ox: f64, 
     const view_padding = output.root.server.config.view_padding;
 
     // left border
-    border.x = @floatToInt(c_int, ox) + view.current_box.x + @intCast(c_int, view_padding);
-    border.y = @floatToInt(c_int, oy) + view.current_box.y + @intCast(c_int, view_padding);
+    border.x = view.current_box.x + @intCast(c_int, view_padding);
+    border.y = view.current_box.y + @intCast(c_int, view_padding);
     border.width = @intCast(c_int, border_width);
     border.height = @intCast(c_int, view.current_box.height - view_padding * 2);
     scaleBox(&border, output.wlr_output.scale);
@@ -283,9 +260,9 @@ fn renderBorders(output: Output, view: *View, now: *c.struct_timespec, ox: f64, 
     );
 
     // right border
-    border.x = @floatToInt(c_int, ox) + view.current_box.x +
+    border.x = view.current_box.x +
         @intCast(c_int, view.current_box.width - border_width - view_padding);
-    border.y = @floatToInt(c_int, oy) + view.current_box.y + @intCast(c_int, view_padding);
+    border.y = view.current_box.y + @intCast(c_int, view_padding);
     border.width = @intCast(c_int, border_width);
     border.height = @intCast(c_int, view.current_box.height - view_padding * 2);
     scaleBox(&border, output.wlr_output.scale);
@@ -297,10 +274,8 @@ fn renderBorders(output: Output, view: *View, now: *c.struct_timespec, ox: f64, 
     );
 
     // top border
-    border.x = @floatToInt(c_int, ox) + view.current_box.x +
-        @intCast(c_int, border_width + view_padding);
-    border.y = @floatToInt(c_int, oy) + view.current_box.y +
-        @intCast(c_int, view_padding);
+    border.x = view.current_box.x + @intCast(c_int, border_width + view_padding);
+    border.y = view.current_box.y + @intCast(c_int, view_padding);
     border.width = @intCast(c_int, view.current_box.width -
         border_width * 2 - view_padding * 2);
     border.height = @intCast(c_int, border_width);
@@ -313,9 +288,8 @@ fn renderBorders(output: Output, view: *View, now: *c.struct_timespec, ox: f64, 
     );
 
     // bottom border
-    border.x = @floatToInt(c_int, ox) + view.current_box.x +
-        @intCast(c_int, border_width + view_padding);
-    border.y = @floatToInt(c_int, oy) + view.current_box.y +
+    border.x = view.current_box.x + @intCast(c_int, border_width + view_padding);
+    border.y = view.current_box.y +
         @intCast(c_int, view.current_box.height - border_width - view_padding);
     border.width = @intCast(c_int, view.current_box.width -
         border_width * 2 - view_padding * 2);
