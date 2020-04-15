@@ -86,16 +86,18 @@ pub const Output = struct {
         self.listen_mode.notify = handleMode;
         c.wl_signal_add(&wlr_output.events.mode, &self.listen_mode);
 
-        // Add the new output to the layout. The add_auto function arranges outputs
-        // from left-to-right in the order they appear. A more sophisticated
-        // compositor would let the user configure the arrangement of outputs in the
-        // layout.
-        c.wlr_output_layout_add_auto(root.wlr_output_layout, wlr_output);
+        if (!c.river_wlr_output_is_noop(wlr_output)) {
+            // Add the new output to the layout. The add_auto function arranges outputs
+            // from left-to-right in the order they appear. A more sophisticated
+            // compositor would let the user configure the arrangement of outputs in the
+            // layout.
+            c.wlr_output_layout_add_auto(root.wlr_output_layout, wlr_output);
 
-        // Creating the global adds a wl_output global to the display, which Wayland
-        // clients can see to find out information about the output (such as
-        // DPI, scale factor, manufacturer, etc).
-        c.wlr_output_create_global(wlr_output);
+            // Creating the global adds a wl_output global to the display, which Wayland
+            // clients can see to find out information about the output (such as
+            // DPI, scale factor, manufacturer, etc).
+            c.wlr_output_create_global(wlr_output);
+        }
     }
 
     /// Add a new view to the output. arrangeViews() will be called by the view
