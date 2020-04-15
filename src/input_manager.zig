@@ -12,6 +12,7 @@ pub const InputManager = struct {
     server: *Server,
 
     seats: std.TailQueue(Seat),
+    default_seat: *Seat,
 
     listen_new_input: c.wl_listener,
 
@@ -22,6 +23,7 @@ pub const InputManager = struct {
 
         const seat_node = try server.allocator.create(std.TailQueue(Seat).Node);
         try seat_node.data.init(self, default_seat_name);
+        self.default_seat = &seat_node.data;
         self.seats.prepend(seat_node);
 
         // Set up handler for all new input devices made available. This

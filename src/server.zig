@@ -145,7 +145,7 @@ pub const Server = struct {
             return;
         }
 
-        server.root.focusedOutput().addView(wlr_xdg_surface);
+        server.input_manager.default_seat.focused_output.addView(wlr_xdg_surface);
     }
 
     /// This event is raised when the layer_shell recieves a new surface from a client.

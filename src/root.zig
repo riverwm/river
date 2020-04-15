@@ -19,7 +19,8 @@ pub const Root = struct {
     wlr_output_layout: *c.wlr_output_layout,
     outputs: std.TailQueue(Output),
 
-    /// This output is used when no real outputs are available.
+    /// This output is used internally when no real outputs are available.
+    /// It is not advertised to clients.
     noop_output: Output,
 
     /// Number of pending configures sent in the current transaction.
@@ -58,11 +59,16 @@ pub const Root = struct {
         const node = self.outputs.allocateNode(self.server.allocator) catch unreachable;
         node.data.init(self, wlr_output) catch unreachable;
         self.outputs.append(node);
-    }
 
-    /// TODO: move this to seat, it's just a stop gap hack
-    pub fn focusedOutput(self: Self) *Output {
-        return &self.outputs.first.?.data;
+        // if we previously had no real outputs, move focus from the noop output
+        // to the new one.
+        if (self.outputs.len == 1) {
+            // TODO: move views from the noop output to the new one and focus(null)
+            var it = self.server.input_manager.seats.first;
+            while (it) |seat_node| : (it = seat_node.next) {
+                seat_node.data.focused_output = &self.outputs.first.?.data;
+            }
+        }
     }
 
     /// Finds the topmost view under the output layout coordinates lx, ly

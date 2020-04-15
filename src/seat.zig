@@ -2,9 +2,10 @@ const std = @import("std");
 const c = @import("c.zig");
 
 const Cursor = @import("cursor.zig").Cursor;
-const Log = @import("log.zig").Log;
 const InputManager = @import("input_manager.zig").InputManager;
 const Keyboard = @import("keyboard.zig").Keyboard;
+const Log = @import("log.zig").Log;
+const Output = @import("output.zig").Output;
 const View = @import("view.zig").View;
 const ViewStack = @import("view_stack.zig").ViewStack;
 
@@ -19,6 +20,9 @@ pub const Seat = struct {
 
     /// Mulitple keyboards are handled separately
     keyboards: std.TailQueue(Keyboard),
+
+    /// Currently focused output, may be the noop output if no
+    focused_output: *Output,
 
     /// Currently focused view if any
     focused_view: ?*View,
@@ -39,6 +43,8 @@ pub const Seat = struct {
 
         self.keyboards = std.TailQueue(Keyboard).init();
 
+        self.focused_output = &self.input_manager.server.root.noop_output;
+
         self.focused_view = null;
 
         self.focus_stack.init();
@@ -54,11 +60,15 @@ pub const Seat = struct {
         var view = _view;
 
         // If view is null or not currently visible
-        if (if (view) |v| v.current_tags & v.output.current_focused_tags == 0 else true) {
+        if (if (view) |v|
+            v.output != self.focused_output or
+                v.current_tags & self.focused_output.current_focused_tags == 0
+        else
+            true) {
             // Set view to the first currently visible view in the focus stack if any
             view = if (ViewStack(*View).iterator(
                 self.focus_stack.first,
-                self.input_manager.server.root.focusedOutput().current_focused_tags,
+                self.focused_output.current_focused_tags,
             ).next()) |node| node.view else null;
         }
 
