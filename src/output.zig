@@ -35,6 +35,8 @@ pub const Output = struct {
     /// Percentage of the total screen that the master section takes up.
     master_factor: f64,
 
+    // All listeners for this output, in alphabetical order
+    listen_destroy: c.wl_listener,
     listen_frame: c.wl_listener,
     listen_mode: c.wl_listener,
 
@@ -81,6 +83,9 @@ pub const Output = struct {
         self.master_factor = 0.6;
 
         // Set up listeners
+        self.listen_destroy.notify = handleDestroy;
+        c.wl_signal_add(&wlr_output.events.destroy, &self.listen_destroy);
+
         self.listen_frame.notify = handleFrame;
         c.wl_signal_add(&wlr_output.events.frame, &self.listen_frame);
 
@@ -366,6 +371,55 @@ pub const Output = struct {
 
             layer_surface.sendConfigure();
         }
+    }
+
+    /// Called when the output is destroyed. Evacuate all views from the output
+    /// and then remove it from the list of outputs.
+    fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+        const destroyed_output = @fieldParentPtr(Output, "listen_destroy", listener.?);
+        const root = destroyed_output.root;
+
+        // Use the first output in the list that is not the one being destroyed.
+        // If there is no other real output, use the noop output.
+        var output_it = root.outputs.first;
+        const fallback_output = while (output_it) |output_node| : (output_it = output_node.next) {
+            if (&output_node.data != destroyed_output) {
+                break &output_node.data;
+            }
+        } else &root.noop_output;
+
+        // Move all views from the destroyed output to the fallback one
+        while (destroyed_output.views.last) |node| {
+            destroyed_output.views.remove(node);
+            fallback_output.views.push(node);
+            node.view.output = fallback_output;
+        }
+
+        // If any seat has the destroyed output focused, focus the fallback one
+        var seat_it = root.server.input_manager.seats.first;
+        while (seat_it) |seat_node| : (seat_it = seat_node.next) {
+            const seat = &seat_node.data;
+            if (seat.focused_output == destroyed_output) {
+                seat.focused_output = fallback_output;
+                seat.focus(null);
+            }
+        }
+
+        // Remove all listeners
+        c.wl_list_remove(&destroyed_output.listen_destroy.link);
+        c.wl_list_remove(&destroyed_output.listen_frame.link);
+        c.wl_list_remove(&destroyed_output.listen_mode.link);
+
+        // Clean up the wlr_output
+        destroyed_output.wlr_output.data = null;
+
+        // Remove the destroyed output from the list
+        const node = @fieldParentPtr(std.TailQueue(Output).Node, "data", destroyed_output);
+        root.outputs.remove(node);
+        root.server.allocator.destroy(node);
+
+        // Arrange the root in case evacuated views affect the layout
+        root.arrange();
     }
 
     fn handleFrame(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
