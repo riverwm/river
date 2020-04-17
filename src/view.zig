@@ -148,8 +148,14 @@ pub const View = struct {
         c.wl_signal_add(&view.wlr_xdg_surface.surface.*.events.commit, &view.listen_commit);
 
         view.mapped = true;
-        // TODO: remove this hack
-        root.server.input_manager.seats.first.?.data.focus(view);
+
+        // Focus the newly mapped view. Note: if a seat is focusing a different output
+        // it will continue to do so.
+        var it = root.server.input_manager.seats.first;
+        while (it) |seat_node| : (it = seat_node.next) {
+            seat_node.data.focus(view);
+        }
+
         view.output.root.arrange();
     }
 
