@@ -25,12 +25,13 @@ pub const View = struct {
     // This is what we render while a transaction is in progress
     stashed_buffer: ?*c.wlr_buffer,
 
+    // Listeners that are always active over the view's lifetime
+    listen_destroy: c.wl_listener,
     listen_map: c.wl_listener,
     listen_unmap: c.wl_listener,
-    listen_destroy: c.wl_listener,
+
+    // Listeners that are only active while the view is mapped
     listen_commit: c.wl_listener,
-    // listen_request_move: c.wl_listener,
-    // listen_request_resize: c.wl_listener,
 
     pub fn init(self: *Self, output: *Output, wlr_xdg_surface: *c.wlr_xdg_surface, tags: u32) void {
         self.output = output;
@@ -58,21 +59,15 @@ pub const View = struct {
 
         self.stashed_buffer = null;
 
+        // Add listeners that are active over the view's entire lifetime
+        self.listen_destroy.notify = handleDestroy;
+        c.wl_signal_add(&self.wlr_xdg_surface.events.destroy, &self.listen_destroy);
+
         self.listen_map.notify = handleMap;
         c.wl_signal_add(&self.wlr_xdg_surface.events.map, &self.listen_map);
 
         self.listen_unmap.notify = handleUnmap;
         c.wl_signal_add(&self.wlr_xdg_surface.events.unmap, &self.listen_unmap);
-
-        self.listen_destroy.notify = handleDestroy;
-        c.wl_signal_add(&self.wlr_xdg_surface.events.destroy, &self.listen_destroy);
-
-        self.listen_commit.notify = handleCommit;
-        c.wl_signal_add(&self.wlr_xdg_surface.surface.*.events.commit, &self.listen_commit);
-
-        // const toplevel = xdg_surface.unnamed_160.toplevel;
-        // c.wl_signal_add(&toplevel.events.request_move, &view.request_move);
-        // c.wl_signal_add(&toplevel.events.request_resize, &view.request_resize);
     }
 
     pub fn needsConfigure(self: Self) bool {
@@ -128,16 +123,37 @@ pub const View = struct {
         c.wlr_xdg_toplevel_send_close(self.wlr_xdg_surface);
     }
 
+    fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+        const view = @fieldParentPtr(View, "listen_destroy", listener.?);
+        const output = view.output;
+
+        // Remove listeners that are active for the entire lifetime of the view
+        c.wl_list_remove(&view.listen_destroy.link);
+        c.wl_list_remove(&view.listen_map.link);
+        c.wl_list_remove(&view.listen_unmap.link);
+
+        // Remove the view from the stack
+        const node = @fieldParentPtr(ViewStack(View).Node, "view", view);
+        output.views.remove(node);
+        output.root.server.allocator.destroy(node);
+    }
+
+    /// Called when the surface is mapped, or ready to display on-screen.
     fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-        // Called when the surface is mapped, or ready to display on-screen.
         const view = @fieldParentPtr(View, "listen_map", listener.?);
         const root = view.output.root;
+
+        // Add listeners that are only active while mapped
+        view.listen_commit.notify = handleCommit;
+        c.wl_signal_add(&view.wlr_xdg_surface.surface.*.events.commit, &view.listen_commit);
+
         view.mapped = true;
         // TODO: remove this hack
         root.server.input_manager.seats.first.?.data.focus(view);
         view.output.root.arrange();
     }
 
+    /// Called when the surface is unmapped and will no longer be displayed.
     fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         const view = @fieldParentPtr(View, "listen_unmap", listener.?);
         const root = view.output.root;
@@ -151,15 +167,9 @@ pub const View = struct {
         }
 
         root.arrange();
-    }
 
-    fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-        const view = @fieldParentPtr(View, "listen_destroy", listener.?);
-        const output = view.output;
-
-        const node = @fieldParentPtr(ViewStack(View).Node, "view", view);
-        output.views.remove(node);
-        output.root.server.allocator.destroy(node);
+        // Remove listeners that are only active while mapped
+        c.wl_list_remove(&view.listen_commit.link);
     }
 
     fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -172,14 +182,6 @@ pub const View = struct {
         }
         // TODO: check for unexpected change in size and react as needed
     }
-
-    // fn xdgToplevelRequestMove(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    //     // ignore for now
-    // }
-
-    // fn xdgToplevelRequestResize(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    //     // ignore for now
-    // }
 
     /// Set the active state of the view to the passed bool
     pub fn setActivated(self: Self, activated: bool) void {
