@@ -141,18 +141,19 @@ pub const Root = struct {
             }
         }
 
-        Log.Debug.log(
-            "Started transaction with {} pending configures.",
-            .{self.pending_configures},
-        );
-
         if (self.pending_configures > 0) {
+            Log.Debug.log(
+                "Started transaction with {} pending configures.",
+                .{self.pending_configures},
+            );
+
             // TODO: log failure to create timer and commit immediately
             self.transaction_timer = c.wl_event_loop_add_timer(
                 self.server.wl_event_loop,
                 handle_timeout,
                 self,
             );
+
             // Set timeout to 200ms
             if (c.wl_event_source_timer_update(self.transaction_timer, 200) == -1) {
                 // TODO: handle failure
