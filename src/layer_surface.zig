@@ -11,12 +11,18 @@ pub const LayerSurface = struct {
     output: *Output,
     wlr_layer_surface: *c.wlr_layer_surface_v1,
 
+    /// True if the layer surface is currently mapped
+    mapped: bool,
+
     box: Box,
     layer: c.zwlr_layer_shell_v1_layer,
 
+    // Listeners active the entire lifetime of the layser surface
+    listen_destroy: c.wl_listener,
     listen_map: c.wl_listener,
     listen_unmap: c.wl_listener,
-    listen_destroy: c.wl_listener,
+
+    // Listeners only active while the layer surface is mapped
     listen_commit: c.wl_listener,
     listen_new_popup: c.wl_listener,
 
@@ -29,41 +35,25 @@ pub const LayerSurface = struct {
         self.output = output;
         self.wlr_layer_surface = wlr_layer_surface;
 
+        self.mapped = false;
+
         self.box = undefined;
         self.layer = layer;
+
+        // Set up listeners that are active for the entire lifetime of the layer surface
+        self.listen_destroy.notify = handleDestroy;
+        c.wl_signal_add(&self.wlr_layer_surface.events.destroy, &self.listen_destroy);
 
         self.listen_map.notify = handleMap;
         c.wl_signal_add(&self.wlr_layer_surface.events.map, &self.listen_map);
 
         self.listen_unmap.notify = handleUnmap;
         c.wl_signal_add(&self.wlr_layer_surface.events.unmap, &self.listen_unmap);
-
-        self.listen_destroy.notify = handleDestroy;
-        c.wl_signal_add(&self.wlr_layer_surface.events.destroy, &self.listen_destroy);
-
-        self.listen_commit.notify = handleCommit;
-        c.wl_signal_add(&self.wlr_layer_surface.surface.*.events.commit, &self.listen_commit);
-
-        self.listen_new_popup.notify = handleNewPopup;
-        c.wl_signal_add(&self.wlr_layer_surface.events.new_popup, &self.listen_new_popup);
     }
 
     /// Send a configure event to the client with the dimensions of the current box
     pub fn sendConfigure(self: Self) void {
         c.wlr_layer_surface_v1_configure(self.wlr_layer_surface, self.box.width, self.box.height);
-    }
-
-    fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-        const layer_surface = @fieldParentPtr(LayerSurface, "listen_map", listener.?);
-        c.wlr_surface_send_enter(
-            layer_surface.wlr_layer_surface.surface,
-            layer_surface.wlr_layer_surface.output,
-        );
-        layer_surface.output.arrangeLayers();
-    }
-
-    fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-        const layer_surface = @fieldParentPtr(LayerSurface, "listen_unmap", listener.?);
     }
 
     fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -75,6 +65,42 @@ pub const LayerSurface = struct {
         layer_surface.output.root.server.allocator.destroy(node);
 
         layer_surface.output.arrangeLayers();
+
+        // Remove listeners active the entire lifetime of the layer surface
+        c.wl_list_remove(&layer_surface.listen_destroy);
+        c.wl_list_remove(&layer_surface.listen_map);
+        c.wl_list_remove(&layer_surface.listen_unmap);
+    }
+
+    fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+        const layer_surface = @fieldParentPtr(LayerSurface, "listen_map", listener.?);
+        const wlr_layer_surface = layer_surface.wlr_layer_surface;
+
+        layer_surface.mapped = true;
+
+        // Add listeners that are only active while mapped
+        layer_surface.listen_commit.notify = handleCommit;
+        c.wl_signal_add(&wlr_layer_surface.surface.*.events.commit, &layer_surface.listen_commit);
+
+        layer_surface.listen_new_popup.notify = handleNewPopup;
+        c.wl_signal_add(&wlr_layer_surface.events.new_popup, &layer_surface.listen_new_popup);
+
+        c.wlr_surface_send_enter(
+            wlr_layer_surface.surface,
+            wlr_layer_surface.output,
+        );
+
+        layer_surface.output.arrangeLayers();
+    }
+
+    fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+        const layer_surface = @fieldParentPtr(LayerSurface, "listen_unmap", listener.?);
+
+        layer_surface.mapped = false;
+
+        // remove listeners only active while the layer surface is mapped
+        c.wl_list_remove(&layer_surface.listen_commit.link);
+        c.wl_list_remove(&layer_surface.listen_new_popup.link);
     }
 
     fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {

@@ -73,6 +73,9 @@ fn renderLayer(output: Output, layer: std.TailQueue(LayerSurface), now: *c.struc
     var it = layer.first;
     while (it) |node| : (it = node.next) {
         const layer_surface = &node.data;
+        if (!layer_surface.mapped) {
+            continue;
+        }
         var rdata = LayerSurfaceRenderData{
             .output = output.wlr_output,
             .renderer = output.root.server.wlr_renderer,
