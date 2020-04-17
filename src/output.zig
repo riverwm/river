@@ -379,6 +379,8 @@ pub const Output = struct {
         const destroyed_output = @fieldParentPtr(Output, "listen_destroy", listener.?);
         const root = destroyed_output.root;
 
+        Log.Debug.log("Output {} destroyed", .{destroyed_output.wlr_output.name});
+
         // Use the first output in the list that is not the one being destroyed.
         // If there is no other real output, use the noop output.
         var output_it = root.outputs.first;
@@ -393,6 +395,21 @@ pub const Output = struct {
             destroyed_output.views.remove(node);
             fallback_output.views.push(node);
             node.view.output = fallback_output;
+        }
+
+        // Close all layer surfaces on the destroyed output
+        for (destroyed_output.layers) |*layer, layer_idx| {
+            while (layer.pop()) |node| {
+                const layer_surface = &node.data;
+                c.wlr_layer_surface_v1_close(layer_surface.wlr_layer_surface);
+                // We need to move the closing layer surface to the noop output
+                // since it is not immediately destoryed. This just a request
+                // to close which will trigger unmap and destroy events in
+                // response, and the LayerSurface needs a valid output to
+                // handle them.
+                root.noop_output.layers[layer_idx].prepend(node);
+                layer_surface.output = &root.noop_output;
+            }
         }
 
         // If any seat has the destroyed output focused, focus the fallback one

@@ -131,6 +131,7 @@ pub const Server = struct {
     fn handleNewOutput(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         const server = @fieldParentPtr(Server, "listen_new_output", listener.?);
         const wlr_output = @ptrCast(*c.wlr_output, @alignCast(@alignOf(*c.wlr_output), data));
+        Log.Debug.log("New output {}", .{wlr_output.name});
         server.root.addOutput(wlr_output);
     }
 

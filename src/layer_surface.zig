@@ -58,18 +58,18 @@ pub const LayerSurface = struct {
 
     fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         const layer_surface = @fieldParentPtr(LayerSurface, "listen_destroy", listener.?);
+        const output = layer_surface.output;
+
         Log.Debug.log("Layer surface '{}' destroyed", .{layer_surface.wlr_layer_surface.namespace});
 
-        const node = @fieldParentPtr(std.TailQueue(LayerSurface).Node, "data", layer_surface);
-        layer_surface.output.layers[@intCast(usize, @enumToInt(layer_surface.layer))].remove(node);
-        layer_surface.output.root.server.allocator.destroy(node);
-
-        layer_surface.output.arrangeLayers();
-
         // Remove listeners active the entire lifetime of the layer surface
-        c.wl_list_remove(&layer_surface.listen_destroy);
-        c.wl_list_remove(&layer_surface.listen_map);
-        c.wl_list_remove(&layer_surface.listen_unmap);
+        c.wl_list_remove(&layer_surface.listen_destroy.link);
+        c.wl_list_remove(&layer_surface.listen_map.link);
+        c.wl_list_remove(&layer_surface.listen_unmap.link);
+
+        const node = @fieldParentPtr(std.TailQueue(LayerSurface).Node, "data", layer_surface);
+        output.layers[@intCast(usize, @enumToInt(layer_surface.layer))].remove(node);
+        output.root.server.allocator.destroy(node);
     }
 
     fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -101,6 +101,8 @@ pub const LayerSurface = struct {
         // remove listeners only active while the layer surface is mapped
         c.wl_list_remove(&layer_surface.listen_commit.link);
         c.wl_list_remove(&layer_surface.listen_new_popup.link);
+
+        layer_surface.output.arrangeLayers();
     }
 
     fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
