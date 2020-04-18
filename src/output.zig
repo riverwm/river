@@ -228,27 +228,58 @@ pub const Output = struct {
         // This box is modified as exclusive zones are applied
         var usable_box = full_box;
 
-        const layers = [_]usize{
+        const layer_idxs = [_]usize{
             c.ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY,
             c.ZWLR_LAYER_SHELL_V1_LAYER_TOP,
             c.ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM,
             c.ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND,
         };
 
-        for (layers) |layer| {
+        // Arrange all layer surfaces with exclusive zones, applying them to the
+        // usable box along the way.
+        for (layer_idxs) |layer| {
             self.arrangeLayer(self.layers[layer], full_box, &usable_box, true);
         }
 
-        if (self.usable_box.width != usable_box.width or self.usable_box.height != usable_box.height) {
+        // If the the usable_box has changed, we need to rearrange the output
+        if (!std.meta.eql(self.usable_box, usable_box)) {
             self.usable_box = usable_box;
             self.root.arrange();
         }
 
-        for (layers) |layer| {
+        // Arrange the layers without exclusive zones
+        for (layer_idxs) |layer| {
             self.arrangeLayer(self.layers[layer], full_box, &usable_box, false);
         }
 
-        // TODO: handle seat focus
+        // If there is any layer surface in the top or overlay layers which requests
+        // keyboard interactivity, give it focus.
+        const topmost_surface = outer: for (layer_idxs[0..2]) |layer| {
+            // Iterate in reverse order since the last layer is rendered on top
+            var it = self.layers[layer].last;
+            while (it) |node| : (it = node.prev) {
+                const layer_surface = &node.data;
+                if (layer_surface.wlr_layer_surface.current.keyboard_interactive) {
+                    break :outer layer_surface;
+                }
+            }
+        } else null;
+
+        var it = self.root.server.input_manager.seats.first;
+        while (it) |node| : (it = node.next) {
+            const seat = &node.data;
+            if (topmost_surface) |to_focus| {
+                // If we found a surface that requires focus, grab the focus of all
+                // seats.
+                seat.focusLayer(to_focus);
+            } else if (seat.focused_layer) |current_focus| {
+                // If the seat is currently focusing a layer without keyboard
+                // interactivity, clear the focused layer.
+                if (!current_focus.wlr_layer_surface.current.keyboard_interactive) {
+                    seat.focusLayer(null);
+                }
+            }
+        }
     }
 
     /// Arrange the layer surfaces of a given layer
