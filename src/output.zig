@@ -252,8 +252,8 @@ pub const Output = struct {
             self.arrangeLayer(self.layers[layer], full_box, &usable_box, false);
         }
 
-        // If there is any layer surface in the top or overlay layers which requests
-        // keyboard interactivity, give it focus.
+        // Find the topmost layer surface in the top or overlay layers which
+        // requests keyboard interactivity if any.
         const topmost_surface = outer: for (layer_idxs[0..2]) |layer| {
             // Iterate in reverse order since the last layer is rendered on top
             var it = self.layers[layer].last;
@@ -268,6 +268,12 @@ pub const Output = struct {
         var it = self.root.server.input_manager.seats.first;
         while (it) |node| : (it = node.next) {
             const seat = &node.data;
+
+            // Only grab focus of seats which have the output focused
+            if (seat.focused_output != self) {
+                continue;
+            }
+
             if (topmost_surface) |to_focus| {
                 // If we found a surface that requires focus, grab the focus of all
                 // seats.

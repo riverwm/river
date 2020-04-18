@@ -155,7 +155,7 @@ pub const Seat = struct {
             // Focus the layer surface
             self.sendKeyboardEnter(layer_to_focus.wlr_layer_surface.surface);
             self.focused_layer = layer_to_focus;
-            self.focused_output = layer_to_focus.output;
+            std.debug.assert(self.focused_output == layer_to_focus.output);
         } else {
             // If there is a layer currently focused, unfocus it
             if (self.focused_layer != null) {
