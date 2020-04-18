@@ -50,7 +50,11 @@ pub const Root = struct {
         self.transaction_timer = null;
     }
 
-    pub fn destroy(self: Self) void {
+    pub fn deinit(self: *Self) void {
+        while (self.outputs.pop()) |output_node| {
+            output_node.data.deinit();
+            self.server.allocator.destroy(output_node);
+        }
         c.wlr_output_layout_destroy(self.wlr_output_layout);
     }
 

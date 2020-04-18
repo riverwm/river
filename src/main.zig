@@ -12,11 +12,13 @@ pub fn main() !void {
 
     var server: Server = undefined;
     try server.init(std.heap.c_allocator);
-    defer server.destroy();
+    defer server.deinit();
 
     try server.start();
 
     Log.Info.log("Running server...", .{});
 
     server.run();
+
+    Log.Info.log("Shutting down server", .{});
 }

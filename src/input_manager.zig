@@ -32,6 +32,13 @@ pub const InputManager = struct {
         c.wl_signal_add(&self.server.wlr_backend.events.new_input, &self.listen_new_input);
     }
 
+    pub fn deinit(self: *Self) void {
+        while (self.seats.pop()) |seat_node| {
+            seat_node.data.deinit();
+            self.server.allocator.destroy(seat_node);
+        }
+    }
+
     /// Must be called whenever a view is unmapped.
     pub fn handleViewUnmap(self: Self, view: *View) void {
         var it = self.seats.first;

@@ -101,6 +101,20 @@ pub const Output = struct {
         }
     }
 
+    pub fn deinit(self: *Self) void {
+        for (self.layers) |*layer| {
+            while (layer.pop()) |layer_surface_node| {
+                self.root.server.allocator.destroy(layer_surface_node);
+            }
+        }
+
+        while (self.views.first) |node| {
+            node.view.deinit();
+            self.views.remove(node);
+            self.root.server.allocator.destroy(node);
+        }
+    }
+
     /// Add a new view to the output. arrangeViews() will be called by the view
     /// when it is mapped.
     pub fn addView(self: *Self, wlr_xdg_surface: *c.wlr_xdg_surface) void {

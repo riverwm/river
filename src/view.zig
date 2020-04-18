@@ -70,6 +70,12 @@ pub const View = struct {
         c.wl_signal_add(&self.wlr_xdg_surface.events.unmap, &self.listen_unmap);
     }
 
+    pub fn deinit(self: *Self) void {
+        if (self.stashed_buffer) |buffer| {
+            c.wlr_buffer_unref(buffer);
+        }
+    }
+
     pub fn needsConfigure(self: Self) bool {
         if (self.pending_box) |pending_box| {
             return pending_box.width != self.current_box.width or

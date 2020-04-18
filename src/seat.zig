@@ -50,8 +50,17 @@ pub const Seat = struct {
         self.focus_stack.init();
     }
 
-    pub fn destroy(self: Self) void {
-        self.cursor.destroy();
+    pub fn deinit(self: *Self) void {
+        self.cursor.deinit();
+
+        while (self.keyboards.pop()) |node| {
+            self.input_manager.server.allocator.destroy(node);
+        }
+
+        while (self.focus_stack.first) |node| {
+            self.focus_stack.remove(node);
+            self.input_manager.server.allocator.destroy(node);
+        }
     }
 
     /// Set the current focus. If a visible view is passed it will be focused.
