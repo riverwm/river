@@ -9,6 +9,12 @@ const Output = @import("output.zig").Output;
 const View = @import("view.zig").View;
 const ViewStack = @import("view_stack.zig").ViewStack;
 
+const FocusTarget = union(enum) {
+    view: *View,
+    layer: *LayerSurface,
+    none: void,
+};
+
 pub const Seat = struct {
     const Self = @This();
 
@@ -98,15 +104,6 @@ pub const Seat = struct {
             } else null;
         }
 
-        if (self.focused_view) |current_focus| {
-            // Don't refocus the currently focused view
-            if (if (view) |v| current_focus == v else false) {
-                return;
-            }
-            // Deactivate the currently focused view
-            current_focus.setActivated(false);
-        }
-
         if (view) |view_to_focus| {
             // Find or allocate a new node in the focus stack for the target view
             var it = self.focus_stack.first;
@@ -126,60 +123,76 @@ pub const Seat = struct {
                 self.focus_stack.push(new_focus_node);
             }
 
-            // The target view is now at the top of the focus stack, so activate it
-            view_to_focus.setActivated(true);
-            self.sendKeyboardEnter(view_to_focus.wlr_xdg_surface.surface);
+            // Focus the target view
+            self.setFocusRaw(.{ .view = view_to_focus });
+        } else {
+            // Otherwise clear the focus
+            self.setFocusRaw(.{ .none = {} });
         }
-
-        self.focused_view = view;
     }
 
-    /// Set the focus to the passed layer surface, or clear the focused layer
-    /// if the argument is null.
-    pub fn focusLayer(self: *Self, layer_surface: ?*LayerSurface) void {
-        if (layer_surface) |layer_to_focus| {
-            // If the layer is already focused, don't re-focus it.
-            if (self.focused_layer) |current_focus| {
-                if (current_focus == layer_to_focus) {
-                    std.debug.assert(self.focused_view == null);
-                    return;
-                }
-            }
+    /// Switch focus to the target, handling unfocus and input inhibition
+    /// properly. This should only be called directly if dealing with layers.
+    pub fn setFocusRaw(self: *Self, focus_target: FocusTarget) void {
+        // If the target is already focused, do nothing
+        if (switch (focus_target) {
+            .view => |target_view| target_view == self.focused_view,
+            .layer => |target_layer| target_layer == self.focused_layer,
+            .none => false,
+        }) {
+            return;
+        }
+        // Obtain the target wlr_surface
+        const target_wlr_surface = switch (focus_target) {
+            .view => |target_view| target_view.wlr_xdg_surface.surface,
+            .layer => |target_layer| target_layer.wlr_layer_surface.surface,
+            .none => null,
+        };
 
-            // If a view is currently focused, unfocus it
+        // If input is not allowed on the target surface (e.g. due to an active
+        // input inhibitor) do not set focus. If there is no target surface we
+        // still clear the focus.
+        if (if (target_wlr_surface) |wlr_surface|
+            self.input_manager.inputAllowed(wlr_surface)
+        else
+            true) {
+            // First clear the current focus
             if (self.focused_view) |current_focus| {
+                std.debug.assert(self.focused_layer == null);
                 current_focus.setActivated(false);
                 self.focused_view = null;
-            }
-
-            // Focus the layer surface
-            self.sendKeyboardEnter(layer_to_focus.wlr_layer_surface.surface);
-            self.focused_layer = layer_to_focus;
-            std.debug.assert(self.focused_output == layer_to_focus.output);
-        } else {
-            // If there is a layer currently focused, unfocus it
-            if (self.focused_layer != null) {
+            } else if (self.focused_layer) |current_focus| {
                 std.debug.assert(self.focused_view == null);
                 self.focused_layer = null;
             }
+            c.wlr_seat_keyboard_clear_focus(self.wlr_seat);
 
-            // Then focus the view on the top of the focus stack if any
-            self.focus(null);
+            // Set the new focus
+            switch (focus_target) {
+                .view => |target_view| {
+                    std.debug.assert(self.focused_output == target_view.output);
+                    target_view.setActivated(true);
+                    self.focused_view = target_view;
+                },
+                .layer => |target_layer| blk: {
+                    std.debug.assert(self.focused_output == target_layer.output);
+                    self.focused_layer = target_layer;
+                },
+                .none => {},
+            }
+
+            // Tell wlroots to send the new keyboard focus if we have a target
+            if (target_wlr_surface) |wlr_surface| {
+                const keyboard: *c.wlr_keyboard = c.wlr_seat_get_keyboard(self.wlr_seat);
+                c.wlr_seat_keyboard_notify_enter(
+                    self.wlr_seat,
+                    wlr_surface,
+                    &keyboard.keycodes,
+                    keyboard.num_keycodes,
+                    &keyboard.modifiers,
+                );
+            }
         }
-    }
-
-    /// Tell the seat to have the keyboard enter this surface. wlroots will keep
-    /// track of this and automatically send key events to the appropriate
-    /// clients.
-    fn sendKeyboardEnter(self: Self, wlr_surface: *c.wlr_surface) void {
-        const keyboard: *c.wlr_keyboard = c.wlr_seat_get_keyboard(self.wlr_seat);
-        c.wlr_seat_keyboard_notify_enter(
-            self.wlr_seat,
-            wlr_surface,
-            &keyboard.keycodes,
-            keyboard.num_keycodes,
-            &keyboard.modifiers,
-        );
     }
 
     /// Handle the unmapping of a view, removing it from the focus stack and

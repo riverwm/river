@@ -277,12 +277,13 @@ pub const Output = struct {
             if (topmost_surface) |to_focus| {
                 // If we found a surface that requires focus, grab the focus of all
                 // seats.
-                seat.focusLayer(to_focus);
+                seat.setFocusRaw(.{ .layer = to_focus });
             } else if (seat.focused_layer) |current_focus| {
                 // If the seat is currently focusing a layer without keyboard
                 // interactivity, clear the focused layer.
                 if (!current_focus.wlr_layer_surface.current.keyboard_interactive) {
-                    seat.focusLayer(null);
+                    seat.setFocusRaw(.{ .none = {} });
+                    seat.focus(null);
                 }
             }
         }

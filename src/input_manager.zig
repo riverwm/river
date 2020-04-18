@@ -11,13 +11,24 @@ pub const InputManager = struct {
 
     server: *Server,
 
+    wlr_input_inhibit_manager: *c.wlr_input_inhibit_manager,
+
     seats: std.TailQueue(Seat),
     default_seat: *Seat,
 
+    exclusive_client: ?*c.wl_client,
+
+    listen_inhibit_activate: c.wl_listener,
+    listen_inhibit_deactivate: c.wl_listener,
     listen_new_input: c.wl_listener,
 
     pub fn init(self: *Self, server: *Server) !void {
         self.server = server;
+
+        // This is automatically freed when the display is destroyed
+        self.wlr_input_inhibit_manager =
+            c.wlr_input_inhibit_manager_create(server.wl_display) orelse
+            return error.CantCreateInputInhibitManager;
 
         self.seats = std.TailQueue(Seat).init();
 
@@ -26,8 +37,21 @@ pub const InputManager = struct {
         self.default_seat = &seat_node.data;
         self.seats.prepend(seat_node);
 
-        // Set up handler for all new input devices made available. This
-        // includes keyboards, pointers, touch, etc.
+        self.exclusive_client = null;
+
+        // Set up all listeners
+        self.listen_inhibit_activate.notify = handleInhibitActivate;
+        c.wl_signal_add(
+            &self.wlr_input_inhibit_manager.events.activate,
+            &self.listen_inhibit_activate,
+        );
+
+        self.listen_inhibit_deactivate.notify = handleInhibitDeactivate;
+        c.wl_signal_add(
+            &self.wlr_input_inhibit_manager.events.deactivate,
+            &self.listen_inhibit_deactivate,
+        );
+
         self.listen_new_input.notify = handleNewInput;
         c.wl_signal_add(&self.server.wlr_backend.events.new_input, &self.listen_new_input);
     }
@@ -45,6 +69,46 @@ pub const InputManager = struct {
         while (it) |node| : (it = node.next) {
             const seat = &node.data;
             seat.handleViewUnmap(view);
+        }
+    }
+
+    /// Returns true if input is currently allowed on the passed surface.
+    pub fn inputAllowed(self: Self, wlr_surface: *c.wlr_surface) bool {
+        return if (self.exclusive_client) |exclusive_client|
+            exclusive_client == c.wl_resource_get_client(wlr_surface.resource)
+        else
+            true;
+    }
+
+    fn handleInhibitActivate(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+        const self = @fieldParentPtr(Self, "listen_inhibit_activate", listener.?);
+
+        // Clear focus of all seats
+        var seat_it = self.seats.first;
+        while (seat_it) |seat_node| : (seat_it = seat_node.next) {
+            seat_node.data.setFocusRaw(.{ .none = {} });
+        }
+
+        self.exclusive_client = self.wlr_input_inhibit_manager.active_client;
+    }
+
+    fn handleInhibitDeactivate(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+        const self = @fieldParentPtr(Self, "listen_inhibit_deactivate", listener.?);
+
+        self.exclusive_client = null;
+
+        // Calling arrangeLayers() like this ensures that any top or overlay,
+        // keyboard-interactive surfaces will re-grab focus.
+        var output_it = self.server.root.outputs.first;
+        while (output_it) |output_node| : (output_it = output_node.next) {
+            output_node.data.arrangeLayers();
+        }
+
+        // After ensuring that any possible layer surface focus grab has occured,
+        // have each Seat handle focus.
+        var seat_it = self.seats.first;
+        while (seat_it) |seat_node| : (seat_it = seat_node.next) {
+            seat_node.data.focus(null);
         }
     }
 
