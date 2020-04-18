@@ -35,7 +35,8 @@ pub fn sendToOutput(seat: *Seat, arg: Arg) void {
         target_output.views.push(view_node);
         view.output = target_output;
 
-        // Focus whatever's next in the focus stack
+        // Handle the change and focus whatever's next in the focus stack
+        root.arrange();
         seat.focus(null);
     }
 }
