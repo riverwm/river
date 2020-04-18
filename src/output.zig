@@ -406,9 +406,8 @@ pub const Output = struct {
 
         // Move all views from the destroyed output to the fallback one
         while (destroyed_output.views.last) |node| {
-            destroyed_output.views.remove(node);
-            fallback_output.views.push(node);
-            node.view.output = fallback_output;
+            const view = &node.view;
+            view.sendToOutput(fallback_output);
         }
 
         // Close all layer surfaces on the destroyed output

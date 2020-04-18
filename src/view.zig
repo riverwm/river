@@ -122,6 +122,20 @@ pub const View = struct {
         }
     }
 
+    /// Move a view from one output to another, sending the required enter/leave
+    /// events.
+    pub fn sendToOutput(self: *Self, destination_output: *Output) void {
+        const node = @fieldParentPtr(ViewStack(View).Node, "view", self);
+
+        self.output.views.remove(node);
+        destination_output.views.push(node);
+
+        c.wlr_surface_send_leave(self.wlr_xdg_surface.surface, self.output.wlr_output);
+        c.wlr_surface_send_enter(self.wlr_xdg_surface.surface, destination_output.wlr_output);
+
+        self.output = destination_output;
+    }
+
     /// Send a close event to the view's client
     pub fn close(self: Self) void {
         // Note: we don't call arrange() here as it will be called
@@ -161,6 +175,8 @@ pub const View = struct {
         while (it) |seat_node| : (it = seat_node.next) {
             seat_node.data.focus(view);
         }
+
+        c.wlr_surface_send_enter(view.wlr_xdg_surface.surface, view.output.wlr_output);
 
         view.output.root.arrange();
     }
