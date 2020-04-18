@@ -23,6 +23,7 @@ pub usingnamespace @import("command/focus_tags.zig");
 pub usingnamespace @import("command/focus_view.zig");
 pub usingnamespace @import("command/modify_master_count.zig");
 pub usingnamespace @import("command/modify_master_factor.zig");
+pub usingnamespace @import("command/send_to_output.zig");
 pub usingnamespace @import("command/set_view_tags.zig");
 pub usingnamespace @import("command/spawn.zig");
 pub usingnamespace @import("command/toggle_tags.zig");

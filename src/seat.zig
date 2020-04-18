@@ -4,7 +4,6 @@ const c = @import("c.zig");
 const Cursor = @import("cursor.zig").Cursor;
 const InputManager = @import("input_manager.zig").InputManager;
 const Keyboard = @import("keyboard.zig").Keyboard;
-const Log = @import("log.zig").Log;
 const Output = @import("output.zig").Output;
 const View = @import("view.zig").View;
 const ViewStack = @import("view_stack.zig").ViewStack;

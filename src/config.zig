@@ -174,5 +174,20 @@ pub const Config = struct {
             .command = command.focusOutput,
             .arg = .{ .direction = .Prev },
         });
+
+        // Mod+Shift+Period/Comma to send the focused view to the the
+        // next/previous output
+        try self.keybinds.append(Keybind{
+            .keysym = c.XKB_KEY_period,
+            .modifiers = mod | c.WLR_MODIFIER_SHIFT,
+            .command = command.sendToOutput,
+            .arg = .{ .direction = .Next },
+        });
+        try self.keybinds.append(Keybind{
+            .keysym = c.XKB_KEY_comma,
+            .modifiers = mod | c.WLR_MODIFIER_SHIFT,
+            .command = command.sendToOutput,
+            .arg = .{ .direction = .Prev },
+        });
     }
 };
