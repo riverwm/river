@@ -136,13 +136,6 @@ pub const View = struct {
         self.output = destination_output;
     }
 
-    /// Send a close event to the view's client
-    pub fn close(self: Self) void {
-        // Note: we don't call arrange() here as it will be called
-        // automatically when the view is unmapped.
-        c.wlr_xdg_toplevel_send_close(self.wlr_xdg_surface);
-    }
-
     fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         const view = @fieldParentPtr(View, "listen_destroy", listener.?);
         const output = view.output;
