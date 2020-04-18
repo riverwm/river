@@ -112,6 +112,14 @@ pub const Config = struct {
             .command = command.modifyMasterCount,
             .arg = .{ .int = -1 },
         });
+        
+        // Mod+Shift+f to toggle fullscreen on the focused view
+        try self.keybinds.append(Keybind{
+            .keysym = c.XKB_KEY_f,
+            .modifiers = mod | c.WLR_MODIFIER_SHIFT,
+            .command = command.fullscreen,
+            .arg = .{ .int = -1 },
+        });
 
         comptime var i = 0;
         inline while (i < 9) : (i += 1) {

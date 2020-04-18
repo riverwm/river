@@ -30,17 +30,22 @@ pub fn renderOutput(output: *Output) void {
     renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND], &now);
     renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM], &now);
 
-    // The first view in the list is "on top" so iterate in reverse.
-    var it = ViewStack(View).reverseIterator(output.views.last, output.current_focused_tags);
-    while (it.next()) |node| {
-        const view = &node.view;
-        // This check prevents a race condition when a frame is requested
-        // between mapping of a view and the first configure being handled.
-        if (view.current_box.width == 0 or view.current_box.height == 0) {
-            continue;
+    if (output.fullscreen_view) |fullscreen_view| {
+        renderView(output.*, fullscreen_view, &now);
+    } else {
+        // The first view in the list is "on top" so iterate in reverse.
+        var it = ViewStack(View).reverseIterator(output.views.last, output.current_focused_tags);
+        while (it.next()) |node| {
+            const view = &node.view;
+            // This check prevents a race condition when a frame is requested
+            // between mapping of a view and the first configure being handled.
+            if (view.current_box.width == 0 or view.current_box.height == 0) {
+                continue;
+            }
+
+            renderView(output.*, view, &now);
+            renderBorders(output.*, view, &now);
         }
-        renderView(output.*, view, &now);
-        renderBorders(output.*, view, &now);
     }
 
     renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_TOP], &now);

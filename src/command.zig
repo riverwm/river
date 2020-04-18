@@ -29,3 +29,4 @@ pub usingnamespace @import("command/spawn.zig");
 pub usingnamespace @import("command/toggle_tags.zig");
 pub usingnamespace @import("command/toggle_view_tags.zig");
 pub usingnamespace @import("command/zoom.zig");
+pub usingnamespace @import("command/toggle_fullscreen.zig");

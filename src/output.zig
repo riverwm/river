@@ -24,6 +24,7 @@ pub const Output = struct {
 
     /// The top of the stack is the "most important" view.
     views: ViewStack(View),
+    fullscreen_view: ?*View,
 
     /// A bit field of focused tags
     current_focused_tags: u32,
@@ -74,6 +75,7 @@ pub const Output = struct {
         };
 
         self.views.init();
+        self.fullscreen_view = null;
 
         self.current_focused_tags = 1 << 0;
         self.pending_focused_tags = null;
@@ -133,7 +135,30 @@ pub const Output = struct {
     }
 
     pub fn arrange(self: *Self) void {
-        self.arrangeViews();
+        if (self.fullscreen_view) |view| {
+            if (self.fullscreen_view == null) {
+                Log.Debug.log("Yeah it is", .{});
+            }
+            self.arrangeFullscreen(view);
+        } else {
+            self.arrangeViews();
+        }
+    }
+
+    /// Arrange the fullscreen_view to take up the entire output space.
+    fn arrangeFullscreen(self: *Self, view: *View) void {
+        Log.Debug.log("Arranging fullscreen", .{});
+
+        const outer_padding = self.root.server.config.outer_padding;
+        const layout_width = @intCast(u32, self.usable_box.width) - outer_padding * 2;
+        const layout_height = @intCast(u32, self.usable_box.height) - outer_padding * 2;
+
+        view.pending_box = Box{
+            .x = @intCast(i32, outer_padding),
+            .y = @intCast(i32, outer_padding),
+            .width = layout_width,
+            .height = layout_height,
+        };
     }
 
     /// Arrange all views on the output for the current layout. Modifies only
