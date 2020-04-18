@@ -45,8 +45,20 @@ pub const Config = struct {
         try self.keybinds.append(Keybind{ .keysym = c.XKB_KEY_e, .modifiers = mod, .command = command.exitCompositor, .arg = .{ .none = {} } });
 
         // Mod+J and Mod+K to focus the next/previous view in the layout stack
-        try self.keybinds.append(Keybind{ .keysym = c.XKB_KEY_j, .modifiers = mod, .command = command.focusNextView, .arg = .{ .none = {} } });
-        try self.keybinds.append(Keybind{ .keysym = c.XKB_KEY_k, .modifiers = mod, .command = command.focusPrevView, .arg = .{ .none = {} } });
+        try self.keybinds.append(
+            Keybind{
+                .keysym = c.XKB_KEY_j,
+                .modifiers = mod,
+                .command = command.focusView,
+                .arg = .{ .direction = .Next },
+            },
+        );
+        try self.keybinds.append(Keybind{
+            .keysym = c.XKB_KEY_k,
+            .modifiers = mod,
+            .command = command.focusView,
+            .arg = .{ .direction = .Prev },
+        });
 
         // Mod+Return to bump the focused view to the top of the layout stack, making it the new master
         try self.keybinds.append(Keybind{ .keysym = c.XKB_KEY_Return, .modifiers = mod, .command = command.zoom, .arg = .{ .none = {} } });
@@ -98,7 +110,17 @@ pub const Config = struct {
         try self.keybinds.append(Keybind{ .keysym = c.XKB_KEY_0, .modifiers = mod | c.WLR_MODIFIER_SHIFT, .command = command.setFocusedViewTags, .arg = .{ .uint = 0xFFFFFFFF } });
 
         // Mod+Period and Mod+Comma to focus the next/previous output
-        try self.keybinds.append(Keybind{ .keysym = c.XKB_KEY_period, .modifiers = mod, .command = command.focusNextOutput, .arg = .{ .none = {} } });
-        try self.keybinds.append(Keybind{ .keysym = c.XKB_KEY_comma, .modifiers = mod, .command = command.focusPrevOutput, .arg = .{ .none = {} } });
+        try self.keybinds.append(Keybind{
+            .keysym = c.XKB_KEY_period,
+            .modifiers = mod,
+            .command = command.focusOutput,
+            .arg = .{ .direction = .Next },
+        });
+        try self.keybinds.append(Keybind{
+            .keysym = c.XKB_KEY_comma,
+            .modifiers = mod,
+            .command = command.focusOutput,
+            .arg = .{ .direction = .Prev },
+        });
     }
 };

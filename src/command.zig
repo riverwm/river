@@ -7,11 +7,17 @@ const Seat = @import("seat.zig").Seat;
 const View = @import("view.zig").View;
 const ViewStack = @import("view_stack.zig").ViewStack;
 
+pub const Direction = enum {
+    Next,
+    Prev,
+};
+
 pub const Arg = union {
     int: i32,
     uint: u32,
     float: f64,
     str: []const u8,
+    direction: Direction,
     none: void,
 };
 
@@ -22,17 +28,18 @@ pub fn exitCompositor(seat: *Seat, arg: Arg) void {
     c.wl_display_terminate(seat.input_manager.server.wl_display);
 }
 
-/// Focus either the next or the previous visible view, depending on the bool
-/// passed.
-fn focusNextPrevView(seat: *Seat, next: bool) void {
+/// Focus either the next or the previous visible view, depending on the enum
+/// passed. Does nothing if there are 1 or 0 views in the stack.
+pub fn focusView(seat: *Seat, arg: Arg) void {
+    const direction = arg.direction;
     const output = seat.focused_output;
     if (seat.focused_view) |current_focus| {
         // If there is a currently focused view, focus the next visible view in the stack.
         const focused_node = @fieldParentPtr(ViewStack(View).Node, "view", current_focus);
-        var it = if (next)
-            ViewStack(View).iterator(focused_node, output.current_focused_tags)
-        else
-            ViewStack(View).reverseIterator(focused_node, output.current_focused_tags);
+        var it = switch (direction) {
+            .Next => ViewStack(View).iterator(focused_node, output.current_focused_tags),
+            .Prev => ViewStack(View).reverseIterator(focused_node, output.current_focused_tags),
+        };
 
         // Skip past the focused node
         _ = it.next();
@@ -45,27 +52,17 @@ fn focusNextPrevView(seat: *Seat, next: bool) void {
 
     // There is either no currently focused view or the last visible view in the
     // stack is focused and we need to wrap.
-    var it = if (next)
-        ViewStack(View).iterator(output.views.first, output.current_focused_tags)
-    else
-        ViewStack(View).reverseIterator(output.views.last, output.current_focused_tags);
+    var it = switch (direction) {
+        .Next => ViewStack(View).iterator(output.views.first, output.current_focused_tags),
+        .Prev => ViewStack(View).reverseIterator(output.views.last, output.current_focused_tags),
+    };
     seat.focus(if (it.next()) |node| &node.view else null);
 }
 
-/// Focus the next visible view in the stack, wrapping if needed. Does
-/// nothing if there is only one view in the stack.
-pub fn focusNextView(seat: *Seat, arg: Arg) void {
-    focusNextPrevView(seat, true);
-}
-
-/// Focus the previous view in the stack, wrapping if needed. Does nothing
-/// if there is only one view in the stack.
-pub fn focusPrevView(seat: *Seat, arg: Arg) void {
-    focusNextPrevView(seat, false);
-}
-
 /// Focus either the next or the previous output, depending on the bool passed.
-fn focusNextPrevOutput(seat: *Seat, next: bool) void {
+/// Does nothing if there is only one output.
+pub fn focusOutput(seat: *Seat, arg: Arg) void {
+    const direction = arg.direction;
     const root = &seat.input_manager.server.root;
     // If the noop output is focused, there are no other outputs to switch to
     if (seat.focused_output == &root.noop_output) {
@@ -73,25 +70,14 @@ fn focusNextPrevOutput(seat: *Seat, next: bool) void {
         return;
     }
 
+    // Focus the next/prev output in the list if there is one, else wrap
     const focused_node = @fieldParentPtr(std.TailQueue(Output).Node, "data", seat.focused_output);
-    seat.focused_output = if (if (next) focused_node.next else focused_node.prev) |output_node|
-    // Focus the next/prev output in the list if there is one
-        &output_node.data
-    else if (next) &root.outputs.first.?.data else &root.outputs.last.?.data;
+    seat.focused_output = switch (direction) {
+        .Next => if (focused_node.next) |node| &node.data else &root.outputs.first.?.data,
+        .Prev => if (focused_node.prev) |node| &node.data else &root.outputs.last.?.data,
+    };
 
     seat.focus(null);
-}
-
-/// Focus the next output, wrapping if needed. Does nothing if there is
-/// only one output.
-pub fn focusNextOutput(seat: *Seat, arg: Arg) void {
-    focusNextPrevOutput(seat, true);
-}
-
-/// Focus the previous output, wrapping if needed. Does nothing if there is
-/// only one output.
-pub fn focusPrevOutput(seat: *Seat, arg: Arg) void {
-    focusNextPrevOutput(seat, false);
 }
 
 /// Modify the number of master views
