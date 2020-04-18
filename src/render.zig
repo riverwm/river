@@ -32,6 +32,7 @@ pub fn renderOutput(output: *Output) void {
 
     if (output.fullscreen_view) |fullscreen_view| {
         renderView(output.*, fullscreen_view, &now);
+        renderBorders(output.*, fullscreen_view, &now);
     } else {
         // The first view in the list is "on top" so iterate in reverse.
         var it = ViewStack(View).reverseIterator(output.views.last, output.current_focused_tags);
