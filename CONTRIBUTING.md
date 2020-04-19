@@ -22,7 +22,7 @@ ihttps://chris.beams.io/posts/git-commit/
 ## Coding style
 
 Please follow the
-[Zig Style Guide](the https://ziglang.org/documentation/master/#Style-Guide)
+[Zig Style Guide](https://ziglang.org/documentation/master/#Style-Guide)
 and run `zig fmt` before every commit. With regards to line length, consider 100
 characters to be a hard upper limit and 80 or less to be the goal. Note that
 inserting a trailing comma after the last parameter in function calls, struct
