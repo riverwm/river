@@ -1,6 +1,7 @@
 const std = @import("std");
 const c = @import("c.zig");
 
+const Log = @import("log.zig").Log;
 const Seat = @import("seat.zig").Seat;
 const Server = @import("server.zig").Server;
 
@@ -83,6 +84,8 @@ pub const InputManager = struct {
     fn handleInhibitActivate(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         const self = @fieldParentPtr(Self, "listen_inhibit_activate", listener.?);
 
+        Log.Debug.log("Input inhibitor activated", .{});
+
         // Clear focus of all seats
         var seat_it = self.seats.first;
         while (seat_it) |seat_node| : (seat_it = seat_node.next) {
@@ -94,6 +97,8 @@ pub const InputManager = struct {
 
     fn handleInhibitDeactivate(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         const self = @fieldParentPtr(Self, "listen_inhibit_deactivate", listener.?);
+
+        Log.Debug.log("Input inhibitor deactivated", .{});
 
         self.exclusive_client = null;
 

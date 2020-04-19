@@ -76,6 +76,8 @@ pub const LayerSurface = struct {
         const layer_surface = @fieldParentPtr(LayerSurface, "listen_map", listener.?);
         const wlr_layer_surface = layer_surface.wlr_layer_surface;
 
+        Log.Debug.log("Layer surface '{}' mapped.", .{wlr_layer_surface.namespace});
+
         layer_surface.mapped = true;
 
         // Add listeners that are only active while mapped
@@ -96,11 +98,24 @@ pub const LayerSurface = struct {
     fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         const layer_surface = @fieldParentPtr(LayerSurface, "listen_unmap", listener.?);
 
+        Log.Debug.log("Layer surface '{}' unmapped.", .{layer_surface.wlr_layer_surface.namespace});
+
         layer_surface.mapped = false;
 
         // remove listeners only active while the layer surface is mapped
         c.wl_list_remove(&layer_surface.listen_commit.link);
         c.wl_list_remove(&layer_surface.listen_new_popup.link);
+
+        // If the unmapped surface is focused, clear focus
+        var it = layer_surface.output.root.server.input_manager.seats.first;
+        while (it) |node| : (it = node.next) {
+            const seat = &node.data;
+            if (seat.focused_layer) |current_focus| {
+                if (current_focus == layer_surface) {
+                    seat.setFocusRaw(.{ .none = {} });
+                }
+            }
+        }
 
         layer_surface.output.arrangeLayers();
     }
