@@ -42,8 +42,7 @@ Check out the [roadmap](https://github.com/ifreund/river/issues/1)
 if you'd like to see what has been done and what is left to do.
 
 If you are interested in the development of river, please join our
-matrix channel:
-[#river](https://matrix.to/#/!BQgAgeafraCtMiVbSX:matrix.org?via=matrix.org).
+matrix channel: [#river](https://matrix.to/#/#river:matrix.org).
 
 I can often be found in the `#sway-devel` IRC channel with the
 nick `ifreund` on irc.freenode.net as well, or reached by email at
