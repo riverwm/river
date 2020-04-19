@@ -1,0 +1,39 @@
+# Build river and run the test suite every time a commit is pushed to master or
+# a pull request is opened against master.
+#
+# TODO: figure out why this didn't work on alpine
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+name: Archliunx CI
+
+jobs:
+  build:
+    name: Archliunx CI
+    runs-on: ubuntu-latest
+    #container: alpine:edge
+    container: archlinux:latest
+
+    steps:
+      - name: Install Dependencies
+        run: |
+          #apk add --no-cache wlroots-dev
+          #apk add --no-cache -X http://dl-cdn.alpinelinux.org/alpine/edge/testing zig
+          pacman -Syu --noconfirm zig wayland-protocols wlroots pkgconf
+
+      - name: Checkout Code
+        uses: actions/checkout@master
+
+      - name: Build
+        run: |
+          zig build
+
+      - name: Test
+        run: |
+          zig build test
