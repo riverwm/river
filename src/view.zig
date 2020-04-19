@@ -100,7 +100,7 @@ pub const View = struct {
     }
 
     pub fn sendFrameDone(self: Self) void {
-        var now: c.struct_timespec = undefined;
+        var now: c.timespec = undefined;
         _ = c.clock_gettime(c.CLOCK_MONOTONIC, &now);
         c.wlr_surface_send_frame_done(self.wlr_xdg_surface.surface, &now);
     }

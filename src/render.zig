@@ -10,7 +10,7 @@ const ViewStack = @import("view_stack.zig").ViewStack;
 pub fn renderOutput(output: *Output) void {
     const renderer = output.root.server.wlr_renderer;
 
-    var now: c.struct_timespec = undefined;
+    var now: c.timespec = undefined;
     _ = c.clock_gettime(c.CLOCK_MONOTONIC, &now);
 
     // wlr_output_attach_render makes the OpenGL context current.
@@ -65,11 +65,11 @@ const LayerSurfaceRenderData = struct {
     output: *c.wlr_output,
     renderer: *c.wlr_renderer,
     layer_surface: *LayerSurface,
-    when: *c.struct_timespec,
+    when: *c.timespec,
 };
 
 /// Render all surfaces on the passed layer
-fn renderLayer(output: Output, layer: std.TailQueue(LayerSurface), now: *c.struct_timespec) void {
+fn renderLayer(output: Output, layer: std.TailQueue(LayerSurface), now: *c.timespec) void {
     var it = layer.first;
     while (it) |node| : (it = node.next) {
         const layer_surface = &node.data;
@@ -141,10 +141,10 @@ const ViewRenderData = struct {
     output: *c.wlr_output,
     renderer: *c.wlr_renderer,
     view: *View,
-    when: *c.struct_timespec,
+    when: *c.timespec,
 };
 
-fn renderView(output: Output, view: *View, now: *c.struct_timespec) void {
+fn renderView(output: Output, view: *View, now: *c.timespec) void {
     // If we have a stashed buffer, we are in the middle of a transaction
     // and need to render that buffer until the transaction is complete.
     if (view.stashed_buffer) |buffer| {
@@ -240,7 +240,7 @@ fn renderSurface(_surface: ?*c.wlr_surface, sx: c_int, sy: c_int, data: ?*c_void
     c.wlr_surface_send_frame_done(surface, rdata.when);
 }
 
-fn renderBorders(output: Output, view: *View, now: *c.struct_timespec) void {
+fn renderBorders(output: Output, view: *View, now: *c.timespec) void {
     var border: c.wlr_box = undefined;
     const color = if (view.wlr_xdg_surface.unnamed_164.toplevel.*.current.activated)
         [_]f32{ 0.57647059, 0.63137255, 0.63137255, 1.0 } // Solarized base1
