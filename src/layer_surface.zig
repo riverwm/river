@@ -117,7 +117,17 @@ pub const LayerSurface = struct {
             }
         }
 
+        // This gives exclusive focus to a keyboard interactive top or overlay layer
+        // surface if there is one.
         layer_surface.output.arrangeLayers();
+
+        // Ensure that focus is given to the appropriate view if there is no
+        // other top/overlay layer surface to grab focus.
+        it = layer_surface.output.root.server.input_manager.seats.first;
+        while (it) |node| : (it = node.next) {
+            const seat = &node.data;
+            seat.focus(null);
+        }
     }
 
     fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {

@@ -161,7 +161,8 @@ pub const Seat = struct {
                 std.debug.assert(self.focused_layer == null);
                 current_focus.setActivated(false);
                 self.focused_view = null;
-            } else if (self.focused_layer) |current_focus| {
+            }
+            if (self.focused_layer) |current_focus| {
                 std.debug.assert(self.focused_view == null);
                 self.focused_layer = null;
             }

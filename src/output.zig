@@ -259,7 +259,10 @@ pub const Output = struct {
             var it = self.layers[layer].last;
             while (it) |node| : (it = node.prev) {
                 const layer_surface = &node.data;
-                if (layer_surface.wlr_layer_surface.current.keyboard_interactive) {
+                // Only mapped surfaces may gain focus
+                if (layer_surface.mapped and
+                    layer_surface.wlr_layer_surface.current.keyboard_interactive)
+                {
                     break :outer layer_surface;
                 }
             }
