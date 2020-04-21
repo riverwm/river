@@ -94,7 +94,7 @@ pub const Cursor = struct {
     fn handleAxis(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is forwarded by the cursor when a pointer emits an axis event,
         // for example when you move the scroll wheel.
-        const cursor = @fieldParentPtr(Cursor, "listen_axis", listener.?);
+        const cursor = @fieldParentPtr(Self, "listen_axis", listener.?);
         const event = @ptrCast(
             *c.wlr_event_pointer_axis,
             @alignCast(@alignOf(*c.wlr_event_pointer_axis), data),
@@ -114,14 +114,14 @@ pub const Cursor = struct {
     fn handleButton(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is forwarded by the cursor when a pointer emits a button
         // event.
-        const cursor = @fieldParentPtr(Cursor, "listen_button", listener.?);
+        const self = @fieldParentPtr(Self, "listen_button", listener.?);
         const event = @ptrCast(
             *c.wlr_event_pointer_button,
             @alignCast(@alignOf(*c.wlr_event_pointer_button), data),
         );
         // Notify the client with pointer focus that a button press has occurred
         _ = c.wlr_seat_pointer_notify_button(
-            cursor.seat.wlr_seat,
+            self.seat.wlr_seat,
             event.time_msec,
             event.button,
             event.state,
@@ -131,9 +131,9 @@ pub const Cursor = struct {
         var sy: f64 = undefined;
 
         var surface: ?*c.wlr_surface = null;
-        const view = cursor.seat.input_manager.server.root.viewAt(
-            cursor.wlr_cursor.x,
-            cursor.wlr_cursor.y,
+        const view = self.seat.input_manager.server.root.viewAt(
+            self.wlr_cursor.x,
+            self.wlr_cursor.y,
             &surface,
             &sx,
             &sy,
@@ -141,11 +141,11 @@ pub const Cursor = struct {
 
         if (event.state == c.enum_wlr_button_state.WLR_BUTTON_RELEASED) {
             // If you released any buttons, we exit interactive move/resize mode.
-            cursor.mode = CursorMode.Passthrough;
+            self.mode = CursorMode.Passthrough;
         } else {
             // Focus that client if the button was _pressed_
             if (view) |v| {
-                cursor.seat.focus(v);
+                self.seat.focus(v);
             }
         }
     }
@@ -155,9 +155,9 @@ pub const Cursor = struct {
         // event. Frame events are sent after regular pointer events to group
         // multiple events together. For instance, two axis events may happen at the
         // same time, in which case a frame event won't be sent in between.
-        const cursor = @fieldParentPtr(Cursor, "listen_frame", listener.?);
+        const self = @fieldParentPtr(Self, "listen_frame", listener.?);
         // Notify the client with pointer focus of the frame event.
-        c.wlr_seat_pointer_notify_frame(cursor.seat.wlr_seat);
+        c.wlr_seat_pointer_notify_frame(self.seat.wlr_seat);
     }
 
     fn processMove(self: Self, time: u32) void {
@@ -176,19 +176,19 @@ pub const Cursor = struct {
         // move the mouse over the window. You could enter the window from any edge,
         // so we have to warp the mouse there. There is also some hardware which
         // emits these events.
-        const cursor = @fieldParentPtr(Cursor, "listen_motion_absolute", listener.?);
+        const self = @fieldParentPtr(Self, "listen_motion_absolute", listener.?);
         const event = @ptrCast(
             *c.wlr_event_pointer_motion_absolute,
             @alignCast(@alignOf(*c.wlr_event_pointer_motion_absolute), data),
         );
-        c.wlr_cursor_warp_absolute(cursor.wlr_cursor, event.device, event.x, event.y);
-        cursor.processMotion(event.time_msec);
+        c.wlr_cursor_warp_absolute(self.wlr_cursor, event.device, event.x, event.y);
+        self.processMotion(event.time_msec);
     }
 
     fn handleMotion(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is forwarded by the cursor when a pointer emits a _relative_
         // pointer motion event (i.e. a delta)
-        const cursor = @fieldParentPtr(Cursor, "listen_motion", listener.?);
+        const self = @fieldParentPtr(Self, "listen_motion", listener.?);
         const event = @ptrCast(
             *c.wlr_event_pointer_motion,
             @alignCast(@alignOf(*c.wlr_event_pointer_motion), data),
@@ -198,18 +198,18 @@ pub const Cursor = struct {
         // special configuration applied for the specific input device which
         // generated the event. You can pass NULL for the device if you want to move
         // the cursor around without any input.
-        c.wlr_cursor_move(cursor.wlr_cursor, event.device, event.delta_x, event.delta_y);
-        cursor.processMotion(event.time_msec);
+        c.wlr_cursor_move(self.wlr_cursor, event.device, event.delta_x, event.delta_y);
+        self.processMotion(event.time_msec);
     }
 
     fn handleRequestSetCursor(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is rasied by the seat when a client provides a cursor image
-        const cursor = @fieldParentPtr(Cursor, "listen_request_set_cursor", listener.?);
+        const self = @fieldParentPtr(Self, "listen_request_set_cursor", listener.?);
         const event = @ptrCast(
             *c.wlr_seat_pointer_request_set_cursor_event,
             @alignCast(@alignOf(*c.wlr_seat_pointer_request_set_cursor_event), data),
         );
-        const focused_client = cursor.seat.wlr_seat.pointer_state.focused_client;
+        const focused_client = self.seat.wlr_seat.pointer_state.focused_client;
 
         // This can be sent by any client, so we check to make sure this one is
         // actually has pointer focus first.
@@ -219,7 +219,7 @@ pub const Cursor = struct {
             // on the output that it's currently on and continue to do so as the
             // cursor moves between outputs.
             c.wlr_cursor_set_surface(
-                cursor.wlr_cursor,
+                self.wlr_cursor,
                 event.surface,
                 event.hotspot_x,
                 event.hotspot_y,

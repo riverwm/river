@@ -431,28 +431,28 @@ pub const Output = struct {
     /// Called when the output is destroyed. Evacuate all views from the output
     /// and then remove it from the list of outputs.
     fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-        const destroyed_output = @fieldParentPtr(Output, "listen_destroy", listener.?);
-        const root = destroyed_output.root;
+        const self = @fieldParentPtr(Self, "listen_destroy", listener.?);
+        const root = self.root;
 
-        Log.Debug.log("Output {} destroyed", .{destroyed_output.wlr_output.name});
+        Log.Debug.log("Output {} destroyed", .{self.wlr_output.name});
 
         // Use the first output in the list that is not the one being destroyed.
         // If there is no other real output, use the noop output.
         var output_it = root.outputs.first;
         const fallback_output = while (output_it) |output_node| : (output_it = output_node.next) {
-            if (&output_node.data != destroyed_output) {
+            if (&output_node.data != self) {
                 break &output_node.data;
             }
         } else &root.noop_output;
 
         // Move all views from the destroyed output to the fallback one
-        while (destroyed_output.views.last) |node| {
+        while (self.views.last) |node| {
             const view = &node.view;
             view.sendToOutput(fallback_output);
         }
 
         // Close all layer surfaces on the destroyed output
-        for (destroyed_output.layers) |*layer, layer_idx| {
+        for (self.layers) |*layer, layer_idx| {
             while (layer.pop()) |node| {
                 const layer_surface = &node.data;
                 c.wlr_layer_surface_v1_close(layer_surface.wlr_layer_surface);
@@ -470,22 +470,22 @@ pub const Output = struct {
         var seat_it = root.server.input_manager.seats.first;
         while (seat_it) |seat_node| : (seat_it = seat_node.next) {
             const seat = &seat_node.data;
-            if (seat.focused_output == destroyed_output) {
+            if (seat.focused_output == self) {
                 seat.focused_output = fallback_output;
                 seat.focus(null);
             }
         }
 
         // Remove all listeners
-        c.wl_list_remove(&destroyed_output.listen_destroy.link);
-        c.wl_list_remove(&destroyed_output.listen_frame.link);
-        c.wl_list_remove(&destroyed_output.listen_mode.link);
+        c.wl_list_remove(&self.listen_destroy.link);
+        c.wl_list_remove(&self.listen_frame.link);
+        c.wl_list_remove(&self.listen_mode.link);
 
         // Clean up the wlr_output
-        destroyed_output.wlr_output.data = null;
+        self.wlr_output.data = null;
 
         // Remove the destroyed output from the list
-        const node = @fieldParentPtr(std.TailQueue(Output).Node, "data", destroyed_output);
+        const node = @fieldParentPtr(std.TailQueue(Output).Node, "data", self);
         root.outputs.remove(node);
         root.server.allocator.destroy(node);
 
@@ -496,13 +496,13 @@ pub const Output = struct {
     fn handleFrame(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This function is called every time an output is ready to display a frame,
         // generally at the output's refresh rate (e.g. 60Hz).
-        const output = @fieldParentPtr(Output, "listen_frame", listener.?);
-        render.renderOutput(output);
+        const self = @fieldParentPtr(Self, "listen_frame", listener.?);
+        render.renderOutput(self);
     }
 
     fn handleMode(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-        const output = @fieldParentPtr(Output, "listen_mode", listener.?);
-        output.arrangeLayers();
-        output.root.arrange();
+        const self = @fieldParentPtr(Self, "listen_mode", listener.?);
+        self.arrangeLayers();
+        self.root.arrange();
     }
 };

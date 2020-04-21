@@ -131,16 +131,16 @@ pub const Server = struct {
     }
 
     fn handleNewOutput(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-        const server = @fieldParentPtr(Server, "listen_new_output", listener.?);
+        const self = @fieldParentPtr(Self, "listen_new_output", listener.?);
         const wlr_output = @ptrCast(*c.wlr_output, @alignCast(@alignOf(*c.wlr_output), data));
         Log.Debug.log("New output {}", .{wlr_output.name});
-        server.root.addOutput(wlr_output);
+        self.root.addOutput(wlr_output);
     }
 
     fn handleNewXdgSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is raised when wlr_xdg_shell receives a new xdg surface from a
         // client, either a toplevel (application window) or popup.
-        const server = @fieldParentPtr(Server, "listen_new_xdg_surface", listener.?);
+        const self = @fieldParentPtr(Self, "listen_new_xdg_surface", listener.?);
         const wlr_xdg_surface = @ptrCast(*c.wlr_xdg_surface, @alignCast(@alignOf(*c.wlr_xdg_surface), data));
 
         if (wlr_xdg_surface.role != c.enum_wlr_xdg_surface_role.WLR_XDG_SURFACE_ROLE_TOPLEVEL) {
@@ -148,12 +148,12 @@ pub const Server = struct {
             return;
         }
 
-        server.input_manager.default_seat.focused_output.addView(wlr_xdg_surface);
+        self.input_manager.default_seat.focused_output.addView(wlr_xdg_surface);
     }
 
     /// This event is raised when the layer_shell recieves a new surface from a client.
     fn handleNewLayerSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-        const server = @fieldParentPtr(Server, "listen_new_layer_surface", listener.?);
+        const self = @fieldParentPtr(Self, "listen_new_layer_surface", listener.?);
         const wlr_layer_surface = @ptrCast(
             *c.wlr_layer_surface_v1,
             @alignCast(@alignOf(*c.wlr_layer_surface_v1), data),
@@ -178,7 +178,7 @@ pub const Server = struct {
         // If the new layer surface does not have an output assigned to it, use the
         // first output or close the surface if none are available.
         if (wlr_layer_surface.output == null) {
-            if (server.root.outputs.first) |node| {
+            if (self.root.outputs.first) |node| {
                 const output = &node.data;
                 Log.Debug.log(
                     "New layer surface had null output, assigning it to output {}",

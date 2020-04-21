@@ -119,11 +119,11 @@ pub const InputManager = struct {
 
     /// This event is raised by the backend when a new input device becomes available.
     fn handleNewInput(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-        const input_manager = @fieldParentPtr(InputManager, "listen_new_input", listener.?);
+        const self = @fieldParentPtr(Self, "listen_new_input", listener.?);
         const device = @ptrCast(*c.wlr_input_device, @alignCast(@alignOf(*c.wlr_input_device), data));
 
         // TODO: suport multiple seats
-        if (input_manager.seats.first) |seat_node| {
+        if (self.seats.first) |seat_node| {
             seat_node.data.addDevice(device) catch unreachable;
         }
     }

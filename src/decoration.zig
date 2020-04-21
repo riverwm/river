@@ -27,10 +27,10 @@ pub const Decoration = struct {
     }
 
     fn handleRequestMode(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-        const decoration = @fieldParentPtr(Decoration, "listen_request_mode", listener.?);
+        const self = @fieldParentPtr(Self, "listen_request_mode", listener.?);
         // TODO: we might need to take this configure serial and do a transaction
         _ = c.wlr_xdg_toplevel_decoration_v1_set_mode(
-            decoration.wlr_xdg_toplevel_decoration,
+            self.wlr_xdg_toplevel_decoration,
             c.wlr_xdg_toplevel_decoration_v1_mode.WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE,
         );
     }

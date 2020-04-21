@@ -154,7 +154,7 @@ pub const Root = struct {
             // TODO: log failure to create timer and commit immediately
             self.transaction_timer = c.wl_event_loop_add_timer(
                 self.server.wl_event_loop,
-                handle_timeout,
+                handleTimeout,
                 self,
             );
 
@@ -167,7 +167,7 @@ pub const Root = struct {
         }
     }
 
-    fn handle_timeout(data: ?*c_void) callconv(.C) c_int {
+    fn handleTimeout(data: ?*c_void) callconv(.C) c_int {
         const root = @ptrCast(*Root, @alignCast(@alignOf(*Root), data));
 
         Log.Error.log("Transaction timed out. Some imperfect frames may be shown.", .{});

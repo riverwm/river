@@ -137,68 +137,68 @@ pub const View = struct {
     }
 
     fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-        const view = @fieldParentPtr(View, "listen_destroy", listener.?);
-        const output = view.output;
+        const self = @fieldParentPtr(Self, "listen_destroy", listener.?);
+        const output = self.output;
 
         // Remove listeners that are active for the entire lifetime of the view
-        c.wl_list_remove(&view.listen_destroy.link);
-        c.wl_list_remove(&view.listen_map.link);
-        c.wl_list_remove(&view.listen_unmap.link);
+        c.wl_list_remove(&self.listen_destroy.link);
+        c.wl_list_remove(&self.listen_map.link);
+        c.wl_list_remove(&self.listen_unmap.link);
 
         // Remove the view from the stack
-        const node = @fieldParentPtr(ViewStack(View).Node, "view", view);
+        const node = @fieldParentPtr(ViewStack(View).Node, "view", self);
         output.views.remove(node);
         output.root.server.allocator.destroy(node);
     }
 
     /// Called when the surface is mapped, or ready to display on-screen.
     fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-        const view = @fieldParentPtr(View, "listen_map", listener.?);
-        const root = view.output.root;
+        const self = @fieldParentPtr(Self, "listen_map", listener.?);
+        const root = self.output.root;
 
         // Add listeners that are only active while mapped
-        view.listen_commit.notify = handleCommit;
-        c.wl_signal_add(&view.wlr_xdg_surface.surface.*.events.commit, &view.listen_commit);
+        self.listen_commit.notify = handleCommit;
+        c.wl_signal_add(&self.wlr_xdg_surface.surface.*.events.commit, &self.listen_commit);
 
-        view.mapped = true;
+        self.mapped = true;
 
         // Focus the newly mapped view. Note: if a seat is focusing a different output
         // it will continue to do so.
         var it = root.server.input_manager.seats.first;
         while (it) |seat_node| : (it = seat_node.next) {
-            seat_node.data.focus(view);
+            seat_node.data.focus(self);
         }
 
-        c.wlr_surface_send_enter(view.wlr_xdg_surface.surface, view.output.wlr_output);
+        c.wlr_surface_send_enter(self.wlr_xdg_surface.surface, self.output.wlr_output);
 
-        view.output.root.arrange();
+        self.output.root.arrange();
     }
 
     /// Called when the surface is unmapped and will no longer be displayed.
     fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-        const view = @fieldParentPtr(View, "listen_unmap", listener.?);
-        const root = view.output.root;
-        view.mapped = false;
+        const self = @fieldParentPtr(Self, "listen_unmap", listener.?);
+        const root = self.output.root;
+        self.mapped = false;
 
         // Inform all seats that the view has been unmapped so they can handle focus
         var it = root.server.input_manager.seats.first;
         while (it) |node| : (it = node.next) {
             const seat = &node.data;
-            seat.handleViewUnmap(view);
+            seat.handleViewUnmap(self);
         }
 
         root.arrange();
 
         // Remove listeners that are only active while mapped
-        c.wl_list_remove(&view.listen_commit.link);
+        c.wl_list_remove(&self.listen_commit.link);
     }
 
     fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-        const view = @fieldParentPtr(View, "listen_commit", listener.?);
-        if (view.pending_serial) |s| {
-            if (s == view.wlr_xdg_surface.configure_serial) {
-                view.output.root.notifyConfigured();
-                view.pending_serial = null;
+        const self = @fieldParentPtr(Self, "listen_commit", listener.?);
+        if (self.pending_serial) |s| {
+            if (s == self.wlr_xdg_surface.configure_serial) {
+                self.output.root.notifyConfigured();
+                self.pending_serial = null;
             }
         }
         // TODO: check for unexpected change in size and react as needed

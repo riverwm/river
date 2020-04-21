@@ -28,18 +28,14 @@ pub const DecorationManager = struct {
     }
 
     fn handleNewToplevelDecoration(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-        const decoration_manager = @fieldParentPtr(
-            DecorationManager,
-            "listen_new_toplevel_decoration",
-            listener.?,
-        );
+        const self = @fieldParentPtr(Self, "listen_new_toplevel_decoration", listener.?);
         const wlr_xdg_toplevel_decoration = @ptrCast(
             *c.wlr_xdg_toplevel_decoration_v1,
             @alignCast(@alignOf(*c.wlr_xdg_toplevel_decoration_v1), data),
         );
 
-        const node = decoration_manager.decorations.allocateNode(decoration_manager.server.allocator) catch unreachable;
-        node.data.init(decoration_manager, wlr_xdg_toplevel_decoration);
-        decoration_manager.decorations.prepend(node);
+        const node = self.decorations.allocateNode(self.server.allocator) catch unreachable;
+        node.data.init(self, wlr_xdg_toplevel_decoration);
+        self.decorations.prepend(node);
     }
 };

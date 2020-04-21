@@ -54,13 +54,13 @@ pub const Keyboard = struct {
 
     fn handleKey(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is raised when a key is pressed or released.
-        const keyboard = @fieldParentPtr(Keyboard, "listen_key", listener.?);
+        const self = @fieldParentPtr(Self, "listen_key", listener.?);
         const event = @ptrCast(
             *c.wlr_event_keyboard_key,
             @alignCast(@alignOf(*c.wlr_event_keyboard_key), data),
         );
 
-        const wlr_keyboard: *c.wlr_keyboard = keyboard.device.unnamed_133.keyboard;
+        const wlr_keyboard: *c.wlr_keyboard = self.device.unnamed_133.keyboard;
 
         // Translate libinput keycode -> xkbcommon
         const keycode = event.keycode + 8;
@@ -91,10 +91,10 @@ pub const Keyboard = struct {
         if (event.state == c.enum_wlr_key_state.WLR_KEY_PRESSED) {
             var i: usize = 0;
             while (i < translated_keysyms_len) : (i += 1) {
-                if (keyboard.handleBuiltinKeybind(translated_keysyms.?[i])) {
+                if (self.handleBuiltinKeybind(translated_keysyms.?[i])) {
                     handled = true;
                     break;
-                } else if (keyboard.seat.handleKeybinding(translated_keysyms.?[i], modifiers)) {
+                } else if (self.seat.handleKeybinding(translated_keysyms.?[i], modifiers)) {
                     handled = true;
                     break;
                 }
@@ -102,10 +102,10 @@ pub const Keyboard = struct {
             if (!handled) {
                 i = 0;
                 while (i < raw_keysyms_len) : (i += 1) {
-                    if (keyboard.handleBuiltinKeybind(raw_keysyms.?[i])) {
+                    if (self.handleBuiltinKeybind(raw_keysyms.?[i])) {
                         handled = true;
                         break;
-                    } else if (keyboard.seat.handleKeybinding(raw_keysyms.?[i], modifiers)) {
+                    } else if (self.seat.handleKeybinding(raw_keysyms.?[i], modifiers)) {
                         handled = true;
                         break;
                     }
@@ -115,8 +115,8 @@ pub const Keyboard = struct {
 
         if (!handled) {
             // Otherwise, we pass it along to the client.
-            const wlr_seat = keyboard.seat.wlr_seat;
-            c.wlr_seat_set_keyboard(wlr_seat, keyboard.device);
+            const wlr_seat = self.seat.wlr_seat;
+            c.wlr_seat_set_keyboard(wlr_seat, self.device);
             c.wlr_seat_keyboard_notify_key(
                 wlr_seat,
                 event.time_msec,
@@ -129,18 +129,18 @@ pub const Keyboard = struct {
     fn handleModifiers(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // This event is raised when a modifier key, such as shift or alt, is
         // pressed. We simply communicate this to the client. */
-        const keyboard = @fieldParentPtr(Keyboard, "listen_modifiers", listener.?);
+        const self = @fieldParentPtr(Self, "listen_modifiers", listener.?);
 
         // A seat can only have one keyboard, but this is a limitation of the
         // Wayland protocol - not wlroots. We assign all connected keyboards to the
         // same seat. You can swap out the underlying wlr_keyboard like this and
         // wlr_seat handles this transparently.
-        c.wlr_seat_set_keyboard(keyboard.seat.wlr_seat, keyboard.device);
+        c.wlr_seat_set_keyboard(self.seat.wlr_seat, self.device);
 
         // Send modifiers to the client.
         c.wlr_seat_keyboard_notify_modifiers(
-            keyboard.seat.wlr_seat,
-            &keyboard.wlr_keyboard.modifiers,
+            self.seat.wlr_seat,
+            &self.wlr_keyboard.modifiers,
         );
     }
 
