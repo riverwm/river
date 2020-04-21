@@ -15,6 +15,12 @@ window manger.
 - Scriptable configuration and control through a socket and separate
 binary, `riverctl`, like bspwm.
 
+## Packaging status
+
+River is available from the
+[AUR](https://aur.archlinux.org/packages/river-git/). Note that river
+is still pre-0.1.0 and may lack features you deem necessary.
+
 ## Building
 
 To compile river first ensure that you have the following dependencies
