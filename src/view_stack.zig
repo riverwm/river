@@ -275,6 +275,7 @@ test "iteration (View)" {
     defer allocator.destroy(two_a);
     two_a.view.mapped = true;
     two_a.view.current_tags = 1 << 0;
+    two_a.view.pending_tags = null;
 
     const three_b_pa = try allocator.create(ViewStack(View).Node);
     defer allocator.destroy(three_b_pa);
@@ -286,11 +287,13 @@ test "iteration (View)" {
     defer allocator.destroy(four_b);
     four_b.view.mapped = true;
     four_b.view.current_tags = 1 << 1;
+    four_b.view.pending_tags = null;
 
     const five_b = try allocator.create(ViewStack(View).Node);
     defer allocator.destroy(five_b);
     five_b.view.mapped = true;
     five_b.view.current_tags = 1 << 1;
+    five_b.view.pending_tags = null;
 
     const unmapped_1 = try allocator.create(ViewStack(View).Node);
     defer allocator.destroy(unmapped_1);
