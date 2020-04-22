@@ -26,12 +26,16 @@ pub const Config = struct {
     /// All user-defined keybindings
     keybinds: std.ArrayList(Keybind),
 
+    /// List of app_ids which will be started floating
+    float_filter: std.ArrayList([*:0]const u8),
+
     pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
         self.border_width = 2;
         self.view_padding = 8;
         self.outer_padding = 8;
 
         self.keybinds = std.ArrayList(Keybind).init(allocator);
+        self.float_filter = std.ArrayList([*:0]const u8).init(allocator);
 
         const mod = c.WLR_MODIFIER_LOGO;
 
@@ -197,5 +201,7 @@ pub const Config = struct {
             .command = command.toggleFloat,
             .arg = .{ .none = {} },
         });
+
+        try self.float_filter.append("float");
     }
 };

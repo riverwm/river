@@ -2,6 +2,7 @@ const std = @import("std");
 const c = @import("c.zig");
 
 const Box = @import("box.zig").Box;
+const Log = @import("log.zig").Log;
 const Output = @import("output.zig").Output;
 const Root = @import("root.zig").Root;
 const ViewStack = @import("view_stack.zig").ViewStack;
@@ -192,6 +193,17 @@ pub const View = struct {
         if (self.natural_width == 0 and self.natural_height == 0) {
             self.natural_width = @intCast(u32, self.wlr_xdg_surface.surface.*.current.width);
             self.natural_height = @intCast(u32, self.wlr_xdg_surface.surface.*.current.height);
+        }
+
+        const app_id: [*:0]const u8 = self.wlr_xdg_surface.unnamed_164.toplevel.*.app_id;
+        Log.Debug.log("View with app_id '{}' mapped", .{app_id});
+
+        // Make views with app_ids listed in the float filter float
+        for (self.output.root.server.config.float_filter.items) |filter_app_id| {
+            if (std.mem.eql(u8, std.mem.span(app_id), std.mem.span(filter_app_id))) {
+                self.setFloating(true);
+                break;
+            }
         }
 
         // Focus the newly mapped view. Note: if a seat is focusing a different output
