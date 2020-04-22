@@ -189,5 +189,13 @@ pub const Config = struct {
             .command = command.sendToOutput,
             .arg = .{ .direction = .Prev },
         });
+
+        // Mod+Space to toggle float
+        try self.keybinds.append(Keybind{
+            .keysym = c.XKB_KEY_space,
+            .modifiers = mod,
+            .command = command.toggleFloat,
+            .arg = .{ .none = {} },
+        });
     }
 };

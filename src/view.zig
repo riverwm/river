@@ -14,8 +14,15 @@ pub const View = struct {
 
     mapped: bool,
 
+    /// If the view is floating or not
+    floating: bool,
+
     current_box: Box,
     pending_box: ?Box,
+
+    /// The dimensions the view would have taken if we didn't force it to tile
+    natural_width: u32,
+    natural_height: u32,
 
     current_tags: u32,
     pending_tags: ?u32,
@@ -122,6 +129,22 @@ pub const View = struct {
         }
     }
 
+    /// If true is passsed, make the view float. If false, return it to the tiled
+    /// layout.
+    pub fn setFloating(self: *Self, float: bool) void {
+        if (float and !self.floating) {
+            self.floating = true;
+            self.pending_box = Box{
+                .x = @intCast(i32, (self.output.usable_box.width - self.natural_width) / 2),
+                .y = @intCast(i32, (self.output.usable_box.height - self.natural_height) / 2),
+                .width = self.natural_width,
+                .height = self.natural_height,
+            };
+        } else if (!float and self.floating) {
+            self.floating = false;
+        }
+    }
+
     /// Move a view from one output to another, sending the required enter/leave
     /// events.
     pub fn sendToOutput(self: *Self, destination_output: *Output) void {
@@ -161,6 +184,15 @@ pub const View = struct {
         c.wl_signal_add(&self.wlr_xdg_surface.surface.*.events.commit, &self.listen_commit);
 
         self.mapped = true;
+        self.floating = false;
+
+        self.natural_width = @intCast(u32, self.wlr_xdg_surface.geometry.width);
+        self.natural_height = @intCast(u32, self.wlr_xdg_surface.geometry.height);
+
+        if (self.natural_width == 0 and self.natural_height == 0) {
+            self.natural_width = @intCast(u32, self.wlr_xdg_surface.surface.*.current.width);
+            self.natural_height = @intCast(u32, self.wlr_xdg_surface.surface.*.current.height);
+        }
 
         // Focus the newly mapped view. Note: if a seat is focusing a different output
         // it will continue to do so.

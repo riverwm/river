@@ -148,7 +148,12 @@ pub const Output = struct {
         const visible_count = blk: {
             var count: u32 = 0;
             var it = ViewStack(View).pendingIterator(self.views.first, output_tags);
-            while (it.next() != null) count += 1;
+            while (it.next()) |node| {
+                if (node.view.floating) {
+                    continue;
+                }
+                count += 1;
+            }
             break :blk count;
         };
 
@@ -178,6 +183,9 @@ pub const Output = struct {
         var it = ViewStack(View).pendingIterator(self.views.first, output_tags);
         while (it.next()) |node| {
             const view = &node.view;
+            if (view.floating) {
+                continue;
+            }
             if (i < master_count) {
                 // Add the remainder to the first master to ensure every pixel of height is used
                 const master_height = @divTrunc(layout_height, master_count);
