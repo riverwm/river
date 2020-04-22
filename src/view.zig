@@ -136,8 +136,10 @@ pub const View = struct {
         if (float and !self.floating) {
             self.floating = true;
             self.pending_box = Box{
-                .x = @intCast(i32, (self.output.usable_box.width - self.natural_width) / 2),
-                .y = @intCast(i32, (self.output.usable_box.height - self.natural_height) / 2),
+                .x = std.math.max(0, @divTrunc(@intCast(i32, self.output.usable_box.width) -
+                    @intCast(i32, self.natural_width), 2)),
+                .y = std.math.max(0, @divTrunc(@intCast(i32, self.output.usable_box.height) -
+                    @intCast(i32, self.natural_height), 2)),
                 .width = self.natural_width,
                 .height = self.natural_height,
             };
