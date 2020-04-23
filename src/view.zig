@@ -18,6 +18,9 @@ pub const View = struct {
     /// If the view is floating or not
     floating: bool,
 
+    /// True if the view is currentlt focused by at lease one seat
+    focused: bool,
+
     current_box: Box,
     pending_box: ?Box,
 
@@ -51,6 +54,8 @@ pub const View = struct {
             c.WLR_EDGE_RIGHT | c.WLR_EDGE_TOP | c.WLR_EDGE_BOTTOM);
 
         self.mapped = false;
+
+        self.focused = false;
 
         self.current_box = Box{
             .x = 0,
@@ -130,6 +135,16 @@ pub const View = struct {
         }
     }
 
+    /// Set the focued bool and the active state of the view if it is a toplevel
+    pub fn setFocused(self: *Self, focused: bool) void {
+        self.focused = focused;
+        if (self.wlr_xdg_surface.role ==
+            c.enum_wlr_xdg_surface_role.WLR_XDG_SURFACE_ROLE_TOPLEVEL)
+        {
+            _ = c.wlr_xdg_toplevel_set_activated(self.wlr_xdg_surface, focused);
+        }
+    }
+
     /// If true is passsed, make the view float. If false, return it to the tiled
     /// layout.
     pub fn setFloating(self: *Self, float: bool) void {
@@ -197,14 +212,16 @@ pub const View = struct {
             self.natural_height = @intCast(u32, self.wlr_xdg_surface.surface.*.current.height);
         }
 
-        const app_id: [*:0]const u8 = self.wlr_xdg_surface.unnamed_164.toplevel.*.app_id;
-        Log.Debug.log("View with app_id '{}' mapped", .{app_id});
+        const app_id: ?[*:0]const u8 = self.wlr_xdg_surface.unnamed_165.toplevel.*.app_id;
+        Log.Debug.log("View with app_id '{}' mapped", .{if (app_id) |id| id else "NULL"});
 
         // Make views with app_ids listed in the float filter float
-        for (self.output.root.server.config.float_filter.items) |filter_app_id| {
-            if (std.mem.eql(u8, std.mem.span(app_id), std.mem.span(filter_app_id))) {
-                self.setFloating(true);
-                break;
+        if (app_id) |id| {
+            for (self.output.root.server.config.float_filter.items) |filter_app_id| {
+                if (std.mem.eql(u8, std.mem.span(id), std.mem.span(filter_app_id))) {
+                    self.setFloating(true);
+                    break;
+                }
             }
         }
 
@@ -248,11 +265,6 @@ pub const View = struct {
             }
         }
         // TODO: check for unexpected change in size and react as needed
-    }
-
-    /// Set the active state of the view to the passed bool
-    pub fn setActivated(self: Self, activated: bool) void {
-        _ = c.wlr_xdg_toplevel_set_activated(self.wlr_xdg_surface, activated);
     }
 
     fn isAt(self: Self, lx: f64, ly: f64, surface: *?*c.wlr_surface, sx: *f64, sy: *f64) bool {

@@ -159,7 +159,7 @@ pub const Seat = struct {
             // First clear the current focus
             if (self.focused_view) |current_focus| {
                 std.debug.assert(self.focused_layer == null);
-                current_focus.setActivated(false);
+                current_focus.setFocused(false);
                 self.focused_view = null;
             }
             if (self.focused_layer) |current_focus| {
@@ -172,7 +172,7 @@ pub const Seat = struct {
             switch (focus_target) {
                 .view => |target_view| {
                     std.debug.assert(self.focused_output == target_view.output);
-                    target_view.setActivated(true);
+                    target_view.setFocused(true);
                     self.focused_view = target_view;
                 },
                 .layer => |target_layer| blk: {

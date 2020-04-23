@@ -17,7 +17,7 @@ pub const Keyboard = struct {
     pub fn init(self: *Self, seat: *Seat, device: *c.wlr_input_device) !void {
         self.seat = seat;
         self.device = device;
-        self.wlr_keyboard = device.unnamed_133.keyboard;
+        self.wlr_keyboard = device.unnamed_134.keyboard;
 
         // We need to prepare an XKB keymap and assign it to the keyboard. This
         // assumes the defaults (e.g. layout = "us").
@@ -60,7 +60,7 @@ pub const Keyboard = struct {
             @alignCast(@alignOf(*c.wlr_event_keyboard_key), data),
         );
 
-        const wlr_keyboard: *c.wlr_keyboard = self.device.unnamed_133.keyboard;
+        const wlr_keyboard: *c.wlr_keyboard = self.device.unnamed_134.keyboard;
 
         // Translate libinput keycode -> xkbcommon
         const keycode = event.keycode + 8;
