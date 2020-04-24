@@ -47,6 +47,7 @@ pub const View = struct {
     pub fn init(self: *Self, output: *Output, wlr_xdg_surface: *c.wlr_xdg_surface, tags: u32) void {
         self.output = output;
         self.wlr_xdg_surface = wlr_xdg_surface;
+        wlr_xdg_surface.data = self;
 
         // Inform the xdg toplevel that it is tiled.
         // For example this prevents firefox from drawing shadows around itself
@@ -265,31 +266,5 @@ pub const View = struct {
             }
         }
         // TODO: check for unexpected change in size and react as needed
-    }
-
-    fn isAt(self: Self, lx: f64, ly: f64, surface: *?*c.wlr_surface, sx: *f64, sy: *f64) bool {
-        // XDG toplevels may have nested surfaces, such as popup windows for context
-        // menus or tooltips. This function tests if any of those are underneath the
-        // coordinates lx and ly (in output Layout Coordinates). If so, it sets the
-        // surface pointer to that wlr_surface and the sx and sy coordinates to the
-        // coordinates relative to that surface's top-left corner.
-        const view_sx = lx - @intToFloat(f64, self.current_box.x);
-        const view_sy = ly - @intToFloat(f64, self.current_box.y);
-
-        // This variable seems to have been unsued in TinyWL
-        // struct wlr_surface_box *state = &view->xdg_surface->surface->current;
-
-        var _sx: f64 = undefined;
-        var _sy: f64 = undefined;
-        const _surface = c.wlr_xdg_surface_surface_at(self.wlr_xdg_surface, view_sx, view_sy, &_sx, &_sy);
-
-        if (_surface) |surface_at| {
-            sx.* = _sx;
-            sy.* = _sy;
-            surface.* = surface_at;
-            return true;
-        }
-
-        return false;
     }
 };

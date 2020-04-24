@@ -34,6 +34,7 @@ pub const LayerSurface = struct {
     ) void {
         self.output = output;
         self.wlr_layer_surface = wlr_layer_surface;
+        wlr_layer_surface.data = self;
 
         self.mapped = false;
 

@@ -75,23 +75,6 @@ pub const Root = struct {
         }
     }
 
-    /// Finds the topmost view under the output layout coordinates lx, ly
-    /// returns the view if found, and a pointer to the wlr_surface as well as the surface coordinates
-    pub fn viewAt(self: Self, lx: f64, ly: f64, surface: *?*c.wlr_surface, sx: *f64, sy: *f64) ?*View {
-        // Iterate over all views of all outputs
-        var output_it = self.outputs.first;
-        while (output_it) |node| : (output_it = node.next) {
-            const output = &node.data;
-            var view_it = ViewStack(View).iterator(output.views.first, 0xFFFFFFFF);
-            while (view_it.next()) |view_node| {
-                if (view_node.view.isAt(lx, ly, surface, sx, sy)) {
-                    return &view_node.view;
-                }
-            }
-        }
-        return null;
-    }
-
     /// Clear the current focus.
     pub fn clearFocus(self: *Self) void {
         if (self.focused_view) |view| {
