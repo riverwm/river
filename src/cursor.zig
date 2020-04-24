@@ -1,8 +1,9 @@
 const std = @import("std");
 const c = @import("c.zig");
 
-const Output = @import("output.zig").Output;
 const LayerSurface = @import("layer_surface.zig").LayerSurface;
+const Log = @import("log.zig").Log;
+const Output = @import("output.zig").Output;
 const Seat = @import("seat.zig").Seat;
 const View = @import("view.zig").View;
 const ViewStack = @import("view_stack.zig").ViewStack;
@@ -127,7 +128,7 @@ pub const Cursor = struct {
 
         if (self.surfaceAt(self.wlr_cursor.x, self.wlr_cursor.y, &sx, &sy)) |wlr_surface| {
             // If the found surface is a keyboard inteactive layer surface,
-            // focus it.
+            // give it keyboard focus.
             if (c.wlr_surface_is_layer_surface(wlr_surface)) {
                 const wlr_layer_surface = c.wlr_layer_surface_v1_from_wlr_surface(wlr_surface);
                 if (wlr_layer_surface.*.current.keyboard_interactive) {
@@ -139,8 +140,8 @@ pub const Cursor = struct {
                 }
             }
 
-            // If the found surface is an xdg toplevel surface, send focus to
-            // the view.
+            // If the found surface is an xdg toplevel surface, send keyboard
+            // focus to the view.
             if (c.wlr_surface_is_xdg_surface(wlr_surface)) {
                 const wlr_xdg_surface = c.wlr_xdg_surface_from_wlr_surface(wlr_surface);
                 if (wlr_xdg_surface.*.role ==
@@ -240,9 +241,11 @@ pub const Cursor = struct {
             // a window.
             if (self.seat.input_manager.inputAllowed(wlr_surface)) {
                 const wlr_seat = self.seat.wlr_seat;
-                const focus_changed = wlr_seat.pointer_state.focused_surface != wlr_surface;
-                c.wlr_seat_pointer_notify_enter(wlr_seat, wlr_surface, sx, sy);
-                if (!focus_changed) {
+                const focus_change = wlr_seat.pointer_state.focused_surface != wlr_surface;
+                if (focus_change) {
+                    Log.Debug.log("Pointer notify enter at ({},{})", .{ sx, sy });
+                    c.wlr_seat_pointer_notify_enter(wlr_seat, wlr_surface, sx, sy);
+                } else {
                     // The enter event contains coordinates, so we only need to notify
                     // on motion if the focus did not change.
                     c.wlr_seat_pointer_notify_motion(wlr_seat, time, sx, sy);
@@ -290,7 +293,7 @@ pub const Cursor = struct {
         };
 
         // Check overlay layer incl. popups
-        if (layerSurfaceAt(output.*, output.layers[0], ox, oy, sx, sy, false)) |surface| {
+        if (layerSurfaceAt(output.*, output.layers[layer_idxs[0]], ox, oy, sx, sy, false)) |surface| {
             return surface;
         }
 
@@ -302,7 +305,7 @@ pub const Cursor = struct {
         }
 
         // Check top layer
-        if (layerSurfaceAt(output.*, output.layers[1], ox, oy, sx, sy, false)) |surface| {
+        if (layerSurfaceAt(output.*, output.layers[layer_idxs[1]], ox, oy, sx, sy, false)) |surface| {
             return surface;
         }
 
