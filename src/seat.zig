@@ -41,6 +41,8 @@ pub const Seat = struct {
     /// recieve focus.
     focused_layer: ?*LayerSurface,
 
+    listen_request_set_selection: c.wl_listener,
+
     pub fn init(self: *Self, input_manager: *InputManager, name: []const u8) !void {
         self.input_manager = input_manager;
 
@@ -60,6 +62,9 @@ pub const Seat = struct {
         self.focus_stack.init();
 
         self.focused_layer = null;
+
+        self.listen_request_set_selection.notify = handleRequestSetSelection;
+        c.wl_signal_add(&self.wlr_seat.events.request_set_selection, &self.listen_request_set_selection);
     }
 
     pub fn deinit(self: *Self) void {
@@ -264,5 +269,14 @@ pub const Seat = struct {
         // opportunity to do libinput configuration on the device to set
         // acceleration, etc.
         c.wlr_cursor_attach_input_device(self.cursor.wlr_cursor, device);
+    }
+
+    fn handleRequestSetSelection(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+        const self = @fieldParentPtr(Self, "listen_request_set_selection", listener.?);
+        const event = @ptrCast(
+            *c.wlr_seat_request_set_selection_event,
+            @alignCast(@alignOf(*c.wlr_seat_request_set_selection_event), data),
+        );
+        c.wlr_seat_set_selection(self.wlr_seat, event.source, event.serial);
     }
 };
