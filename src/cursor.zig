@@ -373,13 +373,15 @@ pub const Cursor = struct {
             if (view.floating != floating) {
                 continue;
             }
-            const surface = c.wlr_xdg_surface_surface_at(
-                view.wlr_xdg_surface,
-                ox - @intToFloat(f64, view.current_box.x),
-                oy - @intToFloat(f64, view.current_box.y),
-                sx,
-                sy,
-            );
+            const surface = switch (view.impl) {
+                .xdg_toplevel => |xdg_toplevel| c.wlr_xdg_surface_surface_at(
+                    xdg_toplevel.wlr_xdg_surface,
+                    ox - @intToFloat(f64, view.current_box.x),
+                    oy - @intToFloat(f64, view.current_box.y),
+                    sx,
+                    sy,
+                ),
+            };
             if (surface) |found| {
                 return found;
             }

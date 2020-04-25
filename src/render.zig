@@ -207,9 +207,7 @@ fn renderView(output: Output, view: *View, now: *c.timespec) void {
             .when = now,
         };
 
-        // This calls our render_surface function for each surface among the
-        // xdg_surface's toplevel and popups.
-        c.wlr_xdg_surface_for_each_surface(view.wlr_xdg_surface, renderSurface, &rdata);
+        view.forEachSurface(renderSurface, &rdata);
     }
 }
 

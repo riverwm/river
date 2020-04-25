@@ -111,7 +111,7 @@ pub const Root = struct {
                 view.pending_serial = null;
 
                 if (view.needsConfigure()) {
-                    view.configurePending();
+                    view.configure();
                     self.pending_configures += 1;
 
                     // We save the current buffer, so we can send an early

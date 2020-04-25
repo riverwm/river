@@ -6,14 +6,23 @@ const Log = @import("log.zig").Log;
 const Output = @import("output.zig").Output;
 const Root = @import("root.zig").Root;
 const ViewStack = @import("view_stack.zig").ViewStack;
+const XdgToplevel = @import("xdg_toplevel.zig");
 
 pub const View = struct {
     const Self = @This();
 
-    output: *Output,
-    wlr_xdg_surface: *c.wlr_xdg_surface,
+    const ViewImpl = union(enum) {
+        xdg_toplevel: XdgToplevel,
+    };
 
-    mapped: bool,
+    /// The implementation of this view
+    impl: ViewImpl,
+
+    /// The output this view is currently associated with
+    output: *Output,
+
+    /// This is non-null exactly when the view is mapped
+    wlr_surface: ?*c.wlr_surface,
 
     /// If the view is floating or not
     floating: bool,
@@ -21,6 +30,7 @@ pub const View = struct {
     /// True if the view is currentlt focused by at lease one seat
     focused: bool,
 
+    /// The current output-relative coordinates and dimensions of the view
     current_box: Box,
     pending_box: ?Box,
 
@@ -36,25 +46,15 @@ pub const View = struct {
     // This is what we render while a transaction is in progress
     stashed_buffer: ?*c.wlr_buffer,
 
-    // Listeners that are always active over the view's lifetime
-    listen_destroy: c.wl_listener,
-    listen_map: c.wl_listener,
-    listen_unmap: c.wl_listener,
-
-    // Listeners that are only active while the view is mapped
-    listen_commit: c.wl_listener,
-
-    pub fn init(self: *Self, output: *Output, wlr_xdg_surface: *c.wlr_xdg_surface, tags: u32) void {
+    pub fn init_xdg_toplevel(
+        self: *Self,
+        output: *Output,
+        tags: u32,
+        wlr_xdg_surface: *c.wlr_xdg_surface,
+    ) void {
         self.output = output;
-        self.wlr_xdg_surface = wlr_xdg_surface;
-        wlr_xdg_surface.data = self;
 
-        // Inform the xdg toplevel that it is tiled.
-        // For example this prevents firefox from drawing shadows around itself
-        _ = c.wlr_xdg_toplevel_set_tiled(self.wlr_xdg_surface, c.WLR_EDGE_LEFT |
-            c.WLR_EDGE_RIGHT | c.WLR_EDGE_TOP | c.WLR_EDGE_BOTTOM);
-
-        self.mapped = false;
+        self.wlr_surface = null;
 
         self.focused = false;
 
@@ -73,15 +73,8 @@ pub const View = struct {
 
         self.stashed_buffer = null;
 
-        // Add listeners that are active over the view's entire lifetime
-        self.listen_destroy.notify = handleDestroy;
-        c.wl_signal_add(&self.wlr_xdg_surface.events.destroy, &self.listen_destroy);
-
-        self.listen_map.notify = handleMap;
-        c.wl_signal_add(&self.wlr_xdg_surface.events.map, &self.listen_map);
-
-        self.listen_unmap.notify = handleUnmap;
-        c.wl_signal_add(&self.wlr_xdg_surface.events.unmap, &self.listen_unmap);
+        self.impl = .{ .xdg_toplevel = undefined };
+        self.impl.xdg_toplevel.init(self, wlr_xdg_surface);
     }
 
     pub fn deinit(self: *Self) void {
@@ -99,24 +92,20 @@ pub const View = struct {
         }
     }
 
-    pub fn configurePending(self: *Self) void {
+    pub fn configure(self: Self) void {
         if (self.pending_box) |pending_box| {
-            const border_width = self.output.root.server.config.border_width;
-            const view_padding = self.output.root.server.config.view_padding;
-            self.pending_serial = c.wlr_xdg_toplevel_set_size(
-                self.wlr_xdg_surface,
-                pending_box.width - border_width * 2 - view_padding * 2,
-                pending_box.height - border_width * 2 - view_padding * 2,
-            );
+            switch (self.impl) {
+                .xdg_toplevel => |xdg_toplevel| xdg_toplevel.configure(pending_box),
+            }
         } else {
-            // TODO: log warning
+            Log.Error.log("Configre called on a View with no pending box", .{});
         }
     }
 
     pub fn sendFrameDone(self: Self) void {
         var now: c.timespec = undefined;
         _ = c.clock_gettime(c.CLOCK_MONOTONIC, &now);
-        c.wlr_surface_send_frame_done(self.wlr_xdg_surface.surface, &now);
+        c.wlr_surface_send_frame_done(self.wlr_surface.?, &now);
     }
 
     pub fn dropStashedBuffer(self: *Self) void {
@@ -129,20 +118,19 @@ pub const View = struct {
 
     pub fn stashBuffer(self: *Self) void {
         // TODO: log debug error if there is already a saved buffer
-        const wlr_surface = self.wlr_xdg_surface.surface;
-        if (c.wlr_surface_has_buffer(wlr_surface)) {
-            _ = c.wlr_buffer_ref(wlr_surface.*.buffer);
-            self.stashed_buffer = wlr_surface.*.buffer;
+        if (self.wlr_surface) |wlr_surface| {
+            if (c.wlr_surface_has_buffer(wlr_surface)) {
+                _ = c.wlr_buffer_ref(wlr_surface.buffer);
+                self.stashed_buffer = wlr_surface.buffer;
+            }
         }
     }
 
     /// Set the focued bool and the active state of the view if it is a toplevel
     pub fn setFocused(self: *Self, focused: bool) void {
         self.focused = focused;
-        if (self.wlr_xdg_surface.role ==
-            c.enum_wlr_xdg_surface_role.WLR_XDG_SURFACE_ROLE_TOPLEVEL)
-        {
-            _ = c.wlr_xdg_toplevel_set_activated(self.wlr_xdg_surface, focused);
+        switch (self.impl) {
+            .xdg_toplevel => |xdg_toplevel| xdg_toplevel.setActivated(focused),
         }
     }
 
@@ -172,99 +160,25 @@ pub const View = struct {
         self.output.views.remove(node);
         destination_output.views.push(node);
 
-        c.wlr_surface_send_leave(self.wlr_xdg_surface.surface, self.output.wlr_output);
-        c.wlr_surface_send_enter(self.wlr_xdg_surface.surface, destination_output.wlr_output);
+        c.wlr_surface_send_leave(self.wlr_surface, self.output.wlr_output);
+        c.wlr_surface_send_enter(self.wlr_surface, destination_output.wlr_output);
 
         self.output = destination_output;
     }
 
-    fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-        const self = @fieldParentPtr(Self, "listen_destroy", listener.?);
-        const output = self.output;
-
-        // Remove listeners that are active for the entire lifetime of the view
-        c.wl_list_remove(&self.listen_destroy.link);
-        c.wl_list_remove(&self.listen_map.link);
-        c.wl_list_remove(&self.listen_unmap.link);
-
-        // Remove the view from the stack
-        const node = @fieldParentPtr(ViewStack(View).Node, "view", self);
-        output.views.remove(node);
-        output.root.server.allocator.destroy(node);
+    pub fn close(self: Self) void {
+        switch (self.impl) {
+            .xdg_toplevel => |xdg_toplevel| xdg_toplevel.close(),
+        }
     }
 
-    /// Called when the surface is mapped, or ready to display on-screen.
-    fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-        const self = @fieldParentPtr(Self, "listen_map", listener.?);
-        const root = self.output.root;
-
-        // Add listeners that are only active while mapped
-        self.listen_commit.notify = handleCommit;
-        c.wl_signal_add(&self.wlr_xdg_surface.surface.*.events.commit, &self.listen_commit);
-
-        self.mapped = true;
-        self.floating = false;
-
-        self.natural_width = @intCast(u32, self.wlr_xdg_surface.geometry.width);
-        self.natural_height = @intCast(u32, self.wlr_xdg_surface.geometry.height);
-
-        if (self.natural_width == 0 and self.natural_height == 0) {
-            self.natural_width = @intCast(u32, self.wlr_xdg_surface.surface.*.current.width);
-            self.natural_height = @intCast(u32, self.wlr_xdg_surface.surface.*.current.height);
+    pub fn forEachSurface(
+        self: Self,
+        iterator: c.wlr_surface_iterator_func_t,
+        user_data: ?*c_void,
+    ) void {
+        switch (self.impl) {
+            .xdg_toplevel => |xdg_toplevel| xdg_toplevel.forEachSurface(iterator, user_data),
         }
-
-        const app_id: ?[*:0]const u8 = self.wlr_xdg_surface.unnamed_166.toplevel.*.app_id;
-        Log.Debug.log("View with app_id '{}' mapped", .{if (app_id) |id| id else "NULL"});
-
-        // Make views with app_ids listed in the float filter float
-        if (app_id) |id| {
-            for (self.output.root.server.config.float_filter.items) |filter_app_id| {
-                if (std.mem.eql(u8, std.mem.span(id), std.mem.span(filter_app_id))) {
-                    self.setFloating(true);
-                    break;
-                }
-            }
-        }
-
-        // Focus the newly mapped view. Note: if a seat is focusing a different output
-        // it will continue to do so.
-        var it = root.server.input_manager.seats.first;
-        while (it) |seat_node| : (it = seat_node.next) {
-            seat_node.data.focus(self);
-        }
-
-        c.wlr_surface_send_enter(self.wlr_xdg_surface.surface, self.output.wlr_output);
-
-        self.output.root.arrange();
-    }
-
-    /// Called when the surface is unmapped and will no longer be displayed.
-    fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-        const self = @fieldParentPtr(Self, "listen_unmap", listener.?);
-        const root = self.output.root;
-        self.mapped = false;
-
-        // Inform all seats that the view has been unmapped so they can handle focus
-        var it = root.server.input_manager.seats.first;
-        while (it) |node| : (it = node.next) {
-            const seat = &node.data;
-            seat.handleViewUnmap(self);
-        }
-
-        root.arrange();
-
-        // Remove listeners that are only active while mapped
-        c.wl_list_remove(&self.listen_commit.link);
-    }
-
-    fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-        const self = @fieldParentPtr(Self, "listen_commit", listener.?);
-        if (self.pending_serial) |s| {
-            if (s == self.wlr_xdg_surface.configure_serial) {
-                self.output.root.notifyConfigured();
-                self.pending_serial = null;
-            }
-        }
-        // TODO: check for unexpected change in size and react as needed
     }
 };

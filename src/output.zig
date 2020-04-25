@@ -119,7 +119,7 @@ pub const Output = struct {
     /// when it is mapped.
     pub fn addView(self: *Self, wlr_xdg_surface: *c.wlr_xdg_surface) void {
         const node = self.root.server.allocator.create(ViewStack(View).Node) catch unreachable;
-        node.view.init(self, wlr_xdg_surface, self.current_focused_tags);
+        node.view.init_xdg_toplevel(self, self.current_focused_tags, wlr_xdg_surface);
         self.views.push(node);
     }
 

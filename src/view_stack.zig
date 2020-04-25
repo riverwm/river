@@ -75,7 +75,7 @@ pub fn ViewStack(comptime T: type) type {
             /// This function is horribly ugly, but it's well tested below.
             pub fn next(self: *Iterator) ?*Node {
                 while (self.it) |node| : (self.it = if (self.reverse) node.prev else node.next) {
-                    if (node.view.mapped and if (self.pending)
+                    if (node.view.wlr_surface != null and if (self.pending)
                         if (node.view.pending_tags) |pending_tags|
                             self.tags & pending_tags != 0
                         else

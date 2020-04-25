@@ -147,10 +147,11 @@ pub const Seat = struct {
         }) {
             return;
         }
+
         // Obtain the target wlr_surface
         const target_wlr_surface = switch (focus_target) {
-            .view => |target_view| target_view.wlr_xdg_surface.surface,
-            .layer => |target_layer| target_layer.wlr_layer_surface.surface,
+            .view => |target_view| target_view.wlr_surface.?,
+            .layer => |target_layer| target_layer.wlr_layer_surface.surface.?,
             .none => null,
         };
 
