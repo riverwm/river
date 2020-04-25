@@ -11,6 +11,9 @@ pub const LayerSurface = struct {
     output: *Output,
     wlr_layer_surface: *c.wlr_layer_surface_v1,
 
+    /// True if the layer surface is currently mapped
+    mapped: bool,
+
     box: Box,
     layer: c.zwlr_layer_shell_v1_layer,
 
@@ -32,6 +35,8 @@ pub const LayerSurface = struct {
         self.output = output;
         self.wlr_layer_surface = wlr_layer_surface;
         wlr_layer_surface.data = self;
+
+        self.mapped = false;
 
         self.box = undefined;
         self.layer = layer;
@@ -74,6 +79,8 @@ pub const LayerSurface = struct {
 
         Log.Debug.log("Layer surface '{}' mapped.", .{wlr_layer_surface.namespace});
 
+        self.mapped = true;
+
         // Add listeners that are only active while mapped
         self.listen_commit.notify = handleCommit;
         c.wl_signal_add(&wlr_layer_surface.surface.*.events.commit, &self.listen_commit);
@@ -94,6 +101,8 @@ pub const LayerSurface = struct {
 
         Log.Debug.log("Layer surface '{}' unmapped.", .{self.wlr_layer_surface.namespace});
 
+        self.mapped = false;
+
         // remove listeners only active while the layer surface is mapped
         c.wl_list_remove(&self.listen_commit.link);
         c.wl_list_remove(&self.listen_new_popup.link);
@@ -108,11 +117,6 @@ pub const LayerSurface = struct {
                 }
             }
         }
-
-        // Slight hack: This is automatically set to false by wlroots after
-        // this callback is exited, but we need it set to false before calling
-        // arrangeLayers() to avoid a crash.
-        self.wlr_layer_surface.mapped = false;
 
         // This gives exclusive focus to a keyboard interactive top or overlay layer
         // surface if there is one.
