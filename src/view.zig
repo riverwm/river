@@ -1,7 +1,7 @@
 const std = @import("std");
 const c = @import("c.zig");
 
-const Box = @import("box.zig").Box;
+const Box = @import("box.zig");
 const Log = @import("log.zig").Log;
 const Output = @import("output.zig").Output;
 const Root = @import("root.zig").Root;

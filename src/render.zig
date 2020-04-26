@@ -1,6 +1,7 @@
 const std = @import("std");
 const c = @import("c.zig");
 
+const Box = @import("box.zig");
 const LayerSurface = @import("layer_surface.zig").LayerSurface;
 const Output = @import("output.zig").Output;
 const Server = @import("server.zig").Server;
@@ -168,13 +169,11 @@ fn renderView(output: Output, view: *View, now: *c.timespec) void {
     // If we have a stashed buffer, we are in the middle of a transaction
     // and need to render that buffer until the transaction is complete.
     if (view.stashed_buffer) |buffer| {
-        const border_width = view.output.root.server.config.border_width;
-        const view_padding = view.output.root.server.config.view_padding;
         var box = c.wlr_box{
-            .x = view.current_box.x + @intCast(i32, border_width + view_padding),
-            .y = view.current_box.y + @intCast(i32, border_width + view_padding),
-            .width = @intCast(c_int, view.current_box.width - border_width * 2 - view_padding * 2),
-            .height = @intCast(c_int, view.current_box.height - border_width * 2 - view_padding * 2),
+            .x = view.current_box.x,
+            .y = view.current_box.y,
+            .width = @intCast(c_int, view.current_box.width),
+            .height = @intCast(c_int, view.current_box.height),
         };
 
         // Scale the box to the output's current scaling factor
@@ -229,11 +228,9 @@ fn renderSurface(_surface: ?*c.wlr_surface, sx: c_int, sy: c_int, data: ?*c_void
         return;
     }
 
-    const border_width = view.output.root.server.config.border_width;
-    const view_padding = view.output.root.server.config.view_padding;
     var box = c.wlr_box{
-        .x = view.current_box.x + sx + @intCast(c_int, border_width + view_padding),
-        .y = view.current_box.y + sy + @intCast(c_int, border_width + view_padding),
+        .x = view.current_box.x + sx,
+        .y = view.current_box.y + sy,
         .width = surface.current.width,
         .height = surface.current.height,
     };
@@ -259,66 +256,46 @@ fn renderSurface(_surface: ?*c.wlr_surface, sx: c_int, sy: c_int, data: ?*c_void
 }
 
 fn renderBorders(output: Output, view: *View, now: *c.timespec) void {
-    var border: c.wlr_box = undefined;
+    var border: Box = undefined;
     const color = if (view.focused)
         [_]f32{ 0.57647059, 0.63137255, 0.63137255, 1.0 } // Solarized base1
     else
         [_]f32{ 0.34509804, 0.43137255, 0.45882353, 1.0 }; // Solarized base01
     const border_width = output.root.server.config.border_width;
-    const view_padding = output.root.server.config.view_padding;
 
-    // left border
-    border.x = view.current_box.x + @intCast(c_int, view_padding);
-    border.y = view.current_box.y + @intCast(c_int, view_padding);
-    border.width = @intCast(c_int, border_width);
-    border.height = @intCast(c_int, view.current_box.height - view_padding * 2);
-    scaleBox(&border, output.wlr_output.scale);
-    c.wlr_render_rect(
-        output.root.server.wlr_renderer,
-        &border,
-        &color,
-        &output.wlr_output.transform_matrix,
-    );
+    // left and right, covering the corners as well
+    border.y = view.current_box.y - @intCast(i32, border_width);
+    border.width = border_width;
+    border.height = view.current_box.height + border_width * 2;
 
-    // right border
-    border.x = view.current_box.x +
-        @intCast(c_int, view.current_box.width - border_width - view_padding);
-    border.y = view.current_box.y + @intCast(c_int, view_padding);
-    border.width = @intCast(c_int, border_width);
-    border.height = @intCast(c_int, view.current_box.height - view_padding * 2);
-    scaleBox(&border, output.wlr_output.scale);
-    c.wlr_render_rect(
-        output.root.server.wlr_renderer,
-        &border,
-        &color,
-        &output.wlr_output.transform_matrix,
-    );
+    // left
+    border.x = view.current_box.x - @intCast(i32, border_width);
+    renderRect(output, border, color);
 
-    // top border
-    border.x = view.current_box.x + @intCast(c_int, border_width + view_padding);
-    border.y = view.current_box.y + @intCast(c_int, view_padding);
-    border.width = @intCast(c_int, view.current_box.width -
-        border_width * 2 - view_padding * 2);
-    border.height = @intCast(c_int, border_width);
-    scaleBox(&border, output.wlr_output.scale);
-    c.wlr_render_rect(
-        output.root.server.wlr_renderer,
-        &border,
-        &color,
-        &output.wlr_output.transform_matrix,
-    );
+    // right
+    border.x = view.current_box.x + @intCast(i32, view.current_box.width);
+    renderRect(output, border, color);
+
+    // top and bottom
+    border.x = view.current_box.x;
+    border.width = view.current_box.width;
+    border.height = border_width;
+
+    // top
+    border.y = view.current_box.y - @intCast(i32, border_width);
+    renderRect(output, border, color);
 
     // bottom border
-    border.x = view.current_box.x + @intCast(c_int, border_width + view_padding);
-    border.y = view.current_box.y +
-        @intCast(c_int, view.current_box.height - border_width - view_padding);
-    border.width = @intCast(c_int, view.current_box.width -
-        border_width * 2 - view_padding * 2);
-    border.height = @intCast(c_int, border_width);
-    scaleBox(&border, output.wlr_output.scale);
+    border.y = view.current_box.y + @intCast(i32, view.current_box.height);
+    renderRect(output, border, color);
+}
+
+fn renderRect(output: Output, box: Box, color: [4]f32) void {
+    var wlr_box = box.toWlrBox();
+    scaleBox(&wlr_box, output.wlr_output.scale);
     c.wlr_render_rect(
         output.root.server.wlr_renderer,
-        &border,
+        &wlr_box,
         &color,
         &output.wlr_output.transform_matrix,
     );

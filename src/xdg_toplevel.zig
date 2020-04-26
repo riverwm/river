@@ -3,7 +3,7 @@ const Self = @This();
 const c = @import("c.zig");
 const std = @import("std");
 
-const Box = @import("box.zig").Box;
+const Box = @import("box.zig");
 const Log = @import("log.zig").Log;
 const View = @import("view.zig").View;
 const ViewStack = @import("view_stack.zig").ViewStack;
@@ -44,12 +44,10 @@ pub fn init(self: *Self, view: *View, wlr_xdg_surface: *c.wlr_xdg_surface) void 
 }
 
 pub fn configure(self: Self, pending_box: Box) void {
-    const border_width = self.view.output.root.server.config.border_width;
-    const view_padding = self.view.output.root.server.config.view_padding;
     self.view.pending_serial = c.wlr_xdg_toplevel_set_size(
         self.wlr_xdg_surface,
-        pending_box.width - border_width * 2 - view_padding * 2,
-        pending_box.height - border_width * 2 - view_padding * 2,
+        pending_box.width,
+        pending_box.height,
     );
 }
 

@@ -2,7 +2,7 @@ const std = @import("std");
 const c = @import("c.zig");
 const render = @import("render.zig");
 
-const Box = @import("box.zig").Box;
+const Box = @import("box.zig");
 const LayerSurface = @import("layer_surface.zig").LayerSurface;
 const Log = @import("log.zig").Log;
 const Root = @import("root.zig").Root;
@@ -160,6 +160,8 @@ pub const Output = struct {
         const master_count = std.math.min(self.master_count, visible_count);
         const slave_count = if (master_count >= visible_count) 0 else visible_count - master_count;
 
+        const border_width = self.root.server.config.border_width;
+        const view_padding = self.root.server.config.view_padding;
         const outer_padding = self.root.server.config.outer_padding;
 
         const layout_width = @intCast(u32, self.usable_box.width) - outer_padding * 2;
@@ -183,30 +185,34 @@ pub const Output = struct {
         var it = ViewStack(View).pendingIterator(self.views.first, output_tags);
         while (it.next()) |node| {
             const view = &node.view;
+
             if (view.floating) {
                 continue;
             }
+
+            var new_box: Box = undefined;
+
+            // Add the remainder to the first master/slave to ensure every
+            // pixel of height is used
             if (i < master_count) {
-                // Add the remainder to the first master to ensure every pixel of height is used
                 const master_height = @divTrunc(layout_height, master_count);
                 const master_height_rem = layout_height % master_count;
 
-                view.pending_box = Box{
-                    .x = @intCast(i32, outer_padding),
-                    .y = @intCast(i32, outer_padding + i * master_height +
+                new_box = .{
+                    .x = 0,
+                    .y = @intCast(i32, i * master_height +
                         if (i > 0) master_height_rem else 0),
 
                     .width = master_column_width,
                     .height = master_height + if (i == 0) master_height_rem else 0,
                 };
             } else {
-                // Add the remainder to the first slave to ensure every pixel of height is used
                 const slave_height = @divTrunc(layout_height, slave_count);
                 const slave_height_rem = layout_height % slave_count;
 
-                view.pending_box = Box{
-                    .x = @intCast(i32, outer_padding + master_column_width),
-                    .y = @intCast(i32, outer_padding + (i - master_count) * slave_height +
+                new_box = .{
+                    .x = @intCast(i32, master_column_width),
+                    .y = @intCast(i32, (i - master_count) * slave_height +
                         if (i > master_count) slave_height_rem else 0),
 
                     .width = slave_column_width,
@@ -214,6 +220,16 @@ pub const Output = struct {
                         if (i == master_count) slave_height_rem else 0,
                 };
             }
+
+            // Apply offsets from borders and padding
+            new_box.x += @intCast(i32, border_width + outer_padding + view_padding);
+            new_box.y += @intCast(i32, border_width + outer_padding + view_padding);
+
+            new_box.width -= (border_width + view_padding) * 2;
+            new_box.height -= (border_width + view_padding) * 2;
+
+            // Set the view's pending box to the new dimensions
+            view.pending_box = new_box;
 
             i += 1;
         }
