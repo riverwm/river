@@ -84,6 +84,8 @@ pub const Server = struct {
             return error.CantCreateWlrCompositor;
         _ = c.wlr_data_device_manager_create(self.wl_display) orelse
             return error.CantCreateWlrDataDeviceManager;
+        _ = c.wlr_screencopy_manager_v1_create(self.wl_display) orelse
+            return error.CantCreateWlrScreencopyManager;
         _ = c.wlr_xdg_output_manager_v1_create(self.wl_display, self.root.wlr_output_layout) orelse
             return error.CantCreateWlrOutputManager;
 

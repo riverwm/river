@@ -17,6 +17,7 @@ pub usingnamespace @cImport({
     @cInclude("wlr/types/wlr_output.h");
     @cInclude("wlr/types/wlr_output_layout.h");
     @cInclude("wlr/types/wlr_pointer.h");
+    @cInclude("wlr/types/wlr_screencopy_v1.h");
     @cInclude("wlr/types/wlr_seat.h");
     @cInclude("wlr/types/wlr_xcursor_manager.h");
     @cInclude("wlr/types/wlr_xdg_decoration_v1.h");

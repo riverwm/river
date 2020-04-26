@@ -213,7 +213,7 @@ pub const View = struct {
             self.natural_height = @intCast(u32, self.wlr_xdg_surface.surface.*.current.height);
         }
 
-        const app_id: ?[*:0]const u8 = self.wlr_xdg_surface.unnamed_165.toplevel.*.app_id;
+        const app_id: ?[*:0]const u8 = self.wlr_xdg_surface.unnamed_166.toplevel.*.app_id;
         Log.Debug.log("View with app_id '{}' mapped", .{if (app_id) |id| id else "NULL"});
 
         // Make views with app_ids listed in the float filter float
