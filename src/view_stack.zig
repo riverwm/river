@@ -129,9 +129,9 @@ pub fn ViewStack(comptime T: type) type {
     };
 }
 
-const testing = @import("std").testing;
-
 test "push/remove (*View)" {
+    const testing = @import("std").testing;
+
     const allocator = testing.allocator;
 
     var views: ViewStack(*View) = undefined;
@@ -260,44 +260,52 @@ test "push/remove (*View)" {
 }
 
 test "iteration (View)" {
+    const c = @import("c.zig");
+    const testing = @import("std").testing;
+
     const allocator = testing.allocator;
 
     var views: ViewStack(View) = undefined;
     views.init();
 
+    // Pretty nice hack for testing: we don't actually need a wlr_surface here,
+    // but we need the iteration function to thing that the view has a non-null
+    // wlr_surface. So, just cast an integer to a pointer to get an arbitrary
+    // but non-null value. Use 8 so the alignment checks out.
+
     const one_a_pb = try allocator.create(ViewStack(View).Node);
     defer allocator.destroy(one_a_pb);
-    one_a_pb.view.mapped = true;
+    one_a_pb.view.wlr_surface = @intToPtr(*c.wlr_surface, 8);
     one_a_pb.view.current_tags = 1 << 0;
     one_a_pb.view.pending_tags = 1 << 1;
 
     const two_a = try allocator.create(ViewStack(View).Node);
     defer allocator.destroy(two_a);
-    two_a.view.mapped = true;
+    two_a.view.wlr_surface = @intToPtr(*c.wlr_surface, 8);
     two_a.view.current_tags = 1 << 0;
     two_a.view.pending_tags = null;
 
     const three_b_pa = try allocator.create(ViewStack(View).Node);
     defer allocator.destroy(three_b_pa);
-    three_b_pa.view.mapped = true;
+    three_b_pa.view.wlr_surface = @intToPtr(*c.wlr_surface, 8);
     three_b_pa.view.current_tags = 1 << 1;
     three_b_pa.view.pending_tags = 1 << 0;
 
     const four_b = try allocator.create(ViewStack(View).Node);
     defer allocator.destroy(four_b);
-    four_b.view.mapped = true;
+    four_b.view.wlr_surface = @intToPtr(*c.wlr_surface, 8);
     four_b.view.current_tags = 1 << 1;
     four_b.view.pending_tags = null;
 
     const five_b = try allocator.create(ViewStack(View).Node);
     defer allocator.destroy(five_b);
-    five_b.view.mapped = true;
+    five_b.view.wlr_surface = @intToPtr(*c.wlr_surface, 8);
     five_b.view.current_tags = 1 << 1;
     five_b.view.pending_tags = null;
 
     const unmapped_1 = try allocator.create(ViewStack(View).Node);
     defer allocator.destroy(unmapped_1);
-    unmapped_1.view.mapped = false;
+    unmapped_1.view.wlr_surface = null;
 
     views.push(three_b_pa); // {3}
     views.push(one_a_pb); // {1, 3}
