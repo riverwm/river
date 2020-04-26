@@ -66,13 +66,6 @@ pub const Output = struct {
             layer.* = std.TailQueue(LayerSurface).init();
         }
 
-        self.usable_box = .{
-            .x = 0,
-            .y = 0,
-            .width = 1920,
-            .height = 1080,
-        };
-
         self.views.init();
 
         self.current_focused_tags = 1 << 0;
@@ -92,12 +85,30 @@ pub const Output = struct {
         self.listen_mode.notify = handleMode;
         c.wl_signal_add(&wlr_output.events.mode, &self.listen_mode);
 
-        if (!c.river_wlr_output_is_noop(wlr_output)) {
+        if (c.river_wlr_output_is_noop(wlr_output)) {
+            // A noop output is always 0 x 0
+            self.usable_box = .{
+                .x = 0,
+                .y = 0,
+                .width = 0,
+                .height = 0,
+            };
+        } else {
             // Add the new output to the layout. The add_auto function arranges outputs
             // from left-to-right in the order they appear. A more sophisticated
             // compositor would let the user configure the arrangement of outputs in the
             // layout. This automatically creates an output global on the wl_display.
             c.wlr_output_layout_add_auto(root.wlr_output_layout, wlr_output);
+
+            var width: c_int = undefined;
+            var height: c_int = undefined;
+            c.wlr_output_effective_resolution(wlr_output, &width, &height);
+            self.usable_box = .{
+                .x = 0,
+                .y = 0,
+                .width = @intCast(u32, width),
+                .height = @intCast(u32, height),
+            };
         }
     }
 
@@ -140,6 +151,12 @@ pub const Output = struct {
     /// pending state, the changes are not appplied until a transaction is started
     /// and completed.
     fn arrangeViews(self: *Self) void {
+        // If the output has a zero dimension, trying to arrange would cause
+        // underflow and is pointless anyway
+        if (self.usable_box.width == 0 or self.usable_box.height == 0) {
+            return;
+        }
+
         const output_tags = if (self.pending_focused_tags) |tags|
             tags
         else
