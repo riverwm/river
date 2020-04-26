@@ -4,8 +4,10 @@ river is a dynamic wayland compositor that takes inspiration from
 [dwm](https://dwm.suckless.org) and
 [bspwm](https://github.com/baskerville/bspwm).
 
-*Note: river is currently early in development and not yet ready for
-the average end user*
+*Note: river is currently early in development and may lack some
+features. If there are specific features blocking you from using river,
+don't hesitate to
+[open an issue](https://github.com/ifreund/river/issues/new)*
 
 ## Design goals
 
@@ -40,7 +42,8 @@ from a tty using KMS/DRM.
 Keybinds are similar to the defaults of dwm, but using the "logo key"
 instead of alt. Check out the comments in [config.zig](src/config.zig) for
 a complete list of bindings. Note that the terminal emulator is currently
-hardcoded to [alacritty](https://github.com/alacritty/alacritty).
+hardcoded to [alacritty](https://github.com/alacritty/alacritty) but
+may be changed by editing [config.zig](src/config.zig) and recompiling.
 
 ## Development
 

@@ -1,7 +1,7 @@
 ## Contributing to river
 
 Contributing is a simple as opening a pull request on our github. You'll likely
-have find more success with your contribution if you hop on our
+have more success with your contribution if you hop on our
 [matrix channel](https://matrix.to/#/#river:matrix.org) to discuss your plans
 first.
 
