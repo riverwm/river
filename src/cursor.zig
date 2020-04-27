@@ -144,9 +144,7 @@ pub const Cursor = struct {
             // focus to the view.
             if (c.wlr_surface_is_xdg_surface(wlr_surface)) {
                 const wlr_xdg_surface = c.wlr_xdg_surface_from_wlr_surface(wlr_surface);
-                if (wlr_xdg_surface.*.role ==
-                    c.enum_wlr_xdg_surface_role.WLR_XDG_SURFACE_ROLE_TOPLEVEL)
-                {
+                if (wlr_xdg_surface.*.role == .WLR_XDG_SURFACE_ROLE_TOPLEVEL) {
                     const view = @ptrCast(*View, @alignCast(@alignOf(*View), wlr_xdg_surface.*.data));
                     self.seat.focus(view);
                 }
@@ -353,9 +351,7 @@ pub const Cursor = struct {
                     return found;
                 } else if (c.wlr_surface_is_xdg_surface(found)) {
                     const wlr_xdg_surface = c.wlr_xdg_surface_from_wlr_surface(found);
-                    if (wlr_xdg_surface.*.role ==
-                        c.enum_wlr_xdg_surface_role.WLR_XDG_SURFACE_ROLE_POPUP)
-                    {
+                    if (wlr_xdg_surface.*.role == .WLR_XDG_SURFACE_ROLE_POPUP) {
                         return found;
                     }
                 }

@@ -28,14 +28,14 @@ pub const Keyboard = struct {
             .variant = null,
             .options = null,
         };
-        const context = c.xkb_context_new(c.enum_xkb_context_flags.XKB_CONTEXT_NO_FLAGS) orelse
+        const context = c.xkb_context_new(.XKB_CONTEXT_NO_FLAGS) orelse
             return error.CantCreateXkbContext;
         defer c.xkb_context_unref(context);
 
         const keymap = c.xkb_keymap_new_from_names(
             context,
             &rules,
-            c.enum_xkb_keymap_compile_flags.XKB_KEYMAP_COMPILE_NO_FLAGS,
+            .XKB_KEYMAP_COMPILE_NO_FLAGS,
         ) orelse
             return error.CantCreateXkbKeymap;
         defer c.xkb_keymap_unref(keymap);
@@ -88,7 +88,7 @@ pub const Keyboard = struct {
         var handled = false;
         // TODO: These modifiers aren't properly handled, see sway's code
         const modifiers = c.wlr_keyboard_get_modifiers(wlr_keyboard);
-        if (event.state == c.enum_wlr_key_state.WLR_KEY_PRESSED) {
+        if (event.state == .WLR_KEY_PRESSED) {
             var i: usize = 0;
             while (i < translated_keysyms_len) : (i += 1) {
                 if (self.handleBuiltinKeybind(translated_keysyms.?[i])) {

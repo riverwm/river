@@ -183,7 +183,7 @@ fn renderView(output: Output, view: *View, now: *c.timespec) void {
         c.wlr_matrix_project_box(
             &matrix,
             &box,
-            c.enum_wl_output_transform.WL_OUTPUT_TRANSFORM_NORMAL,
+            .WL_OUTPUT_TRANSFORM_NORMAL,
             0.0,
             &output.wlr_output.transform_matrix,
         );

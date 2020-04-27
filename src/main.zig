@@ -6,7 +6,7 @@ const Server = @import("server.zig").Server;
 
 pub fn main() !void {
     Log.init(Log.Debug);
-    c.wlr_log_init(c.enum_wlr_log_importance.WLR_ERROR, null);
+    c.wlr_log_init(.WLR_ERROR, null);
 
     Log.Info.log("Initializing server", .{});
 

@@ -145,7 +145,7 @@ pub const Server = struct {
         const self = @fieldParentPtr(Self, "listen_new_xdg_surface", listener.?);
         const wlr_xdg_surface = @ptrCast(*c.wlr_xdg_surface, @alignCast(@alignOf(*c.wlr_xdg_surface), data));
 
-        if (wlr_xdg_surface.role != c.enum_wlr_xdg_surface_role.WLR_XDG_SURFACE_ROLE_TOPLEVEL) {
+        if (wlr_xdg_surface.role != .WLR_XDG_SURFACE_ROLE_TOPLEVEL) {
             // TODO: log
             return;
         }

@@ -248,7 +248,7 @@ pub const Seat = struct {
         // We need to let the wlr_seat know what our capabilities are, which is
         // communiciated to the client. We always have a cursor, even if
         // there are no pointer devices, so we always include that capability.
-        var caps: u32 = @intCast(u32, c.WL_SEAT_CAPABILITY_POINTER);
+        var caps = @intCast(u32, c.WL_SEAT_CAPABILITY_POINTER);
         // if list not empty
         if (self.keyboards.len > 0) {
             caps |= @intCast(u32, c.WL_SEAT_CAPABILITY_KEYBOARD);
