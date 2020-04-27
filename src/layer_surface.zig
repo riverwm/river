@@ -52,11 +52,6 @@ pub const LayerSurface = struct {
         c.wl_signal_add(&self.wlr_layer_surface.events.unmap, &self.listen_unmap);
     }
 
-    /// Send a configure event to the client with the dimensions of the current box
-    pub fn sendConfigure(self: Self) void {
-        c.wlr_layer_surface_v1_configure(self.wlr_layer_surface, self.box.width, self.box.height);
-    }
-
     fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         const self = @fieldParentPtr(Self, "listen_destroy", listener.?);
         const output = self.output;
@@ -71,6 +66,8 @@ pub const LayerSurface = struct {
         const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
         output.layers[@intCast(usize, @enumToInt(self.layer))].remove(node);
         output.root.server.allocator.destroy(node);
+
+        self.output.arrangeLayers();
     }
 
     fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -92,8 +89,6 @@ pub const LayerSurface = struct {
             wlr_layer_surface.surface,
             wlr_layer_surface.output,
         );
-
-        self.output.arrangeLayers();
     }
 
     fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {

@@ -464,7 +464,13 @@ pub const Output = struct {
                 }
             }
 
-            layer_surface.sendConfigure();
+            // Tell the client to assume the new size
+            Log.Debug.log("send configure, {} x {}", .{ layer_surface.box.width, layer_surface.box.height });
+            c.wlr_layer_surface_v1_configure(
+                layer_surface.wlr_layer_surface,
+                layer_surface.box.width,
+                layer_surface.box.height,
+            );
         }
     }
 
