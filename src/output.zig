@@ -235,11 +235,14 @@ pub const Output = struct {
             }
 
             // Apply offsets from borders and padding
-            new_box.x += @intCast(i32, border_width + outer_padding + view_padding);
-            new_box.y += @intCast(i32, border_width + outer_padding + view_padding);
+            const xy_offset = @intCast(i32, border_width + outer_padding + view_padding);
+            new_box.x += self.usable_box.x + xy_offset;
+            new_box.y += self.usable_box.y + xy_offset;
 
-            new_box.width -= (border_width + view_padding) * 2;
-            new_box.height -= (border_width + view_padding) * 2;
+            // Reduce size to allow space for borders/padding
+            const delta_size = (border_width + view_padding) * 2;
+            new_box.width -= delta_size;
+            new_box.height -= delta_size;
 
             // Set the view's pending box to the new dimensions
             view.pending_box = new_box;
