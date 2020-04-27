@@ -86,9 +86,8 @@ pub const Root = struct {
     /// Arrange all outputs and then a transaction.
     pub fn arrange(self: *Self) void {
         var it = self.outputs.first;
-        while (it) |node| : (it = node.next) {
-            const output = &node.data;
-            output.arrange();
+        while (it) |output_node| : (it = output_node.next) {
+            output_node.data.arrangeViews();
         }
         self.startTransaction();
     }

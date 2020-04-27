@@ -143,14 +143,10 @@ pub const Output = struct {
         self.arrangeLayers();
     }
 
-    pub fn arrange(self: *Self) void {
-        self.arrangeViews();
-    }
-
     /// Arrange all views on the output for the current layout. Modifies only
     /// pending state, the changes are not appplied until a transaction is started
     /// and completed.
-    fn arrangeViews(self: *Self) void {
+    pub fn arrangeViews(self: *Self) void {
         // If the output has a zero dimension, trying to arrange would cause
         // underflow and is pointless anyway
         if (self.usable_box.width == 0 or self.usable_box.height == 0) {
