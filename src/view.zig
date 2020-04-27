@@ -98,7 +98,7 @@ pub const View = struct {
                 .xdg_toplevel => |xdg_toplevel| xdg_toplevel.configure(pending_box),
             }
         } else {
-            Log.Error.log("Configre called on a View with no pending box", .{});
+            Log.Error.log("Configure called on a View with no pending box", .{});
         }
     }
 

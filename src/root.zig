@@ -83,7 +83,7 @@ pub const Root = struct {
         self.focused_view = null;
     }
 
-    /// Arrange all outputs and then a transaction.
+    /// Arrange all views on all outputs and then start a transaction.
     pub fn arrange(self: *Self) void {
         var it = self.outputs.first;
         while (it) |output_node| : (it = output_node.next) {
