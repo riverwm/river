@@ -7,6 +7,7 @@ const Box = @import("box.zig");
 const Log = @import("log.zig").Log;
 const View = @import("view.zig").View;
 const ViewStack = @import("view_stack.zig").ViewStack;
+const XdgPopup = @import("xdg_popup.zig");
 
 /// The view this xdg toplevel implements
 view: *View,
@@ -21,6 +22,7 @@ listen_unmap: c.wl_listener,
 
 // Listeners that are only active while the view is mapped
 listen_commit: c.wl_listener,
+listen_new_popup: c.wl_listener,
 
 pub fn init(self: *Self, view: *View, wlr_xdg_surface: *c.wlr_xdg_surface) void {
     self.view = view;
@@ -93,6 +95,9 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     self.listen_commit.notify = handleCommit;
     c.wl_signal_add(&self.wlr_xdg_surface.surface.*.events.commit, &self.listen_commit);
 
+    self.listen_new_popup.notify = handleNewPopup;
+    c.wl_signal_add(&self.wlr_xdg_surface.events.new_popup, &self.listen_new_popup);
+
     view.wlr_surface = self.wlr_xdg_surface.surface;
     view.floating = false;
 
@@ -147,6 +152,7 @@ fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 
     // Remove listeners that are only active while mapped
     c.wl_list_remove(&self.listen_commit.link);
+    c.wl_list_remove(&self.listen_new_popup.link);
 }
 
 /// Called when the surface is comitted
@@ -161,4 +167,15 @@ fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
             view.pending_serial = null;
         }
     }
+}
+
+/// Called when a new xdg popup is requested by the client
+fn handleNewPopup(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    const self = @fieldParentPtr(Self, "listen_new_popup", listener.?);
+    const wlr_xdg_popup = @ptrCast(*c.wlr_xdg_popup, @alignCast(@alignOf(*c.wlr_xdg_popup), data));
+    const server = self.view.output.root.server;
+
+    // This will free itself on destroy
+    var xdg_popup = server.allocator.create(XdgPopup) catch unreachable;
+    xdg_popup.init(self, wlr_xdg_popup);
 }
