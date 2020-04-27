@@ -69,6 +69,7 @@ pub fn forEachSurface(
 ) void {
     c.wlr_xdg_surface_for_each_surface(self.wlr_xdg_surface, iterator, user_data);
 }
+
 /// Called when the xdg surface is destroyed
 fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_destroy", listener.?);
@@ -109,17 +110,24 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         view.natural_height = @intCast(u32, self.wlr_xdg_surface.surface.*.current.height);
     }
 
-    const app_id: ?[*:0]const u8 = self.wlr_xdg_surface.unnamed_166.toplevel.*.app_id;
-    Log.Debug.log("View with app_id '{}' mapped", .{if (app_id) |id| id else "NULL"});
+    const wlr_xdg_toplevel: *c.wlr_xdg_toplevel = self.wlr_xdg_surface.unnamed_166.toplevel;
+    const state = &wlr_xdg_toplevel.current;
+    const app_id: [*:0]const u8 = if (wlr_xdg_toplevel.app_id) |id| id else "NULL";
 
-    // Make views with app_ids listed in the float filter float
-    if (app_id) |id| {
-        for (root.server.config.float_filter.items) |filter_app_id| {
-            if (std.mem.eql(u8, std.mem.span(id), std.mem.span(filter_app_id))) {
-                view.setFloating(true);
-                break;
-            }
+    Log.Debug.log("View with app_id '{}' mapped", .{app_id});
+
+    for (root.server.config.float_filter.items) |filter_app_id| {
+        // Make views with app_ids listed in the float filter float
+        if (std.mem.eql(u8, std.mem.span(app_id), std.mem.span(filter_app_id))) {
+            view.setFloating(true);
+            break;
         }
+    } else if ((wlr_xdg_toplevel.parent != null) or
+        (state.min_width != 0 and state.min_height != 0 and
+        (state.min_width == state.max_width or state.min_height == state.max_height)))
+    {
+        // If the toplevel has a parent or is of fixed size make it float
+        view.setFloating(true);
     }
 
     // Focus the newly mapped view. Note: if a seat is focusing a different output

@@ -145,10 +145,12 @@ pub const Server = struct {
         const self = @fieldParentPtr(Self, "listen_new_xdg_surface", listener.?);
         const wlr_xdg_surface = @ptrCast(*c.wlr_xdg_surface, @alignCast(@alignOf(*c.wlr_xdg_surface), data));
 
-        if (wlr_xdg_surface.role != .WLR_XDG_SURFACE_ROLE_TOPLEVEL) {
-            // TODO: log
+        if (wlr_xdg_surface.role == .WLR_XDG_SURFACE_ROLE_POPUP) {
+            Log.Debug.log("New xdg_popup", .{});
             return;
         }
+
+        Log.Debug.log("New xdg_toplevel", .{});
 
         self.input_manager.default_seat.focused_output.addView(wlr_xdg_surface);
     }
