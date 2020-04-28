@@ -30,3 +30,9 @@ pub usingnamespace @cImport({
     // that can be automatically imported
     @cInclude("include/bindings.h");
 });
+
+// These are needed because zig currently names translated anonymous unions
+// with a global counter, which makes code unportable.
+// See https://github.com/ifreund/river/issues/17
+pub const wlr_xdg_surface_union = @typeInfo(wlr_xdg_surface).Struct.fields[5].name;
+pub const wlr_input_device_union = @typeInfo(wlr_input_device).Struct.fields[8].name;

@@ -110,7 +110,10 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         view.natural_height = @intCast(u32, self.wlr_xdg_surface.surface.*.current.height);
     }
 
-    const wlr_xdg_toplevel: *c.wlr_xdg_toplevel = self.wlr_xdg_surface.unnamed_166.toplevel;
+    const wlr_xdg_toplevel: *c.wlr_xdg_toplevel = @field(
+        self.wlr_xdg_surface,
+        c.wlr_xdg_surface_union,
+    ).toplevel;
     const state = &wlr_xdg_toplevel.current;
     const app_id: [*:0]const u8 = if (wlr_xdg_toplevel.app_id) |id| id else "NULL";
 
