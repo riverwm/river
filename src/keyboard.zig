@@ -8,16 +8,16 @@ pub const Keyboard = struct {
     const Self = @This();
 
     seat: *Seat,
-    device: *c.wlr_input_device,
+    wlr_input_device: *c.wlr_input_device,
     wlr_keyboard: *c.wlr_keyboard,
 
     listen_key: c.wl_listener,
     listen_modifiers: c.wl_listener,
 
-    pub fn init(self: *Self, seat: *Seat, device: *c.wlr_input_device) !void {
+    pub fn init(self: *Self, seat: *Seat, wlr_input_device: *c.wlr_input_device) !void {
         self.seat = seat;
-        self.device = device;
-        self.wlr_keyboard = @field(device, c.wlr_input_device_union).keyboard;
+        self.wlr_input_device = wlr_input_device;
+        self.wlr_keyboard = @field(wlr_input_device, c.wlr_input_device_union).keyboard;
 
         // We need to prepare an XKB keymap and assign it to the keyboard. This
         // assumes the defaults (e.g. layout = "us").
@@ -116,7 +116,7 @@ pub const Keyboard = struct {
         if (!handled) {
             // Otherwise, we pass it along to the client.
             const wlr_seat = self.seat.wlr_seat;
-            c.wlr_seat_set_keyboard(wlr_seat, self.device);
+            c.wlr_seat_set_keyboard(wlr_seat, self.wlr_input_device);
             c.wlr_seat_keyboard_notify_key(
                 wlr_seat,
                 event.time_msec,
@@ -135,7 +135,7 @@ pub const Keyboard = struct {
         // Wayland protocol - not wlroots. We assign all connected keyboards to the
         // same seat. You can swap out the underlying wlr_keyboard like this and
         // wlr_seat handles this transparently.
-        c.wlr_seat_set_keyboard(self.seat.wlr_seat, self.device);
+        c.wlr_seat_set_keyboard(self.seat.wlr_seat, self.wlr_input_device);
 
         // Send modifiers to the client.
         c.wlr_seat_keyboard_notify_modifiers(
