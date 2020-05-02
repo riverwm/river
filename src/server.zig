@@ -4,7 +4,7 @@ const std = @import("std");
 
 const c = @import("c.zig");
 
-const Config = @import("config.zig").Config;
+const Config = @import("config.zig");
 const DecorationManager = @import("decoration_manager.zig");
 const InputManager = @import("input_manager.zig").InputManager;
 const Log = @import("log.zig").Log;
