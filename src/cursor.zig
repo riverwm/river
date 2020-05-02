@@ -4,7 +4,7 @@ const c = @import("c.zig");
 const LayerSurface = @import("layer_surface.zig").LayerSurface;
 const Log = @import("log.zig").Log;
 const Output = @import("output.zig").Output;
-const Seat = @import("seat.zig").Seat;
+const Seat = @import("seat.zig");
 const View = @import("view.zig").View;
 const ViewStack = @import("view_stack.zig").ViewStack;
 

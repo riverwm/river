@@ -2,7 +2,7 @@ const std = @import("std");
 const c = @import("c.zig");
 
 const Log = @import("log.zig").Log;
-const Seat = @import("seat.zig").Seat;
+const Seat = @import("seat.zig");
 
 pub const Keyboard = struct {
     const Self = @This();

@@ -5,7 +5,7 @@ const std = @import("std");
 const c = @import("c.zig");
 
 const Log = @import("log.zig").Log;
-const Seat = @import("seat.zig").Seat;
+const Seat = @import("seat.zig");
 const Server = @import("server.zig");
 
 const default_seat_name = "default";

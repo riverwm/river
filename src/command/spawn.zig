@@ -3,7 +3,7 @@ const std = @import("std");
 
 const Arg = @import("../command.zig").Arg;
 const Log = @import("../log.zig").Log;
-const Seat = @import("../seat.zig").Seat;
+const Seat = @import("../seat.zig");
 
 /// Spawn a program.
 pub fn spawn(seat: *Seat, arg: Arg) void {

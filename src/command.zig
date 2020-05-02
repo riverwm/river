@@ -1,4 +1,4 @@
-const Seat = @import("seat.zig").Seat;
+const Seat = @import("seat.zig");
 
 pub const Direction = enum {
     Next,

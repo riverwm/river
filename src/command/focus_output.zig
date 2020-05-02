@@ -3,7 +3,7 @@ const std = @import("std");
 
 const Arg = @import("../command.zig").Arg;
 const Output = @import("../output.zig").Output;
-const Seat = @import("../seat.zig").Seat;
+const Seat = @import("../seat.zig");
 
 /// Focus either the next or the previous output, depending on the bool passed.
 /// Does nothing if there is only one output.

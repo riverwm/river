@@ -1,7 +1,7 @@
 const c = @import("../c.zig");
 
 const Arg = @import("../command.zig").Arg;
-const Seat = @import("../seat.zig").Seat;
+const Seat = @import("../seat.zig");
 
 /// Switch focus to the passed tags.
 pub fn focusTags(seat: *Seat, arg: Arg) void {

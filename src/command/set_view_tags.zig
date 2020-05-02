@@ -1,7 +1,7 @@
 const c = @import("../c.zig");
 
 const Arg = @import("../command.zig").Arg;
-const Seat = @import("../seat.zig").Seat;
+const Seat = @import("../seat.zig");
 
 /// Set the tags of the focused view.
 pub fn setViewTags(seat: *Seat, arg: Arg) void {
