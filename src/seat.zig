@@ -2,7 +2,7 @@ const c = @import("c.zig");
 const std = @import("std");
 
 const Cursor = @import("cursor.zig").Cursor;
-const InputManager = @import("input_manager.zig").InputManager;
+const InputManager = @import("input_manager.zig");
 const Keyboard = @import("keyboard.zig").Keyboard;
 const LayerSurface = @import("layer_surface.zig").LayerSurface;
 const Output = @import("output.zig").Output;

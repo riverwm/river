@@ -6,7 +6,7 @@ const c = @import("c.zig");
 
 const Config = @import("config.zig");
 const DecorationManager = @import("decoration_manager.zig");
-const InputManager = @import("input_manager.zig").InputManager;
+const InputManager = @import("input_manager.zig");
 const Log = @import("log.zig").Log;
 const Output = @import("output.zig").Output;
 const Root = @import("root.zig").Root;
