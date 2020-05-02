@@ -4,7 +4,7 @@ const util = @import("util.zig");
 
 const Box = @import("box.zig").Box;
 const Log = @import("log.zig").Log;
-const Output = @import("output.zig").Output;
+const Output = @import("output.zig");
 const Server = @import("server.zig");
 const Seat = @import("seat.zig").Seat;
 const View = @import("view.zig").View;

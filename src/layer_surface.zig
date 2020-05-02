@@ -3,7 +3,7 @@ const c = @import("c.zig");
 
 const Box = @import("box.zig");
 const Log = @import("log.zig").Log;
-const Output = @import("output.zig").Output;
+const Output = @import("output.zig");
 
 pub const LayerSurface = struct {
     const Self = @This();

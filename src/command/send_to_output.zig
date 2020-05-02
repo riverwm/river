@@ -2,7 +2,7 @@ const c = @import("../c.zig");
 const std = @import("std");
 
 const Arg = @import("../command.zig").Arg;
-const Output = @import("../output.zig").Output;
+const Output = @import("../output.zig");
 const Seat = @import("../seat.zig");
 
 /// Send the focused view to the the next or the previous output, depending on
