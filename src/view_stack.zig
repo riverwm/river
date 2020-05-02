@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const View = @import("view.zig");
+const View = @import("View.zig");
 
 /// A specialized doubly-linked stack that allows for filtered iteration
 /// over the nodes. T must be View or *View.

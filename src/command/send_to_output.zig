@@ -20,8 +20,8 @@ const std = @import("std");
 const c = @import("../c.zig");
 
 const Arg = @import("../command.zig").Arg;
-const Output = @import("../output.zig");
-const Seat = @import("../seat.zig");
+const Output = @import("../Output.zig");
+const Seat = @import("../Seat.zig");
 
 /// Send the focused view to the the next or the previous output, depending on
 /// the bool passed. Does nothing if there is only one output.

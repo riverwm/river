@@ -18,7 +18,7 @@
 const c = @import("../c.zig");
 
 const Arg = @import("../command.zig").Arg;
-const Seat = @import("../seat.zig");
+const Seat = @import("../Seat.zig");
 
 /// Close the focused view, if any.
 pub fn close_view(seat: *Seat, arg: Arg) void {

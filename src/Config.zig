@@ -22,7 +22,7 @@ const std = @import("std");
 const c = @import("c.zig");
 const command = @import("command.zig");
 
-const Server = @import("server.zig");
+const Server = @import("Server.zig");
 
 /// Width of borders in pixels
 border_width: u32,

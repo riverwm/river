@@ -21,11 +21,11 @@ const std = @import("std");
 
 const c = @import("c.zig");
 
-const LayerSurface = @import("layer_surface.zig");
+const LayerSurface = @import("LayerSurface.zig");
 const Log = @import("log.zig").Log;
-const Output = @import("output.zig");
-const Seat = @import("seat.zig");
-const View = @import("view.zig");
+const Output = @import("Output.zig");
+const Seat = @import("Seat.zig");
+const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 
 const CursorMode = enum {

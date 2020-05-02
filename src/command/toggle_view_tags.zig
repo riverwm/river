@@ -18,7 +18,7 @@
 const c = @import("../c.zig");
 
 const Arg = @import("../command.zig").Arg;
-const Seat = @import("../seat.zig");
+const Seat = @import("../Seat.zig");
 
 /// Toggle the passed tags of the focused view
 pub fn toggleViewTags(seat: *Seat, arg: Arg) void {

@@ -21,7 +21,7 @@ const std = @import("std");
 
 const c = @import("c.zig");
 
-const DecorationManager = @import("decoration_manager.zig");
+const DecorationManager = @import("DecorationManager.zig");
 
 // TODO: this needs to listen for destroy and free nodes from the deco list
 decoration_manager: *DecorationManager,

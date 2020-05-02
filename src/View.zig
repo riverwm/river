@@ -21,12 +21,12 @@ const std = @import("std");
 
 const c = @import("c.zig");
 
-const Box = @import("box.zig");
+const Box = @import("Box.zig");
 const Log = @import("log.zig").Log;
-const Output = @import("output.zig");
-const Root = @import("root.zig");
+const Output = @import("Output.zig");
+const Root = @import("Root.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
-const XdgToplevel = @import("xdg_toplevel.zig");
+const XdgToplevel = @import("XdgToplevel.zig");
 
 const ViewImpl = union(enum) {
     xdg_toplevel: XdgToplevel,

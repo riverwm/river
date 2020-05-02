@@ -20,7 +20,7 @@ const std = @import("std");
 const c = @import("c.zig");
 
 const Log = @import("log.zig").Log;
-const Server = @import("server.zig");
+const Server = @import("Server.zig");
 
 pub fn main() !void {
     Log.init(Log.Debug);

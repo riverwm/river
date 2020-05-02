@@ -21,7 +21,7 @@ const std = @import("std");
 
 const c = @import("c.zig");
 
-const XdgToplevel = @import("xdg_toplevel.zig");
+const XdgToplevel = @import("XdgToplevel.zig");
 
 /// The toplevel this popup is a child of
 xdg_toplevel: *XdgToplevel,

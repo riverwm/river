@@ -18,7 +18,7 @@
 const c = @import("../c.zig");
 
 const Arg = @import("../command.zig").Arg;
-const Seat = @import("../seat.zig");
+const Seat = @import("../Seat.zig");
 
 /// Exit the compositor, terminating the wayland session.
 pub fn exitCompositor(seat: *Seat, arg: Arg) void {

@@ -21,9 +21,9 @@ const std = @import("std");
 
 const c = @import("c.zig");
 
-const Box = @import("box.zig");
+const Box = @import("Box.zig");
 const Log = @import("log.zig").Log;
-const Output = @import("output.zig");
+const Output = @import("Output.zig");
 
 output: *Output,
 wlr_layer_surface: *c.wlr_layer_surface_v1,

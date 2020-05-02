@@ -19,11 +19,11 @@ const std = @import("std");
 
 const c = @import("c.zig");
 
-const Box = @import("box.zig");
-const LayerSurface = @import("layer_surface.zig");
-const Output = @import("output.zig");
-const Server = @import("server.zig");
-const View = @import("view.zig");
+const Box = @import("Box.zig");
+const LayerSurface = @import("LayerSurface.zig");
+const Output = @import("Output.zig");
+const Server = @import("Server.zig");
+const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 
 pub fn renderOutput(output: *Output) void {

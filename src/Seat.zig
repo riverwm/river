@@ -21,12 +21,12 @@ const std = @import("std");
 
 const c = @import("c.zig");
 
-const Cursor = @import("cursor.zig");
-const InputManager = @import("input_manager.zig");
-const Keyboard = @import("keyboard.zig");
-const LayerSurface = @import("layer_surface.zig");
-const Output = @import("output.zig");
-const View = @import("view.zig");
+const Cursor = @import("Cursor.zig");
+const InputManager = @import("InputManager.zig");
+const Keyboard = @import("Keyboard.zig");
+const LayerSurface = @import("LayerSurface.zig");
+const Output = @import("Output.zig");
+const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 
 const FocusTarget = union(enum) {

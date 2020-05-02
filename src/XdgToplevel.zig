@@ -21,11 +21,11 @@ const std = @import("std");
 
 const c = @import("c.zig");
 
-const Box = @import("box.zig");
+const Box = @import("Box.zig");
 const Log = @import("log.zig").Log;
-const View = @import("view.zig");
+const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
-const XdgPopup = @import("xdg_popup.zig");
+const XdgPopup = @import("XdgPopup.zig");
 
 /// The view this xdg toplevel implements
 view: *View,

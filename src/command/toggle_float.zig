@@ -18,7 +18,7 @@
 const c = @import("../c.zig");
 
 const Arg = @import("../command.zig").Arg;
-const Seat = @import("../seat.zig");
+const Seat = @import("../Seat.zig");
 
 /// Make the focused view float or stop floating, depending on its current
 /// state.

@@ -22,11 +22,11 @@ const std = @import("std");
 const c = @import("c.zig");
 const render = @import("render.zig");
 
-const Box = @import("box.zig");
-const LayerSurface = @import("layer_surface.zig");
+const Box = @import("Box.zig");
+const LayerSurface = @import("LayerSurface.zig");
 const Log = @import("log.zig").Log;
-const Root = @import("root.zig");
-const View = @import("view.zig");
+const Root = @import("Root.zig");
+const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 
 root: *Root,

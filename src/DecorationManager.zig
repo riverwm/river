@@ -21,8 +21,8 @@ const std = @import("std");
 
 const c = @import("c.zig");
 
-const Decoration = @import("decoration.zig");
-const Server = @import("server.zig");
+const Decoration = @import("Decoration.zig");
+const Server = @import("Server.zig");
 
 server: *Server,
 

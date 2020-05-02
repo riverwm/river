@@ -22,7 +22,7 @@ const std = @import("std");
 const c = @import("c.zig");
 
 const Log = @import("log.zig").Log;
-const Seat = @import("seat.zig");
+const Seat = @import("Seat.zig");
 
 seat: *Seat,
 wlr_input_device: *c.wlr_input_device,

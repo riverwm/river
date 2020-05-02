@@ -21,7 +21,7 @@ const c = @import("../c.zig");
 
 const Arg = @import("../command.zig").Arg;
 const Log = @import("../log.zig").Log;
-const Seat = @import("../seat.zig");
+const Seat = @import("../Seat.zig");
 
 /// Spawn a program.
 pub fn spawn(seat: *Seat, arg: Arg) void {

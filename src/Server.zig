@@ -21,13 +21,13 @@ const std = @import("std");
 
 const c = @import("c.zig");
 
-const Config = @import("config.zig");
-const DecorationManager = @import("decoration_manager.zig");
-const InputManager = @import("input_manager.zig");
+const Config = @import("Config.zig");
+const DecorationManager = @import("DecorationManager.zig");
+const InputManager = @import("InputManager.zig");
 const Log = @import("log.zig").Log;
-const Output = @import("output.zig");
-const Root = @import("root.zig");
-const View = @import("view.zig");
+const Output = @import("Output.zig");
+const Root = @import("Root.zig");
+const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 
 allocator: *std.mem.Allocator,

@@ -22,9 +22,9 @@ const std = @import("std");
 const c = @import("c.zig");
 
 const Log = @import("log.zig").Log;
-const Output = @import("output.zig");
-const Server = @import("server.zig");
-const View = @import("view.zig");
+const Output = @import("Output.zig");
+const Server = @import("Server.zig");
+const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 
 /// Responsible for all windowing operations

@@ -20,7 +20,7 @@ const std = @import("std");
 const c = @import("../c.zig");
 
 const Arg = @import("../command.zig").Arg;
-const Seat = @import("../seat.zig");
+const Seat = @import("../Seat.zig");
 
 /// Modify the number of master views
 pub fn modifyMasterCount(seat: *Seat, arg: Arg) void {
