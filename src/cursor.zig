@@ -1,7 +1,7 @@
 const std = @import("std");
 const c = @import("c.zig");
 
-const LayerSurface = @import("layer_surface.zig").LayerSurface;
+const LayerSurface = @import("layer_surface.zig");
 const Log = @import("log.zig").Log;
 const Output = @import("output.zig");
 const Seat = @import("seat.zig");

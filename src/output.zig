@@ -6,7 +6,7 @@ const c = @import("c.zig");
 const render = @import("render.zig");
 
 const Box = @import("box.zig");
-const LayerSurface = @import("layer_surface.zig").LayerSurface;
+const LayerSurface = @import("layer_surface.zig");
 const Log = @import("log.zig").Log;
 const Root = @import("root.zig").Root;
 const View = @import("view.zig").View;
