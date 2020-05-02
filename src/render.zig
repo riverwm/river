@@ -4,7 +4,7 @@ const c = @import("c.zig");
 const Box = @import("box.zig");
 const LayerSurface = @import("layer_surface.zig").LayerSurface;
 const Output = @import("output.zig").Output;
-const Server = @import("server.zig").Server;
+const Server = @import("server.zig");
 const View = @import("view.zig").View;
 const ViewStack = @import("view_stack.zig").ViewStack;
 

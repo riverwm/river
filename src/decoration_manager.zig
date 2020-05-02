@@ -2,7 +2,7 @@ const std = @import("std");
 const c = @import("c.zig");
 
 const Decoration = @import("decoration.zig").Decoration;
-const Server = @import("server.zig").Server;
+const Server = @import("server.zig");
 
 pub const DecorationManager = struct {
     const Self = @This();

@@ -3,7 +3,7 @@ const c = @import("c.zig");
 
 const Log = @import("log.zig").Log;
 const Seat = @import("seat.zig").Seat;
-const Server = @import("server.zig").Server;
+const Server = @import("server.zig");
 
 pub const InputManager = struct {
     const Self = @This();
