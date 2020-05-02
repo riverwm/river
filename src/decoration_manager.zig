@@ -4,7 +4,7 @@ const std = @import("std");
 
 const c = @import("c.zig");
 
-const Decoration = @import("decoration.zig").Decoration;
+const Decoration = @import("decoration.zig");
 const Server = @import("server.zig");
 
 server: *Server,
