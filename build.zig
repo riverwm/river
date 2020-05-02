@@ -42,6 +42,7 @@ fn addDeps(exe: *std.build.LibExeObjStep, protocol_step: *std.build.Step) void {
     exe.addIncludeDir(".");
 
     exe.linkLibC();
+    exe.linkSystemLibrary("pixman-1");
     exe.linkSystemLibrary("wayland-server");
     exe.linkSystemLibrary("wlroots");
     exe.linkSystemLibrary("xkbcommon");
