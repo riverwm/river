@@ -347,7 +347,7 @@ pub const Output = struct {
 
             // If the value of exclusive_zone is greater than zero, then it exclusivly
             // occupies some area of the screen.
-            if (exclusive != (current_state.exclusive_zone > 0)) {
+            if (!layer_surface.mapped or exclusive != (current_state.exclusive_zone > 0)) {
                 continue;
             }
 

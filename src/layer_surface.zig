@@ -36,10 +36,15 @@ pub const LayerSurface = struct {
         self.wlr_layer_surface = wlr_layer_surface;
         wlr_layer_surface.data = self;
 
-        self.mapped = false;
-
-        self.box = undefined;
         self.layer = layer;
+
+        // Temporarily set mapped to true and apply the pending state to allow
+        // for inital arrangement which sends the first configure.
+        self.mapped = true;
+        const stashed_state = wlr_layer_surface.current;
+        wlr_layer_surface.current = wlr_layer_surface.client_pending;
+        output.arrangeLayers();
+        wlr_layer_surface.current = stashed_state;
 
         // Set up listeners that are active for the entire lifetime of the layer surface
         self.listen_destroy.notify = handleDestroy;
@@ -96,11 +101,17 @@ pub const LayerSurface = struct {
 
         Log.Debug.log("Layer surface '{}' unmapped.", .{self.wlr_layer_surface.namespace});
 
-        self.mapped = false;
+        // This is a bit ugly: we need to use the wlr bool here since surfaces
+        // may be closed during the inital configure since we set our mapped
+        // bool to true so that we can avoid making the arrange function even
+        // more complex.
+        if (self.wlr_layer_surface.mapped) {
+            // remove listeners only active while the layer surface is mapped
+            c.wl_list_remove(&self.listen_commit.link);
+            c.wl_list_remove(&self.listen_new_popup.link);
+        }
 
-        // remove listeners only active while the layer surface is mapped
-        c.wl_list_remove(&self.listen_commit.link);
-        c.wl_list_remove(&self.listen_new_popup.link);
+        self.mapped = false;
 
         // If the unmapped surface is focused, clear focus
         var it = self.output.root.server.input_manager.seats.first;
