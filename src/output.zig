@@ -8,7 +8,7 @@ const render = @import("render.zig");
 const Box = @import("box.zig");
 const LayerSurface = @import("layer_surface.zig");
 const Log = @import("log.zig").Log;
-const Root = @import("root.zig").Root;
+const Root = @import("root.zig");
 const View = @import("view.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 

@@ -9,7 +9,7 @@ const DecorationManager = @import("decoration_manager.zig");
 const InputManager = @import("input_manager.zig");
 const Log = @import("log.zig").Log;
 const Output = @import("output.zig");
-const Root = @import("root.zig").Root;
+const Root = @import("root.zig");
 const View = @import("view.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 

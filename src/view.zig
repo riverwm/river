@@ -7,7 +7,7 @@ const c = @import("c.zig");
 const Box = @import("box.zig");
 const Log = @import("log.zig").Log;
 const Output = @import("output.zig");
-const Root = @import("root.zig").Root;
+const Root = @import("root.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const XdgToplevel = @import("xdg_toplevel.zig");
 
