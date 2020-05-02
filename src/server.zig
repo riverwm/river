@@ -10,7 +10,7 @@ const InputManager = @import("input_manager.zig");
 const Log = @import("log.zig").Log;
 const Output = @import("output.zig");
 const Root = @import("root.zig").Root;
-const View = @import("view.zig").View;
+const View = @import("view.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 
 allocator: *std.mem.Allocator,

@@ -2,7 +2,7 @@ const c = @import("../c.zig");
 
 const Arg = @import("../command.zig").Arg;
 const Seat = @import("../seat.zig");
-const View = @import("../view.zig").View;
+const View = @import("../view.zig");
 const ViewStack = @import("../view_stack.zig").ViewStack;
 
 /// Focus either the next or the previous visible view, depending on the enum

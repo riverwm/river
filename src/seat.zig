@@ -8,7 +8,7 @@ const InputManager = @import("input_manager.zig");
 const Keyboard = @import("keyboard.zig").Keyboard;
 const LayerSurface = @import("layer_surface.zig");
 const Output = @import("output.zig");
-const View = @import("view.zig").View;
+const View = @import("view.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 
 const FocusTarget = union(enum) {

@@ -1,4 +1,4 @@
-const View = @import("view.zig").View;
+const View = @import("view.zig");
 
 /// A specialized doubly-linked stack that allows for filtered iteration
 /// over the nodes. T must be View or *View.

@@ -2,7 +2,7 @@ const c = @import("../c.zig");
 
 const Arg = @import("../command.zig").Arg;
 const Seat = @import("../seat.zig");
-const View = @import("../view.zig").View;
+const View = @import("../view.zig");
 const ViewStack = @import("../view_stack.zig").ViewStack;
 
 /// Bump the focused view to the top of the stack. If the view on the top of

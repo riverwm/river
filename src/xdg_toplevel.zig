@@ -5,7 +5,7 @@ const std = @import("std");
 
 const Box = @import("box.zig");
 const Log = @import("log.zig").Log;
-const View = @import("view.zig").View;
+const View = @import("view.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const XdgPopup = @import("xdg_popup.zig");
 

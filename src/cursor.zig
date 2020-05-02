@@ -5,7 +5,7 @@ const LayerSurface = @import("layer_surface.zig");
 const Log = @import("log.zig").Log;
 const Output = @import("output.zig");
 const Seat = @import("seat.zig");
-const View = @import("view.zig").View;
+const View = @import("view.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 
 const CursorMode = enum {
