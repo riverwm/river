@@ -3,7 +3,7 @@ const Self = @This();
 const c = @import("c.zig");
 const std = @import("std");
 
-const Cursor = @import("cursor.zig").Cursor;
+const Cursor = @import("cursor.zig");
 const InputManager = @import("input_manager.zig");
 const Keyboard = @import("keyboard.zig").Keyboard;
 const LayerSurface = @import("layer_surface.zig");
