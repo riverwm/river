@@ -11,11 +11,18 @@ pub fn build(b: *std.build.Builder) !void {
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
     const mode = b.standardReleaseOptions();
 
+    const xwayland = b.option(
+        bool,
+        "xwayland",
+        "Set to true to enable xwayland support",
+    ) orelse false;
+
     const scan_protocols = ScanProtocolsStep.create(b);
 
     const exe = b.addExecutable("river", "src/main.zig");
     exe.setTarget(target);
     exe.setBuildMode(mode);
+    exe.addBuildOption(bool, "xwayland", xwayland);
     addDeps(exe, &scan_protocols.step);
     exe.install();
 
@@ -28,6 +35,7 @@ pub fn build(b: *std.build.Builder) !void {
     const test_exe = b.addTest("src/test_main.zig");
     test_exe.setTarget(target);
     test_exe.setBuildMode(mode);
+    test_exe.addBuildOption(bool, "xwayland", xwayland);
     addDeps(test_exe, &scan_protocols.step);
 
     const test_step = b.step("test", "Run the tests");
