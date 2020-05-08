@@ -26,8 +26,20 @@ const Server = @import("Server.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 
+const ViewRenderData = struct {
+    output: *const Output,
+    view: *View,
+    when: *c.timespec,
+};
+
+const LayerSurfaceRenderData = struct {
+    output: *const Output,
+    layer_surface: *LayerSurface,
+    when: *c.timespec,
+};
+
 pub fn renderOutput(output: *Output) void {
-    const renderer = output.root.server.wlr_renderer;
+    const wlr_renderer = output.getRenderer();
 
     var now: c.timespec = undefined;
     _ = c.clock_gettime(c.CLOCK_MONOTONIC, &now);
@@ -41,10 +53,10 @@ pub fn renderOutput(output: *Output) void {
     var height: c_int = undefined;
     c.wlr_output_effective_resolution(output.wlr_output, &width, &height);
     // Begin the renderer (calls glViewport and some other GL sanity checks)
-    c.wlr_renderer_begin(renderer, width, height);
+    c.wlr_renderer_begin(wlr_renderer, width, height);
 
     const color = [_]f32{ 0.0, 0.16862745, 0.21176471, 1.0 };
-    c.wlr_renderer_clear(renderer, &color);
+    c.wlr_renderer_clear(wlr_renderer, &color);
 
     renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND], &now);
     renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM], &now);
@@ -95,17 +107,10 @@ pub fn renderOutput(output: *Output) void {
 
     // Conclude rendering and swap the buffers, showing the final frame
     // on-screen.
-    c.wlr_renderer_end(renderer);
+    c.wlr_renderer_end(wlr_renderer);
     // TODO: handle failure
     _ = c.wlr_output_commit(output.wlr_output);
 }
-
-const LayerSurfaceRenderData = struct {
-    output: *c.wlr_output,
-    renderer: *c.wlr_renderer,
-    layer_surface: *LayerSurface,
-    when: *c.timespec,
-};
 
 /// Render all surfaces on the passed layer
 fn renderLayer(output: Output, layer: std.TailQueue(LayerSurface), now: *c.timespec) void {
@@ -116,8 +121,7 @@ fn renderLayer(output: Output, layer: std.TailQueue(LayerSurface), now: *c.times
             continue;
         }
         var rdata = LayerSurfaceRenderData{
-            .output = output.wlr_output,
-            .renderer = output.root.server.wlr_renderer,
+            .output = &output,
             .layer_surface = layer_surface,
             .when = now,
         };
@@ -138,6 +142,7 @@ fn renderLayerSurface(_surface: ?*c.wlr_surface, sx: c_int, sy: c_int, data: ?*c
     const rdata = @ptrCast(*LayerSurfaceRenderData, @alignCast(@alignOf(LayerSurfaceRenderData), data));
     const layer_surface = rdata.layer_surface;
     const output = rdata.output;
+    const wlr_output = output.wlr_output;
 
     // We first obtain a wlr_texture, which is a GPU resource. wlroots
     // automatically handles negotiating these with the client. The underlying
@@ -157,7 +162,7 @@ fn renderLayerSurface(_surface: ?*c.wlr_surface, sx: c_int, sy: c_int, data: ?*c
     };
 
     // Scale the box to the output's current scaling factor
-    scaleBox(&box, output.scale);
+    scaleBox(&box, wlr_output.scale);
 
     // wlr_matrix_project_box is a helper which takes a box with a desired
     // x, y coordinates, width and height, and an output geometry, then
@@ -165,23 +170,16 @@ fn renderLayerSurface(_surface: ?*c.wlr_surface, sx: c_int, sy: c_int, data: ?*c
     // transforms to produce a model-view-projection matrix.
     var matrix: [9]f32 = undefined;
     const transform = c.wlr_output_transform_invert(surface.current.transform);
-    c.wlr_matrix_project_box(&matrix, &box, transform, 0.0, &output.transform_matrix);
+    c.wlr_matrix_project_box(&matrix, &box, transform, 0.0, &wlr_output.transform_matrix);
 
     // This takes our matrix, the texture, and an alpha, and performs the actual
     // rendering on the GPU.
-    _ = c.wlr_render_texture_with_matrix(rdata.renderer, texture, &matrix, 1.0);
+    _ = c.wlr_render_texture_with_matrix(output.getRenderer(), texture, &matrix, 1.0);
 
     // This lets the client know that we've displayed that frame and it can
     // prepare another one now if it likes.
     c.wlr_surface_send_frame_done(surface, rdata.when);
 }
-
-const ViewRenderData = struct {
-    output: *c.wlr_output,
-    renderer: *c.wlr_renderer,
-    view: *View,
-    when: *c.timespec,
-};
 
 fn renderView(output: Output, view: *View, now: *c.timespec) void {
     // If we have a stashed buffer, we are in the middle of a transaction
@@ -209,7 +207,7 @@ fn renderView(output: Output, view: *View, now: *c.timespec) void {
         // This takes our matrix, the texture, and an alpha, and performs the actual
         // rendering on the GPU.
         _ = c.wlr_render_texture_with_matrix(
-            output.root.server.wlr_renderer,
+            output.getRenderer(),
             buffer.texture,
             &matrix,
             1.0,
@@ -218,9 +216,8 @@ fn renderView(output: Output, view: *View, now: *c.timespec) void {
         // Since there is no stashed buffer, we are not in the middle of
         // a transaction and may simply render each toplevel surface.
         var rdata = ViewRenderData{
-            .output = output.wlr_output,
+            .output = &output,
             .view = view,
-            .renderer = output.root.server.wlr_renderer,
             .when = now,
         };
 
@@ -235,6 +232,7 @@ fn renderSurface(_surface: ?*c.wlr_surface, sx: c_int, sy: c_int, data: ?*c_void
     const rdata = @ptrCast(*ViewRenderData, @alignCast(@alignOf(ViewRenderData), data));
     const view = rdata.view;
     const output = rdata.output;
+    const wlr_output = output.wlr_output;
 
     // We first obtain a wlr_texture, which is a GPU resource. wlroots
     // automatically handles negotiating these with the client. The underlying
@@ -254,7 +252,7 @@ fn renderSurface(_surface: ?*c.wlr_surface, sx: c_int, sy: c_int, data: ?*c_void
     };
 
     // Scale the box to the output's current scaling factor
-    scaleBox(&box, output.scale);
+    scaleBox(&box, wlr_output.scale);
 
     // wlr_matrix_project_box is a helper which takes a box with a desired
     // x, y coordinates, width and height, and an output geometry, then
@@ -262,11 +260,11 @@ fn renderSurface(_surface: ?*c.wlr_surface, sx: c_int, sy: c_int, data: ?*c_void
     // transforms to produce a model-view-projection matrix.
     var matrix: [9]f32 = undefined;
     const transform = c.wlr_output_transform_invert(surface.current.transform);
-    c.wlr_matrix_project_box(&matrix, &box, transform, 0.0, &output.transform_matrix);
+    c.wlr_matrix_project_box(&matrix, &box, transform, 0.0, &wlr_output.transform_matrix);
 
     // This takes our matrix, the texture, and an alpha, and performs the actual
     // rendering on the GPU.
-    _ = c.wlr_render_texture_with_matrix(rdata.renderer, texture, &matrix, 1.0);
+    _ = c.wlr_render_texture_with_matrix(output.getRenderer(), texture, &matrix, 1.0);
 
     // This lets the client know that we've displayed that frame and it can
     // prepare another one now if it likes.
@@ -312,7 +310,7 @@ fn renderRect(output: Output, box: Box, color: [4]f32) void {
     var wlr_box = box.toWlrBox();
     scaleBox(&wlr_box, output.wlr_output.scale);
     c.wlr_render_rect(
-        output.root.server.wlr_renderer,
+        output.getRenderer(),
         &wlr_box,
         &color,
         &output.wlr_output.transform_matrix,

@@ -143,6 +143,10 @@ pub fn deinit(self: *Self) void {
     }
 }
 
+pub fn getRenderer(self: Self) *c.wlr_renderer {
+    return c.river_wlr_backend_get_renderer(self.wlr_output.backend);
+}
+
 /// Add a new view to the output. arrangeViews() will be called by the view
 /// when it is mapped. The surface argument must be a c.wlr_xdg_surface or
 /// c.wlr_xwayland_surface (if xwayland is enabled)

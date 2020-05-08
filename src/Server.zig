@@ -35,23 +35,24 @@ allocator: *std.mem.Allocator,
 
 wl_display: *c.wl_display,
 wl_event_loop: *c.wl_event_loop,
+
 wlr_backend: *c.wlr_backend,
 noop_backend: *c.wlr_backend,
-wlr_renderer: *c.wlr_renderer,
+listen_new_output: c.wl_listener,
 
 wlr_xdg_shell: *c.wlr_xdg_shell,
+listen_new_xdg_surface: c.wl_listener,
+
 wlr_layer_shell: *c.wlr_layer_shell_v1,
+listen_new_layer_surface: c.wl_listener,
+
 wlr_xwayland: if (build_options.xwayland) *c.wlr_xwayland else void,
+listen_new_xwayland_surface: if (build_options.xwayland) c.wl_listener else void,
 
 decoration_manager: DecorationManager,
 input_manager: InputManager,
 root: Root,
 config: Config,
-
-listen_new_output: c.wl_listener,
-listen_new_xdg_surface: c.wl_listener,
-listen_new_layer_surface: c.wl_listener,
-listen_new_xwayland_surface: c.wl_listener,
 
 pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
     self.allocator = allocator;
@@ -81,24 +82,35 @@ pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
     // If we don't provide a renderer, autocreate makes a GLES2 renderer for us.
     // The renderer is responsible for defining the various pixel formats it
     // supports for shared memory, this configures that for clients.
-    self.wlr_renderer = c.river_wlr_backend_get_renderer(self.wlr_backend) orelse
+    const wlr_renderer = c.river_wlr_backend_get_renderer(self.wlr_backend) orelse
         return error.CantGetWlrRenderer;
     // TODO: Handle failure after https://github.com/swaywm/wlroots/pull/2080
-    c.wlr_renderer_init_wl_display(self.wlr_renderer, self.wl_display); // orelse
+    c.wlr_renderer_init_wl_display(wlr_renderer, self.wl_display); // orelse
     //    return error.CantInitWlDisplay;
+    self.listen_new_output.notify = handleNewOutput;
+    c.wl_signal_add(&self.wlr_backend.events.new_output, &self.listen_new_output);
 
-    const wlr_compositor = c.wlr_compositor_create(self.wl_display, self.wlr_renderer) orelse
+    const wlr_compositor = c.wlr_compositor_create(self.wl_display, wlr_renderer) orelse
         return error.CantCreateWlrCompositor;
 
+    // Set up xdg shell
     self.wlr_xdg_shell = c.wlr_xdg_shell_create(self.wl_display) orelse
         return error.CantCreateWlrXdgShell;
+    self.listen_new_xdg_surface.notify = handleNewXdgSurface;
+    c.wl_signal_add(&self.wlr_xdg_shell.events.new_surface, &self.listen_new_xdg_surface);
 
+    // Set up layer shell
     self.wlr_layer_shell = c.wlr_layer_shell_v1_create(self.wl_display) orelse
         return error.CantCreateWlrLayerShell;
+    self.listen_new_layer_surface.notify = handleNewLayerSurface;
+    c.wl_signal_add(&self.wlr_layer_shell.events.new_surface, &self.listen_new_layer_surface);
 
+    // Set up xwayland if built with suport
     if (build_options.xwayland) {
         self.wlr_xwayland = c.wlr_xwayland_create(self.wl_display, wlr_compositor, false) orelse
             return error.CantCreateWlrXwayland;
+        self.listen_new_xwayland_surface.notify = handleNewXwaylandSurface;
+        c.wl_signal_add(&self.wlr_xwayland.events.new_surface, &self.listen_new_xwayland_surface);
     }
 
     try self.decoration_manager.init(self);
@@ -114,21 +126,6 @@ pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
         return error.CantCreateWlrScreencopyManager;
     _ = c.wlr_xdg_output_manager_v1_create(self.wl_display, self.root.wlr_output_layout) orelse
         return error.CantCreateWlrOutputManager;
-
-    // Register listeners for events on our globals
-    self.listen_new_output.notify = handleNewOutput;
-    c.wl_signal_add(&self.wlr_backend.events.new_output, &self.listen_new_output);
-
-    self.listen_new_xdg_surface.notify = handleNewXdgSurface;
-    c.wl_signal_add(&self.wlr_xdg_shell.events.new_surface, &self.listen_new_xdg_surface);
-
-    self.listen_new_layer_surface.notify = handleNewLayerSurface;
-    c.wl_signal_add(&self.wlr_layer_shell.events.new_surface, &self.listen_new_layer_surface);
-
-    if (build_options.xwayland) {
-        self.listen_new_xwayland_surface.notify = handleNewXwaylandSurface;
-        c.wl_signal_add(&self.wlr_xwayland.events.new_surface, &self.listen_new_xwayland_surface);
-    }
 }
 
 /// Free allocated memory and clean up
