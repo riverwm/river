@@ -88,6 +88,18 @@ pub fn forEachSurface(
     c.wlr_xdg_surface_for_each_surface(self.wlr_xdg_surface, iterator, user_data);
 }
 
+/// Return the surface at output coordinates ox, oy and set sx, sy to the
+/// corresponding surface-relative coordinates, if there is a surface.
+pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*c.wlr_surface {
+    return c.wlr_xdg_surface_surface_at(
+        self.wlr_xdg_surface,
+        ox - @intToFloat(f64, self.view.current_box.x),
+        oy - @intToFloat(f64, self.view.current_box.y),
+        sx,
+        sy,
+    );
+}
+
 /// Called when the xdg surface is destroyed
 fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_destroy", listener.?);
@@ -151,16 +163,7 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         view.setFloating(true);
     }
 
-    // Focus the newly mapped view. Note: if a seat is focusing a different output
-    // it will continue to do so.
-    var it = root.server.input_manager.seats.first;
-    while (it) |seat_node| : (it = seat_node.next) {
-        seat_node.data.focus(view);
-    }
-
-    c.wlr_surface_send_enter(self.wlr_xdg_surface.surface, view.output.wlr_output);
-
-    root.arrange();
+    view.map();
 }
 
 /// Called when the surface is unmapped and will no longer be displayed.
@@ -168,16 +171,7 @@ fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_unmap", listener.?);
     const root = self.view.output.root;
 
-    self.view.wlr_surface = null;
-
-    // Inform all seats that the view has been unmapped so they can handle focus
-    var it = root.server.input_manager.seats.first;
-    while (it) |node| : (it = node.next) {
-        const seat = &node.data;
-        seat.handleViewUnmap(self.view);
-    }
-
-    root.arrange();
+    self.view.unmap();
 
     // Remove listeners that are only active while mapped
     c.wl_list_remove(&self.listen_commit.link);

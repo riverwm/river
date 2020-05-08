@@ -144,10 +144,11 @@ pub fn deinit(self: *Self) void {
 }
 
 /// Add a new view to the output. arrangeViews() will be called by the view
-/// when it is mapped.
-pub fn addView(self: *Self, wlr_xdg_surface: *c.wlr_xdg_surface) void {
-    const node = self.root.server.allocator.create(ViewStack(View).Node) catch unreachable;
-    node.view.init_xdg_toplevel(self, self.current_focused_tags, wlr_xdg_surface);
+/// when it is mapped. The surface argument must be a c.wlr_xdg_surface or
+/// c.wlr_xwayland_surface (if xwayland is enabled)
+pub fn addView(self: *Self, surface: var) !void {
+    const node = try self.root.server.allocator.create(ViewStack(View).Node);
+    node.view.init(self, self.current_focused_tags, surface);
     self.views.push(node);
 }
 

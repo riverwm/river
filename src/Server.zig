@@ -17,6 +17,7 @@
 
 const Self = @This();
 
+const build_options = @import("build_options");
 const std = @import("std");
 
 const c = @import("c.zig");
@@ -40,6 +41,7 @@ wlr_renderer: *c.wlr_renderer,
 
 wlr_xdg_shell: *c.wlr_xdg_shell,
 wlr_layer_shell: *c.wlr_layer_shell_v1,
+wlr_xwayland: if (build_options.xwayland) *c.wlr_xwayland else void,
 
 decoration_manager: DecorationManager,
 input_manager: InputManager,
@@ -49,6 +51,7 @@ config: Config,
 listen_new_output: c.wl_listener,
 listen_new_xdg_surface: c.wl_listener,
 listen_new_layer_surface: c.wl_listener,
+listen_new_xwayland_surface: c.wl_listener,
 
 pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
     self.allocator = allocator;
@@ -84,11 +87,19 @@ pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
     c.wlr_renderer_init_wl_display(self.wlr_renderer, self.wl_display); // orelse
     //    return error.CantInitWlDisplay;
 
+    const wlr_compositor = c.wlr_compositor_create(self.wl_display, self.wlr_renderer) orelse
+        return error.CantCreateWlrCompositor;
+
     self.wlr_xdg_shell = c.wlr_xdg_shell_create(self.wl_display) orelse
         return error.CantCreateWlrXdgShell;
 
     self.wlr_layer_shell = c.wlr_layer_shell_v1_create(self.wl_display) orelse
         return error.CantCreateWlrLayerShell;
+
+    if (build_options.xwayland) {
+        self.wlr_xwayland = c.wlr_xwayland_create(self.wl_display, wlr_compositor, false) orelse
+            return error.CantCreateWlrXwayland;
+    }
 
     try self.decoration_manager.init(self);
     try self.root.init(self);
@@ -97,8 +108,6 @@ pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
     try self.config.init(self.allocator);
 
     // These all free themselves when the wl_display is destroyed
-    _ = c.wlr_compositor_create(self.wl_display, self.wlr_renderer) orelse
-        return error.CantCreateWlrCompositor;
     _ = c.wlr_data_device_manager_create(self.wl_display) orelse
         return error.CantCreateWlrDataDeviceManager;
     _ = c.wlr_screencopy_manager_v1_create(self.wl_display) orelse
@@ -115,11 +124,19 @@ pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
 
     self.listen_new_layer_surface.notify = handleNewLayerSurface;
     c.wl_signal_add(&self.wlr_layer_shell.events.new_surface, &self.listen_new_layer_surface);
+
+    if (build_options.xwayland) {
+        self.listen_new_xwayland_surface.notify = handleNewXwaylandSurface;
+        c.wl_signal_add(&self.wlr_xwayland.events.new_surface, &self.listen_new_xwayland_surface);
+    }
 }
 
 /// Free allocated memory and clean up
 pub fn deinit(self: *Self) void {
     // Note: order is important here
+    if (build_options.xwayland) {
+        c.wlr_xwayland_destroy(self.wlr_xwayland);
+    }
     c.wl_display_destroy_clients(self.wl_display);
     c.wl_display_destroy(self.wl_display);
     self.input_manager.deinit();
@@ -141,6 +158,12 @@ pub fn start(self: Self) !void {
     // Set the WAYLAND_DISPLAY environment variable to our socket
     if (c.setenv("WAYLAND_DISPLAY", socket, 1) == -1) {
         return error.CantSetEnv;
+    }
+
+    if (build_options.xwayland) {
+        if (c.setenv("DISPLAY", &self.wlr_xwayland.display_name, 1) == -1) {
+            return error.CantSetEnv;
+        }
     }
 }
 
@@ -169,7 +192,7 @@ fn handleNewXdgSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) v
 
     Log.Debug.log("New xdg_toplevel", .{});
 
-    self.input_manager.default_seat.focused_output.addView(wlr_xdg_surface);
+    self.input_manager.default_seat.focused_output.addView(wlr_xdg_surface) catch unreachable;
 }
 
 /// This event is raised when the layer_shell recieves a new surface from a client.
@@ -218,4 +241,18 @@ fn handleNewLayerSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C)
 
     const output = @ptrCast(*Output, @alignCast(@alignOf(*Output), wlr_layer_surface.output.*.data));
     output.addLayerSurface(wlr_layer_surface) catch unreachable;
+}
+
+fn handleNewXwaylandSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    const self = @fieldParentPtr(Self, "listen_new_xwayland_surface", listener.?);
+    const wlr_xwayland_surface = @ptrCast(
+        *c.wlr_xwayland_surface,
+        @alignCast(@alignOf(*c.wlr_xwayland_surface), data),
+    );
+
+    Log.Debug.log(
+        "New xwayland surface: title '{}', class '{}'",
+        .{ wlr_xwayland_surface.title, wlr_xwayland_surface.class },
+    );
+    self.input_manager.default_seat.focused_output.addView(wlr_xwayland_surface) catch unreachable;
 }

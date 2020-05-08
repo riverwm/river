@@ -386,16 +386,7 @@ fn viewSurfaceAt(output: Output, ox: f64, oy: f64, sx: *f64, sy: *f64, floating:
         if (view.floating != floating) {
             continue;
         }
-        const surface = switch (view.impl) {
-            .xdg_toplevel => |xdg_toplevel| c.wlr_xdg_surface_surface_at(
-                xdg_toplevel.wlr_xdg_surface,
-                ox - @intToFloat(f64, view.current_box.x),
-                oy - @intToFloat(f64, view.current_box.y),
-                sx,
-                sy,
-            ),
-        };
-        if (surface) |found| {
+        if (view.surfaceAt(ox, oy, sx, sy)) |found| {
             return found;
         }
     }

@@ -34,7 +34,8 @@ installed:
 - [wlroots](https://github.com/swaywm/wlroots) 0.10.1
 - xkbcommon
 
-Then simply use `zig build` to build and `zig build run` to run.
+Then simply use `zig build` to build and `zig build run` to run. To
+enable experimental Xwayland support use `-Dxwayland=true`.
 
 River can either be run nested in an X11/wayland session or directly
 from a tty using KMS/DRM.
