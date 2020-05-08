@@ -66,6 +66,12 @@ pub fn configure(self: Self, pending_box: Box) void {
         @intCast(u16, pending_box.width),
         @intCast(u16, pending_box.height),
     );
+    // Xwayland surfaces don't use serials, so we will just assume they have
+    // configured the next time they commit. Set pending serial to a dummy
+    // value to indicate that a transaction has started. Note: we can't just
+    // call notifyConfigured() here as the transaction has not yet been fully
+    // initiated.
+    self.view.pending_serial = 0x66666666;
 }
 
 /// Inform the xwayland surface that it has gained focus
@@ -145,7 +151,13 @@ fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 }
 
 /// Called when the surface is comitted
+/// TODO: check for unexpected change in size and react as needed
 fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_commit", listener.?);
-    // TODO: check for unexpected change in size and react as needed
+    const view = self.view;
+    // See comment in XwaylandView.configure()
+    if (view.pending_serial != null) {
+        view.output.root.notifyConfigured();
+        view.pending_serial = null;
+    }
 }
