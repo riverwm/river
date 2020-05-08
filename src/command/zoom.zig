@@ -29,8 +29,9 @@ pub fn zoom(seat: *Seat, arg: Arg) void {
         const output = seat.focused_output;
         const focused_node = @fieldParentPtr(ViewStack(View).Node, "view", current_focus);
 
-        const zoom_node = if (focused_node == output.views.first)
-            if (focused_node.next) |second| second else null
+        var it = ViewStack(View).iterator(output.views.first, output.current_focused_tags);
+        const zoom_node = if (focused_node == it.next())
+            if (it.next()) |second| second else null
         else
             focused_node;
 
