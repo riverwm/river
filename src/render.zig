@@ -121,9 +121,6 @@ fn renderLayer(output: Output, layer: std.TailQueue(LayerSurface), now: *c.times
     var it = layer.first;
     while (it) |node| : (it = node.next) {
         const layer_surface = &node.data;
-        if (!layer_surface.mapped) {
-            continue;
-        }
         var rdata = SurfaceRenderData{
             .output = &output,
             .output_x = layer_surface.box.x,

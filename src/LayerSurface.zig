@@ -28,9 +28,6 @@ const Output = @import("Output.zig");
 output: *Output,
 wlr_layer_surface: *c.wlr_layer_surface_v1,
 
-/// True if the layer surface is currently mapped
-mapped: bool,
-
 box: Box,
 layer: c.zwlr_layer_shell_v1_layer,
 
@@ -47,20 +44,22 @@ pub fn init(
     self: *Self,
     output: *Output,
     wlr_layer_surface: *c.wlr_layer_surface_v1,
-    layer: c.zwlr_layer_shell_v1_layer,
 ) void {
     self.output = output;
     self.wlr_layer_surface = wlr_layer_surface;
     wlr_layer_surface.data = self;
 
-    self.layer = layer;
+    self.layer = wlr_layer_surface.client_pending.layer;
 
-    // Temporarily set mapped to true and apply the pending state to allow
+    // Temporarily add to the output's list and apply the pending state to allow
     // for inital arrangement which sends the first configure.
-    self.mapped = true;
+    const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
+    const list = &output.layers[@intCast(usize, @enumToInt(self.layer))];
     const stashed_state = wlr_layer_surface.current;
     wlr_layer_surface.current = wlr_layer_surface.client_pending;
+    list.append(node);
     output.arrangeLayers();
+    list.remove(node);
     wlr_layer_surface.current = stashed_state;
 
     // Set up listeners that are active for the entire lifetime of the layer surface
@@ -86,10 +85,7 @@ fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     c.wl_list_remove(&self.listen_unmap.link);
 
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-    output.layers[@intCast(usize, @enumToInt(self.layer))].remove(node);
     output.root.server.allocator.destroy(node);
-
-    self.output.arrangeLayers();
 }
 
 fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -97,8 +93,6 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const wlr_layer_surface = self.wlr_layer_surface;
 
     Log.Debug.log("Layer surface '{}' mapped.", .{wlr_layer_surface.namespace});
-
-    self.mapped = true;
 
     // Add listeners that are only active while mapped
     self.listen_commit.notify = handleCommit;
@@ -111,6 +105,9 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         wlr_layer_surface.surface,
         wlr_layer_surface.output,
     );
+
+    const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
+    self.output.layers[@intCast(usize, @enumToInt(self.layer))].append(node);
 }
 
 fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -119,9 +116,10 @@ fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     Log.Debug.log("Layer surface '{}' unmapped.", .{self.wlr_layer_surface.namespace});
 
     // This is a bit ugly: we need to use the wlr bool here since surfaces
-    // may be closed during the inital configure since we set our mapped
-    // bool to true so that we can avoid making the arrange function even
-    // more complex.
+    // may be closed during the inital configure which we preform
+    // while unmapped. wlroots currently calls unmap unconditionally on close
+    // even if the surface is not mapped. I sent a patch which was merged, but
+    // we need to wait for a release to use it.
     //
     // TODO(wlroots): Remove this check on updating
     // https://github.com/swaywm/wlroots/commit/11e94c406bb75c9a8990ce99489798411deb110c
@@ -131,7 +129,9 @@ fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         c.wl_list_remove(&self.listen_new_popup.link);
     }
 
-    self.mapped = false;
+    // Remove from the output's list of layer surfaces
+    const self_node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
+    self.output.layers[@intCast(usize, @enumToInt(self.layer))].remove(self_node);
 
     // If the unmapped surface is focused, clear focus
     var it = self.output.root.server.input_manager.seats.first;

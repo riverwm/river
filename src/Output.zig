@@ -147,15 +147,6 @@ pub fn getRenderer(self: Self) *c.wlr_renderer {
     return c.river_wlr_backend_get_renderer(self.wlr_output.backend);
 }
 
-/// Add a newly created layer surface to the output.
-pub fn addLayerSurface(self: *Self, wlr_layer_surface: *c.wlr_layer_surface_v1) !void {
-    const layer = wlr_layer_surface.client_pending.layer;
-    const node = try self.layers[@intCast(usize, @enumToInt(layer))].allocateNode(self.root.server.allocator);
-    node.data.init(self, wlr_layer_surface, layer);
-    self.layers[@intCast(usize, @enumToInt(layer))].append(node);
-    self.arrangeLayers();
-}
-
 /// Arrange all views on the output for the current layout. Modifies only
 /// pending state, the changes are not appplied until a transaction is started
 /// and completed.
@@ -312,10 +303,7 @@ pub fn arrangeLayers(self: *Self) void {
         var it = self.layers[layer].last;
         while (it) |node| : (it = node.prev) {
             const layer_surface = &node.data;
-            // Only mapped surfaces may gain focus
-            if (layer_surface.mapped and
-                layer_surface.wlr_layer_surface.current.keyboard_interactive)
-            {
+            if (layer_surface.wlr_layer_surface.current.keyboard_interactive) {
                 break :outer layer_surface;
             }
         }
@@ -360,7 +348,7 @@ fn arrangeLayer(
 
         // If the value of exclusive_zone is greater than zero, then it exclusivly
         // occupies some area of the screen.
-        if (!layer_surface.mapped or exclusive != (current_state.exclusive_zone > 0)) {
+        if (exclusive != (current_state.exclusive_zone > 0)) {
             continue;
         }
 

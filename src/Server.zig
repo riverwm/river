@@ -25,6 +25,7 @@ const c = @import("c.zig");
 const Config = @import("Config.zig");
 const DecorationManager = @import("DecorationManager.zig");
 const InputManager = @import("InputManager.zig");
+const LayerSurface = @import("LayerSurface.zig");
 const Log = @import("log.zig").Log;
 const Output = @import("Output.zig");
 const Root = @import("Root.zig");
@@ -240,8 +241,10 @@ fn handleNewLayerSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C)
         }
     }
 
+    // The layer surface will add itself to the proper list of the output on map
     const output = @ptrCast(*Output, @alignCast(@alignOf(*Output), wlr_layer_surface.output.*.data));
-    output.addLayerSurface(wlr_layer_surface) catch unreachable;
+    const node = self.allocator.create(std.TailQueue(LayerSurface).Node) catch unreachable;
+    node.data.init(output, wlr_layer_surface);
 }
 
 fn handleNewXwaylandSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
