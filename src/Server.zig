@@ -30,6 +30,7 @@ const Output = @import("Output.zig");
 const Root = @import("Root.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
+const XwaylandUnmanaged = @import("XwaylandUnmanaged.zig");
 
 allocator: *std.mem.Allocator,
 
@@ -105,7 +106,7 @@ pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
     self.listen_new_layer_surface.notify = handleNewLayerSurface;
     c.wl_signal_add(&self.wlr_layer_shell.events.new_surface, &self.listen_new_layer_surface);
 
-    // Set up xwayland if built with suport
+    // Set up xwayland if built with support
     if (build_options.xwayland) {
         self.wlr_xwayland = c.wlr_xwayland_create(self.wl_display, wlr_compositor, false) orelse
             return error.CantCreateWlrXwayland;
@@ -246,6 +247,15 @@ fn handleNewXwaylandSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(
         *c.wlr_xwayland_surface,
         @alignCast(@alignOf(*c.wlr_xwayland_surface), data),
     );
+
+    if (wlr_xwayland_surface.override_redirect) {
+        Log.Debug.log("New unmanaged xwayland surface", .{});
+        // The unmanged surface will add itself to the list of unmanaged views
+        // in Root when it is mapped.
+        const node = self.allocator.create(std.TailQueue(XwaylandUnmanaged).Node) catch unreachable;
+        node.data.init(&self.root, wlr_xwayland_surface);
+        return;
+    }
 
     Log.Debug.log(
         "New xwayland surface: title '{}', class '{}'",

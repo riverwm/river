@@ -15,6 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+const build_options = @import("build_options");
 const std = @import("std");
 
 const c = @import("c.zig");
@@ -26,15 +27,13 @@ const Server = @import("Server.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 
-const ViewRenderData = struct {
+const SurfaceRenderData = struct {
     output: *const Output,
-    view: *View,
-    when: *c.timespec,
-};
 
-const LayerSurfaceRenderData = struct {
-    output: *const Output,
-    layer_surface: *LayerSurface,
+    /// In output layout coordinates relative to the output
+    output_x: i32,
+    output_y: i32,
+
     when: *c.timespec,
 };
 
@@ -94,6 +93,11 @@ pub fn renderOutput(output: *Output) void {
         renderBorders(output.*, view, &now);
     }
 
+    // Render xwayland unmanged views
+    if (build_options.xwayland) {
+        renderXwaylandUnmanaged(output.*, &now);
+    }
+
     renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_TOP], &now);
     renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY], &now);
 
@@ -120,65 +124,18 @@ fn renderLayer(output: Output, layer: std.TailQueue(LayerSurface), now: *c.times
         if (!layer_surface.mapped) {
             continue;
         }
-        var rdata = LayerSurfaceRenderData{
+        var rdata = SurfaceRenderData{
             .output = &output,
-            .layer_surface = layer_surface,
+            .output_x = layer_surface.box.x,
+            .output_y = layer_surface.box.y,
             .when = now,
         };
         c.wlr_layer_surface_v1_for_each_surface(
             layer_surface.wlr_layer_surface,
-            renderLayerSurface,
+            renderSurface,
             &rdata,
         );
     }
-}
-
-/// This function is called for every layer surface and popup that needs to be rendered.
-/// TODO: refactor this to reduce code duplication
-fn renderLayerSurface(_surface: ?*c.wlr_surface, sx: c_int, sy: c_int, data: ?*c_void) callconv(.C) void {
-    // wlroots says this will never be null
-    const surface = _surface.?;
-    // This function is called for every surface that needs to be rendered.
-    const rdata = @ptrCast(*LayerSurfaceRenderData, @alignCast(@alignOf(LayerSurfaceRenderData), data));
-    const layer_surface = rdata.layer_surface;
-    const output = rdata.output;
-    const wlr_output = output.wlr_output;
-
-    // We first obtain a wlr_texture, which is a GPU resource. wlroots
-    // automatically handles negotiating these with the client. The underlying
-    // resource could be an opaque handle passed from the client, or the client
-    // could have sent a pixel buffer which we copied to the GPU, or a few other
-    // means. You don't have to worry about this, wlroots takes care of it.
-    const texture = c.wlr_surface_get_texture(surface);
-    if (texture == null) {
-        return;
-    }
-
-    var box = c.wlr_box{
-        .x = layer_surface.box.x + sx,
-        .y = layer_surface.box.y + sy,
-        .width = surface.current.width,
-        .height = surface.current.height,
-    };
-
-    // Scale the box to the output's current scaling factor
-    scaleBox(&box, wlr_output.scale);
-
-    // wlr_matrix_project_box is a helper which takes a box with a desired
-    // x, y coordinates, width and height, and an output geometry, then
-    // prepares an orthographic projection and multiplies the necessary
-    // transforms to produce a model-view-projection matrix.
-    var matrix: [9]f32 = undefined;
-    const transform = c.wlr_output_transform_invert(surface.current.transform);
-    c.wlr_matrix_project_box(&matrix, &box, transform, 0.0, &wlr_output.transform_matrix);
-
-    // This takes our matrix, the texture, and an alpha, and performs the actual
-    // rendering on the GPU.
-    _ = c.wlr_render_texture_with_matrix(output.getRenderer(), texture, &matrix, 1.0);
-
-    // This lets the client know that we've displayed that frame and it can
-    // prepare another one now if it likes.
-    c.wlr_surface_send_frame_done(surface, rdata.when);
 }
 
 fn renderView(output: Output, view: *View, now: *c.timespec) void {
@@ -215,9 +172,10 @@ fn renderView(output: Output, view: *View, now: *c.timespec) void {
     } else {
         // Since there is no stashed buffer, we are not in the middle of
         // a transaction and may simply render each toplevel surface.
-        var rdata = ViewRenderData{
+        var rdata = SurfaceRenderData{
             .output = &output,
-            .view = view,
+            .output_x = view.current_box.x,
+            .output_y = view.current_box.y,
             .when = now,
         };
 
@@ -225,12 +183,38 @@ fn renderView(output: Output, view: *View, now: *c.timespec) void {
     }
 }
 
-/// This function is called for every toplevel and popup surface that needs to be rendered.
-fn renderSurface(_surface: ?*c.wlr_surface, sx: c_int, sy: c_int, data: ?*c_void) callconv(.C) void {
+/// Render all xwayland unmanaged windows that appear on the output
+fn renderXwaylandUnmanaged(output: Output, now: *c.timespec) void {
+    const root = output.root;
+    const output_box: *c.wlr_box = c.wlr_output_layout_get_box(
+        root.wlr_output_layout,
+        output.wlr_output,
+    );
+
+    var it = output.root.xwayland_unmanaged_views.first;
+    while (it) |node| : (it = node.next) {
+        const wlr_xwayland_surface = node.data.wlr_xwayland_surface;
+
+        var rdata = SurfaceRenderData{
+            .output = &output,
+            .output_x = wlr_xwayland_surface.x - output_box.x,
+            .output_y = wlr_xwayland_surface.y - output_box.y,
+            .when = now,
+        };
+        c.wlr_surface_for_each_surface(wlr_xwayland_surface.surface, renderSurface, &rdata);
+    }
+}
+
+/// This function is passed to wlroots to render each surface during iteration
+fn renderSurface(
+    _surface: ?*c.wlr_surface,
+    surface_x: c_int,
+    surface_y: c_int,
+    data: ?*c_void,
+) callconv(.C) void {
     // wlroots says this will never be null
     const surface = _surface.?;
-    const rdata = @ptrCast(*ViewRenderData, @alignCast(@alignOf(ViewRenderData), data));
-    const view = rdata.view;
+    const rdata = @ptrCast(*SurfaceRenderData, @alignCast(@alignOf(SurfaceRenderData), data));
     const output = rdata.output;
     const wlr_output = output.wlr_output;
 
@@ -245,8 +229,8 @@ fn renderSurface(_surface: ?*c.wlr_surface, sx: c_int, sy: c_int, data: ?*c_void
     }
 
     var box = c.wlr_box{
-        .x = view.current_box.x + sx,
-        .y = view.current_box.y + sy,
+        .x = rdata.output_x + surface_x,
+        .y = rdata.output_y + surface_y,
         .width = surface.current.width,
         .height = surface.current.height,
     };

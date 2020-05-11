@@ -18,6 +18,7 @@
 const Self = @This();
 
 const std = @import("std");
+const build_options = @import("build_options");
 
 const c = @import("c.zig");
 
@@ -26,6 +27,7 @@ const Output = @import("Output.zig");
 const Server = @import("Server.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
+const XwaylandUnmanaged = @import("XwaylandUnmanaged.zig");
 
 /// Responsible for all windowing operations
 server: *Server,
@@ -36,6 +38,10 @@ outputs: std.TailQueue(Output),
 /// This output is used internally when no real outputs are available.
 /// It is not advertised to clients.
 noop_output: Output,
+
+/// This list stores all unmanaged Xwayland windows. This needs to be in root
+/// since X is like the wild west and who knows where these things will go.
+xwayland_unmanaged_views: if (build_options.xwayland) std.TailQueue(XwaylandUnmanaged) else void,
 
 /// Number of pending configures sent in the current transaction.
 /// A value of 0 means there is no current transaction.
@@ -58,6 +64,10 @@ pub fn init(self: *Self, server: *Server) !void {
     const noop_wlr_output = c.river_wlr_noop_add_output(server.noop_backend) orelse
         return error.CantAddNoopOutput;
     try self.noop_output.init(self, noop_wlr_output);
+
+    if (build_options.xwayland) {
+        self.xwayland_unmanaged_views = std.TailQueue(XwaylandUnmanaged).init();
+    }
 
     self.pending_configures = 0;
 
