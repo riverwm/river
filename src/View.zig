@@ -105,7 +105,7 @@ pub fn init(
     } else unreachable;
 }
 
-pub fn deinit(self: *Self) void {
+pub fn deinit(self: Self) void {
     if (self.stashed_buffer) |buffer| {
         c.wlr_buffer_unref(buffer);
     }
@@ -227,6 +227,10 @@ pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*c.wlr_surfa
 pub fn map(self: *Self) void {
     const root = self.output.root;
 
+    // Add the view to the stack of its output
+    const node = @fieldParentPtr(ViewStack(Self).Node, "view", self);
+    self.output.views.push(node);
+
     // Focus the newly mapped view. Note: if a seat is focusing a different output
     // it will continue to do so.
     var it = root.server.input_manager.seats.first;
@@ -252,5 +256,16 @@ pub fn unmap(self: *Self) void {
         seat.handleViewUnmap(self);
     }
 
+    // Remove the view from its output's stack
+    const node = @fieldParentPtr(ViewStack(Self).Node, "view", self);
+    self.output.views.remove(node);
+
     root.arrange();
+}
+
+/// Destory the view and free the ViewStack node holding it.
+pub fn destroy(self: *const Self) void {
+    self.deinit();
+    const node = @fieldParentPtr(ViewStack(Self).Node, "view", self);
+    self.output.root.server.allocator.destroy(node);
 }

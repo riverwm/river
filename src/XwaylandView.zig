@@ -108,17 +108,13 @@ pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*c.wlr_surfa
 /// Called when the xwayland surface is destroyed
 fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_destroy", listener.?);
-    const output = self.view.output;
 
     // Remove listeners that are active for the entire lifetime of the view
     c.wl_list_remove(&self.listen_destroy.link);
     c.wl_list_remove(&self.listen_map.link);
     c.wl_list_remove(&self.listen_unmap.link);
 
-    // Remove the view from the stack
-    const node = @fieldParentPtr(ViewStack(View).Node, "view", self.view);
-    output.views.remove(node);
-    output.root.server.allocator.destroy(node);
+    self.view.destroy();
 }
 
 /// Called when the xwayland surface is mapped, or ready to display on-screen.

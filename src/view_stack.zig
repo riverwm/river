@@ -92,7 +92,7 @@ pub fn ViewStack(comptime T: type) type {
             /// This function is horribly ugly, but it's well tested below.
             pub fn next(self: *Iterator) ?*Node {
                 while (self.it) |node| : (self.it = if (self.reverse) node.prev else node.next) {
-                    if (node.view.wlr_surface != null and if (self.pending)
+                    if (if (self.pending)
                         if (node.view.pending_tags) |pending_tags|
                             self.tags & pending_tags != 0
                         else
@@ -109,7 +109,6 @@ pub fn ViewStack(comptime T: type) type {
 
         /// Returns an iterator starting at the passed node and filtered by
         /// checking the passed tags against the current tags of each view.
-        /// Unmapped views are skipped.
         pub fn iterator(start: ?*Node, tags: u32) Iterator {
             return Iterator{
                 .it = start,
@@ -121,7 +120,6 @@ pub fn ViewStack(comptime T: type) type {
 
         /// Returns a reverse iterator starting at the passed node and filtered by
         /// checking the passed tags against the current tags of each view.
-        /// Unmapped views are skipped.
         pub fn reverseIterator(start: ?*Node, tags: u32) Iterator {
             return Iterator{
                 .it = start,
@@ -133,8 +131,7 @@ pub fn ViewStack(comptime T: type) type {
 
         /// Returns an iterator starting at the passed node and filtered by
         /// checking the passed tags against the pending tags of each view.
-        /// If a view has no pending tags, the current tags are used. Unmapped
-        /// views are skipped.
+        /// If a view has no pending tags, the current tags are used.
         pub fn pendingIterator(start: ?*Node, tags: u32) Iterator {
             return Iterator{
                 .it = start,
@@ -285,51 +282,36 @@ test "iteration (View)" {
     var views: ViewStack(View) = undefined;
     views.init();
 
-    // Pretty nice hack for testing: we don't actually need a wlr_surface here,
-    // but we need the iteration function to thing that the view has a non-null
-    // wlr_surface. So, just cast an integer to a pointer to get an arbitrary
-    // but non-null value. Use 8 so the alignment checks out.
-
     const one_a_pb = try allocator.create(ViewStack(View).Node);
     defer allocator.destroy(one_a_pb);
-    one_a_pb.view.wlr_surface = @intToPtr(*c.wlr_surface, 8);
     one_a_pb.view.current_tags = 1 << 0;
     one_a_pb.view.pending_tags = 1 << 1;
 
     const two_a = try allocator.create(ViewStack(View).Node);
     defer allocator.destroy(two_a);
-    two_a.view.wlr_surface = @intToPtr(*c.wlr_surface, 8);
     two_a.view.current_tags = 1 << 0;
     two_a.view.pending_tags = null;
 
     const three_b_pa = try allocator.create(ViewStack(View).Node);
     defer allocator.destroy(three_b_pa);
-    three_b_pa.view.wlr_surface = @intToPtr(*c.wlr_surface, 8);
     three_b_pa.view.current_tags = 1 << 1;
     three_b_pa.view.pending_tags = 1 << 0;
 
     const four_b = try allocator.create(ViewStack(View).Node);
     defer allocator.destroy(four_b);
-    four_b.view.wlr_surface = @intToPtr(*c.wlr_surface, 8);
     four_b.view.current_tags = 1 << 1;
     four_b.view.pending_tags = null;
 
     const five_b = try allocator.create(ViewStack(View).Node);
     defer allocator.destroy(five_b);
-    five_b.view.wlr_surface = @intToPtr(*c.wlr_surface, 8);
     five_b.view.current_tags = 1 << 1;
     five_b.view.pending_tags = null;
 
-    const unmapped_1 = try allocator.create(ViewStack(View).Node);
-    defer allocator.destroy(unmapped_1);
-    unmapped_1.view.wlr_surface = null;
-
     views.push(three_b_pa); // {3}
     views.push(one_a_pb); // {1, 3}
-    views.push(unmapped_1); // {u, 1, 3}
-    views.push(four_b); // {4, u, 1, 3}
-    views.push(five_b); // {5, 4, u, 1, 3}
-    views.push(two_a); // {2, 5, 4, u, 1, 3}
+    views.push(four_b); // {4, 1, 3}
+    views.push(five_b); // {5, 4, 1, 3}
+    views.push(two_a); // {2, 5, 4, 1, 3}
 
     // Iteration over all tags
     {

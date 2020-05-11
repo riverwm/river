@@ -147,15 +147,6 @@ pub fn getRenderer(self: Self) *c.wlr_renderer {
     return c.river_wlr_backend_get_renderer(self.wlr_output.backend);
 }
 
-/// Add a new view to the output. arrangeViews() will be called by the view
-/// when it is mapped. The surface argument must be a c.wlr_xdg_surface or
-/// c.wlr_xwayland_surface (if xwayland is enabled)
-pub fn addView(self: *Self, surface: var) !void {
-    const node = try self.root.server.allocator.create(ViewStack(View).Node);
-    node.view.init(self, self.current_focused_tags, surface);
-    self.views.push(node);
-}
-
 /// Add a newly created layer surface to the output.
 pub fn addLayerSurface(self: *Self, wlr_layer_surface: *c.wlr_layer_surface_v1) !void {
     const layer = wlr_layer_surface.client_pending.layer;

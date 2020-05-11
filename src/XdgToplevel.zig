@@ -110,10 +110,7 @@ fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     c.wl_list_remove(&self.listen_map.link);
     c.wl_list_remove(&self.listen_unmap.link);
 
-    // Remove the view from the stack
-    const node = @fieldParentPtr(ViewStack(View).Node, "view", self.view);
-    output.views.remove(node);
-    output.root.server.allocator.destroy(node);
+    self.view.destroy();
 }
 
 /// Called when the xdg surface is mapped, or ready to display on-screen.

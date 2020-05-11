@@ -190,7 +190,10 @@ fn handleNewXdgSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) v
 
     Log.Debug.log("New xdg_toplevel", .{});
 
-    self.input_manager.default_seat.focused_output.addView(wlr_xdg_surface) catch unreachable;
+    // The View will add itself to the output's view stack on map
+    const output = self.input_manager.default_seat.focused_output;
+    const node = self.allocator.create(ViewStack(View).Node) catch unreachable;
+    node.view.init(output, output.current_focused_tags, wlr_xdg_surface);
 }
 
 /// This event is raised when the layer_shell recieves a new surface from a client.
@@ -261,5 +264,9 @@ fn handleNewXwaylandSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(
         "New xwayland surface: title '{}', class '{}'",
         .{ wlr_xwayland_surface.title, wlr_xwayland_surface.class },
     );
-    self.input_manager.default_seat.focused_output.addView(wlr_xwayland_surface) catch unreachable;
+
+    // The View will add itself to the output's view stack on map
+    const output = self.input_manager.default_seat.focused_output;
+    const node = self.allocator.create(ViewStack(View).Node) catch unreachable;
+    node.view.init(output, output.current_focused_tags, wlr_xwayland_surface);
 }
