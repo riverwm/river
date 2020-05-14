@@ -17,6 +17,7 @@
 
 const Self = @This();
 
+const build_options = @import("build_options");
 const std = @import("std");
 
 const c = @import("c.zig");
@@ -57,8 +58,6 @@ pub fn init(self: *Self, seat: *Seat) !void {
     self.seat = seat;
 
     // Creates a wlroots utility for tracking the cursor image shown on screen.
-    //
-    // TODO: free this, it allocates!
     self.wlr_cursor = c.wlr_cursor_create() orelse
         return error.CantCreateWlrCursor;
 
@@ -66,13 +65,31 @@ pub fn init(self: *Self, seat: *Seat) !void {
     // Xcursor themes to source cursor images from and makes sure that cursor
     // images are available at all scale factors on the screen (necessary for
     // HiDPI support). We add a cursor theme at scale factor 1 to begin with.
-    //
-    // TODO: free this, it allocates!
     self.wlr_xcursor_manager = c.wlr_xcursor_manager_create(null, 24) orelse
         return error.CantCreateWlrXCursorManager;
-
     c.wlr_cursor_attach_output_layout(self.wlr_cursor, seat.input_manager.server.root.wlr_output_layout);
-    _ = c.wlr_xcursor_manager_load(self.wlr_xcursor_manager, 1);
+    if (c.wlr_xcursor_manager_load(self.wlr_xcursor_manager, 1) == 0) {
+        if (build_options.xwayland) {
+            if (c.wlr_xcursor_manager_get_xcursor(
+                self.wlr_xcursor_manager,
+                "left_ptr",
+                1,
+            )) |wlr_xcursor| {
+                const image: *c.wlr_xcursor_image = wlr_xcursor.*.images[0];
+                c.wlr_xwayland_set_cursor(
+                    seat.input_manager.server.wlr_xwayland,
+                    image.buffer,
+                    image.width * 4,
+                    image.width,
+                    image.height,
+                    @intCast(i32, image.hotspot_x),
+                    @intCast(i32, image.hotspot_y),
+                );
+            }
+        }
+    } else {
+        Log.Error.log("Failed to load an xcursor theme", .{});
+    }
 
     self.mode = CursorMode.Passthrough;
     self.grabbed_view = null;
@@ -235,6 +252,7 @@ fn handleRequestSetCursor(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C
         // provided surface as the cursor image. It will set the hardware cursor
         // on the output that it's currently on and continue to do so as the
         // cursor moves between outputs.
+        Log.Debug.log("Focused client set cursor", .{});
         c.wlr_cursor_set_surface(
             self.wlr_cursor,
             event.surface,
