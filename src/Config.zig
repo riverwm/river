@@ -22,6 +22,8 @@ const std = @import("std");
 const c = @import("c.zig");
 const command = @import("command.zig");
 
+const Log = @import("log.zig").Log;
+const Mode = @import("Mode.zig");
 const Server = @import("Server.zig");
 
 /// Width of borders in pixels
@@ -33,15 +35,8 @@ view_padding: u32,
 /// Amount of padding arount the outer edge of the layout in pixels
 outer_padding: u32,
 
-const Keybind = struct {
-    keysym: c.xkb_keysym_t,
-    modifiers: u32,
-    command: command.Command,
-    arg: command.Arg,
-};
-
-/// All user-defined keybindings
-keybinds: std.ArrayList(Keybind),
+/// All user-defined keybinding modes
+modes: std.ArrayList(Mode),
 
 /// List of app_ids which will be started floating
 float_filter: std.ArrayList([*:0]const u8),
@@ -51,13 +46,16 @@ pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
     self.view_padding = 8;
     self.outer_padding = 8;
 
-    self.keybinds = std.ArrayList(Keybind).init(allocator);
+    self.modes = std.ArrayList(Mode).init(allocator);
+    try self.modes.append(try Mode.init("normal", allocator));
+
     self.float_filter = std.ArrayList([*:0]const u8).init(allocator);
 
+    const normal = &self.modes.items[0];
     const mod = c.WLR_MODIFIER_LOGO;
 
     // Mod+Shift+Return to start an instance of alacritty
-    try self.keybinds.append(Keybind{
+    try normal.keybinds.append(.{
         .keysym = c.XKB_KEY_Return,
         .modifiers = mod | c.WLR_MODIFIER_SHIFT,
         .command = command.spawn,
@@ -65,7 +63,7 @@ pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
     });
 
     // Mod+Q to close the focused view
-    try self.keybinds.append(Keybind{
+    try normal.keybinds.append(.{
         .keysym = c.XKB_KEY_q,
         .modifiers = mod,
         .command = command.close_view,
@@ -73,7 +71,7 @@ pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
     });
 
     // Mod+E to exit river
-    try self.keybinds.append(Keybind{
+    try normal.keybinds.append(.{
         .keysym = c.XKB_KEY_e,
         .modifiers = mod,
         .command = command.exitCompositor,
@@ -81,15 +79,13 @@ pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
     });
 
     // Mod+J and Mod+K to focus the next/previous view in the layout stack
-    try self.keybinds.append(
-        Keybind{
-            .keysym = c.XKB_KEY_j,
-            .modifiers = mod,
-            .command = command.focusView,
-            .arg = .{ .direction = .Next },
-        },
-    );
-    try self.keybinds.append(Keybind{
+    try normal.keybinds.append(.{
+        .keysym = c.XKB_KEY_j,
+        .modifiers = mod,
+        .command = command.focusView,
+        .arg = .{ .direction = .Next },
+    });
+    try normal.keybinds.append(.{
         .keysym = c.XKB_KEY_k,
         .modifiers = mod,
         .command = command.focusView,
@@ -98,7 +94,7 @@ pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
 
     // Mod+Return to bump the focused view to the top of the layout stack,
     // making it the new master
-    try self.keybinds.append(Keybind{
+    try normal.keybinds.append(.{
         .keysym = c.XKB_KEY_Return,
         .modifiers = mod,
         .command = command.zoom,
@@ -106,13 +102,13 @@ pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
     });
 
     // Mod+H and Mod+L to increase/decrease the width of the master column
-    try self.keybinds.append(Keybind{
+    try normal.keybinds.append(.{
         .keysym = c.XKB_KEY_h,
         .modifiers = mod,
         .command = command.modifyMasterFactor,
         .arg = .{ .float = 0.05 },
     });
-    try self.keybinds.append(Keybind{
+    try normal.keybinds.append(.{
         .keysym = c.XKB_KEY_l,
         .modifiers = mod,
         .command = command.modifyMasterFactor,
@@ -121,13 +117,13 @@ pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
 
     // Mod+Shift+H and Mod+Shift+L to increment/decrement the number of
     // master views in the layout
-    try self.keybinds.append(Keybind{
+    try normal.keybinds.append(.{
         .keysym = c.XKB_KEY_h,
         .modifiers = mod | c.WLR_MODIFIER_SHIFT,
         .command = command.modifyMasterCount,
         .arg = .{ .int = 1 },
     });
-    try self.keybinds.append(Keybind{
+    try normal.keybinds.append(.{
         .keysym = c.XKB_KEY_l,
         .modifiers = mod | c.WLR_MODIFIER_SHIFT,
         .command = command.modifyMasterCount,
@@ -137,28 +133,28 @@ pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
     comptime var i = 0;
     inline while (i < 9) : (i += 1) {
         // Mod+[1-9] to focus tag [1-9]
-        try self.keybinds.append(Keybind{
+        try normal.keybinds.append(.{
             .keysym = c.XKB_KEY_1 + i,
             .modifiers = mod,
             .command = command.focusTags,
             .arg = .{ .uint = 1 << i },
         });
         // Mod+Shift+[1-9] to tag focused view with tag [1-9]
-        try self.keybinds.append(Keybind{
+        try normal.keybinds.append(.{
             .keysym = c.XKB_KEY_1 + i,
             .modifiers = mod | c.WLR_MODIFIER_SHIFT,
             .command = command.setViewTags,
             .arg = .{ .uint = 1 << i },
         });
         // Mod+Ctrl+[1-9] to toggle focus of tag [1-9]
-        try self.keybinds.append(Keybind{
+        try normal.keybinds.append(.{
             .keysym = c.XKB_KEY_1 + i,
             .modifiers = mod | c.WLR_MODIFIER_CTRL,
             .command = command.toggleTags,
             .arg = .{ .uint = 1 << i },
         });
         // Mod+Shift+Ctrl+[1-9] to toggle tag [1-9] of focused view
-        try self.keybinds.append(Keybind{
+        try normal.keybinds.append(.{
             .keysym = c.XKB_KEY_1 + i,
             .modifiers = mod | c.WLR_MODIFIER_CTRL | c.WLR_MODIFIER_SHIFT,
             .command = command.toggleViewTags,
@@ -167,7 +163,7 @@ pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
     }
 
     // Mod+0 to focus all tags
-    try self.keybinds.append(Keybind{
+    try normal.keybinds.append(.{
         .keysym = c.XKB_KEY_0,
         .modifiers = mod,
         .command = command.focusTags,
@@ -175,7 +171,7 @@ pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
     });
 
     // Mod+Shift+0 to tag focused view with all tags
-    try self.keybinds.append(Keybind{
+    try normal.keybinds.append(.{
         .keysym = c.XKB_KEY_0,
         .modifiers = mod | c.WLR_MODIFIER_SHIFT,
         .command = command.setViewTags,
@@ -183,13 +179,13 @@ pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
     });
 
     // Mod+Period and Mod+Comma to focus the next/previous output
-    try self.keybinds.append(Keybind{
+    try normal.keybinds.append(.{
         .keysym = c.XKB_KEY_period,
         .modifiers = mod,
         .command = command.focusOutput,
         .arg = .{ .direction = .Next },
     });
-    try self.keybinds.append(Keybind{
+    try normal.keybinds.append(.{
         .keysym = c.XKB_KEY_comma,
         .modifiers = mod,
         .command = command.focusOutput,
@@ -198,13 +194,13 @@ pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
 
     // Mod+Shift+Period/Comma to send the focused view to the the
     // next/previous output
-    try self.keybinds.append(Keybind{
+    try normal.keybinds.append(.{
         .keysym = c.XKB_KEY_period,
         .modifiers = mod | c.WLR_MODIFIER_SHIFT,
         .command = command.sendToOutput,
         .arg = .{ .direction = .Next },
     });
-    try self.keybinds.append(Keybind{
+    try normal.keybinds.append(.{
         .keysym = c.XKB_KEY_comma,
         .modifiers = mod | c.WLR_MODIFIER_SHIFT,
         .command = command.sendToOutput,
@@ -212,12 +208,40 @@ pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
     });
 
     // Mod+Space to toggle float
-    try self.keybinds.append(Keybind{
+    try normal.keybinds.append(.{
         .keysym = c.XKB_KEY_space,
         .modifiers = mod,
         .command = command.toggleFloat,
         .arg = .{ .none = {} },
     });
 
+    // Mod+F11 to enter passthrough mode
+    try normal.keybinds.append(.{
+        .keysym = c.XKB_KEY_F11,
+        .modifiers = mod,
+        .command = command.mode,
+        .arg = .{ .str = "passthrough" },
+    });
+
+    try self.modes.append(try Mode.init("passthrough", allocator));
+
+    // Mod+F11 to return to normal mode
+    try self.modes.items[1].keybinds.append(.{
+        .keysym = c.XKB_KEY_F11,
+        .modifiers = mod,
+        .command = command.mode,
+        .arg = .{ .str = "normal" },
+    });
+
+    // Float views with app_id "float"
     try self.float_filter.append("float");
+}
+
+pub fn getMode(self: Self, name: []const u8) *Mode {
+    for (self.modes.items) |*mode|
+        if (std.mem.eql(u8, mode.name, name)) return mode;
+    Log.Error.log("Mode '{}' does not exist, entering normal mode", .{name});
+    for (self.modes.items) |*mode|
+        if (std.mem.eql(u8, mode.name, "normal")) return mode;
+    unreachable;
 }

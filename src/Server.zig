@@ -115,11 +115,11 @@ pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
         c.wl_signal_add(&self.wlr_xwayland.events.new_surface, &self.listen_new_xwayland_surface);
     }
 
+    try self.config.init(self.allocator);
     try self.decoration_manager.init(self);
     try self.root.init(self);
     // Must be called after root is initialized
     try self.input_manager.init(self);
-    try self.config.init(self.allocator);
 
     // These all free themselves when the wl_display is destroyed
     _ = c.wlr_data_device_manager_create(self.wl_display) orelse
