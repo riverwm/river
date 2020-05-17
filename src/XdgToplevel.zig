@@ -193,9 +193,9 @@ fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 fn handleNewPopup(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_new_popup", listener.?);
     const wlr_xdg_popup = @ptrCast(*c.wlr_xdg_popup, @alignCast(@alignOf(*c.wlr_xdg_popup), data));
-    const server = self.view.output.root.server;
+    const allocator = self.view.output.root.server.allocator;
 
     // This will free itself on destroy
-    var xdg_popup = server.allocator.create(XdgPopup) catch unreachable;
-    xdg_popup.init(self, wlr_xdg_popup);
+    var xdg_popup = allocator.create(XdgPopup) catch unreachable;
+    xdg_popup.init(self.view.output, &self.view.current_box, wlr_xdg_popup);
 }
