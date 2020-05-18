@@ -323,6 +323,40 @@ pub fn layoutLeftMaster(self: *Self, visible_count: u32, output_tags: u32) void 
     layoutMasterStack(self, visible_count, output_tags, MasterPosition.Left);
 }
 
+/// A layout in which every window uses the maximum available space.
+pub fn layoutFull(self: *Self, visible_count: u32, output_tags: u32) void {
+    const border_width = self.root.server.config.border_width;
+    const outer_padding = self.root.server.config.outer_padding;
+
+    const layout_width = @intCast(u32, self.usable_box.width)
+            - (outer_padding * 2) - (border_width * 2);
+    const layout_height = @intCast(u32, self.usable_box.height)
+            - (outer_padding * 2) - (border_width * 2);
+    const xy_offset = @intCast(i32, outer_padding + border_width);
+
+    var i: u32 = 0;
+    var it = ViewStack(View).pendingIterator(self.views.first, output_tags);
+    while (it.next()) |node| {
+        const view = &node.view;
+
+        if (view.floating) {
+            continue;
+        }
+
+        var new_box: Box = undefined;
+        new_box = .{
+            .x = xy_offset,
+            .y = xy_offset,
+            .width = layout_width,
+            .height = layout_height,
+        };
+
+        view.pending_box = new_box;
+
+        i += 1;
+    }
+}
+
 /// Arrange all views on the output for the current layout. Modifies only
 /// pending state, the changes are not appplied until a transaction is started
 /// and completed.
@@ -354,7 +388,8 @@ pub fn arrangeViews(self: *Self) void {
     //layoutTopMaster(self, visible_count, output_tags);
     //layoutRightMaster(self, visible_count, output_tags);
     //layoutBottomMaster(self, visible_count, output_tags);
-    layoutLeftMaster(self, visible_count, output_tags);
+    //layoutLeftMaster(self, visible_count, output_tags);
+    layoutFull(self, visible_count, output_tags);
 }
 
 /// Arrange all layer surfaces of this output and addjust the usable aread
