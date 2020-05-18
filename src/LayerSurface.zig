@@ -24,6 +24,7 @@ const c = @import("c.zig");
 const Box = @import("Box.zig");
 const Log = @import("log.zig").Log;
 const Output = @import("Output.zig");
+const XdgPopup = @import("XdgPopup.zig");
 
 output: *Output,
 wlr_layer_surface: *c.wlr_layer_surface_v1,
@@ -186,7 +187,10 @@ fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 
 fn handleNewPopup(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_new_popup", listener.?);
-    Log.Debug.log("new layer surface popup.", .{});
-    // TODO: handle popups
-    unreachable;
+    const wlr_xdg_popup = @ptrCast(*c.wlr_xdg_popup, @alignCast(@alignOf(*c.wlr_xdg_popup), data));
+    const allocator = self.output.root.server.allocator;
+
+    // This will free itself on destroy
+    var xdg_popup = allocator.create(XdgPopup) catch unreachable;
+    xdg_popup.init(self.output, &self.box, wlr_xdg_popup);
 }
