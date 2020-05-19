@@ -47,6 +47,8 @@ pub usingnamespace @cImport({
     // Contains a subset of functions from wlr/backend.h and wlr/render/wlr_renderer.h
     // that can be automatically imported
     @cInclude("include/bindings.h");
+
+    @cInclude("river-window-management-unstable-v1-protocol.h");
 });
 
 // These are needed because zig currently names translated anonymous unions

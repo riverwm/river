@@ -45,6 +45,7 @@ pub fn build(b: *std.build.Builder) !void {
 fn addDeps(exe: *std.build.LibExeObjStep, protocol_step: *std.build.Step) void {
     exe.step.dependOn(protocol_step);
     exe.addIncludeDir("protocol");
+    exe.addCSourceFile("protocol/river-window-management-unstable-v1-protocol.c", &[_][]const u8{"-std=c99"});
 
     exe.addCSourceFile("include/bindings.c", &[_][]const u8{"-std=c99"});
     exe.addIncludeDir(".");
@@ -83,6 +84,7 @@ const ScanProtocolsStep = struct {
         const protocol_dir_paths = [_][]const []const u8{
             &[_][]const u8{ protocol_dir, "stable/xdg-shell/xdg-shell.xml" },
             &[_][]const u8{ "protocol", "wlr-layer-shell-unstable-v1.xml" },
+            &[_][]const u8{ "protocol", "river-window-management-unstable-v1.xml" },
         };
 
         for (protocol_dir_paths) |dir_path| {
