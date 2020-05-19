@@ -27,7 +27,8 @@
         A complete list of commands will be found in the man page.
         TODO: write the man page.
       </description>
-      <arg name="command" type="string" summary="the command to run"/>
+      <arg name="command" type="array" summary="the command to run as a series
+        of null-terminated strings"/>
     </request>
 
     <enum name="error">

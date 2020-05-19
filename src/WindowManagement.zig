@@ -36,6 +36,7 @@ wl_global: *c.wl_global,
 listen_display_destroy: c.wl_listener,
 
 pub fn init(self: *Self, server: *Server) !void {
+    self.server = server;
     self.wl_global = c.wl_global_create(
         server.wl_display,
         &c.zriver_window_manager_v1_interface,
@@ -72,6 +73,22 @@ fn resourceDestroy(wl_resource: ?*c.wl_resource) callconv(.C) void {
     // TODO
 }
 
-fn runCommand(wl_client: ?*c.wl_client, wl_resource: ?*c.wl_resource, command: ?[*:0]const u8) callconv(.C) void {
-    Log.Debug.log("command: {}", .{command});
+fn runCommand(wl_client: ?*c.wl_client, wl_resource: ?*c.wl_resource, command: ?*c.wl_array) callconv(.C) void {
+    const self = @ptrCast(*Self, @alignCast(@alignOf(*Self), c.wl_resource_get_user_data(wl_resource)));
+    const allocator = self.server.allocator;
+
+    var args = std.ArrayList([]const u8).init(allocator);
+
+    var i: usize = 0;
+    const data = @ptrCast([*]const u8, command.?.data);
+    while (i < command.?.size) {
+        const slice = std.mem.spanZ(@ptrCast([*:0]const u8, &data[i]));
+        args.append(std.mem.dupe(allocator, u8, slice) catch unreachable) catch unreachable;
+
+        i += slice.len + 1;
+    }
+
+    for (args.items) |x| {
+        std.debug.warn("{}\n", .{x});
+    }
 }

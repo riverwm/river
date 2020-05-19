@@ -19,39 +19,53 @@ pub fn build(b: *std.build.Builder) !void {
 
     const scan_protocols = ScanProtocolsStep.create(b);
 
-    const river = b.addExecutable("river", "src/river.zig");
-    river.setTarget(target);
-    river.setBuildMode(mode);
-    river.addBuildOption(bool, "xwayland", xwayland);
-    addServerDeps(river, &scan_protocols.step);
-    river.install();
+    {
+        const river = b.addExecutable("river", "src/river.zig");
+        river.setTarget(target);
+        river.setBuildMode(mode);
+        river.addBuildOption(bool, "xwayland", xwayland);
 
-    const run_cmd = river.run();
-    run_cmd.step.dependOn(b.getInstallStep());
+        addProtocolDeps(river, &scan_protocols.step);
+        addServerDeps(river);
 
-    const run_step = b.step("run", "Run the compositor");
-    run_step.dependOn(&run_cmd.step);
+        river.install();
 
-    const riverctl = b.addExecutable("riverctl", "src/riverctl.zig");
-    riverctl.setTarget(target);
-    riverctl.setBuildMode(mode);
-    riverctl.install();
+        const run_cmd = river.run();
+        run_cmd.step.dependOn(b.getInstallStep());
 
-    const river_test = b.addTest("src/test_main.zig");
-    river_test.setTarget(target);
-    river_test.setBuildMode(mode);
-    river_test.addBuildOption(bool, "xwayland", xwayland);
-    addServerDeps(river_test, &scan_protocols.step);
+        const run_step = b.step("run", "Run the compositor");
+        run_step.dependOn(&run_cmd.step);
+    }
 
-    const test_step = b.step("test", "Run the tests");
-    test_step.dependOn(&river_test.step);
+    {
+        const riverctl = b.addExecutable("riverctl", "src/riverctl.zig");
+        riverctl.setTarget(target);
+        riverctl.setBuildMode(mode);
+
+        addProtocolDeps(riverctl, &scan_protocols.step);
+
+        riverctl.linkLibC();
+
+        riverctl.linkSystemLibrary("wayland-client");
+
+        riverctl.install();
+    }
+
+    {
+        const river_test = b.addTest("src/test_main.zig");
+        river_test.setTarget(target);
+        river_test.setBuildMode(mode);
+        river_test.addBuildOption(bool, "xwayland", xwayland);
+
+        addProtocolDeps(river_test, &scan_protocols.step);
+        addServerDeps(river_test);
+
+        const test_step = b.step("test", "Run the tests");
+        test_step.dependOn(&river_test.step);
+    }
 }
 
-fn addServerDeps(exe: *std.build.LibExeObjStep, protocol_step: *std.build.Step) void {
-    exe.step.dependOn(protocol_step);
-    exe.addIncludeDir("protocol");
-    exe.addCSourceFile("protocol/river-window-management-unstable-v1-protocol.c", &[_][]const u8{"-std=c99"});
-
+fn addServerDeps(exe: *std.build.LibExeObjStep) void {
     exe.addCSourceFile("include/bindings.c", &[_][]const u8{"-std=c99"});
     exe.addIncludeDir(".");
 
@@ -60,6 +74,12 @@ fn addServerDeps(exe: *std.build.LibExeObjStep, protocol_step: *std.build.Step) 
     exe.linkSystemLibrary("wayland-server");
     exe.linkSystemLibrary("wlroots");
     exe.linkSystemLibrary("xkbcommon");
+}
+
+fn addProtocolDeps(exe: *std.build.LibExeObjStep, protocol_step: *std.build.Step) void {
+    exe.step.dependOn(protocol_step);
+    exe.addIncludeDir("protocol");
+    exe.addCSourceFile("protocol/river-window-management-unstable-v1-protocol.c", &[_][]const u8{"-std=c99"});
 }
 
 const ScanProtocolsStep = struct {
@@ -116,6 +136,18 @@ const ScanProtocolsStep = struct {
             _ = try self.builder.exec(
                 &[_][]const u8{ "wayland-scanner", "private-code", xml_in_path, code_out_path },
             );
+
+            // We need the client header as well for river-window-management
+            if (std.mem.eql(u8, basename_no_ext, "river-window-management-unstable-v1")) {
+                const client_header_out_path = try std.mem.concat(
+                    self.builder.allocator,
+                    u8,
+                    &[_][]const u8{ "protocol/", basename_no_ext, "-client-protocol.h" },
+                );
+                _ = try self.builder.exec(
+                    &[_][]const u8{ "wayland-scanner", "client-header", xml_in_path, client_header_out_path },
+                );
+            }
         }
     }
 };

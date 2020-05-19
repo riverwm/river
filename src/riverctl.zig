@@ -18,9 +18,62 @@
 const std = @import("std");
 
 const c = @cImport({
-    @cInclude();
+    @cInclude("wayland-client.h");
+    @cInclude("river-window-management-unstable-v1-client-protocol.h");
 });
 
-pub fn main() void {
-    std.debug.warn("hello world\n", .{});
+const wl_registry_listener = c.wl_registry_listener{
+    .global = handleGlobal,
+    .global_remove = handleGlobalRemove,
+};
+
+var river_window_manager: ?*c.zriver_window_manager_v1 = null;
+
+pub fn main() !void {
+    const wl_display = c.wl_display_connect(null) orelse return error.CantConnectToDisplay;
+    const wl_registry = c.wl_display_get_registry(wl_display);
+
+    _ = c.wl_registry_add_listener(wl_registry, &wl_registry_listener, null);
+    if (c.wl_display_roundtrip(wl_display) == -1) return error.RoundtripFailed;
+
+    const wm = river_window_manager orelse return error.RiverWMNotAdvertised;
+
+    var command: c.wl_array = undefined;
+    c.wl_array_init(&command);
+    var it = std.process.args();
+    // Skip our name
+    _ = it.nextPosix();
+    while (it.nextPosix()) |arg| {
+        // Add one as we need to copy the null terminators as well
+        var ptr = @ptrCast([*]u8, c.wl_array_add(&command, arg.len + 1) orelse
+            return error.OutOfMemory);
+        for (arg) |ch, i| ptr[i] = ch;
+        ptr[arg.len] = 0;
+    }
+
+    c.zriver_window_manager_v1_run_command(wm, &command);
+    if (c.wl_display_roundtrip(wl_display) == -1) return error.RoundtripFailed;
 }
+
+fn handleGlobal(
+    data: ?*c_void,
+    wl_registry: ?*c.wl_registry,
+    name: u32,
+    interface: ?[*:0]const u8,
+    version: u32,
+) callconv(.C) void {
+    // We only care about the river_window_manager global
+    if (std.mem.eql(
+        u8,
+        std.mem.spanZ(interface.?),
+        std.mem.spanZ(@ptrCast([*:0]const u8, c.zriver_window_manager_v1_interface.name.?)),
+    )) {
+        river_window_manager = @ptrCast(
+            *c.zriver_window_manager_v1,
+            c.wl_registry_bind(wl_registry, name, &c.zriver_window_manager_v1_interface, 1),
+        );
+    }
+}
+
+/// Ignore the event
+fn handleGlobalRemove(data: ?*c_void, wl_registry: ?*c.wl_registry, name: u32) callconv(.C) void {}
