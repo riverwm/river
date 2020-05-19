@@ -16,9 +16,8 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 const c = @import("c.zig");
-const command = @import("command.zig");
+const Command = @import("Command.zig");
 
 keysym: c.xkb_keysym_t,
 modifiers: u32,
-command: command.Command,
-arg: command.Arg,
+command: Command,

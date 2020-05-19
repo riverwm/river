@@ -19,7 +19,7 @@ const std = @import("std");
 
 const c = @import("../c.zig");
 
-const Arg = @import("../command.zig").Arg;
+const Arg = @import("../Command.zig").Arg;
 const Output = @import("../Output.zig");
 const Seat = @import("../Seat.zig");
 

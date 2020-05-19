@@ -15,25 +15,18 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const std = @import("std");
-
 const c = @import("../c.zig");
 
 const Arg = @import("../Command.zig").Arg;
-const Log = @import("../log.zig").Log;
 const Seat = @import("../Seat.zig");
 
-/// Spawn a program.
-pub fn spawn(seat: *Seat, arg: Arg) void {
-    const cmd = arg.str;
-
-    const argv = [_][]const u8{ "/bin/sh", "-c", cmd };
-    const child = std.ChildProcess.init(&argv, std.heap.c_allocator) catch |err| {
-        Log.Error.log("Failed to execute {}: {}", .{ cmd, err });
-        return;
-    };
-    std.ChildProcess.spawn(child) catch |err| {
-        Log.Error.log("Failed to execute {}: {}", .{ cmd, err });
-        return;
-    };
+/// Set the tag of the focused view.
+pub fn tagView(seat: *Seat, arg: Arg) void {
+    const tags = @as(u32, 1) << @intCast(u5, arg.uint - 1);
+    if (seat.focused_view) |view| {
+        if (view.current_tags != tags) {
+            view.pending_tags = tags;
+            seat.input_manager.server.root.arrange();
+        }
+    }
 }

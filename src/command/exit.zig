@@ -17,16 +17,10 @@
 
 const c = @import("../c.zig");
 
-const Arg = @import("../command.zig").Arg;
+const Arg = @import("../Command.zig").Arg;
 const Seat = @import("../Seat.zig");
 
-/// Set the tags of the focused view.
-pub fn setViewTags(seat: *Seat, arg: Arg) void {
-    const tags = arg.uint;
-    if (seat.focused_view) |view| {
-        if (view.current_tags != tags) {
-            view.pending_tags = tags;
-            seat.input_manager.server.root.arrange();
-        }
-    }
+/// Exit the compositor, terminating the wayland session.
+pub fn exit(seat: *Seat, arg: Arg) void {
+    c.wl_display_terminate(seat.input_manager.server.wl_display);
 }

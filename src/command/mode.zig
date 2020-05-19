@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const Arg = @import("../command.zig").Arg;
+const Arg = @import("../Command.zig").Arg;
 const Seat = @import("../Seat.zig");
 
 /// Switch to the given mode

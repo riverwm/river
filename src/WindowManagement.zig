@@ -21,6 +21,7 @@ const std = @import("std");
 
 const c = @import("c.zig");
 
+const Command = @import("Command.zig");
 const Log = @import("log.zig").Log;
 const Server = @import("Server.zig");
 
@@ -73,15 +74,15 @@ fn resourceDestroy(wl_resource: ?*c.wl_resource) callconv(.C) void {
     // TODO
 }
 
-fn runCommand(wl_client: ?*c.wl_client, wl_resource: ?*c.wl_resource, command: ?*c.wl_array) callconv(.C) void {
+fn runCommand(wl_client: ?*c.wl_client, wl_resource: ?*c.wl_resource, wl_array: ?*c.wl_array) callconv(.C) void {
     const self = @ptrCast(*Self, @alignCast(@alignOf(*Self), c.wl_resource_get_user_data(wl_resource)));
     const allocator = self.server.allocator;
 
     var args = std.ArrayList([]const u8).init(allocator);
 
     var i: usize = 0;
-    const data = @ptrCast([*]const u8, command.?.data);
-    while (i < command.?.size) {
+    const data = @ptrCast([*]const u8, wl_array.?.data);
+    while (i < wl_array.?.size) {
         const slice = std.mem.spanZ(@ptrCast([*:0]const u8, &data[i]));
         args.append(std.mem.dupe(allocator, u8, slice) catch unreachable) catch unreachable;
 
@@ -91,4 +92,8 @@ fn runCommand(wl_client: ?*c.wl_client, wl_resource: ?*c.wl_resource, command: ?
     for (args.items) |x| {
         std.debug.warn("{}\n", .{x});
     }
+
+    // TODO: send the error event on failure instead of crashing
+    const command = Command.init(args.items, allocator) catch unreachable;
+    command.run(self.server.input_manager.default_seat);
 }

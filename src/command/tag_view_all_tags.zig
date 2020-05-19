@@ -17,16 +17,15 @@
 
 const c = @import("../c.zig");
 
-const Arg = @import("../command.zig").Arg;
+const Arg = @import("../Command.zig").Arg;
 const Seat = @import("../Seat.zig");
 
-/// Toggle focus of the passsed tags.
-pub fn toggleTags(seat: *Seat, arg: Arg) void {
-    const tags = arg.uint;
-    const output = seat.focused_output;
-    const new_focused_tags = output.current_focused_tags ^ tags;
-    if (new_focused_tags != 0) {
-        output.pending_focused_tags = new_focused_tags;
-        seat.input_manager.server.root.arrange();
+/// Tag the focused view with all tags.
+pub fn tagViewAllTags(seat: *Seat, arg: Arg) void {
+    if (seat.focused_view) |view| {
+        if (view.current_tags != 0xFFFFFFFF) {
+            view.pending_tags = 0xFFFFFFFF;
+            seat.input_manager.server.root.arrange();
+        }
     }
 }

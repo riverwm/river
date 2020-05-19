@@ -17,12 +17,14 @@
 
 const c = @import("../c.zig");
 
-const Arg = @import("../command.zig").Arg;
+const Arg = @import("../Command.zig").Arg;
 const Seat = @import("../Seat.zig");
 
-/// Switch focus to the passed tags.
-pub fn focusTags(seat: *Seat, arg: Arg) void {
-    const tags = arg.uint;
-    seat.focused_output.pending_focused_tags = tags;
-    seat.input_manager.server.root.arrange();
+/// Close the focused view, if any.
+pub fn close(seat: *Seat, arg: Arg) void {
+    if (seat.focused_view) |view| {
+        // Note: we don't call arrange() here as it will be called
+        // automatically when the view is unmapped.
+        view.close();
+    }
 }

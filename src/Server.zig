@@ -143,6 +143,7 @@ pub fn deinit(self: *Self) void {
     c.wl_display_destroy(self.wl_display);
     self.input_manager.deinit();
     self.root.deinit();
+    self.config.deinit(self.allocator);
 }
 
 /// Create the socket, set WAYLAND_DISPLAY, and start the backend

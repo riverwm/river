@@ -38,5 +38,6 @@ pub fn init(name: []const u8, allocator: *std.mem.Allocator) !Self {
 pub fn deinit(self: Self) void {
     const allocator = self.keybinds.allocator;
     allocator.free(self.name);
+    for (self.keybinds.items) |keybind| keybind.command.deinit(allocator);
     self.keybinds.deinit();
 }

@@ -17,7 +17,7 @@
 
 const c = @import("../c.zig");
 
-const Arg = @import("../command.zig").Arg;
+const Arg = @import("../Command.zig").Arg;
 const Seat = @import("../Seat.zig");
 const View = @import("../View.zig");
 const ViewStack = @import("../view_stack.zig").ViewStack;

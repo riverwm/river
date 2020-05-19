@@ -15,16 +15,20 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+const std = @import("std");
+
 const c = @import("../c.zig");
 
-const Arg = @import("../command.zig").Arg;
+const Arg = @import("../Command.zig").Arg;
 const Seat = @import("../Seat.zig");
 
-/// Close the focused view, if any.
-pub fn close_view(seat: *Seat, arg: Arg) void {
-    if (seat.focused_view) |view| {
-        // Note: we don't call arrange() here as it will be called
-        // automatically when the view is unmapped.
-        view.close();
-    }
+/// Modify the number of master views
+pub fn modMasterCount(seat: *Seat, arg: Arg) void {
+    const delta = arg.int;
+    const output = seat.focused_output;
+    output.master_count = @intCast(
+        u32,
+        std.math.max(0, @intCast(i32, output.master_count) + delta),
+    );
+    seat.input_manager.server.root.arrange();
 }

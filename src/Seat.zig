@@ -252,7 +252,7 @@ pub fn handleKeybinding(self: *Self, keysym: c.xkb_keysym_t, modifiers: u32) boo
     for (self.mode.keybinds.items) |keybind| {
         if (modifiers == keybind.modifiers and keysym == keybind.keysym) {
             // Execute the bound command
-            keybind.command(self, keybind.arg);
+            keybind.command.run(self);
             return true;
         }
     }

@@ -15,20 +15,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const std = @import("std");
-
-const c = @import("../c.zig");
-
-const Arg = @import("../command.zig").Arg;
+const Arg = @import("../Command.zig").Arg;
 const Seat = @import("../Seat.zig");
 
-/// Modify the number of master views
-pub fn modifyMasterCount(seat: *Seat, arg: Arg) void {
-    const delta = arg.int;
-    const output = seat.focused_output;
-    output.master_count = @intCast(
-        u32,
-        std.math.max(0, @intCast(i32, output.master_count) + delta),
-    );
+/// Switch focus to the passed tag.
+pub fn focusTag(seat: *Seat, arg: Arg) void {
+    const tags = @as(u32, 1) << @intCast(u5, arg.uint - 1);
+    seat.focused_output.pending_focused_tags = tags;
     seat.input_manager.server.root.arrange();
 }
