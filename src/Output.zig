@@ -502,14 +502,14 @@ fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     for (self.layers) |*layer, layer_idx| {
         while (layer.pop()) |node| {
             const layer_surface = &node.data;
-            c.wlr_layer_surface_v1_close(layer_surface.wlr_layer_surface);
             // We need to move the closing layer surface to the noop output
-            // since it is not immediately destoryed. This just a request
+            // since it may not be immediately destoryed. This just a request
             // to close which will trigger unmap and destroy events in
             // response, and the LayerSurface needs a valid output to
             // handle them.
             root.noop_output.layers[layer_idx].prepend(node);
             layer_surface.output = &root.noop_output;
+            c.wlr_layer_surface_v1_close(layer_surface.wlr_layer_surface);
         }
     }
 
