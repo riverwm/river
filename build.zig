@@ -19,30 +19,35 @@ pub fn build(b: *std.build.Builder) !void {
 
     const scan_protocols = ScanProtocolsStep.create(b);
 
-    const exe = b.addExecutable("river", "src/main.zig");
-    exe.setTarget(target);
-    exe.setBuildMode(mode);
-    exe.addBuildOption(bool, "xwayland", xwayland);
-    addDeps(exe, &scan_protocols.step);
-    exe.install();
+    const river = b.addExecutable("river", "src/river.zig");
+    river.setTarget(target);
+    river.setBuildMode(mode);
+    river.addBuildOption(bool, "xwayland", xwayland);
+    addServerDeps(river, &scan_protocols.step);
+    river.install();
 
-    const run_cmd = exe.run();
+    const run_cmd = river.run();
     run_cmd.step.dependOn(b.getInstallStep());
 
     const run_step = b.step("run", "Run the compositor");
     run_step.dependOn(&run_cmd.step);
 
-    const test_exe = b.addTest("src/test_main.zig");
-    test_exe.setTarget(target);
-    test_exe.setBuildMode(mode);
-    test_exe.addBuildOption(bool, "xwayland", xwayland);
-    addDeps(test_exe, &scan_protocols.step);
+    const riverctl = b.addExecutable("riverctl", "src/riverctl.zig");
+    riverctl.setTarget(target);
+    riverctl.setBuildMode(mode);
+    riverctl.install();
+
+    const river_test = b.addTest("src/test_main.zig");
+    river_test.setTarget(target);
+    river_test.setBuildMode(mode);
+    river_test.addBuildOption(bool, "xwayland", xwayland);
+    addServerDeps(river_test, &scan_protocols.step);
 
     const test_step = b.step("test", "Run the tests");
-    test_step.dependOn(&test_exe.step);
+    test_step.dependOn(&river_test.step);
 }
 
-fn addDeps(exe: *std.build.LibExeObjStep, protocol_step: *std.build.Step) void {
+fn addServerDeps(exe: *std.build.LibExeObjStep, protocol_step: *std.build.Step) void {
     exe.step.dependOn(protocol_step);
     exe.addIncludeDir("protocol");
     exe.addCSourceFile("protocol/river-window-management-unstable-v1-protocol.c", &[_][]const u8{"-std=c99"});
