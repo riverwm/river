@@ -369,10 +369,10 @@ pub fn layoutFull(self: *Self, visible_count: u32, output_tags: u32) void {
     const border_width = self.root.server.config.border_width;
     const outer_padding = self.root.server.config.outer_padding;
 
-    const layout_width = @intCast(u32, self.usable_box.width)
-            - (outer_padding * 2) - (border_width * 2);
-    const layout_height = @intCast(u32, self.usable_box.height)
-            - (outer_padding * 2) - (border_width * 2);
+    const layout_width = @intCast(u32, self.usable_box.width) -
+        (outer_padding * 2) - (border_width * 2);
+    const layout_height = @intCast(u32, self.usable_box.height) -
+        (outer_padding * 2) - (border_width * 2);
     const xy_offset = @intCast(i32, outer_padding + border_width);
 
     var i: u32 = 0;

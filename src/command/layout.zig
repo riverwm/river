@@ -22,7 +22,6 @@ const Seat = @import("../Seat.zig");
 
 pub fn layout(seat: *Seat, arg: Arg) void {
     const layout_name = arg.str;
-    const config = seat.input_manager.server.config;
     seat.focused_output.layout = seat.focused_output.getLayoutByName(layout_name);
     seat.focused_output.arrangeViews();
     seat.input_manager.server.root.startTransaction();
