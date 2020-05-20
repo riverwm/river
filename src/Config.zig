@@ -211,6 +211,35 @@ pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
         .command = try Command.init(&[_][]const u8{ "mode", "normal" }, allocator),
     });
 
+    // Change master orientation with Mod+{Up,Right,Down,Left}
+    try normal.keybinds.append(.{
+        .keysym = c.XKB_KEY_Up,
+        .modifiers = mod,
+        .command = try Command.init(&[_][]const u8{ "layout", "TopMaster" }, allocator),
+    });
+    try normal.keybinds.append(.{
+        .keysym = c.XKB_KEY_Right,
+        .modifiers = mod,
+        .command = try Command.init(&[_][]const u8{ "layout", "RightMaster" }, allocator),
+    });
+    try normal.keybinds.append(.{
+        .keysym = c.XKB_KEY_Down,
+        .modifiers = mod,
+        .command = try Command.init(&[_][]const u8{ "layout", "BottomMaster" }, allocator),
+    });
+    try normal.keybinds.append(.{
+        .keysym = c.XKB_KEY_Left,
+        .modifiers = mod,
+        .command = try Command.init(&[_][]const u8{ "layout", "LeftMaster" }, allocator),
+    });
+
+    // Mod+f to change to Full layout
+    try normal.keybinds.append(.{
+        .keysym = c.XKB_KEY_f,
+        .modifiers = mod,
+        .command = try Command.init(&[_][]const u8{ "layout", "Full" }, allocator),
+    });
+
     // Float views with app_id "float"
     try self.float_filter.append("float");
 }
