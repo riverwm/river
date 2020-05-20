@@ -30,10 +30,14 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@master
 
-      - name: Build
+      - name: build
         run: |
           zig build
 
-      - name: Test
+      - name: test
         run: |
           zig build test
+
+      - name: zig fmt
+        run: |
+          zig fmt --check src/**/*.zig
