@@ -52,10 +52,22 @@ master_count: u32,
 /// Percentage of the total screen that the master section takes up.
 master_factor: f64,
 
+/// Current layout of the output.
+layout: Layouts,
+
 // All listeners for this output, in alphabetical order
 listen_destroy: c.wl_listener,
 listen_frame: c.wl_listener,
 listen_mode: c.wl_listener,
+
+// All possible layouts.
+pub const Layouts = enum {
+    TopMaster,
+    RightMaster,
+    BottomMaster,
+    LeftMaster,
+    Full,
+};
 
 pub fn init(self: *Self, root: *Root, wlr_output: *c.wlr_output) !void {
     // Some backends don't have modes. DRM+KMS does, and we need to set a mode
@@ -91,6 +103,9 @@ pub fn init(self: *Self, root: *Root, wlr_output: *c.wlr_output) !void {
     self.master_count = 1;
 
     self.master_factor = 0.6;
+
+    // LeftMaster is the default layout for all outputs
+    self.layout = Layout.LeftMaster;
 
     // Set up listeners
     self.listen_destroy.notify = handleDestroy;
@@ -393,13 +408,13 @@ pub fn arrangeViews(self: *Self) void {
         return;
     }
 
-    // TODO layout switching mechanism
-    //layoutFull(self, visible_count, output_tags);
-    //layoutTopMaster(self, visible_count, output_tags);
-    //layoutRightMaster(self, visible_count, output_tags);
-    //layoutBottomMaster(self, visible_count, output_tags);
-    //layoutLeftMaster(self, visible_count, output_tags);
-    layoutFull(self, visible_count, output_tags);
+    switch (self.layout) {
+        .Full => layoutFull(self, visible_count, output_tags),
+        .TopMaster => layoutTopMaster(self, visible_count, output_tags),
+        .RightMaster => layoutRightMaster(self, visible_count, output_tags),
+        .BottomMaster => layoutBottomMaster(self, visible_count, output_tags),
+        .LeftMaster => layoutLeftMaster(self, visible_count, output_tags),
+    }
 }
 
 /// Arrange all layer surfaces of this output and addjust the usable aread
