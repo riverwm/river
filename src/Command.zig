@@ -28,6 +28,7 @@ const command = struct {
     const focusAllTags = @import("command/focus_all_tags.zig").focusAllTags;
     const focusOutput = @import("command/focus_output.zig").focusOutput;
     const focusTag = @import("command/focus_tag.zig").focusTag;
+    const layout = @import("command/layout.zig").layout;
     const modMasterCount = @import("command/mod_master_count.zig").modMasterCount;
     const modMasterFactor = @import("command/mod_master_factor.zig").modMasterFactor;
     const mode = @import("command/mode.zig").mode;
@@ -101,6 +102,7 @@ const str_to_read_fn = [_]Definition{
     .{ .name = "focus_all_tags",    .arg_type = .none,      .impl = command.focusAllTags },
     .{ .name = "focus_output",      .arg_type = .direction, .impl = command.focusOutput },
     .{ .name = "focus_tag",         .arg_type = .uint,      .impl = command.focusTag },
+    .{ .name = "layout",            .arg_type = .str,       .impl = command.layout},
     .{ .name = "mod_master_count",  .arg_type = .int,       .impl = command.modMasterCount },
     .{ .name = "mod_master_factor", .arg_type = .float,     .impl = command.modMasterFactor },
     .{ .name = "mode",              .arg_type = .str,       .impl = command.mode },

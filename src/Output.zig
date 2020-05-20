@@ -53,7 +53,7 @@ master_count: u32,
 master_factor: f64,
 
 /// Current layout of the output.
-layout: Layouts,
+layout: Layout,
 
 // All listeners for this output, in alphabetical order
 listen_destroy: c.wl_listener,
@@ -61,13 +61,39 @@ listen_frame: c.wl_listener,
 listen_mode: c.wl_listener,
 
 // All possible layouts.
-pub const Layouts = enum {
+pub const Layout = enum {
     TopMaster,
     RightMaster,
     BottomMaster,
     LeftMaster,
     Full,
 };
+
+const LayoutName = struct {
+    name: []const u8,
+    layout: Layout,
+};
+
+// zig fmt: off
+const layout_names = [_]LayoutName {
+    .{ .name = "TopMaster",    .layout = Layout.TopMaster, },
+    .{ .name = "RightMaster",  .layout = Layout.RightMaster, },
+    .{ .name = "BottomMaster", .layout = Layout.BottomMaster, },
+    .{ .name = "LeftMaster",   .layout = Layout.LeftMaster, },
+    .{ .name = "Full",         .layout = Layout.Full, },
+};
+// zig fmt: on
+
+pub fn getLayoutByName(self: Self, name: []const u8) Layout {
+    for (layout_names) |current| {
+        if (std.mem.eql(u8, name, current.name)) {
+            return current.layout;
+        }
+    }
+    Log.Error.log("Layout '{}' does not exist", .{name});
+    // In case of error default to LeftMaster
+    return Layout.LeftMaster;
+}
 
 pub fn init(self: *Self, root: *Root, wlr_output: *c.wlr_output) !void {
     // Some backends don't have modes. DRM+KMS does, and we need to set a mode
