@@ -384,6 +384,16 @@ pub fn arrangeViews(self: *Self) void {
         break :blk count;
     };
 
+    // A single view should always use the maximum available space. This is
+    // implemented via the "full" layout to remove the need of every single
+    // layout to explicitly handle this edge case or the other edge case of
+    // no visible views.
+    if (visible_count <= 1) {
+        layoutFull(self, visible_count, output_tags);
+        return;
+    }
+
+    // TODO layout switching mechanism
     //layoutFull(self, visible_count, output_tags);
     //layoutTopMaster(self, visible_count, output_tags);
     //layoutRightMaster(self, visible_count, output_tags);
