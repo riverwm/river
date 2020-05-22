@@ -31,7 +31,7 @@ const Output = @import("Output.zig");
 const Root = @import("Root.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
-const WindowManagement = @import("WindowManagement.zig");
+const WindowManager = @import("WindowManager.zig");
 const XwaylandUnmanaged = @import("XwaylandUnmanaged.zig");
 
 allocator: *std.mem.Allocator,
@@ -56,7 +56,7 @@ decoration_manager: DecorationManager,
 input_manager: InputManager,
 root: Root,
 config: Config,
-window_management: WindowManagement,
+window_manager: WindowManager,
 
 pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
     self.allocator = allocator;
@@ -122,7 +122,7 @@ pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
     try self.root.init(self);
     // Must be called after root is initialized
     try self.input_manager.init(self);
-    try self.window_management.init(self);
+    try self.window_manager.init(self);
 
     // These all free themselves when the wl_display is destroyed
     _ = c.wlr_data_device_manager_create(self.wl_display) orelse
