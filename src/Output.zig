@@ -231,7 +231,7 @@ pub fn layoutMasterStack(self: *Self, visible_count: u32, output_tags: u32, posi
         if (position == MasterPosition.Right or position == MasterPosition.Left) {
             slave_stack_size = layout_width;
         } else {
-            slave_stack_size = layout_width;
+            slave_stack_size = layout_height;
         }
         master_stack_size = 0;
     }
@@ -367,13 +367,14 @@ pub fn layoutLeftMaster(self: *Self, visible_count: u32, output_tags: u32) void 
 /// A layout in which every window uses the maximum available space.
 pub fn layoutFull(self: *Self, visible_count: u32, output_tags: u32) void {
     const border_width = self.root.server.config.border_width;
+    const view_padding = self.root.server.config.view_padding;
     const outer_padding = self.root.server.config.outer_padding;
 
     const layout_width = @intCast(u32, self.usable_box.width) -
-        (outer_padding * 2) - (border_width * 2);
+        (outer_padding * 2) - (border_width * 2) - (view_padding * 2);
     const layout_height = @intCast(u32, self.usable_box.height) -
-        (outer_padding * 2) - (border_width * 2);
-    const xy_offset = @intCast(i32, outer_padding + border_width);
+        (outer_padding * 2) - (border_width * 2) - (view_padding * 2);
+    const xy_offset = @intCast(i32, outer_padding + border_width + view_padding);
 
     var i: u32 = 0;
     var it = ViewStack(View).pendingIterator(self.views.first, output_tags);
