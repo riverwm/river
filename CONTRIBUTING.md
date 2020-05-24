@@ -17,7 +17,7 @@ by a blank line. A good rule of thumb is that anything you would write in a pull
 request description on github has a place in the commit message as well.
 
 For more discussion and details of good commit message practices, check out
-ihttps://chris.beams.io/posts/git-commit/
+[this post](https://chris.beams.io/posts/git-commit/).
 
 ## Coding style
 
