@@ -17,21 +17,11 @@
   </copyright>
 
   <interface name="zriver_window_manager_v1" version="1">
-    <description summary="manage windows and track windowing state">
-      This protocol allows clients to run windowing commands and recieve
-      information about the current windowing state.
+    <description summary="track windowing state">
+      This protocol allows clients to recieve information about the current
+      windowing state. It is useful to implement, for example, a status bar
+      displaying information specific to the river compositor.
     </description>
-
-    <request name="run_command">
-      <description summary="run a compositor command">
-        A complete list of commands will be found in the man page.
-        TODO: write the man page.
-      </description>
-      <arg name="command" type="array" summary="the command to run as a series
-        of null-terminated strings"/>
-      <arg name="callback" type="new_id" interface="zriver_command_callback_v1"
-        summary="callback object to recieve success/error events"/>
-    </request>
 
     <event name="focus">
       <description summary="sent when a view gains focus">
@@ -52,29 +42,6 @@
         summary="the currently focused tags of the output"/>
       <arg name="view_tags" type="array"
         summary="the current tags of each view on the output"/>
-    </event>
-  </interface>
-
-  <interface name="zriver_command_callback_v1" version="1">
-    <description summary="callback object">
-      Exactly one of the success or failure events will be sent.
-    </description>
-
-    <event name="success">
-      <description summary="command successful">
-        Send when the command has been successfully received and validated by
-        the server and will be carried out.
-      </description>
-    </event>
-
-    <event name="failure">
-      <description summary="command failed">
-        Sent when the command could not be carried out. This could be due to
-        sending a non-existent command, no command, not enough arguments, too
-        many arguments, invalid arguments, etc.
-      </description>
-      <arg name="failure_message" type="string"
-        summary="a message explaining why failure occurred"/>
     </event>
   </interface>
 </protocol>

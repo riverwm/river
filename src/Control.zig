@@ -27,7 +27,7 @@ const Server = @import("Server.zig");
 
 const protocol_version = 1;
 
-const implementation = c.struct_zriver_window_manager_v1_interface{
+const implementation = c.struct_zriver_control_v1_interface{
     .run_command = runCommand,
 };
 
@@ -40,7 +40,7 @@ pub fn init(self: *Self, server: *Server) !void {
     self.server = server;
     self.wl_global = c.wl_global_create(
         server.wl_display,
-        &c.zriver_window_manager_v1_interface,
+        &c.zriver_control_v1_interface,
         protocol_version,
         self,
         bind,
@@ -60,7 +60,7 @@ fn bind(wl_client: ?*c.wl_client, data: ?*c_void, version: u32, id: u32) callcon
     const self = @ptrCast(*Self, @alignCast(@alignOf(*Self), data));
     const wl_resource = c.wl_resource_create(
         wl_client,
-        &c.zriver_window_manager_v1_interface,
+        &c.zriver_control_v1_interface,
         @intCast(c_int, version),
         id,
     ) orelse {
