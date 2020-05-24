@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="river_control_unstable_v1">
+  <copyright>
+    Copyright 2020 Isaac Freund
+
+    Permission to use, copy, modify, and/or distribute this software for any
+    purpose with or without fee is hereby granted, provided that the above
+    copyright notice and this permission notice appear in all copies.
+
+    THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+    WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+    MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+    ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+    ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  </copyright>
+
+  <interface name="zriver_control_v1" version="1">
+    <description summary="run compositor commands">
+      This interface allows clients to run compositor commands and receive a
+      success/failure response with a failure message if needed.
+    </description>
+
+    <request name="run_command">
+      <description summary="run a compositor command">
+        A complete list of commands will be found in the man page for the
+        compositor.
+      </description>
+      <arg name="command" type="array" summary="the command to run as a series
+        of null-terminated strings"/>
+      <arg name="callback" type="new_id" interface="zriver_command_callback_v1"
+        summary="callback object to receive success/error events"/>
+    </request>
+  </interface>
+
+  <interface name="zriver_command_callback_v1" version="1">
+    <description summary="callback object">
+      This object is created by the run_command request. Exactly one of the
+      success or failure events will be sent.
+    </description>
+
+    <event name="success">
+      <description summary="command successful">
+        Send when the command has been successfully received and validated by
+        the server and will be carried out.
+      </description>
+    </event>
+
+    <event name="failure">
+      <description summary="command failed">
+        Sent when the command could not be carried out. This could be due to
+        sending a non-existent command, no command, not enough arguments, too
+        many arguments, invalid arguments, etc.
+      </description>
+      <arg name="failure_message" type="string"
+        summary="a message explaining why failure occurred"/>
+    </event>
+  </interface>
+</protocol>

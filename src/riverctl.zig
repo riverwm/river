@@ -19,7 +19,7 @@ const std = @import("std");
 
 const c = @cImport({
     @cInclude("wayland-client.h");
-    @cInclude("river-window-management-unstable-v1-client-protocol.h");
+    @cInclude("river-control-unstable-v1-client-protocol.h");
 });
 
 const wl_registry_listener = c.wl_registry_listener{
@@ -32,7 +32,7 @@ const command_callback_listener = c.zriver_command_callback_v1_listener{
     .failure = handleFailure,
 };
 
-var river_window_manager: ?*c.zriver_window_manager_v1 = null;
+var river_control_optional: ?*c.zriver_control_v1 = null;
 
 pub fn main() !void {
     const wl_display = c.wl_display_connect(null) orelse return error.CantConnectToDisplay;
@@ -42,7 +42,7 @@ pub fn main() !void {
         return error.FailedToAddListener;
     if (c.wl_display_roundtrip(wl_display) < 0) return error.RoundtripFailed;
 
-    const wm = river_window_manager orelse return error.RiverWMNotAdvertised;
+    const river_control = river_control_optional orelse return error.RiverControlNotAdvertised;
 
     var command: c.wl_array = undefined;
     c.wl_array_init(&command);
@@ -57,7 +57,7 @@ pub fn main() !void {
         ptr[arg.len] = 0;
     }
 
-    const command_callback = c.zriver_window_manager_v1_run_command(wm, &command);
+    const command_callback = c.zriver_control_v1_run_command(river_control, &command);
     if (c.zriver_command_callback_v1_add_listener(
         command_callback,
         &command_callback_listener,
@@ -75,15 +75,15 @@ fn handleGlobal(
     interface: ?[*:0]const u8,
     version: u32,
 ) callconv(.C) void {
-    // We only care about the river_window_manager global
+    // We only care about the river_control global
     if (std.mem.eql(
         u8,
         std.mem.spanZ(interface.?),
-        std.mem.spanZ(@ptrCast([*:0]const u8, c.zriver_window_manager_v1_interface.name.?)),
+        std.mem.spanZ(@ptrCast([*:0]const u8, c.zriver_control_v1_interface.name.?)),
     )) {
-        river_window_manager = @ptrCast(
-            *c.zriver_window_manager_v1,
-            c.wl_registry_bind(wl_registry, name, &c.zriver_window_manager_v1_interface, 1),
+        river_control_optional = @ptrCast(
+            *c.zriver_control_v1,
+            c.wl_registry_bind(wl_registry, name, &c.zriver_control_v1_interface, 1),
         );
     }
 }

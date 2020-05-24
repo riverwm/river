@@ -79,7 +79,7 @@ fn addServerDeps(exe: *std.build.LibExeObjStep) void {
 fn addProtocolDeps(exe: *std.build.LibExeObjStep, protocol_step: *std.build.Step) void {
     exe.step.dependOn(protocol_step);
     exe.addIncludeDir("protocol");
-    exe.addCSourceFile("protocol/river-window-management-unstable-v1-protocol.c", &[_][]const u8{"-std=c99"});
+    exe.addCSourceFile("protocol/river-control-unstable-v1-protocol.c", &[_][]const u8{"-std=c99"});
 }
 
 const ScanProtocolsStep = struct {
@@ -109,7 +109,7 @@ const ScanProtocolsStep = struct {
         const protocol_dir_paths = [_][]const []const u8{
             &[_][]const u8{ protocol_dir, "stable/xdg-shell/xdg-shell.xml" },
             &[_][]const u8{ "protocol", "wlr-layer-shell-unstable-v1.xml" },
-            &[_][]const u8{ "protocol", "river-window-management-unstable-v1.xml" },
+            &[_][]const u8{ "protocol", "river-control-unstable-v1.xml" },
         };
 
         for (protocol_dir_paths) |dir_path| {
@@ -137,8 +137,8 @@ const ScanProtocolsStep = struct {
                 &[_][]const u8{ "wayland-scanner", "private-code", xml_in_path, code_out_path },
             );
 
-            // We need the client header as well for river-window-management
-            if (std.mem.eql(u8, basename_no_ext, "river-window-management-unstable-v1")) {
+            // We need the client header as well for river-control
+            if (std.mem.eql(u8, basename_no_ext, "river-control-unstable-v1")) {
                 const client_header_out_path = try std.mem.concat(
                     self.builder.allocator,
                     u8,
