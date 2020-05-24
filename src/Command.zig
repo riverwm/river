@@ -117,10 +117,21 @@ const str_to_read_fn = [_]Definition{
 };
 // zig fmt: on
 
+pub const Error = error{
+    NoCommand,
+    UnknownCommand,
+    NotEnoughArguments,
+    TooManyArguments,
+    Overflow,
+    InvalidCharacter,
+    InvalidDirection,
+    OutOfMemory,
+};
+
 impl: ImplFn,
 arg: Arg,
 
-pub fn init(args: []const []const u8, allocator: *std.mem.Allocator) !Self {
+pub fn init(args: []const []const u8, allocator: *std.mem.Allocator) Error!Self {
     if (args.len == 0) return error.NoCommand;
     const name = args[0];
 

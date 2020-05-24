@@ -27,14 +27,20 @@ const wl_registry_listener = c.wl_registry_listener{
     .global_remove = handleGlobalRemove,
 };
 
+const command_callback_listener = c.zriver_command_callback_v1_listener{
+    .success = handleSuccess,
+    .failure = handleFailure,
+};
+
 var river_window_manager: ?*c.zriver_window_manager_v1 = null;
 
 pub fn main() !void {
     const wl_display = c.wl_display_connect(null) orelse return error.CantConnectToDisplay;
     const wl_registry = c.wl_display_get_registry(wl_display);
 
-    _ = c.wl_registry_add_listener(wl_registry, &wl_registry_listener, null);
-    if (c.wl_display_roundtrip(wl_display) == -1) return error.RoundtripFailed;
+    if (c.wl_registry_add_listener(wl_registry, &wl_registry_listener, null) < 0)
+        return error.FailedToAddListener;
+    if (c.wl_display_roundtrip(wl_display) < 0) return error.RoundtripFailed;
 
     const wm = river_window_manager orelse return error.RiverWMNotAdvertised;
 
@@ -51,8 +57,15 @@ pub fn main() !void {
         ptr[arg.len] = 0;
     }
 
-    c.zriver_window_manager_v1_run_command(wm, &command);
-    if (c.wl_display_roundtrip(wl_display) == -1) return error.RoundtripFailed;
+    const command_callback = c.zriver_window_manager_v1_run_command(wm, &command);
+    if (c.zriver_command_callback_v1_add_listener(
+        command_callback,
+        &command_callback_listener,
+        null,
+    ) < 0) return error.FailedToAddListener;
+
+    // Loop until our callback is called and we exit.
+    while (true) if (c.wl_display_dispatch(wl_display) < 0) return error.DispatchFailed;
 }
 
 fn handleGlobal(
@@ -77,3 +90,20 @@ fn handleGlobal(
 
 /// Ignore the event
 fn handleGlobalRemove(data: ?*c_void, wl_registry: ?*c.wl_registry, name: u32) callconv(.C) void {}
+
+/// On success we simply exit with a clean exit code
+fn handleSuccess(data: ?*c_void, callback: ?*c.zriver_command_callback_v1) callconv(.C) void {
+    std.os.exit(0);
+}
+
+/// Print the failure message and exit non-zero
+fn handleFailure(
+    data: ?*c_void,
+    callback: ?*c.zriver_command_callback_v1,
+    failure_message: ?[*:0]const u8,
+) callconv(.C) void {
+    if (failure_message) |message| {
+        std.debug.warn("Error: {}\n", .{failure_message});
+    }
+    std.os.exit(1);
+}

@@ -74,7 +74,12 @@ fn resourceDestroy(wl_resource: ?*c.wl_resource) callconv(.C) void {
     // TODO
 }
 
-fn runCommand(wl_client: ?*c.wl_client, wl_resource: ?*c.wl_resource, wl_array: ?*c.wl_array) callconv(.C) void {
+fn runCommand(
+    wl_client: ?*c.wl_client,
+    wl_resource: ?*c.wl_resource,
+    wl_array: ?*c.wl_array,
+    callback_id: u32,
+) callconv(.C) void {
     const self = @ptrCast(*Self, @alignCast(@alignOf(*Self), c.wl_resource_get_user_data(wl_resource)));
     const allocator = self.server.allocator;
 
@@ -89,11 +94,34 @@ fn runCommand(wl_client: ?*c.wl_client, wl_resource: ?*c.wl_resource, wl_array: 
         i += slice.len + 1;
     }
 
-    for (args.items) |x| {
-        std.debug.warn("{}\n", .{x});
-    }
+    const callback_resource = c.wl_resource_create(
+        wl_client,
+        &c.zriver_command_callback_v1_interface,
+        protocol_version,
+        callback_id,
+    ) orelse {
+        c.wl_client_post_no_memory(wl_client);
+        return;
+    };
 
-    // TODO: send the error event on failure instead of crashing
-    const command = Command.init(args.items, allocator) catch unreachable;
+    c.wl_resource_set_implementation(callback_resource, null, null, null);
+
+    const command = Command.init(args.items, allocator) catch |err| {
+        c.zriver_command_callback_v1_send_failure(
+            callback_resource,
+            switch (err) {
+                Command.Error.NoCommand => "no command given",
+                Command.Error.UnknownCommand => "unknown command",
+                Command.Error.NotEnoughArguments => "not enough arguments",
+                Command.Error.TooManyArguments => "too many arguments",
+                Command.Error.Overflow => "value out of bounds",
+                Command.Error.InvalidCharacter => "invalid character in argument",
+                Command.Error.InvalidDirection => "invalid direction. Must be 'next' or 'previous'",
+                Command.Error.OutOfMemory => unreachable,
+            },
+        );
+        return;
+    };
+    c.zriver_command_callback_v1_send_success(callback_resource);
     command.run(self.server.input_manager.default_seat);
 }
