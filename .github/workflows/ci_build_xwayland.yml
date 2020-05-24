@@ -1,5 +1,5 @@
-# Build river and run the test suite every time a commit is pushed to master or
-# a pull request is opened against master.
+# Build river and run the test suite with xwayland enabled every time a commit
+# is pushed to master or a pull request is opened against master.
 
 on:
   push:
@@ -9,11 +9,11 @@ on:
     branches:
       - master
 
-name: Archliunx
+name: Archliunx + Xwayland
 
 jobs:
   build:
-    name: Archliunx
+    name: Archliunx + Xwayland
     runs-on: ubuntu-latest
     container: archlinux:latest
 
@@ -27,11 +27,11 @@ jobs:
 
       - name: build
         run: |
-          zig build
+          zig build -Dxwayland=true
 
       - name: test
         run: |
-          zig build test
+          zig build -Dxwayland=true test
 
       - name: zig fmt
         run: |
