@@ -374,7 +374,8 @@ pub fn layoutFull(self: *Self, visible_count: u32, output_tags: u32) void {
         (outer_padding * 2) - (border_width * 2) - (view_padding * 2);
     const layout_height = @intCast(u32, self.usable_box.height) -
         (outer_padding * 2) - (border_width * 2) - (view_padding * 2);
-    const xy_offset = @intCast(i32, outer_padding + border_width + view_padding);
+    const x_offset = self.usable_box.x + @intCast(i32, outer_padding + border_width + view_padding);
+    const y_offset = self.usable_box.y + @intCast(i32, outer_padding + border_width + view_padding);
 
     var i: u32 = 0;
     var it = ViewStack(View).pendingIterator(self.views.first, output_tags);
@@ -387,8 +388,8 @@ pub fn layoutFull(self: *Self, visible_count: u32, output_tags: u32) void {
 
         var new_box: Box = undefined;
         new_box = .{
-            .x = xy_offset,
-            .y = xy_offset,
+            .x = x_offset,
+            .y = y_offset,
             .width = layout_width,
             .height = layout_height,
         };
