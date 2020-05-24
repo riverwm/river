@@ -14,8 +14,9 @@ don't hesitate to
 - Simplicity and minimalism, river should not overstep the bounds of a
 window manger.
 - Dynamic window management based on a stack of views and tags like dwm.
-- Scriptable configuration and control through a socket and separate
-binary, `riverctl`, like bspwm.
+- Scriptable configuration and control through a separate binary,
+`riverctl`, like bspwm. This works using the custom
+[river-control](protocol/river-control-unstable-v1.xml) protocol.
 
 ## Packaging status
 
