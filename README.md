@@ -61,8 +61,8 @@ nick `ifreund` on irc.freenode.net as well, or reached by email at
 river is released under the GNU General Public License version 3, or (at your
 option) any later version.
 
-The protocols in the protocol directory are released under various licenses by
-various parties licenses. You should refer to the copyright block of each
-protocol for the license. The protocols prefixed with `river` and developed by
+The protocols in the `protocol` directory are released under various licenses by
+various parties. You should refer to the copyright block of each protocol for
+the licensing information. The protocols prefixed with `river` and developed by
 this project are released under the ISC license (as stated in their copyright
 blocks).
