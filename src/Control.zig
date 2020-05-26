@@ -20,8 +20,8 @@ const Self = @This();
 const std = @import("std");
 
 const c = @import("c.zig");
+const command = @import("command.zig");
 
-const Command = @import("Command.zig");
 const Log = @import("log.zig").Log;
 const Server = @import("Server.zig");
 
@@ -82,6 +82,7 @@ fn runCommand(
 ) callconv(.C) void {
     const self = @ptrCast(*Self, @alignCast(@alignOf(*Self), c.wl_resource_get_user_data(wl_resource)));
     const allocator = self.server.allocator;
+    const seat = self.server.input_manager.default_seat;
 
     var args = std.ArrayList([]const u8).init(allocator);
 
@@ -106,22 +107,30 @@ fn runCommand(
 
     c.wl_resource_set_implementation(callback_resource, null, null, null);
 
-    const command = Command.init(args.items, allocator) catch |err| {
-        c.zriver_command_callback_v1_send_failure(
-            callback_resource,
-            switch (err) {
-                Command.Error.NoCommand => "no command given",
-                Command.Error.UnknownCommand => "unknown command",
-                Command.Error.NotEnoughArguments => "not enough arguments",
-                Command.Error.TooManyArguments => "too many arguments",
-                Command.Error.Overflow => "value out of bounds",
-                Command.Error.InvalidCharacter => "invalid character in argument",
-                Command.Error.InvalidDirection => "invalid direction. Must be 'next' or 'previous'",
-                Command.Error.OutOfMemory => unreachable,
-            },
-        );
+    var failure_message: []const u8 = undefined;
+    command.run(allocator, seat, args.items, &failure_message) catch |err| {
+        if (err == command.Error.CommandFailed) {
+            const out = std.cstr.addNullByte(allocator, failure_message) catch "out of memory";
+            defer allocator.free(out);
+            allocator.free(failure_message);
+            c.zriver_command_callback_v1_send_failure(callback_resource, out);
+        } else {
+            c.zriver_command_callback_v1_send_failure(
+                callback_resource,
+                switch (err) {
+                    command.Error.NoCommand => "no command given",
+                    command.Error.UnknownCommand => "unknown command",
+                    command.Error.NotEnoughArguments => "not enough arguments",
+                    command.Error.TooManyArguments => "too many arguments",
+                    command.Error.Overflow => "value out of bounds",
+                    command.Error.InvalidCharacter => "invalid character in argument",
+                    command.Error.InvalidDirection => "invalid direction. Must be 'next' or 'previous'",
+                    command.Error.OutOfMemory => "out of memory",
+                    command.Error.CommandFailed => unreachable,
+                },
+            );
+        }
         return;
     };
     c.zriver_command_callback_v1_send_success(callback_resource);
-    command.run(self.server.input_manager.default_seat);
 }

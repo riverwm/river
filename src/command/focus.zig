@@ -15,18 +15,30 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+const std = @import("std");
+
 const c = @import("../c.zig");
 
-const Arg = @import("../Command.zig").Arg;
+const Error = @import("../command.zig").Error;
+const Direction = @import("../command.zig").Direction;
 const Seat = @import("../Seat.zig");
 const View = @import("../View.zig");
 const ViewStack = @import("../view_stack.zig").ViewStack;
 
 /// Focus either the next or the previous visible view, depending on the enum
 /// passed. Does nothing if there are 1 or 0 views in the stack.
-pub fn focus(seat: *Seat, arg: Arg) void {
-    const direction = arg.direction;
+pub fn focus(
+    allocator: *std.mem.Allocator,
+    seat: *Seat,
+    args: []const []const u8,
+    failure_message: *[]const u8,
+) Error!void {
+    if (args.len < 2) return Error.NotEnoughArguments;
+    if (args.len > 2) return Error.TooManyArguments;
+
+    const direction = try Direction.parse(args[1]);
     const output = seat.focused_output;
+
     if (seat.focused_view) |current_focus| {
         // If there is a currently focused view, focus the next visible view in the stack.
         const focused_node = @fieldParentPtr(ViewStack(View).Node, "view", current_focus);
@@ -50,5 +62,6 @@ pub fn focus(seat: *Seat, arg: Arg) void {
         .Next => ViewStack(View).iterator(output.views.first, output.current_focused_tags),
         .Prev => ViewStack(View).reverseIterator(output.views.last, output.current_focused_tags),
     };
+
     seat.focus(if (it.next()) |node| &node.view else null);
 }

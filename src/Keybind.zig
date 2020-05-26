@@ -15,9 +15,32 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+const Self = @This();
+
+const std = @import("std");
+
 const c = @import("c.zig");
-const Command = @import("Command.zig");
 
 keysym: c.xkb_keysym_t,
 modifiers: u32,
-command: Command,
+command_args: []const []const u8,
+
+pub fn init(
+    allocator: *std.mem.Allocator,
+    keysym: c.xkb_keysym_t,
+    modifiers: u32,
+    command_args: []const []const u8,
+) !Self {
+    var owned_args = try allocator.alloc([]u8, command_args.len);
+    for (command_args) |arg, i| owned_args[i] = try std.mem.dupe(allocator, u8, arg);
+    return Self{
+        .keysym = keysym,
+        .modifiers = modifiers,
+        .command_args = owned_args,
+    };
+}
+
+pub fn deinit(self: Self, allocator: *std.mem.Allocator) void {
+    for (self.command_args) |arg| allocator.free(arg);
+    allocator.free(self.command_args);
+}

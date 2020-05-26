@@ -15,13 +15,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const Self = @This();
-
 const std = @import("std");
 
 const Seat = @import("Seat.zig");
 
-const command = struct {
+const impl = struct {
     const close = @import("command/close.zig").close;
     const exit = @import("command/exit.zig").exit;
     const focus = @import("command/focus.zig").focus;
@@ -42,12 +40,21 @@ const command = struct {
     const zoom = @import("command/zoom.zig").zoom;
 };
 
-const Direction = enum {
+pub const Direction = enum {
     Next,
     Prev,
+
+    pub fn parse(str: []const u8) error{InvalidDirection}!Direction {
+        return if (std.mem.eql(u8, str, "next"))
+            Direction.Next
+        else if (std.mem.eql(u8, str, "previous"))
+            Direction.Prev
+        else
+            error.InvalidDirection;
+    }
 };
 
-pub const Arg = union(enum) {
+const Arg = union(enum) {
     int: i32,
     uint: u32,
     float: f64,
@@ -86,34 +93,32 @@ pub const Arg = union(enum) {
     }
 };
 
-const ImplFn = fn (seat: *Seat, arg: Arg) void;
-
 const Definition = struct {
     name: []const u8,
-    arg_type: @TagType(Arg),
-    impl: ImplFn,
+    impl: fn (*std.mem.Allocator, *Seat, []const []const u8, *[]const u8) Error!void,
 };
 
+// TODO: this could be replaced with a comptime hashmap
 // zig fmt: off
-const str_to_read_fn = [_]Definition{
-    .{ .name = "close",             .arg_type = .none,      .impl = command.close },
-    .{ .name = "exit",              .arg_type = .none,      .impl = command.exit },
-    .{ .name = "focus",             .arg_type = .direction, .impl = command.focus },
-    .{ .name = "focus_all_tags",    .arg_type = .none,      .impl = command.focusAllTags },
-    .{ .name = "focus_output",      .arg_type = .direction, .impl = command.focusOutput },
-    .{ .name = "focus_tag",         .arg_type = .uint,      .impl = command.focusTag },
-    .{ .name = "layout",            .arg_type = .str,       .impl = command.layout},
-    .{ .name = "mod_master_count",  .arg_type = .int,       .impl = command.modMasterCount },
-    .{ .name = "mod_master_factor", .arg_type = .float,     .impl = command.modMasterFactor },
-    .{ .name = "mode",              .arg_type = .str,       .impl = command.mode },
-    .{ .name = "send_to_output",    .arg_type = .direction, .impl = command.sendToOutput },
-    .{ .name = "spawn",             .arg_type = .str,       .impl = command.spawn },
-    .{ .name = "tag_view",          .arg_type = .uint,      .impl = command.tagView },
-    .{ .name = "tag_view_all_tags", .arg_type = .none,      .impl = command.tagViewAllTags },
-    .{ .name = "toggle_float",      .arg_type = .none,      .impl = command.toggleFloat },
-    .{ .name = "toggle_tag_focus",  .arg_type = .uint,      .impl = command.toggleTagFocus },
-    .{ .name = "toggle_view_tag",   .arg_type = .uint,      .impl = command.toggleViewTag },
-    .{ .name = "zoom",              .arg_type = .none,      .impl = command.zoom },
+const str_to_impl_fn = [_]Definition{
+    .{ .name = "close",             .impl = impl.close },
+    .{ .name = "exit",              .impl = impl.exit },
+    .{ .name = "focus",             .impl = impl.focus },
+    .{ .name = "focus_all_tags",    .impl = impl.focusAllTags },
+    .{ .name = "focus_output",      .impl = impl.focusOutput },
+    .{ .name = "focus_tag",         .impl = impl.focusTag },
+    .{ .name = "layout",            .impl = impl.layout},
+    .{ .name = "mod_master_count",  .impl = impl.modMasterCount },
+    .{ .name = "mod_master_factor", .impl = impl.modMasterFactor },
+    .{ .name = "mode",              .impl = impl.mode },
+    .{ .name = "send_to_output",    .impl = impl.sendToOutput },
+    .{ .name = "spawn",             .impl = impl.spawn },
+    .{ .name = "tag_view",          .impl = impl.tagView },
+    .{ .name = "tag_view_all_tags", .impl = impl.tagViewAllTags },
+    .{ .name = "toggle_float",      .impl = impl.toggleFloat },
+    .{ .name = "toggle_tag_focus",  .impl = impl.toggleTagFocus },
+    .{ .name = "toggle_view_tag",   .impl = impl.toggleViewTag },
+    .{ .name = "zoom",              .impl = impl.zoom },
 };
 // zig fmt: on
 
@@ -126,29 +131,27 @@ pub const Error = error{
     InvalidCharacter,
     InvalidDirection,
     OutOfMemory,
+    CommandFailed,
 };
 
-impl: ImplFn,
-arg: Arg,
+/// Run a command for the given Seat. The `args` parameter is similar to the
+/// classic argv in that the command to be run is passed as the first argument.
+/// If the command fails with Error.CommandFailed, a failure message will be
+/// allocated and the slice pointed to by the `failure_message` parameter will
+/// be set to point to it. The caller is responsible for freeing this message
+/// in the case of failure.
+pub fn run(
+    allocator: *std.mem.Allocator,
+    seat: *Seat,
+    args: []const []const u8,
+    failure_message: *[]const u8,
+) Error!void {
+    if (args.len == 0) return Error.NoCommand;
 
-pub fn init(args: []const []const u8, allocator: *std.mem.Allocator) Error!Self {
-    if (args.len == 0) return error.NoCommand;
     const name = args[0];
+    const impl_fn = for (str_to_impl_fn) |definition| {
+        if (std.mem.eql(u8, name, definition.name)) break definition.impl;
+    } else return Error.UnknownCommand;
 
-    const definition = for (str_to_read_fn) |definition| {
-        if (std.mem.eql(u8, name, definition.name)) break definition;
-    } else return error.UnknownCommand;
-
-    return Self{
-        .impl = definition.impl,
-        .arg = try Arg.parse(definition.arg_type, args[1..], allocator),
-    };
-}
-
-pub fn deinit(self: Self, allocator: *std.mem.Allocator) void {
-    if (self.arg == .str) allocator.free(self.arg.str);
-}
-
-pub fn run(self: Self, seat: *Seat) void {
-    self.impl(seat, self.arg);
+    try impl_fn(allocator, seat, args, failure_message);
 }

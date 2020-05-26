@@ -15,13 +15,20 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+const std = @import("std");
+
 const c = @import("../c.zig");
 
-const Arg = @import("../Command.zig").Arg;
+const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
 /// Close the focused view, if any.
-pub fn close(seat: *Seat, arg: Arg) void {
+pub fn close(
+    allocator: *std.mem.Allocator,
+    seat: *Seat,
+    args: []const []const u8,
+    failure_message: *[]const u8,
+) Error!void {
     if (seat.focused_view) |view| {
         // Note: we don't call arrange() here as it will be called
         // automatically when the view is unmapped.

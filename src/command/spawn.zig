@@ -17,23 +17,31 @@
 
 const std = @import("std");
 
-const c = @import("../c.zig");
-
-const Arg = @import("../Command.zig").Arg;
-const Log = @import("../log.zig").Log;
+const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
 /// Spawn a program.
-pub fn spawn(seat: *Seat, arg: Arg) void {
-    const cmd = arg.str;
+pub fn spawn(
+    allocator: *std.mem.Allocator,
+    seat: *Seat,
+    args: []const []const u8,
+    failure_message: *[]const u8,
+) Error!void {
+    if (args.len < 2) return Error.NotEnoughArguments;
 
-    const argv = [_][]const u8{ "/bin/sh", "-c", cmd };
-    const child = std.ChildProcess.init(&argv, std.heap.c_allocator) catch |err| {
-        Log.Error.log("Failed to execute {}: {}", .{ cmd, err });
-        return;
-    };
+    const cmd = try std.mem.join(allocator, " ", args[1..]);
+    defer allocator.free(cmd);
+
+    const child_args = [_][]const u8{ "/bin/sh", "-c", cmd };
+    const child = try std.ChildProcess.init(&child_args, allocator);
+    defer child.deinit();
+
     std.ChildProcess.spawn(child) catch |err| {
-        Log.Error.log("Failed to execute {}: {}", .{ cmd, err });
-        return;
+        failure_message.* = try std.fmt.allocPrint(
+            allocator,
+            "failed to spawn {}: {}.",
+            .{ cmd, err },
+        );
+        return Error.CommandFailed;
     };
 }

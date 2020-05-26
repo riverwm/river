@@ -19,16 +19,23 @@ const std = @import("std");
 
 const c = @import("../c.zig");
 
-const Arg = @import("../Command.zig").Arg;
+const Error = @import("../command.zig").Error;
+const Direction = @import("../command.zig").Direction;
 const Output = @import("../Output.zig");
 const Seat = @import("../Seat.zig");
 
 /// Send the focused view to the the next or the previous output, depending on
 /// the bool passed. Does nothing if there is only one output.
-pub fn sendToOutput(seat: *Seat, arg: Arg) void {
-    @import("../log.zig").Log.Debug.log("send to output", .{});
+pub fn sendToOutput(
+    allocator: *std.mem.Allocator,
+    seat: *Seat,
+    args: []const []const u8,
+    failure_message: *[]const u8,
+) Error!void {
+    if (args.len < 2) return Error.NotEnoughArguments;
+    if (args.len > 2) return Error.TooManyArguments;
 
-    const direction = arg.direction;
+    const direction = try Direction.parse(args[1]);
     const root = &seat.input_manager.server.root;
 
     if (seat.focused_view) |view| {

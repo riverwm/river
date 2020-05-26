@@ -15,11 +15,18 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const Arg = @import("../Command.zig").Arg;
+const std = @import("std");
+
+const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
 /// Set focus to all tags
-pub fn focusAllTags(seat: *Seat, arg: Arg) void {
+pub fn focusAllTags(
+    allocator: *std.mem.Allocator,
+    seat: *Seat,
+    args: []const []const u8,
+    failure_message: *[]const u8,
+) Error!void {
     seat.focused_output.pending_focused_tags = 0xFFFFFFFF;
     seat.input_manager.server.root.arrange();
 }

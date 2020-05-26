@@ -20,6 +20,7 @@ const Self = @This();
 const std = @import("std");
 
 const c = @import("c.zig");
+const command = @import("command.zig");
 
 const Cursor = @import("Cursor.zig");
 const InputManager = @import("InputManager.zig");
@@ -252,7 +253,13 @@ pub fn handleKeybinding(self: *Self, keysym: c.xkb_keysym_t, modifiers: u32) boo
     for (self.mode.keybinds.items) |keybind| {
         if (modifiers == keybind.modifiers and keysym == keybind.keysym) {
             // Execute the bound command
-            keybind.command.run(self);
+            const allocator = self.input_manager.server.allocator;
+            var failure_message: []const u8 = undefined;
+            command.run(allocator, self, keybind.command_args, &failure_message) catch |err| {
+                // TODO: log the error
+                if (err == command.Error.CommandFailed)
+                    allocator.free(failure_message);
+            };
             return true;
         }
     }

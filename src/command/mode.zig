@@ -15,12 +15,21 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const Arg = @import("../Command.zig").Arg;
+const std = @import("std");
+
+const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
 /// Switch to the given mode
-pub fn mode(seat: *Seat, arg: Arg) void {
-    const mode_name = arg.str;
+pub fn mode(
+    allocator: *std.mem.Allocator,
+    seat: *Seat,
+    args: []const []const u8,
+    failure_message: *[]const u8,
+) Error!void {
+    if (args.len < 2) return Error.NotEnoughArguments;
+    if (args.len > 2) return Error.TooManyArguments;
+
     const config = seat.input_manager.server.config;
-    seat.mode = config.getMode(mode_name);
+    seat.mode = config.getMode(args[1]);
 }

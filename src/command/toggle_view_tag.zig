@@ -15,14 +15,25 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+const std = @import("std");
+
 const c = @import("../c.zig");
 
-const Arg = @import("../Command.zig").Arg;
+const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
 /// Toggle the passed tag of the focused view
-pub fn toggleViewTag(seat: *Seat, arg: Arg) void {
-    const tags = @as(u32, 1) << @intCast(u5, arg.uint - 1);
+pub fn toggleViewTag(
+    allocator: *std.mem.Allocator,
+    seat: *Seat,
+    args: []const []const u8,
+    failure_message: *[]const u8,
+) Error!void {
+    if (args.len < 2) return Error.NotEnoughArguments;
+    if (args.len > 2) return Error.TooManyArguments;
+
+    const tag = try std.fmt.parseInt(u32, args[1], 10);
+    const tags = @as(u32, 1) << @intCast(u5, tag - 1);
     if (seat.focused_view) |view| {
         const new_tags = view.current_tags ^ tags;
         if (new_tags != 0) {
