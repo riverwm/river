@@ -18,12 +18,6 @@ window manger.
 `riverctl`, like bspwm. This works using the custom
 [river-control](protocol/river-control-unstable-v1.xml) protocol.
 
-## Packaging status
-
-River is available from the
-[AUR](https://aur.archlinux.org/packages/river-git/). Note that river
-is still pre-0.1.0 and may lack features you deem necessary.
-
 ## Building
 
 To compile river first ensure that you have the following dependencies
@@ -36,7 +30,8 @@ installed:
 - xkbcommon
 
 Then simply use `zig build` to build and `zig build run` to run. To
-enable experimental Xwayland support use `-Dxwayland=true`.
+enable experimental Xwayland support use `-Dxwayland=true`. This will
+also build `riverctl` which can be found at `zig-cache/bin/riverctl`.
 
 River can either be run nested in an X11/wayland session or directly
 from a tty using KMS/DRM.
@@ -60,3 +55,14 @@ to submit patches.
 I can often be found in the `#sway-devel` IRC channel with the
 nick `ifreund` on irc.freenode.net as well, or reached by email at
 [ifreund@ifreund.xyz](mailto:ifreund@ifreund.xyz).
+
+## Licensing 
+
+river is released under the GNU General Public License version 3, or (at your
+option) any later version.
+
+The protocols in the protocol directory are released under various licenses by
+various parties licenses. You should refer to the copyright block of each
+protocol for the license. The protocols prefixed with `river` and developed by
+this project are released under the ISC license (as stated in their copyright
+blocks).
