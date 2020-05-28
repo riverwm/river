@@ -28,10 +28,12 @@ installed:
 - wayland-protocols
 - [wlroots](https://github.com/swaywm/wlroots) 0.10.1
 - xkbcommon
+- pixman
+- pkg-config
 
-Then simply use `zig build` to build and `zig build run` to run. To
-enable experimental Xwayland support use `-Dxwayland=true`. This will
-also build `riverctl` which can be found at `zig-cache/bin/riverctl`.
+Then simply use `zig build` to build and `zig build run` to run. This will also
+build `riverctl` which can be found at `zig-cache/bin/riverctl`. To enable
+experimental Xwayland support use `-Dxwayland=true`.
 
 River can either be run nested in an X11/wayland session or directly
 from a tty using KMS/DRM.
