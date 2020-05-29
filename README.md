@@ -35,6 +35,9 @@ Then simply use `zig build` to build and `zig build run` to run. This will also
 build `riverctl` which can be found at `zig-cache/bin/riverctl`. To enable
 experimental Xwayland support use `-Dxwayland=true`.
 
+*Note: NixOS users should refer to the
+[Building on NixOS wiki page](https://github.com/ifreund/river/wiki/Building-on-NixOS)*
+
 River can either be run nested in an X11/wayland session or directly
 from a tty using KMS/DRM.
 
