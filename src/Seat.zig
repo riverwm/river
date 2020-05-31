@@ -26,7 +26,6 @@ const Cursor = @import("Cursor.zig");
 const InputManager = @import("InputManager.zig");
 const Keyboard = @import("Keyboard.zig");
 const LayerSurface = @import("LayerSurface.zig");
-const Mode = @import("Mode.zig");
 const Output = @import("Output.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
@@ -46,8 +45,8 @@ cursor: Cursor,
 /// Mulitple keyboards are handled separately
 keyboards: std.TailQueue(Keyboard),
 
-/// Current keybind mode
-mode: *Mode,
+/// Id of the current keybind mode
+mode_id: u32,
 
 /// Currently focused output, may be the noop output if no
 focused_output: *Output,
@@ -77,7 +76,7 @@ pub fn init(self: *Self, input_manager: *InputManager, name: []const u8) !void {
 
     self.keyboards = std.TailQueue(Keyboard).init();
 
-    self.mode = input_manager.server.config.getMode("normal");
+    self.mode_id = 0;
 
     self.focused_output = &self.input_manager.server.root.noop_output;
 
@@ -250,7 +249,8 @@ pub fn handleViewUnmap(self: *Self, view: *View) void {
 /// Handle any user-defined keybinding for the passed keysym and modifiers
 /// Returns true if the key was handled
 pub fn handleKeybinding(self: *Self, keysym: c.xkb_keysym_t, modifiers: u32) bool {
-    for (self.mode.keybinds.items) |keybind| {
+    const modes = &self.input_manager.server.config.modes;
+    for (modes.items[self.mode_id].items) |keybind| {
         if (modifiers == keybind.modifiers and keysym == keybind.keysym) {
             // Execute the bound command
             const allocator = self.input_manager.server.allocator;

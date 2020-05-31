@@ -31,5 +31,13 @@ pub fn mode(
     if (args.len > 2) return Error.TooManyArguments;
 
     const config = seat.input_manager.server.config;
-    seat.mode = config.getMode(args[1]);
+    const target_mode = args[1];
+    seat.mode_id = config.mode_to_id.getValue(target_mode) orelse {
+        failure_message.* = try std.fmt.allocPrint(
+            allocator,
+            "cannot enter non-existant mode '{}'",
+            .{target_mode},
+        );
+        return Error.CommandFailed;
+    };
 }
