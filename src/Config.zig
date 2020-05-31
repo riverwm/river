@@ -228,7 +228,7 @@ pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
         allocator,
         c.XKB_KEY_F11,
         mod,
-        &[_][]const u8{ "mode", "passthrough" },
+        &[_][]const u8{ "enter_mode", "passthrough" },
     ));
 
     // Change master orientation with Mod+{Up,Right,Down,Left}
@@ -270,7 +270,7 @@ pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
         allocator,
         c.XKB_KEY_F11,
         mod,
-        &[_][]const u8{ "mode", "normal" },
+        &[_][]const u8{ "enter_mode", "normal" },
     ));
 
     // Float views with app_id "float"

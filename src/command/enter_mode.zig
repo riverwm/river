@@ -21,7 +21,7 @@ const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
 /// Switch to the given mode
-pub fn mode(
+pub fn enterMode(
     allocator: *std.mem.Allocator,
     seat: *Seat,
     args: []const []const u8,

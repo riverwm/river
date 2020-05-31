@@ -29,7 +29,7 @@ const impl = struct {
     const layout = @import("command/layout.zig").layout;
     const modMasterCount = @import("command/mod_master_count.zig").modMasterCount;
     const modMasterFactor = @import("command/mod_master_factor.zig").modMasterFactor;
-    const mode = @import("command/mode.zig").mode;
+    const enterMode = @import("command/enter_mode.zig").enterMode;
     const sendToOutput = @import("command/send_to_output.zig").sendToOutput;
     const spawn = @import("command/spawn.zig").spawn;
     const tagView = @import("command/tag_view.zig").tagView;
@@ -68,10 +68,10 @@ const str_to_impl_fn = [_]Definition{
     .{ .name = "focus_all_tags",    .impl = impl.focusAllTags },
     .{ .name = "focus_output",      .impl = impl.focusOutput },
     .{ .name = "focus_tag",         .impl = impl.focusTag },
-    .{ .name = "layout",            .impl = impl.layout},
+    .{ .name = "layout",            .impl = impl.layout },
     .{ .name = "mod_master_count",  .impl = impl.modMasterCount },
     .{ .name = "mod_master_factor", .impl = impl.modMasterFactor },
-    .{ .name = "mode",              .impl = impl.mode },
+    .{ .name = "enter_mode",        .impl = impl.enterMode },
     .{ .name = "send_to_output",    .impl = impl.sendToOutput },
     .{ .name = "spawn",             .impl = impl.spawn },
     .{ .name = "tag_view",          .impl = impl.tagView },
