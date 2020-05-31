@@ -54,45 +54,6 @@ pub const Direction = enum {
     }
 };
 
-const Arg = union(enum) {
-    int: i32,
-    uint: u32,
-    float: f64,
-    str: []const u8,
-    direction: Direction,
-    none: void,
-
-    fn parse(
-        arg_type: @TagType(Arg),
-        args: []const []const u8,
-        allocator: *std.mem.Allocator,
-    ) !Arg {
-        switch (arg_type) {
-            .int, .uint, .float, .direction => {
-                if (args.len == 0) return error.NotEnoughArguments;
-                if (args.len > 1) return error.TooManyArguments;
-                return switch (arg_type) {
-                    .int => .{ .int = try std.fmt.parseInt(i32, args[0], 10) },
-                    .uint => .{ .uint = try std.fmt.parseInt(u32, args[0], 10) },
-                    .float => .{ .float = try std.fmt.parseFloat(f64, args[0]) },
-                    .direction => if (std.mem.eql(u8, args[0], "next"))
-                        Arg{ .direction = .Next }
-                    else if (std.mem.eql(u8, args[0], "previous"))
-                        Arg{ .direction = .Prev }
-                    else
-                        error.InvalidDirection,
-                    else => unreachable,
-                };
-            },
-            .str => {
-                if (args.len == 0) return error.NotEnoughArguments;
-                return Arg{ .str = try std.mem.join(allocator, " ", args) };
-            },
-            .none => return if (args.len == 0) .{ .none = {} } else error.TooManyArguments,
-        }
-    }
-};
-
 const Definition = struct {
     name: []const u8,
     impl: fn (*std.mem.Allocator, *Seat, []const []const u8, *[]const u8) Error!void,
