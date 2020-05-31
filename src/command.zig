@@ -21,6 +21,8 @@ const Seat = @import("Seat.zig");
 
 const impl = struct {
     const close = @import("command/close.zig").close;
+    const declareMode = @import("command/declare_mode.zig").declareMode;
+    const enterMode = @import("command/enter_mode.zig").enterMode;
     const exit = @import("command/exit.zig").exit;
     const focus = @import("command/focus.zig").focus;
     const focusAllTags = @import("command/focus_all_tags.zig").focusAllTags;
@@ -29,7 +31,6 @@ const impl = struct {
     const layout = @import("command/layout.zig").layout;
     const modMasterCount = @import("command/mod_master_count.zig").modMasterCount;
     const modMasterFactor = @import("command/mod_master_factor.zig").modMasterFactor;
-    const enterMode = @import("command/enter_mode.zig").enterMode;
     const sendToOutput = @import("command/send_to_output.zig").sendToOutput;
     const spawn = @import("command/spawn.zig").spawn;
     const tagView = @import("command/tag_view.zig").tagView;
@@ -63,6 +64,8 @@ const Definition = struct {
 // zig fmt: off
 const str_to_impl_fn = [_]Definition{
     .{ .name = "close",             .impl = impl.close },
+    .{ .name = "declare_mode",      .impl = impl.declareMode},
+    .{ .name = "enter_mode",        .impl = impl.enterMode },
     .{ .name = "exit",              .impl = impl.exit },
     .{ .name = "focus",             .impl = impl.focus },
     .{ .name = "focus_all_tags",    .impl = impl.focusAllTags },
@@ -71,7 +74,6 @@ const str_to_impl_fn = [_]Definition{
     .{ .name = "layout",            .impl = impl.layout },
     .{ .name = "mod_master_count",  .impl = impl.modMasterCount },
     .{ .name = "mod_master_factor", .impl = impl.modMasterFactor },
-    .{ .name = "enter_mode",        .impl = impl.enterMode },
     .{ .name = "send_to_output",    .impl = impl.sendToOutput },
     .{ .name = "spawn",             .impl = impl.spawn },
     .{ .name = "tag_view",          .impl = impl.tagView },

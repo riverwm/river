@@ -35,7 +35,7 @@ view_padding: u32,
 outer_padding: u32,
 
 /// Map of mode name to mode id
-mode_to_id: std.StringHashMap(u32),
+mode_to_id: std.StringHashMap(usize),
 
 /// All user-defined keybinding modes, indexed by mode id
 modes: std.ArrayList(std.ArrayList(Keybind)),
@@ -48,7 +48,7 @@ pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
     self.view_padding = 8;
     self.outer_padding = 8;
 
-    self.mode_to_id = std.StringHashMap(u32).init(allocator);
+    self.mode_to_id = std.StringHashMap(usize).init(allocator);
     try self.mode_to_id.putNoClobber("normal", 0);
     try self.mode_to_id.putNoClobber("passthrough", 1);
 

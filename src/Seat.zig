@@ -46,7 +46,7 @@ cursor: Cursor,
 keyboards: std.TailQueue(Keyboard),
 
 /// Id of the current keybind mode
-mode_id: u32,
+mode_id: usize,
 
 /// Currently focused output, may be the noop output if no
 focused_output: *Output,
