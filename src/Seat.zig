@@ -45,7 +45,7 @@ cursor: Cursor,
 /// Mulitple keyboards are handled separately
 keyboards: std.TailQueue(Keyboard),
 
-/// Id of the current keybind mode
+/// ID of the current keymap mode
 mode_id: usize,
 
 /// Currently focused output, may be the noop output if no
@@ -246,16 +246,16 @@ pub fn handleViewUnmap(self: *Self, view: *View) void {
     }
 }
 
-/// Handle any user-defined keybinding for the passed keysym and modifiers
+/// Handle any user-defined mapping for the passed keysym and modifiers
 /// Returns true if the key was handled
-pub fn handleKeybinding(self: *Self, keysym: c.xkb_keysym_t, modifiers: u32) bool {
+pub fn handleMapping(self: *Self, keysym: c.xkb_keysym_t, modifiers: u32) bool {
     const modes = &self.input_manager.server.config.modes;
-    for (modes.items[self.mode_id].items) |keybind| {
-        if (modifiers == keybind.modifiers and keysym == keybind.keysym) {
+    for (modes.items[self.mode_id].items) |mapping| {
+        if (modifiers == mapping.modifiers and keysym == mapping.keysym) {
             // Execute the bound command
             const allocator = self.input_manager.server.allocator;
             var failure_message: []const u8 = undefined;
-            command.run(allocator, self, keybind.command_args, &failure_message) catch |err| {
+            command.run(allocator, self, mapping.command_args, &failure_message) catch |err| {
                 // TODO: log the error
                 if (err == command.Error.CommandFailed)
                     allocator.free(failure_message);

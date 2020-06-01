@@ -91,7 +91,7 @@ fn handleKey(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     );
 
     // Get a list of keysyms ignoring modifiers (e.g. 1 instead of !)
-    // Important for bindings like Mod+Shift+1
+    // Important for mappings like Mod+Shift+1
     var raw_keysyms: ?[*]c.xkb_keysym_t = undefined;
     const layout_index = c.xkb_state_key_get_layout(wlr_keyboard.xkb_state, keycode);
     const raw_keysyms_len = c.xkb_keymap_key_get_syms_by_level(
@@ -108,10 +108,10 @@ fn handleKey(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     if (event.state == .WLR_KEY_PRESSED) {
         var i: usize = 0;
         while (i < translated_keysyms_len) : (i += 1) {
-            if (self.handleBuiltinKeybind(translated_keysyms.?[i])) {
+            if (self.handleBuiltinMapping(translated_keysyms.?[i])) {
                 handled = true;
                 break;
-            } else if (self.seat.handleKeybinding(translated_keysyms.?[i], modifiers)) {
+            } else if (self.seat.handleMapping(translated_keysyms.?[i], modifiers)) {
                 handled = true;
                 break;
             }
@@ -119,10 +119,10 @@ fn handleKey(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         if (!handled) {
             i = 0;
             while (i < raw_keysyms_len) : (i += 1) {
-                if (self.handleBuiltinKeybind(raw_keysyms.?[i])) {
+                if (self.handleBuiltinMapping(raw_keysyms.?[i])) {
                     handled = true;
                     break;
-                } else if (self.seat.handleKeybinding(raw_keysyms.?[i], modifiers)) {
+                } else if (self.seat.handleMapping(raw_keysyms.?[i], modifiers)) {
                     handled = true;
                     break;
                 }
@@ -161,9 +161,9 @@ fn handleModifiers(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void 
     );
 }
 
-/// Handle any builtin, harcoded compsitor bindings such as VT switching.
+/// Handle any builtin, harcoded compsitor mappings such as VT switching.
 /// Returns true if the keysym was handled.
-fn handleBuiltinKeybind(self: Self, keysym: c.xkb_keysym_t) bool {
+fn handleBuiltinMapping(self: Self, keysym: c.xkb_keysym_t) bool {
     if (keysym >= c.XKB_KEY_XF86Switch_VT_1 and keysym <= c.XKB_KEY_XF86Switch_VT_12) {
         Log.Debug.log("Switch VT keysym received", .{});
         const wlr_backend = self.seat.input_manager.server.wlr_backend;

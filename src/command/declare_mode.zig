@@ -20,10 +20,10 @@ const std = @import("std");
 const c = @import("../c.zig");
 
 const Error = @import("../command.zig").Error;
-const Keybind = @import("../Keybind.zig");
+const Mapping = @import("../Mapping.zig");
 const Seat = @import("../Seat.zig");
 
-/// Declare a new keybind mode
+/// Declare a new keymap mode
 pub fn declareMode(
     allocator: *std.mem.Allocator,
     seat: *Seat,
@@ -47,5 +47,5 @@ pub fn declareMode(
 
     try config.mode_to_id.putNoClobber(new_mode_name, config.modes.items.len);
     errdefer _ = config.mode_to_id.remove(new_mode_name);
-    try config.modes.append(std.ArrayList(Keybind).init(allocator));
+    try config.modes.append(std.ArrayList(Mapping).init(allocator));
 }

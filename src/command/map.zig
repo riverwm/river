@@ -20,7 +20,7 @@ const std = @import("std");
 const c = @import("../c.zig");
 
 const Error = @import("../command.zig").Error;
-const Keybind = @import("../Keybind.zig");
+const Mapping = @import("../Mapping.zig");
 const Seat = @import("../Seat.zig");
 
 const modifier_names = [_]struct {
@@ -37,10 +37,11 @@ const modifier_names = [_]struct {
     .{ .name = "Mod5", .modifier = c.WLR_MODIFIER_MOD5 },
 };
 
-/// Create a new keybind for a given mode
+/// Create a new mapping for a given mode
 ///
-/// bind normal Control|Shift|Mod4 Comma spawn alacritty
-pub fn bind(
+/// Example:
+/// map normal Mod4|Shift Return spawn alacritty
+pub fn map(
     allocator: *std.mem.Allocator,
     seat: *Seat,
     args: []const []const u8,
@@ -54,7 +55,7 @@ pub fn bind(
     const mode_id = config.mode_to_id.getValue(target_mode) orelse {
         failure_message.* = try std.fmt.allocPrint(
             allocator,
-            "cannot add keybind to non-existant mode '{}'",
+            "cannot add mapping to non-existant mode '{}p'",
             .{target_mode},
         );
         return Error.CommandFailed;
@@ -105,5 +106,5 @@ pub fn bind(
         }
     }
 
-    try mode_mappings.append(try Keybind.init(allocator, keysym, modifiers, args[4..]));
+    try mode_mappings.append(try Mapping.init(allocator, keysym, modifiers, args[4..]));
 }
