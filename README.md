@@ -31,21 +31,32 @@ installed:
 - pixman
 - pkg-config
 
-Then simply use `zig build` to build and `zig build run` to run. This will also
-build `riverctl` which can be found at `zig-cache/bin/riverctl`. To enable
-experimental Xwayland support use `-Dxwayland=true`.
-
 *Note: NixOS users should refer to the
 [Building on NixOS wiki page](https://github.com/ifreund/river/wiki/Building-on-NixOS)*
+
+Then run, for example, `sudo zig build --prefix /usr/local install` to build
+and install the `river` and `riverctl` binaries to `/usr/local/bin`. To enable
+experimental Xwayland support pass the `-Dxwayland=true` option.
+
+## Usage
 
 River can either be run nested in an X11/wayland session or directly
 from a tty using KMS/DRM.
 
-Keybinds are similar to the defaults of dwm, but using the "logo key"
-instead of alt. Check out the comments in [config.zig](src/config.zig) for
-a complete list of bindings. Note that the terminal emulator is currently
-hardcoded to [alacritty](https://github.com/alacritty/alacritty) but
-may be changed by editing [config.zig](src/config.zig) and recompiling.
+River has no keybindings by default; mappings can be created using the `map`
+command of `riverctl`. Generally, creating mappings and other configuration is
+done with a shell script. River will execute any arbitrary shell command passed
+with the `-c` flag during startup. For example:
+
+```
+river -c /path/to/config.sh
+```
+
+An example script with sane defaults is provided [here](contrib/config.sh) in
+the contrib directory.
+
+Some configuration options are still hardcoded in [config.zig](src/config.zig).
+Eventually all configuration will be moved to the `riverctl` binary.
 
 ## Development
 
