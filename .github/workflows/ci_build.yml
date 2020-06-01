@@ -35,6 +35,4 @@ jobs:
 
       - name: zig fmt
         run: |
-          zig fmt --check river/**/*.zig
-          zig fmt --check riverctl/**/*.zig
-          zig fmt --check build.zig
+          find . -path ./zig-cache -prune -o -name "*.zig" -exec zig fmt --check {} ";"
