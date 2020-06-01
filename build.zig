@@ -20,7 +20,7 @@ pub fn build(b: *std.build.Builder) !void {
     const scan_protocols = ScanProtocolsStep.create(b);
 
     {
-        const river = b.addExecutable("river", "src/river.zig");
+        const river = b.addExecutable("river", "river/main.zig");
         river.setTarget(target);
         river.setBuildMode(mode);
         river.addBuildOption(bool, "xwayland", xwayland);
@@ -38,7 +38,7 @@ pub fn build(b: *std.build.Builder) !void {
     }
 
     {
-        const riverctl = b.addExecutable("riverctl", "src/riverctl.zig");
+        const riverctl = b.addExecutable("riverctl", "riverctl/main.zig");
         riverctl.setTarget(target);
         riverctl.setBuildMode(mode);
 
@@ -52,7 +52,7 @@ pub fn build(b: *std.build.Builder) !void {
     }
 
     {
-        const river_test = b.addTest("src/test_main.zig");
+        const river_test = b.addTest("river/test_main.zig");
         river_test.setTarget(target);
         river_test.setBuildMode(mode);
         river_test.addBuildOption(bool, "xwayland", xwayland);
