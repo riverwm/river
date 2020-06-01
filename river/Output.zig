@@ -76,11 +76,11 @@ const LayoutName = struct {
 
 // zig fmt: off
 const layout_names = [_]LayoutName {
-    .{ .name = "TopMaster",    .layout = Layout.TopMaster, },
-    .{ .name = "RightMaster",  .layout = Layout.RightMaster, },
-    .{ .name = "BottomMaster", .layout = Layout.BottomMaster, },
-    .{ .name = "LeftMaster",   .layout = Layout.LeftMaster, },
-    .{ .name = "Full",         .layout = Layout.Full, },
+    .{ .name = "top-master",    .layout = Layout.TopMaster, },
+    .{ .name = "right-master",  .layout = Layout.RightMaster, },
+    .{ .name = "bottom-master", .layout = Layout.BottomMaster, },
+    .{ .name = "left-master",   .layout = Layout.LeftMaster, },
+    .{ .name = "full",          .layout = Layout.Full, },
 };
 // zig fmt: on
 
