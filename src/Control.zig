@@ -110,9 +110,12 @@ fn runCommand(
     var failure_message: []const u8 = undefined;
     command.run(allocator, seat, args.items, &failure_message) catch |err| {
         if (err == command.Error.CommandFailed) {
-            const out = std.cstr.addNullByte(allocator, failure_message) catch "out of memory";
+            defer allocator.free(failure_message);
+            const out = std.cstr.addNullByte(allocator, failure_message) catch {
+                c.zriver_command_callback_v1_send_failure(callback_resource, "out of memory");
+                return;
+            };
             defer allocator.free(out);
-            allocator.free(failure_message);
             c.zriver_command_callback_v1_send_failure(callback_resource, out);
         } else {
             c.zriver_command_callback_v1_send_failure(

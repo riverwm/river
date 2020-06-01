@@ -27,6 +27,7 @@ const impl = struct {
     const focus = @import("command/focus.zig").focus;
     const focusAllTags = @import("command/focus_all_tags.zig").focusAllTags;
     const focusOutput = @import("command/focus_output.zig").focusOutput;
+    const bind = @import("command/bind.zig").bind;
     const focusTag = @import("command/focus_tag.zig").focusTag;
     const layout = @import("command/layout.zig").layout;
     const modMasterCount = @import("command/mod_master_count.zig").modMasterCount;
@@ -76,6 +77,7 @@ const str_to_impl_fn = [_]Definition{
     .{ .name = "mod_master_factor", .impl = impl.modMasterFactor },
     .{ .name = "send_to_output",    .impl = impl.sendToOutput },
     .{ .name = "spawn",             .impl = impl.spawn },
+    .{ .name = "bind",              .impl = impl.bind },
     .{ .name = "tag_view",          .impl = impl.tagView },
     .{ .name = "tag_view_all_tags", .impl = impl.tagViewAllTags },
     .{ .name = "toggle_float",      .impl = impl.toggleFloat },
