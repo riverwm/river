@@ -35,4 +35,6 @@ jobs:
 
       - name: zig fmt
         run: |
-          zig fmt --check src/**/*.zig
+          zig fmt --check river/**/*.zig
+          zig fmt --check riverctl/**/*.zig
+          zig fmt --check build.zig
