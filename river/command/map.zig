@@ -62,7 +62,7 @@ pub fn map(
     };
 
     // Parse the modifiers
-    var it = std.mem.split(args[2], "|");
+    var it = std.mem.split(args[2], "+");
     var modifiers: u32 = 0;
     while (it.next()) |mod_name| {
         for (modifier_names) |def| {
