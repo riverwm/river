@@ -48,7 +48,7 @@ xwayland_unmanaged_views: if (build_options.xwayland) std.TailQueue(XwaylandUnma
 pending_configures: u32,
 
 /// Handles timeout of transactions
-transaction_timer: ?*c.wl_event_source,
+transaction_timer: *c.wl_event_source,
 
 pub fn init(self: *Self, server: *Server) !void {
     self.server = server;
@@ -71,7 +71,11 @@ pub fn init(self: *Self, server: *Server) !void {
 
     self.pending_configures = 0;
 
-    self.transaction_timer = null;
+    self.transaction_timer = c.wl_event_loop_add_timer(
+        self.server.wl_event_loop,
+        handleTimeout,
+        self,
+    ) orelse return error.CantCreateTimer;
 }
 
 pub fn deinit(self: *Self) void {
@@ -157,16 +161,10 @@ fn startTransaction(self: *Self) void {
             .{self.pending_configures},
         );
 
-        // TODO: log failure to create timer and commit immediately
-        self.transaction_timer = c.wl_event_loop_add_timer(
-            self.server.wl_event_loop,
-            handleTimeout,
-            self,
-        );
-
         // Set timeout to 200ms
-        if (c.wl_event_source_timer_update(self.transaction_timer, 200) == -1) {
-            // TODO: handle failure
+        if (c.wl_event_source_timer_update(self.transaction_timer, 200) < 0) {
+            Log.Error.log("failed to update timer.", .{});
+            self.commitTransaction();
         }
     } else {
         self.commitTransaction();
@@ -186,10 +184,9 @@ fn handleTimeout(data: ?*c_void) callconv(.C) c_int {
 pub fn notifyConfigured(self: *Self) void {
     self.pending_configures -= 1;
     if (self.pending_configures == 0) {
-        // Stop the timer, as we didn't timeout
-        if (c.wl_event_source_timer_update(self.transaction_timer, 0) == -1) {
-            // TODO: handle failure
-        }
+        // Disarm the timer, as we didn't timeout
+        if (c.wl_event_source_timer_update(self.transaction_timer, 0) == -1)
+            Log.Error.log("Error disarming timer", .{});
         self.commitTransaction();
     }
 }
