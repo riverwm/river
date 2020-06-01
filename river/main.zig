@@ -22,7 +22,41 @@ const c = @import("c.zig");
 const Log = @import("log.zig").Log;
 const Server = @import("Server.zig");
 
+const usage: []const u8 =
+    \\Usage: river [options]
+    \\
+    \\  -h            Print this help message and exit.
+    \\  -c <command>  Run `sh -c <command>` on startup.
+    \\
+;
+
 pub fn main() !void {
+    var startup_command: ?[]const u8 = null;
+    {
+        var it = std.process.args();
+        // Skip our name
+        _ = it.nextPosix();
+        while (it.nextPosix()) |arg| {
+            if (std.mem.eql(u8, arg, "-h")) {
+                const stdout = std.io.getStdOut().outStream();
+                try stdout.print(usage, .{});
+                std.os.exit(0);
+            } else if (std.mem.eql(u8, arg, "-c")) {
+                if (it.nextPosix()) |command| {
+                    startup_command = command;
+                } else {
+                    const stderr = std.io.getStdErr().outStream();
+                    try stderr.print("Error: flag '-c' requires exactly one argument\n", .{});
+                    std.os.exit(1);
+                }
+            } else {
+                const stderr = std.io.getStdErr().outStream();
+                try stderr.print(usage, .{});
+                std.os.exit(1);
+            }
+        }
+    }
+
     Log.init(Log.Debug);
     c.wlr_log_init(.WLR_ERROR, null);
 
@@ -33,6 +67,13 @@ pub fn main() !void {
     defer server.deinit();
 
     try server.start();
+
+    if (startup_command) |cmd| {
+        const child_args = [_][]const u8{ "/bin/sh", "-c", cmd };
+        const child = try std.ChildProcess.init(&child_args, std.heap.c_allocator);
+        defer child.deinit();
+        try std.ChildProcess.spawn(child);
+    }
 
     Log.Info.log("Running server...", .{});
 
