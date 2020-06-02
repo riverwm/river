@@ -275,7 +275,8 @@ test "push/remove (*View)" {
 
 test "iteration (View)" {
     const c = @import("c.zig");
-    const testing = @import("std").testing;
+    const std = @import("std");
+    const testing = std.testing;
 
     const allocator = testing.allocator;
 
@@ -315,7 +316,7 @@ test "iteration (View)" {
 
     // Iteration over all tags
     {
-        var it = ViewStack(View).iterator(views.first, 0xFFFFFFFF);
+        var it = ViewStack(View).iterator(views.first, std.math.maxInt(u32));
         testing.expect((if (it.next()) |node| &node.view else null) == &two_a.view);
         testing.expect((if (it.next()) |node| &node.view else null) == &five_b.view);
         testing.expect((if (it.next()) |node| &node.view else null) == &four_b.view);
@@ -349,7 +350,7 @@ test "iteration (View)" {
 
     // Reverse iteration over all tags
     {
-        var it = ViewStack(View).reverseIterator(views.last, 0xFFFFFFFF);
+        var it = ViewStack(View).reverseIterator(views.last, std.math.maxInt(u32));
         testing.expect((if (it.next()) |node| &node.view else null) == &three_b_pa.view);
         testing.expect((if (it.next()) |node| &node.view else null) == &one_a_pb.view);
         testing.expect((if (it.next()) |node| &node.view else null) == &four_b.view);

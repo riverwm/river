@@ -137,7 +137,7 @@ fn startTransaction(self: *Self) void {
     var output_it = self.outputs.first;
     while (output_it) |node| : (output_it = node.next) {
         const output = &node.data;
-        var view_it = ViewStack(View).iterator(output.views.first, 0xFFFFFFFF);
+        var view_it = ViewStack(View).iterator(output.views.first, std.math.maxInt(u32));
         while (view_it.next()) |view_node| {
             const view = &view_node.view;
             // Clear the serial in case this transaction is interrupting a prior one.
@@ -222,7 +222,7 @@ fn commitTransaction(self: *Self) void {
             output.pending_focused_tags = null;
         }
 
-        var view_it = ViewStack(View).iterator(output.views.first, 0xFFFFFFFF);
+        var view_it = ViewStack(View).iterator(output.views.first, std.math.maxInt(u32));
         while (view_it.next()) |view_node| {
             const view = &view_node.view;
             // Ensure that all pending state is cleared
