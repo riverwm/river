@@ -24,21 +24,19 @@ const impl = struct {
     const declareMode = @import("command/declare_mode.zig").declareMode;
     const enterMode = @import("command/enter_mode.zig").enterMode;
     const exit = @import("command/exit.zig").exit;
-    const focusView = @import("command/focus_view.zig").focusView;
-    const focusAllTags = @import("command/focus_all_tags.zig").focusAllTags;
     const focusOutput = @import("command/focus_output.zig").focusOutput;
-    const map = @import("command/map.zig").map;
-    const focusTag = @import("command/focus_tag.zig").focusTag;
+    const focusView = @import("command/focus_view.zig").focusView;
     const layout = @import("command/layout.zig").layout;
+    const map = @import("command/map.zig").map;
     const modMasterCount = @import("command/mod_master_count.zig").modMasterCount;
     const modMasterFactor = @import("command/mod_master_factor.zig").modMasterFactor;
     const sendToOutput = @import("command/send_to_output.zig").sendToOutput;
+    const setFocusedTags = @import("command/tags.zig").setFocusedTags;
+    const setViewTags = @import("command/tags.zig").setViewTags;
     const spawn = @import("command/spawn.zig").spawn;
-    const tagView = @import("command/tag_view.zig").tagView;
-    const tagViewAllTags = @import("command/tag_view_all_tags.zig").tagViewAllTags;
     const toggleFloat = @import("command/toggle_float.zig").toggleFloat;
-    const toggleTagFocus = @import("command/toggle_tag_focus.zig").toggleTagFocus;
-    const toggleViewTag = @import("command/toggle_view_tag.zig").toggleViewTag;
+    const toggleFocusedTags = @import("command/tags.zig").toggleFocusedTags;
+    const toggleViewTags = @import("command/tags.zig").toggleViewTags;
     const zoom = @import("command/zoom.zig").zoom;
 };
 
@@ -56,34 +54,30 @@ pub const Direction = enum {
     }
 };
 
-const Definition = struct {
-    name: []const u8,
-    impl: fn (*std.mem.Allocator, *Seat, []const []const u8, *[]const u8) Error!void,
-};
-
 // TODO: this could be replaced with a comptime hashmap
 // zig fmt: off
-const str_to_impl_fn = [_]Definition{
-    .{ .name = "close",             .impl = impl.close },
-    .{ .name = "declare-mode",      .impl = impl.declareMode},
-    .{ .name = "enter-mode",        .impl = impl.enterMode },
-    .{ .name = "exit",              .impl = impl.exit },
-    .{ .name = "focus-view",        .impl = impl.focusView },
-    .{ .name = "focus-all-tags",    .impl = impl.focusAllTags },
-    .{ .name = "focus-output",      .impl = impl.focusOutput },
-    .{ .name = "focus-tag",         .impl = impl.focusTag },
-    .{ .name = "layout",            .impl = impl.layout },
-    .{ .name = "mod-master-count",  .impl = impl.modMasterCount },
-    .{ .name = "mod-master-factor", .impl = impl.modMasterFactor },
-    .{ .name = "send-to-output",    .impl = impl.sendToOutput },
-    .{ .name = "spawn",             .impl = impl.spawn },
-    .{ .name = "map",               .impl = impl.map },
-    .{ .name = "tag-view",          .impl = impl.tagView },
-    .{ .name = "tag-view-all-tags", .impl = impl.tagViewAllTags },
-    .{ .name = "toggle-float",      .impl = impl.toggleFloat },
-    .{ .name = "toggle-tag-focus",  .impl = impl.toggleTagFocus },
-    .{ .name = "toggle-view-tag",   .impl = impl.toggleViewTag },
-    .{ .name = "zoom",              .impl = impl.zoom },
+const str_to_impl_fn = [_]struct {
+    name: []const u8,
+    impl: fn (*std.mem.Allocator, *Seat, []const []const u8, *[]const u8) Error!void,
+}{
+    .{ .name = "close",               .impl = impl.close },
+    .{ .name = "declare-mode",        .impl = impl.declareMode },
+    .{ .name = "enter-mode",          .impl = impl.enterMode },
+    .{ .name = "exit",                .impl = impl.exit },
+    .{ .name = "focus-output",        .impl = impl.focusOutput },
+    .{ .name = "focus-view",          .impl = impl.focusView },
+    .{ .name = "layout",              .impl = impl.layout },
+    .{ .name = "map",                 .impl = impl.map },
+    .{ .name = "mod-master-count",    .impl = impl.modMasterCount },
+    .{ .name = "mod-master-factor",   .impl = impl.modMasterFactor },
+    .{ .name = "send-to-output",      .impl = impl.sendToOutput },
+    .{ .name = "set-focused-tags",    .impl = impl.setFocusedTags },
+    .{ .name = "set-view-tags",       .impl = impl.setViewTags },
+    .{ .name = "spawn",               .impl = impl.spawn },
+    .{ .name = "toggle-float",        .impl = impl.toggleFloat },
+    .{ .name = "toggle-focused-tags", .impl = impl.toggleFocusedTags },
+    .{ .name = "toggle-view-tags",    .impl = impl.toggleViewTags },
+    .{ .name = "zoom",                .impl = impl.zoom },
 };
 // zig fmt: on
 

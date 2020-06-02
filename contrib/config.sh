@@ -38,24 +38,26 @@ riverctl map normal $mod+Shift H mod-master-count +1
 riverctl map normal $mod+Shift L mod-master-count -1
 
 for i in $(seq 1 9); do
-    # Mod+[1-9] to focus tag [1-9]
-    riverctl map normal $mod $i focus-tag $i
+    tagmask=$((1 << ($i - 1)))
 
-    # Mod+Shift+[1-9] to tag focused view with tag [1-9]
-    riverctl map normal $mod+Shift $i tag-view $i
+    # Mod+[1-9] to focus tag [0-8]
+    riverctl map normal $mod $i set-focused-tags $tagmask
 
-    # Mod+Ctrl+[1-9] to toggle focus of tag [1-9]
-    riverctl map normal $mod+Control $i toggle-tag-focus $i
+    # Mod+Shift+[1-9] to tag focused view with tag [0-8]
+    riverctl map normal $mod+Shift $i set-view-tags $tagmask
 
-    # Mod+Shift+Ctrl+[1-9] to toggle tag [1-9] of focused view
-    riverctl map normal $mod+Shift+Control $i toggle-view-tag $i
+    # Mod+Ctrl+[1-9] to toggle focus of tag [0-8]
+    riverctl map normal $mod+Control $i toggle-focused-tags $tagmask
+
+    # Mod+Shift+Ctrl+[1-9] to toggle tag [0-8] of focused view
+    riverctl map normal $mod+Shift+Control $i toggle-view-tags $tagmask
 done
 
 # Mod+0 to focus all tags
-riverctl map normal $mod 0 focus-all-tags
-
 # Mod+Shift+0 to tag focused view with all tags
-riverctl map normal $mod+Shift 0 tag-view-all-tags
+all_tags_mask=$(((1 << 32) - 1))
+riverctl map normal $mod 0 set-focused-tags $all_tags_mask
+riverctl map normal $mod+Shift 0 set-view-tags $all_tags_mask
 
 # Mod+Space to toggle float
 riverctl map normal $mod Space toggle-float
