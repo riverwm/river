@@ -27,6 +27,7 @@ const DecorationManager = @import("DecorationManager.zig");
 decoration_manager: *DecorationManager,
 wlr_xdg_toplevel_decoration: *c.wlr_xdg_toplevel_decoration_v1,
 
+listen_destroy: c.wl_listener,
 listen_request_mode: c.wl_listener,
 
 pub fn init(
@@ -37,10 +38,22 @@ pub fn init(
     self.decoration_manager = decoration_manager;
     self.wlr_xdg_toplevel_decoration = wlr_xdg_toplevel_decoration;
 
+    self.listen_destroy.notify = handleDestroy;
+    c.wl_signal_add(&self.wlr_xdg_toplevel_decoration.events.destroy, &self.listen_destroy);
+
     self.listen_request_mode.notify = handleRequestMode;
     c.wl_signal_add(&self.wlr_xdg_toplevel_decoration.events.request_mode, &self.listen_request_mode);
 
     handleRequestMode(&self.listen_request_mode, self.wlr_xdg_toplevel_decoration);
+}
+
+fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    const self = @fieldParentPtr(Self, "listen_destroy", listener.?);
+    const allocator = self.decoration_manager.server.allocator;
+    const node = @fieldParentPtr(std.SinglyLinkedList(Self).Node, "data", self);
+
+    self.decoration_manager.decorations.remove(node);
+    allocator.destroy(node);
 }
 
 fn handleRequestMode(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {

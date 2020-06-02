@@ -62,6 +62,10 @@ pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
 
 pub fn deinit(self: Self, allocator: *std.mem.Allocator) void {
     self.mode_to_id.deinit();
-    for (self.modes.items) |*mode| mode.deinit();
+    for (self.modes.items) |mode| {
+        for (mode.items) |mapping| mapping.deinit(allocator);
+        mode.deinit();
+    }
     self.modes.deinit();
+    self.float_filter.deinit();
 }

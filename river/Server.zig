@@ -136,13 +136,16 @@ pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
 /// Free allocated memory and clean up
 pub fn deinit(self: *Self) void {
     // Note: order is important here
-    if (build_options.xwayland) {
-        c.wlr_xwayland_destroy(self.wlr_xwayland);
-    }
+    if (build_options.xwayland) c.wlr_xwayland_destroy(self.wlr_xwayland);
+
     c.wl_display_destroy_clients(self.wl_display);
-    c.wl_display_destroy(self.wl_display);
-    self.input_manager.deinit();
+
     self.root.deinit();
+
+    c.wl_display_destroy(self.wl_display);
+    c.river_wlr_backend_destory(self.noop_backend);
+
+    self.input_manager.deinit();
     self.config.deinit(self.allocator);
 }
 

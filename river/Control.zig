@@ -85,12 +85,13 @@ fn runCommand(
     const seat = self.server.input_manager.default_seat;
 
     var args = std.ArrayList([]const u8).init(allocator);
+    defer args.deinit();
 
     var i: usize = 0;
     const data = @ptrCast([*]const u8, wl_array.?.data);
     while (i < wl_array.?.size) {
         const slice = std.mem.spanZ(@ptrCast([*:0]const u8, &data[i]));
-        args.append(std.mem.dupe(allocator, u8, slice) catch unreachable) catch unreachable;
+        args.append(slice) catch unreachable;
 
         i += slice.len + 1;
     }

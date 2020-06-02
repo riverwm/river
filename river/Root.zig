@@ -79,11 +79,17 @@ pub fn init(self: *Self, server: *Server) !void {
 }
 
 pub fn deinit(self: *Self) void {
-    while (self.outputs.pop()) |output_node| {
-        output_node.data.deinit();
-        self.server.allocator.destroy(output_node);
-    }
+    // Need to remove these listeners as the noop output will be destroyed with
+    // the noop backend triggering the destroy event. However,
+    // Output.handleDestroy is not intended to handle the noop output being
+    // destroyed.
+    c.wl_list_remove(&self.noop_output.listen_destroy.link);
+    c.wl_list_remove(&self.noop_output.listen_frame.link);
+    c.wl_list_remove(&self.noop_output.listen_mode.link);
+
     c.wlr_output_layout_destroy(self.wlr_output_layout);
+
+    if (c.wl_event_source_remove(self.transaction_timer) < 0) unreachable;
 }
 
 pub fn addOutput(self: *Self, wlr_output: *c.wlr_output) void {

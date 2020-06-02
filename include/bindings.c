@@ -35,3 +35,7 @@ struct wlr_output *river_wlr_noop_add_output(struct wlr_backend *backend) {
 bool river_wlr_output_is_noop(struct wlr_output *output) {
     return wlr_output_is_noop(output);
 }
+
+void river_wlr_backend_destory(struct wlr_backend *backend) {
+    wlr_backend_destroy(backend);
+}
