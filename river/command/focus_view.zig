@@ -27,7 +27,7 @@ const ViewStack = @import("../view_stack.zig").ViewStack;
 
 /// Focus either the next or the previous visible view, depending on the enum
 /// passed. Does nothing if there are 1 or 0 views in the stack.
-pub fn focus(
+pub fn focusView(
     allocator: *std.mem.Allocator,
     seat: *Seat,
     args: []const []const u8,

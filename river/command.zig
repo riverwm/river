@@ -24,7 +24,7 @@ const impl = struct {
     const declareMode = @import("command/declare_mode.zig").declareMode;
     const enterMode = @import("command/enter_mode.zig").enterMode;
     const exit = @import("command/exit.zig").exit;
-    const focus = @import("command/focus.zig").focus;
+    const focusView = @import("command/focus_view.zig").focusView;
     const focusAllTags = @import("command/focus_all_tags.zig").focusAllTags;
     const focusOutput = @import("command/focus_output.zig").focusOutput;
     const map = @import("command/map.zig").map;
@@ -68,7 +68,7 @@ const str_to_impl_fn = [_]Definition{
     .{ .name = "declare-mode",      .impl = impl.declareMode},
     .{ .name = "enter-mode",        .impl = impl.enterMode },
     .{ .name = "exit",              .impl = impl.exit },
-    .{ .name = "focus",             .impl = impl.focus },
+    .{ .name = "focus-view",        .impl = impl.focusView },
     .{ .name = "focus-all-tags",    .impl = impl.focusAllTags },
     .{ .name = "focus-output",      .impl = impl.focusOutput },
     .{ .name = "focus-tag",         .impl = impl.focusTag },

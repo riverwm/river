@@ -13,8 +13,8 @@ riverctl map normal $mod Q close
 riverctl map normal $mod E exit
 
 # Mod+J and Mod+K to focus the next/previous view in the layout stack
-riverctl map normal $mod J focus next
-riverctl map normal $mod K focus previous
+riverctl map normal $mod J focus-view next
+riverctl map normal $mod K focus-view previous
 
 # Mod+Period and Mod+Comma to focus the next/previous output
 riverctl map normal $mod Period focus-output next
