@@ -110,6 +110,19 @@ const ScanProtocolsStep = struct {
             &[_][]const u8{ protocol_dir, "stable/xdg-shell/xdg-shell.xml" },
             &[_][]const u8{ "protocol", "wlr-layer-shell-unstable-v1.xml" },
             &[_][]const u8{ "protocol", "river-control-unstable-v1.xml" },
+            &[_][]const u8{ "protocol", "river-status-unstable-v1.xml" },
+        };
+
+        const server_protocols = [_][]const u8{
+            "xdg-shell",
+            "wlr-layer-shell-unstable-v1",
+            "river-control-unstable-v1",
+            "river-status-unstable-v1",
+        };
+
+        const client_protocols = [_][]const u8{
+            "river-control-unstable-v1",
+            "river-status-unstable-v1",
         };
 
         for (protocol_dir_paths) |dir_path| {
@@ -119,34 +132,39 @@ const ScanProtocolsStep = struct {
             const basename = std.fs.path.basename(xml_in_path);
             const basename_no_ext = basename[0..(basename.len - 4)];
 
-            const header_out_path = try std.mem.concat(
-                self.builder.allocator,
-                u8,
-                &[_][]const u8{ "protocol/", basename_no_ext, "-protocol.h" },
-            );
             const code_out_path = try std.mem.concat(
                 self.builder.allocator,
                 u8,
                 &[_][]const u8{ "protocol/", basename_no_ext, "-protocol.c" },
             );
-
-            _ = try self.builder.exec(
-                &[_][]const u8{ "wayland-scanner", "server-header", xml_in_path, header_out_path },
-            );
             _ = try self.builder.exec(
                 &[_][]const u8{ "wayland-scanner", "private-code", xml_in_path, code_out_path },
             );
 
-            // We need the client header as well for river-control
-            if (std.mem.eql(u8, basename_no_ext, "river-control-unstable-v1")) {
-                const client_header_out_path = try std.mem.concat(
-                    self.builder.allocator,
-                    u8,
-                    &[_][]const u8{ "protocol/", basename_no_ext, "-client-protocol.h" },
-                );
-                _ = try self.builder.exec(
-                    &[_][]const u8{ "wayland-scanner", "client-header", xml_in_path, client_header_out_path },
-                );
+            for (server_protocols) |server_protocol| {
+                if (std.mem.eql(u8, basename_no_ext, server_protocol)) {
+                    const header_out_path = try std.mem.concat(
+                        self.builder.allocator,
+                        u8,
+                        &[_][]const u8{ "protocol/", basename_no_ext, "-protocol.h" },
+                    );
+                    _ = try self.builder.exec(
+                        &[_][]const u8{ "wayland-scanner", "server-header", xml_in_path, header_out_path },
+                    );
+                }
+            }
+
+            for (client_protocols) |client_protocol| {
+                if (std.mem.eql(u8, basename_no_ext, client_protocol)) {
+                    const header_out_path = try std.mem.concat(
+                        self.builder.allocator,
+                        u8,
+                        &[_][]const u8{ "protocol/", basename_no_ext, "-client-protocol.h" },
+                    );
+                    _ = try self.builder.exec(
+                        &[_][]const u8{ "wayland-scanner", "client-header", xml_in_path, header_out_path },
+                    );
+                }
             }
         }
     }
