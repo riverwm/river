@@ -17,7 +17,7 @@
   </copyright>
 
   <interface name="zriver_status_manager_v1" version="1">
-    <description summary="manage >
+    <description summary="manage river status objects">
       A global factory for objects that receive status information specific
       to river.
     </description>
