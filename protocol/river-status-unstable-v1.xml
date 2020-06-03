@@ -16,38 +16,58 @@
     OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
   </copyright>
 
-  <interface name="zriver_status_v1" version="1">
-    <description summary="track tags and focus">
-      This protocol allows clients to receive information about the current
-      windowing state. It can be used to implement, for example, a status bar
-      displaying information specific to river.
+  <interface name="zriver_status_manager_v1" version="1">
+    <description summary="manage >
+      A global factory for objects that receive status information specific
+      to river.
+    </description>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the river_status_manager object">
+        This request indicates that the client will not use the
+        river_status_manager object any more. Objects that have been created
+       through this instance are not affected.
+      </description>
+    </request>
+
+    <request name="get_river_output_status">
+      <description summary="create an output status object">
+        This creates a new river_output_status object for the given wl_output.
+      </description>
+      <arg name="id" type="new_id" interface="zriver_output_status_v1"/>
+      <arg name="output" type="object" interface="wl_output"/>
+    </request>
+  </interface>
+
+  <interface name="zriver_output_status_v1" version="1">
+    <description summary="track output tags and focus">
+      This interface allows clients to receive information about the current
+      windowing state of an output. It can be used to implement, for example,
+      a status bar displaying information specific to river.
     </description>
 
     <event name="focused_tags">
-      <description summary="focused tags of an output">
-        Sent once for each output on binding the interface and again whenever
-        the tag focus of an output changes.
+      <description summary="focused tags of the output">
+        Sent once binding the interface and again whenever the tag focus of
+        the output changes.
       </description>
-      <arg name="output" type="object" interface="wl_output"/>
       <arg name="tags" type="uint" summary="32-bit bitfield"/>
     </event>
 
     <event name="view_tags">
       <description summary="tag state of an output's views">
-        Sent once for each output on binding the interface and again whenever
-        the state changes.
+        Sent once on binding the interface and again whenever the tag state
+        of the output changes.
       </description>
-      <arg name="output" type="object" interface="wl_output"/>
       <arg name="tags" type="array" summary="array of 32-bit bitfields"/>
     </event>
 
     <event name="focused_title">
       <description summary="focused view title">
-        This event is sent for each output on binding the interface and when
-        the focused view or title thereof changes. The title may be an empty
-        string if no view is focused or the focused view did not set a title.
+        Sent once on binding the interface and again whenever the focused
+        view or title thereof changes. The title may be an empty string if
+        no view is focused or the focused view did not set a title.
       </description>
-      <arg name="output" type="object" interface="wl_output"/>
       <arg name="title" type="string" summary="title of the focused view"/>
     </event>
   </interface>
