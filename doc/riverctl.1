@@ -1,0 +1,173 @@
+.TH RIVERCTL 1 2020-06-03 github.com/ifreund/river "General Commands Manual"
+
+.SH NAME
+riverctl \- command-line interface for controlling river
+
+.SH SYNOPSIS
+.BR riverctl " " close | declare-mode | enter-mode | exit | focus-output | focus-view | layout | map | mod-master-count | mod-master-factor | send-to-output | set-focused-tags | set-view-tags | spawn | toggle-float | toggle-focused-tags | toggle-view-tags | zoom
+.RI [ "command specific arguments" ]
+
+.SH DESCRIPTION
+.B riverctl
+is a command-line interface inspired by bspc from bspwm used to control and configure river.
+
+.SH COMMANDS
+.SS ACTIONS
+
+.TP
+.B close
+Close the focused view.
+
+.TP 
+.B exit
+Exit the compositor, terminating the Wayland session.
+
+.TP
+.B focus-output \c
+.BR next | previous
+Focus next or previous output.
+
+.TP
+.B focus-view \c
+.BR next | previous  
+Focus next or previous view in the stack.
+
+.TP
+.B layout \c
+.BR top-master | right-master | bottom-master | left-master | full 
+Change the view layout.
+
+.TP
+.BI mod-master-count " integer"
+Increase or decrease the number of master views.
+.I integer
+can be positive or negative.
+
+.TP
+.BI mod-master-factor " float"
+Make the master area bigger or smaller.
+.I float
+is a positive or negative floating point number (such as 0.05)
+where 1 corresponds to the whole screen.
+
+.TP
+.B send-to-output \c
+.BR next | previous
+Send the focused view to the next or the previous output.
+
+.TP
+.BI spawn " shell_command"
+Run
+.I shell_command
+using
+.IR "/bin/sh -c" .
+Put single quotes around
+.I shell_command
+if you do not want special characters to get interpreted by your shell
+before the command gets passed to
+.IR /bin/sh .
+
+.TP
+.B toggle-float
+If the focused view is floating, make it tiled.
+If it is tiled, make it floating.
+
+.TP
+.B zoom
+Bump the focused view to the top of the layout stack to make it the new master.
+
+.SS ACTIONS ON TAGS
+Tags are like workspaces but more flexible:
+You can assign views to multiple tags and look at multiple tags at once.
+A
+.I tagmask
+is used to represent which tags are visible.
+The following commands take a
+.I tagmask
+in base 10 as argument but
+.I tagmasks
+are best understood in binary:
+000000001 means that the first tag is visible;
+111111111 means that tag 1 through 9 are visible. 
+
+.TP
+.BI set-focused-tags " tagmask"
+Show the tags specified with
+.IR tagmask .
+
+.TP
+.BI set-view-tags " tagmask"
+Assign focused view to tags specified with
+.IR tagmask .
+
+.TP
+.BI toggle-focused-tags " tagmask"
+Toggle visibility of tags specified with
+.IR tagmask .
+
+.TP
+.BI toggle-view-tags " tagmask"
+Toggle tags of focused view as specified with
+.IR tagmask .
+
+.SS CONFIGURATION COMMANDS
+
+.TP
+.BI declare-mode " name"
+Create a new mode called
+.I name
+for use in mappings.
+
+.TP
+.BI enter-mode " name"
+Switch to given mode if it exits.
+
+.TP
+.B map \c
+.I mode modifiers key command
+.I mode
+is either
+.B normal
+(the default mode) or a mode created with
+.BR declare-mode .
+.I modifiers
+is a list of one or more of the following modifiers separated with a plus sign:
+.IP 	\(bu
+Shift
+.IP 	\(bu
+Lock (Caps lock)
+.IP 	\(bu
+Control (Ctrl)
+.IP 	\(bu
+Mod (Alt)
+.IP 	\(bu
+Mod2
+.IP 	\(bu
+Mod3
+.IP 	\(bu
+Mod4 (Super, Logo, Windows)
+.IP 	\(bu
+Mod5
+
+.I key
+is an XKB key name. See
+.I /usr/include/xkbcommon/xkbcommon-keysyms.h
+for a list of special key names.
+.I command
+can be any of the above commands.
+
+.SH EXAMPLES
+
+Bind bemenu-run to Super+P:
+
+.RS 4
+riverctl map normal Mod4 P spawn bemenu-run
+.RE
+
+See
+.I contrib/config.sh
+for some basic keybindings.
+
+.SH SEE ALSO
+
+.BR river "(1), " bspc (1)
