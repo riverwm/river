@@ -80,6 +80,7 @@ fn addProtocolDeps(exe: *std.build.LibExeObjStep, protocol_step: *std.build.Step
     exe.step.dependOn(protocol_step);
     exe.addIncludeDir("protocol");
     exe.addCSourceFile("protocol/river-control-unstable-v1-protocol.c", &[_][]const u8{"-std=c99"});
+    exe.addCSourceFile("protocol/river-status-unstable-v1-protocol.c", &[_][]const u8{"-std=c99"});
 }
 
 const ScanProtocolsStep = struct {

@@ -100,6 +100,15 @@ pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*c.wlr_surfa
     );
 }
 
+/// Return the current title of the toplevel. May be an empty string.
+pub fn getTitle(self: Self) [*:0]const u8 {
+    const wlr_xdg_toplevel: *c.wlr_xdg_toplevel = @field(
+        self.wlr_xdg_surface,
+        c.wlr_xdg_surface_union,
+    ).toplevel;
+    return wlr_xdg_toplevel.title;
+}
+
 /// Called when the xdg surface is destroyed
 fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_destroy", listener.?);

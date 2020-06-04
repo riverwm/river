@@ -27,9 +27,12 @@ const InputManager = @import("InputManager.zig");
 const Keyboard = @import("Keyboard.zig");
 const LayerSurface = @import("LayerSurface.zig");
 const Output = @import("Output.zig");
+const SeatStatus = @import("SeatStatus.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 
+// TODO: remove none variant, unify focused_view and focused_layer fields
+// with type ?FocusTarget
 const FocusTarget = union(enum) {
     view: *View,
     layer: *LayerSurface,
@@ -62,6 +65,9 @@ focus_stack: ViewStack(*View),
 /// recieve focus.
 focused_layer: ?*LayerSurface,
 
+/// List of status tracking objects relaying changes to this seat to clients.
+status_trackers: std.SinglyLinkedList(SeatStatus),
+
 listen_request_set_selection: c.wl_listener,
 
 pub fn init(self: *Self, input_manager: *InputManager, name: []const u8) !void {
@@ -70,6 +76,7 @@ pub fn init(self: *Self, input_manager: *InputManager, name: []const u8) !void {
     // This will be automatically destroyed when the display is destroyed
     self.wlr_seat = c.wlr_seat_create(input_manager.server.wl_display, name.ptr) orelse
         return error.CantCreateWlrSeat;
+    self.wlr_seat.data = self;
 
     try self.cursor.init(self);
     errdefer self.cursor.destroy();
@@ -85,6 +92,8 @@ pub fn init(self: *Self, input_manager: *InputManager, name: []const u8) !void {
     self.focus_stack.init();
 
     self.focused_layer = null;
+
+    self.status_trackers = std.SinglyLinkedList(SeatStatus).init();
 
     self.listen_request_set_selection.notify = handleRequestSetSelection;
     c.wl_signal_add(&self.wlr_seat.events.request_set_selection, &self.listen_request_set_selection);
@@ -167,9 +176,7 @@ pub fn setFocusRaw(self: *Self, focus_target: FocusTarget) void {
         .view => |target_view| target_view == self.focused_view,
         .layer => |target_layer| target_layer == self.focused_layer,
         .none => false,
-    }) {
-        return;
-    }
+    }) return;
 
     // Obtain the target wlr_surface
     const target_wlr_surface = switch (focus_target) {
@@ -223,6 +230,23 @@ pub fn setFocusRaw(self: *Self, focus_target: FocusTarget) void {
             );
         }
     }
+
+    // Inform any clients tracking status of the change
+    var it = self.status_trackers.first;
+    while (it) |node| : (it = node.next) node.data.sendFocusedView();
+}
+
+/// Focus the given output, notifying any listening clients of the change.
+pub fn focusOutput(self: *Self, output: *Output) void {
+    const root = &self.input_manager.server.root;
+
+    var it = self.status_trackers.first;
+    while (it) |node| : (it = node.next) node.data.sendOutput(.unfocused);
+
+    self.focused_output = output;
+
+    it = self.status_trackers.first;
+    while (it) |node| : (it = node.next) node.data.sendOutput(.focused);
 }
 
 /// Handle the unmapping of a view, removing it from the focus stack and

@@ -23,15 +23,16 @@ const std = @import("std");
 const c = @import("c.zig");
 
 const Config = @import("Config.zig");
+const Control = @import("Control.zig");
 const DecorationManager = @import("DecorationManager.zig");
 const InputManager = @import("InputManager.zig");
 const LayerSurface = @import("LayerSurface.zig");
 const Log = @import("log.zig").Log;
 const Output = @import("Output.zig");
 const Root = @import("Root.zig");
+const StatusManager = @import("StatusManager.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
-const Control = @import("Control.zig");
 const XwaylandUnmanaged = @import("XwaylandUnmanaged.zig");
 
 allocator: *std.mem.Allocator,
@@ -57,6 +58,7 @@ input_manager: InputManager,
 root: Root,
 config: Config,
 control: Control,
+status_manager: StatusManager,
 
 pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
     self.allocator = allocator;
@@ -123,6 +125,7 @@ pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
     // Must be called after root is initialized
     try self.input_manager.init(self);
     try self.control.init(self);
+    try self.status_manager.init(self);
 
     // These all free themselves when the wl_display is destroyed
     _ = c.wlr_data_device_manager_create(self.wl_display) orelse

@@ -28,6 +28,7 @@ const Log = @import("log.zig").Log;
 const Root = @import("Root.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
+const OutputStatus = @import("OutputStatus.zig");
 
 root: *Root,
 wlr_output: *c.wlr_output,
@@ -54,6 +55,9 @@ master_factor: f64,
 
 /// Current layout of the output.
 layout: Layout,
+
+/// List of status tracking objects relaying changes to this output to clients.
+status_trackers: std.SinglyLinkedList(OutputStatus),
 
 // All listeners for this output, in alphabetical order
 listen_destroy: c.wl_listener,
@@ -133,6 +137,8 @@ pub fn init(self: *Self, root: *Root, wlr_output: *c.wlr_output) !void {
     // LeftMaster is the default layout for all outputs
     self.layout = Layout.LeftMaster;
 
+    self.status_trackers = std.SinglyLinkedList(OutputStatus).init();
+
     // Set up listeners
     self.listen_destroy.notify = handleDestroy;
     c.wl_signal_add(&wlr_output.events.destroy, &self.listen_destroy);
@@ -167,20 +173,6 @@ pub fn init(self: *Self, root: *Root, wlr_output: *c.wlr_output) !void {
             .width = @intCast(u32, width),
             .height = @intCast(u32, height),
         };
-    }
-}
-
-pub fn deinit(self: *Self) void {
-    for (self.layers) |*layer| {
-        while (layer.pop()) |layer_surface_node| {
-            self.root.server.allocator.destroy(layer_surface_node);
-        }
-    }
-
-    while (self.views.first) |node| {
-        node.view.deinit();
-        self.views.remove(node);
-        self.root.server.allocator.destroy(node);
     }
 }
 
@@ -708,7 +700,7 @@ fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     while (seat_it) |seat_node| : (seat_it = seat_node.next) {
         const seat = &seat_node.data;
         if (seat.focused_output == self) {
-            seat.focused_output = fallback_output;
+            seat.focusOutput(self);
             seat.focus(null);
         }
     }

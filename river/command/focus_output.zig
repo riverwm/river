@@ -45,10 +45,10 @@ pub fn focusOutput(
 
     // Focus the next/prev output in the list if there is one, else wrap
     const focused_node = @fieldParentPtr(std.TailQueue(Output).Node, "data", seat.focused_output);
-    seat.focused_output = switch (direction) {
+    seat.focusOutput(switch (direction) {
         .Next => if (focused_node.next) |node| &node.data else &root.outputs.first.?.data,
         .Prev => if (focused_node.prev) |node| &node.data else &root.outputs.last.?.data,
-    };
+    });
 
     seat.focus(null);
 }

@@ -104,7 +104,7 @@ pub fn addOutput(self: *Self, wlr_output: *c.wlr_output) void {
         // TODO: move views from the noop output to the new one and focus(null)
         var it = self.server.input_manager.seats.first;
         while (it) |seat_node| : (it = seat_node.next) {
-            seat_node.data.focused_output = &self.outputs.first.?.data;
+            seat_node.data.focusOutput(&self.outputs.first.?.data);
         }
     }
 }
@@ -220,7 +220,11 @@ fn commitTransaction(self: *Self) void {
             );
             output.current_focused_tags = tags;
             output.pending_focused_tags = null;
+            var it = output.status_trackers.first;
+            while (it) |node| : (it = node.next) node.data.sendFocusedTags();
         }
+
+        var view_tags_changed = false;
 
         var view_it = ViewStack(View).iterator(output.views.first, std.math.maxInt(u32));
         while (view_it.next()) |view_node| {
@@ -236,9 +240,15 @@ fn commitTransaction(self: *Self) void {
             if (view.pending_tags) |tags| {
                 view.current_tags = tags;
                 view.pending_tags = null;
+                view_tags_changed = true;
             }
 
             view.dropStashedBuffer();
+        }
+
+        if (view_tags_changed) {
+            var it = output.status_trackers.first;
+            while (it) |node| : (it = node.next) node.data.sendViewTags();
         }
     }
 

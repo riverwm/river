@@ -51,6 +51,7 @@ pub usingnamespace @cImport({
     @cInclude("include/bindings.h");
 
     @cInclude("river-control-unstable-v1-protocol.h");
+    @cInclude("river-status-unstable-v1-protocol.h");
 });
 
 // These are needed because zig currently names translated anonymous unions

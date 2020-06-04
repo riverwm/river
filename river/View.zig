@@ -223,6 +223,14 @@ pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*c.wlr_surfa
     };
 }
 
+/// Return the current title of the view. May be an empty string.
+pub fn getTitle(self: Self) [*:0]const u8 {
+    return switch (self.impl) {
+        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.getTitle(),
+        .xwayland_view => |xwayland_view| xwayland_view.getTitle(),
+    };
+}
+
 /// Called by the impl when the surface is ready to be displayed
 pub fn map(self: *Self) void {
     const root = self.output.root;

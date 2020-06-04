@@ -44,7 +44,7 @@ pub fn init(self: *Self, server: *Server) !void {
         protocol_version,
         self,
         bind,
-    ) orelse return error.CantCreateRiverWindowManagementGlobal;
+    ) orelse return error.CantCreateWlGlobal;
 
     self.listen_display_destroy.notify = handleDisplayDestroy;
     c.wl_display_add_destroy_listener(server.wl_display, &self.listen_display_destroy);
@@ -67,11 +67,7 @@ fn bind(wl_client: ?*c.wl_client, data: ?*c_void, version: u32, id: u32) callcon
         c.wl_client_post_no_memory(wl_client);
         return;
     };
-    c.wl_resource_set_implementation(wl_resource, &implementation, self, resourceDestroy);
-}
-
-fn resourceDestroy(wl_resource: ?*c.wl_resource) callconv(.C) void {
-    // TODO
+    c.wl_resource_set_implementation(wl_resource, &implementation, self, null);
 }
 
 fn runCommand(

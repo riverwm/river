@@ -46,3 +46,7 @@ pub fn forEachSurface(
 pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*c.wlr_surface {
     unreachable;
 }
+
+pub fn getTitle(self: Self) [*:0]const u8 {
+    unreachable;
+}
