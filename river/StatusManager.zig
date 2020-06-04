@@ -120,7 +120,7 @@ fn getRiverSeatStatus(
 ) callconv(.C) void {
     const self = @ptrCast(*Self, @alignCast(@alignOf(*Self), c.wl_resource_get_user_data(wl_resource)));
     // This can be null if the seat is inert, in which case we ignore the request
-    const wlr_seat_client = c.wlr_seat_client_from_resource(wl_resource) orelse return;
+    const wlr_seat_client = c.wlr_seat_client_from_resource(seat_wl_resource) orelse return;
     const seat = @ptrCast(*Seat, @alignCast(@alignOf(*Seat), wlr_seat_client.*.seat.*.data));
     const allocator = self.server.allocator;
 
