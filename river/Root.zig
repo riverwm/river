@@ -246,10 +246,7 @@ fn commitTransaction(self: *Self) void {
             view.dropStashedBuffer();
         }
 
-        if (view_tags_changed) {
-            var it = output.status_trackers.first;
-            while (it) |node| : (it = node.next) node.data.sendViewTags();
-        }
+        if (view_tags_changed) output.sendViewTags();
     }
 
     // Iterate over all seats and update focus

@@ -180,6 +180,11 @@ pub fn getRenderer(self: Self) *c.wlr_renderer {
     return c.river_wlr_backend_get_renderer(self.wlr_output.backend);
 }
 
+pub fn sendViewTags(self: Self) void {
+    var it = self.status_trackers.first;
+    while (it) |node| : (it = node.next) node.data.sendViewTags();
+}
+
 const MasterPosition = enum {
     Top,
     Right,

@@ -248,6 +248,8 @@ pub fn map(self: *Self) void {
 
     c.wlr_surface_send_enter(self.wlr_surface.?, self.output.wlr_output);
 
+    self.output.sendViewTags();
+
     root.arrange();
 }
 
@@ -267,6 +269,8 @@ pub fn unmap(self: *Self) void {
     // Remove the view from its output's stack
     const node = @fieldParentPtr(ViewStack(Self).Node, "view", self);
     self.output.views.remove(node);
+
+    self.output.sendViewTags();
 
     root.arrange();
 }
