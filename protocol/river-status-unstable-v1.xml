@@ -19,14 +19,14 @@
   <interface name="zriver_status_manager_v1" version="1">
     <description summary="manage river status objects">
       A global factory for objects that receive status information specific
-      to river.
+      to river. It could be used to implement, for example, a status bar.
     </description>
 
     <request name="destroy" type="destructor">
       <description summary="destroy the river_status_manager object">
         This request indicates that the client will not use the
         river_status_manager object any more. Objects that have been created
-       through this instance are not affected.
+        through this instance are not affected.
       </description>
     </request>
 
@@ -37,14 +37,28 @@
       <arg name="id" type="new_id" interface="zriver_output_status_v1"/>
       <arg name="output" type="object" interface="wl_output"/>
     </request>
+
+    <request name="get_river_seat_status">
+      <description summary="create a seat status object">
+        This creates a new river_seat_status object for the given wl_seat.
+      </description>
+      <arg name="id" type="new_id" interface="zriver_seat_status_v1"/>
+      <arg name="seat" type="object" interface="wl_seat"/>
+    </request>
   </interface>
 
   <interface name="zriver_output_status_v1" version="1">
     <description summary="track output tags and focus">
       This interface allows clients to receive information about the current
-      windowing state of an output. It can be used to implement, for example,
-      a status bar displaying information specific to river.
+      windowing state of an output.
     </description>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the river_output_status object">
+        This request indicates that the client will not use the
+        river_output_status object any more.
+      </description>
+    </request>
 
     <event name="focused_tags">
       <description summary="focused tags of the output">
@@ -61,12 +75,40 @@
       </description>
       <arg name="tags" type="array" summary="array of 32-bit bitfields"/>
     </event>
+  </interface>
 
-    <event name="focused_title">
-      <description summary="focused view title">
+  <interface name="zriver_seat_status_v1" version="1">
+    <description summary="track seat focus">
+      This interface allows clients to receive information about the current
+      focus of a seat.
+    </description>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the river_seat_status object">
+        This request indicates that the client will not use the
+        river_seat_status object any more.
+      </description>
+    </request>
+
+    <event name="focused_output">
+      <description summary="the seat focused an output">
+        Sent on binding the interface and again whenever an output gains focus.
+      </description>
+      <arg name="output" type="object" interface="wl_output"/>
+    </event>
+
+    <event name="unfocused_output">
+      <description summary="the seat unfocused an output">
+        Sent whenever an output loses focus.
+      </description>
+      <arg name="output" type="object" interface="wl_output"/>
+    </event>
+
+    <event name="focused_view">
+      <description summary="information on the focused view">
         Sent once on binding the interface and again whenever the focused
-        view or title thereof changes. The title may be an empty string if
-        no view is focused or the focused view did not set a title.
+        view or a property thereof changes. The title may be an empty string
+        if no view is focused or the focused view did not set a title.
       </description>
       <arg name="title" type="string" summary="title of the focused view"/>
     </event>
