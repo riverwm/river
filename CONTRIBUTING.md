@@ -1,23 +1,35 @@
 ## Contributing to river
 
-Contributing is a simple as opening a pull request on our github. You'll likely
+Contributing is a simple as opening a pull request on github. You'll likely
 have more success with your contribution if you hop on our
 [matrix channel](https://matrix.to/#/#river:matrix.org) to discuss your plans
 first.
 
 ## Commit messages
 
-Please take the time to write a good commit message, having a clean git history
-makes maintaining and contributing to river easier. Commit messages should start
-with a summary in 50 characters or less. This summary should complete the
-sentence "When applied, this commit will...". 
+Please take the time to write a good commit message, having a clean git
+history makes maintaining and contributing to river easier. Commit messages
+should start with a prefix indicating what part of river is affected by the
+change, followed by a brief summary.
+
+For example:
+
+```
+build: scan river-status protocol
+```
+
+or
+
+```
+river-status: send view_tags on view map/unmap
+```
 
 In addition to the summary, feel free to add any other details you want preceded
 by a blank line. A good rule of thumb is that anything you would write in a pull
 request description on github has a place in the commit message as well.
 
-For more discussion and details of good commit message practices, check out
-[this post](https://chris.beams.io/posts/git-commit/).
+For further details regarding commit style and git history see
+[weston's contributing guidelines](https://gitlab.freedesktop.org/wayland/weston/-/blob/master/CONTRIBUTING.md#formatting-and-separating-commits).
 
 ## Coding style
 
