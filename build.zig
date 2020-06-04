@@ -17,6 +17,12 @@ pub fn build(b: *std.build.Builder) !void {
         "Set to true to enable xwayland support",
     ) orelse false;
 
+    const examples = b.option(
+        bool,
+        "examples",
+        "Set to true to build examples",
+    ) orelse false;
+
     const scan_protocols = ScanProtocolsStep.create(b);
 
     {
@@ -45,10 +51,22 @@ pub fn build(b: *std.build.Builder) !void {
         addProtocolDeps(riverctl, &scan_protocols.step);
 
         riverctl.linkLibC();
-
         riverctl.linkSystemLibrary("wayland-client");
 
         riverctl.install();
+    }
+
+    if (examples) {
+        const status = b.addExecutable("status", "example/status.zig");
+        status.setTarget(target);
+        status.setBuildMode(mode);
+
+        addProtocolDeps(status, &scan_protocols.step);
+
+        status.linkLibC();
+        status.linkSystemLibrary("wayland-client");
+
+        status.install();
     }
 
     {
