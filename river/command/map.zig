@@ -27,6 +27,7 @@ const modifier_names = [_]struct {
     name: []const u8,
     modifier: u32,
 }{
+    .{ .name = "", .modifier = 0 },
     .{ .name = "Shift", .modifier = c.WLR_MODIFIER_SHIFT },
     .{ .name = "Lock", .modifier = c.WLR_MODIFIER_CAPS },
     .{ .name = "Control", .modifier = c.WLR_MODIFIER_CTRL },
@@ -40,7 +41,7 @@ const modifier_names = [_]struct {
 /// Create a new mapping for a given mode
 ///
 /// Example:
-/// map normal Mod4|Shift Return spawn alacritty
+/// map normal Mod4+Shift Return spawn alacritty
 pub fn map(
     allocator: *std.mem.Allocator,
     seat: *Seat,
