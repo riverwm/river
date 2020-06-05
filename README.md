@@ -55,7 +55,7 @@ river -c /path/to/config.sh
 An example script with sane defaults is provided [here](contrib/config.sh) in
 the contrib directory.
 
-Some configuration options are still hardcoded in [config.zig](src/config.zig).
+Some configuration options are still hardcoded in [Config.zig](src/Config.zig).
 Eventually all configuration will be moved to the `riverctl` binary.
 
 ## Development
@@ -72,7 +72,7 @@ I can often be found in the `#sway-devel` IRC channel with the
 nick `ifreund` on irc.freenode.net as well, or reached by email at
 [ifreund@ifreund.xyz](mailto:ifreund@ifreund.xyz).
 
-## Licensing 
+## Licensing
 
 river is released under the GNU General Public License version 3, or (at your
 option) any later version.
