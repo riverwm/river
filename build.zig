@@ -25,6 +25,10 @@ pub fn build(b: *std.build.Builder) !void {
 
     const scan_protocols = ScanProtocolsStep.create(b);
 
+    // Install man pages, no gzip for now
+    b.installFile("doc/river.1", "share/man/man1/river.1");
+    b.installFile("doc/riverctl.1", "share/man/man1/riverctl.1");
+
     {
         const river = b.addExecutable("river", "river/main.zig");
         river.setTarget(target);
