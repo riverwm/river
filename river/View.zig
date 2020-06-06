@@ -190,6 +190,9 @@ pub fn sendToOutput(self: *Self, destination_output: *Output) void {
     self.output.views.remove(node);
     destination_output.views.push(node);
 
+    self.output.sendViewTags();
+    destination_output.sendViewTags();
+
     c.wlr_surface_send_leave(self.wlr_surface, self.output.wlr_output);
     c.wlr_surface_send_enter(self.wlr_surface, destination_output.wlr_output);
 
