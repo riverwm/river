@@ -53,6 +53,11 @@ pub fn main() !void {
 
     if (river_status_manager == null) return error.RiverStatusManagerNotAdvertised;
 
+    for (outputs.items) |wl_output| createOutputStatus(wl_output);
+    for (seats.items) |wl_seat| createSeatStatus(wl_seat);
+    outputs.deinit();
+    seats.deinit();
+
     // Loop forever, listening for new events.
     while (true) if (c.wl_display_dispatch(wl_display) < 0) return error.DispatchFailed;
 }
@@ -71,28 +76,18 @@ fn handleGlobal(
             *c.zriver_status_manager_v1,
             c.wl_registry_bind(wl_registry, name, &c.zriver_status_manager_v1_interface, version),
         );
-        for (outputs.items) |wl_output| createOutputStatus(wl_output);
-        for (seats.items) |wl_seat| createSeatStatus(wl_seat);
-        outputs.deinit();
-        seats.deinit();
     } else if (std.cstr.cmp(interface.?, @ptrCast([*:0]const u8, c.wl_output_interface.name.?)) == 0) {
         const wl_output = @ptrCast(
             *c.wl_output,
             c.wl_registry_bind(wl_registry, name, &c.wl_output_interface, version),
         );
-        if (river_status_manager != null)
-            createOutputStatus(wl_output)
-        else
-            outputs.append(wl_output) catch @panic("out of memory");
+        outputs.append(wl_output) catch @panic("out of memory");
     } else if (std.cstr.cmp(interface.?, @ptrCast([*:0]const u8, c.wl_seat_interface.name.?)) == 0) {
         const wl_seat = @ptrCast(
             *c.wl_seat,
             c.wl_registry_bind(wl_registry, name, &c.wl_seat_interface, version),
         );
-        if (river_status_manager != null)
-            createSeatStatus(wl_seat)
-        else
-            seats.append(wl_seat) catch @panic("out of memory");
+        seats.append(wl_seat) catch @panic("out of memory");
     }
 }
 
