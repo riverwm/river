@@ -109,14 +109,6 @@ pub fn addOutput(self: *Self, wlr_output: *c.wlr_output) void {
     }
 }
 
-/// Clear the current focus.
-pub fn clearFocus(self: *Self) void {
-    if (self.focused_view) |view| {
-        _ = c.wlr_xdg_toplevel_set_activated(view.wlr_xdg_surface, false);
-    }
-    self.focused_view = null;
-}
-
 /// Arrange all views on all outputs and then start a transaction.
 pub fn arrange(self: *Self) void {
     var it = self.outputs.first;
