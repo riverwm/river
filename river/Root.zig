@@ -132,27 +132,57 @@ fn startTransaction(self: *Self) void {
         var view_it = ViewStack(View).iterator(output.views.first, std.math.maxInt(u32));
         while (view_it.next()) |view_node| {
             const view = &view_node.view;
-            // Clear the serial in case this transaction is interrupting a prior one.
-            view.pending_serial = null;
 
-            if (view.needsConfigure()) {
-                view.configure();
-                self.pending_configures += 1;
+            switch (view.configureAction()) {
+                .override => {
+                    view.configure();
+
+                    // Some clients do not ack a configure if the requested
+                    // size is the same as their current size. Configures of
+                    // this nature may be sent if a pending configure is
+                    // interrupted by a configure returning to the original
+                    // size.
+                    if (view.pending_box.?.width == view.current_box.width and
+                        view.pending_box.?.height == view.current_box.height)
+                    {
+                        view.pending_serial = null;
+                    } else {
+                        std.debug.assert(view.pending_serial != null);
+                        self.pending_configures += 1;
+                    }
+                },
+                .new_configure => {
+                    view.configure();
+                    self.pending_configures += 1;
+                    std.debug.assert(view.pending_serial != null);
+                },
+                .old_configure => {
+                    self.pending_configures += 1;
+                    view.next_box = null;
+                    std.debug.assert(view.pending_serial != null);
+                },
+                .noop => {
+                    view.next_box = null;
+                    std.debug.assert(view.pending_serial == null);
+                },
+            }
+
+            // If there is a saved buffer present, then this transaction is
+            // interrupting a previous transaction and we should keep the old
+            // buffer.
+            if (view.stashed_buffer == null) {
+                view.stashBuffer();
 
                 // We save the current buffer, so we can send an early
                 // frame done event to give the client a head start on
                 // redrawing.
                 view.sendFrameDone();
             }
-
-            // If there is a saved buffer present, then this transaction is interrupting
-            // a previous transaction and we should keep the old buffer.
-            if (view.stashed_buffer == null) {
-                view.stashBuffer();
-            }
         }
     }
 
+    // If there are views that need configures, start a timer and wait for
+    // configure events before committing.
     if (self.pending_configures > 0) {
         Log.Debug.log(
             "Started transaction with {} pending configures.",
@@ -160,11 +190,15 @@ fn startTransaction(self: *Self) void {
         );
 
         // Set timeout to 200ms
-        if (c.wl_event_source_timer_update(self.transaction_timer, 200) < 0) {
+        if (c.wl_event_source_timer_update(self.transaction_timer, 1000) < 0) {
             Log.Error.log("failed to update timer.", .{});
             self.commitTransaction();
         }
     } else {
+        // No views need configures, clear the current timer in case we are
+        // interrupting another transaction and commit.
+        if (c.wl_event_source_timer_update(self.transaction_timer, 0) < 0)
+            Log.Error.log("Error disarming timer", .{});
         self.commitTransaction();
     }
 }
@@ -183,7 +217,7 @@ pub fn notifyConfigured(self: *Self) void {
     self.pending_configures -= 1;
     if (self.pending_configures == 0) {
         // Disarm the timer, as we didn't timeout
-        if (c.wl_event_source_timer_update(self.transaction_timer, 0) == -1)
+        if (c.wl_event_source_timer_update(self.transaction_timer, 0) < 0)
             Log.Error.log("Error disarming timer", .{});
         self.commitTransaction();
     }
@@ -223,6 +257,7 @@ fn commitTransaction(self: *Self) void {
             const view = &view_node.view;
             // Ensure that all pending state is cleared
             view.pending_serial = null;
+            std.debug.assert(view.next_box == null);
             if (view.pending_box) |state| {
                 view.current_box = state;
                 view.pending_box = null;

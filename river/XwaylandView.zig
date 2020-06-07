@@ -58,13 +58,13 @@ pub fn init(self: *Self, view: *View, wlr_xwayland_surface: *c.wlr_xwayland_surf
 }
 
 /// Tell the client to take a new size
-pub fn configure(self: Self, pending_box: Box) void {
+pub fn configure(self: Self, box: Box) void {
     c.wlr_xwayland_surface_configure(
         self.wlr_xwayland_surface,
-        @intCast(i16, pending_box.x),
-        @intCast(i16, pending_box.y),
-        @intCast(u16, pending_box.width),
-        @intCast(u16, pending_box.height),
+        @intCast(i16, box.x),
+        @intCast(i16, box.y),
+        @intCast(u16, box.width),
+        @intCast(u16, box.height),
     );
     // Xwayland surfaces don't use serials, so we will just assume they have
     // configured the next time they commit. Set pending serial to a dummy
