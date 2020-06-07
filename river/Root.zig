@@ -190,7 +190,7 @@ fn startTransaction(self: *Self) void {
         );
 
         // Set timeout to 200ms
-        if (c.wl_event_source_timer_update(self.transaction_timer, 1000) < 0) {
+        if (c.wl_event_source_timer_update(self.transaction_timer, 200) < 0) {
             Log.Error.log("failed to update timer.", .{});
             self.commitTransaction();
         }
