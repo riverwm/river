@@ -64,6 +64,45 @@ pub fn ViewStack(comptime T: type) type {
             self.first = new_node;
         }
 
+        /// Swap positions of two nodes in the view stack.
+        pub fn swap(self: *Self, node_x: *Node, node_y: *Node) void {
+            if (node_x == node_y) return;
+
+            // Swap next pointers of the two nodes.
+            const temp_next = node_x.next;
+            node_x.next = node_y.next;
+            node_y.next = temp_next;
+
+            // Update view stack.
+            if (node_x.next) |next_node| {
+                next_node.prev = node_x;
+            } else {
+                self.last = node_x;
+            }
+            if (node_y.next) |next_node| {
+                next_node.prev = node_y;
+            } else {
+                self.last = node_y;
+            }
+
+            // Swap prev pointers of the two nodes.
+            const temp_prev = node_x.prev;
+            node_x.prev = node_y.prev;
+            node_y.prev = temp_prev;
+
+            // Update view stack.
+            if (node_x.prev) |prev_node| {
+                prev_node.next = node_x;
+            } else {
+                self.first = node_x;
+            }
+            if (node_y.prev) |prev_node| {
+                prev_node.next = node_y;
+            } else {
+                self.first = node_y;
+            }
+        }
+
         /// Remove a node from the view stack. This removes it from the stack of
         /// all views as well as the stack of visible ones.
         pub fn remove(self: *Self, target_node: *Node) void {
