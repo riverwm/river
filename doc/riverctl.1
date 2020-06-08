@@ -4,7 +4,7 @@
 riverctl \- command-line interface for controlling river
 
 .SH SYNOPSIS
-.BR riverctl " " close | declare-mode | enter-mode | exit | focus-output | focus-view | layout | map | mod-master-count | mod-master-factor | send-to-output | set-focused-tags | set-view-tags | spawn | toggle-float | toggle-focused-tags | toggle-view-tags | zoom
+.BR riverctl " " close | declare-mode | enter-mode | exit | focus-output | focus-view | layout | map | mod-master-count | mod-master-factor | send-to-output | set-focused-tags | set-view-tags | spawn | swap-master | toggle-float | toggle-focused-tags | toggle-view-tags | zoom
 .RI [ "command specific arguments" ]
 
 .SH DESCRIPTION
@@ -66,6 +66,11 @@ Put single quotes around
 if you do not want special characters to get interpreted by your shell
 before the command gets passed to
 .IR /bin/sh .
+
+.TP
+.B swap-master
+Swap focused window with master window. If focused window is the master
+window, swap it with either previously swapped window or second window.
 
 .TP
 .B toggle-float
