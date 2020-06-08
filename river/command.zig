@@ -34,6 +34,7 @@ const impl = struct {
     const setFocusedTags = @import("command/tags.zig").setFocusedTags;
     const setViewTags = @import("command/tags.zig").setViewTags;
     const spawn = @import("command/spawn.zig").spawn;
+    const swapMaster = @import("command/swap_master.zig").swapMaster;
     const toggleFloat = @import("command/toggle_float.zig").toggleFloat;
     const toggleFocusedTags = @import("command/tags.zig").toggleFocusedTags;
     const toggleViewTags = @import("command/tags.zig").toggleViewTags;
@@ -74,6 +75,7 @@ const str_to_impl_fn = [_]struct {
     .{ .name = "set-focused-tags",    .impl = impl.setFocusedTags },
     .{ .name = "set-view-tags",       .impl = impl.setViewTags },
     .{ .name = "spawn",               .impl = impl.spawn },
+    .{ .name = "swap-master",         .impl = impl.swapMaster },
     .{ .name = "toggle-float",        .impl = impl.toggleFloat },
     .{ .name = "toggle-focused-tags", .impl = impl.toggleFocusedTags },
     .{ .name = "toggle-view-tags",    .impl = impl.toggleViewTags },
