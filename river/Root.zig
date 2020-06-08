@@ -158,11 +158,17 @@ fn startTransaction(self: *Self) void {
                 },
                 .old_configure => {
                     self.pending_configures += 1;
-                    view.next_box = null;
-                    std.debug.assert(view.pending_serial != null);
+                    if (view.next_box) |next_box| {
+                        view.pending_box.?.x = next_box.x;
+                        view.pending_box.?.y = next_box.y;
+                        view.next_box = null;
+                    }
                 },
                 .noop => {
-                    view.next_box = null;
+                    if (view.next_box) |next_box| {
+                        view.pending_box = view.next_box;
+                        view.next_box = null;
+                    }
                     std.debug.assert(view.pending_serial == null);
                 },
             }
