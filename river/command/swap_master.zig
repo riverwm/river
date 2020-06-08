@@ -38,7 +38,7 @@ pub fn swapMaster(
         const output = seat.focused_output;
         const first_node: *ViewStack(View).Node = output.views.first orelse return Error.CommandFailed;
         const focused_node = @fieldParentPtr(ViewStack(View).Node, "view", current_focus);
-        const state = struct{
+        const state = struct {
             var last_focused_node: ?*ViewStack(View).Node = null;
         };
 
