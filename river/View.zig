@@ -41,6 +41,7 @@ const Impl = union(enum) {
 const SavedBuffer = struct {
     wlr_buffer: *c.wlr_buffer,
     box: Box,
+    transform: c.wl_output_transform,
 };
 
 /// The implementation of this view
@@ -173,6 +174,7 @@ fn saveBuffersIterator(
                     .width = @intCast(u32, surface.current.width),
                     .height = @intCast(u32, surface.current.height),
                 },
+                .transform = surface.current.transform,
             }) catch return;
             _ = c.wlr_buffer_ref(surface.buffer);
         }

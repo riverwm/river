@@ -129,7 +129,7 @@ fn renderLayer(output: Output, layer: std.TailQueue(LayerSurface), now: *c.times
         };
         c.wlr_layer_surface_v1_for_each_surface(
             layer_surface.wlr_layer_surface,
-            renderSurface,
+            renderSurfaceIterator,
             &rdata,
         );
     }
@@ -139,32 +139,18 @@ fn renderView(output: Output, view: *View, now: *c.timespec) void {
     // If we have saved buffers, we are in the middle of a transaction
     // and need to render those buffers until the transaction is complete.
     if (view.saved_buffers.items.len != 0) {
-        for (view.saved_buffers.items) |saved_buffer| {
-            var box = saved_buffer.box.toWlrBox();
-            box.x += view.current_box.x;
-            box.y += view.current_box.y;
-
-            // Scale the box to the output's current scaling factor
-            scaleBox(&box, output.wlr_output.scale);
-
-            var matrix: [9]f32 = undefined;
-            c.wlr_matrix_project_box(
-                &matrix,
-                &box,
-                .WL_OUTPUT_TRANSFORM_NORMAL,
-                0.0,
-                &output.wlr_output.transform_matrix,
-            );
-
-            // This takes our matrix, the texture, and an alpha, and performs the actual
-            // rendering on the GPU.
-            _ = c.wlr_render_texture_with_matrix(
-                output.getRenderer(),
+        for (view.saved_buffers.items) |saved_buffer|
+            renderTexture(
+                output,
                 saved_buffer.wlr_buffer.texture,
-                &matrix,
-                1.0,
+                .{
+                    .x = saved_buffer.box.x + view.current_box.x,
+                    .y = saved_buffer.box.y + view.current_box.y,
+                    .width = @intCast(c_int, saved_buffer.box.width),
+                    .height = @intCast(c_int, saved_buffer.box.height),
+                },
+                saved_buffer.transform,
             );
-        }
     } else {
         // Since there is no stashed buffer, we are not in the middle of
         // a transaction and may simply render each toplevel surface.
@@ -175,7 +161,7 @@ fn renderView(output: Output, view: *View, now: *c.timespec) void {
             .when = now,
         };
 
-        view.forEachSurface(renderSurface, &rdata);
+        view.forEachSurface(renderSurfaceIterator, &rdata);
     }
 }
 
@@ -197,58 +183,59 @@ fn renderXwaylandUnmanaged(output: Output, now: *c.timespec) void {
             .output_y = wlr_xwayland_surface.y - output_box.y,
             .when = now,
         };
-        c.wlr_surface_for_each_surface(wlr_xwayland_surface.surface, renderSurface, &rdata);
+        c.wlr_surface_for_each_surface(wlr_xwayland_surface.surface, renderSurfaceIterator, &rdata);
     }
 }
 
 /// This function is passed to wlroots to render each surface during iteration
-fn renderSurface(
-    _surface: ?*c.wlr_surface,
+fn renderSurfaceIterator(
+    surface: ?*c.wlr_surface,
     surface_x: c_int,
     surface_y: c_int,
     data: ?*c_void,
 ) callconv(.C) void {
-    // wlroots says this will never be null
-    const surface = _surface.?;
     const rdata = @ptrCast(*SurfaceRenderData, @alignCast(@alignOf(SurfaceRenderData), data));
-    const output = rdata.output;
-    const wlr_output = output.wlr_output;
 
-    // We first obtain a wlr_texture, which is a GPU resource. wlroots
-    // automatically handles negotiating these with the client. The underlying
-    // resource could be an opaque handle passed from the client, or the client
-    // could have sent a pixel buffer which we copied to the GPU, or a few other
-    // means. You don't have to worry about this, wlroots takes care of it.
-    const texture = c.wlr_surface_get_texture(surface);
-    if (texture == null) {
-        return;
-    }
+    renderTexture(
+        rdata.output.*,
+        c.wlr_surface_get_texture(surface),
+        .{
+            .x = rdata.output_x + surface_x,
+            .y = rdata.output_y + surface_y,
+            .width = surface.?.current.width,
+            .height = surface.?.current.height,
+        },
+        surface.?.current.transform,
+    );
 
-    var box = c.wlr_box{
-        .x = rdata.output_x + surface_x,
-        .y = rdata.output_y + surface_y,
-        .width = surface.current.width,
-        .height = surface.current.height,
-    };
+    c.wlr_surface_send_frame_done(surface, rdata.when);
+}
+
+/// Render the given texture at the given box, taking the scale and transform
+/// of the output into account.
+fn renderTexture(
+    output: Output,
+    wlr_texture: ?*c.wlr_texture,
+    wlr_box: c.wlr_box,
+    transform: c.wl_output_transform,
+) void {
+    const texture = wlr_texture orelse return;
+    var box = wlr_box;
 
     // Scale the box to the output's current scaling factor
-    scaleBox(&box, wlr_output.scale);
+    scaleBox(&box, output.wlr_output.scale);
 
     // wlr_matrix_project_box is a helper which takes a box with a desired
     // x, y coordinates, width and height, and an output geometry, then
     // prepares an orthographic projection and multiplies the necessary
     // transforms to produce a model-view-projection matrix.
     var matrix: [9]f32 = undefined;
-    const transform = c.wlr_output_transform_invert(surface.current.transform);
-    c.wlr_matrix_project_box(&matrix, &box, transform, 0.0, &wlr_output.transform_matrix);
+    const inverted = c.wlr_output_transform_invert(transform);
+    c.wlr_matrix_project_box(&matrix, &box, inverted, 0.0, &output.wlr_output.transform_matrix);
 
     // This takes our matrix, the texture, and an alpha, and performs the actual
     // rendering on the GPU.
     _ = c.wlr_render_texture_with_matrix(output.getRenderer(), texture, &matrix, 1.0);
-
-    // This lets the client know that we've displayed that frame and it can
-    // prepare another one now if it likes.
-    c.wlr_surface_send_frame_done(surface, rdata.when);
 }
 
 fn renderBorders(output: Output, view: *View, now: *c.timespec) void {
