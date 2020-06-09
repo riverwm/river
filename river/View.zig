@@ -38,6 +38,11 @@ const Impl = union(enum) {
     xwayland_view: XwaylandView,
 };
 
+const SavedBuffer = struct {
+    wlr_buffer: *c.wlr_buffer,
+    box: Box,
+};
+
 /// The implementation of this view
 impl: Impl,
 
@@ -66,8 +71,8 @@ pending_tags: ?u32,
 
 pending_serial: ?u32,
 
-// This is what we render while a transaction is in progress
-stashed_buffer: ?*c.wlr_buffer,
+/// These are what we render while a transaction is in progress
+saved_buffers: std.ArrayList(SavedBuffer),
 
 pub fn init(
     self: *Self,
@@ -94,7 +99,7 @@ pub fn init(
 
     self.pending_serial = null;
 
-    self.stashed_buffer = null;
+    self.saved_buffers = std.ArrayList(SavedBuffer).init(output.root.server.allocator);
 
     if (@TypeOf(surface) == *c.wlr_xdg_surface) {
         self.impl = .{ .xdg_toplevel = undefined };
@@ -106,9 +111,8 @@ pub fn init(
 }
 
 pub fn deinit(self: Self) void {
-    if (self.stashed_buffer) |buffer| {
-        c.wlr_buffer_unref(buffer);
-    }
+    for (self.saved_buffers.items) |buffer| c.wlr_buffer_unref(buffer.wlr_buffer);
+    self.saved_buffers.deinit();
 }
 
 pub fn needsConfigure(self: Self) bool {
@@ -135,20 +139,42 @@ pub fn sendFrameDone(self: Self) void {
     c.wlr_surface_send_frame_done(self.wlr_surface.?, &now);
 }
 
-pub fn dropStashedBuffer(self: *Self) void {
-    // TODO: log debug error
-    if (self.stashed_buffer) |buffer| {
-        c.wlr_buffer_unref(buffer);
-        self.stashed_buffer = null;
-    }
+pub fn dropSavedBuffers(self: *Self) void {
+    for (self.saved_buffers.items) |buffer| c.wlr_buffer_unref(buffer.wlr_buffer);
+    self.saved_buffers.items.len = 0;
 }
 
-pub fn stashBuffer(self: *Self) void {
-    // TODO: log debug error if there is already a saved buffer
-    if (self.wlr_surface) |wlr_surface| {
-        if (c.wlr_surface_has_buffer(wlr_surface)) {
-            _ = c.wlr_buffer_ref(wlr_surface.buffer);
-            self.stashed_buffer = wlr_surface.buffer;
+pub fn saveBuffers(self: *Self) void {
+    if (self.saved_buffers.items.len > 0) {
+        Log.Error.log("view already has buffers saved, overwriting", .{});
+        self.saved_buffers.items.len = 0;
+    }
+
+    self.forEachSurface(saveBuffersIterator, &self.saved_buffers);
+}
+
+fn saveBuffersIterator(
+    wlr_surface: ?*c.wlr_surface,
+    surface_x: c_int,
+    surface_y: c_int,
+    data: ?*c_void,
+) callconv(.C) void {
+    const saved_buffers = @ptrCast(
+        *std.ArrayList(SavedBuffer),
+        @alignCast(@alignOf(*std.ArrayList(SavedBuffer)), data),
+    );
+    if (wlr_surface) |surface| {
+        if (c.wlr_surface_has_buffer(surface)) {
+            saved_buffers.append(.{
+                .wlr_buffer = surface.buffer,
+                .box = Box{
+                    .x = surface_x,
+                    .y = surface_y,
+                    .width = @intCast(u32, surface.current.width),
+                    .height = @intCast(u32, surface.current.height),
+                },
+            }) catch return;
+            _ = c.wlr_buffer_ref(surface.buffer);
         }
     }
 }

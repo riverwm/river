@@ -136,36 +136,35 @@ fn renderLayer(output: Output, layer: std.TailQueue(LayerSurface), now: *c.times
 }
 
 fn renderView(output: Output, view: *View, now: *c.timespec) void {
-    // If we have a stashed buffer, we are in the middle of a transaction
-    // and need to render that buffer until the transaction is complete.
-    if (view.stashed_buffer) |buffer| {
-        var box = c.wlr_box{
-            .x = view.current_box.x,
-            .y = view.current_box.y,
-            .width = @intCast(c_int, view.current_box.width),
-            .height = @intCast(c_int, view.current_box.height),
-        };
+    // If we have saved buffers, we are in the middle of a transaction
+    // and need to render those buffers until the transaction is complete.
+    if (view.saved_buffers.items.len != 0) {
+        for (view.saved_buffers.items) |saved_buffer| {
+            var box = saved_buffer.box.toWlrBox();
+            box.x += view.current_box.x;
+            box.y += view.current_box.y;
 
-        // Scale the box to the output's current scaling factor
-        scaleBox(&box, output.wlr_output.scale);
+            // Scale the box to the output's current scaling factor
+            scaleBox(&box, output.wlr_output.scale);
 
-        var matrix: [9]f32 = undefined;
-        c.wlr_matrix_project_box(
-            &matrix,
-            &box,
-            .WL_OUTPUT_TRANSFORM_NORMAL,
-            0.0,
-            &output.wlr_output.transform_matrix,
-        );
+            var matrix: [9]f32 = undefined;
+            c.wlr_matrix_project_box(
+                &matrix,
+                &box,
+                .WL_OUTPUT_TRANSFORM_NORMAL,
+                0.0,
+                &output.wlr_output.transform_matrix,
+            );
 
-        // This takes our matrix, the texture, and an alpha, and performs the actual
-        // rendering on the GPU.
-        _ = c.wlr_render_texture_with_matrix(
-            output.getRenderer(),
-            buffer.texture,
-            &matrix,
-            1.0,
-        );
+            // This takes our matrix, the texture, and an alpha, and performs the actual
+            // rendering on the GPU.
+            _ = c.wlr_render_texture_with_matrix(
+                output.getRenderer(),
+                saved_buffer.wlr_buffer.texture,
+                &matrix,
+                1.0,
+            );
+        }
     } else {
         // Since there is no stashed buffer, we are not in the middle of
         // a transaction and may simply render each toplevel surface.

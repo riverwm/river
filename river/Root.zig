@@ -132,6 +132,7 @@ fn startTransaction(self: *Self) void {
         var view_it = ViewStack(View).iterator(output.views.first, std.math.maxInt(u32));
         while (view_it.next()) |view_node| {
             const view = &view_node.view;
+
             // Clear the serial in case this transaction is interrupting a prior one.
             view.pending_serial = null;
 
@@ -145,10 +146,10 @@ fn startTransaction(self: *Self) void {
                 view.sendFrameDone();
             }
 
-            // If there is a saved buffer present, then this transaction is interrupting
-            // a previous transaction and we should keep the old buffer.
-            if (view.stashed_buffer == null) {
-                view.stashBuffer();
+            // If there are saved buffers present, then this transaction is interrupting
+            // a previous transaction and we should keep the old buffers.
+            if (view.saved_buffers.items.len == 0) {
+                view.saveBuffers();
             }
         }
     }
@@ -239,7 +240,7 @@ fn commitTransaction(self: *Self) void {
                 view_tags_changed = true;
             }
 
-            view.dropStashedBuffer();
+            view.dropSavedBuffers();
         }
 
         if (view_tags_changed) output.sendViewTags();
