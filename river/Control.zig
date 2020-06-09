@@ -120,6 +120,7 @@ fn runCommand(
                 switch (err) {
                     command.Error.NoCommand => "no command given",
                     command.Error.UnknownCommand => "unknown command",
+                    command.Error.UnknownOption => "unknown option",
                     command.Error.NotEnoughArguments => "not enough arguments",
                     command.Error.TooManyArguments => "too many arguments",
                     command.Error.Overflow => "value out of bounds",

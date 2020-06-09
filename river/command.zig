@@ -32,6 +32,7 @@ const impl = struct {
     const modMasterFactor = @import("command/mod_master_factor.zig").modMasterFactor;
     const sendToOutput = @import("command/send_to_output.zig").sendToOutput;
     const setFocusedTags = @import("command/tags.zig").setFocusedTags;
+    const setOption = @import("command/set_option.zig").setOption;
     const setViewTags = @import("command/tags.zig").setViewTags;
     const spawn = @import("command/spawn.zig").spawn;
     const toggleFloat = @import("command/toggle_float.zig").toggleFloat;
@@ -54,6 +55,20 @@ pub const Direction = enum {
     }
 };
 
+pub const Option = enum {
+    BorderWidth,
+    OuterPadding,
+
+    pub fn parse(str: []const u8) error{UnknownOption}!Option {
+        return if (std.mem.eql(u8, str, "border_width"))
+            Option.BorderWidth
+        else if (std.mem.eql(u8, str, "outer_padding"))
+            Option.OuterPadding
+        else
+            error.UnknownOption;
+    }
+};
+
 // TODO: this could be replaced with a comptime hashmap
 // zig fmt: off
 const str_to_impl_fn = [_]struct {
@@ -72,6 +87,7 @@ const str_to_impl_fn = [_]struct {
     .{ .name = "mod-master-factor",   .impl = impl.modMasterFactor },
     .{ .name = "send-to-output",      .impl = impl.sendToOutput },
     .{ .name = "set-focused-tags",    .impl = impl.setFocusedTags },
+    .{ .name = "set-option",          .impl = impl.setOption },
     .{ .name = "set-view-tags",       .impl = impl.setViewTags },
     .{ .name = "spawn",               .impl = impl.spawn },
     .{ .name = "toggle-float",        .impl = impl.toggleFloat },
@@ -89,6 +105,7 @@ pub const Error = error{
     Overflow,
     InvalidCharacter,
     InvalidDirection,
+    UnknownOption,
     OutOfMemory,
     CommandFailed,
 };
