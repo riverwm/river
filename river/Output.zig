@@ -334,8 +334,8 @@ pub fn layoutMasterStack(self: *Self, visible_count: u32, output_tags: u32, posi
         new_box.width -= delta_size;
         new_box.height -= delta_size;
 
-        // Set the view's next box to the new dimensions
-        view.next_box = new_box;
+        // Set the view's pending box to the new dimensions
+        view.pending_box = new_box;
 
         i += 1;
     }
@@ -391,7 +391,7 @@ pub fn layoutFull(self: *Self, visible_count: u32, output_tags: u32) void {
             .height = layout_height,
         };
 
-        view.next_box = new_box;
+        view.pending_box = new_box;
 
         i += 1;
     }

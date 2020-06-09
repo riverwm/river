@@ -55,12 +55,7 @@ focused: bool,
 
 /// The current output-relative coordinates and dimensions of the view
 current_box: Box,
-
-/// The dimensions sent with the most recent configure
 pending_box: ?Box,
-
-/// The dimensions to be used for the next configure
-next_box: ?Box,
 
 /// The dimensions the view would have taken if we didn't force it to tile
 natural_width: u32,
@@ -116,40 +111,23 @@ pub fn deinit(self: Self) void {
     }
 }
 
-/// Returns true if a configure needs to be sent to ensure the next_box is
-/// applied correctly.
-pub fn configureAction(self: Self) enum { override, new_configure, old_configure, noop } {
-    // If we have a pending box, check if the next box is different from the
-    // pending box. If we do not have a pending box, check if the next box is
-    // different from the current box.
-    if (self.pending_box) |pending_box|
-        if (self.next_box) |next_box| {
-            if (next_box.width != pending_box.width or next_box.height != pending_box.height) {
-                return .override;
-            } else {
-                return .old_configure;
-            }
-        };
-
-    if (self.next_box) |next_box|
-        if (next_box.width != self.current_box.width or next_box.height != self.current_box.height)
-            return .new_configure;
-
-    return .noop;
+pub fn needsConfigure(self: Self) bool {
+    if (self.pending_box) |pending_box| {
+        return pending_box.width != self.current_box.width or
+            pending_box.height != self.current_box.height;
+    } else {
+        return false;
+    }
 }
 
-/// Tell the client to assume the size of next_box. Set pending_box to
-/// next_box and next_box to null.
-pub fn configure(self: *Self) void {
-    if (self.next_box) |next_box| {
+pub fn configure(self: Self) void {
+    if (self.pending_box) |pending_box| {
         switch (self.impl) {
-            .xdg_toplevel => |xdg_toplevel| xdg_toplevel.configure(next_box),
-            .xwayland_view => |xwayland_view| xwayland_view.configure(next_box),
+            .xdg_toplevel => |xdg_toplevel| xdg_toplevel.configure(pending_box),
+            .xwayland_view => |xwayland_view| xwayland_view.configure(pending_box),
         }
-        self.pending_box = next_box;
-        self.next_box = null;
     } else {
-        Log.Error.log("configure called on View with null next_box", .{});
+        Log.Error.log("Configure called on a View with no pending box", .{});
     }
 }
 

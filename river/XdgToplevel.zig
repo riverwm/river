@@ -63,11 +63,11 @@ pub fn init(self: *Self, view: *View, wlr_xdg_surface: *c.wlr_xdg_surface) void 
     c.wl_signal_add(&self.wlr_xdg_surface.events.unmap, &self.listen_unmap);
 }
 
-pub fn configure(self: Self, box: Box) void {
+pub fn configure(self: Self, pending_box: Box) void {
     self.view.pending_serial = c.wlr_xdg_toplevel_set_size(
         self.wlr_xdg_surface,
-        box.width,
-        box.height,
+        pending_box.width,
+        pending_box.height,
     );
 }
 
