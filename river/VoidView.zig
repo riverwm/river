@@ -23,6 +23,10 @@ const c = @import("c.zig");
 
 const Box = @import("Box.zig");
 
+pub fn needsConfigure(self: Self) bool {
+    unreachable;
+}
+
 pub fn configure(self: Self, pending_box: Box) void {
     unreachable;
 }

@@ -139,9 +139,9 @@ fn startTransaction(self: *Self) void {
                 view.configure();
                 self.pending_configures += 1;
 
-                // We save the current buffer, so we can send an early
-                // frame done event to give the client a head start on
-                // redrawing.
+                // Send a frame done that the client will commit a new frame
+                // with the dimensions we sent in the configure. Normally this
+                // event would be sent in the render function.
                 view.sendFrameDone();
             }
 
@@ -165,6 +165,10 @@ fn startTransaction(self: *Self) void {
             self.commitTransaction();
         }
     } else {
+        // No views need configures, clear the current timer in case we are
+        // interrupting another transaction and commit.
+        if (c.wl_event_source_timer_update(self.transaction_timer, 0) < 0)
+            Log.Error.log("error disarming timer", .{});
         self.commitTransaction();
     }
 }

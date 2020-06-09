@@ -57,6 +57,12 @@ pub fn init(self: *Self, view: *View, wlr_xwayland_surface: *c.wlr_xwayland_surf
     c.wl_signal_add(&self.wlr_xwayland_surface.events.unmap, &self.listen_unmap);
 }
 
+/// Don't really care about efficiency with xwayland, we don't wait for them
+/// to ack anyways since they don't use serials.
+pub fn needsConfigure(self: Self) bool {
+    return true;
+}
+
 /// Tell the client to take a new size
 pub fn configure(self: Self, pending_box: Box) void {
     c.wlr_xwayland_surface_configure(

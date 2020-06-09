@@ -112,12 +112,10 @@ pub fn deinit(self: Self) void {
 }
 
 pub fn needsConfigure(self: Self) bool {
-    if (self.pending_box) |pending_box| {
-        return pending_box.width != self.current_box.width or
-            pending_box.height != self.current_box.height;
-    } else {
-        return false;
-    }
+    return switch (self.impl) {
+        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.needsConfigure(),
+        .xwayland_view => |xwayland_view| xwayland_view.needsConfigure(),
+    };
 }
 
 pub fn configure(self: Self) void {
@@ -238,6 +236,8 @@ pub fn getTitle(self: Self) [*:0]const u8 {
 pub fn map(self: *Self) void {
     const root = self.output.root;
 
+    Log.Debug.log("View '{}' mapped", .{self.getTitle()});
+
     // Add the view to the stack of its output
     const node = @fieldParentPtr(ViewStack(Self).Node, "view", self);
     self.output.views.push(node);
@@ -259,6 +259,8 @@ pub fn map(self: *Self) void {
 /// Called by the impl when the surface will no longer be displayed
 pub fn unmap(self: *Self) void {
     const root = self.output.root;
+
+    Log.Debug.log("View '{}' unmapped", .{self.getTitle()});
 
     self.wlr_surface = null;
 

@@ -63,6 +63,25 @@ pub fn init(self: *Self, view: *View, wlr_xdg_surface: *c.wlr_xdg_surface) void 
     c.wl_signal_add(&self.wlr_xdg_surface.events.unmap, &self.listen_unmap);
 }
 
+/// Returns true if a configure must be sent to ensure the dimensions of the
+/// pending_box are applied.
+pub fn needsConfigure(self: Self) bool {
+    const pending_box = self.view.pending_box orelse return false;
+
+    const wlr_xdg_toplevel: *c.wlr_xdg_toplevel = @field(
+        self.wlr_xdg_surface,
+        c.wlr_xdg_surface_union,
+    ).toplevel;
+
+    // Checking server_pending is sufficient here since it will be either in
+    // sync with the current dimensions or be the dimensions sent with the
+    // most recent configure. In both cases server_pending has the values we
+    // want to check against.
+    return pending_box.width != wlr_xdg_toplevel.server_pending.width or
+        pending_box.height != wlr_xdg_toplevel.server_pending.height;
+}
+
+/// Send a configure event, applying the width/height of the pending box.
 pub fn configure(self: Self, pending_box: Box) void {
     self.view.pending_serial = c.wlr_xdg_toplevel_set_size(
         self.wlr_xdg_surface,
@@ -106,7 +125,7 @@ pub fn getTitle(self: Self) [*:0]const u8 {
         self.wlr_xdg_surface,
         c.wlr_xdg_surface_union,
     ).toplevel;
-    return wlr_xdg_toplevel.title;
+    return wlr_xdg_toplevel.title orelse "NULL";
 }
 
 /// Called when the xdg surface is destroyed
@@ -153,8 +172,6 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const state = &wlr_xdg_toplevel.current;
     const app_id: [*:0]const u8 = if (wlr_xdg_toplevel.app_id) |id| id else "NULL";
 
-    Log.Debug.log("View with app_id '{}' mapped", .{app_id});
-
     for (root.server.config.float_filter.items) |filter_app_id| {
         // Make views with app_ids listed in the float filter float
         if (std.mem.eql(u8, std.mem.span(app_id), std.mem.span(filter_app_id))) {
@@ -194,6 +211,12 @@ fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         if (s == self.wlr_xdg_surface.configure_serial) {
             view.output.root.notifyConfigured();
             view.pending_serial = null;
+        } else {
+            // If the view has not yet acked our configure, we need to send a
+            // frame done event so that they commit another buffer. These
+            // buffers won't be rendered since we are still rendering our
+            // stashed buffer from when the transaction started.
+            view.sendFrameDone();
         }
     }
 }
