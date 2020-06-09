@@ -55,7 +55,7 @@ river -c /path/to/config.sh
 An example script with sane defaults is provided [here](contrib/config.sh) in
 the contrib directory.
 
-Some configuration options are still hardcoded in [Config.zig](src/Config.zig).
+Some configuration options are still hardcoded in [Config.zig](river/Config.zig).
 Eventually all configuration will be moved to the `riverctl` binary.
 
 ## Development
