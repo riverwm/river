@@ -56,7 +56,7 @@ wlr_surface: ?*c.wlr_surface,
 /// If the view is floating or not
 floating: bool,
 
-/// True if the view is currentlt focused by at lease one seat
+/// True if the view is currently focused by at least one seat
 focused: bool,
 
 /// The current output-relative coordinates and dimensions of the view
