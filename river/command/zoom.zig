@@ -38,6 +38,9 @@ pub fn zoom(
         const output = seat.focused_output;
         const focused_node = @fieldParentPtr(ViewStack(View).Node, "view", current_focus);
 
+        // Don't zoom floating views
+        if (current_focus.floating) return;
+
         var it = ViewStack(View).iterator(output.views.first, output.current_focused_tags);
         const zoom_node = if (focused_node == it.next())
             if (it.next()) |second| second else null
