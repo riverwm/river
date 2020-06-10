@@ -39,6 +39,7 @@ const SurfaceRenderData = struct {
 
 pub fn renderOutput(output: *Output) void {
     const wlr_renderer = output.getRenderer();
+    const input_manager = output.root.server.input_manager;
 
     var now: c.timespec = undefined;
     _ = c.clock_gettime(c.CLOCK_MONOTONIC, &now);
@@ -64,20 +65,26 @@ pub fn renderOutput(output: *Output) void {
     var it = ViewStack(View).reverseIterator(output.views.last, output.current_focused_tags);
     while (it.next()) |node| {
         const view = &node.view;
+
         // This check prevents a race condition when a frame is requested
         // between mapping of a view and the first configure being handled.
         if (view.current_box.width == 0 or view.current_box.height == 0) {
             continue;
         }
-        // Floating views are rendered on top of normal views
-        if (view.floating) {
+
+        // Focused views are rendered on top of normal views, skip them for now
+        var seat_it = input_manager.seats.first;
+        if (while (seat_it) |seat_node| : (seat_it = seat_node.next) {
+            if (seat_node.data.focused_view == view) break true;
+        } else false) {
             continue;
         }
+
         renderView(output.*, view, &now);
         renderBorders(output.*, view, &now);
     }
 
-    // Render floating views
+    // Render focused views
     it = ViewStack(View).reverseIterator(output.views.last, output.current_focused_tags);
     while (it.next()) |node| {
         const view = &node.view;
@@ -86,7 +93,12 @@ pub fn renderOutput(output: *Output) void {
         if (view.current_box.width == 0 or view.current_box.height == 0) {
             continue;
         }
-        if (!view.floating) {
+
+        // Skip unfocused views
+        var seat_it = input_manager.seats.first;
+        if (while (seat_it) |seat_node| : (seat_it = seat_node.next) {
+            if (seat_node.data.focused_view == view) break false;
+        } else true) {
             continue;
         }
         renderView(output.*, view, &now);
