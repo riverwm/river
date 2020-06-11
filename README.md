@@ -33,9 +33,13 @@ installed:
 *Note: NixOS users should refer to the
 [Building on NixOS wiki page](https://github.com/ifreund/river/wiki/Building-on-NixOS)*
 
-Then run, for example, `sudo zig build --prefix /usr/local install` to build
-and install the `river` and `riverctl` binaries to `/usr/local/bin`. To enable
-experimental Xwayland support pass the `-Dxwayland=true` option.
+Then run, for example,
+```
+sudo zig build -Drelease-safe=true --prefix /usr/local install
+```
+to build and install the `river` and `riverctl` binaries to
+`/usr/local/bin`. To enable experimental Xwayland support pass the
+`-Dxwayland=true` option as well.
 
 ## Usage
 
