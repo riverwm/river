@@ -1,12 +1,11 @@
 # river
 
-river is a dynamic wayland compositor that takes inspiration from
+river is a dynamic tiling wayland compositor that takes inspiration from
 [dwm](https://dwm.suckless.org) and
 [bspwm](https://github.com/baskerville/bspwm).
 
-*Note: river is currently early in development and may lack some
-features. If there are specific features blocking you from using river,
-don't hesitate to
+*Note: river is currently early in development. Expect breaking changes
+and missing features. If you run into a bug don't hesitate to
 [open an issue](https://github.com/ifreund/river/issues/new)*
 
 ## Design goals
