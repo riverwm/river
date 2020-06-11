@@ -63,14 +63,9 @@ Eventually all configuration will be moved to the `riverctl` binary.
 Check out the [roadmap](https://github.com/ifreund/river/issues/1)
 if you'd like to see what has been done and what is left to do.
 
-If you are interested in the development of river, please join our
-matrix channel: [#river:matrix.org](https://matrix.to/#/#river:matrix.org).
-You should also read [CONTRIBUTING.md](CONTRIBUTING.md) if you intend
-to submit patches.
-
-I can often be found in the `#sway-devel` IRC channel with the
-nick `ifreund` on irc.freenode.net as well, or reached by email at
-[ifreund@ifreund.xyz](mailto:ifreund@ifreund.xyz).
+If you are interested in the development of river, please join us at
+[#river](https://webchat.freenode.net/#river) on freenode. You should also
+read [CONTRIBUTING.md](CONTRIBUTING.md) if you intend to submit patches.
 
 ## Licensing
 
