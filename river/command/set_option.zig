@@ -31,14 +31,17 @@ pub fn setOption(
     if (args.len < 3) return Error.NotEnoughArguments;
     if (args.len > 3) return Error.TooManyArguments;
 
+    const config = &seat.focused_output.root.server.config;
+
     // Parse option and value.
     const option = try Option.parse(args[1]);
-    const value = try std.fmt.parseInt(u32, args[2], 10);
 
     // Assign value to option.
     switch (option) {
-        .BorderWidth => seat.focused_output.root.server.config.border_width = value,
-        .OuterPadding => seat.focused_output.root.server.config.outer_padding = value,
+        .BorderWidth => config.border_width = try std.fmt.parseInt(u32, args[2], 10),
+        .BorderFocusedColor => try config.border_focused_color.parseString(args[2]),
+        .BorderUnfocusedColor => try config.border_unfocused_color.parseString(args[2]),
+        .OuterPadding => config.outer_padding = try std.fmt.parseInt(u32, args[2], 10),
     }
 
     // 'Refresh' focused output to display the desired changes.
