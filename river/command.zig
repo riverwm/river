@@ -57,11 +57,17 @@ pub const Direction = enum {
 
 pub const Option = enum {
     BorderWidth,
+    BorderFocusedColor,
+    BorderUnfocusedColor,
     OuterPadding,
 
     pub fn parse(str: []const u8) error{UnknownOption}!Option {
         return if (std.mem.eql(u8, str, "border_width"))
             Option.BorderWidth
+        else if (std.mem.eql(u8, str, "border_focused_color"))
+            Option.BorderFocusedColor
+        else if (std.mem.eql(u8, str, "border_unfocused_color"))
+            Option.BorderUnfocusedColor
         else if (std.mem.eql(u8, str, "outer_padding"))
             Option.OuterPadding
         else
@@ -105,6 +111,7 @@ pub const Error = error{
     Overflow,
     InvalidCharacter,
     InvalidDirection,
+    InvalidRgbFormat,
     UnknownOption,
     OutOfMemory,
     CommandFailed,

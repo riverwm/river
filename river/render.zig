@@ -240,9 +240,9 @@ fn renderTexture(
 fn renderBorders(output: Output, view: *View, now: *c.timespec) void {
     var border: Box = undefined;
     const color = if (view.focused)
-        [_]f32{ 0.57647059, 0.63137255, 0.63137255, 1.0 } // Solarized base1
+        output.root.server.config.border_focused_color.getDecimalRgbaArray()
     else
-        [_]f32{ 0.34509804, 0.43137255, 0.45882353, 1.0 }; // Solarized base01
+        output.root.server.config.border_unfocused_color.getDecimalRgbaArray();
     const border_width = output.root.server.config.border_width;
 
     // left and right, covering the corners as well
