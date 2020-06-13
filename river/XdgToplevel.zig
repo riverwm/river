@@ -47,11 +47,6 @@ pub fn init(self: *Self, view: *View, wlr_xdg_surface: *c.wlr_xdg_surface) void 
     self.wlr_xdg_surface = wlr_xdg_surface;
     wlr_xdg_surface.data = self;
 
-    // Inform the xdg toplevel that it is tiled.
-    // For example this prevents firefox from drawing shadows around itself
-    _ = c.wlr_xdg_toplevel_set_tiled(self.wlr_xdg_surface, c.WLR_EDGE_LEFT |
-        c.WLR_EDGE_RIGHT | c.WLR_EDGE_TOP | c.WLR_EDGE_BOTTOM);
-
     // Add listeners that are active over the view's entire lifetime
     self.listen_destroy.notify = handleDestroy;
     c.wl_signal_add(&self.wlr_xdg_surface.events.destroy, &self.listen_destroy);
@@ -110,10 +105,11 @@ pub fn forEachSurface(
 /// Return the surface at output coordinates ox, oy and set sx, sy to the
 /// corresponding surface-relative coordinates, if there is a surface.
 pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*c.wlr_surface {
+    const view = self.view;
     return c.wlr_xdg_surface_surface_at(
         self.wlr_xdg_surface,
-        ox - @intToFloat(f64, self.view.current_box.x),
-        oy - @intToFloat(f64, self.view.current_box.y),
+        ox - @intToFloat(f64, view.current_box.x - view.surface_box.x),
+        oy - @intToFloat(f64, view.current_box.y - view.surface_box.y),
         sx,
         sy,
     );
@@ -186,6 +182,14 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         view.setFloating(true);
     }
 
+    // If the toplevel has no parent, inform it that it is tiled. This
+    // prevents firefox, for example, from drawing shadows around itself.
+    if (wlr_xdg_toplevel.parent == null)
+        _ = c.wlr_xdg_toplevel_set_tiled(
+            self.wlr_xdg_surface,
+            c.WLR_EDGE_LEFT | c.WLR_EDGE_RIGHT | c.WLR_EDGE_TOP | c.WLR_EDGE_BOTTOM,
+        );
+
     view.map();
 }
 
@@ -202,22 +206,36 @@ fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 }
 
 /// Called when the surface is comitted
-/// TODO: check for unexpected change in size and react as needed
 fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_commit", listener.?);
     const view = self.view;
 
+    var wlr_box: c.wlr_box = undefined;
+    c.wlr_xdg_surface_get_geometry(self.wlr_xdg_surface, &wlr_box);
+    const new_box = Box.fromWlrBox(wlr_box);
+
+    // If we have sent a configure changing the size
     if (view.pending_serial) |s| {
+        // Update the stored dimensions of the surface
+        view.surface_box = new_box;
+
         if (s == self.wlr_xdg_surface.configure_serial) {
+            // If this commit is in response to our configure, notify the
+            // transaction code.
             view.output.root.notifyConfigured();
             view.pending_serial = null;
         } else {
-            // If the view has not yet acked our configure, we need to send a
-            // frame done event so that they commit another buffer. These
+            // If the client has not yet acked our configure, we need to send a
+            // frame done event so that it commits another buffer. These
             // buffers won't be rendered since we are still rendering our
             // stashed buffer from when the transaction started.
             view.sendFrameDone();
         }
+    } else {
+        // TODO: handle unexpected change in dimensions
+        if (!std.meta.eql(view.surface_box, new_box))
+            Log.Error.log("View changed size unexpectedly", .{});
+        view.surface_box = new_box;
     }
 }
 

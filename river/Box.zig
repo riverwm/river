@@ -24,6 +24,15 @@ y: i32,
 width: u32,
 height: u32,
 
+pub fn fromWlrBox(wlr_box: c.wlr_box) Self {
+    return Self{
+        .x = @intCast(i32, wlr_box.x),
+        .y = @intCast(i32, wlr_box.y),
+        .width = @intCast(u32, wlr_box.width),
+        .height = @intCast(u32, wlr_box.height),
+    };
+}
+
 pub fn toWlrBox(self: Self) c.wlr_box {
     return c.wlr_box{
         .x = @intCast(c_int, self.x),

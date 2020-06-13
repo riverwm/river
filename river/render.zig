@@ -143,8 +143,8 @@ fn renderView(output: Output, view: *View, now: *c.timespec) void {
                 output,
                 saved_buffer.wlr_buffer.texture,
                 .{
-                    .x = saved_buffer.box.x + view.current_box.x,
-                    .y = saved_buffer.box.y + view.current_box.y,
+                    .x = saved_buffer.box.x + view.current_box.x - view.saved_surface_box.x,
+                    .y = saved_buffer.box.y + view.current_box.y - view.saved_surface_box.y,
                     .width = @intCast(c_int, saved_buffer.box.width),
                     .height = @intCast(c_int, saved_buffer.box.height),
                 },
@@ -155,8 +155,8 @@ fn renderView(output: Output, view: *View, now: *c.timespec) void {
         // a transaction and may simply render each toplevel surface.
         var rdata = SurfaceRenderData{
             .output = &output,
-            .output_x = view.current_box.x,
-            .output_y = view.current_box.y,
+            .output_x = view.current_box.x - view.surface_box.x,
+            .output_y = view.current_box.y - view.surface_box.y,
             .when = now,
         };
 

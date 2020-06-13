@@ -57,10 +57,12 @@ pub fn init(self: *Self, view: *View, wlr_xwayland_surface: *c.wlr_xwayland_surf
     c.wl_signal_add(&self.wlr_xwayland_surface.events.unmap, &self.listen_unmap);
 }
 
-/// Don't really care about efficiency with xwayland, we don't wait for them
-/// to ack anyways since they don't use serials.
 pub fn needsConfigure(self: Self) bool {
-    return true;
+    const view = self.view;
+    if (view.pending_box) |pending_box|
+        return view.current_box.width != pending_box.width or
+            view.current_box.height != pending_box.height;
+    return false;
 }
 
 /// Tell the client to take a new size
@@ -162,6 +164,14 @@ fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_commit", listener.?);
     const view = self.view;
+
+    view.surface_box = Box{
+        .x = 0,
+        .y = 0,
+        .width = @intCast(u32, self.wlr_xwayland_surface.surface.*.current.width),
+        .height = @intCast(u32, self.wlr_xwayland_surface.surface.*.current.height),
+    };
+
     // See comment in XwaylandView.configure()
     if (view.pending_serial != null) {
         view.output.root.notifyConfigured();

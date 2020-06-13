@@ -59,9 +59,24 @@ floating: bool,
 /// True if the view is currently focused by at least one seat
 focused: bool,
 
-/// The current output-relative coordinates and dimensions of the view
+/// The current output-relative coordinates and dimensions of the view. The
+/// surface itself may have other dimensions which are stored in the
+/// surface_box member.
 current_box: Box,
+
+/// Pending dimensions of the view during a transaction
 pending_box: ?Box,
+
+/// The currently commited geometry of the surface. The x/y may be negative if
+/// for example the client has decided to draw CSD shadows a la GTK.
+surface_box: Box,
+
+/// The geometry the view's surface had when the transaction started and
+/// buffers were saved.
+saved_surface_box: Box,
+
+/// These are what we render while a transaction is in progress
+saved_buffers: std.ArrayList(SavedBuffer),
 
 /// The dimensions the view would have taken if we didn't force it to tile
 natural_width: u32,
@@ -71,9 +86,6 @@ current_tags: u32,
 pending_tags: ?u32,
 
 pending_serial: ?u32,
-
-/// These are what we render while a transaction is in progress
-saved_buffers: std.ArrayList(SavedBuffer),
 
 pub fn init(
     self: *Self,
@@ -151,6 +163,7 @@ pub fn saveBuffers(self: *Self) void {
         self.saved_buffers.items.len = 0;
     }
 
+    self.saved_surface_box = self.surface_box;
     self.forEachSurface(saveBuffersIterator, &self.saved_buffers);
 }
 
