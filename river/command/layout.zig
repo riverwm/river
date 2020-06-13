@@ -29,9 +29,10 @@ pub fn layout(
     failure_message: *[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
-    if (args.len > 2) return Error.TooManyArguments;
 
-    seat.focused_output.layout = seat.focused_output.getLayoutByName(args[1]);
+    allocator.free(seat.focused_output.layout);
+    seat.focused_output.layout = try std.mem.join(allocator, " ", args[1..]);
+
     seat.focused_output.arrangeViews();
     seat.input_manager.server.root.startTransaction();
 }
