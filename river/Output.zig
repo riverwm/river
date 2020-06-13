@@ -61,8 +61,10 @@ master_count: u32,
 /// Percentage of the total screen that the master section takes up.
 master_factor: f64,
 
-/// Current layout of the output.
-layout: Layout,
+/// Current layout of the output. If it is "full", river will use the full
+/// layout. Otherwise river assumes it contains a string which, when executed
+/// with sh, will result in a layout.
+layout: []const u8,
 
 /// List of status tracking objects relaying changes to this output to clients.
 status_trackers: std.SinglyLinkedList(OutputStatus),
@@ -71,41 +73,6 @@ status_trackers: std.SinglyLinkedList(OutputStatus),
 listen_destroy: c.wl_listener,
 listen_frame: c.wl_listener,
 listen_mode: c.wl_listener,
-
-// All possible layouts.
-pub const Layout = enum {
-    TopMaster,
-    RightMaster,
-    BottomMaster,
-    LeftMaster,
-    Full,
-};
-
-const LayoutName = struct {
-    name: []const u8,
-    layout: Layout,
-};
-
-// zig fmt: off
-const layout_names = [_]LayoutName {
-    .{ .name = "top-master",    .layout = Layout.TopMaster, },
-    .{ .name = "right-master",  .layout = Layout.RightMaster, },
-    .{ .name = "bottom-master", .layout = Layout.BottomMaster, },
-    .{ .name = "left-master",   .layout = Layout.LeftMaster, },
-    .{ .name = "full",          .layout = Layout.Full, },
-};
-// zig fmt: on
-
-pub fn getLayoutByName(self: Self, name: []const u8) Layout {
-    for (layout_names) |current| {
-        if (std.mem.eql(u8, name, current.name)) {
-            return current.layout;
-        }
-    }
-    Log.Error.log("Layout '{}' does not exist", .{name});
-    // In case of error default to LeftMaster
-    return Layout.LeftMaster;
-}
 
 pub fn init(self: *Self, root: *Root, wlr_output: *c.wlr_output) !void {
     // Some backends don't have modes. DRM+KMS does, and we need to set a mode
@@ -142,8 +109,7 @@ pub fn init(self: *Self, root: *Root, wlr_output: *c.wlr_output) !void {
 
     self.master_factor = 0.6;
 
-    // LeftMaster is the default layout for all outputs
-    self.layout = Layout.LeftMaster;
+    self.layout = try std.fmt.allocPrint(self.root.server.allocator, "full", .{});
 
     self.status_trackers = std.SinglyLinkedList(OutputStatus).init();
 
@@ -257,10 +223,8 @@ fn layoutFull(self: *Self, visible_count: u32, output_tags: u32) void {
 /// and completed.
 pub fn arrangeViews(self: *Self) void {
     // If the output has a zero dimension, trying to arrange would cause
-    // underflow and is pointless anyway
-    if (self.usable_box.width == 0 or self.usable_box.height == 0) {
-        return;
-    }
+    // an underflow and is pointless anyway.
+    if (self.usable_box.width == 0 or self.usable_box.height == 0) return;
 
     const output_tags = if (self.pending_focused_tags) |tags|
         tags
@@ -271,30 +235,26 @@ pub fn arrangeViews(self: *Self) void {
         var count: u32 = 0;
         var it = ViewStack(View).pendingIterator(self.views.first, output_tags);
         while (it.next()) |node| {
-            if (node.view.floating) {
-                continue;
-            }
+            if (node.view.floating) continue;
             count += 1;
         }
         break :blk count;
     };
 
-    // A single view should always use the maximum available space. This is
-    // implemented via the "full" layout to remove the need of every single
-    // layout to explicitly handle this edge case or the other edge case of
-    // no visible views.
-    if (visible_count <= 1) {
-        layoutFull(self, visible_count, output_tags);
-        return;
-    }
+    if (visible_count == 0) return;
 
-    switch (self.layout) {
-        .Full => layoutFull(self, visible_count, output_tags),
-        .TopMaster => layoutTopMaster(self, visible_count, output_tags),
-        .RightMaster => layoutRightMaster(self, visible_count, output_tags),
-        .BottomMaster => layoutBottomMaster(self, visible_count, output_tags),
-        .LeftMaster => layoutLeftMaster(self, visible_count, output_tags),
-    }
+    if (std.mem.eql(u8, self.layout, "full")) return layoutFull(self, visible_count, output_tags);
+
+    layoutExternal(self, visible_count, output_tags) catch |err| {
+        switch (err) {
+            LayoutError.BadExitCode => Log.Error.log("Layout command exited with non-zero return code.", .{}),
+            LayoutError.BadWindowConfiguration => Log.Error.log("Invalid window configuration.", .{}),
+            LayoutError.ConfigurationMismatch => Log.Error.log("Mismatch between amount of window configurations and visible windows.", .{}),
+            else => Log.Error.log("Encountered unexpected error while trying to use external layout.", .{}),
+        }
+        Log.Error.log("Falling back to internal layout", .{});
+        layoutFull(self, visible_count, output_tags);
+    };
 }
 
 /// Arrange all layer surfaces of this output and addjust the usable aread
