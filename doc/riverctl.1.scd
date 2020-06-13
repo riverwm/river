@@ -31,8 +31,13 @@ used to control and configure river.
 *focus-view* *next*|*previous*
 	Focus next or previous view in the stack.
 
-*layout* *top-master*|*right-master*|*bottom-master*|*left-master*|*full*
-	Change the view layout.
+*layout* *full*|_command_
+	Provide a command which river will use for generating the layout of
+	non-floating windows on the currently focused output. See
+	*river-layouts*(1) for details on the expected formatting of the output
+	of layout commands. Alternatively, "full"can be given instead of a
+	command to cause river to use its single internal layout, in which
+	windows span the entire width and height of the output.
 
 *mod-master-count* _integer_
 	Increase or decrease the number of master views. _integer_ can be

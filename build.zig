@@ -210,6 +210,7 @@ const ScdocStep = struct {
     const scd_paths = [_][]const u8{
         "doc/river.1.scd",
         "doc/riverctl.1.scd",
+        "doc/river-layouts.1.scd",
     };
 
     builder: *std.build.Builder,
