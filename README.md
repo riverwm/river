@@ -61,6 +61,22 @@ the contrib directory.
 Some configuration options are still hardcoded in [Config.zig](river/Config.zig).
 Eventually all configuration will be moved to the `riverctl` binary.
 
+Keyboard configuration is not yet implemented in river, but since river uses
+libxkbcommon you may use the following environment variables to set defaults:
+
+- `XKB_DEFAULT_RULES`
+- `XKB_DEFAULT_MODEL`
+- `XKB_DEFAULT_LAYOUT`
+- `XKB_DEFAULT_VARIANT`
+- `XKB_DEFAULT_OPTIONS`
+
+Possible values for these variables can be found in the `xkeyboard-config(7)`
+man page. For example, to use a dvorak layout one could start river with
+
+```
+XKB_DEFAULT_LAYOUT="us(dvorak)" river
+```
+
 ## Development
 
 Check out the [roadmap](https://github.com/ifreund/river/issues/1)
