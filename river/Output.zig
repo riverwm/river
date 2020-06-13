@@ -1,6 +1,7 @@
 // This file is part of river, a dynamic tiling wayland compositor.
 //
 // Copyright 2020 Isaac Freund
+// Copyright 2020 Leon Henrik Plickat
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -29,6 +30,13 @@ const Root = @import("Root.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const OutputStatus = @import("OutputStatus.zig");
+/// Minimum width/height for surfaces.
+// This is needed, because external layouts and large padding and border sizes
+// may cause surfaces so small, that bugs in client applications are encountered,
+// or even surfaces of zero or negative size,which are a protocol error and would
+// likely cause river to crash. The value is totally arbitrary and low enough,
+// that it should never be encountered during normal usage.
+const minimum_size = 50;
 
 root: *Root,
 wlr_output: *c.wlr_output,
@@ -185,194 +193,41 @@ pub fn sendViewTags(self: Self) void {
     while (it) |node| : (it = node.next) node.data.sendViewTags();
 }
 
-const MasterPosition = enum {
-    Top,
-    Right,
-    Bottom,
-    Left,
-};
-
-/// Default layout of master-stack and slave-stack.
-pub fn layoutMasterStack(self: *Self, visible_count: u32, output_tags: u32, position: MasterPosition) void {
-    const master_count = std.math.min(self.master_count, visible_count);
-    const slave_count = if (master_count >= visible_count) 0 else visible_count - master_count;
-
+/// The single build in layout, which makes all views use the maximum available
+/// space.
+fn layoutFull(self: *Self, visible_count: u32, output_tags: u32) void {
     const border_width = self.root.server.config.border_width;
     const view_padding = self.root.server.config.view_padding;
     const outer_padding = self.root.server.config.outer_padding;
+    const xy_offset = @intCast(i32, outer_padding + border_width + view_padding);
 
-    const layout_width = @intCast(u32, self.usable_box.width) - outer_padding * 2;
-    const layout_height = @intCast(u32, self.usable_box.height) - outer_padding * 2;
+    var full_box: Box = .{
+        .x = self.usable_box.x + @intCast(i32, xy_offset),
+        .y = self.usable_box.y + @intCast(i32, xy_offset),
+        .width = self.usable_box.width - (2 * xy_offset),
+        .height = self.usable_box.height - (2 * xy_offset),
+    };
 
-    // Depending on position of the master area,
-    // the *_stack_size is either width or height
-    var master_stack_size: u32 = undefined;
-    var slave_stack_size: u32 = undefined;
-    if (master_count > 0 and slave_count > 0) {
-        // If both master and slave views are present
-        if (position == MasterPosition.Right or position == MasterPosition.Left) {
-            master_stack_size = @floatToInt(u32, @round(@intToFloat(f64, layout_width) * self.master_factor));
-            slave_stack_size = layout_width - master_stack_size;
-        } else {
-            master_stack_size = @floatToInt(u32, @round(@intToFloat(f64, layout_height) * self.master_factor));
-            slave_stack_size = layout_height - master_stack_size;
-        }
-    } else if (master_count > 0) {
-        if (position == MasterPosition.Right or position == MasterPosition.Left) {
-            master_stack_size = layout_width;
-        } else {
-            master_stack_size = layout_height;
-        }
-        slave_stack_size = 0;
-    } else {
-        if (position == MasterPosition.Right or position == MasterPosition.Left) {
-            slave_stack_size = layout_width;
-        } else {
-            slave_stack_size = layout_height;
-        }
-        master_stack_size = 0;
+    // Apply minimum view size
+    if (full_box.width < minimum_size) {
+        full_box.width = minimum_size;
+    }
+    if (full_box.height < minimum_size) {
+        full_box.height = minimum_size;
     }
 
-    var i: u32 = 0;
     var it = ViewStack(View).pendingIterator(self.views.first, output_tags);
     while (it.next()) |node| {
         const view = &node.view;
-
-        if (view.floating) {
-            continue;
-        }
-
-        var new_box: Box = undefined;
-
-        // Add the remainder to the first master/slave to ensure every
-        // pixel of height is used
-        if (i < master_count) {
-            if (position == MasterPosition.Top) { // Top master
-                const master_width = @divTrunc(layout_width, master_count);
-                const master_width_rem = layout_width % master_count;
-                new_box = .{
-                    .x = @intCast(i32, i * master_width + if (i > 0) master_width_rem else 0),
-                    .y = 0,
-                    .width = master_width + if (i == 0) master_width_rem else 0,
-                    .height = master_stack_size,
-                };
-            } else if (position == MasterPosition.Right) { // Right master
-                const master_height = @divTrunc(layout_height, master_count);
-                const master_height_rem = layout_height % master_count;
-                new_box = .{
-                    .x = @intCast(i32, slave_stack_size),
-                    .y = @intCast(i32, i * master_height + if (i > 0) master_height_rem else 0),
-                    .width = master_stack_size,
-                    .height = master_height + if (i == 0) master_height_rem else 0,
-                };
-            } else if (position == MasterPosition.Bottom) { // Bottom master
-                const master_width = @divTrunc(layout_width, master_count);
-                const master_width_rem = layout_width % master_count;
-                new_box = .{
-                    .x = @intCast(i32, i * master_width + if (i > 0) master_width_rem else 0),
-                    .y = @intCast(i32, slave_stack_size),
-                    .width = master_width + if (i == 0) master_width_rem else 0,
-                    .height = master_stack_size,
-                };
-            } else { // Left master
-                const master_height = @divTrunc(layout_height, master_count);
-                const master_height_rem = layout_height % master_count;
-                new_box = .{
-                    .x = 0,
-                    .y = @intCast(i32, i * master_height + if (i > 0) master_height_rem else 0),
-                    .width = master_stack_size,
-                    .height = master_height + if (i == 0) master_height_rem else 0,
-                };
-            }
-        } else {
-            if (position == MasterPosition.Top) { // Top master
-                const slave_width = @divTrunc(layout_width, slave_count);
-                const slave_width_rem = layout_width % slave_count;
-                new_box = .{
-                    .x = @intCast(i32, (i - master_count) * slave_width + if (i > master_count) slave_width_rem else 0),
-                    .y = @intCast(i32, master_stack_size),
-                    .width = slave_width + if (i == master_count) slave_width_rem else 0,
-                    .height = slave_stack_size,
-                };
-            } else if (position == MasterPosition.Right) { // Right master
-                const slave_height = @divTrunc(layout_height, slave_count);
-                const slave_height_rem = layout_height % slave_count;
-                new_box = .{
-                    .x = 0,
-                    .y = @intCast(i32, (i - master_count) * slave_height + if (i > master_count) slave_height_rem else 0),
-                    .width = slave_stack_size,
-                    .height = slave_height + if (i == master_count) slave_height_rem else 0,
-                };
-            } else if (position == MasterPosition.Bottom) { // Bottom master
-                const slave_width = @divTrunc(layout_width, slave_count);
-                const slave_width_rem = layout_width % slave_count;
-                new_box = .{
-                    .x = @intCast(i32, (i - master_count) * slave_width + if (i > master_count) slave_width_rem else 0),
-                    .y = 0,
-                    .width = slave_width + if (i == master_count) slave_width_rem else 0,
-                    .height = slave_stack_size,
-                };
-            } else { // Left master
-                const slave_height = @divTrunc(layout_height, slave_count);
-                const slave_height_rem = layout_height % slave_count;
-                new_box = .{
-                    .x = @intCast(i32, master_stack_size),
-                    .y = @intCast(i32, (i - master_count) * slave_height + if (i > master_count) slave_height_rem else 0),
-                    .width = slave_stack_size,
-                    .height = slave_height + if (i == master_count) slave_height_rem else 0,
-                };
-            }
-        }
-
-        // Apply offsets from borders and padding
-        const xy_offset = @intCast(i32, border_width + outer_padding + view_padding);
-        new_box.x += self.usable_box.x + xy_offset;
-        new_box.y += self.usable_box.y + xy_offset;
-
-        // Reduce size to allow space for borders/padding
-        const delta_size = (border_width + view_padding) * 2;
-        new_box.width -= delta_size;
-        new_box.height -= delta_size;
-
-        // Set the view's pending box to the new dimensions
-        view.pending_box = new_box;
-
-        i += 1;
+        if (view.floating) continue;
+        view.pending_box = full_box;
     }
 }
 
-/// Wrapper for default layout with master area on the top
-pub fn layoutTopMaster(self: *Self, visible_count: u32, output_tags: u32) void {
-    layoutMasterStack(self, visible_count, output_tags, MasterPosition.Top);
-}
-
-/// Wrapper for default layout with master area on the right
-pub fn layoutRightMaster(self: *Self, visible_count: u32, output_tags: u32) void {
-    layoutMasterStack(self, visible_count, output_tags, MasterPosition.Right);
-}
-
-/// Wrapper for default layout with master area on the bottom
-pub fn layoutBottomMaster(self: *Self, visible_count: u32, output_tags: u32) void {
-    layoutMasterStack(self, visible_count, output_tags, MasterPosition.Bottom);
-}
-
-/// Wrapper for default layout with master area on the left
-pub fn layoutLeftMaster(self: *Self, visible_count: u32, output_tags: u32) void {
-    layoutMasterStack(self, visible_count, output_tags, MasterPosition.Left);
-}
-
-/// A layout in which every window uses the maximum available space.
-pub fn layoutFull(self: *Self, visible_count: u32, output_tags: u32) void {
     const border_width = self.root.server.config.border_width;
     const view_padding = self.root.server.config.view_padding;
     const outer_padding = self.root.server.config.outer_padding;
 
-    const layout_width = @intCast(u32, self.usable_box.width) -
-        (outer_padding * 2) - (border_width * 2) - (view_padding * 2);
-    const layout_height = @intCast(u32, self.usable_box.height) -
-        (outer_padding * 2) - (border_width * 2) - (view_padding * 2);
-    const x_offset = self.usable_box.x + @intCast(i32, outer_padding + border_width + view_padding);
-    const y_offset = self.usable_box.y + @intCast(i32, outer_padding + border_width + view_padding);
 
     var i: u32 = 0;
     var it = ViewStack(View).pendingIterator(self.views.first, output_tags);
