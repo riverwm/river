@@ -165,7 +165,7 @@ fn layoutFull(self: *Self, visible_count: u32, output_tags: u32) void {
     const border_width = self.root.server.config.border_width;
     const view_padding = self.root.server.config.view_padding;
     const outer_padding = self.root.server.config.outer_padding;
-    const xy_offset = @intCast(i32, outer_padding + border_width + view_padding);
+    const xy_offset = outer_padding + border_width + view_padding;
 
     var full_box: Box = .{
         .x = self.usable_box.x + @intCast(i32, xy_offset),
@@ -190,31 +190,116 @@ fn layoutFull(self: *Self, visible_count: u32, output_tags: u32) void {
     }
 }
 
+const LayoutError = error{
+    BadExitCode,
+    BadWindowConfiguration,
+    ConfigurationMismatch,
+};
+
+/// Parse a window configuration string and write values to the box
+fn parseWindowConfig(buffer: []const u8) LayoutError!Box {
+    var i: u32 = 0;
+    var box: Box = undefined;
+    var it = std.mem.split(buffer, " ");
+    while (it.next()) |token| : (i += 1) {
+        switch (i) {
+            0 => box.x = std.fmt.parseInt(i32, token, 10) catch return LayoutError.BadWindowConfiguration,
+            1 => box.y = std.fmt.parseInt(i32, token, 10) catch return LayoutError.BadWindowConfiguration,
+            2 => box.width = std.fmt.parseInt(u32, token, 10) catch return LayoutError.BadWindowConfiguration,
+            3 => box.height = std.fmt.parseInt(u32, token, 10) catch return LayoutError.BadWindowConfiguration,
+            else => {},
+        }
+    }
+    if (i != 4) return LayoutError.BadWindowConfiguration;
+    return box;
+}
+
+test "parse window configuration" {
+    const testing = @import("std").testing;
+    var box = try parseWindowConfig("5 10 100 200");
+    testing.expect(box.x == 5);
+    testing.expect(box.y == 10);
+    testing.expect(box.width == 100);
+    testing.expect(box.height == 200);
+}
+
+/// Execute an external layout function, parse its output and apply the layout
+/// to the output.
+fn layoutExternal(self: *Self, visible_count: u32, output_tags: u32) !void {
+    const allocator = self.root.server.allocator;
+
     const border_width = self.root.server.config.border_width;
     const view_padding = self.root.server.config.view_padding;
     const outer_padding = self.root.server.config.outer_padding;
+    const xy_offset = @intCast(i32, border_width + outer_padding + view_padding);
+    const delta_size = (border_width + view_padding) * 2;
+    const layout_width = @intCast(u32, self.usable_box.width) - outer_padding * 2;
+    const layout_height = @intCast(u32, self.usable_box.height) - outer_padding * 2;
 
+    // Assemble command
+    const parameters = std.fmt.allocPrint(allocator, "{} {} {d} {} {}", .{ visible_count, self.master_count, self.master_factor, layout_width, layout_height }) catch @panic("Out of memory.");
+    defer allocator.free(parameters);
+    const layout_command = try std.mem.join(allocator, " ", &[_][]const u8{
+        self.layout,
+        parameters,
+    });
+    defer allocator.free(layout_command);
+    const cmd = [_][]const u8{
+        "/bin/sh",
+        "-c",
+        layout_command,
+    };
 
-    var i: u32 = 0;
-    var it = ViewStack(View).pendingIterator(self.views.first, output_tags);
-    while (it.next()) |node| {
-        const view = &node.view;
+    // Execute layout executable
+    // TODO abort after 1 second
+    const child = try std.ChildProcess.init(&cmd, allocator);
+    defer child.deinit();
+    child.stdin_behavior = .Ignore;
+    child.stdout_behavior = .Pipe;
+    try std.ChildProcess.spawn(child);
+    const max_output_size = 400 * 1024;
+    const buffer = try child.stdout.?.inStream().readAllAlloc(allocator, max_output_size);
+    defer allocator.free(buffer);
+    const term = try child.wait();
+    switch (term) {
+        .Exited, .Signal, .Stopped, .Unknown => |code| {
+            if (code != 0) {
+                return LayoutError.BadExitCode;
+            }
+        },
+    }
 
-        if (view.floating) {
-            continue;
+    // Parse layout command output
+    var view_boxen = std.ArrayList(Box).init(self.root.server.allocator);
+    defer view_boxen.deinit();
+    var parse_it = std.mem.split(buffer, "\n");
+    while (parse_it.next()) |token| {
+        if (std.mem.eql(u8, token, "")) break;
+        var box = try parseWindowConfig(token);
+        box.x += self.usable_box.x + xy_offset;
+        box.y += self.usable_box.y + xy_offset;
+        box.width -= delta_size;
+        box.height -= delta_size;
+        if (box.width < minimum_size) {
+            box.width = minimum_size;
+            Log.Info.log("Window configuration hits minimum view width.", .{});
         }
+        if (box.height < minimum_size) {
+            box.height = minimum_size;
+            Log.Info.log("Window configuration hits minimum view height.", .{});
+        }
+        try view_boxen.append(box);
+    }
 
-        var new_box: Box = undefined;
-        new_box = .{
-            .x = x_offset,
-            .y = y_offset,
-            .width = layout_width,
-            .height = layout_height,
-        };
+    if (view_boxen.items.len != visible_count) return LayoutError.ConfigurationMismatch;
 
-        view.pending_box = new_box;
-
-        i += 1;
+    // Apply window configuration to views
+    var i: u32 = 0;
+    var view_it = ViewStack(View).pendingIterator(self.views.first, output_tags);
+    while (view_it.next()) |node| : (i += 1) {
+        const view = &node.view;
+        if (view.floating) continue;
+        view.pending_box = view_boxen.items[i];
     }
 }
 
