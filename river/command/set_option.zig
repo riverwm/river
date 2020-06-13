@@ -21,11 +21,12 @@ const std = @import("std");
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
-pub const Option = enum {
+const Option = enum {
     border_width,
     border_color_focused,
     border_color_unfocused,
     outer_padding,
+    view_padding,
 };
 
 /// Set option to a specified value.
@@ -40,7 +41,6 @@ pub fn setOption(
 
     const config = &seat.input_manager.server.config;
 
-    // Parse option and value.
     const option = std.meta.stringToEnum(Option, args[1]) orelse return Error.UnknownOption;
 
     // Assign value to option.
@@ -49,6 +49,7 @@ pub fn setOption(
         .border_color_focused => config.border_color_focused = try parseRgba(args[2]),
         .border_color_unfocused => config.border_color_unfocused = try parseRgba(args[2]),
         .outer_padding => config.outer_padding = try std.fmt.parseInt(u32, args[2], 10),
+        .view_padding => config.view_padding = try std.fmt.parseInt(u32, args[2], 10),
     }
 
     // 'Refresh' focused output to display the desired changes.
