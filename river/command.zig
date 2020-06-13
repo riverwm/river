@@ -91,7 +91,7 @@ pub const Error = error{
     Overflow,
     InvalidCharacter,
     InvalidDirection,
-    InvalidRgbFormat,
+    InvalidRgba,
     UnknownOption,
     OutOfMemory,
     CommandFailed,

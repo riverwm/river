@@ -23,17 +23,16 @@ const c = @import("c.zig");
 
 const Log = @import("log.zig").Log;
 const Server = @import("Server.zig");
-const Rgb = @import("Rgb.zig");
 const Mapping = @import("Mapping.zig");
 
 /// Width of borders in pixels
 border_width: u32,
 
-/// Color of border of focused window in RGB
-border_color_focused: Rgb,
+/// Color of border of focused window in RGBA
+border_color_focused: [4]f32,
 
-/// Color of border of unfocused window in RGB
-border_color_unfocused: Rgb,
+/// Color of border of unfocused window in RGBA
+border_color_unfocused: [4]f32,
 
 /// Amount of view padding in pixels
 view_padding: u32,
@@ -52,8 +51,8 @@ float_filter: std.ArrayList([*:0]const u8),
 
 pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
     self.border_width = 2;
-    try self.border_color_focused.parseString("#93A1A1"); // Solarized base1
-    try self.border_color_unfocused.parseString("#586E75"); // Solarized base0
+    self.border_color_focused = [_]f32{ 0.57647059, 0.63137255, 0.63137255, 1.0 }; // Solarized base1
+    self.border_color_unfocused = [_]f32{ 0.34509804, 0.43137255, 0.45882353, 1.0 }; // Solarized base0
     self.view_padding = 8;
     self.outer_padding = 8;
 

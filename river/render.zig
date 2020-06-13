@@ -238,11 +238,12 @@ fn renderTexture(
 }
 
 fn renderBorders(output: Output, view: *View, now: *c.timespec) void {
+    const config = &output.root.server.config;
     var border: Box = undefined;
     const color = if (view.focused)
-        output.root.server.config.border_color_focused.getDecimalRgbaArray()
+        &output.root.server.config.border_color_focused
     else
-        output.root.server.config.border_color_unfocused.getDecimalRgbaArray();
+        &output.root.server.config.border_color_unfocused;
     const border_width = output.root.server.config.border_width;
 
     // left and right, covering the corners as well
@@ -272,13 +273,13 @@ fn renderBorders(output: Output, view: *View, now: *c.timespec) void {
     renderRect(output, border, color);
 }
 
-fn renderRect(output: Output, box: Box, color: [4]f32) void {
+fn renderRect(output: Output, box: Box, color: *const [4]f32) void {
     var wlr_box = box.toWlrBox();
     scaleBox(&wlr_box, output.wlr_output.scale);
     c.wlr_render_rect(
         output.getRenderer(),
         &wlr_box,
-        &color,
+        color,
         &output.wlr_output.transform_matrix,
     );
 }

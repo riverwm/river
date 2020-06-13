@@ -38,7 +38,7 @@ pub fn setOption(
     if (args.len < 3) return Error.NotEnoughArguments;
     if (args.len > 3) return Error.TooManyArguments;
 
-    const config = &seat.focused_output.root.server.config;
+    const config = &seat.input_manager.server.config;
 
     // Parse option and value.
     const option = std.meta.stringToEnum(Option, args[1]) orelse return Error.UnknownOption;
@@ -46,11 +46,28 @@ pub fn setOption(
     // Assign value to option.
     switch (option) {
         .border_width => config.border_width = try std.fmt.parseInt(u32, args[2], 10),
-        .border_color_focused => try config.border_color_focused.parseString(args[2]),
-        .border_color_unfocused => try config.border_color_unfocused.parseString(args[2]),
+        .border_color_focused => config.border_color_focused = try parseRgba(args[2]),
+        .border_color_unfocused => config.border_color_unfocused = try parseRgba(args[2]),
         .outer_padding => config.outer_padding = try std.fmt.parseInt(u32, args[2], 10),
     }
 
     // 'Refresh' focused output to display the desired changes.
     seat.focused_output.root.arrange();
+}
+
+/// Parse a color in the format #RRGGBB or #RRGGBBAA
+pub fn parseRgba(string: []const u8) ![4]f32 {
+    if (string[0] != '#' or (string.len != 7 and string.len != 9)) return error.InvalidRgba;
+
+    const r = try std.fmt.parseInt(u8, string[1..3], 16);
+    const g = try std.fmt.parseInt(u8, string[3..5], 16);
+    const b = try std.fmt.parseInt(u8, string[5..7], 16);
+    const a = if (string.len == 9) try std.fmt.parseInt(u8, string[7..9], 16) else 255;
+
+    return [4]f32{
+        @intToFloat(f32, r) / 255.0,
+        @intToFloat(f32, g) / 255.0,
+        @intToFloat(f32, b) / 255.0,
+        @intToFloat(f32, a) / 255.0,
+    };
 }

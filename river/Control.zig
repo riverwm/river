@@ -126,7 +126,7 @@ fn runCommand(
                     command.Error.Overflow => "value out of bounds",
                     command.Error.InvalidCharacter => "invalid character in argument",
                     command.Error.InvalidDirection => "invalid direction. Must be 'next' or 'previous'",
-                    command.Error.InvalidRgbFormat => "invalid RGB format",
+                    command.Error.InvalidRgba => "invalid color format, must be #RRGGBB or #RRGGBBAA",
                     command.Error.OutOfMemory => "out of memory",
                     command.Error.CommandFailed => unreachable,
                 },
