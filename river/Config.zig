@@ -30,10 +30,10 @@ const Mapping = @import("Mapping.zig");
 border_width: u32,
 
 /// Color of border of focused window in RGB
-border_focused_color: Rgb,
+border_color_focused: Rgb,
 
 /// Color of border of unfocused window in RGB
-border_unfocused_color: Rgb,
+border_color_unfocused: Rgb,
 
 /// Amount of view padding in pixels
 view_padding: u32,
@@ -52,8 +52,8 @@ float_filter: std.ArrayList([*:0]const u8),
 
 pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
     self.border_width = 2;
-    try self.border_focused_color.parseString("#93A1A1"); // Solarized base1
-    try self.border_unfocused_color.parseString("#586E75"); // Solarized base0
+    try self.border_color_focused.parseString("#93A1A1"); // Solarized base1
+    try self.border_color_unfocused.parseString("#586E75"); // Solarized base0
     self.view_padding = 8;
     self.outer_padding = 8;
 

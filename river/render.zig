@@ -240,9 +240,9 @@ fn renderTexture(
 fn renderBorders(output: Output, view: *View, now: *c.timespec) void {
     var border: Box = undefined;
     const color = if (view.focused)
-        output.root.server.config.border_focused_color.getDecimalRgbaArray()
+        output.root.server.config.border_color_focused.getDecimalRgbaArray()
     else
-        output.root.server.config.border_unfocused_color.getDecimalRgbaArray();
+        output.root.server.config.border_color_unfocused.getDecimalRgbaArray();
     const border_width = output.root.server.config.border_width;
 
     // left and right, covering the corners as well
