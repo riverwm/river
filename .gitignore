@@ -1,2 +1,4 @@
 zig-cache
-*.1
+protocol/*.h
+protocol/*.c
+doc/*.1
