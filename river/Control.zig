@@ -23,16 +23,21 @@ const c = @import("c.zig");
 const command = @import("command.zig");
 
 const Log = @import("log.zig").Log;
+const Seat = @import("Seat.zig");
 const Server = @import("Server.zig");
 
 const protocol_version = 1;
 
 const implementation = c.struct_zriver_control_v1_interface{
+    .destroy = destroy,
+    .add_argument = addArgument,
     .run_command = runCommand,
 };
 
 server: *Server,
 wl_global: *c.wl_global,
+
+args_map: std.AutoHashMap(u32, std.ArrayList([]const u8)),
 
 listen_display_destroy: c.wl_listener,
 
@@ -46,6 +51,8 @@ pub fn init(self: *Self, server: *Server) !void {
         bind,
     ) orelse return error.CantCreateWlGlobal;
 
+    self.args_map = std.AutoHashMap(u32, std.ArrayList([]const u8)).init(server.allocator);
+
     self.listen_display_destroy.notify = handleDisplayDestroy;
     c.wl_display_add_destroy_listener(server.wl_display, &self.listen_display_destroy);
 }
@@ -53,6 +60,7 @@ pub fn init(self: *Self, server: *Server) !void {
 fn handleDisplayDestroy(wl_listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_display_destroy", wl_listener.?);
     c.wl_global_destroy(self.wl_global);
+    self.args_map.deinit();
 }
 
 /// Called when a client binds our global
@@ -67,30 +75,55 @@ fn bind(wl_client: ?*c.wl_client, data: ?*c_void, version: u32, id: u32) callcon
         c.wl_client_post_no_memory(wl_client);
         return;
     };
-    c.wl_resource_set_implementation(wl_resource, &implementation, self, null);
+    self.args_map.putNoClobber(id, std.ArrayList([]const u8).init(self.server.allocator)) catch {
+        c.wl_resource_destroy(wl_resource);
+        c.wl_client_post_no_memory(wl_client);
+        return;
+    };
+    c.wl_resource_set_implementation(wl_resource, &implementation, self, handleResourceDestroy);
+}
+
+/// Remove the resource from the hash map and free all stored args
+fn handleResourceDestroy(wl_resource: ?*c.wl_resource) callconv(.C) void {
+    const self = @ptrCast(*Self, @alignCast(@alignOf(*Self), c.wl_resource_get_user_data(wl_resource)));
+    const id = c.wl_resource_get_id(wl_resource);
+    const list = self.args_map.remove(id).?.value;
+    for (list.items) |arg| list.allocator.free(arg);
+    list.deinit();
+}
+
+fn destroy(wl_client: ?*c.wl_client, wl_resource: ?*c.wl_resource) callconv(.C) void {
+    c.wl_resource_destroy(wl_resource);
+}
+
+fn addArgument(wl_client: ?*c.wl_client, wl_resource: ?*c.wl_resource, arg: ?[*:0]const u8) callconv(.C) void {
+    const self = @ptrCast(*Self, @alignCast(@alignOf(*Self), c.wl_resource_get_user_data(wl_resource)));
+    const id = c.wl_resource_get_id(wl_resource);
+    const allocator = self.server.allocator;
+
+    const owned_slice = std.mem.dupe(allocator, u8, std.mem.span(arg.?)) catch {
+        c.wl_client_post_no_memory(wl_client);
+        return;
+    };
+
+    self.args_map.get(id).?.value.append(owned_slice) catch {
+        c.wl_client_post_no_memory(wl_client);
+        allocator.free(owned_slice);
+        return;
+    };
 }
 
 fn runCommand(
     wl_client: ?*c.wl_client,
     wl_resource: ?*c.wl_resource,
-    wl_array: ?*c.wl_array,
+    seat_wl_resource: ?*c.wl_resource,
     callback_id: u32,
 ) callconv(.C) void {
     const self = @ptrCast(*Self, @alignCast(@alignOf(*Self), c.wl_resource_get_user_data(wl_resource)));
+    // This can be null if the seat is inert, in which case we ignore the request
+    const wlr_seat_client = c.wlr_seat_client_from_resource(seat_wl_resource) orelse return;
+    const seat = @ptrCast(*Seat, @alignCast(@alignOf(*Seat), wlr_seat_client.*.seat.*.data));
     const allocator = self.server.allocator;
-    const seat = self.server.input_manager.default_seat;
-
-    var args = std.ArrayList([]const u8).init(allocator);
-    defer args.deinit();
-
-    var i: usize = 0;
-    const data = @ptrCast([*]const u8, wl_array.?.data);
-    while (i < wl_array.?.size) {
-        const slice = std.mem.spanZ(@ptrCast([*:0]const u8, &data[i]));
-        args.append(slice) catch unreachable;
-
-        i += slice.len + 1;
-    }
 
     const callback_resource = c.wl_resource_create(
         wl_client,
@@ -101,11 +134,12 @@ fn runCommand(
         c.wl_client_post_no_memory(wl_client);
         return;
     };
-
     c.wl_resource_set_implementation(callback_resource, null, null, null);
 
+    const args = self.args_map.get(c.wl_resource_get_id(wl_resource)).?.value.items;
+
     var failure_message: []const u8 = undefined;
-    command.run(allocator, seat, args.items, &failure_message) catch |err| {
+    command.run(allocator, seat, args, &failure_message) catch |err| {
         if (err == command.Error.CommandFailed) {
             defer allocator.free(failure_message);
             const out = std.cstr.addNullByte(allocator, failure_message) catch {
@@ -134,5 +168,5 @@ fn runCommand(
         }
         return;
     };
-    c.zriver_command_callback_v1_send_success(callback_resource);
+    c.zriver_command_callback_v1_send_success(callback_resource, "");
 }
