@@ -77,7 +77,9 @@ fn bind(wl_client: ?*c.wl_client, data: ?*c_void, version: u32, id: u32) callcon
     c.wl_resource_set_implementation(wl_resource, &implementation, self, null);
 }
 
-fn destroy(wl_client: ?*c.wl_client, wl_resource: ?*c.wl_resource) callconv(.C) void {}
+fn destroy(wl_client: ?*c.wl_client, wl_resource: ?*c.wl_resource) callconv(.C) void {
+    c.wl_resource_destroy(wl_resource);
+}
 
 fn getRiverOutputStatus(
     wl_client: ?*c.wl_client,
