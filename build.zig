@@ -17,6 +17,12 @@ pub fn build(b: *std.build.Builder) !void {
         "Set to true to enable xwayland support",
     ) orelse false;
 
+    const man_pages = b.option(
+        bool,
+        "man-pages",
+        "Set to true to build man pages. Requires scdoc. Defaults to true if scdoc is found.",
+    ) orelse false;
+
     const examples = b.option(
         bool,
         "examples",
@@ -24,10 +30,6 @@ pub fn build(b: *std.build.Builder) !void {
     ) orelse false;
 
     const scan_protocols = ScanProtocolsStep.create(b);
-
-    // Install man pages, no gzip for now
-    b.installFile("doc/river.1", "share/man/man1/river.1");
-    b.installFile("doc/riverctl.1", "share/man/man1/riverctl.1");
 
     {
         const river = b.addExecutable("river", "river/main.zig");
@@ -58,6 +60,18 @@ pub fn build(b: *std.build.Builder) !void {
         riverctl.linkSystemLibrary("wayland-client");
 
         riverctl.install();
+    }
+
+    const scdoc = b.findProgram(&[_][]const u8{"scdoc"}, &[_][]const u8{}) catch |err| switch (err) {
+        error.FileNotFound => if (man_pages) {
+            @panic("scdoc not found, cannot generate man pages");
+        } else null,
+        else => return err,
+    };
+
+    if (scdoc != null) {
+        const scdoc_step = ScdocStep.create(b);
+        try scdoc_step.install();
     }
 
     if (examples) {
@@ -189,6 +203,59 @@ const ScanProtocolsStep = struct {
                     );
                 }
             }
+        }
+    }
+};
+
+const ScdocStep = struct {
+    const scd_paths = [_][]const u8{
+        "doc/river.1.scd",
+        "doc/riverctl.1.scd",
+    };
+
+    builder: *std.build.Builder,
+    step: std.build.Step,
+
+    fn create(builder: *std.build.Builder) *ScdocStep {
+        const self = builder.allocator.create(ScdocStep) catch unreachable;
+        self.* = init(builder);
+        return self;
+    }
+
+    fn init(builder: *std.build.Builder) ScdocStep {
+        return ScdocStep{
+            .builder = builder,
+            .step = std.build.Step.init("Generate man pages", builder.allocator, make),
+        };
+    }
+
+    fn make(step: *std.build.Step) !void {
+        const self = @fieldParentPtr(ScdocStep, "step", step);
+        for (scd_paths) |path| {
+            const command = try std.fmt.allocPrint(
+                self.builder.allocator,
+                "scdoc < {} > {}",
+                .{ path, path[0..(path.len - 4)] },
+            );
+            _ = try self.builder.exec(&[_][]const u8{ "sh", "-c", command });
+        }
+    }
+
+    fn install(self: *ScdocStep) !void {
+        self.builder.getInstallStep().dependOn(&self.step);
+
+        for (scd_paths) |path| {
+            const path_no_ext = path[0..(path.len - 4)];
+            const basename_no_ext = std.fs.path.basename(path_no_ext);
+            const section = path_no_ext[(path_no_ext.len - 1)..];
+
+            const output = try std.fmt.allocPrint(
+                self.builder.allocator,
+                "share/man/man{}/{}",
+                .{ section, basename_no_ext },
+            );
+
+            self.builder.installFile(path_no_ext, output);
         }
     }
 };
