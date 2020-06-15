@@ -21,7 +21,13 @@ pub fn build(b: *std.build.Builder) !void {
         bool,
         "man-pages",
         "Set to true to build man pages. Requires scdoc. Defaults to true if scdoc is found.",
-    ) orelse false;
+    ) orelse scdoc_found: {
+        _ = b.findProgram(&[_][]const u8{"scdoc"}, &[_][]const u8{}) catch |err| switch (err) {
+            error.FileNotFound => break :scdoc_found false,
+            else => return err,
+        };
+        break :scdoc_found true;
+    };
 
     const examples = b.option(
         bool,
@@ -62,14 +68,7 @@ pub fn build(b: *std.build.Builder) !void {
         riverctl.install();
     }
 
-    const scdoc = b.findProgram(&[_][]const u8{"scdoc"}, &[_][]const u8{}) catch |err| switch (err) {
-        error.FileNotFound => if (man_pages) {
-            @panic("scdoc not found, cannot generate man pages");
-        } else null,
-        else => return err,
-    };
-
-    if (scdoc != null) {
+    if (man_pages) {
         const scdoc_step = ScdocStep.create(b);
         try scdoc_step.install();
     }
