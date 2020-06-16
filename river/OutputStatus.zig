@@ -57,19 +57,23 @@ fn destroy(wl_client: ?*c.wl_client, wl_resource: ?*c.wl_resource) callconv(.C) 
 
 /// Send the current tags of each view on the output to the client.
 pub fn sendViewTags(self: Self) void {
-    var view_tags: c.wl_array = undefined;
-    c.wl_array_init(&view_tags);
+    var view_tags = std.ArrayList(u32).init(util.allocator);
+    defer view_tags.deinit();
+
     var it = ViewStack(View).iterator(self.output.views.first, std.math.maxInt(u32));
-    while (it.next()) |node| {
-        const ptr = c.wl_array_add(&view_tags, @sizeOf(u32)) orelse {
-            c.wl_resource_post_no_memory(self.wl_resource);
-            Log.Error.log("out of memory", .{});
-            return;
-        };
-        const ptr_u32 = util.voidCast(u32, ptr);
-        ptr_u32.* = node.view.current_tags;
-    }
-    c.zriver_output_status_v1_send_view_tags(self.wl_resource, &view_tags);
+    while (it.next()) |node|
+        view_tags.append(node.view.current_tags) catch {
+        c.wl_resource_post_no_memory(self.wl_resource);
+        Log.Error.log("out of memory", .{});
+        return;
+    };
+
+    var wl_array = c.wl_array{
+        .size = view_tags.items.len,
+        .alloc = view_tags.capacity,
+        .data = view_tags.items.ptr,
+    };
+    c.zriver_output_status_v1_send_view_tags(self.wl_resource, &wl_array);
 }
 
 /// Send the currently focused tags of the output to the client.
