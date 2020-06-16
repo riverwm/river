@@ -20,9 +20,9 @@ const Self = @This();
 const std = @import("std");
 
 const c = @import("c.zig");
+const log = @import("log.zig");
 const util = @import("util.zig");
 
-const Log = @import("log.zig").Log;
 const Seat = @import("Seat.zig");
 
 seat: *Seat,
@@ -163,12 +163,12 @@ fn handleModifiers(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void 
 /// Returns true if the keysym was handled.
 fn handleBuiltinMapping(self: Self, keysym: c.xkb_keysym_t) bool {
     if (keysym >= c.XKB_KEY_XF86Switch_VT_1 and keysym <= c.XKB_KEY_XF86Switch_VT_12) {
-        Log.Debug.log("Switch VT keysym received", .{});
+        log.debug(.keyboard, "switch VT keysym received", .{});
         const wlr_backend = self.seat.input_manager.server.wlr_backend;
         if (c.river_wlr_backend_is_multi(wlr_backend)) {
             if (c.river_wlr_backend_get_session(wlr_backend)) |session| {
                 const vt = keysym - c.XKB_KEY_XF86Switch_VT_1 + 1;
-                Log.Debug.log("Switching to VT {}", .{vt});
+                log.notice(.server, "switching to VT {}", .{vt});
                 _ = c.wlr_session_change_vt(session, vt);
             }
         }

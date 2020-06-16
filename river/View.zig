@@ -21,10 +21,10 @@ const build_options = @import("build_options");
 const std = @import("std");
 
 const c = @import("c.zig");
+const log = @import("log.zig");
 const util = @import("util.zig");
 
 const Box = @import("Box.zig");
-const Log = @import("log.zig").Log;
 const Output = @import("Output.zig");
 const Root = @import("Root.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
@@ -138,7 +138,7 @@ pub fn configure(self: Self) void {
             .xwayland_view => |xwayland_view| xwayland_view.configure(pending_box),
         }
     } else {
-        Log.Error.log("Configure called on a View with no pending box", .{});
+        log.err(.transaction, "configure called on a View with no pending box", .{});
     }
 }
 
@@ -155,7 +155,7 @@ pub fn dropSavedBuffers(self: *Self) void {
 
 pub fn saveBuffers(self: *Self) void {
     if (self.saved_buffers.items.len > 0) {
-        Log.Error.log("view already has buffers saved, overwriting", .{});
+        log.err(.transaction, "view already has buffers saved, overwriting", .{});
         self.saved_buffers.items.len = 0;
     }
 
@@ -270,7 +270,7 @@ pub fn getTitle(self: Self) [*:0]const u8 {
 pub fn map(self: *Self) void {
     const root = self.output.root;
 
-    Log.Debug.log("View '{}' mapped", .{self.getTitle()});
+    log.debug(.server, "view '{}' mapped", .{self.getTitle()});
 
     // Add the view to the stack of its output
     const node = @fieldParentPtr(ViewStack(Self).Node, "view", self);
@@ -294,7 +294,7 @@ pub fn map(self: *Self) void {
 pub fn unmap(self: *Self) void {
     const root = self.output.root;
 
-    Log.Debug.log("View '{}' unmapped", .{self.getTitle()});
+    log.debug(.server, "view '{}' unmapped", .{self.getTitle()});
 
     self.wlr_surface = null;
 

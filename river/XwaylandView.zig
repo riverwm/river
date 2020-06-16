@@ -22,7 +22,6 @@ const std = @import("std");
 const c = @import("c.zig");
 
 const Box = @import("Box.zig");
-const Log = @import("log.zig").Log;
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const XdgPopup = @import("XdgPopup.zig");

@@ -20,9 +20,9 @@ const Self = @This();
 const std = @import("std");
 
 const c = @import("c.zig");
+const log = @import("log.zig");
 const util = @import("util.zig");
 
-const Log = @import("log.zig").Log;
 const Seat = @import("Seat.zig");
 const Server = @import("Server.zig");
 
@@ -102,7 +102,7 @@ pub fn inputAllowed(self: Self, wlr_surface: *c.wlr_surface) bool {
 fn handleInhibitActivate(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_inhibit_activate", listener.?);
 
-    Log.Debug.log("Input inhibitor activated", .{});
+    log.debug(.input_manager, "input inhibitor activated", .{});
 
     // Clear focus of all seats
     var seat_it = self.seats.first;
@@ -116,7 +116,7 @@ fn handleInhibitActivate(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C)
 fn handleInhibitDeactivate(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_inhibit_deactivate", listener.?);
 
-    Log.Debug.log("Input inhibitor deactivated", .{});
+    log.debug(.input_manager, "input inhibitor deactivated", .{});
 
     self.exclusive_client = null;
 

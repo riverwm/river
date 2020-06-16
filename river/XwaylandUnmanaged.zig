@@ -23,7 +23,6 @@ const c = @import("c.zig");
 const util = @import("util.zig");
 
 const Box = @import("Box.zig");
-const Log = @import("log.zig").Log;
 const Root = @import("Root.zig");
 
 root: *Root,

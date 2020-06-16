@@ -20,10 +20,10 @@ const Self = @This();
 const std = @import("std");
 
 const c = @import("c.zig");
+const log = @import("log.zig");
 const util = @import("util.zig");
 
 const Box = @import("Box.zig");
-const Log = @import("log.zig").Log;
 const Output = @import("Output.zig");
 const XdgPopup = @import("XdgPopup.zig");
 
@@ -79,7 +79,7 @@ fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_destroy", listener.?);
     const output = self.output;
 
-    Log.Debug.log("Layer surface '{}' destroyed", .{self.wlr_layer_surface.namespace});
+    log.debug(.layer_shell, "layer surface '{}' destroyed", .{self.wlr_layer_surface.namespace});
 
     // Remove listeners active the entire lifetime of the layer surface
     c.wl_list_remove(&self.listen_destroy.link);
@@ -94,7 +94,7 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_map", listener.?);
     const wlr_layer_surface = self.wlr_layer_surface;
 
-    Log.Debug.log("Layer surface '{}' mapped.", .{wlr_layer_surface.namespace});
+    log.debug(.layer_shell, "layer surface '{}' mapped", .{wlr_layer_surface.namespace});
 
     // Add listeners that are only active while mapped
     self.listen_commit.notify = handleCommit;
@@ -115,7 +115,7 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_unmap", listener.?);
 
-    Log.Debug.log("Layer surface '{}' unmapped.", .{self.wlr_layer_surface.namespace});
+    log.debug(.layer_shell, "layer surface '{}' unmapped", .{self.wlr_layer_surface.namespace});
 
     // This is a bit ugly: we need to use the wlr bool here since surfaces
     // may be closed during the inital configure which we preform
@@ -164,7 +164,7 @@ fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const wlr_layer_surface = self.wlr_layer_surface;
 
     if (self.wlr_layer_surface.output == null) {
-        Log.Error.log("Layer surface committed with null output", .{});
+        log.err(.layer_shell, "layer surface committed with null output", .{});
         return;
     }
 

@@ -21,6 +21,7 @@ const build_options = @import("build_options");
 const std = @import("std");
 
 const c = @import("c.zig");
+const log = @import("log.zig");
 const util = @import("util.zig");
 
 const Config = @import("Config.zig");
@@ -28,7 +29,6 @@ const Control = @import("Control.zig");
 const DecorationManager = @import("DecorationManager.zig");
 const InputManager = @import("InputManager.zig");
 const LayerSurface = @import("LayerSurface.zig");
-const Log = @import("log.zig").Log;
 const Output = @import("Output.zig");
 const Root = @import("Root.zig");
 const StatusManager = @import("StatusManager.zig");
@@ -181,7 +181,7 @@ pub fn run(self: Self) void {
 fn handleNewOutput(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_new_output", listener.?);
     const wlr_output = util.voidCast(c.wlr_output, data.?);
-    Log.Debug.log("New output {}", .{wlr_output.name});
+    log.debug(.server, "new output {}", .{wlr_output.name});
     self.root.addOutput(wlr_output);
 }
 
@@ -192,11 +192,11 @@ fn handleNewXdgSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) v
     const wlr_xdg_surface = util.voidCast(c.wlr_xdg_surface, data.?);
 
     if (wlr_xdg_surface.role == .WLR_XDG_SURFACE_ROLE_POPUP) {
-        Log.Debug.log("New xdg_popup", .{});
+        log.debug(.server, "new xdg_popup", .{});
         return;
     }
 
-    Log.Debug.log("New xdg_toplevel", .{});
+    log.debug(.server, "new xdg_toplevel", .{});
 
     // The View will add itself to the output's view stack on map
     const output = self.input_manager.default_seat.focused_output;
@@ -209,7 +209,8 @@ fn handleNewLayerSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C)
     const self = @fieldParentPtr(Self, "listen_new_layer_surface", listener.?);
     const wlr_layer_surface = util.voidCast(c.wlr_layer_surface_v1, data.?);
 
-    Log.Debug.log(
+    log.debug(
+        .server,
         "New layer surface: namespace {}, layer {}, anchor {}, size {}x{}, margin ({},{},{},{}), exclusive_zone {}",
         .{
             wlr_layer_surface.namespace,
@@ -230,14 +231,16 @@ fn handleNewLayerSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C)
     if (wlr_layer_surface.output == null) {
         if (self.root.outputs.first) |node| {
             const output = &node.data;
-            Log.Debug.log(
-                "New layer surface had null output, assigning it to output {}",
+            log.debug(
+                .server,
+                "new layer surface had null output, assigning it to output '{}'",
                 .{output.wlr_output.name},
             );
             wlr_layer_surface.output = output.wlr_output;
         } else {
-            Log.Error.log(
-                "No output available for layer surface '{}'",
+            log.err(
+                .server,
+                "no output available for layer surface '{}'",
                 .{wlr_layer_surface.namespace},
             );
             c.wlr_layer_surface_v1_close(wlr_layer_surface);
@@ -256,7 +259,7 @@ fn handleNewXwaylandSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(
     const wlr_xwayland_surface = util.voidCast(c.wlr_xwayland_surface, data.?);
 
     if (wlr_xwayland_surface.override_redirect) {
-        Log.Debug.log("New unmanaged xwayland surface", .{});
+        log.debug(.server, "new unmanaged xwayland surface", .{});
         // The unmanged surface will add itself to the list of unmanaged views
         // in Root when it is mapped.
         const node = util.allocator.create(std.TailQueue(XwaylandUnmanaged).Node) catch unreachable;
@@ -264,8 +267,9 @@ fn handleNewXwaylandSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(
         return;
     }
 
-    Log.Debug.log(
-        "New xwayland surface: title '{}', class '{}'",
+    log.debug(
+        .server,
+        "new xwayland surface: title '{}', class '{}'",
         .{ wlr_xwayland_surface.title, wlr_xwayland_surface.class },
     );
 

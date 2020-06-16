@@ -22,7 +22,6 @@ const std = @import("std");
 const c = @import("c.zig");
 const util = @import("util.zig");
 
-const Log = @import("log.zig").Log;
 const Server = @import("Server.zig");
 const Mapping = @import("Mapping.zig");
 

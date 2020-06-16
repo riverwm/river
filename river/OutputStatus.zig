@@ -20,9 +20,9 @@ const Self = @This();
 const std = @import("std");
 
 const c = @import("c.zig");
+const log = @import("log.zig");
 const util = @import("util.zig");
 
-const Log = @import("log.zig").Log;
 const Output = @import("Output.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
@@ -64,7 +64,7 @@ pub fn sendViewTags(self: Self) void {
     while (it.next()) |node|
         view_tags.append(node.view.current_tags) catch {
         c.wl_resource_post_no_memory(self.wl_resource);
-        Log.Error.log("out of memory", .{});
+        log.crit(.river_status, "out of memory", .{});
         return;
     };
 

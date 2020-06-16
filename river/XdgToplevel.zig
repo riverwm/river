@@ -20,10 +20,10 @@ const Self = @This();
 const std = @import("std");
 
 const c = @import("c.zig");
+const log = @import("log.zig");
 const util = @import("util.zig");
 
 const Box = @import("Box.zig");
-const Log = @import("log.zig").Log;
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const XdgPopup = @import("XdgPopup.zig");
@@ -235,7 +235,7 @@ fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     } else {
         // TODO: handle unexpected change in dimensions
         if (!std.meta.eql(view.surface_box, new_box))
-            Log.Error.log("View changed size unexpectedly", .{});
+            log.err(.xdg_shell, "view changed size unexpectedly", .{});
         view.surface_box = new_box;
     }
 }

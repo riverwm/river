@@ -21,9 +21,9 @@ const std = @import("std");
 const build_options = @import("build_options");
 
 const c = @import("c.zig");
+const log = @import("log.zig");
 const util = @import("util.zig");
 
-const Log = @import("log.zig").Log;
 const Output = @import("Output.zig");
 const Server = @import("Server.zig");
 const View = @import("View.zig");
@@ -156,21 +156,22 @@ fn startTransaction(self: *Self) void {
     }
 
     if (self.pending_configures > 0) {
-        Log.Debug.log(
-            "Started transaction with {} pending configures.",
+        log.debug(
+            .transaction,
+            "started transaction with {} pending configure(s)",
             .{self.pending_configures},
         );
 
         // Set timeout to 200ms
         if (c.wl_event_source_timer_update(self.transaction_timer, 200) < 0) {
-            Log.Error.log("failed to update timer.", .{});
+            log.err(.transaction, "failed to update timer", .{});
             self.commitTransaction();
         }
     } else {
         // No views need configures, clear the current timer in case we are
         // interrupting another transaction and commit.
         if (c.wl_event_source_timer_update(self.transaction_timer, 0) < 0)
-            Log.Error.log("error disarming timer", .{});
+            log.err(.transaction, "error disarming timer", .{});
         self.commitTransaction();
     }
 }
@@ -178,7 +179,7 @@ fn startTransaction(self: *Self) void {
 fn handleTimeout(data: ?*c_void) callconv(.C) c_int {
     const self = util.voidCast(Self, data.?);
 
-    Log.Error.log("Transaction timed out. Some imperfect frames may be shown.", .{});
+    log.err(.transaction, "time out occurred, some imperfect frames may be shown", .{});
 
     self.commitTransaction();
 
@@ -190,7 +191,7 @@ pub fn notifyConfigured(self: *Self) void {
     if (self.pending_configures == 0) {
         // Disarm the timer, as we didn't timeout
         if (c.wl_event_source_timer_update(self.transaction_timer, 0) == -1)
-            Log.Error.log("Error disarming timer", .{});
+            log.err(.transaction, "error disarming timer", .{});
         self.commitTransaction();
     }
 }
@@ -212,7 +213,8 @@ fn commitTransaction(self: *Self) void {
 
         // If there were pending focused tags, make them the current focus
         if (output.pending_focused_tags) |tags| {
-            Log.Debug.log(
+            log.debug(
+                .output,
                 "changing current focus: {b:0>10} to {b:0>10}",
                 .{ output.current_focused_tags, tags },
             );

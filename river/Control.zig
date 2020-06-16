@@ -23,7 +23,6 @@ const c = @import("c.zig");
 const command = @import("command.zig");
 const util = @import("util.zig");
 
-const Log = @import("log.zig").Log;
 const Seat = @import("Seat.zig");
 const Server = @import("Server.zig");
 

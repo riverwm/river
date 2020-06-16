@@ -21,12 +21,12 @@ const Self = @This();
 const std = @import("std");
 
 const c = @import("c.zig");
+const log = @import("log.zig");
 const render = @import("render.zig");
 const util = @import("util.zig");
 
 const Box = @import("Box.zig");
 const LayerSurface = @import("LayerSurface.zig");
-const Log = @import("log.zig").Log;
 const Root = @import("Root.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
@@ -288,11 +288,11 @@ fn layoutExternal(self: *Self, visible_count: u32, output_tags: u32) !void {
         box.height -= delta_size;
         if (box.width < minimum_size) {
             box.width = minimum_size;
-            Log.Info.log("Window configuration hits minimum view width.", .{});
+            log.notice(.layout, "window hits minimum view width.", .{});
         }
         if (box.height < minimum_size) {
             box.height = minimum_size;
-            Log.Info.log("Window configuration hits minimum view height.", .{});
+            log.notice(.layout, "window hits minimum view height.", .{});
         }
         try view_boxen.append(box);
     }
@@ -338,12 +338,12 @@ pub fn arrangeViews(self: *Self) void {
 
     layoutExternal(self, visible_count, output_tags) catch |err| {
         switch (err) {
-            LayoutError.BadExitCode => Log.Error.log("Layout command exited with non-zero return code.", .{}),
-            LayoutError.BadWindowConfiguration => Log.Error.log("Invalid window configuration.", .{}),
-            LayoutError.ConfigurationMismatch => Log.Error.log("Mismatch between amount of window configurations and visible windows.", .{}),
-            else => Log.Error.log("Encountered unexpected error while trying to use external layout.", .{}),
+            LayoutError.BadExitCode => log.err(.layout, "layout command exited with non-zero return code", .{}),
+            LayoutError.BadWindowConfiguration => log.err(.layout, "invalid window configuration", .{}),
+            LayoutError.ConfigurationMismatch => log.err(.layout, "mismatch between window configuration and visible window counts", .{}),
+            else => log.err(.layout, "'{}' error while trying to use external layout", .{err}),
         }
-        Log.Error.log("Falling back to internal layout", .{});
+        log.err(.layout, "falling back to internal layout", .{});
         layoutFull(self, visible_count, output_tags);
     };
 }
@@ -461,8 +461,9 @@ fn arrangeLayer(
                 new_box.width = bounds.width -
                     (current_state.margin.left + current_state.margin.right);
             } else {
-                Log.Error.log(
-                    "Protocol Error: layer surface '{}' requested width 0 without anchoring to opposite edges.",
+                log.err(
+                    .layer_shell,
+                    "protocol error: layer surface '{}' requested width 0 without anchoring to opposite edges",
                     .{layer_surface.wlr_layer_surface.namespace},
                 );
                 c.wlr_layer_surface_v1_close(layer_surface.wlr_layer_surface);
@@ -490,8 +491,9 @@ fn arrangeLayer(
                 new_box.height = bounds.height -
                     (current_state.margin.top + current_state.margin.bottom);
             } else {
-                Log.Error.log(
-                    "Protocol Error: layer surface '{}' requested height 0 without anchoring to opposite edges.",
+                log.err(
+                    .layer_shell,
+                    "protocol error: layer surface '{}' requested height 0 without anchoring to opposite edges",
                     .{layer_surface.wlr_layer_surface.namespace},
                 );
                 c.wlr_layer_surface_v1_close(layer_surface.wlr_layer_surface);
@@ -559,7 +561,7 @@ fn arrangeLayer(
         }
 
         // Tell the client to assume the new size
-        Log.Debug.log("send configure, {} x {}", .{ layer_surface.box.width, layer_surface.box.height });
+        log.debug(.layer_shell, "send configure, {} x {}", .{ layer_surface.box.width, layer_surface.box.height });
         c.wlr_layer_surface_v1_configure(
             layer_surface.wlr_layer_surface,
             layer_surface.box.width,
@@ -574,7 +576,7 @@ fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_destroy", listener.?);
     const root = self.root;
 
-    Log.Debug.log("Output {} destroyed", .{self.wlr_output.name});
+    log.debug(.server, "output '{}' destroyed", .{self.wlr_output.name});
 
     // Use the first output in the list that is not the one being destroyed.
     // If there is no other real output, use the noop output.

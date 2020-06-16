@@ -20,9 +20,9 @@ const Self = @This();
 const std = @import("std");
 
 const c = @import("c.zig");
+const log = @import("log.zig");
 const util = @import("util.zig");
 
-const Log = @import("log.zig").Log;
 const Output = @import("Output.zig");
 const OutputStatus = @import("OutputStatus.zig");
 const Seat = @import("Seat.zig");
@@ -72,7 +72,7 @@ fn bind(wl_client: ?*c.wl_client, data: ?*c_void, version: u32, id: u32) callcon
         id,
     ) orelse {
         c.wl_client_post_no_memory(wl_client);
-        Log.Error.log("out of memory\n", .{});
+        log.crit(.river_status, "out of memory", .{});
         return;
     };
     c.wl_resource_set_implementation(wl_resource, &implementation, self, null);
@@ -95,7 +95,7 @@ fn getRiverOutputStatus(
 
     const node = util.allocator.create(std.SinglyLinkedList(OutputStatus).Node) catch {
         c.wl_client_post_no_memory(wl_client);
-        Log.Error.log("out of memory\n", .{});
+        log.crit(.river_status, "out of memory", .{});
         return;
     };
 
@@ -107,7 +107,7 @@ fn getRiverOutputStatus(
     ) orelse {
         c.wl_client_post_no_memory(wl_client);
         util.allocator.destroy(node);
-        Log.Error.log("out of memory\n", .{});
+        log.crit(.river_status, "out of memory", .{});
         return;
     };
 
@@ -128,7 +128,7 @@ fn getRiverSeatStatus(
 
     const node = util.allocator.create(std.SinglyLinkedList(SeatStatus).Node) catch {
         c.wl_client_post_no_memory(wl_client);
-        Log.Error.log("out of memory\n", .{});
+        log.crit(.river_status, "out of memory", .{});
         return;
     };
 
@@ -140,7 +140,7 @@ fn getRiverSeatStatus(
     ) orelse {
         c.wl_client_post_no_memory(wl_client);
         util.allocator.destroy(node);
-        Log.Error.log("out of memory\n", .{});
+        log.crit(.river_status, "out of memory", .{});
         return;
     };
 

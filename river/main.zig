@@ -18,9 +18,9 @@
 const std = @import("std");
 
 const c = @import("c.zig");
+const log = @import("log.zig");
 const util = @import("util.zig");
 
-const Log = @import("log.zig").Log;
 const Server = @import("Server.zig");
 
 const usage: []const u8 =
@@ -58,10 +58,9 @@ pub fn main() !void {
         }
     }
 
-    Log.init(Log.Debug);
     c.wlr_log_init(.WLR_ERROR, null);
 
-    Log.Info.log("Initializing server", .{});
+    log.info(.server, "initializing", .{});
 
     var server: Server = undefined;
     try server.init();
@@ -76,9 +75,9 @@ pub fn main() !void {
         try std.ChildProcess.spawn(child);
     }
 
-    Log.Info.log("Running server...", .{});
+    log.info(.server, "running...", .{});
 
     server.run();
 
-    Log.Info.log("Shutting down server", .{});
+    log.info(.server, "shutting down", .{});
 }

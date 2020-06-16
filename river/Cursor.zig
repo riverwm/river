@@ -21,10 +21,10 @@ const build_options = @import("build_options");
 const std = @import("std");
 
 const c = @import("c.zig");
+const log = @import("log.zig");
 const util = @import("util.zig");
 
 const LayerSurface = @import("LayerSurface.zig");
-const Log = @import("log.zig").Log;
 const Output = @import("Output.zig");
 const Seat = @import("Seat.zig");
 const View = @import("View.zig");
@@ -89,7 +89,7 @@ pub fn init(self: *Self, seat: *Seat) !void {
             }
         }
     } else {
-        Log.Error.log("Failed to load an xcursor theme", .{});
+        log.err(.cursor, "failed to load an xcursor theme", .{});
     }
 
     self.mode = CursorMode.Passthrough;
@@ -235,7 +235,7 @@ fn handleRequestSetCursor(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C
         // provided surface as the cursor image. It will set the hardware cursor
         // on the output that it's currently on and continue to do so as the
         // cursor moves between outputs.
-        Log.Debug.log("Focused client set cursor", .{});
+        log.debug(.cursor, "focused client set cursor", .{});
         c.wlr_cursor_set_surface(
             self.wlr_cursor,
             event.surface,
@@ -259,7 +259,7 @@ fn processMotion(self: Self, time: u32) void {
             const wlr_seat = self.seat.wlr_seat;
             const focus_change = wlr_seat.pointer_state.focused_surface != wlr_surface;
             if (focus_change) {
-                Log.Debug.log("Pointer notify enter at ({},{})", .{ sx, sy });
+                log.debug(.cursor, "pointer notify enter at ({},{})", .{ sx, sy });
                 c.wlr_seat_pointer_notify_enter(wlr_seat, wlr_surface, sx, sy);
             } else {
                 // The enter event contains coordinates, so we only need to notify
