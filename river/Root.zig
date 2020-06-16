@@ -21,6 +21,7 @@ const std = @import("std");
 const build_options = @import("build_options");
 
 const c = @import("c.zig");
+const util = @import("util.zig");
 
 const Log = @import("log.zig").Log;
 const Output = @import("Output.zig");
@@ -175,7 +176,7 @@ fn startTransaction(self: *Self) void {
 }
 
 fn handleTimeout(data: ?*c_void) callconv(.C) c_int {
-    const self = @ptrCast(*Self, @alignCast(@alignOf(*Self), data));
+    const self = util.voidCast(Self, data.?);
 
     Log.Error.log("Transaction timed out. Some imperfect frames may be shown.", .{});
 

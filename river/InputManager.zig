@@ -20,6 +20,7 @@ const Self = @This();
 const std = @import("std");
 
 const c = @import("c.zig");
+const util = @import("util.zig");
 
 const Log = @import("log.zig").Log;
 const Seat = @import("Seat.zig");
@@ -137,7 +138,7 @@ fn handleInhibitDeactivate(listener: ?*c.wl_listener, data: ?*c_void) callconv(.
 /// This event is raised by the backend when a new input device becomes available.
 fn handleNewInput(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_new_input", listener.?);
-    const device = @ptrCast(*c.wlr_input_device, @alignCast(@alignOf(*c.wlr_input_device), data));
+    const device = util.voidCast(c.wlr_input_device, data.?);
 
     // TODO: suport multiple seats
     if (self.seats.first) |seat_node| {

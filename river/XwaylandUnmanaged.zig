@@ -20,6 +20,7 @@ const Self = @This();
 const std = @import("std");
 
 const c = @import("c.zig");
+const util = @import("util.zig");
 
 const Box = @import("Box.zig");
 const Log = @import("log.zig").Log;
@@ -71,10 +72,7 @@ pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*c.wlr_surfa
 
 fn handleRequestConfigure(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "liseten_request_configure", listener.?);
-    const wlr_xwayland_surface_configure_event = @ptrCast(
-        *c.wlr_xwayland_surface_configure_event,
-        @alignCast(@alignOf(*c.wlr_xwayland_surface_configure_event), data),
-    );
+    const wlr_xwayland_surface_configure_event = util.voidCast(c.wlr_xwayland_surface_configure_event, data.?);
     c.wlr_xwayland_surface_configure(
         self.wlr_xwayland_surface,
         wlr_xwayland_surface_configure_event.x,

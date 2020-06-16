@@ -20,6 +20,7 @@ const Self = @This();
 const std = @import("std");
 
 const c = @import("c.zig");
+const util = @import("util.zig");
 
 const Log = @import("log.zig").Log;
 const Seat = @import("Seat.zig");
@@ -72,10 +73,7 @@ pub fn init(self: *Self, seat: *Seat, wlr_input_device: *c.wlr_input_device) !vo
 fn handleKey(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     // This event is raised when a key is pressed or released.
     const self = @fieldParentPtr(Self, "listen_key", listener.?);
-    const event = @ptrCast(
-        *c.wlr_event_keyboard_key,
-        @alignCast(@alignOf(*c.wlr_event_keyboard_key), data),
-    );
+    const event = util.voidCast(c.wlr_event_keyboard_key, data.?);
 
     const wlr_keyboard = self.wlr_keyboard;
 

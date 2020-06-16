@@ -19,6 +19,7 @@ const build_options = @import("build_options");
 const std = @import("std");
 
 const c = @import("c.zig");
+const util = @import("util.zig");
 
 const Box = @import("Box.zig");
 const LayerSurface = @import("LayerSurface.zig");
@@ -193,7 +194,7 @@ fn renderSurfaceIterator(
     surface_y: c_int,
     data: ?*c_void,
 ) callconv(.C) void {
-    const rdata = @ptrCast(*SurfaceRenderData, @alignCast(@alignOf(SurfaceRenderData), data));
+    const rdata = util.voidCast(SurfaceRenderData, data.?);
 
     renderTexture(
         rdata.output.*,

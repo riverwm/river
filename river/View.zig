@@ -21,6 +21,7 @@ const build_options = @import("build_options");
 const std = @import("std");
 
 const c = @import("c.zig");
+const util = @import("util.zig");
 
 const Box = @import("Box.zig");
 const Log = @import("log.zig").Log;
@@ -173,10 +174,7 @@ fn saveBuffersIterator(
     surface_y: c_int,
     data: ?*c_void,
 ) callconv(.C) void {
-    const saved_buffers = @ptrCast(
-        *std.ArrayList(SavedBuffer),
-        @alignCast(@alignOf(*std.ArrayList(SavedBuffer)), data),
-    );
+    const saved_buffers = util.voidCast(std.ArrayList(SavedBuffer), data.?);
     if (wlr_surface) |surface| {
         if (c.wlr_surface_has_buffer(surface)) {
             saved_buffers.append(.{

@@ -21,6 +21,7 @@ const std = @import("std");
 
 const c = @import("c.zig");
 const command = @import("command.zig");
+const util = @import("util.zig");
 
 const Cursor = @import("Cursor.zig");
 const InputManager = @import("InputManager.zig");
@@ -328,9 +329,6 @@ fn addPointer(self: Self, device: *c.struct_wlr_input_device) void {
 
 fn handleRequestSetSelection(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_request_set_selection", listener.?);
-    const event = @ptrCast(
-        *c.wlr_seat_request_set_selection_event,
-        @alignCast(@alignOf(*c.wlr_seat_request_set_selection_event), data),
-    );
+    const event = util.voidCast(c.wlr_seat_request_set_selection_event, data.?);
     c.wlr_seat_set_selection(self.wlr_seat, event.source, event.serial);
 }

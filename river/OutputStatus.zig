@@ -20,6 +20,7 @@ const Self = @This();
 const std = @import("std");
 
 const c = @import("c.zig");
+const util = @import("util.zig");
 
 const Log = @import("log.zig").Log;
 const Output = @import("Output.zig");
@@ -45,7 +46,7 @@ pub fn init(self: *Self, output: *Output, wl_resource: *c.wl_resource) void {
 }
 
 fn handleResourceDestroy(wl_resource: ?*c.wl_resource) callconv(.C) void {
-    const self = @ptrCast(*Self, @alignCast(@alignOf(*Self), c.wl_resource_get_user_data(wl_resource)));
+    const self = util.voidCast(Self, @ptrCast(*c_void, c.wl_resource_get_user_data(wl_resource)));
     const node = @fieldParentPtr(std.SinglyLinkedList(Self).Node, "data", self);
     self.output.status_trackers.remove(node);
 }
@@ -65,7 +66,7 @@ pub fn sendViewTags(self: Self) void {
             Log.Error.log("out of memory", .{});
             return;
         };
-        const ptr_u32 = @ptrCast(*u32, @alignCast(@alignOf(u32), ptr));
+        const ptr_u32 = util.voidCast(u32, ptr);
         ptr_u32.* = node.view.current_tags;
     }
     c.zriver_output_status_v1_send_view_tags(self.wl_resource, &view_tags);

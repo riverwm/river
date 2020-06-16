@@ -21,6 +21,7 @@ const build_options = @import("build_options");
 const std = @import("std");
 
 const c = @import("c.zig");
+const util = @import("util.zig");
 
 const LayerSurface = @import("LayerSurface.zig");
 const Log = @import("log.zig").Log;
@@ -133,10 +134,7 @@ fn handleAxis(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     // This event is forwarded by the cursor when a pointer emits an axis event,
     // for example when you move the scroll wheel.
     const cursor = @fieldParentPtr(Self, "listen_axis", listener.?);
-    const event = @ptrCast(
-        *c.wlr_event_pointer_axis,
-        @alignCast(@alignOf(*c.wlr_event_pointer_axis), data),
-    );
+    const event = util.voidCast(c.wlr_event_pointer_axis, data.?);
 
     // Notify the client with pointer focus of the axis event.
     c.wlr_seat_pointer_notify_axis(
@@ -153,10 +151,7 @@ fn handleButton(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     // This event is forwarded by the cursor when a pointer emits a button
     // event.
     const self = @fieldParentPtr(Self, "listen_button", listener.?);
-    const event = @ptrCast(
-        *c.wlr_event_pointer_button,
-        @alignCast(@alignOf(*c.wlr_event_pointer_button), data),
-    );
+    const event = util.voidCast(c.wlr_event_pointer_button, data.?);
     var sx: f64 = undefined;
     var sy: f64 = undefined;
 
@@ -166,10 +161,7 @@ fn handleButton(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         if (c.wlr_surface_is_layer_surface(wlr_surface)) {
             const wlr_layer_surface = c.wlr_layer_surface_v1_from_wlr_surface(wlr_surface);
             if (wlr_layer_surface.*.current.keyboard_interactive) {
-                const layer_surface = @ptrCast(
-                    *LayerSurface,
-                    @alignCast(@alignOf(*LayerSurface), wlr_layer_surface.*.data),
-                );
+                const layer_surface = util.voidCast(LayerSurface, wlr_layer_surface.*.data.?);
                 self.seat.setFocusRaw(.{ .layer = layer_surface });
             }
         }
@@ -179,7 +171,7 @@ fn handleButton(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         if (c.wlr_surface_is_xdg_surface(wlr_surface)) {
             const wlr_xdg_surface = c.wlr_xdg_surface_from_wlr_surface(wlr_surface);
             if (wlr_xdg_surface.*.role == .WLR_XDG_SURFACE_ROLE_TOPLEVEL) {
-                const view = @ptrCast(*View, @alignCast(@alignOf(*View), wlr_xdg_surface.*.data));
+                const view = util.voidCast(View, wlr_xdg_surface.*.data.?);
                 self.seat.focus(view);
             }
         }
@@ -211,10 +203,7 @@ fn handleMotionAbsolute(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) 
     // so we have to warp the mouse there. There is also some hardware which
     // emits these events.
     const self = @fieldParentPtr(Self, "listen_motion_absolute", listener.?);
-    const event = @ptrCast(
-        *c.wlr_event_pointer_motion_absolute,
-        @alignCast(@alignOf(*c.wlr_event_pointer_motion_absolute), data),
-    );
+    const event = util.voidCast(c.wlr_event_pointer_motion_absolute, data.?);
     c.wlr_cursor_warp_absolute(self.wlr_cursor, event.device, event.x, event.y);
     self.processMotion(event.time_msec);
 }
@@ -223,10 +212,7 @@ fn handleMotion(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     // This event is forwarded by the cursor when a pointer emits a _relative_
     // pointer motion event (i.e. a delta)
     const self = @fieldParentPtr(Self, "listen_motion", listener.?);
-    const event = @ptrCast(
-        *c.wlr_event_pointer_motion,
-        @alignCast(@alignOf(*c.wlr_event_pointer_motion), data),
-    );
+    const event = util.voidCast(c.wlr_event_pointer_motion, data.?);
     // The cursor doesn't move unless we tell it to. The cursor automatically
     // handles constraining the motion to the output layout, as well as any
     // special configuration applied for the specific input device which
@@ -239,10 +225,7 @@ fn handleMotion(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 fn handleRequestSetCursor(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     // This event is rasied by the seat when a client provides a cursor image
     const self = @fieldParentPtr(Self, "listen_request_set_cursor", listener.?);
-    const event = @ptrCast(
-        *c.wlr_seat_pointer_request_set_cursor_event,
-        @alignCast(@alignOf(*c.wlr_seat_pointer_request_set_cursor_event), data),
-    );
+    const event = util.voidCast(c.wlr_seat_pointer_request_set_cursor_event, data.?);
     const focused_client = self.seat.wlr_seat.pointer_state.focused_client;
 
     // This can be sent by any client, so we check to make sure this one is
@@ -307,10 +290,7 @@ fn surfaceAt(self: Self, lx: f64, ly: f64, sx: *f64, sy: *f64) ?*c.wlr_surface {
     const root = self.seat.input_manager.server.root;
     const wlr_output = c.wlr_output_layout_output_at(root.wlr_output_layout, lx, ly) orelse
         return null;
-    const output = @ptrCast(
-        *Output,
-        @alignCast(@alignOf(*Output), wlr_output.*.data orelse return null),
-    );
+    const output = util.voidCast(Output, wlr_output.*.data orelse return null);
 
     // Get output-local coords from the layout coords
     var ox = lx;

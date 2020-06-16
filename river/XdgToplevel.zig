@@ -20,6 +20,7 @@ const Self = @This();
 const std = @import("std");
 
 const c = @import("c.zig");
+const util = @import("util.zig");
 
 const Box = @import("Box.zig");
 const Log = @import("log.zig").Log;
@@ -242,7 +243,7 @@ fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 /// Called when a new xdg popup is requested by the client
 fn handleNewPopup(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_new_popup", listener.?);
-    const wlr_xdg_popup = @ptrCast(*c.wlr_xdg_popup, @alignCast(@alignOf(*c.wlr_xdg_popup), data));
+    const wlr_xdg_popup = util.voidCast(c.wlr_xdg_popup, data.?);
     const allocator = self.view.output.root.server.allocator;
 
     // This will free itself on destroy

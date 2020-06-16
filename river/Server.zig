@@ -21,6 +21,7 @@ const build_options = @import("build_options");
 const std = @import("std");
 
 const c = @import("c.zig");
+const util = @import("util.zig");
 
 const Config = @import("Config.zig");
 const Control = @import("Control.zig");
@@ -183,7 +184,7 @@ pub fn run(self: Self) void {
 
 fn handleNewOutput(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_new_output", listener.?);
-    const wlr_output = @ptrCast(*c.wlr_output, @alignCast(@alignOf(*c.wlr_output), data));
+    const wlr_output = util.voidCast(c.wlr_output, data.?);
     Log.Debug.log("New output {}", .{wlr_output.name});
     self.root.addOutput(wlr_output);
 }
@@ -192,7 +193,7 @@ fn handleNewXdgSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) v
     // This event is raised when wlr_xdg_shell receives a new xdg surface from a
     // client, either a toplevel (application window) or popup.
     const self = @fieldParentPtr(Self, "listen_new_xdg_surface", listener.?);
-    const wlr_xdg_surface = @ptrCast(*c.wlr_xdg_surface, @alignCast(@alignOf(*c.wlr_xdg_surface), data));
+    const wlr_xdg_surface = util.voidCast(c.wlr_xdg_surface, data.?);
 
     if (wlr_xdg_surface.role == .WLR_XDG_SURFACE_ROLE_POPUP) {
         Log.Debug.log("New xdg_popup", .{});
@@ -210,10 +211,7 @@ fn handleNewXdgSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) v
 /// This event is raised when the layer_shell recieves a new surface from a client.
 fn handleNewLayerSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_new_layer_surface", listener.?);
-    const wlr_layer_surface = @ptrCast(
-        *c.wlr_layer_surface_v1,
-        @alignCast(@alignOf(*c.wlr_layer_surface_v1), data),
-    );
+    const wlr_layer_surface = util.voidCast(c.wlr_layer_surface_v1, data.?);
 
     Log.Debug.log(
         "New layer surface: namespace {}, layer {}, anchor {}, size {}x{}, margin ({},{},{},{}), exclusive_zone {}",
@@ -252,17 +250,14 @@ fn handleNewLayerSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C)
     }
 
     // The layer surface will add itself to the proper list of the output on map
-    const output = @ptrCast(*Output, @alignCast(@alignOf(*Output), wlr_layer_surface.output.*.data));
+    const output = util.voidCast(Output, wlr_layer_surface.output.*.data.?);
     const node = self.allocator.create(std.TailQueue(LayerSurface).Node) catch unreachable;
     node.data.init(output, wlr_layer_surface);
 }
 
 fn handleNewXwaylandSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_new_xwayland_surface", listener.?);
-    const wlr_xwayland_surface = @ptrCast(
-        *c.wlr_xwayland_surface,
-        @alignCast(@alignOf(*c.wlr_xwayland_surface), data),
-    );
+    const wlr_xwayland_surface = util.voidCast(c.wlr_xwayland_surface, data.?);
 
     if (wlr_xwayland_surface.override_redirect) {
         Log.Debug.log("New unmanaged xwayland surface", .{});

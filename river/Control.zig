@@ -21,6 +21,7 @@ const std = @import("std");
 
 const c = @import("c.zig");
 const command = @import("command.zig");
+const util = @import("util.zig");
 
 const Log = @import("log.zig").Log;
 const Seat = @import("Seat.zig");
@@ -65,7 +66,7 @@ fn handleDisplayDestroy(wl_listener: ?*c.wl_listener, data: ?*c_void) callconv(.
 
 /// Called when a client binds our global
 fn bind(wl_client: ?*c.wl_client, data: ?*c_void, version: u32, id: u32) callconv(.C) void {
-    const self = @ptrCast(*Self, @alignCast(@alignOf(*Self), data));
+    const self = util.voidCast(Self, data.?);
     const wl_resource = c.wl_resource_create(
         wl_client,
         &c.zriver_control_v1_interface,
@@ -85,7 +86,7 @@ fn bind(wl_client: ?*c.wl_client, data: ?*c_void, version: u32, id: u32) callcon
 
 /// Remove the resource from the hash map and free all stored args
 fn handleResourceDestroy(wl_resource: ?*c.wl_resource) callconv(.C) void {
-    const self = @ptrCast(*Self, @alignCast(@alignOf(*Self), c.wl_resource_get_user_data(wl_resource)));
+    const self = util.voidCast(Self, c.wl_resource_get_user_data(wl_resource).?);
     const id = c.wl_resource_get_id(wl_resource);
     const list = self.args_map.remove(id).?.value;
     for (list.items) |arg| list.allocator.free(arg);
@@ -97,7 +98,7 @@ fn destroy(wl_client: ?*c.wl_client, wl_resource: ?*c.wl_resource) callconv(.C) 
 }
 
 fn addArgument(wl_client: ?*c.wl_client, wl_resource: ?*c.wl_resource, arg: ?[*:0]const u8) callconv(.C) void {
-    const self = @ptrCast(*Self, @alignCast(@alignOf(*Self), c.wl_resource_get_user_data(wl_resource)));
+    const self = util.voidCast(Self, c.wl_resource_get_user_data(wl_resource).?);
     const id = c.wl_resource_get_id(wl_resource);
     const allocator = self.server.allocator;
 
@@ -119,10 +120,10 @@ fn runCommand(
     seat_wl_resource: ?*c.wl_resource,
     callback_id: u32,
 ) callconv(.C) void {
-    const self = @ptrCast(*Self, @alignCast(@alignOf(*Self), c.wl_resource_get_user_data(wl_resource)));
+    const self = util.voidCast(Self, c.wl_resource_get_user_data(wl_resource).?);
     // This can be null if the seat is inert, in which case we ignore the request
     const wlr_seat_client = c.wlr_seat_client_from_resource(seat_wl_resource) orelse return;
-    const seat = @ptrCast(*Seat, @alignCast(@alignOf(*Seat), wlr_seat_client.*.seat.*.data));
+    const seat = util.voidCast(Seat, wlr_seat_client.*.seat.*.data.?);
     const allocator = self.server.allocator;
 
     const callback_resource = c.wl_resource_create(
