@@ -45,13 +45,17 @@ const Orientation = enum {
 /// |                       |            |
 /// +-----------------------+------------+
 pub fn main() !void {
+    const args = std.os.argv;
+    if (args.len != 7) printUsageAndExit();
+
     // first arg must be left, right, top, or bottom
-    const master_location = std.meta.stringToEnum(Orientation, std.mem.spanZ(std.os.argv[1])).?;
+    const master_location = std.meta.stringToEnum(Orientation, std.mem.spanZ(args[1])) orelse
+        printUsageAndExit();
 
     // the other 5 are passed by river and described in river-layouts(7)
-    const num_views = try std.fmt.parseInt(u32, std.mem.spanZ(std.os.argv[2]), 10);
-    const master_count = try std.fmt.parseInt(u32, std.mem.spanZ(std.os.argv[3]), 10);
-    const master_factor = try std.fmt.parseFloat(f64, std.mem.spanZ(std.os.argv[4]));
+    const num_views = try std.fmt.parseInt(u32, std.mem.spanZ(args[2]), 10);
+    const master_count = try std.fmt.parseInt(u32, std.mem.spanZ(args[3]), 10);
+    const master_factor = try std.fmt.parseFloat(f64, std.mem.spanZ(args[4]));
 
     const width_arg: u32 = switch (master_location) {
         .left, .right => 5,
@@ -59,8 +63,8 @@ pub fn main() !void {
     };
     const height_arg: u32 = if (width_arg == 5) 6 else 5;
 
-    const output_width = try std.fmt.parseInt(u32, std.mem.spanZ(std.os.argv[width_arg]), 10);
-    const output_height = try std.fmt.parseInt(u32, std.mem.spanZ(std.os.argv[height_arg]), 10);
+    const output_width = try std.fmt.parseInt(u32, std.mem.spanZ(args[width_arg]), 10);
+    const output_height = try std.fmt.parseInt(u32, std.mem.spanZ(args[height_arg]), 10);
 
     const secondary_count = num_views - master_count;
 
@@ -125,4 +129,14 @@ pub fn main() !void {
     }
 
     try stdout_buf.flush();
+}
+
+fn printUsageAndExit() noreturn {
+    const usage: []const u8 =
+        \\Usage: rivertile left|right|top|bottom [args passed by river]
+        \\
+    ;
+
+    std.debug.warn(usage, .{});
+    std.os.exit(1);
 }
