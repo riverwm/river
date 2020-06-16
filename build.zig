@@ -68,6 +68,13 @@ pub fn build(b: *std.build.Builder) !void {
         riverctl.install();
     }
 
+    {
+        const rivertile = b.addExecutable("rivertile", "rivertile/main.zig");
+        rivertile.setTarget(target);
+        rivertile.setBuildMode(mode);
+        rivertile.install();
+    }
+
     if (man_pages) {
         const scdoc_step = ScdocStep.create(b);
         try scdoc_step.install();
