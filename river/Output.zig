@@ -22,6 +22,7 @@ const std = @import("std");
 
 const c = @import("c.zig");
 const render = @import("render.zig");
+const util = @import("util.zig");
 
 const Box = @import("Box.zig");
 const LayerSurface = @import("LayerSurface.zig");
@@ -30,7 +31,8 @@ const Root = @import("Root.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const OutputStatus = @import("OutputStatus.zig");
-/// Minimum width/height for surfaces.
+
+// Minimum width/height for surfaces.
 // This is needed, because external layouts and large padding and border sizes
 // may cause surfaces so small, that bugs in client applications are encountered,
 // or even surfaces of zero or negative size,which are a protocol error and would
@@ -109,7 +111,7 @@ pub fn init(self: *Self, root: *Root, wlr_output: *c.wlr_output) !void {
 
     self.master_factor = 0.6;
 
-    self.layout = try std.fmt.allocPrint(self.root.server.allocator, "full", .{});
+    self.layout = try std.fmt.allocPrint(util.allocator, "full", .{});
 
     self.status_trackers = std.SinglyLinkedList(OutputStatus).init();
 
@@ -226,8 +228,6 @@ test "parse window configuration" {
 /// Execute an external layout function, parse its output and apply the layout
 /// to the output.
 fn layoutExternal(self: *Self, visible_count: u32, output_tags: u32) !void {
-    const allocator = self.root.server.allocator;
-
     const border_width = self.root.server.config.border_width;
     const view_padding = self.root.server.config.view_padding;
     const outer_padding = self.root.server.config.outer_padding;
@@ -237,13 +237,19 @@ fn layoutExternal(self: *Self, visible_count: u32, output_tags: u32) !void {
     const layout_height = @intCast(u32, self.usable_box.height) - outer_padding * 2;
 
     // Assemble command
-    const parameters = std.fmt.allocPrint(allocator, "{} {} {d} {} {}", .{ visible_count, self.master_count, self.master_factor, layout_width, layout_height }) catch @panic("Out of memory.");
-    defer allocator.free(parameters);
-    const layout_command = try std.mem.join(allocator, " ", &[_][]const u8{
+    const parameters = std.fmt.allocPrint(util.allocator, "{} {} {d} {} {}", .{
+        visible_count,
+        self.master_count,
+        self.master_factor,
+        layout_width,
+        layout_height,
+    }) catch @panic("Out of memory.");
+    defer util.allocator.free(parameters);
+    const layout_command = try std.mem.join(util.allocator, " ", &[_][]const u8{
         self.layout,
         parameters,
     });
-    defer allocator.free(layout_command);
+    defer util.allocator.free(layout_command);
     const cmd = [_][]const u8{
         "/bin/sh",
         "-c",
@@ -252,14 +258,14 @@ fn layoutExternal(self: *Self, visible_count: u32, output_tags: u32) !void {
 
     // Execute layout executable
     // TODO abort after 1 second
-    const child = try std.ChildProcess.init(&cmd, allocator);
+    const child = try std.ChildProcess.init(&cmd, util.allocator);
     defer child.deinit();
     child.stdin_behavior = .Ignore;
     child.stdout_behavior = .Pipe;
     try std.ChildProcess.spawn(child);
     const max_output_size = 400 * 1024;
-    const buffer = try child.stdout.?.inStream().readAllAlloc(allocator, max_output_size);
-    defer allocator.free(buffer);
+    const buffer = try child.stdout.?.inStream().readAllAlloc(util.allocator, max_output_size);
+    defer util.allocator.free(buffer);
     const term = try child.wait();
     switch (term) {
         .Exited, .Signal, .Stopped, .Unknown => |code| {
@@ -270,7 +276,7 @@ fn layoutExternal(self: *Self, visible_count: u32, output_tags: u32) !void {
     }
 
     // Parse layout command output
-    var view_boxen = std.ArrayList(Box).init(self.root.server.allocator);
+    var view_boxen = std.ArrayList(Box).init(util.allocator);
     defer view_boxen.deinit();
     var parse_it = std.mem.split(buffer, "\n");
     while (parse_it.next()) |token| {
@@ -621,7 +627,7 @@ fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     // Remove the destroyed output from the list
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
     root.outputs.remove(node);
-    root.server.allocator.destroy(node);
+    util.allocator.destroy(node);
 
     // Arrange the root in case evacuated views affect the layout
     root.arrange();

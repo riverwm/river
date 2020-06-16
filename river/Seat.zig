@@ -103,13 +103,11 @@ pub fn init(self: *Self, input_manager: *InputManager, name: []const u8) !void {
 pub fn deinit(self: *Self) void {
     self.cursor.deinit();
 
-    while (self.keyboards.pop()) |node| {
-        self.input_manager.server.allocator.destroy(node);
-    }
+    while (self.keyboards.pop()) |node| util.allocator.destroy(node);
 
     while (self.focus_stack.first) |node| {
         self.focus_stack.remove(node);
-        self.input_manager.server.allocator.destroy(node);
+        util.allocator.destroy(node);
     }
 }
 
@@ -154,7 +152,7 @@ pub fn focus(self: *Self, _view: ?*View) void {
             }
         } else {
             // The view is not in the stack, so allocate a new node and prepend it
-            const new_focus_node = self.input_manager.server.allocator.create(
+            const new_focus_node = util.allocator.create(
                 ViewStack(*View).Node,
             ) catch unreachable;
             new_focus_node.view = view_to_focus;
@@ -258,7 +256,7 @@ pub fn handleViewUnmap(self: *Self, view: *View) void {
     while (it) |node| : (it = node.next) {
         if (node.view == view) {
             self.focus_stack.remove(node);
-            self.input_manager.server.allocator.destroy(node);
+            util.allocator.destroy(node);
             break;
         }
     }
@@ -278,12 +276,11 @@ pub fn handleMapping(self: *Self, keysym: c.xkb_keysym_t, modifiers: u32) bool {
     for (modes.items[self.mode_id].items) |mapping| {
         if (modifiers == mapping.modifiers and keysym == mapping.keysym) {
             // Execute the bound command
-            const allocator = self.input_manager.server.allocator;
             var failure_message: []const u8 = undefined;
-            command.run(allocator, self, mapping.command_args, &failure_message) catch |err| {
+            command.run(util.allocator, self, mapping.command_args, &failure_message) catch |err| {
                 // TODO: log the error
                 if (err == command.Error.CommandFailed)
-                    allocator.free(failure_message);
+                    util.allocator.free(failure_message);
             };
             return true;
         }
@@ -314,7 +311,7 @@ pub fn addDevice(self: *Self, device: *c.wlr_input_device) !void {
 fn addKeyboard(self: *Self, device: *c.wlr_input_device) !void {
     c.wlr_seat_set_keyboard(self.wlr_seat, device);
 
-    const node = try self.keyboards.allocateNode(self.input_manager.server.allocator);
+    const node = try util.allocator.create(std.TailQueue(Keyboard).Node);
     try node.data.init(self, device);
     self.keyboards.append(node);
 }

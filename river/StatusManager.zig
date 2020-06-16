@@ -92,9 +92,8 @@ fn getRiverOutputStatus(
     // This can be null if the output is inert, in which case we ignore the request
     const wlr_output = c.wlr_output_from_resource(output_wl_resource) orelse return;
     const output = util.voidCast(Output, wlr_output.*.data.?);
-    const allocator = self.server.allocator;
 
-    const node = allocator.create(std.SinglyLinkedList(OutputStatus).Node) catch {
+    const node = util.allocator.create(std.SinglyLinkedList(OutputStatus).Node) catch {
         c.wl_client_post_no_memory(wl_client);
         Log.Error.log("out of memory\n", .{});
         return;
@@ -107,6 +106,7 @@ fn getRiverOutputStatus(
         new_id,
     ) orelse {
         c.wl_client_post_no_memory(wl_client);
+        util.allocator.destroy(node);
         Log.Error.log("out of memory\n", .{});
         return;
     };
@@ -125,9 +125,8 @@ fn getRiverSeatStatus(
     // This can be null if the seat is inert, in which case we ignore the request
     const wlr_seat_client = c.wlr_seat_client_from_resource(seat_wl_resource) orelse return;
     const seat = util.voidCast(Seat, wlr_seat_client.*.seat.*.data.?);
-    const allocator = self.server.allocator;
 
-    const node = allocator.create(std.SinglyLinkedList(SeatStatus).Node) catch {
+    const node = util.allocator.create(std.SinglyLinkedList(SeatStatus).Node) catch {
         c.wl_client_post_no_memory(wl_client);
         Log.Error.log("out of memory\n", .{});
         return;
@@ -140,6 +139,7 @@ fn getRiverSeatStatus(
         new_id,
     ) orelse {
         c.wl_client_post_no_memory(wl_client);
+        util.allocator.destroy(node);
         Log.Error.log("out of memory\n", .{});
         return;
     };

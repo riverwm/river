@@ -63,21 +63,19 @@ pub fn init(
 
 fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_destroy", listener.?);
-    const allocator = self.output.root.server.allocator;
 
     c.wl_list_remove(&self.listen_destroy.link);
     c.wl_list_remove(&self.listen_new_popup.link);
 
-    allocator.destroy(self);
+    util.allocator.destroy(self);
 }
 
 /// Called when a new xdg popup is requested by the client
 fn handleNewPopup(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_new_popup", listener.?);
     const wlr_xdg_popup = util.voidCast(c.wlr_xdg_popup, data.?);
-    const allocator = self.output.root.server.allocator;
 
     // This will free itself on destroy
-    var xdg_popup = allocator.create(Self) catch unreachable;
+    var xdg_popup = util.allocator.create(Self) catch unreachable;
     xdg_popup.init(self.output, self.parent_box, wlr_xdg_popup);
 }

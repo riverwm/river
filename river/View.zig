@@ -88,12 +88,7 @@ pending_tags: ?u32,
 
 pending_serial: ?u32,
 
-pub fn init(
-    self: *Self,
-    output: *Output,
-    tags: u32,
-    surface: var,
-) void {
+pub fn init(self: *Self, output: *Output, tags: u32, surface: var) void {
     self.output = output;
 
     self.wlr_surface = null;
@@ -113,7 +108,7 @@ pub fn init(
 
     self.pending_serial = null;
 
-    self.saved_buffers = std.ArrayList(SavedBuffer).init(output.root.server.allocator);
+    self.saved_buffers = std.ArrayList(SavedBuffer).init(util.allocator);
 
     if (@TypeOf(surface) == *c.wlr_xdg_surface) {
         self.impl = .{ .xdg_toplevel = undefined };
@@ -323,5 +318,5 @@ pub fn unmap(self: *Self) void {
 pub fn destroy(self: *const Self) void {
     self.deinit();
     const node = @fieldParentPtr(ViewStack(Self).Node, "view", self);
-    self.output.root.server.allocator.destroy(node);
+    util.allocator.destroy(node);
 }

@@ -15,6 +15,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+const std = @import("std");
+
+/// The global general-purpose allocator used throughout river's code
+pub const allocator = std.heap.c_allocator;
+
 /// Take a pointer to c_void and cast it to a pointer to T. This function
 /// exists to avoid having the verbosity of the required alignment casts all
 /// over the code.

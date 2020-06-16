@@ -93,7 +93,7 @@ fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 
     // Deallocate the node
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-    self.root.server.allocator.destroy(node);
+    util.allocator.destroy(node);
 }
 
 /// Called when the xwayland surface is mapped, or ready to display on-screen.

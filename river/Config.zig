@@ -20,6 +20,7 @@ const Self = @This();
 const std = @import("std");
 
 const c = @import("c.zig");
+const util = @import("util.zig");
 
 const Log = @import("log.zig").Log;
 const Server = @import("Server.zig");
@@ -49,29 +50,29 @@ modes: std.ArrayList(std.ArrayList(Mapping)),
 /// List of app_ids which will be started floating
 float_filter: std.ArrayList([*:0]const u8),
 
-pub fn init(self: *Self, allocator: *std.mem.Allocator) !void {
+pub fn init(self: *Self) !void {
     self.border_width = 2;
     self.border_color_focused = [_]f32{ 0.57647059, 0.63137255, 0.63137255, 1.0 }; // Solarized base1
     self.border_color_unfocused = [_]f32{ 0.34509804, 0.43137255, 0.45882353, 1.0 }; // Solarized base0
     self.view_padding = 8;
     self.outer_padding = 8;
 
-    self.mode_to_id = std.StringHashMap(usize).init(allocator);
+    self.mode_to_id = std.StringHashMap(usize).init(util.allocator);
     try self.mode_to_id.putNoClobber("normal", 0);
 
-    self.modes = std.ArrayList(std.ArrayList(Mapping)).init(allocator);
-    try self.modes.append(std.ArrayList(Mapping).init(allocator));
+    self.modes = std.ArrayList(std.ArrayList(Mapping)).init(util.allocator);
+    try self.modes.append(std.ArrayList(Mapping).init(util.allocator));
 
-    self.float_filter = std.ArrayList([*:0]const u8).init(allocator);
+    self.float_filter = std.ArrayList([*:0]const u8).init(util.allocator);
 
     // Float views with app_id "float"
     try self.float_filter.append("float");
 }
 
-pub fn deinit(self: Self, allocator: *std.mem.Allocator) void {
+pub fn deinit(self: Self) void {
     self.mode_to_id.deinit();
     for (self.modes.items) |mode| {
-        for (mode.items) |mapping| mapping.deinit(allocator);
+        for (mode.items) |mapping| mapping.deinit(util.allocator);
         mode.deinit();
     }
     self.modes.deinit();

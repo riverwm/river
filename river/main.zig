@@ -18,6 +18,7 @@
 const std = @import("std");
 
 const c = @import("c.zig");
+const util = @import("util.zig");
 
 const Log = @import("log.zig").Log;
 const Server = @import("Server.zig");
@@ -63,14 +64,14 @@ pub fn main() !void {
     Log.Info.log("Initializing server", .{});
 
     var server: Server = undefined;
-    try server.init(std.heap.c_allocator);
+    try server.init();
     defer server.deinit();
 
     try server.start();
 
     if (startup_command) |cmd| {
         const child_args = [_][]const u8{ "/bin/sh", "-c", cmd };
-        const child = try std.ChildProcess.init(&child_args, std.heap.c_allocator);
+        const child = try std.ChildProcess.init(&child_args, util.allocator);
         defer child.deinit();
         try std.ChildProcess.spawn(child);
     }

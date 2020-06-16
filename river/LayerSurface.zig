@@ -87,7 +87,7 @@ fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     c.wl_list_remove(&self.listen_unmap.link);
 
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-    output.root.server.allocator.destroy(node);
+    util.allocator.destroy(node);
 }
 
 fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -189,9 +189,8 @@ fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 fn handleNewPopup(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_new_popup", listener.?);
     const wlr_xdg_popup = util.voidCast(c.wlr_xdg_popup, data.?);
-    const allocator = self.output.root.server.allocator;
 
     // This will free itself on destroy
-    var xdg_popup = allocator.create(XdgPopup) catch unreachable;
+    var xdg_popup = util.allocator.create(XdgPopup) catch unreachable;
     xdg_popup.init(self.output, &self.box, wlr_xdg_popup);
 }

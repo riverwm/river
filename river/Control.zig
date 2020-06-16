@@ -35,7 +35,6 @@ const implementation = c.struct_zriver_control_v1_interface{
     .run_command = runCommand,
 };
 
-server: *Server,
 wl_global: *c.wl_global,
 
 args_map: std.AutoHashMap(u32, std.ArrayList([]const u8)),
@@ -43,7 +42,6 @@ args_map: std.AutoHashMap(u32, std.ArrayList([]const u8)),
 listen_display_destroy: c.wl_listener,
 
 pub fn init(self: *Self, server: *Server) !void {
-    self.server = server;
     self.wl_global = c.wl_global_create(
         server.wl_display,
         &c.zriver_control_v1_interface,
@@ -52,7 +50,7 @@ pub fn init(self: *Self, server: *Server) !void {
         bind,
     ) orelse return error.CantCreateWlGlobal;
 
-    self.args_map = std.AutoHashMap(u32, std.ArrayList([]const u8)).init(server.allocator);
+    self.args_map = std.AutoHashMap(u32, std.ArrayList([]const u8)).init(util.allocator);
 
     self.listen_display_destroy.notify = handleDisplayDestroy;
     c.wl_display_add_destroy_listener(server.wl_display, &self.listen_display_destroy);
@@ -76,7 +74,7 @@ fn bind(wl_client: ?*c.wl_client, data: ?*c_void, version: u32, id: u32) callcon
         c.wl_client_post_no_memory(wl_client);
         return;
     };
-    self.args_map.putNoClobber(id, std.ArrayList([]const u8).init(self.server.allocator)) catch {
+    self.args_map.putNoClobber(id, std.ArrayList([]const u8).init(util.allocator)) catch {
         c.wl_resource_destroy(wl_resource);
         c.wl_client_post_no_memory(wl_client);
         return;
@@ -100,16 +98,15 @@ fn destroy(wl_client: ?*c.wl_client, wl_resource: ?*c.wl_resource) callconv(.C) 
 fn addArgument(wl_client: ?*c.wl_client, wl_resource: ?*c.wl_resource, arg: ?[*:0]const u8) callconv(.C) void {
     const self = util.voidCast(Self, c.wl_resource_get_user_data(wl_resource).?);
     const id = c.wl_resource_get_id(wl_resource);
-    const allocator = self.server.allocator;
 
-    const owned_slice = std.mem.dupe(allocator, u8, std.mem.span(arg.?)) catch {
+    const owned_slice = std.mem.dupe(util.allocator, u8, std.mem.span(arg.?)) catch {
         c.wl_client_post_no_memory(wl_client);
         return;
     };
 
     self.args_map.get(id).?.value.append(owned_slice) catch {
         c.wl_client_post_no_memory(wl_client);
-        allocator.free(owned_slice);
+        util.allocator.free(owned_slice);
         return;
     };
 }
@@ -124,7 +121,6 @@ fn runCommand(
     // This can be null if the seat is inert, in which case we ignore the request
     const wlr_seat_client = c.wlr_seat_client_from_resource(seat_wl_resource) orelse return;
     const seat = util.voidCast(Seat, wlr_seat_client.*.seat.*.data.?);
-    const allocator = self.server.allocator;
 
     const callback_resource = c.wl_resource_create(
         wl_client,
@@ -140,14 +136,14 @@ fn runCommand(
     const args = self.args_map.get(c.wl_resource_get_id(wl_resource)).?.value.items;
 
     var failure_message: []const u8 = undefined;
-    command.run(allocator, seat, args, &failure_message) catch |err| {
+    command.run(util.allocator, seat, args, &failure_message) catch |err| {
         if (err == command.Error.CommandFailed) {
-            defer allocator.free(failure_message);
-            const out = std.cstr.addNullByte(allocator, failure_message) catch {
+            defer util.allocator.free(failure_message);
+            const out = std.cstr.addNullByte(util.allocator, failure_message) catch {
                 c.zriver_command_callback_v1_send_failure(callback_resource, "out of memory");
                 return;
             };
-            defer allocator.free(out);
+            defer util.allocator.free(out);
             c.zriver_command_callback_v1_send_failure(callback_resource, out);
         } else {
             c.zriver_command_callback_v1_send_failure(

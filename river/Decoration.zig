@@ -20,6 +20,7 @@ const Self = @This();
 const std = @import("std");
 
 const c = @import("c.zig");
+const util = @import("util.zig");
 
 const DecorationManager = @import("DecorationManager.zig");
 
@@ -49,11 +50,10 @@ pub fn init(
 
 fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_destroy", listener.?);
-    const allocator = self.decoration_manager.server.allocator;
     const node = @fieldParentPtr(std.SinglyLinkedList(Self).Node, "data", self);
 
     self.decoration_manager.decorations.remove(node);
-    allocator.destroy(node);
+    util.allocator.destroy(node);
 }
 
 fn handleRequestMode(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {

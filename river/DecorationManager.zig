@@ -25,8 +25,6 @@ const util = @import("util.zig");
 const Decoration = @import("Decoration.zig");
 const Server = @import("Server.zig");
 
-server: *Server,
-
 wlr_xdg_decoration_manager: *c.wlr_xdg_decoration_manager_v1,
 
 decorations: std.SinglyLinkedList(Decoration),
@@ -34,7 +32,6 @@ decorations: std.SinglyLinkedList(Decoration),
 listen_new_toplevel_decoration: c.wl_listener,
 
 pub fn init(self: *Self, server: *Server) !void {
-    self.server = server;
     self.wlr_xdg_decoration_manager = c.wlr_xdg_decoration_manager_v1_create(server.wl_display) orelse
         return error.CantCreateWlrXdgDecorationManager;
 
@@ -49,7 +46,7 @@ fn handleNewToplevelDecoration(listener: ?*c.wl_listener, data: ?*c_void) callco
     const self = @fieldParentPtr(Self, "listen_new_toplevel_decoration", listener.?);
     const wlr_xdg_toplevel_decoration = util.voidCast(c.wlr_xdg_toplevel_decoration_v1, data.?);
 
-    const node = self.decorations.allocateNode(self.server.allocator) catch unreachable;
+    const node = self.decorations.allocateNode(util.allocator) catch unreachable;
     node.data.init(self, wlr_xdg_toplevel_decoration);
     self.decorations.prepend(node);
 }
