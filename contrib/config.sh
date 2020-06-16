@@ -63,10 +63,10 @@ riverctl map normal $mod+Shift 0 set-view-tags $all_tags_mask
 riverctl map normal $mod Space toggle-float
 
 # Mod+{Up,Right,Down,Left} to change master orientation
-riverctl map normal $mod Up layout top-master
-riverctl map normal $mod Right layout right-master
-riverctl map normal $mod Down layout bottom-master
-riverctl map normal $mod Left layout left-master
+riverctl map normal $mod Up layout rivertile top
+riverctl map normal $mod Right layout rivertile right
+riverctl map normal $mod Down layout rivertile down
+riverctl map normal $mod Left layout rivertile left
 
 # Mod+f to change to Full layout
 riverctl map normal $mod F layout full
@@ -80,3 +80,6 @@ riverctl map normal $mod F11 enter-mode passthrough
 
 # Mod+F11 to return to normal mode
 riverctl map passthrough $mod F11 enter-mode normal
+
+# Set the layout on startup
+riverctl layout rivertile left
