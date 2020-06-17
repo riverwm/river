@@ -5,10 +5,8 @@ riverctl - command-line interface for controlling river
 
 # SYNOPSIS
 
-*riverctl* *close*|*declare-mode*|*enter-mode*|*exit*|*focus-output*|
-*focus-view*|*layout*|*map*|*mod-master-count*|*mod-master-factor*|
-*send-to-output*|*set-focused-tags*|*set-view-tags*|*spawn*|*toggle-float*|
-*toggle-focused-tags*|*toggle-view-tags*|*zoom* [_command specific arguments_]
+*riverctl*
+*close*|*declare-mode*|*enter-mode*|*exit*|*focus-output*|*focus-view*|*layout*|*map*|*mod-master-count*|*mod-master-factor*|*send-to-output*|*set-focused-tags*|*set-option*|*set-view-tags*|*spawn*|*toggle-float*|*toggle-focused-tags*|*toggle-view-tags*|*zoom* [_command specific arguments_]
 
 # DESCRIPTION
 
@@ -34,8 +32,8 @@ used to control and configure river.
 *layout* *full*|_command_
 	Provide a command which river will use for generating the layout of
 	non-floating windows on the currently focused output. See
-	*river-layouts*(1) for details on the expected formatting of the output
-	of layout commands. Alternatively, "full"can be given instead of a
+	*river-layouts*(7) for details on the expected formatting of the output
+	of layout commands. Alternatively, “full” can be given instead of a
 	command to cause river to use its single internal layout, in which
 	windows span the entire width and height of the output.
 
@@ -94,14 +92,14 @@ that tag 1 through 9 are visible.
 	Switch to given mode if it exits.
 
 *map* _mode_ _modifiers_ _key_ _command_
-	_mode_ is either *normal* (the default mode) or a mode created with
+	_mode_ is either “normal” (the default mode) or a mode created with
 	*declare-mode*. _modifiers_ is a list of one or more of the following
 	modifiers separated with a plus sign:
 
 	- Shift
 	- Lock (Caps lock)
 	- Control (Ctrl)
-	- Mod (Alt)
+	- Mod1 (Alt)
 	- Mod2
 	- Mod3
 	- Mod4 (Super, Logo, Windows)
@@ -132,4 +130,4 @@ See _contrib/config.sh_ for some basic keybindings.
 
 # SEE ALSO
 
-*river*(1), *bspc*(1)
+*river*(1), *river-layouts*(7), *rivertile*(1)

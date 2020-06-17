@@ -27,14 +27,23 @@ bspwm based on wlroots and written in Zig.
 
 # CONFIGURATION
 
-View border width, gap sizes, and programs which should float are
-configured in _Config.zig_. Make your changes and recompile.
+You can define the list of programs which should float in _Config.zig_.
+Make your changes and recompile.
 
 Experimental XWayland support can be enabled on compile-time with the
 _-Dxwayland=true_ flag.
 
-Keyboard layout and other XKB options can be set in _Keyboard.zig_.
+# ENVIRONMENT
+
+The following environment variables are used to configure the keyboard. See
+*xkeyboard-config*(7) for possible values.
+
+- XKB_DEFAULT_MODEL
+- XKB_DEFAULT_LAYOUT
+- XKB_DEFAULT_VARIANT
+- XKB_DEFAULT_OPTIONS
+- XKB_DEFAULT_RULES
 
 # SEE ALSO
 
-*riverctl*(1), *bspwm*(1), *dwm*(1)
+*riverctl*(1), *river-layouts*(7), *rivertile*(1)
