@@ -70,5 +70,4 @@ in a grid.
 ```
 
 # SEE ALSO
-*river*(1), *riverctl*(1)
-
+*river*(1), *riverctl*(1), *rivertile*(1)

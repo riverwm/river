@@ -1,4 +1,4 @@
 zig-cache
 protocol/*.h
 protocol/*.c
-doc/*.1
+doc/*.[1-9]
