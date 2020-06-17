@@ -28,6 +28,7 @@ const usage: []const u8 =
     \\
     \\  -h            Print this help message and exit.
     \\  -c <command>  Run `sh -c <command>` on startup.
+    \\  -l <level>    Set the log level to a value from 0 to 7.
     \\
 ;
 
@@ -46,9 +47,15 @@ pub fn main() !void {
                 if (it.nextPosix()) |command| {
                     startup_command = command;
                 } else {
-                    const stderr = std.io.getStdErr().outStream();
-                    try stderr.print("Error: flag '-c' requires exactly one argument\n", .{});
-                    std.os.exit(1);
+                    printErrorExit("Error: flag '-c' requires exactly one argument", .{});
+                }
+            } else if (std.mem.eql(u8, arg, "-l")) {
+                if (it.nextPosix()) |level_str| {
+                    const level = std.fmt.parseInt(u3, level_str, 10) catch
+                        printErrorExit("Error: invalid log level '{}'", .{level_str});
+                    log.level = @intToEnum(log.Level, level);
+                } else {
+                    printErrorExit("Error: flag '-l' requires exactly one argument", .{});
                 }
             } else {
                 const stderr = std.io.getStdErr().outStream();
@@ -80,4 +87,10 @@ pub fn main() !void {
     server.run();
 
     log.info(.server, "shutting down", .{});
+}
+
+fn printErrorExit(comptime format: []const u8, args: var) noreturn {
+    const stderr = std.io.getStdErr().outStream();
+    stderr.print(format ++ "\n", args) catch std.os.exit(1);
+    std.os.exit(1);
 }
