@@ -149,27 +149,13 @@ pub fn deinit(self: *Self) void {
     self.config.deinit();
 }
 
-/// Create the socket, set WAYLAND_DISPLAY, and start the backend
+/// Create the socket, start the backend, and setup the environment
 pub fn start(self: Self) !void {
-    // Add a Unix socket to the Wayland display.
-    const socket = c.wl_display_add_socket_auto(self.wl_display) orelse
-        return error.CantAddSocket;
-
-    // Start the backend. This will enumerate outputs and inputs, become the DRM
-    // master, etc
-    if (!c.river_wlr_backend_start(self.wlr_backend)) {
-        return error.CantStartBackend;
-    }
-
-    // Set the WAYLAND_DISPLAY environment variable to our socket
-    if (c.setenv("WAYLAND_DISPLAY", socket, 1) == -1) {
-        return error.CantSetEnv;
-    }
-
+    const socket = c.wl_display_add_socket_auto(self.wl_display) orelse return error.CantAddSocket;
+    if (!c.river_wlr_backend_start(self.wlr_backend)) return error.CantStartBackend;
+    if (c.setenv("WAYLAND_DISPLAY", socket, 1) < 0) return error.CantSetEnv;
     if (build_options.xwayland) {
-        if (c.setenv("DISPLAY", &self.wlr_xwayland.display_name, 1) == -1) {
-            return error.CantSetEnv;
-        }
+        if (c.setenv("DISPLAY", &self.wlr_xwayland.display_name, 1) < 0) return error.CantSetEnv;
     }
 }
 
