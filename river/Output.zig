@@ -228,44 +228,34 @@ test "parse window configuration" {
 /// Execute an external layout function, parse its output and apply the layout
 /// to the output.
 fn layoutExternal(self: *Self, visible_count: u32, output_tags: u32) !void {
-    const border_width = self.root.server.config.border_width;
-    const view_padding = self.root.server.config.view_padding;
-    const outer_padding = self.root.server.config.outer_padding;
-    const xy_offset = @intCast(i32, border_width + outer_padding + view_padding);
-    const delta_size = (border_width + view_padding) * 2;
-    const layout_width = @intCast(u32, self.usable_box.width) - outer_padding * 2;
-    const layout_height = @intCast(u32, self.usable_box.height) - outer_padding * 2;
+    const config = self.root.server.config;
+    const xy_offset = @intCast(i32, config.border_width + config.outer_padding + config.view_padding);
+    const delta_size = (config.border_width + config.view_padding) * 2;
+    const layout_width = @intCast(u32, self.usable_box.width) - config.outer_padding * 2;
+    const layout_height = @intCast(u32, self.usable_box.height) - config.outer_padding * 2;
+
+    var arena = std.heap.ArenaAllocator.init(util.allocator);
+    defer arena.deinit();
 
     // Assemble command
-    const parameters = std.fmt.allocPrint(util.allocator, "{} {} {d} {} {}", .{
+    const layout_command = std.fmt.allocPrint(&arena.allocator, "{} {} {} {d} {} {}", .{
+        self.layout,
         visible_count,
         self.master_count,
         self.master_factor,
         layout_width,
         layout_height,
     }) catch @panic("Out of memory.");
-    defer util.allocator.free(parameters);
-    const layout_command = try std.mem.join(util.allocator, " ", &[_][]const u8{
-        self.layout,
-        parameters,
-    });
-    defer util.allocator.free(layout_command);
-    const cmd = [_][]const u8{
-        "/bin/sh",
-        "-c",
-        layout_command,
-    };
+    const cmd = [_][]const u8{ "/bin/sh", "-c", layout_command };
 
     // Execute layout executable
     // TODO abort after 1 second
-    const child = try std.ChildProcess.init(&cmd, util.allocator);
-    defer child.deinit();
+    const child = try std.ChildProcess.init(&cmd, &arena.allocator);
     child.stdin_behavior = .Ignore;
     child.stdout_behavior = .Pipe;
     try std.ChildProcess.spawn(child);
     const max_output_size = 400 * 1024;
-    const buffer = try child.stdout.?.inStream().readAllAlloc(util.allocator, max_output_size);
-    defer util.allocator.free(buffer);
+    const buffer = try child.stdout.?.inStream().readAllAlloc(&arena.allocator, max_output_size);
     const term = try child.wait();
     switch (term) {
         .Exited, .Signal, .Stopped, .Unknown => |code| {
@@ -276,8 +266,7 @@ fn layoutExternal(self: *Self, visible_count: u32, output_tags: u32) !void {
     }
 
     // Parse layout command output
-    var view_boxen = std.ArrayList(Box).init(util.allocator);
-    defer view_boxen.deinit();
+    var view_boxen = std.ArrayList(Box).init(&arena.allocator);
     var parse_it = std.mem.split(buffer, "\n");
     while (parse_it.next()) |token| {
         if (std.mem.eql(u8, token, "")) break;
