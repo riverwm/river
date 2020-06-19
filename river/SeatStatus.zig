@@ -53,6 +53,7 @@ fn handleResourceDestroy(wl_resource: ?*c.wl_resource) callconv(.C) void {
     const self = util.voidCast(Self, c.wl_resource_get_user_data(wl_resource).?);
     const node = @fieldParentPtr(std.SinglyLinkedList(Self).Node, "data", self);
     self.seat.status_trackers.remove(node);
+    util.gpa.destroy(node);
 }
 
 fn destroy(wl_client: ?*c.wl_client, wl_resource: ?*c.wl_resource) callconv(.C) void {
