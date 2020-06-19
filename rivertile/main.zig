@@ -66,7 +66,7 @@ pub fn main() !void {
     const output_width = try std.fmt.parseInt(u32, std.mem.spanZ(args[width_arg]), 10);
     const output_height = try std.fmt.parseInt(u32, std.mem.spanZ(args[height_arg]), 10);
 
-    const secondary_count = num_views - master_count;
+    const secondary_count = if (num_views > master_count) num_views - master_count else 0;
 
     // to make things pixel-perfect, we make the first master and first secondary
     // view slightly larger if the height is not evenly divisible
