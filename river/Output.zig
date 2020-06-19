@@ -302,10 +302,11 @@ fn layoutExternal(self: *Self, visible_count: u32, output_tags: u32) !void {
     // Apply window configuration to views
     var i: u32 = 0;
     var view_it = ViewStack(View).pendingIterator(self.views.first, output_tags);
-    while (view_it.next()) |node| : (i += 1) {
+    while (view_it.next()) |node| {
         const view = &node.view;
         if (view.floating) continue;
         view.pending_box = view_boxen.items[i];
+        i += 1;
     }
 }
 
