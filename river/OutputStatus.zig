@@ -57,7 +57,7 @@ fn destroy(wl_client: ?*c.wl_client, wl_resource: ?*c.wl_resource) callconv(.C) 
 
 /// Send the current tags of each view on the output to the client.
 pub fn sendViewTags(self: Self) void {
-    var view_tags = std.ArrayList(u32).init(util.allocator);
+    var view_tags = std.ArrayList(u32).init(util.gpa);
     defer view_tags.deinit();
 
     var it = ViewStack(View).iterator(self.output.views.first, std.math.maxInt(u32));

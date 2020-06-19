@@ -93,7 +93,7 @@ fn getRiverOutputStatus(
     const wlr_output = c.wlr_output_from_resource(output_wl_resource) orelse return;
     const output = util.voidCast(Output, wlr_output.*.data.?);
 
-    const node = util.allocator.create(std.SinglyLinkedList(OutputStatus).Node) catch {
+    const node = util.gpa.create(std.SinglyLinkedList(OutputStatus).Node) catch {
         c.wl_client_post_no_memory(wl_client);
         log.crit(.river_status, "out of memory", .{});
         return;
@@ -106,7 +106,7 @@ fn getRiverOutputStatus(
         new_id,
     ) orelse {
         c.wl_client_post_no_memory(wl_client);
-        util.allocator.destroy(node);
+        util.gpa.destroy(node);
         log.crit(.river_status, "out of memory", .{});
         return;
     };
@@ -126,7 +126,7 @@ fn getRiverSeatStatus(
     const wlr_seat_client = c.wlr_seat_client_from_resource(seat_wl_resource) orelse return;
     const seat = util.voidCast(Seat, wlr_seat_client.*.seat.*.data.?);
 
-    const node = util.allocator.create(std.SinglyLinkedList(SeatStatus).Node) catch {
+    const node = util.gpa.create(std.SinglyLinkedList(SeatStatus).Node) catch {
         c.wl_client_post_no_memory(wl_client);
         log.crit(.river_status, "out of memory", .{});
         return;
@@ -139,7 +139,7 @@ fn getRiverSeatStatus(
         new_id,
     ) orelse {
         c.wl_client_post_no_memory(wl_client);
-        util.allocator.destroy(node);
+        util.gpa.destroy(node);
         log.crit(.river_status, "out of memory", .{});
         return;
     };

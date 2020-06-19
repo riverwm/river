@@ -49,7 +49,7 @@ pub fn init(self: *Self, server: *Server) !void {
         bind,
     ) orelse return error.CantCreateWlGlobal;
 
-    self.args_map = std.AutoHashMap(u32, std.ArrayList([]const u8)).init(util.allocator);
+    self.args_map = std.AutoHashMap(u32, std.ArrayList([]const u8)).init(util.gpa);
 
     self.listen_display_destroy.notify = handleDisplayDestroy;
     c.wl_display_add_destroy_listener(server.wl_display, &self.listen_display_destroy);
@@ -73,7 +73,7 @@ fn bind(wl_client: ?*c.wl_client, data: ?*c_void, version: u32, id: u32) callcon
         c.wl_client_post_no_memory(wl_client);
         return;
     };
-    self.args_map.putNoClobber(id, std.ArrayList([]const u8).init(util.allocator)) catch {
+    self.args_map.putNoClobber(id, std.ArrayList([]const u8).init(util.gpa)) catch {
         c.wl_resource_destroy(wl_resource);
         c.wl_client_post_no_memory(wl_client);
         return;
@@ -98,14 +98,14 @@ fn addArgument(wl_client: ?*c.wl_client, wl_resource: ?*c.wl_resource, arg: ?[*:
     const self = util.voidCast(Self, c.wl_resource_get_user_data(wl_resource).?);
     const id = c.wl_resource_get_id(wl_resource);
 
-    const owned_slice = std.mem.dupe(util.allocator, u8, std.mem.span(arg.?)) catch {
+    const owned_slice = std.mem.dupe(util.gpa, u8, std.mem.span(arg.?)) catch {
         c.wl_client_post_no_memory(wl_client);
         return;
     };
 
     self.args_map.get(id).?.value.append(owned_slice) catch {
         c.wl_client_post_no_memory(wl_client);
-        util.allocator.free(owned_slice);
+        util.gpa.free(owned_slice);
         return;
     };
 }
@@ -135,14 +135,14 @@ fn runCommand(
     const args = self.args_map.get(c.wl_resource_get_id(wl_resource)).?.value.items;
 
     var failure_message: []const u8 = undefined;
-    command.run(util.allocator, seat, args, &failure_message) catch |err| {
+    command.run(util.gpa, seat, args, &failure_message) catch |err| {
         if (err == command.Error.CommandFailed) {
-            defer util.allocator.free(failure_message);
-            const out = std.cstr.addNullByte(util.allocator, failure_message) catch {
+            defer util.gpa.free(failure_message);
+            const out = std.cstr.addNullByte(util.gpa, failure_message) catch {
                 c.zriver_command_callback_v1_send_failure(callback_resource, "out of memory");
                 return;
             };
-            defer util.allocator.free(out);
+            defer util.gpa.free(out);
             c.zriver_command_callback_v1_send_failure(callback_resource, out);
         } else {
             c.zriver_command_callback_v1_send_failure(

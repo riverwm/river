@@ -18,7 +18,7 @@
 const std = @import("std");
 
 /// The global general-purpose allocator used throughout river's code
-pub const allocator = std.heap.c_allocator;
+pub const gpa = std.heap.c_allocator;
 
 /// Take a pointer to c_void and cast it to a pointer to T. This function
 /// exists to avoid having the verbosity of the required alignment casts all

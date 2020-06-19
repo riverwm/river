@@ -51,7 +51,7 @@ pub fn init(self: *Self, server: *Server) !void {
 
     self.seats = std.TailQueue(Seat).init();
 
-    const seat_node = try util.allocator.create(std.TailQueue(Seat).Node);
+    const seat_node = try util.gpa.create(std.TailQueue(Seat).Node);
     try seat_node.data.init(self, default_seat_name);
     self.default_seat = &seat_node.data;
     self.seats.prepend(seat_node);
@@ -78,7 +78,7 @@ pub fn init(self: *Self, server: *Server) !void {
 pub fn deinit(self: *Self) void {
     while (self.seats.pop()) |seat_node| {
         seat_node.data.deinit();
-        util.allocator.destroy(seat_node);
+        util.gpa.destroy(seat_node);
     }
 }
 

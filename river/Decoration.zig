@@ -53,7 +53,7 @@ fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const node = @fieldParentPtr(std.SinglyLinkedList(Self).Node, "data", self);
 
     self.decoration_manager.decorations.remove(node);
-    util.allocator.destroy(node);
+    util.gpa.destroy(node);
 }
 
 fn handleRequestMode(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {

@@ -103,11 +103,11 @@ pub fn init(self: *Self, input_manager: *InputManager, name: []const u8) !void {
 pub fn deinit(self: *Self) void {
     self.cursor.deinit();
 
-    while (self.keyboards.pop()) |node| util.allocator.destroy(node);
+    while (self.keyboards.pop()) |node| util.gpa.destroy(node);
 
     while (self.focus_stack.first) |node| {
         self.focus_stack.remove(node);
-        util.allocator.destroy(node);
+        util.gpa.destroy(node);
     }
 }
 
@@ -152,7 +152,7 @@ pub fn focus(self: *Self, _view: ?*View) void {
             }
         } else {
             // The view is not in the stack, so allocate a new node and prepend it
-            const new_focus_node = util.allocator.create(
+            const new_focus_node = util.gpa.create(
                 ViewStack(*View).Node,
             ) catch unreachable;
             new_focus_node.view = view_to_focus;
@@ -256,7 +256,7 @@ pub fn handleViewUnmap(self: *Self, view: *View) void {
     while (it) |node| : (it = node.next) {
         if (node.view == view) {
             self.focus_stack.remove(node);
-            util.allocator.destroy(node);
+            util.gpa.destroy(node);
             break;
         }
     }
@@ -277,10 +277,10 @@ pub fn handleMapping(self: *Self, keysym: c.xkb_keysym_t, modifiers: u32) bool {
         if (modifiers == mapping.modifiers and keysym == mapping.keysym) {
             // Execute the bound command
             var failure_message: []const u8 = undefined;
-            command.run(util.allocator, self, mapping.command_args, &failure_message) catch |err| {
+            command.run(util.gpa, self, mapping.command_args, &failure_message) catch |err| {
                 // TODO: log the error
                 if (err == command.Error.CommandFailed)
-                    util.allocator.free(failure_message);
+                    util.gpa.free(failure_message);
             };
             return true;
         }
@@ -311,7 +311,7 @@ pub fn addDevice(self: *Self, device: *c.wlr_input_device) !void {
 fn addKeyboard(self: *Self, device: *c.wlr_input_device) !void {
     c.wlr_seat_set_keyboard(self.wlr_seat, device);
 
-    const node = try util.allocator.create(std.TailQueue(Keyboard).Node);
+    const node = try util.gpa.create(std.TailQueue(Keyboard).Node);
     try node.data.init(self, device);
     self.keyboards.append(node);
 }

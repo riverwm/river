@@ -108,7 +108,7 @@ pub fn init(self: *Self, output: *Output, tags: u32, surface: var) void {
 
     self.pending_serial = null;
 
-    self.saved_buffers = std.ArrayList(SavedBuffer).init(util.allocator);
+    self.saved_buffers = std.ArrayList(SavedBuffer).init(util.gpa);
 
     if (@TypeOf(surface) == *c.wlr_xdg_surface) {
         self.impl = .{ .xdg_toplevel = undefined };
@@ -318,5 +318,5 @@ pub fn unmap(self: *Self) void {
 pub fn destroy(self: *const Self) void {
     self.deinit();
     const node = @fieldParentPtr(ViewStack(Self).Node, "view", self);
-    util.allocator.destroy(node);
+    util.gpa.destroy(node);
 }

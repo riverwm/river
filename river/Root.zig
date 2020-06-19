@@ -95,7 +95,7 @@ pub fn deinit(self: *Self) void {
 
 pub fn addOutput(self: *Self, wlr_output: *c.wlr_output) void {
     // TODO: Handle failure
-    const node = self.outputs.allocateNode(util.allocator) catch unreachable;
+    const node = self.outputs.allocateNode(util.gpa) catch unreachable;
     node.data.init(self, wlr_output) catch unreachable;
     self.outputs.append(node);
 

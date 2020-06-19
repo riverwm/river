@@ -77,7 +77,7 @@ pub fn main() !void {
 
     if (startup_command) |cmd| {
         const child_args = [_][]const u8{ "/bin/sh", "-c", cmd };
-        const child = try std.ChildProcess.init(&child_args, util.allocator);
+        const child = try std.ChildProcess.init(&child_args, util.gpa);
         defer child.deinit();
         try std.ChildProcess.spawn(child);
     }

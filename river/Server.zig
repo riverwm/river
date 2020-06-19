@@ -186,7 +186,7 @@ fn handleNewXdgSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) v
 
     // The View will add itself to the output's view stack on map
     const output = self.input_manager.default_seat.focused_output;
-    const node = util.allocator.create(ViewStack(View).Node) catch unreachable;
+    const node = util.gpa.create(ViewStack(View).Node) catch unreachable;
     node.view.init(output, output.current_focused_tags, wlr_xdg_surface);
 }
 
@@ -236,7 +236,7 @@ fn handleNewLayerSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C)
 
     // The layer surface will add itself to the proper list of the output on map
     const output = util.voidCast(Output, wlr_layer_surface.output.*.data.?);
-    const node = util.allocator.create(std.TailQueue(LayerSurface).Node) catch unreachable;
+    const node = util.gpa.create(std.TailQueue(LayerSurface).Node) catch unreachable;
     node.data.init(output, wlr_layer_surface);
 }
 
@@ -248,7 +248,7 @@ fn handleNewXwaylandSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(
         log.debug(.server, "new unmanaged xwayland surface", .{});
         // The unmanged surface will add itself to the list of unmanaged views
         // in Root when it is mapped.
-        const node = util.allocator.create(std.TailQueue(XwaylandUnmanaged).Node) catch unreachable;
+        const node = util.gpa.create(std.TailQueue(XwaylandUnmanaged).Node) catch unreachable;
         node.data.init(&self.root, wlr_xwayland_surface);
         return;
     }
@@ -261,6 +261,6 @@ fn handleNewXwaylandSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(
 
     // The View will add itself to the output's view stack on map
     const output = self.input_manager.default_seat.focused_output;
-    const node = util.allocator.create(ViewStack(View).Node) catch unreachable;
+    const node = util.gpa.create(ViewStack(View).Node) catch unreachable;
     node.view.init(output, output.current_focused_tags, wlr_xwayland_surface);
 }

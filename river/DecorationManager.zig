@@ -46,7 +46,7 @@ fn handleNewToplevelDecoration(listener: ?*c.wl_listener, data: ?*c_void) callco
     const self = @fieldParentPtr(Self, "listen_new_toplevel_decoration", listener.?);
     const wlr_xdg_toplevel_decoration = util.voidCast(c.wlr_xdg_toplevel_decoration_v1, data.?);
 
-    const node = self.decorations.allocateNode(util.allocator) catch unreachable;
+    const node = self.decorations.allocateNode(util.gpa) catch unreachable;
     node.data.init(self, wlr_xdg_toplevel_decoration);
     self.decorations.prepend(node);
 }

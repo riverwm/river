@@ -56,13 +56,13 @@ pub fn init(self: *Self) !void {
     self.view_padding = 8;
     self.outer_padding = 8;
 
-    self.mode_to_id = std.StringHashMap(usize).init(util.allocator);
+    self.mode_to_id = std.StringHashMap(usize).init(util.gpa);
     try self.mode_to_id.putNoClobber("normal", 0);
 
-    self.modes = std.ArrayList(std.ArrayList(Mapping)).init(util.allocator);
-    try self.modes.append(std.ArrayList(Mapping).init(util.allocator));
+    self.modes = std.ArrayList(std.ArrayList(Mapping)).init(util.gpa);
+    try self.modes.append(std.ArrayList(Mapping).init(util.gpa));
 
-    self.float_filter = std.ArrayList([*:0]const u8).init(util.allocator);
+    self.float_filter = std.ArrayList([*:0]const u8).init(util.gpa);
 
     // Float views with app_id "float"
     try self.float_filter.append("float");
@@ -71,7 +71,7 @@ pub fn init(self: *Self) !void {
 pub fn deinit(self: Self) void {
     self.mode_to_id.deinit();
     for (self.modes.items) |mode| {
-        for (mode.items) |mapping| mapping.deinit(util.allocator);
+        for (mode.items) |mapping| mapping.deinit(util.gpa);
         mode.deinit();
     }
     self.modes.deinit();

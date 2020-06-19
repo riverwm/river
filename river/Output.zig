@@ -111,7 +111,7 @@ pub fn init(self: *Self, root: *Root, wlr_output: *c.wlr_output) !void {
 
     self.master_factor = 0.6;
 
-    self.layout = try std.fmt.allocPrint(util.allocator, "full", .{});
+    self.layout = try std.fmt.allocPrint(util.gpa, "full", .{});
 
     self.status_trackers = std.SinglyLinkedList(OutputStatus).init();
 
@@ -234,7 +234,7 @@ fn layoutExternal(self: *Self, visible_count: u32, output_tags: u32) !void {
     const layout_width = @intCast(u32, self.usable_box.width) - config.outer_padding * 2;
     const layout_height = @intCast(u32, self.usable_box.height) - config.outer_padding * 2;
 
-    var arena = std.heap.ArenaAllocator.init(util.allocator);
+    var arena = std.heap.ArenaAllocator.init(util.gpa);
     defer arena.deinit();
 
     // Assemble command
@@ -619,7 +619,7 @@ fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     // Remove the destroyed output from the list
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
     root.outputs.remove(node);
-    util.allocator.destroy(node);
+    util.gpa.destroy(node);
 
     // Arrange the root in case evacuated views affect the layout
     root.arrange();
