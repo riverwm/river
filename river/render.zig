@@ -39,6 +39,7 @@ const SurfaceRenderData = struct {
 };
 
 pub fn renderOutput(output: *Output) void {
+    const config = &output.root.server.config;
     const wlr_renderer = output.getRenderer();
 
     var now: c.timespec = undefined;
@@ -55,8 +56,7 @@ pub fn renderOutput(output: *Output) void {
     // Begin the renderer (calls glViewport and some other GL sanity checks)
     c.wlr_renderer_begin(wlr_renderer, width, height);
 
-    const color = [_]f32{ 0.0, 0.16862745, 0.21176471, 1.0 };
-    c.wlr_renderer_clear(wlr_renderer, &color);
+    c.wlr_renderer_clear(wlr_renderer, &config.background_color);
 
     renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND], &now);
     renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM], &now);

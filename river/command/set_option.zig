@@ -22,6 +22,7 @@ const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
 const Option = enum {
+    background_color,
     border_width,
     border_color_focused,
     border_color_unfocused,
@@ -45,6 +46,7 @@ pub fn setOption(
 
     // Assign value to option.
     switch (option) {
+        .background_color => config.background_color = try parseRgba(args[2]),
         .border_width => config.border_width = try std.fmt.parseInt(u32, args[2], 10),
         .border_color_focused => config.border_color_focused = try parseRgba(args[2]),
         .border_color_unfocused => config.border_color_unfocused = try parseRgba(args[2]),

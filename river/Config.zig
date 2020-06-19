@@ -25,6 +25,9 @@ const util = @import("util.zig");
 const Server = @import("Server.zig");
 const Mapping = @import("Mapping.zig");
 
+/// Color of background in RGBA (alpha should only affect nested sessions)
+background_color: [4]f32,
+
 /// Width of borders in pixels
 border_width: u32,
 
@@ -50,6 +53,7 @@ modes: std.ArrayList(std.ArrayList(Mapping)),
 float_filter: std.ArrayList([*:0]const u8),
 
 pub fn init(self: *Self) !void {
+    self.background_color = [_]f32{ 0.0, 0.16862745, 0.21176471, 1.0 }; // Solarized base03
     self.border_width = 2;
     self.border_color_focused = [_]f32{ 0.57647059, 0.63137255, 0.63137255, 1.0 }; // Solarized base1
     self.border_color_unfocused = [_]f32{ 0.34509804, 0.43137255, 0.45882353, 1.0 }; // Solarized base0

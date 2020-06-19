@@ -114,6 +114,7 @@ that tag 1 through 9 are visible.
 *set-option* _option_ _value_
 	Set _option_ to a specified _value_. List of valid options:
 
+	- *background_color* _RGB/RGBA_hex_code_
 	- *border_width* _non-negative_integer_
 	- *border_color_focused* _RGB/RGBA_hex_code_
 	- *border_color_unfocused* _RGB/RGBA_hex_code_
