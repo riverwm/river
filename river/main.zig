@@ -32,7 +32,7 @@ const usage: []const u8 =
     \\
 ;
 
-pub fn main() !void {
+pub fn main() anyerror!void {
     var startup_command: ?[]const u8 = null;
     {
         var it = std.process.args();

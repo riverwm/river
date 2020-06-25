@@ -62,31 +62,28 @@ status_manager: StatusManager,
 pub fn init(self: *Self) !void {
     // The Wayland display is managed by libwayland. It handles accepting
     // clients from the Unix socket, managing Wayland globals, and so on.
-    self.wl_display = c.wl_display_create() orelse
-        return error.CantCreateWlDisplay;
+    self.wl_display = c.wl_display_create() orelse return error.CreateDisplayError;
     errdefer c.wl_display_destroy(self.wl_display);
 
-    // Should never return null if the display was created successfully
-    self.wl_event_loop = c.wl_display_get_event_loop(self.wl_display) orelse
-        return error.CantGetEventLoop;
+    // Never returns null if the display was created successfully
+    self.wl_event_loop = c.wl_display_get_event_loop(self.wl_display).?;
 
     // The wlr_backend abstracts the input/output hardware. Autocreate chooses
     // the best option based on the environment, for example DRM when run from
     // a tty or wayland if WAYLAND_DISPLAY is set. This frees itself when the
     // wl_display is destroyed.
     self.wlr_backend = c.river_wlr_backend_autocreate(self.wl_display) orelse
-        return error.CantCreateWlrBackend;
+        return error.CreateBackendError;
 
     // This backend is used to create a noop output for use when no actual
     // outputs are available. This frees itself when the wl_display is destroyed.
     self.noop_backend = c.river_wlr_noop_backend_create(self.wl_display) orelse
-        return error.CantCreateNoopBackend;
+        return error.OutOfMemory;
 
     // If we don't provide a renderer, autocreate makes a GLES2 renderer for us.
     // The renderer is responsible for defining the various pixel formats it
     // supports for shared memory, this configures that for clients.
-    const wlr_renderer = c.river_wlr_backend_get_renderer(self.wlr_backend) orelse
-        return error.CantGetWlrRenderer;
+    const wlr_renderer = c.river_wlr_backend_get_renderer(self.wlr_backend).?;
     // TODO: Handle failure after https://github.com/swaywm/wlroots/pull/2080
     c.wlr_renderer_init_wl_display(wlr_renderer, self.wl_display); // orelse
     //    return error.CantInitWlDisplay;
@@ -94,24 +91,22 @@ pub fn init(self: *Self) !void {
     c.wl_signal_add(&self.wlr_backend.events.new_output, &self.listen_new_output);
 
     const wlr_compositor = c.wlr_compositor_create(self.wl_display, wlr_renderer) orelse
-        return error.CantCreateWlrCompositor;
+        return error.OutOfMemory;
 
     // Set up xdg shell
-    self.wlr_xdg_shell = c.wlr_xdg_shell_create(self.wl_display) orelse
-        return error.CantCreateWlrXdgShell;
+    self.wlr_xdg_shell = c.wlr_xdg_shell_create(self.wl_display) orelse return error.OutOfMemory;
     self.listen_new_xdg_surface.notify = handleNewXdgSurface;
     c.wl_signal_add(&self.wlr_xdg_shell.events.new_surface, &self.listen_new_xdg_surface);
 
     // Set up layer shell
-    self.wlr_layer_shell = c.wlr_layer_shell_v1_create(self.wl_display) orelse
-        return error.CantCreateWlrLayerShell;
+    self.wlr_layer_shell = c.wlr_layer_shell_v1_create(self.wl_display) orelse return error.OutOfMemory;
     self.listen_new_layer_surface.notify = handleNewLayerSurface;
     c.wl_signal_add(&self.wlr_layer_shell.events.new_surface, &self.listen_new_layer_surface);
 
     // Set up xwayland if built with support
     if (build_options.xwayland) {
         self.wlr_xwayland = c.wlr_xwayland_create(self.wl_display, wlr_compositor, false) orelse
-            return error.CantCreateWlrXwayland;
+            return error.CreateXwaylandError;
         self.listen_new_xwayland_surface.notify = handleNewXwaylandSurface;
         c.wl_signal_add(&self.wlr_xwayland.events.new_surface, &self.listen_new_xwayland_surface);
     }
@@ -125,14 +120,11 @@ pub fn init(self: *Self) !void {
     try self.status_manager.init(self);
 
     // These all free themselves when the wl_display is destroyed
-    _ = c.wlr_data_device_manager_create(self.wl_display) orelse
-        return error.CantCreateWlrDataDeviceManager;
-    _ = c.wlr_data_control_manager_v1_create(self.wl_display) orelse
-        return error.CantCreateWlrDataControlManager;
-    _ = c.wlr_screencopy_manager_v1_create(self.wl_display) orelse
-        return error.CantCreateWlrScreencopyManager;
+    _ = c.wlr_data_device_manager_create(self.wl_display) orelse return error.OutOfMemory;
+    _ = c.wlr_data_control_manager_v1_create(self.wl_display) orelse return error.OutOfMemory;
+    _ = c.wlr_screencopy_manager_v1_create(self.wl_display) orelse return error.OutOfMemory;
     _ = c.wlr_xdg_output_manager_v1_create(self.wl_display, self.root.wlr_output_layout) orelse
-        return error.CantCreateWlrOutputManager;
+        return error.OutOfMemory;
 }
 
 /// Free allocated memory and clean up
