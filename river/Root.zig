@@ -56,19 +56,15 @@ pub fn init(self: *Self, server: *Server) !void {
 
     // Create an output layout, which a wlroots utility for working with an
     // arrangement of screens in a physical layout.
-    self.wlr_output_layout = c.wlr_output_layout_create() orelse
-        return error.CantCreateWlrOutputLayout;
+    self.wlr_output_layout = c.wlr_output_layout_create() orelse return error.OutOfMemory;
     errdefer c.wlr_output_layout_destroy(self.wlr_output_layout);
 
     self.outputs = std.TailQueue(Output).init();
 
-    const noop_wlr_output = c.river_wlr_noop_add_output(server.noop_backend) orelse
-        return error.CantAddNoopOutput;
+    const noop_wlr_output = c.river_wlr_noop_add_output(server.noop_backend) orelse return error.OutOfMemory;
     try self.noop_output.init(self, noop_wlr_output);
 
-    if (build_options.xwayland) {
-        self.xwayland_unmanaged_views = std.TailQueue(XwaylandUnmanaged).init();
-    }
+    if (build_options.xwayland) self.xwayland_unmanaged_views = std.TailQueue(XwaylandUnmanaged).init();
 
     self.pending_configures = 0;
 
@@ -76,7 +72,7 @@ pub fn init(self: *Self, server: *Server) !void {
         self.server.wl_event_loop,
         handleTimeout,
         self,
-    ) orelse return error.CantCreateTimer;
+    ) orelse return error.AddTimerError;
 }
 
 pub fn deinit(self: *Self) void {

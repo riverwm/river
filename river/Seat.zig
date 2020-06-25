@@ -75,12 +75,11 @@ pub fn init(self: *Self, input_manager: *InputManager, name: []const u8) !void {
     self.input_manager = input_manager;
 
     // This will be automatically destroyed when the display is destroyed
-    self.wlr_seat = c.wlr_seat_create(input_manager.server.wl_display, name.ptr) orelse
-        return error.CantCreateWlrSeat;
+    self.wlr_seat = c.wlr_seat_create(input_manager.server.wl_display, name.ptr) orelse return error.OutOfMemory;
     self.wlr_seat.data = self;
 
     try self.cursor.init(self);
-    errdefer self.cursor.destroy();
+    errdefer self.cursor.deinit();
 
     self.keyboards = std.TailQueue(Keyboard).init();
 

@@ -82,16 +82,10 @@ pub fn init(self: *Self, root: *Root, wlr_output: *c.wlr_output) !void {
     // refresh rate), and each monitor supports only a specific set of modes. We
     // just pick the monitor's preferred mode, a more sophisticated compositor
     // would let the user configure it.
-
-    // if not empty
-    if (c.wl_list_empty(&wlr_output.modes) == 0) {
-        // TODO: handle failure
-        const mode = c.wlr_output_preferred_mode(wlr_output);
+    if (c.wlr_output_preferred_mode(wlr_output)) |mode| {
         c.wlr_output_set_mode(wlr_output, mode);
         c.wlr_output_enable(wlr_output, true);
-        if (!c.wlr_output_commit(wlr_output)) {
-            return error.CantCommitWlrOutputMode;
-        }
+        if (!c.wlr_output_commit(wlr_output)) return error.OutputCommitFailed;
     }
 
     self.root = root;

@@ -47,7 +47,7 @@ pub fn init(self: *Self, server: *Server) !void {
         protocol_version,
         self,
         bind,
-    ) orelse return error.CantCreateWlGlobal;
+    ) orelse return error.OutOfMemory;
 
     self.args_map = std.AutoHashMap(u32, std.ArrayList([]const u8)).init(util.gpa);
 

@@ -33,7 +33,7 @@ listen_new_toplevel_decoration: c.wl_listener,
 
 pub fn init(self: *Self, server: *Server) !void {
     self.wlr_xdg_decoration_manager = c.wlr_xdg_decoration_manager_v1_create(server.wl_display) orelse
-        return error.CantCreateWlrXdgDecorationManager;
+        return error.OutOfMemory;
 
     self.listen_new_toplevel_decoration.notify = handleNewToplevelDecoration;
     c.wl_signal_add(

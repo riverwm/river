@@ -51,7 +51,7 @@ pub fn init(self: *Self, server: *Server) !void {
         protocol_version,
         self,
         bind,
-    ) orelse return error.CantCreateWlGlobal;
+    ) orelse return error.OutOfMemory;
 
     self.listen_display_destroy.notify = handleDisplayDestroy;
     c.wl_display_add_destroy_listener(server.wl_display, &self.listen_display_destroy);

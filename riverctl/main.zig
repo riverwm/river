@@ -36,11 +36,10 @@ var river_control_optional: ?*c.zriver_control_v1 = null;
 var wl_seat_optional: ?*c.wl_seat = null;
 
 pub fn main() !void {
-    const wl_display = c.wl_display_connect(null) orelse return error.CantConnectToDisplay;
+    const wl_display = c.wl_display_connect(null) orelse return error.ConnectError;
     const wl_registry = c.wl_display_get_registry(wl_display);
 
-    if (c.wl_registry_add_listener(wl_registry, &wl_registry_listener, null) < 0)
-        return error.FailedToAddListener;
+    if (c.wl_registry_add_listener(wl_registry, &wl_registry_listener, null) < 0) unreachable;
     if (c.wl_display_roundtrip(wl_display) < 0) return error.RoundtripFailed;
 
     const river_control = river_control_optional orelse return error.RiverControlNotAdvertised;
@@ -56,7 +55,7 @@ pub fn main() !void {
         command_callback,
         &command_callback_listener,
         null,
-    ) < 0) return error.FailedToAddListener;
+    ) < 0) unreachable;
 
     // Loop until our callback is called and we exit.
     while (true) if (c.wl_display_dispatch(wl_display) < 0) return error.DispatchFailed;

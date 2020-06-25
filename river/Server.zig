@@ -145,11 +145,11 @@ pub fn deinit(self: *Self) void {
 
 /// Create the socket, start the backend, and setup the environment
 pub fn start(self: Self) !void {
-    const socket = c.wl_display_add_socket_auto(self.wl_display) orelse return error.CantAddSocket;
-    if (!c.river_wlr_backend_start(self.wlr_backend)) return error.CantStartBackend;
-    if (c.setenv("WAYLAND_DISPLAY", socket, 1) < 0) return error.CantSetEnv;
+    const socket = c.wl_display_add_socket_auto(self.wl_display) orelse return error.AddSocketError;
+    if (!c.river_wlr_backend_start(self.wlr_backend)) return error.StartBackendError;
+    if (c.setenv("WAYLAND_DISPLAY", socket, 1) < 0) return error.SetenvError;
     if (build_options.xwayland) {
-        if (c.setenv("DISPLAY", &self.wlr_xwayland.display_name, 1) < 0) return error.CantSetEnv;
+        if (c.setenv("DISPLAY", &self.wlr_xwayland.display_name, 1) < 0) return error.SetenvError;
     }
 }
 

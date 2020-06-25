@@ -59,15 +59,13 @@ pub fn init(self: *Self, seat: *Seat) !void {
     self.seat = seat;
 
     // Creates a wlroots utility for tracking the cursor image shown on screen.
-    self.wlr_cursor = c.wlr_cursor_create() orelse
-        return error.CantCreateWlrCursor;
+    self.wlr_cursor = c.wlr_cursor_create() orelse return error.OutOfMemory;
 
     // Creates an xcursor manager, another wlroots utility which loads up
     // Xcursor themes to source cursor images from and makes sure that cursor
     // images are available at all scale factors on the screen (necessary for
     // HiDPI support). We add a cursor theme at scale factor 1 to begin with.
-    self.wlr_xcursor_manager = c.wlr_xcursor_manager_create(null, 24) orelse
-        return error.CantCreateWlrXCursorManager;
+    self.wlr_xcursor_manager = c.wlr_xcursor_manager_create(null, 24) orelse return error.OutOfMemory;
     c.wlr_cursor_attach_output_layout(self.wlr_cursor, seat.input_manager.server.root.wlr_output_layout);
     if (c.wlr_xcursor_manager_load(self.wlr_xcursor_manager, 1) == 0) {
         if (build_options.xwayland) {

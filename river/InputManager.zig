@@ -46,8 +46,7 @@ pub fn init(self: *Self, server: *Server) !void {
 
     // This is automatically freed when the display is destroyed
     self.wlr_input_inhibit_manager =
-        c.wlr_input_inhibit_manager_create(server.wl_display) orelse
-        return error.CantCreateInputInhibitManager;
+        c.wlr_input_inhibit_manager_create(server.wl_display) orelse return error.OutOfMemory;
 
     self.seats = std.TailQueue(Seat).init();
 
