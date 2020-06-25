@@ -71,11 +71,11 @@ status_trackers: std.SinglyLinkedList(SeatStatus),
 
 listen_request_set_selection: c.wl_listener,
 
-pub fn init(self: *Self, input_manager: *InputManager, name: []const u8) !void {
+pub fn init(self: *Self, input_manager: *InputManager, name: [*:0]const u8) !void {
     self.input_manager = input_manager;
 
     // This will be automatically destroyed when the display is destroyed
-    self.wlr_seat = c.wlr_seat_create(input_manager.server.wl_display, name.ptr) orelse return error.OutOfMemory;
+    self.wlr_seat = c.wlr_seat_create(input_manager.server.wl_display, name) orelse return error.OutOfMemory;
     self.wlr_seat.data = self;
 
     try self.cursor.init(self);
