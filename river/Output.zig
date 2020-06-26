@@ -105,7 +105,7 @@ pub fn init(self: *Self, root: *Root, wlr_output: *c.wlr_output) !void {
 
     self.master_factor = 0.6;
 
-    self.layout = try std.fmt.allocPrint(util.gpa, "full", .{});
+    self.layout = try std.mem.dupe(util.gpa, u8, "full");
 
     self.status_trackers = std.SinglyLinkedList(OutputStatus).init();
 

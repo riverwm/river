@@ -62,7 +62,9 @@ pub fn init(self: *Self) !void {
 
     self.mode_to_id = std.StringHashMap(usize).init(util.gpa);
     errdefer self.mode_to_id.deinit();
-    try self.mode_to_id.putNoClobber("normal", 0);
+    const owned_slice = try std.mem.dupe(util.gpa, u8, "normal");
+    errdefer util.gpa.free(owned_slice);
+    try self.mode_to_id.putNoClobber(owned_slice, 0);
 
     self.modes = std.ArrayList(std.ArrayList(Mapping)).init(util.gpa);
     errdefer self.modes.deinit();
@@ -76,11 +78,15 @@ pub fn init(self: *Self) !void {
 }
 
 pub fn deinit(self: Self) void {
+    var it = self.mode_to_id.iterator();
+    while (it.next()) |kv| util.gpa.free(kv.key);
     self.mode_to_id.deinit();
+
     for (self.modes.items) |mode| {
         for (mode.items) |mapping| mapping.deinit(util.gpa);
         mode.deinit();
     }
     self.modes.deinit();
+
     self.float_filter.deinit();
 }
