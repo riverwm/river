@@ -18,6 +18,7 @@
 const std = @import("std");
 
 const c = @import("../c.zig");
+const util = @import("../util.zig");
 
 const Error = @import("../command.zig").Error;
 const Mapping = @import("../Mapping.zig");
@@ -45,7 +46,9 @@ pub fn declareMode(
         return Error.CommandFailed;
     }
 
-    try config.mode_to_id.putNoClobber(new_mode_name, config.modes.items.len);
-    errdefer _ = config.mode_to_id.remove(new_mode_name);
+    const owned_name = try std.mem.dupe(util.gpa, u8, new_mode_name);
+    errdefer util.gpa.free(owned_name);
+    try config.mode_to_id.putNoClobber(owned_name, config.modes.items.len);
+    errdefer _ = config.mode_to_id.remove(owned_name);
     try config.modes.append(std.ArrayList(Mapping).init(allocator));
 }

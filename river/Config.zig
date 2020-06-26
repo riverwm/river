@@ -61,12 +61,15 @@ pub fn init(self: *Self) !void {
     self.outer_padding = 8;
 
     self.mode_to_id = std.StringHashMap(usize).init(util.gpa);
+    errdefer self.mode_to_id.deinit();
     try self.mode_to_id.putNoClobber("normal", 0);
 
     self.modes = std.ArrayList(std.ArrayList(Mapping)).init(util.gpa);
+    errdefer self.modes.deinit();
     try self.modes.append(std.ArrayList(Mapping).init(util.gpa));
 
     self.float_filter = std.ArrayList([*:0]const u8).init(util.gpa);
+    errdefer self.float_filter.deinit();
 
     // Float views with app_id "float"
     try self.float_filter.append("float");
