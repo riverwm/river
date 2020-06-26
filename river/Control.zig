@@ -138,15 +138,6 @@ fn runCommand(
     defer if (out) |s| util.gpa.free(s);
     command.run(util.gpa, seat, args, &out) catch |err| {
         const failure_message = switch (err) {
-            command.Error.NoCommand => "no command given",
-            command.Error.UnknownCommand => "unknown command",
-            command.Error.UnknownOption => "unknown option",
-            command.Error.NotEnoughArguments => "not enough arguments",
-            command.Error.TooManyArguments => "too many arguments",
-            command.Error.Overflow => "value out of bounds",
-            command.Error.InvalidCharacter => "invalid character in argument",
-            command.Error.InvalidDirection => "invalid direction. Must be 'next' or 'previous'",
-            command.Error.InvalidRgba => "invalid color format, must be #RRGGBB or #RRGGBBAA",
             command.Error.OutOfMemory => {
                 c.wl_client_post_no_memory(wl_client);
                 return;
@@ -155,6 +146,7 @@ fn runCommand(
                 c.wl_client_post_no_memory(wl_client);
                 return;
             },
+            else => command.errToMsg(err),
         };
         defer if (err == command.Error.Other) util.gpa.free(failure_message);
         c.zriver_command_callback_v1_send_failure(callback_resource, failure_message);

@@ -21,6 +21,7 @@ const std = @import("std");
 
 const c = @import("c.zig");
 const command = @import("command.zig");
+const log = @import("log.zig");
 const util = @import("util.zig");
 
 const Cursor = @import("Cursor.zig");
@@ -275,12 +276,22 @@ pub fn handleMapping(self: *Self, keysym: c.xkb_keysym_t, modifiers: u32) bool {
     for (modes.items[self.mode_id].items) |mapping| {
         if (modifiers == mapping.modifiers and keysym == mapping.keysym) {
             // Execute the bound command
-            var failure_message: ?[]const u8 = null;
-            command.run(util.gpa, self, mapping.command_args, &failure_message) catch |err| {
-                // TODO: log the error
-                if (err == command.Error.Other)
-                    util.gpa.free(failure_message.?);
+            const args = mapping.command_args;
+            var out: ?[]const u8 = null;
+            defer if (out) |s| util.gpa.free(s);
+            command.run(util.gpa, self, args, &out) catch |err| {
+                const failure_message = switch (err) {
+                    command.Error.Other => out.?,
+                    else => command.errToMsg(err),
+                };
+                log.err(.command, "{}: {}", .{ args[0], failure_message });
+                return true;
             };
+            if (out) |s| {
+                const stdout = std.io.getStdOut().outStream();
+                stdout.print("{}", .{s}) catch
+                    |err| log.err(.command, "{}: write to stdout failed {}", .{ args[0], err });
+            }
             return true;
         }
     }

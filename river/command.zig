@@ -119,3 +119,20 @@ pub fn run(
 
     try impl_fn(allocator, seat, args, out);
 }
+
+/// Return a short error message for the given error. Passing Error.Other is UB
+pub fn errToMsg(err: Error) [:0]const u8 {
+    return switch (err) {
+        Error.NoCommand => "no command given",
+        Error.UnknownCommand => "unknown command",
+        Error.UnknownOption => "unknown option",
+        Error.NotEnoughArguments => "not enough arguments",
+        Error.TooManyArguments => "too many arguments",
+        Error.Overflow => "value out of bounds",
+        Error.InvalidCharacter => "invalid character in argument",
+        Error.InvalidDirection => "invalid direction. Must be 'next' or 'previous'",
+        Error.InvalidRgba => "invalid color format, must be #RRGGBB or #RRGGBBAA",
+        Error.OutOfMemory => "out of memory",
+        Error.Other => unreachable,
+    };
+}
