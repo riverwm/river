@@ -35,13 +35,12 @@ pub fn setOption(
     allocator: *std.mem.Allocator,
     seat: *Seat,
     args: []const []const u8,
-    failure_message: *[]const u8,
+    out: *?[]const u8,
 ) Error!void {
     if (args.len < 3) return Error.NotEnoughArguments;
     if (args.len > 3) return Error.TooManyArguments;
 
     const config = &seat.input_manager.server.config;
-
     const option = std.meta.stringToEnum(Option, args[1]) orelse return Error.UnknownOption;
 
     // Assign value to option.
@@ -59,7 +58,7 @@ pub fn setOption(
 }
 
 /// Parse a color in the format #RRGGBB or #RRGGBBAA
-pub fn parseRgba(string: []const u8) ![4]f32 {
+fn parseRgba(string: []const u8) ![4]f32 {
     if (string[0] != '#' or (string.len != 7 and string.len != 9)) return error.InvalidRgba;
 
     const r = try std.fmt.parseInt(u8, string[1..3], 16);

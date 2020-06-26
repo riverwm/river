@@ -25,9 +25,9 @@ pub fn setFocusedTags(
     allocator: *std.mem.Allocator,
     seat: *Seat,
     args: []const []const u8,
-    failure_message: *[]const u8,
+    out: *?[]const u8,
 ) Error!void {
-    const tags = try parseTags(allocator, args, failure_message);
+    const tags = try parseTags(allocator, args, out);
     if (seat.focused_output.current_focused_tags != tags) {
         seat.focused_output.pending_focused_tags = tags;
         seat.input_manager.server.root.arrange();
@@ -39,9 +39,9 @@ pub fn setViewTags(
     allocator: *std.mem.Allocator,
     seat: *Seat,
     args: []const []const u8,
-    failure_message: *[]const u8,
+    out: *?[]const u8,
 ) Error!void {
-    const tags = try parseTags(allocator, args, failure_message);
+    const tags = try parseTags(allocator, args, out);
     if (seat.focused_view) |view| {
         if (view.current_tags != tags) {
             view.pending_tags = tags;
@@ -55,9 +55,9 @@ pub fn toggleFocusedTags(
     allocator: *std.mem.Allocator,
     seat: *Seat,
     args: []const []const u8,
-    failure_message: *[]const u8,
+    out: *?[]const u8,
 ) Error!void {
-    const tags = try parseTags(allocator, args, failure_message);
+    const tags = try parseTags(allocator, args, out);
     const output = seat.focused_output;
     const new_focused_tags = output.current_focused_tags ^ tags;
     if (new_focused_tags != 0) {
@@ -71,9 +71,9 @@ pub fn toggleViewTags(
     allocator: *std.mem.Allocator,
     seat: *Seat,
     args: []const []const u8,
-    failure_message: *[]const u8,
+    out: *?[]const u8,
 ) Error!void {
-    const tags = try parseTags(allocator, args, failure_message);
+    const tags = try parseTags(allocator, args, out);
     if (seat.focused_view) |view| {
         const new_tags = view.current_tags ^ tags;
         if (new_tags != 0) {
@@ -86,7 +86,7 @@ pub fn toggleViewTags(
 fn parseTags(
     allocator: *std.mem.Allocator,
     args: []const []const u8,
-    failure_message: *[]const u8,
+    out: *?[]const u8,
 ) Error!u32 {
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
@@ -94,8 +94,8 @@ fn parseTags(
     const tags = try std.fmt.parseInt(u32, args[1], 10);
 
     if (tags == 0) {
-        failure_message.* = try std.fmt.allocPrint(allocator, "tagmask may not be 0", .{});
-        return Error.CommandFailed;
+        out.* = try std.fmt.allocPrint(allocator, "tagmask may not be 0", .{});
+        return Error.Other;
     }
 
     return tags;

@@ -134,35 +134,40 @@ fn runCommand(
 
     const args = self.args_map.get(c.wl_resource_get_id(wl_resource)).?.value.items;
 
-    var failure_message: []const u8 = undefined;
-    command.run(util.gpa, seat, args, &failure_message) catch |err| {
-        if (err == command.Error.CommandFailed) {
-            defer util.gpa.free(failure_message);
-            const out = std.cstr.addNullByte(util.gpa, failure_message) catch {
-                c.zriver_command_callback_v1_send_failure(callback_resource, "out of memory");
+    var out: ?[]const u8 = null;
+    defer if (out) |s| util.gpa.free(s);
+    command.run(util.gpa, seat, args, &out) catch |err| {
+        const failure_message = switch (err) {
+            command.Error.NoCommand => "no command given",
+            command.Error.UnknownCommand => "unknown command",
+            command.Error.UnknownOption => "unknown option",
+            command.Error.NotEnoughArguments => "not enough arguments",
+            command.Error.TooManyArguments => "too many arguments",
+            command.Error.Overflow => "value out of bounds",
+            command.Error.InvalidCharacter => "invalid character in argument",
+            command.Error.InvalidDirection => "invalid direction. Must be 'next' or 'previous'",
+            command.Error.InvalidRgba => "invalid color format, must be #RRGGBB or #RRGGBBAA",
+            command.Error.OutOfMemory => {
+                c.wl_client_post_no_memory(wl_client);
                 return;
-            };
-            defer util.gpa.free(out);
-            c.zriver_command_callback_v1_send_failure(callback_resource, out);
-        } else {
-            c.zriver_command_callback_v1_send_failure(
-                callback_resource,
-                switch (err) {
-                    command.Error.NoCommand => "no command given",
-                    command.Error.UnknownCommand => "unknown command",
-                    command.Error.UnknownOption => "unknown option",
-                    command.Error.NotEnoughArguments => "not enough arguments",
-                    command.Error.TooManyArguments => "too many arguments",
-                    command.Error.Overflow => "value out of bounds",
-                    command.Error.InvalidCharacter => "invalid character in argument",
-                    command.Error.InvalidDirection => "invalid direction. Must be 'next' or 'previous'",
-                    command.Error.InvalidRgba => "invalid color format, must be #RRGGBB or #RRGGBBAA",
-                    command.Error.OutOfMemory => "out of memory",
-                    command.Error.CommandFailed => unreachable,
-                },
-            );
-        }
+            },
+            command.Error.Other => std.cstr.addNullByte(util.gpa, out.?) catch {
+                c.wl_client_post_no_memory(wl_client);
+                return;
+            },
+        };
+        defer if (err == command.Error.Other) util.gpa.free(failure_message);
+        c.zriver_command_callback_v1_send_failure(callback_resource, failure_message);
         return;
     };
-    c.zriver_command_callback_v1_send_success(callback_resource, "");
+
+    const success_message = if (out) |s|
+        std.cstr.addNullByte(util.gpa, s) catch {
+            c.wl_client_post_no_memory(wl_client);
+            return;
+        }
+    else
+        "";
+    defer if (out != null) util.gpa.free(success_message);
+    c.zriver_command_callback_v1_send_success(callback_resource, success_message);
 }

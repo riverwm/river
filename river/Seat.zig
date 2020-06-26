@@ -275,11 +275,11 @@ pub fn handleMapping(self: *Self, keysym: c.xkb_keysym_t, modifiers: u32) bool {
     for (modes.items[self.mode_id].items) |mapping| {
         if (modifiers == mapping.modifiers and keysym == mapping.keysym) {
             // Execute the bound command
-            var failure_message: []const u8 = undefined;
+            var failure_message: ?[]const u8 = null;
             command.run(util.gpa, self, mapping.command_args, &failure_message) catch |err| {
                 // TODO: log the error
-                if (err == command.Error.CommandFailed)
-                    util.gpa.free(failure_message);
+                if (err == command.Error.Other)
+                    util.gpa.free(failure_message.?);
             };
             return true;
         }

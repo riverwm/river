@@ -17,7 +17,6 @@
 
 const std = @import("std");
 
-const c = @import("../c.zig");
 const util = @import("../util.zig");
 
 const Error = @import("../command.zig").Error;
@@ -29,7 +28,7 @@ pub fn declareMode(
     allocator: *std.mem.Allocator,
     seat: *Seat,
     args: []const []const u8,
-    failure_message: *[]const u8,
+    out: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
@@ -38,17 +37,17 @@ pub fn declareMode(
     const new_mode_name = args[1];
 
     if (config.mode_to_id.get(new_mode_name) != null) {
-        failure_message.* = try std.fmt.allocPrint(
+        out.* = try std.fmt.allocPrint(
             allocator,
             "mode '{}' already exists and cannot be re-declared",
             .{new_mode_name},
         );
-        return Error.CommandFailed;
+        return Error.Other;
     }
 
     const owned_name = try std.mem.dupe(util.gpa, u8, new_mode_name);
     errdefer util.gpa.free(owned_name);
     try config.mode_to_id.putNoClobber(owned_name, config.modes.items.len);
     errdefer _ = config.mode_to_id.remove(owned_name);
-    try config.modes.append(std.ArrayList(Mapping).init(allocator));
+    try config.modes.append(std.ArrayList(Mapping).init(util.gpa));
 }

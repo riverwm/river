@@ -59,7 +59,7 @@ pub const Direction = enum {
 // zig fmt: off
 const str_to_impl_fn = [_]struct {
     name: []const u8,
-    impl: fn (*std.mem.Allocator, *Seat, []const []const u8, *[]const u8) Error!void,
+    impl: fn (*std.mem.Allocator, *Seat, []const []const u8, *?[]const u8) Error!void,
 }{
     .{ .name = "close",               .impl = impl.close },
     .{ .name = "declare-mode",        .impl = impl.declareMode },
@@ -94,27 +94,28 @@ pub const Error = error{
     InvalidRgba,
     UnknownOption,
     OutOfMemory,
-    CommandFailed,
+    Other,
 };
 
 /// Run a command for the given Seat. The `args` parameter is similar to the
 /// classic argv in that the command to be run is passed as the first argument.
-/// If the command fails with Error.CommandFailed, a failure message will be
-/// allocated and the slice pointed to by the `failure_message` parameter will
-/// be set to point to it. The caller is responsible for freeing this message
-/// in the case of failure.
+/// The optional slice passed as the out parameter must initially be set to
+/// null. If the command produces output or Error.Other is returned, the slice
+/// will be set to the output of the command or a failure message, respectively.
+/// The caller is then responsible for freeing that slice, which will be
+/// allocated using the provided allocator.
 pub fn run(
     allocator: *std.mem.Allocator,
     seat: *Seat,
     args: []const []const u8,
-    failure_message: *[]const u8,
+    out: *?[]const u8,
 ) Error!void {
+    std.debug.assert(out.* == null);
     if (args.len == 0) return Error.NoCommand;
 
-    const name = args[0];
     const impl_fn = for (str_to_impl_fn) |definition| {
-        if (std.mem.eql(u8, name, definition.name)) break definition.impl;
+        if (std.mem.eql(u8, args[0], definition.name)) break definition.impl;
     } else return Error.UnknownCommand;
 
-    try impl_fn(allocator, seat, args, failure_message);
+    try impl_fn(allocator, seat, args, out);
 }

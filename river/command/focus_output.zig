@@ -17,10 +17,8 @@
 
 const std = @import("std");
 
-const c = @import("../c.zig");
-
-const Error = @import("../command.zig").Error;
 const Direction = @import("../command.zig").Direction;
+const Error = @import("../command.zig").Error;
 const Output = @import("../Output.zig");
 const Seat = @import("../Seat.zig");
 
@@ -30,13 +28,14 @@ pub fn focusOutput(
     allocator: *std.mem.Allocator,
     seat: *Seat,
     args: []const []const u8,
-    failure_message: *[]const u8,
+    out: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
 
     const direction = try Direction.parse(args[1]);
     const root = &seat.input_manager.server.root;
+
     // If the noop output is focused, there are no other outputs to switch to
     if (seat.focused_output == &root.noop_output) {
         std.debug.assert(root.outputs.len == 0);

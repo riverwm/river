@@ -17,8 +17,6 @@
 
 const std = @import("std");
 
-const c = @import("../c.zig");
-
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
@@ -27,11 +25,9 @@ pub fn close(
     allocator: *std.mem.Allocator,
     seat: *Seat,
     args: []const []const u8,
-    failure_message: *[]const u8,
+    out: *?[]const u8,
 ) Error!void {
-    if (seat.focused_view) |view| {
-        // Note: we don't call arrange() here as it will be called
-        // automatically when the view is unmapped.
-        view.close();
-    }
+    // Note: we don't call arrange() here as it will be called
+    // automatically when the view is unmapped.
+    if (seat.focused_view) |view| view.close();
 }

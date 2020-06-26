@@ -17,8 +17,6 @@
 
 const std = @import("std");
 
-const c = @import("../c.zig");
-
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 const View = @import("../View.zig");
@@ -30,7 +28,7 @@ pub fn zoom(
     allocator: *std.mem.Allocator,
     seat: *Seat,
     args: []const []const u8,
-    failure_message: *[]const u8,
+    out: *?[]const u8,
 ) Error!void {
     if (args.len > 1) return Error.TooManyArguments;
 

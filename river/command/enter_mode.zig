@@ -25,7 +25,7 @@ pub fn enterMode(
     allocator: *std.mem.Allocator,
     seat: *Seat,
     args: []const []const u8,
-    failure_message: *[]const u8,
+    out: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
@@ -33,11 +33,11 @@ pub fn enterMode(
     const config = seat.input_manager.server.config;
     const target_mode = args[1];
     seat.mode_id = config.mode_to_id.getValue(target_mode) orelse {
-        failure_message.* = try std.fmt.allocPrint(
+        out.* = try std.fmt.allocPrint(
             allocator,
             "cannot enter non-existant mode '{}'",
             .{target_mode},
         );
-        return Error.CommandFailed;
+        return Error.Other;
     };
 }

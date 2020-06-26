@@ -17,7 +17,7 @@
 
 const std = @import("std");
 
-const c = @import("../c.zig");
+const util = @import("../util.zig");
 
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
@@ -26,12 +26,12 @@ pub fn layout(
     allocator: *std.mem.Allocator,
     seat: *Seat,
     args: []const []const u8,
-    failure_message: *[]const u8,
+    out: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
 
-    allocator.free(seat.focused_output.layout);
-    seat.focused_output.layout = try std.mem.join(allocator, " ", args[1..]);
+    util.gpa.free(seat.focused_output.layout);
+    seat.focused_output.layout = try std.mem.join(util.gpa, " ", args[1..]);
 
     seat.focused_output.arrangeViews();
     seat.input_manager.server.root.startTransaction();

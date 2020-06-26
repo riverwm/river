@@ -17,10 +17,8 @@
 
 const std = @import("std");
 
-const c = @import("../c.zig");
-
-const Error = @import("../command.zig").Error;
 const Direction = @import("../command.zig").Direction;
+const Error = @import("../command.zig").Error;
 const Output = @import("../Output.zig");
 const Seat = @import("../Seat.zig");
 
@@ -30,7 +28,7 @@ pub fn sendToOutput(
     allocator: *std.mem.Allocator,
     seat: *Seat,
     args: []const []const u8,
-    failure_message: *[]const u8,
+    out: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
@@ -45,7 +43,7 @@ pub fn sendToOutput(
             return;
         }
 
-        // Send to the next/preg output in the list if there is one, else wrap
+        // Send to the next/prev output in the list if there is one, else wrap
         const current_node = @fieldParentPtr(std.TailQueue(Output).Node, "data", view.output);
         const destination_output = switch (direction) {
             .Next => if (current_node.next) |node| &node.data else &root.outputs.first.?.data,

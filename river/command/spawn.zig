@@ -25,7 +25,7 @@ pub fn spawn(
     allocator: *std.mem.Allocator,
     seat: *Seat,
     args: []const []const u8,
-    failure_message: *[]const u8,
+    out: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
 
@@ -37,11 +37,11 @@ pub fn spawn(
     defer child.deinit();
 
     std.ChildProcess.spawn(child) catch |err| {
-        failure_message.* = try std.fmt.allocPrint(
+        out.* = try std.fmt.allocPrint(
             allocator,
             "failed to spawn {}: {}.",
             .{ cmd, err },
         );
-        return Error.CommandFailed;
+        return Error.Other;
     };
 }

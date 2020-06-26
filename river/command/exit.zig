@@ -27,7 +27,7 @@ pub fn exit(
     allocator: *std.mem.Allocator,
     seat: *Seat,
     args: []const []const u8,
-    failure_message: *[]const u8,
+    out: *?[]const u8,
 ) Error!void {
     if (args.len > 1) return Error.TooManyArguments;
     c.wl_display_terminate(seat.input_manager.server.wl_display);

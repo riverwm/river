@@ -17,8 +17,6 @@
 
 const std = @import("std");
 
-const c = @import("../c.zig");
-
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
@@ -27,16 +25,13 @@ pub fn modMasterCount(
     allocator: *std.mem.Allocator,
     seat: *Seat,
     args: []const []const u8,
-    failure_message: *[]const u8,
+    out: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
 
     const delta = try std.fmt.parseInt(i32, args[1], 10);
     const output = seat.focused_output;
-    output.master_count = @intCast(
-        u32,
-        std.math.max(0, @intCast(i32, output.master_count) + delta),
-    );
+    output.master_count = @intCast(u32, std.math.max(0, @intCast(i32, output.master_count) + delta));
     seat.input_manager.server.root.arrange();
 }

@@ -18,6 +18,7 @@
 const std = @import("std");
 
 const c = @import("../c.zig");
+const util = @import("../util.zig");
 
 const Error = @import("../command.zig").Error;
 const Mapping = @import("../Mapping.zig");
@@ -46,7 +47,7 @@ pub fn map(
     allocator: *std.mem.Allocator,
     seat: *Seat,
     args: []const []const u8,
-    failure_message: *[]const u8,
+    out: *?[]const u8,
 ) Error!void {
     if (args.len < 4) return Error.NotEnoughArguments;
 
@@ -54,12 +55,12 @@ pub fn map(
     const config = seat.input_manager.server.config;
     const target_mode = args[1];
     const mode_id = config.mode_to_id.getValue(target_mode) orelse {
-        failure_message.* = try std.fmt.allocPrint(
+        out.* = try std.fmt.allocPrint(
             allocator,
             "cannot add mapping to non-existant mode '{}p'",
             .{target_mode},
         );
-        return Error.CommandFailed;
+        return Error.Other;
     };
 
     // Parse the modifiers
@@ -72,12 +73,12 @@ pub fn map(
                 break;
             }
         } else {
-            failure_message.* = try std.fmt.allocPrint(
+            out.* = try std.fmt.allocPrint(
                 allocator,
                 "invalid modifier '{}'",
                 .{mod_name},
             );
-            return Error.CommandFailed;
+            return Error.Other;
         }
     }
 
@@ -86,26 +87,26 @@ pub fn map(
     defer allocator.free(keysym_name);
     const keysym = c.xkb_keysym_from_name(keysym_name, .XKB_KEYSYM_CASE_INSENSITIVE);
     if (keysym == c.XKB_KEY_NoSymbol) {
-        failure_message.* = try std.fmt.allocPrint(
+        out.* = try std.fmt.allocPrint(
             allocator,
             "invalid keysym '{}'",
             .{args[3]},
         );
-        return Error.CommandFailed;
+        return Error.Other;
     }
 
     // Check if the mapping already exists
     const mode_mappings = &config.modes.items[mode_id];
     for (mode_mappings.items) |existant_mapping| {
         if (existant_mapping.modifiers == modifiers and existant_mapping.keysym == keysym) {
-            failure_message.* = try std.fmt.allocPrint(
+            out.* = try std.fmt.allocPrint(
                 allocator,
                 "a mapping for modifiers '{}' and keysym '{}' already exists",
                 .{ args[2], args[3] },
             );
-            return Error.CommandFailed;
+            return Error.Other;
         }
     }
 
-    try mode_mappings.append(try Mapping.init(allocator, keysym, modifiers, args[4..]));
+    try mode_mappings.append(try Mapping.init(util.gpa, keysym, modifiers, args[4..]));
 }
