@@ -69,8 +69,8 @@ pub fn sendViewTags(self: Self) void {
     };
 
     var wl_array = c.wl_array{
-        .size = view_tags.items.len,
-        .alloc = view_tags.capacity,
+        .size = view_tags.items.len * @sizeOf(u32),
+        .alloc = view_tags.capacity * @sizeOf(u32),
         .data = view_tags.items.ptr,
     };
     c.zriver_output_status_v1_send_view_tags(self.wl_resource, &wl_array);
