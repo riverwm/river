@@ -175,7 +175,7 @@ fn startTransaction(self: *Self) void {
 fn handleTimeout(data: ?*c_void) callconv(.C) c_int {
     const self = util.voidCast(Self, data.?);
 
-    log.err(.transaction, "time out occurred, some imperfect frames may be shown", .{});
+    log.err(.transaction, "timeout occurred, some imperfect frames may be shown", .{});
 
     self.commitTransaction();
 
@@ -225,19 +225,10 @@ fn commitTransaction(self: *Self) void {
         var view_it = ViewStack(View).iterator(output.views.first, std.math.maxInt(u32));
         while (view_it.next()) |view_node| {
             const view = &view_node.view;
-            // Ensure that all pending state is cleared
+            // Apply pending state
             view.pending_serial = null;
-            if (view.pending_box) |state| {
-                view.current_box = state;
-                view.pending_box = null;
-            }
-
-            // Apply possible pending tags
-            if (view.pending_tags) |tags| {
-                view.current_tags = tags;
-                view.pending_tags = null;
-                view_tags_changed = true;
-            }
+            if (view.pending.tags != view.current.tags) view_tags_changed = true;
+            view.current = view.pending;
 
             view.dropSavedBuffers();
         }
@@ -247,7 +238,5 @@ fn commitTransaction(self: *Self) void {
 
     // Iterate over all seats and update focus
     var it = self.server.input_manager.seats.first;
-    while (it) |seat_node| : (it = seat_node.next) {
-        seat_node.data.focus(null);
-    }
+    while (it) |seat_node| : (it = seat_node.next) seat_node.data.focus(null);
 }

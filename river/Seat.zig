@@ -125,7 +125,7 @@ pub fn focus(self: *Self, _view: ?*View) void {
     // If view is null or not currently visible
     if (if (view) |v|
         v.output != self.focused_output or
-            v.current_tags & self.focused_output.current_focused_tags == 0
+            v.current.tags & self.focused_output.current_focused_tags == 0
     else
         true) {
         // Set view to the first currently visible view on in the focus stack if any

@@ -93,12 +93,9 @@ pub fn ViewStack(comptime T: type) type {
             pub fn next(self: *Iterator) ?*Node {
                 while (self.it) |node| : (self.it = if (self.reverse) node.prev else node.next) {
                     if (if (self.pending)
-                        if (node.view.pending_tags) |pending_tags|
-                            self.tags & pending_tags != 0
-                        else
-                            self.tags & node.view.current_tags != 0
+                        self.tags & node.view.pending.tags != 0
                     else
-                        self.tags & node.view.current_tags != 0) {
+                        self.tags & node.view.current.tags != 0) {
                         self.it = if (self.reverse) node.prev else node.next;
                         return node;
                     }

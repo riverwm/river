@@ -41,6 +41,18 @@ const Mode = enum {
     float,
 };
 
+const State = struct {
+    /// The output-relative coordinates and dimensions of the view. The
+    /// surface itself may have other dimensions which are stored in the
+    /// surface_box member.
+    box: Box,
+
+    /// The tags of the view, as a bitmask
+    tags: u32,
+
+    mode: Mode,
+};
+
 const SavedBuffer = struct {
     wlr_buffer: *c.wlr_buffer,
     box: Box,
@@ -56,19 +68,15 @@ output: *Output,
 /// This is non-null exactly when the view is mapped
 wlr_surface: ?*c.wlr_surface,
 
-/// The current mode of the view
-mode: Mode,
-
 /// True if the view is currently focused by at least one seat
 focused: bool,
 
-/// The current output-relative coordinates and dimensions of the view. The
-/// surface itself may have other dimensions which are stored in the
-/// surface_box member.
-current_box: Box,
+/// The double-buffered state of the view
+current: State,
+pending: State,
 
-/// Pending dimensions of the view during a transaction
-pending_box: ?Box,
+/// The serial sent with the currently pending configure event
+pending_serial: ?u32,
 
 /// The currently commited geometry of the surface. The x/y may be negative if
 /// for example the client has decided to draw CSD shadows a la GTK.
@@ -85,29 +93,24 @@ saved_buffers: std.ArrayList(SavedBuffer),
 natural_width: u32,
 natural_height: u32,
 
-current_tags: u32,
-pending_tags: ?u32,
-
-pending_serial: ?u32,
-
 pub fn init(self: *Self, output: *Output, tags: u32, surface: var) void {
     self.output = output;
 
     self.wlr_surface = null;
-    self.mode = .layout;
 
     self.focused = false;
 
-    self.current_box = Box{
-        .x = 0,
-        .y = 0,
-        .height = 0,
-        .width = 0,
+    self.current = .{
+        .box = .{
+            .x = 0,
+            .y = 0,
+            .height = 0,
+            .width = 0,
+        },
+        .tags = tags,
+        .mode = .layout,
     };
-    self.pending_box = null;
-
-    self.current_tags = tags;
-    self.pending_tags = null;
+    self.pending = self.current;
 
     self.pending_serial = null;
 
@@ -135,13 +138,9 @@ pub fn needsConfigure(self: Self) bool {
 }
 
 pub fn configure(self: Self) void {
-    if (self.pending_box) |pending_box| {
-        switch (self.impl) {
-            .xdg_toplevel => |xdg_toplevel| xdg_toplevel.configure(pending_box),
-            .xwayland_view => |xwayland_view| xwayland_view.configure(pending_box),
-        }
-    } else {
-        log.err(.transaction, "configure called on a View with no pending box", .{});
+    switch (self.impl) {
+        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.configure(self.pending.box),
+        .xwayland_view => |xwayland_view| xwayland_view.configure(self.pending.box),
     }
 }
 
@@ -190,36 +189,13 @@ fn saveBuffersIterator(
     }
 }
 
-/// Set the focued bool and the active state of the view if it is a toplevel
+/// Set the focused bool and the active state of the view if it is a toplevel
+/// TODO: This is insufficient for multi-seat, probably need a focus counter.
 pub fn setFocused(self: *Self, focused: bool) void {
     self.focused = focused;
     switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.setActivated(focused),
         .xwayland_view => |xwayland_view| xwayland_view.setActivated(focused),
-    }
-}
-
-/// Set the mode of the view to the given mode
-pub fn setMode(self: *Self, mode: Mode) void {
-    switch (self.mode) {
-        .layout => switch (mode) {
-            .layout => {},
-            .float => {
-                self.mode = .float;
-                self.pending_box = Box{
-                    .x = std.math.max(0, @divTrunc(@intCast(i32, self.output.usable_box.width) -
-                        @intCast(i32, self.natural_width), 2)),
-                    .y = std.math.max(0, @divTrunc(@intCast(i32, self.output.usable_box.height) -
-                        @intCast(i32, self.natural_height), 2)),
-                    .width = self.natural_width,
-                    .height = self.natural_height,
-                };
-            },
-        },
-        .float => switch (mode) {
-            .float => {},
-            .layout => self.mode = .layout,
-        },
     }
 }
 

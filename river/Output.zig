@@ -181,7 +181,7 @@ fn layoutFull(self: *Self, visible_count: u32, output_tags: u32) void {
     var it = ViewStack(View).pendingIterator(self.views.first, output_tags);
     while (it.next()) |node| {
         const view = &node.view;
-        if (view.mode == .layout) view.pending_box = full_box;
+        if (view.pending.mode == .layout) view.pending.box = full_box;
     }
 }
 
@@ -286,8 +286,8 @@ fn layoutExternal(self: *Self, visible_count: u32, output_tags: u32) !void {
     var view_it = ViewStack(View).pendingIterator(self.views.first, output_tags);
     while (view_it.next()) |node| {
         const view = &node.view;
-        if (view.mode == .layout) {
-            view.pending_box = view_boxen.items[i];
+        if (view.pending.mode == .layout) {
+            view.pending.box = view_boxen.items[i];
             i += 1;
         }
     }
@@ -310,7 +310,7 @@ pub fn arrangeViews(self: *Self) void {
         var count: u32 = 0;
         var it = ViewStack(View).pendingIterator(self.views.first, output_tags);
         while (it.next()) |node| {
-            if (node.view.mode == .layout) count += 1;
+            if (node.view.pending.mode == .layout) count += 1;
         }
         break :blk count;
     };

@@ -68,7 +68,7 @@ pub fn renderOutput(output: *Output) void {
 
         // This check prevents a race condition when a frame is requested
         // between mapping of a view and the first configure being handled.
-        if (view.current_box.width == 0 or view.current_box.height == 0) continue;
+        if (view.current.box.width == 0 or view.current.box.height == 0) continue;
 
         // Focused views are rendered on top of normal views, skip them for now
         if (view.focused) continue;
@@ -84,7 +84,7 @@ pub fn renderOutput(output: *Output) void {
 
         // This check prevents a race condition when a frame is requested
         // between mapping of a view and the first configure being handled.
-        if (view.current_box.width == 0 or view.current_box.height == 0) continue;
+        if (view.current.box.width == 0 or view.current.box.height == 0) continue;
 
         // Skip unfocused views since we already rendered them
         if (!view.focused) continue;
@@ -144,8 +144,8 @@ fn renderView(output: Output, view: *View, now: *c.timespec) void {
                 output,
                 saved_buffer.wlr_buffer.texture,
                 .{
-                    .x = saved_buffer.box.x + view.current_box.x - view.saved_surface_box.x,
-                    .y = saved_buffer.box.y + view.current_box.y - view.saved_surface_box.y,
+                    .x = saved_buffer.box.x + view.current.box.x - view.saved_surface_box.x,
+                    .y = saved_buffer.box.y + view.current.box.y - view.saved_surface_box.y,
                     .width = @intCast(c_int, saved_buffer.box.width),
                     .height = @intCast(c_int, saved_buffer.box.height),
                 },
@@ -156,8 +156,8 @@ fn renderView(output: Output, view: *View, now: *c.timespec) void {
         // a transaction and may simply render each toplevel surface.
         var rdata = SurfaceRenderData{
             .output = &output,
-            .output_x = view.current_box.x - view.surface_box.x,
-            .output_y = view.current_box.y - view.surface_box.y,
+            .output_x = view.current.box.x - view.surface_box.x,
+            .output_y = view.current.box.y - view.surface_box.y,
             .when = now,
         };
 
@@ -248,29 +248,29 @@ fn renderBorders(output: Output, view: *View, now: *c.timespec) void {
     const border_width = output.root.server.config.border_width;
 
     // left and right, covering the corners as well
-    border.y = view.current_box.y - @intCast(i32, border_width);
+    border.y = view.current.box.y - @intCast(i32, border_width);
     border.width = border_width;
-    border.height = view.current_box.height + border_width * 2;
+    border.height = view.current.box.height + border_width * 2;
 
     // left
-    border.x = view.current_box.x - @intCast(i32, border_width);
+    border.x = view.current.box.x - @intCast(i32, border_width);
     renderRect(output, border, color);
 
     // right
-    border.x = view.current_box.x + @intCast(i32, view.current_box.width);
+    border.x = view.current.box.x + @intCast(i32, view.current.box.width);
     renderRect(output, border, color);
 
     // top and bottom
-    border.x = view.current_box.x;
-    border.width = view.current_box.width;
+    border.x = view.current.box.x;
+    border.width = view.current.box.width;
     border.height = border_width;
 
     // top
-    border.y = view.current_box.y - @intCast(i32, border_width);
+    border.y = view.current.box.y - @intCast(i32, border_width);
     renderRect(output, border, color);
 
     // bottom border
-    border.y = view.current_box.y + @intCast(i32, view.current_box.height);
+    border.y = view.current.box.y + @intCast(i32, view.current.box.height);
     renderRect(output, border, color);
 }
 

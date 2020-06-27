@@ -62,7 +62,7 @@ pub fn sendViewTags(self: Self) void {
 
     var it = ViewStack(View).iterator(self.output.views.first, std.math.maxInt(u32));
     while (it.next()) |node|
-        view_tags.append(node.view.current_tags) catch {
+        view_tags.append(node.view.current.tags) catch {
         c.wl_resource_post_no_memory(self.wl_resource);
         log.crit(.river_status, "out of memory", .{});
         return;

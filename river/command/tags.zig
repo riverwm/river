@@ -43,10 +43,8 @@ pub fn setViewTags(
 ) Error!void {
     const tags = try parseTags(allocator, args, out);
     if (seat.focused_view) |view| {
-        if (view.current_tags != tags) {
-            view.pending_tags = tags;
-            seat.input_manager.server.root.arrange();
-        }
+        view.pending.tags = tags;
+        view.output.root.arrange();
     }
 }
 
@@ -75,10 +73,10 @@ pub fn toggleViewTags(
 ) Error!void {
     const tags = try parseTags(allocator, args, out);
     if (seat.focused_view) |view| {
-        const new_tags = view.current_tags ^ tags;
+        const new_tags = view.current.tags ^ tags;
         if (new_tags != 0) {
-            view.pending_tags = new_tags;
-            seat.input_manager.server.root.arrange();
+            view.pending.tags = new_tags;
+            view.output.root.arrange();
         }
     }
 }

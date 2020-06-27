@@ -57,11 +57,8 @@ pub fn init(self: *Self, view: *View, wlr_xwayland_surface: *c.wlr_xwayland_surf
 }
 
 pub fn needsConfigure(self: Self) bool {
-    const view = self.view;
-    if (view.pending_box) |pending_box|
-        return view.current_box.width != pending_box.width or
-            view.current_box.height != pending_box.height;
-    return false;
+    return self.view.current.box.width != self.view.pending.box.width or
+        self.view.current.box.height != self.view.pending.box.height;
 }
 
 /// Tell the client to take a new size
@@ -105,8 +102,8 @@ pub fn forEachSurface(
 pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*c.wlr_surface {
     return c.wlr_surface_surface_at(
         self.wlr_xwayland_surface.surface,
-        ox - @intToFloat(f64, self.view.current_box.x),
-        oy - @intToFloat(f64, self.view.current_box.y),
+        ox - @intToFloat(f64, self.view.current.box.x),
+        oy - @intToFloat(f64, self.view.current.box.y),
         sx,
         sy,
     );

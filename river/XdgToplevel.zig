@@ -62,8 +62,6 @@ pub fn init(self: *Self, view: *View, wlr_xdg_surface: *c.wlr_xdg_surface) void 
 /// Returns true if a configure must be sent to ensure the dimensions of the
 /// pending_box are applied.
 pub fn needsConfigure(self: Self) bool {
-    const pending_box = self.view.pending_box orelse return false;
-
     const wlr_xdg_toplevel: *c.wlr_xdg_toplevel = @field(
         self.wlr_xdg_surface,
         c.wlr_xdg_surface_union,
@@ -73,8 +71,8 @@ pub fn needsConfigure(self: Self) bool {
     // sync with the current dimensions or be the dimensions sent with the
     // most recent configure. In both cases server_pending has the values we
     // want to check against.
-    return pending_box.width != wlr_xdg_toplevel.server_pending.width or
-        pending_box.height != wlr_xdg_toplevel.server_pending.height;
+    return self.view.pending.box.width != wlr_xdg_toplevel.server_pending.width or
+        self.view.pending.box.height != wlr_xdg_toplevel.server_pending.height;
 }
 
 /// Send a configure event, applying the width/height of the pending box.
@@ -109,8 +107,8 @@ pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*c.wlr_surfa
     const view = self.view;
     return c.wlr_xdg_surface_surface_at(
         self.wlr_xdg_surface,
-        ox - @intToFloat(f64, view.current_box.x - view.surface_box.x),
-        oy - @intToFloat(f64, view.current_box.y - view.surface_box.y),
+        ox - @intToFloat(f64, view.current.box.x - view.surface_box.x),
+        oy - @intToFloat(f64, view.current.box.y - view.surface_box.y),
         sx,
         sy,
     );
@@ -171,7 +169,15 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     for (root.server.config.float_filter.items) |filter_app_id| {
         // Make views with app_ids listed in the float filter float
         if (std.mem.eql(u8, std.mem.span(app_id), std.mem.span(filter_app_id))) {
-            view.setMode(.float);
+            view.pending.mode = .float;
+            view.pending.box = .{
+                .x = std.math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.width) -
+                    @intCast(i32, view.natural_width), 2)),
+                .y = std.math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.height) -
+                    @intCast(i32, view.natural_height), 2)),
+                .width = view.natural_width,
+                .height = view.natural_height,
+            };
             break;
         }
     } else if ((wlr_xdg_toplevel.parent != null) or
@@ -179,7 +185,15 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         (state.min_width == state.max_width or state.min_height == state.max_height)))
     {
         // If the toplevel has a parent or is of fixed size make it float
-        view.setMode(.float);
+        view.pending.mode = .float;
+        view.pending.box = .{
+            .x = std.math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.width) -
+                @intCast(i32, view.natural_width), 2)),
+            .y = std.math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.height) -
+                @intCast(i32, view.natural_height), 2)),
+            .width = view.natural_width,
+            .height = view.natural_height,
+        };
     }
 
     // If the toplevel has no parent, inform it that it is tiled. This
@@ -246,5 +260,5 @@ fn handleNewPopup(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 
     // This will free itself on destroy
     var xdg_popup = util.gpa.create(XdgPopup) catch unreachable;
-    xdg_popup.init(self.view.output, &self.view.current_box, wlr_xdg_popup);
+    xdg_popup.init(self.view.output, &self.view.current.box, wlr_xdg_popup);
 }
