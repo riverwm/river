@@ -264,6 +264,16 @@ pub fn getDefaultFloatBox(self: Self) Box {
     };
 }
 
+/// Return the dimensions of the actual "visible bounds" that the client has
+/// committed. This excludes any "invisible" areas of the surface that show
+/// useless stuff like CSD shadows.
+pub fn getActualBox(self: Self) Box {
+    return switch (self.impl) {
+        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.getActualBox(),
+        .xwayland_view => |xwayland_view| xwayland_view.getActualBox(),
+    };
+}
+
 /// Called by the impl when the surface is ready to be displayed
 pub fn map(self: *Self) void {
     const root = self.output.root;

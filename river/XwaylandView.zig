@@ -114,6 +114,15 @@ pub fn getTitle(self: Self) [*:0]const u8 {
     return self.wlr_xwayland_surface.title;
 }
 
+pub fn getActualBox(self: Self) Box {
+    return .{
+        .x = self.wlr_xwayland_surface.x,
+        .y = self.wlr_xwayland_surface.y,
+        .width = self.wlr_xwayland_surface.width,
+        .height = self.wlr_xwayland_surface.height,
+    };
+}
+
 /// Called when the xwayland surface is destroyed
 fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_destroy", listener.?);

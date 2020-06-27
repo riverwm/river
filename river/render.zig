@@ -241,28 +241,26 @@ fn renderTexture(
 fn renderBorders(output: Output, view: *View, now: *c.timespec) void {
     const config = &output.root.server.config;
     var border: Box = undefined;
-    const color = if (view.focused)
-        &output.root.server.config.border_color_focused
-    else
-        &output.root.server.config.border_color_unfocused;
-    const border_width = output.root.server.config.border_width;
+    const color = if (view.focused) &config.border_color_focused else &config.border_color_unfocused;
+    const border_width = config.border_width;
+    const actual_box = view.getActualBox();
 
     // left and right, covering the corners as well
     border.y = view.current.box.y - @intCast(i32, border_width);
     border.width = border_width;
-    border.height = view.current.box.height + border_width * 2;
+    border.height = actual_box.height + border_width * 2;
 
     // left
     border.x = view.current.box.x - @intCast(i32, border_width);
     renderRect(output, border, color);
 
     // right
-    border.x = view.current.box.x + @intCast(i32, view.current.box.width);
+    border.x = view.current.box.x + @intCast(i32, actual_box.width);
     renderRect(output, border, color);
 
     // top and bottom
     border.x = view.current.box.x;
-    border.width = view.current.box.width;
+    border.width = actual_box.width;
     border.height = border_width;
 
     // top
@@ -270,7 +268,7 @@ fn renderBorders(output: Output, view: *View, now: *c.timespec) void {
     renderRect(output, border, color);
 
     // bottom border
-    border.y = view.current.box.y + @intCast(i32, view.current.box.height);
+    border.y = view.current.box.y + @intCast(i32, actual_box.height);
     renderRect(output, border, color);
 }
 
