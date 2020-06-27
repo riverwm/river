@@ -33,14 +33,7 @@ pub fn toggleFloat(
         switch (view.current.mode) {
             .layout => {
                 view.pending.mode = .float;
-                view.pending.box = .{
-                    .x = std.math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.width) -
-                        @intCast(i32, view.natural_width), 2)),
-                    .y = std.math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.height) -
-                        @intCast(i32, view.natural_height), 2)),
-                    .width = view.natural_width,
-                    .height = view.natural_height,
-                };
+                view.pending.box = view.getDefaultFloatBox();
             },
             .float => view.pending.mode = .layout,
         }

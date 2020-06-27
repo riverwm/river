@@ -154,46 +154,28 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     view.natural_width = @intCast(u32, self.wlr_xdg_surface.geometry.width);
     view.natural_height = @intCast(u32, self.wlr_xdg_surface.geometry.height);
 
-    if (view.natural_width == 0 and view.natural_height == 0) {
-        view.natural_width = @intCast(u32, self.wlr_xdg_surface.surface.*.current.width);
-        view.natural_height = @intCast(u32, self.wlr_xdg_surface.surface.*.current.height);
-    }
-
     const wlr_xdg_toplevel: *c.wlr_xdg_toplevel = @field(
         self.wlr_xdg_surface,
         c.wlr_xdg_surface_union,
     ).toplevel;
     const state = &wlr_xdg_toplevel.current;
+    const has_fixed_size = state.min_width != 0 and state.min_height != 0 and
+        (state.min_width == state.max_width or state.min_height == state.max_height);
     const app_id: [*:0]const u8 = if (wlr_xdg_toplevel.app_id) |id| id else "NULL";
 
-    for (root.server.config.float_filter.items) |filter_app_id| {
-        // Make views with app_ids listed in the float filter float
-        if (std.mem.eql(u8, std.mem.span(app_id), std.mem.span(filter_app_id))) {
-            view.pending.mode = .float;
-            view.pending.box = .{
-                .x = std.math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.width) -
-                    @intCast(i32, view.natural_width), 2)),
-                .y = std.math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.height) -
-                    @intCast(i32, view.natural_height), 2)),
-                .width = view.natural_width,
-                .height = view.natural_height,
-            };
-            break;
-        }
-    } else if ((wlr_xdg_toplevel.parent != null) or
-        (state.min_width != 0 and state.min_height != 0 and
-        (state.min_width == state.max_width or state.min_height == state.max_height)))
-    {
-        // If the toplevel has a parent or is of fixed size make it float
+    if (wlr_xdg_toplevel.parent != null or has_fixed_size) {
+        // If the toplevel has a parent or has a fixed size make it float
         view.pending.mode = .float;
-        view.pending.box = .{
-            .x = std.math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.width) -
-                @intCast(i32, view.natural_width), 2)),
-            .y = std.math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.height) -
-                @intCast(i32, view.natural_height), 2)),
-            .width = view.natural_width,
-            .height = view.natural_height,
-        };
+        view.pending.box = view.getDefaultFloatBox();
+    } else {
+        // Make views with app_ids listed in the float filter float
+        for (root.server.config.float_filter.items) |filter_app_id| {
+            if (std.mem.eql(u8, std.mem.span(app_id), std.mem.span(filter_app_id))) {
+                view.pending.mode = .float;
+                view.pending.box = view.getDefaultFloatBox();
+                break;
+            }
+        }
     }
 
     // If the toplevel has no parent, inform it that it is tiled. This

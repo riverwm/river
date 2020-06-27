@@ -251,6 +251,19 @@ pub fn getTitle(self: Self) [*:0]const u8 {
     };
 }
 
+/// Return a box centered on the usable area of the current output and with
+/// the natural width/height of the view.
+pub fn getDefaultFloatBox(self: Self) Box {
+    return .{
+        .x = std.math.max(0, @divTrunc(@intCast(i32, self.output.usable_box.width) -
+            @intCast(i32, self.natural_width), 2)),
+        .y = std.math.max(0, @divTrunc(@intCast(i32, self.output.usable_box.height) -
+            @intCast(i32, self.natural_height), 2)),
+        .width = self.natural_width,
+        .height = self.natural_height,
+    };
+}
+
 /// Called by the impl when the surface is ready to be displayed
 pub fn map(self: *Self) void {
     const root = self.output.root;
