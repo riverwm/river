@@ -282,28 +282,28 @@ test "iteration (View)" {
 
     const one_a_pb = try allocator.create(ViewStack(View).Node);
     defer allocator.destroy(one_a_pb);
-    one_a_pb.view.current_tags = 1 << 0;
-    one_a_pb.view.pending_tags = 1 << 1;
+    one_a_pb.view.current.tags = 1 << 0;
+    one_a_pb.view.pending.tags = 1 << 1;
 
     const two_a = try allocator.create(ViewStack(View).Node);
     defer allocator.destroy(two_a);
-    two_a.view.current_tags = 1 << 0;
-    two_a.view.pending_tags = null;
+    two_a.view.current.tags = 1 << 0;
+    two_a.view.pending.tags = 1 << 0;
 
     const three_b_pa = try allocator.create(ViewStack(View).Node);
     defer allocator.destroy(three_b_pa);
-    three_b_pa.view.current_tags = 1 << 1;
-    three_b_pa.view.pending_tags = 1 << 0;
+    three_b_pa.view.current.tags = 1 << 1;
+    three_b_pa.view.pending.tags = 1 << 0;
 
     const four_b = try allocator.create(ViewStack(View).Node);
     defer allocator.destroy(four_b);
-    four_b.view.current_tags = 1 << 1;
-    four_b.view.pending_tags = null;
+    four_b.view.current.tags = 1 << 1;
+    four_b.view.pending.tags = 1 << 1;
 
     const five_b = try allocator.create(ViewStack(View).Node);
     defer allocator.destroy(five_b);
-    five_b.view.current_tags = 1 << 1;
-    five_b.view.pending_tags = null;
+    five_b.view.current.tags = 1 << 1;
+    five_b.view.pending.tags = 1 << 1;
 
     views.push(three_b_pa); // {3}
     views.push(one_a_pb); // {1, 3}
