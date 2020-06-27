@@ -30,7 +30,10 @@ pub fn toggleFloat(
 ) Error!void {
     if (args.len > 1) return Error.TooManyArguments;
     if (seat.focused_view) |view| {
-        view.setFloating(!view.floating);
+        switch (view.mode) {
+            .layout => view.setMode(.float),
+            .float => view.setMode(.layout),
+        }
         view.output.root.arrange();
     }
 }

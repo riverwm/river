@@ -286,8 +286,7 @@ fn processMotion(self: Self, time: u32) void {
 fn surfaceAt(self: Self, lx: f64, ly: f64, sx: *f64, sy: *f64) ?*c.wlr_surface {
     // Find the output to check
     const root = self.seat.input_manager.server.root;
-    const wlr_output = c.wlr_output_layout_output_at(root.wlr_output_layout, lx, ly) orelse
-        return null;
+    const wlr_output = c.wlr_output_layout_output_at(root.wlr_output_layout, lx, ly) orelse return null;
     const output = util.voidCast(Output, wlr_output.*.data orelse return null);
 
     // Get output-local coords from the layout coords
@@ -304,36 +303,21 @@ fn surfaceAt(self: Self, lx: f64, ly: f64, sx: *f64, sy: *f64) ?*c.wlr_surface {
     };
 
     // Check overlay layer incl. popups
-    if (layerSurfaceAt(output.*, output.layers[layer_idxs[0]], ox, oy, sx, sy, false)) |surface| {
-        return surface;
-    }
+    if (layerSurfaceAt(output.*, output.layers[layer_idxs[0]], ox, oy, sx, sy, false)) |s| return s;
 
     // Check top-background popups only
-    for (layer_idxs[1..4]) |layer_idx| {
-        if (layerSurfaceAt(output.*, output.layers[layer_idx], ox, oy, sx, sy, true)) |surface| {
-            return surface;
-        }
-    }
+    for (layer_idxs[1..4]) |idx|
+        if (layerSurfaceAt(output.*, output.layers[idx], ox, oy, sx, sy, true)) |s| return s;
 
     // Check top layer
-    if (layerSurfaceAt(output.*, output.layers[layer_idxs[1]], ox, oy, sx, sy, false)) |surface| {
-        return surface;
-    }
+    if (layerSurfaceAt(output.*, output.layers[layer_idxs[1]], ox, oy, sx, sy, false)) |s| return s;
 
-    // Check floating views then normal views
-    if (viewSurfaceAt(output.*, ox, oy, sx, sy, true)) |surface| {
-        return surface;
-    }
-    if (viewSurfaceAt(output.*, ox, oy, sx, sy, false)) |surface| {
-        return surface;
-    }
+    // Check views
+    if (viewSurfaceAt(output.*, ox, oy, sx, sy)) |s| return s;
 
     // Check the bottom-background layers
-    for (layer_idxs[2..4]) |layer_idx| {
-        if (layerSurfaceAt(output.*, output.layers[layer_idx], ox, oy, sx, sy, false)) |surface| {
-            return surface;
-        }
-    }
+    for (layer_idxs[2..4]) |idx|
+        if (layerSurfaceAt(output.*, output.layers[idx], ox, oy, sx, sy, false)) |s| return s;
 
     return null;
 }
@@ -373,18 +357,10 @@ fn layerSurfaceAt(
     return null;
 }
 
-/// Find the topmost visible view surface (incl. popups) at ox,oy. Will
-/// check only floating views if floating is true.
-fn viewSurfaceAt(output: Output, ox: f64, oy: f64, sx: *f64, sy: *f64, floating: bool) ?*c.wlr_surface {
+/// Find the topmost visible view surface (incl. popups) at ox,oy.
+fn viewSurfaceAt(output: Output, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*c.wlr_surface {
     var it = ViewStack(View).iterator(output.views.first, output.current_focused_tags);
-    while (it.next()) |node| {
-        const view = &node.view;
-        if (view.floating != floating) {
-            continue;
-        }
-        if (view.surfaceAt(ox, oy, sx, sy)) |found| {
-            return found;
-        }
-    }
-    return null;
+    return while (it.next()) |node| {
+        if (node.view.surfaceAt(ox, oy, sx, sy)) |found| break found;
+    } else null;
 }

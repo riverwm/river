@@ -140,7 +140,6 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     c.wl_signal_add(&self.wlr_xwayland_surface.surface.*.events.commit, &self.listen_commit);
 
     view.wlr_surface = self.wlr_xwayland_surface.surface;
-    view.floating = false;
 
     view.natural_width = self.wlr_xwayland_surface.width;
     view.natural_height = self.wlr_xwayland_surface.height;

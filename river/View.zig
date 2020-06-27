@@ -29,14 +29,16 @@ const Output = @import("Output.zig");
 const Root = @import("Root.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const XdgToplevel = @import("XdgToplevel.zig");
-const XwaylandView = if (build_options.xwayland)
-    @import("XwaylandView.zig")
-else
-    @import("VoidView.zig");
+const XwaylandView = if (build_options.xwayland) @import("XwaylandView.zig") else @import("VoidView.zig");
 
 const Impl = union(enum) {
     xdg_toplevel: XdgToplevel,
     xwayland_view: XwaylandView,
+};
+
+const Mode = enum {
+    layout,
+    float,
 };
 
 const SavedBuffer = struct {
@@ -54,8 +56,8 @@ output: *Output,
 /// This is non-null exactly when the view is mapped
 wlr_surface: ?*c.wlr_surface,
 
-/// If the view is floating or not
-floating: bool,
+/// The current mode of the view
+mode: Mode,
 
 /// True if the view is currently focused by at least one seat
 focused: bool,
@@ -92,6 +94,7 @@ pub fn init(self: *Self, output: *Output, tags: u32, surface: var) void {
     self.output = output;
 
     self.wlr_surface = null;
+    self.mode = .layout;
 
     self.focused = false;
 
@@ -196,21 +199,27 @@ pub fn setFocused(self: *Self, focused: bool) void {
     }
 }
 
-/// If true is passsed, make the view float. If false, return it to the tiled
-/// layout.
-pub fn setFloating(self: *Self, float: bool) void {
-    if (float and !self.floating) {
-        self.floating = true;
-        self.pending_box = Box{
-            .x = std.math.max(0, @divTrunc(@intCast(i32, self.output.usable_box.width) -
-                @intCast(i32, self.natural_width), 2)),
-            .y = std.math.max(0, @divTrunc(@intCast(i32, self.output.usable_box.height) -
-                @intCast(i32, self.natural_height), 2)),
-            .width = self.natural_width,
-            .height = self.natural_height,
-        };
-    } else if (!float and self.floating) {
-        self.floating = false;
+/// Set the mode of the view to the given mode
+pub fn setMode(self: *Self, mode: Mode) void {
+    switch (self.mode) {
+        .layout => switch (mode) {
+            .layout => {},
+            .float => {
+                self.mode = .float;
+                self.pending_box = Box{
+                    .x = std.math.max(0, @divTrunc(@intCast(i32, self.output.usable_box.width) -
+                        @intCast(i32, self.natural_width), 2)),
+                    .y = std.math.max(0, @divTrunc(@intCast(i32, self.output.usable_box.height) -
+                        @intCast(i32, self.natural_height), 2)),
+                    .width = self.natural_width,
+                    .height = self.natural_height,
+                };
+            },
+        },
+        .float => switch (mode) {
+            .float => {},
+            .layout => self.mode = .layout,
+        },
     }
 }
 

@@ -152,7 +152,6 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     c.wl_signal_add(&self.wlr_xdg_surface.events.new_popup, &self.listen_new_popup);
 
     view.wlr_surface = self.wlr_xdg_surface.surface;
-    view.floating = false;
 
     view.natural_width = @intCast(u32, self.wlr_xdg_surface.geometry.width);
     view.natural_height = @intCast(u32, self.wlr_xdg_surface.geometry.height);
@@ -172,7 +171,7 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     for (root.server.config.float_filter.items) |filter_app_id| {
         // Make views with app_ids listed in the float filter float
         if (std.mem.eql(u8, std.mem.span(app_id), std.mem.span(filter_app_id))) {
-            view.setFloating(true);
+            view.setMode(.float);
             break;
         }
     } else if ((wlr_xdg_toplevel.parent != null) or
@@ -180,7 +179,7 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         (state.min_width == state.max_width or state.min_height == state.max_height)))
     {
         // If the toplevel has a parent or is of fixed size make it float
-        view.setFloating(true);
+        view.setMode(.float);
     }
 
     // If the toplevel has no parent, inform it that it is tiled. This
