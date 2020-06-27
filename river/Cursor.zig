@@ -359,8 +359,17 @@ fn layerSurfaceAt(
 
 /// Find the topmost visible view surface (incl. popups) at ox,oy.
 fn viewSurfaceAt(output: Output, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*c.wlr_surface {
+    // Focused views are rendered on top, so look for them first.
     var it = ViewStack(View).iterator(output.views.first, output.current_focused_tags);
-    return while (it.next()) |node| {
-        if (node.view.surfaceAt(ox, oy, sx, sy)) |found| break found;
-    } else null;
+    while (it.next()) |node| {
+        if (!node.view.focused) continue;
+        if (node.view.surfaceAt(ox, oy, sx, sy)) |found| return found;
+    }
+
+    it = ViewStack(View).iterator(output.views.first, output.current_focused_tags);
+    while (it.next()) |node| {
+        if (node.view.surfaceAt(ox, oy, sx, sy)) |found| return found;
+    }
+
+    return null;
 }
