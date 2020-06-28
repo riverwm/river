@@ -197,6 +197,16 @@ pub fn setFocused(self: *Self, focused: bool) void {
     }
 }
 
+/// Set the pending state to fullscren and inform the client. Should be
+/// followed by starting a transaction to apply the pending state.
+pub fn setFullscreen(self: *Self, fullscreen: bool) void {
+    self.pending.fullscreen = fullscreen;
+    switch (self.impl) {
+        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.setFullscreen(fullscreen),
+        .xwayland_view => |xwayland_view| xwayland_view.setFullscreen(fullscreen),
+    }
+}
+
 /// Move a view from one output to another, sending the required enter/leave
 /// events.
 pub fn sendToOutput(self: *Self, destination_output: *Output) void {

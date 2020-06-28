@@ -15,46 +15,22 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const Self = @This();
-
 const std = @import("std");
 
-const c = @import("c.zig");
+const Error = @import("../command.zig").Error;
+const Seat = @import("../Seat.zig");
 
-const Box = @import("Box.zig");
+/// Toggle fullscreen state of the currently focused view
+pub fn toggleFullscreen(
+    allocator: *std.mem.Allocator,
+    seat: *Seat,
+    args: []const []const u8,
+    out: *?[]const u8,
+) Error!void {
+    if (args.len > 1) return Error.TooManyArguments;
 
-pub fn needsConfigure(self: Self) bool {
-    unreachable;
-}
-
-pub fn configure(self: Self, pending_box: Box) void {
-    unreachable;
-}
-
-pub fn setActivated(self: Self, activated: bool) void {
-    unreachable;
-}
-
-pub fn setFullscreen(self: Self, fullscreen: bool) void {
-    unreachable;
-}
-
-pub fn close(self: Self) void {
-    unreachable;
-}
-
-pub fn forEachSurface(
-    self: Self,
-    iterator: c.wlr_surface_iterator_func_t,
-    user_data: ?*c_void,
-) void {
-    unreachable;
-}
-
-pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*c.wlr_surface {
-    unreachable;
-}
-
-pub fn getTitle(self: Self) [*:0]const u8 {
-    unreachable;
+    if (seat.focused_view) |view| {
+        view.setFullscreen(!view.pending.fullscreen);
+        view.output.root.arrange();
+    }
 }

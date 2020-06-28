@@ -297,29 +297,33 @@ fn layoutExternal(self: *Self, visible_count: u32, output_tags: u32) !void {
 /// pending state, the changes are not appplied until a transaction is started
 /// and completed.
 pub fn arrangeViews(self: *Self) void {
-    // If the output has a zero dimension, trying to arrange would cause
-    // an underflow and is pointless anyway.
-    if (self.usable_box.width == 0 or self.usable_box.height == 0) return;
-
     const output_tags = if (self.pending_focused_tags) |tags|
         tags
     else
         self.current_focused_tags;
 
-    const visible_count = blk: {
-        var count: u32 = 0;
-        var it = ViewStack(View).pendingIterator(self.views.first, output_tags);
-        while (it.next()) |node| {
-            if (!node.view.pending.float and !node.view.pending.fullscreen) count += 1;
+    const full_area = Box.fromWlrBox(c.wlr_output_layout_get_box(self.root.wlr_output_layout, self.wlr_output).*);
+
+    // Make fullscreen views take the full area, count up views that will be
+    // arranged by the layout.
+    var layout_count: u32 = 0;
+    var it = ViewStack(View).pendingIterator(self.views.first, output_tags);
+    while (it.next()) |node| {
+        const view = &node.view;
+        if (view.pending.fullscreen) {
+            view.pending.box = full_area;
+        } else if (!view.pending.float) {
+            layout_count += 1;
         }
-        break :blk count;
-    };
+    }
 
-    if (visible_count == 0) return;
+    // If the usable area has a zero dimension, trying to arrange the layout
+    // would cause an underflow and is pointless anyway.
+    if (layout_count == 0 or self.usable_box.width == 0 or self.usable_box.height == 0) return;
 
-    if (std.mem.eql(u8, self.layout, "full")) return layoutFull(self, visible_count, output_tags);
+    if (std.mem.eql(u8, self.layout, "full")) return layoutFull(self, layout_count, output_tags);
 
-    layoutExternal(self, visible_count, output_tags) catch |err| {
+    layoutExternal(self, layout_count, output_tags) catch |err| {
         switch (err) {
             LayoutError.BadExitCode => log.err(.layout, "layout command exited with non-zero return code", .{}),
             LayoutError.BadWindowConfiguration => log.err(.layout, "invalid window configuration", .{}),
@@ -327,11 +331,11 @@ pub fn arrangeViews(self: *Self) void {
             else => log.err(.layout, "'{}' error while trying to use external layout", .{err}),
         }
         log.err(.layout, "falling back to internal layout", .{});
-        layoutFull(self, visible_count, output_tags);
+        layoutFull(self, layout_count, output_tags);
     };
 }
 
-/// Arrange all layer surfaces of this output and addjust the usable aread
+/// Arrange all layer surfaces of this output and adjust the usable area
 pub fn arrangeLayers(self: *Self) void {
     const full_box = blk: {
         var width: c_int = undefined;

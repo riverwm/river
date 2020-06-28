@@ -88,6 +88,10 @@ pub fn setActivated(self: Self, activated: bool) void {
     _ = c.wlr_xdg_toplevel_set_activated(self.wlr_xdg_surface, activated);
 }
 
+pub fn setFullscreen(self: Self, fullscreen: bool) void {
+    _ = c.wlr_xdg_toplevel_set_fullscreen(self.wlr_xdg_surface, fullscreen);
+}
+
 /// Close the view. This will lead to the unmap and destroy events being sent
 pub fn close(self: Self) void {
     c.wlr_xdg_toplevel_send_close(self.wlr_xdg_surface);

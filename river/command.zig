@@ -81,6 +81,7 @@ const str_to_impl_fn = [_]struct {
     .{ .name = "toggle-focused-tags", .impl = impl.toggleFocusedTags },
     .{ .name = "toggle-view-tags",    .impl = impl.toggleViewTags },
     .{ .name = "zoom",                .impl = impl.zoom },
+    .{ .name = "toggle-fullscreen",   .impl = impl.toggleFullscreen },
 };
 // zig fmt: on
 

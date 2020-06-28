@@ -83,6 +83,10 @@ pub fn setActivated(self: Self, activated: bool) void {
     c.wlr_xwayland_surface_activate(self.wlr_xwayland_surface, activated);
 }
 
+pub fn setFullscreen(self: Self, fullscreen: bool) void {
+    c.wlr_xwayland_surface_set_fullscreen(self.wlr_xwayland_surface, fullscreen);
+}
+
 /// Close the view. This will lead to the unmap and destroy events being sent
 pub fn close(self: Self) void {
     c.wlr_xwayland_surface_close(self.wlr_xwayland_surface);
