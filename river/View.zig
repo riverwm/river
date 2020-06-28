@@ -282,12 +282,10 @@ pub fn map(self: *Self) void {
     const node = @fieldParentPtr(ViewStack(Self).Node, "view", self);
     self.output.views.push(node);
 
-    // Focus the newly mapped view. Note: if a seat is focusing a different output
-    // it will continue to do so.
+    // Focus the new view, assuming the seat is focusing the proper output
+    // and there isn't something else like a fullscreen view grabbing focus.
     var it = root.server.input_manager.seats.first;
-    while (it) |seat_node| : (it = seat_node.next) {
-        seat_node.data.focus(self);
-    }
+    while (it) |seat_node| : (it = seat_node.next) seat_node.data.focus(self);
 
     c.wlr_surface_send_enter(self.wlr_surface.?, self.output.wlr_output);
 
