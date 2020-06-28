@@ -174,13 +174,13 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 
     if (wlr_xdg_toplevel.parent != null or has_fixed_size) {
         // If the toplevel has a parent or has a fixed size make it float
-        view.pending.mode = .float;
+        view.pending.float = true;
         view.pending.box = view.getDefaultFloatBox();
     } else {
         // Make views with app_ids listed in the float filter float
         for (root.server.config.float_filter.items) |filter_app_id| {
             if (std.mem.eql(u8, std.mem.span(app_id), std.mem.span(filter_app_id))) {
-                view.pending.mode = .float;
+                view.pending.float = true;
                 view.pending.box = view.getDefaultFloatBox();
                 break;
             }

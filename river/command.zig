@@ -37,6 +37,7 @@ const impl = struct {
     const spawn = @import("command/spawn.zig").spawn;
     const toggleFloat = @import("command/toggle_float.zig").toggleFloat;
     const toggleFocusedTags = @import("command/tags.zig").toggleFocusedTags;
+    const toggleFullscreen = @import("command/toggle_fullscreen.zig").toggleFullscreen;
     const toggleViewTags = @import("command/tags.zig").toggleViewTags;
     const zoom = @import("command/zoom.zig").zoom;
 };

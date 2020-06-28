@@ -29,14 +29,13 @@ pub fn toggleFloat(
     out: *?[]const u8,
 ) Error!void {
     if (args.len > 1) return Error.TooManyArguments;
+
     if (seat.focused_view) |view| {
-        switch (view.current.mode) {
-            .layout => {
-                view.pending.mode = .float;
-                view.pending.box = view.getDefaultFloatBox();
-            },
-            .float => view.pending.mode = .layout,
-        }
+        // Don't float fullscreen views
+        if (view.pending.fullscreen) return;
+
+        if (!view.pending.float) view.pending.box = view.getDefaultFloatBox();
+        view.pending.float = !view.pending.float;
         view.output.root.arrange();
     }
 }

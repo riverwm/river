@@ -36,11 +36,6 @@ const Impl = union(enum) {
     xwayland_view: XwaylandView,
 };
 
-const Mode = enum {
-    layout,
-    float,
-};
-
 const State = struct {
     /// The output-relative coordinates and dimensions of the view. The
     /// surface itself may have other dimensions which are stored in the
@@ -50,7 +45,8 @@ const State = struct {
     /// The tags of the view, as a bitmask
     tags: u32,
 
-    mode: Mode,
+    float: bool,
+    fullscreen: bool,
 };
 
 const SavedBuffer = struct {
@@ -108,8 +104,10 @@ pub fn init(self: *Self, output: *Output, tags: u32, surface: var) void {
             .width = 0,
         },
         .tags = tags,
-        .mode = .layout,
+        .float = false,
+        .fullscreen = false,
     };
+
     self.pending = self.current;
 
     self.pending_serial = null;

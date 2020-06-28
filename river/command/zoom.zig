@@ -37,13 +37,21 @@ pub fn zoom(
         const focused_node = @fieldParentPtr(ViewStack(View).Node, "view", current_focus);
 
         // Only zoom views that are part of the layout
-        if (current_focus.current.mode != .layout) return;
+        if (current_focus.pending.float or current_focus.pending.fullscreen) return;
 
+        // If the the first view that is part of the layout is focused, zoom
+        // the next view in the layout. Otherwise zoom the focused view.
         var it = ViewStack(View).iterator(output.views.first, output.current_focused_tags);
-        const zoom_node = if (focused_node == it.next())
-            if (it.next()) |second| second else null
-        else
-            focused_node;
+        const layout_first = while (it.next()) |node| {
+            if (!node.view.pending.float and !node.view.pending.fullscreen) break node;
+        } else unreachable;
+        const zoom_node = if (focused_node == layout_first) blk: {
+            while (it.next()) |node| {
+                if (!node.view.pending.float and !node.view.pending.fullscreen) break :blk node;
+            } else {
+                break :blk null;
+            }
+        } else focused_node;
 
         if (zoom_node) |to_bump| {
             output.views.remove(to_bump);
