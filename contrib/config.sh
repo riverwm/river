@@ -62,14 +62,17 @@ riverctl map normal $mod+Shift 0 set-view-tags $all_tags_mask
 # Mod+Space to toggle float
 riverctl map normal $mod Space toggle-float
 
+# Mod+F to toggle fullscreen
+riverctl map normal $mod Space toggle-fullscreen
+
 # Mod+{Up,Right,Down,Left} to change master orientation
 riverctl map normal $mod Up layout rivertile top
 riverctl map normal $mod Right layout rivertile right
 riverctl map normal $mod Down layout rivertile down
 riverctl map normal $mod Left layout rivertile left
 
-# Mod+f to change to Full layout
-riverctl map normal $mod F layout full
+# Mod+S to change to Full layout
+riverctl map normal $mod S layout full
 
 # Declare a passthrough mode. This mode has only a single mapping to return to
 # normal mode. This makes it useful for testing a nested wayland compositor

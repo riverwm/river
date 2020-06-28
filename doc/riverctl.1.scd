@@ -58,6 +58,9 @@ used to control and configure river.
 	If the focused view is floating, make it tiled. If it is tiled, make
 	it floating.
 
+*toggle-fullscreen*
+	Toggle the fullscreen state of the focused view.
+
 *zoom*
 	Bump the focused view to the top of the layout stack to make it the
 	new master.
