@@ -46,59 +46,73 @@ pub fn renderOutput(output: *Output) void {
     _ = c.clock_gettime(c.CLOCK_MONOTONIC, &now);
 
     // wlr_output_attach_render makes the OpenGL context current.
-    if (!c.wlr_output_attach_render(output.wlr_output, null)) {
-        return;
-    }
+    if (!c.wlr_output_attach_render(output.wlr_output, null)) return;
+
     // The "effective" resolution can change if you rotate your outputs.
     var width: c_int = undefined;
     var height: c_int = undefined;
     c.wlr_output_effective_resolution(output.wlr_output, &width, &height);
+
     // Begin the renderer (calls glViewport and some other GL sanity checks)
     c.wlr_renderer_begin(wlr_renderer, width, height);
 
-    c.wlr_renderer_clear(wlr_renderer, &config.background_color);
+    // Find the first visible fullscreen view in the stack if there is one
+    var it = ViewStack(View).iterator(output.views.first, output.current_focused_tags);
+    const fullscreen_view = while (it.next()) |node| {
+        if (node.view.current.fullscreen) break &node.view;
+    } else null;
 
-    renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND], &now);
-    renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM], &now);
-
-    // The first view in the list is "on top" so iterate in reverse.
-    var it = ViewStack(View).reverseIterator(output.views.last, output.current_focused_tags);
-    while (it.next()) |node| {
-        const view = &node.view;
-
-        // This check prevents a race condition when a frame is requested
-        // between mapping of a view and the first configure being handled.
-        if (view.current.box.width == 0 or view.current.box.height == 0) continue;
-
-        // Focused views are rendered on top of normal views, skip them for now
-        if (view.focused) continue;
-
+    // If we have a fullscreen view to render, render it.
+    if (fullscreen_view) |view| {
+        // Always clear with solid black for fullscreen
+        c.wlr_renderer_clear(wlr_renderer, &[_]f32{ 0, 0, 0, 1 });
         renderView(output.*, view, &now);
-        renderBorders(output.*, view, &now);
+        if (build_options.xwayland) renderXwaylandUnmanaged(output.*, &now);
+    } else {
+        // No fullscreen view, so render normal layers/views
+        c.wlr_renderer_clear(wlr_renderer, &config.background_color);
+
+        renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND], &now);
+        renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM], &now);
+
+        // The first view in the list is "on top" so iterate in reverse.
+        it = ViewStack(View).reverseIterator(output.views.last, output.current_focused_tags);
+        while (it.next()) |node| {
+            const view = &node.view;
+
+            // This check prevents a race condition when a frame is requested
+            // between mapping of a view and the first configure being handled.
+            if (view.current.box.width == 0 or view.current.box.height == 0) continue;
+
+            // Focused views are rendered on top of normal views, skip them for now
+            if (view.focused) continue;
+
+            renderView(output.*, view, &now);
+            renderBorders(output.*, view, &now);
+        }
+
+        // Render focused views
+        it = ViewStack(View).reverseIterator(output.views.last, output.current_focused_tags);
+        while (it.next()) |node| {
+            const view = &node.view;
+
+            // This check prevents a race condition when a frame is requested
+            // between mapping of a view and the first configure being handled.
+            if (view.current.box.width == 0 or view.current.box.height == 0) continue;
+
+            // Skip unfocused views since we already rendered them
+            if (!view.focused) continue;
+
+            renderView(output.*, view, &now);
+            renderBorders(output.*, view, &now);
+        }
+
+        if (build_options.xwayland) renderXwaylandUnmanaged(output.*, &now);
+
+        renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_TOP], &now);
     }
 
-    // Render focused views
-    it = ViewStack(View).reverseIterator(output.views.last, output.current_focused_tags);
-    while (it.next()) |node| {
-        const view = &node.view;
-
-        // This check prevents a race condition when a frame is requested
-        // between mapping of a view and the first configure being handled.
-        if (view.current.box.width == 0 or view.current.box.height == 0) continue;
-
-        // Skip unfocused views since we already rendered them
-        if (!view.focused) continue;
-
-        renderView(output.*, view, &now);
-        renderBorders(output.*, view, &now);
-    }
-
-    // Render xwayland unmanged views
-    if (build_options.xwayland) {
-        renderXwaylandUnmanaged(output.*, &now);
-    }
-
-    renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_TOP], &now);
+    // The overlay layer is rendered in both fullscreen and normal cases
     renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY], &now);
 
     // Hardware cursors are rendered by the GPU on a separate plane, and can be
