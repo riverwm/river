@@ -240,10 +240,11 @@ fn renderTexture(
 
 fn renderBorders(output: Output, view: *View, now: *c.timespec) void {
     const config = &output.root.server.config;
-    var border: Box = undefined;
     const color = if (view.focused) &config.border_color_focused else &config.border_color_unfocused;
     const border_width = config.border_width;
-    const actual_box = view.getActualBox();
+    const actual_box = if (view.saved_buffers.items.len != 0) view.saved_surface_box else view.surface_box;
+
+    var border: Box = undefined;
 
     // left and right, covering the corners as well
     border.y = view.current.box.y - @intCast(i32, border_width);
