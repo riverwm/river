@@ -38,6 +38,9 @@ pub fn focusView(
     const output = seat.focused_output;
 
     if (seat.focused_view) |current_focus| {
+        // If the focused view is fullscreen, do nothing
+        if (current_focus.current.fullscreen) return;
+
         // If there is a currently focused view, focus the next visible view in the stack.
         const focused_node = @fieldParentPtr(ViewStack(View).Node, "view", current_focus);
         var it = switch (direction) {
