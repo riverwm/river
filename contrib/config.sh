@@ -63,7 +63,7 @@ riverctl map normal $mod+Shift 0 set-view-tags $all_tags_mask
 riverctl map normal $mod Space toggle-float
 
 # Mod+F to toggle fullscreen
-riverctl map normal $mod Space toggle-fullscreen
+riverctl map normal $mod F toggle-fullscreen
 
 # Mod+{Up,Right,Down,Left} to change master orientation
 riverctl map normal $mod Up layout rivertile top
