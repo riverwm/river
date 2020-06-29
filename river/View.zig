@@ -85,9 +85,9 @@ saved_surface_box: Box,
 /// These are what we render while a transaction is in progress
 saved_buffers: std.ArrayList(SavedBuffer),
 
-/// The dimensions the view would have taken if we didn't force it to tile
-natural_width: u32,
-natural_height: u32,
+/// The floating dimensions the view, saved so that they can be restored if the
+/// view returns to floating mode.
+float_box: Box,
 
 pub fn init(self: *Self, output: *Output, tags: u32, surface: var) void {
     self.output = output;
@@ -256,19 +256,6 @@ pub fn getTitle(self: Self) [*:0]const u8 {
     return switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.getTitle(),
         .xwayland_view => |xwayland_view| xwayland_view.getTitle(),
-    };
-}
-
-/// Return a box centered on the usable area of the current output and with
-/// the natural width/height of the view.
-pub fn getDefaultFloatBox(self: Self) Box {
-    return .{
-        .x = std.math.max(0, @divTrunc(@intCast(i32, self.output.usable_box.width) -
-            @intCast(i32, self.natural_width), 2)),
-        .y = std.math.max(0, @divTrunc(@intCast(i32, self.output.usable_box.height) -
-            @intCast(i32, self.natural_height), 2)),
-        .width = self.natural_width,
-        .height = self.natural_height,
     };
 }
 

@@ -34,7 +34,7 @@ pub fn toggleFloat(
         // Don't float fullscreen views
         if (view.pending.fullscreen) return;
 
-        if (!view.pending.float) view.pending.box = view.getDefaultFloatBox();
+        if (!view.pending.float) view.pending.box = view.float_box;
         view.pending.float = !view.pending.float;
         view.output.root.arrange();
     }

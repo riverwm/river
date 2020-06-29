@@ -142,8 +142,14 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 
     view.wlr_surface = self.wlr_xwayland_surface.surface;
 
-    view.natural_width = self.wlr_xwayland_surface.width;
-    view.natural_height = self.wlr_xwayland_surface.height;
+    // Use the view's "natural" size centered on the output as the default
+    // floating dimensions
+    view.float_box.width = self.wlr_xwayland_surface.width;
+    view.float_box.height = self.wlr_xwayland_surface.height;
+    view.float_box.x = std.math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.width) -
+        @intCast(i32, view.float_box.width), 2));
+    view.float_box.y = std.math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.height) -
+        @intCast(i32, view.float_box.height), 2));
 
     view.map();
 }

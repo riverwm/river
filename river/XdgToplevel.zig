@@ -155,8 +155,14 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 
     view.wlr_surface = self.wlr_xdg_surface.surface;
 
-    view.natural_width = @intCast(u32, self.wlr_xdg_surface.geometry.width);
-    view.natural_height = @intCast(u32, self.wlr_xdg_surface.geometry.height);
+    // Use the view's "natural" size centered on the output as the default
+    // floating dimensions
+    view.float_box.width = @intCast(u32, self.wlr_xdg_surface.geometry.width);
+    view.float_box.height = @intCast(u32, self.wlr_xdg_surface.geometry.height);
+    view.float_box.x = std.math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.width) -
+        @intCast(i32, view.float_box.width), 2));
+    view.float_box.y = std.math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.height) -
+        @intCast(i32, view.float_box.height), 2));
 
     const wlr_xdg_toplevel: *c.wlr_xdg_toplevel = @field(
         self.wlr_xdg_surface,
@@ -170,13 +176,13 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     if (wlr_xdg_toplevel.parent != null or has_fixed_size) {
         // If the toplevel has a parent or has a fixed size make it float
         view.pending.float = true;
-        view.pending.box = view.getDefaultFloatBox();
+        view.pending.box = view.float_box;
     } else {
         // Make views with app_ids listed in the float filter float
         for (root.server.config.float_filter.items) |filter_app_id| {
             if (std.mem.eql(u8, std.mem.span(app_id), std.mem.span(filter_app_id))) {
                 view.pending.float = true;
-                view.pending.box = view.getDefaultFloatBox();
+                view.pending.box = view.float_box;
                 break;
             }
         }

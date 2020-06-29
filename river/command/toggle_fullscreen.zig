@@ -30,6 +30,9 @@ pub fn toggleFullscreen(
     if (args.len > 1) return Error.TooManyArguments;
 
     if (seat.focused_view) |view| {
+        // If transitionng from fullscreen -> float, return to the saved
+        // floating dimensions.
+        if (view.pending.fullscreen and view.pending.float) view.pending.box = view.float_box;
         view.setFullscreen(!view.pending.fullscreen);
         view.output.root.arrange();
     }
