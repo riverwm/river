@@ -200,6 +200,9 @@ pub fn setFocused(self: *Self, focused: bool) void {
 /// Set the pending state to fullscren and inform the client. Should be
 /// followed by starting a transaction to apply the pending state.
 pub fn setFullscreen(self: *Self, fullscreen: bool) void {
+    // If transitionng from fullscreen -> float, return to the saved
+    // floating dimensions.
+    if (self.pending.fullscreen and self.pending.float) self.pending.box = self.float_box;
     self.pending.fullscreen = fullscreen;
     switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.setFullscreen(fullscreen),

@@ -42,6 +42,7 @@ listen_unmap: c.wl_listener,
 // Listeners that are only active while the view is mapped
 listen_commit: c.wl_listener,
 listen_new_popup: c.wl_listener,
+listen_request_fullscreen: c.wl_listener,
 
 pub fn init(self: *Self, view: *View, wlr_xdg_surface: *c.wlr_xdg_surface) void {
     self.view = view;
@@ -145,6 +146,7 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_map", listener.?);
     const view = self.view;
     const root = view.output.root;
+    const wlr_xdg_toplevel: *c.wlr_xdg_toplevel = @field(self.wlr_xdg_surface, c.wlr_xdg_surface_union).toplevel;
 
     // Add listeners that are only active while mapped
     self.listen_commit.notify = handleCommit;
@@ -152,6 +154,9 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 
     self.listen_new_popup.notify = handleNewPopup;
     c.wl_signal_add(&self.wlr_xdg_surface.events.new_popup, &self.listen_new_popup);
+
+    self.listen_request_fullscreen.notify = handleRequestFullscreen;
+    c.wl_signal_add(&wlr_xdg_toplevel.events.request_fullscreen, &self.listen_request_fullscreen);
 
     view.wlr_surface = self.wlr_xdg_surface.surface;
 
@@ -164,10 +169,6 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     view.float_box.y = std.math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.height) -
         @intCast(i32, view.float_box.height), 2));
 
-    const wlr_xdg_toplevel: *c.wlr_xdg_toplevel = @field(
-        self.wlr_xdg_surface,
-        c.wlr_xdg_surface_union,
-    ).toplevel;
     const state = &wlr_xdg_toplevel.current;
     const has_fixed_size = state.min_width != 0 and state.min_height != 0 and
         (state.min_width == state.max_width or state.min_height == state.max_height);
@@ -209,6 +210,7 @@ fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     // Remove listeners that are only active while mapped
     c.wl_list_remove(&self.listen_commit.link);
     c.wl_list_remove(&self.listen_new_popup.link);
+    c.wl_list_remove(&self.listen_request_fullscreen.link);
 }
 
 /// Called when the surface is comitted
@@ -253,4 +255,13 @@ fn handleNewPopup(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     // This will free itself on destroy
     var xdg_popup = util.gpa.create(XdgPopup) catch unreachable;
     xdg_popup.init(self.view.output, &self.view.current.box, wlr_xdg_popup);
+}
+
+/// Called when the client asks to be fullscreened. We always honor the request
+/// for now, perhaps it should be denied in some cases in the future.
+fn handleRequestFullscreen(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    const self = @fieldParentPtr(Self, "listen_request_fullscreen", listener.?);
+    const event = util.voidCast(c.wlr_xdg_toplevel_set_fullscreen_event, data.?);
+    self.view.setFullscreen(event.fullscreen);
+    self.view.output.root.arrange();
 }
