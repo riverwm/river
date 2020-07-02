@@ -107,7 +107,6 @@ pub fn init(self: *Self, output: *Output, tags: u32, surface: var) void {
         .float = false,
         .fullscreen = false,
     };
-
     self.pending = self.current;
 
     self.pending_serial = null;

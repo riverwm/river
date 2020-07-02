@@ -28,8 +28,8 @@ pub fn setFocusedTags(
     out: *?[]const u8,
 ) Error!void {
     const tags = try parseTags(allocator, args, out);
-    if (seat.focused_output.current_focused_tags != tags) {
-        seat.focused_output.pending_focused_tags = tags;
+    if (seat.focused_output.pending.tags != tags) {
+        seat.focused_output.pending.tags = tags;
         seat.input_manager.server.root.arrange();
     }
 }
@@ -57,9 +57,9 @@ pub fn toggleFocusedTags(
 ) Error!void {
     const tags = try parseTags(allocator, args, out);
     const output = seat.focused_output;
-    const new_focused_tags = output.current_focused_tags ^ tags;
+    const new_focused_tags = output.pending.tags ^ tags;
     if (new_focused_tags != 0) {
-        output.pending_focused_tags = new_focused_tags;
+        output.pending.tags = new_focused_tags;
         seat.input_manager.server.root.arrange();
     }
 }

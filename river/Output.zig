@@ -40,6 +40,11 @@ const OutputStatus = @import("OutputStatus.zig");
 // that it should never be encountered during normal usage.
 const minimum_size = 50;
 
+const State = struct {
+    /// A bit field of focused tags
+    tags: u32,
+};
+
 root: *Root,
 wlr_output: *c.wlr_output,
 
@@ -48,14 +53,15 @@ layers: [4]std.TailQueue(LayerSurface),
 
 /// The area left for views and other layer surfaces after applying the
 /// exclusive zones of exclusive layer surfaces.
+/// TODO: this should be part of the output's State
 usable_box: Box,
 
 /// The top of the stack is the "most important" view.
 views: ViewStack(View),
 
-/// A bit field of focused tags
-current_focused_tags: u32,
-pending_focused_tags: ?u32,
+/// The double-buffered state of the output.
+current: State,
+pending: State,
 
 /// Number of views in "master" section of the screen.
 master_count: u32,
@@ -98,8 +104,10 @@ pub fn init(self: *Self, root: *Root, wlr_output: *c.wlr_output) !void {
 
     self.views.init();
 
-    self.current_focused_tags = 1 << 0;
-    self.pending_focused_tags = null;
+    self.current = .{
+        .tags = 1 << 0,
+    };
+    self.pending = self.current;
 
     self.master_count = 1;
 
@@ -297,17 +305,12 @@ fn layoutExternal(self: *Self, visible_count: u32, output_tags: u32) !void {
 /// pending state, the changes are not appplied until a transaction is started
 /// and completed.
 pub fn arrangeViews(self: *Self) void {
-    const output_tags = if (self.pending_focused_tags) |tags|
-        tags
-    else
-        self.current_focused_tags;
-
     const full_area = Box.fromWlrBox(c.wlr_output_layout_get_box(self.root.wlr_output_layout, self.wlr_output).*);
 
     // Make fullscreen views take the full area, count up views that will be
     // arranged by the layout.
     var layout_count: u32 = 0;
-    var it = ViewStack(View).pendingIterator(self.views.first, output_tags);
+    var it = ViewStack(View).pendingIterator(self.views.first, self.pending.tags);
     while (it.next()) |node| {
         const view = &node.view;
         if (view.pending.fullscreen) {
@@ -321,9 +324,9 @@ pub fn arrangeViews(self: *Self) void {
     // would cause an underflow and is pointless anyway.
     if (layout_count == 0 or self.usable_box.width == 0 or self.usable_box.height == 0) return;
 
-    if (std.mem.eql(u8, self.layout, "full")) return layoutFull(self, layout_count, output_tags);
+    if (std.mem.eql(u8, self.layout, "full")) return layoutFull(self, layout_count, self.pending.tags);
 
-    layoutExternal(self, layout_count, output_tags) catch |err| {
+    layoutExternal(self, layout_count, self.pending.tags) catch |err| {
         switch (err) {
             LayoutError.BadExitCode => log.err(.layout, "layout command exited with non-zero return code", .{}),
             LayoutError.BadWindowConfiguration => log.err(.layout, "invalid window configuration", .{}),
@@ -331,7 +334,7 @@ pub fn arrangeViews(self: *Self) void {
             else => log.err(.layout, "'{}' error while trying to use external layout", .{err}),
         }
         log.err(.layout, "falling back to internal layout", .{});
-        layoutFull(self, layout_count, output_tags);
+        layoutFull(self, layout_count, self.pending.tags);
     };
 }
 

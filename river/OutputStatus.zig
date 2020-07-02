@@ -78,5 +78,5 @@ pub fn sendViewTags(self: Self) void {
 
 /// Send the currently focused tags of the output to the client.
 pub fn sendFocusedTags(self: Self) void {
-    c.zriver_output_status_v1_send_focused_tags(self.wl_resource, self.output.current_focused_tags);
+    c.zriver_output_status_v1_send_focused_tags(self.wl_resource, self.output.current.tags);
 }

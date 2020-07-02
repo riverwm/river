@@ -41,7 +41,7 @@ pub fn zoom(
 
         // If the the first view that is part of the layout is focused, zoom
         // the next view in the layout. Otherwise zoom the focused view.
-        var it = ViewStack(View).iterator(output.views.first, output.current_focused_tags);
+        var it = ViewStack(View).iterator(output.views.first, output.current.tags);
         const layout_first = while (it.next()) |node| {
             if (!node.view.pending.float and !node.view.pending.fullscreen) break node;
         } else unreachable;

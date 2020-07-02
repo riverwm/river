@@ -57,7 +57,7 @@ pub fn renderOutput(output: *Output) void {
     c.wlr_renderer_begin(wlr_renderer, width, height);
 
     // Find the first visible fullscreen view in the stack if there is one
-    var it = ViewStack(View).iterator(output.views.first, output.current_focused_tags);
+    var it = ViewStack(View).iterator(output.views.first, output.current.tags);
     const fullscreen_view = while (it.next()) |node| {
         if (node.view.current.fullscreen) break &node.view;
     } else null;
@@ -76,7 +76,7 @@ pub fn renderOutput(output: *Output) void {
         renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM], &now);
 
         // The first view in the list is "on top" so iterate in reverse.
-        it = ViewStack(View).reverseIterator(output.views.last, output.current_focused_tags);
+        it = ViewStack(View).reverseIterator(output.views.last, output.current.tags);
         while (it.next()) |node| {
             const view = &node.view;
 
@@ -92,7 +92,7 @@ pub fn renderOutput(output: *Output) void {
         }
 
         // Render focused views
-        it = ViewStack(View).reverseIterator(output.views.last, output.current_focused_tags);
+        it = ViewStack(View).reverseIterator(output.views.last, output.current.tags);
         while (it.next()) |node| {
             const view = &node.view;
 

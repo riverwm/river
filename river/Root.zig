@@ -207,25 +207,24 @@ fn commitTransaction(self: *Self) void {
     while (output_it) |output_node| : (output_it = output_node.next) {
         const output = &output_node.data;
 
-        // If there were pending focused tags, make them the current focus
-        if (output.pending_focused_tags) |tags| {
+        // Apply pending state of the output
+        if (output.pending.tags != output.current.tags) {
             log.debug(
                 .output,
                 "changing current focus: {b:0>10} to {b:0>10}",
-                .{ output.current_focused_tags, tags },
+                .{ output.current.tags, output.pending.tags },
             );
-            output.current_focused_tags = tags;
-            output.pending_focused_tags = null;
             var it = output.status_trackers.first;
             while (it) |node| : (it = node.next) node.data.sendFocusedTags();
         }
+        output.current = output.pending;
 
         var view_tags_changed = false;
 
         var view_it = ViewStack(View).iterator(output.views.first, std.math.maxInt(u32));
         while (view_it.next()) |view_node| {
             const view = &view_node.view;
-            // Apply pending state
+            // Apply pending state of the view
             view.pending_serial = null;
             if (view.pending.tags != view.current.tags) view_tags_changed = true;
             view.current = view.pending;

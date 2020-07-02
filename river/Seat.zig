@@ -125,13 +125,13 @@ pub fn focus(self: *Self, _view: ?*View) void {
     // If the view is not currently visible, behave as if null was passed
     if (view) |v| {
         if (v.output != self.focused_output or
-            v.current.tags & self.focused_output.current_focused_tags == 0) view = null;
+            v.current.tags & self.focused_output.current.tags == 0) view = null;
     }
 
     // If the target view is not fullscreen or null, then a fullscreen view
     // will grab focus if visible.
     if (if (view) |v| !v.current.fullscreen else true) {
-        var it = ViewStack(*View).iterator(self.focus_stack.first, self.focused_output.current_focused_tags);
+        var it = ViewStack(*View).iterator(self.focus_stack.first, self.focused_output.current.tags);
         view = while (it.next()) |node| {
             if (node.view.output == self.focused_output and node.view.current.fullscreen) break node.view;
         } else view;
@@ -139,7 +139,7 @@ pub fn focus(self: *Self, _view: ?*View) void {
 
     if (view == null) {
         // Set view to the first currently visible view in the focus stack if any
-        var it = ViewStack(*View).iterator(self.focus_stack.first, self.focused_output.current_focused_tags);
+        var it = ViewStack(*View).iterator(self.focus_stack.first, self.focused_output.current.tags);
         view = while (it.next()) |node| {
             if (node.view.output == self.focused_output) break node.view;
         } else null;
