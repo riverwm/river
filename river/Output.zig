@@ -364,9 +364,7 @@ pub fn arrangeLayers(self: *Self) void {
 
     // Arrange all layer surfaces with exclusive zones, applying them to the
     // usable box along the way.
-    for (layer_idxs) |layer| {
-        self.arrangeLayer(self.layers[layer], full_box, &usable_box, true);
-    }
+    for (layer_idxs) |layer| self.arrangeLayer(self.layers[layer], full_box, &usable_box, true);
 
     // If the the usable_box has changed, we need to rearrange the output
     if (!std.meta.eql(self.usable_box, usable_box)) {
@@ -375,9 +373,7 @@ pub fn arrangeLayers(self: *Self) void {
     }
 
     // Arrange the layers without exclusive zones
-    for (layer_idxs) |layer| {
-        self.arrangeLayer(self.layers[layer], full_box, &usable_box, false);
-    }
+    for (layer_idxs) |layer| self.arrangeLayer(self.layers[layer], full_box, &usable_box, false);
 
     // Find the topmost layer surface in the top or overlay layers which
     // requests keyboard interactivity if any.
@@ -431,9 +427,7 @@ fn arrangeLayer(
 
         // If the value of exclusive_zone is greater than zero, then it exclusivly
         // occupies some area of the screen.
-        if (exclusive != (current_state.exclusive_zone > 0)) {
-            continue;
-        }
+        if (exclusive != (current_state.exclusive_zone > 0)) continue;
 
         // If the exclusive zone is set to -1, this means the the client would like
         // to ignore any exclusive zones and use the full area of the output.
@@ -505,31 +499,36 @@ fn arrangeLayer(
 
         // Apply the exclusive zone to the current bounds
         const edges = [4]struct {
-            anchors: u32,
+            single: u32,
+            triple: u32,
             to_increase: ?*i32,
-            to_decrease: ?*u32,
+            to_decrease: *u32,
             margin: u32,
         }{
             .{
-                .anchors = anchor_left | anchor_right | anchor_top,
+                .single = anchor_top,
+                .triple = anchor_top | anchor_left | anchor_right,
                 .to_increase = &usable_box.y,
                 .to_decrease = &usable_box.height,
                 .margin = current_state.margin.top,
             },
             .{
-                .anchors = anchor_left | anchor_right | anchor_bottom,
+                .single = anchor_bottom,
+                .triple = anchor_bottom | anchor_left | anchor_right,
                 .to_increase = null,
                 .to_decrease = &usable_box.height,
                 .margin = current_state.margin.bottom,
             },
             .{
-                .anchors = anchor_left | anchor_top | anchor_bottom,
+                .single = anchor_left,
+                .triple = anchor_left | anchor_top | anchor_bottom,
                 .to_increase = &usable_box.x,
                 .to_decrease = &usable_box.width,
                 .margin = current_state.margin.left,
             },
             .{
-                .anchors = anchor_right | anchor_top | anchor_bottom,
+                .single = anchor_right,
+                .triple = anchor_right | anchor_top | anchor_bottom,
                 .to_increase = null,
                 .to_decrease = &usable_box.width,
                 .margin = current_state.margin.right,
@@ -537,16 +536,13 @@ fn arrangeLayer(
         };
 
         for (edges) |edge| {
-            if (current_state.anchor & edge.anchors == edge.anchors and
+            if ((current_state.anchor == edge.single or current_state.anchor == edge.triple) and
                 current_state.exclusive_zone + @intCast(i32, edge.margin) > 0)
             {
                 const delta = current_state.exclusive_zone + @intCast(i32, edge.margin);
-                if (edge.to_increase) |value| {
-                    value.* += delta;
-                }
-                if (edge.to_decrease) |value| {
-                    value.* -= @intCast(u32, delta);
-                }
+                if (edge.to_increase) |value| value.* += delta;
+                edge.to_decrease.* -= @intCast(u32, delta);
+                break;
             }
         }
 
