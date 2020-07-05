@@ -85,12 +85,15 @@ pub fn main() anyerror!void {
 
     try server.start();
 
-    if (startup_command) |cmd| {
+    const startup_process = if (startup_command) |cmd| blk: {
         const child_args = [_][]const u8{ "/bin/sh", "-c", cmd };
         const child = try std.ChildProcess.init(&child_args, util.gpa);
-        defer child.deinit();
         try std.ChildProcess.spawn(child);
-    }
+        break :blk child;
+    } else null;
+    defer if (startup_process) |child| {
+        _ = child.kill() catch |e| log.err(.server, "failed to terminate startup process: {}", .{e});
+    };
 
     log.info(.server, "running...", .{});
 

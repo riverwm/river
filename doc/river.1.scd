@@ -16,9 +16,12 @@ bspwm based on wlroots and written in Zig.
 
 *-c* _shell_command_
 	Run a shell command or give the path to a script that will be run
-	before river gets started. This is where you define keymaps using
-	*riverctl*(1) and autostart programs. Make sure the script is
-	executable.
+	after river's wayland server is initialized but before entering the
+	main loop. You may use this to configure river and define keymaps
+	using *riverctl*(1), start programs such as a status bar, or perhaps
+	run a service manager. If the process started by this flag is still
+	running when river exits, river will send SIGTERM and and wait for it
+	to terminate.
 
 *-l* _log_level_
 	Set the log level of river to a value from 0 to 7 with 0 being the
