@@ -22,10 +22,6 @@ const std = @import("std");
 const c = @import("c.zig");
 const util = @import("util.zig");
 
-const DecorationManager = @import("DecorationManager.zig");
-
-// TODO: this needs to listen for destroy and free nodes from the deco list
-decoration_manager: *DecorationManager,
 wlr_xdg_toplevel_decoration: *c.wlr_xdg_toplevel_decoration_v1,
 
 listen_destroy: c.wl_listener,
@@ -33,10 +29,8 @@ listen_request_mode: c.wl_listener,
 
 pub fn init(
     self: *Self,
-    decoration_manager: *DecorationManager,
     wlr_xdg_toplevel_decoration: *c.wlr_xdg_toplevel_decoration_v1,
 ) void {
-    self.decoration_manager = decoration_manager;
     self.wlr_xdg_toplevel_decoration = wlr_xdg_toplevel_decoration;
 
     self.listen_destroy.notify = handleDestroy;
@@ -50,17 +44,13 @@ pub fn init(
 
 fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_destroy", listener.?);
-    const node = @fieldParentPtr(std.SinglyLinkedList(Self).Node, "data", self);
-
-    self.decoration_manager.decorations.remove(node);
-    util.gpa.destroy(node);
+    util.gpa.destroy(self);
 }
 
 fn handleRequestMode(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_request_mode", listener.?);
-    // TODO: we might need to take this configure serial and do a transaction
     _ = c.wlr_xdg_toplevel_decoration_v1_set_mode(
         self.wlr_xdg_toplevel_decoration,
-        c.wlr_xdg_toplevel_decoration_v1_mode.WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE,
+        .WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE,
     );
 }

@@ -157,9 +157,7 @@ pub fn focus(self: *Self, _view: ?*View) void {
             }
         } else {
             // The view is not in the stack, so allocate a new node and prepend it
-            const new_focus_node = util.gpa.create(
-                ViewStack(*View).Node,
-            ) catch unreachable;
+            const new_focus_node = util.gpa.create(ViewStack(*View).Node) catch return;
             new_focus_node.view = view_to_focus;
             self.focus_stack.push(new_focus_node);
         }
@@ -305,30 +303,32 @@ pub fn handleMapping(self: *Self, keysym: c.xkb_keysym_t, modifiers: u32) bool {
 
 /// Add a newly created input device to the seat and update the reported
 /// capabilities.
-pub fn addDevice(self: *Self, device: *c.wlr_input_device) !void {
+pub fn addDevice(self: *Self, device: *c.wlr_input_device) void {
     switch (device.type) {
-        .WLR_INPUT_DEVICE_KEYBOARD => self.addKeyboard(device) catch unreachable,
+        .WLR_INPUT_DEVICE_KEYBOARD => self.addKeyboard(device) catch return,
         .WLR_INPUT_DEVICE_POINTER => self.addPointer(device),
-        else => {},
+        else => return,
     }
 
     // We need to let the wlr_seat know what our capabilities are, which is
     // communiciated to the client. We always have a cursor, even if
     // there are no pointer devices, so we always include that capability.
     var caps = @intCast(u32, c.WL_SEAT_CAPABILITY_POINTER);
-    // if list not empty
-    if (self.keyboards.len > 0) {
-        caps |= @intCast(u32, c.WL_SEAT_CAPABILITY_KEYBOARD);
-    }
+    if (self.keyboards.len > 0) caps |= @intCast(u32, c.WL_SEAT_CAPABILITY_KEYBOARD);
     c.wlr_seat_set_capabilities(self.wlr_seat, caps);
 }
 
 fn addKeyboard(self: *Self, device: *c.wlr_input_device) !void {
-    c.wlr_seat_set_keyboard(self.wlr_seat, device);
-
-    const node = try util.gpa.create(std.TailQueue(Keyboard).Node);
-    try node.data.init(self, device);
+    const node = try self.keyboards.allocateNode(util.gpa);
+    node.data.init(self, device) catch |err| {
+        switch (err) {
+            error.CreateXkbContextError => log.err(.keyboard, "Failed to create XKB context", .{}),
+            error.CreateXkbKeymapError => log.err(.keyboard, "Failed to create XKB keymap", .{}),
+        }
+        return;
+    };
     self.keyboards.append(node);
+    c.wlr_seat_set_keyboard(self.wlr_seat, device);
 }
 
 fn addPointer(self: Self, device: *c.struct_wlr_input_device) void {

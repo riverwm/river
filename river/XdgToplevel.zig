@@ -253,7 +253,10 @@ fn handleNewPopup(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const wlr_xdg_popup = util.voidCast(c.wlr_xdg_popup, data.?);
 
     // This will free itself on destroy
-    var xdg_popup = util.gpa.create(XdgPopup) catch unreachable;
+    var xdg_popup = util.gpa.create(XdgPopup) catch {
+        c.wl_resource_post_no_memory(wlr_xdg_popup.resource);
+        return;
+    };
     xdg_popup.init(self.view.output, &self.view.current.box, wlr_xdg_popup);
 }
 

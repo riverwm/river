@@ -140,7 +140,5 @@ fn handleNewInput(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const device = util.voidCast(c.wlr_input_device, data.?);
 
     // TODO: suport multiple seats
-    if (self.seats.first) |seat_node| {
-        seat_node.data.addDevice(device) catch unreachable;
-    }
+    self.default_seat.addDevice(device);
 }

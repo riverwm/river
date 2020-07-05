@@ -86,13 +86,19 @@ pub fn deinit(self: *Self) void {
 
     c.wlr_output_layout_destroy(self.wlr_output_layout);
 
+    // This literally cannot fail, but for some reason returns 0
     if (c.wl_event_source_remove(self.transaction_timer) < 0) unreachable;
 }
 
 pub fn addOutput(self: *Self, wlr_output: *c.wlr_output) void {
-    // TODO: Handle failure
-    const node = self.outputs.allocateNode(util.gpa) catch unreachable;
-    node.data.init(self, wlr_output) catch unreachable;
+    const node = self.outputs.allocateNode(util.gpa) catch {
+        c.wlr_output_destroy(wlr_output);
+        return;
+    };
+    node.data.init(self, wlr_output) catch {
+        c.wlr_output_destroy(wlr_output);
+        return;
+    };
     self.outputs.append(node);
 
     // if we previously had no real outputs, move focus from the noop output

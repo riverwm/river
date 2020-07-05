@@ -130,7 +130,7 @@ const ScanProtocolsStep = struct {
     step: std.build.Step,
 
     fn create(builder: *std.build.Builder) *ScanProtocolsStep {
-        const self = builder.allocator.create(ScanProtocolsStep) catch unreachable;
+        const self = builder.allocator.create(ScanProtocolsStep) catch @panic("out of memory");
         self.* = init(builder);
         return self;
     }
@@ -225,7 +225,7 @@ const ScdocStep = struct {
     step: std.build.Step,
 
     fn create(builder: *std.build.Builder) *ScdocStep {
-        const self = builder.allocator.create(ScdocStep) catch unreachable;
+        const self = builder.allocator.create(ScdocStep) catch @panic("out of memory");
         self.* = init(builder);
         return self;
     }
