@@ -32,6 +32,8 @@ const usage: []const u8 =
     \\
 ;
 
+var server: Server = undefined;
+
 pub fn main() anyerror!void {
     var startup_command: ?[]const u8 = null;
     {
@@ -69,7 +71,15 @@ pub fn main() anyerror!void {
 
     log.info(.server, "initializing", .{});
 
-    var server: Server = undefined;
+    // Setup a handler for SIGINT and SIGTERM so we can clean up properly
+    var act = std.os.Sigaction{
+        .sigaction = handleSignal,
+        .mask = std.os.empty_sigset,
+        .flags = 0,
+    };
+    std.os.sigaction(std.os.SIGINT, &act, null);
+    std.os.sigaction(std.os.SIGTERM, &act, null);
+
     try server.init();
     defer server.deinit();
 
@@ -93,4 +103,11 @@ fn printErrorExit(comptime format: []const u8, args: var) noreturn {
     const stderr = std.io.getStdErr().outStream();
     stderr.print(format ++ "\n", args) catch std.os.exit(1);
     std.os.exit(1);
+}
+
+fn handleSignal(sig: i32, info: *const std.os.siginfo_t, ctx_ptr: ?*const c_void) callconv(.C) void {
+    switch (sig) {
+        std.os.SIGINT, std.os.SIGTERM => c.wl_display_terminate(server.wl_display),
+        else => unreachable,
+    }
 }
