@@ -166,7 +166,7 @@ pub fn sendViewTags(self: Self) void {
 
 /// The single build in layout, which makes all views use the maximum available
 /// space.
-fn layoutFull(self: *Self, visible_count: u32, output_tags: u32) void {
+fn layoutFull(self: *Self, visible_count: u32) void {
     const border_width = self.root.server.config.border_width;
     const view_padding = self.root.server.config.view_padding;
     const outer_padding = self.root.server.config.outer_padding;
@@ -179,7 +179,7 @@ fn layoutFull(self: *Self, visible_count: u32, output_tags: u32) void {
         .height = self.usable_box.height - (2 * xy_offset),
     };
 
-    var it = ViewStack(View).pendingIterator(self.views.first, output_tags);
+    var it = ViewStack(View).pendingIterator(self.views.first, self.pending.tags);
     while (it.next()) |node| {
         const view = &node.view;
         if (!view.pending.float and !view.pending.fullscreen) {
@@ -191,31 +191,28 @@ fn layoutFull(self: *Self, visible_count: u32, output_tags: u32) void {
 
 const LayoutError = error{
     BadExitCode,
-    BadWindowConfiguration,
-    ConfigurationMismatch,
+    WrongViewCount,
 };
 
-/// Parse a window configuration string and write values to the box
-fn parseWindowConfig(buffer: []const u8) LayoutError!Box {
-    var i: u32 = 0;
-    var box: Box = undefined;
+/// Parse 4 integers separated by spaces into a Box
+fn parseBox(buffer: []const u8) !Box {
     var it = std.mem.split(buffer, " ");
-    while (it.next()) |token| : (i += 1) {
-        switch (i) {
-            0 => box.x = std.fmt.parseInt(i32, token, 10) catch return LayoutError.BadWindowConfiguration,
-            1 => box.y = std.fmt.parseInt(i32, token, 10) catch return LayoutError.BadWindowConfiguration,
-            2 => box.width = std.fmt.parseInt(u32, token, 10) catch return LayoutError.BadWindowConfiguration,
-            3 => box.height = std.fmt.parseInt(u32, token, 10) catch return LayoutError.BadWindowConfiguration,
-            else => {},
-        }
-    }
-    if (i != 4) return LayoutError.BadWindowConfiguration;
+
+    const box = Box{
+        .x = try std.fmt.parseInt(i32, it.next() orelse return error.NotEnoughArguments, 10),
+        .y = try std.fmt.parseInt(i32, it.next() orelse return error.NotEnoughArguments, 10),
+        .width = try std.fmt.parseInt(u32, it.next() orelse return error.NotEnoughArguments, 10),
+        .height = try std.fmt.parseInt(u32, it.next() orelse return error.NotEnoughArguments, 10),
+    };
+
+    if (it.next() != null) return error.TooManyArguments;
+
     return box;
 }
 
 test "parse window configuration" {
     const testing = @import("std").testing;
-    var box = try parseWindowConfig("5 10 100 200");
+    const box = try parseBox("5 10 100 200");
     testing.expect(box.x == 5);
     testing.expect(box.y == 10);
     testing.expect(box.width == 100);
@@ -224,7 +221,7 @@ test "parse window configuration" {
 
 /// Execute an external layout function, parse its output and apply the layout
 /// to the output.
-fn layoutExternal(self: *Self, visible_count: u32, output_tags: u32) !void {
+fn layoutExternal(self: *Self, visible_count: u32) !void {
     const config = self.root.server.config;
     const xy_offset = @intCast(i32, config.border_width + config.outer_padding + config.view_padding);
     const delta_size = (config.border_width + config.view_padding) * 2;
@@ -267,7 +264,7 @@ fn layoutExternal(self: *Self, visible_count: u32, output_tags: u32) !void {
     var parse_it = std.mem.split(buffer, "\n");
     while (parse_it.next()) |token| {
         if (std.mem.eql(u8, token, "")) break;
-        var box = try parseWindowConfig(token);
+        var box = try parseBox(token);
         box.x += self.usable_box.x + xy_offset;
         box.y += self.usable_box.y + xy_offset;
         box.width -= delta_size;
@@ -275,11 +272,11 @@ fn layoutExternal(self: *Self, visible_count: u32, output_tags: u32) !void {
         try view_boxen.append(box);
     }
 
-    if (view_boxen.items.len != visible_count) return LayoutError.ConfigurationMismatch;
+    if (view_boxen.items.len != visible_count) return LayoutError.WrongViewCount;
 
     // Apply window configuration to views
     var i: u32 = 0;
-    var view_it = ViewStack(View).pendingIterator(self.views.first, output_tags);
+    var view_it = ViewStack(View).pendingIterator(self.views.first, self.pending.tags);
     while (view_it.next()) |node| {
         const view = &node.view;
         if (!view.pending.float and !view.pending.fullscreen) {
@@ -308,17 +305,16 @@ pub fn arrangeViews(self: *Self) void {
     // would cause an underflow and is pointless anyway.
     if (layout_count == 0 or self.usable_box.width == 0 or self.usable_box.height == 0) return;
 
-    if (std.mem.eql(u8, self.layout, "full")) return layoutFull(self, layout_count, self.pending.tags);
+    if (std.mem.eql(u8, self.layout, "full")) return layoutFull(self, layout_count);
 
-    layoutExternal(self, layout_count, self.pending.tags) catch |err| {
+    self.layoutExternal(layout_count) catch |err| {
         switch (err) {
             LayoutError.BadExitCode => log.err(.layout, "layout command exited with non-zero return code", .{}),
-            LayoutError.BadWindowConfiguration => log.err(.layout, "invalid window configuration", .{}),
-            LayoutError.ConfigurationMismatch => log.err(.layout, "mismatch between window configuration and visible window counts", .{}),
-            else => log.err(.layout, "'{}' error while trying to use external layout", .{err}),
+            LayoutError.WrongViewCount => log.err(.layout, "mismatch between window configuration and visible window counts", .{}),
+            else => log.err(.layout, "failed to use external layout: {}", .{err}),
         }
         log.err(.layout, "falling back to internal layout", .{});
-        layoutFull(self, layout_count, self.pending.tags);
+        self.layoutFull(layout_count);
     };
 }
 
