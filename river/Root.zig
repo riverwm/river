@@ -214,7 +214,9 @@ fn commitTransaction(self: *Self) void {
         const output = &output_node.data;
 
         // Apply pending state of the output
-        if (output.pending.tags != output.current.tags) {
+        const output_tags_changed = output.pending.tags != output.current.tags;
+        output.current = output.pending;
+        if (output_tags_changed) {
             log.debug(
                 .output,
                 "changing current focus: {b:0>10} to {b:0>10}",
@@ -223,7 +225,6 @@ fn commitTransaction(self: *Self) void {
             var it = output.status_trackers.first;
             while (it) |node| : (it = node.next) node.data.sendFocusedTags();
         }
-        output.current = output.pending;
 
         var view_tags_changed = false;
 
