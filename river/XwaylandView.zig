@@ -115,7 +115,7 @@ pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*c.wlr_surfa
 
 /// Get the current title of the xwayland surface. May be an empty string
 pub fn getTitle(self: Self) [*:0]const u8 {
-    return self.wlr_xwayland_surface.title;
+    return self.wlr_xwayland_surface.title orelse "";
 }
 
 /// Called when the xwayland surface is destroyed
