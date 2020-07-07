@@ -21,6 +21,7 @@ pub usingnamespace @cImport({
 
     @cInclude("time.h");
     @cInclude("stdlib.h");
+    @cInclude("linux/input-event-codes.h");
     @cInclude("wayland-server-core.h");
     //@cInclude("wlr/backend.h");
     //@cInclude("wlr/render/wlr_renderer.h");

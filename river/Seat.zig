@@ -70,6 +70,9 @@ focused_layer: ?*LayerSurface,
 /// List of status tracking objects relaying changes to this seat to clients.
 status_trackers: std.SinglyLinkedList(SeatStatus),
 
+/// State of pointer modifier; Used for pointer operations such as move ans resize.
+pointer_modifier: bool,
+
 listen_request_set_selection: c.wl_listener,
 
 pub fn init(self: *Self, input_manager: *InputManager, name: [*:0]const u8) !void {
@@ -95,6 +98,8 @@ pub fn init(self: *Self, input_manager: *InputManager, name: [*:0]const u8) !voi
     self.focused_layer = null;
 
     self.status_trackers = std.SinglyLinkedList(SeatStatus).init();
+
+    self.pointer_modifier = false;
 
     self.listen_request_set_selection.notify = handleRequestSetSelection;
     c.wl_signal_add(&self.wlr_seat.events.request_set_selection, &self.listen_request_set_selection);
