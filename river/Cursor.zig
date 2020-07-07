@@ -1,6 +1,7 @@
 // This file is part of river, a dynamic tiling wayland compositor.
 //
 // Copyright 2020 Isaac Freund
+// Copyright 2020 Leon Henrik Plickat
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -24,6 +25,8 @@ const c = @import("c.zig");
 const log = @import("log.zig");
 const util = @import("util.zig");
 
+const Box = @import("Box.zig");
+const Config = @import("Config.zig");
 const LayerSurface = @import("LayerSurface.zig");
 const Output = @import("Output.zig");
 const Seat = @import("Seat.zig");
@@ -41,12 +44,20 @@ wlr_cursor: *c.wlr_cursor,
 wlr_xcursor_manager: *c.wlr_xcursor_manager,
 
 mode: CursorMode,
-grabbed_view: ?*View,
-grab_x: f64,
-grab_y: f64,
-grab_width: c_int,
-grab_height: c_int,
-resize_edges: u32,
+grabbed_view: *View,
+
+/// Distance between cursor and top-left corner of grabbed view
+grab_delta_x: f64,
+grab_delta_y: f64,
+
+/// Dimensions of the output the grabbed view is on
+grab_output_width: u64,
+grab_output_height: u64,
+
+const CursorPosition = struct {
+    x: f64,
+    y: f64,
+};
 
 listen_axis: c.wl_listener,
 listen_button: c.wl_listener,
@@ -91,12 +102,9 @@ pub fn init(self: *Self, seat: *Seat) !void {
     }
 
     self.mode = CursorMode.Passthrough;
-    self.grabbed_view = null;
-    self.grab_x = 0.0;
-    self.grab_y = 0.0;
-    self.grab_width = 0;
-    self.grab_height = 0;
-    self.resize_edges = 0;
+    self.grabbed_view = undefined;
+    self.grab_delta_x = 0.0;
+    self.grab_delta_y = 0.0;
 
     // wlr_cursor *only* displays an image on screen. It does not move around
     // when the pointer moves. However, we can attach input devices to it, and
@@ -145,6 +153,70 @@ fn handleAxis(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     );
 }
 
+fn enterCursorMode(self: *Self, event: *c.wlr_event_pointer_button, view: *View, mode: CursorMode) void {
+    if (self.mode != CursorMode.Passthrough) return;
+
+    switch (mode) {
+        .Passthrough => {},
+        .Resize => {},
+
+        .Move => {
+            self.grabbed_view = view;
+
+            // Automatically float alll views being moved by the pointer
+            if (!self.grabbed_view.current.float) {
+                self.grabbed_view.pending.float = true;
+                // Start a transaction to apply the pending state of the grabbed
+                // view and rearrange the layout to fill the hole.
+                self.grabbed_view.output.root.arrange();
+            }
+
+            // Enter moving mode
+            self.mode = CursorMode.Move;
+
+            self.grab_delta_x = @fabs(self.wlr_cursor.x - @intToFloat(f64, self.grabbed_view.pending.box.x));
+            self.grab_delta_y = @fabs(self.wlr_cursor.y - @intToFloat(f64, self.grabbed_view.pending.box.y));
+
+            // Clear cursor focus, so that the surface does not receive events
+            c.wlr_seat_pointer_clear_focus(self.seat.wlr_seat);
+
+            c.wlr_xcursor_manager_set_cursor_image(self.wlr_xcursor_manager, "move", self.wlr_cursor);
+
+            // Get dimension of output the grabbed view is on
+            var output_width_c: c_int = undefined;
+            var output_height_c: c_int = undefined;
+            c.wlr_output_effective_resolution(
+                self.grabbed_view.output.wlr_output,
+                &output_width_c,
+                &output_height_c,
+            );
+            self.grab_output_width = @intCast(u64, output_width_c);
+            self.grab_output_height = @intCast(u64, output_height_c);
+        },
+    }
+}
+
+fn leaveCursorMode(self: *Self, event: *c.wlr_event_pointer_button) void {
+    switch (self.mode) {
+        .Passthrough => {},
+        .Resize => {},
+
+        .Move => {
+            self.mode = CursorMode.Passthrough;
+
+            // Set generic cursor image in case the application does not set one.
+            c.wlr_xcursor_manager_set_cursor_image(
+                self.wlr_xcursor_manager,
+                "left_ptr",
+                self.wlr_cursor,
+            );
+
+            // Cursor-Reentry by notifying surface underneath cursor.
+            processMotionPassthrough(self, event.time_msec);
+        },
+    }
+}
+
 fn handleButton(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     // This event is forwarded by the cursor when a pointer emits a button
     // event.
@@ -171,6 +243,28 @@ fn handleButton(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
             if (wlr_xdg_surface.*.role == .WLR_XDG_SURFACE_ROLE_TOPLEVEL) {
                 const view = util.voidCast(View, wlr_xdg_surface.*.data.?);
                 self.seat.focus(view);
+
+                if (event.state == .WLR_BUTTON_PRESSED) {
+                    // If the button is pressed and the pointer modifier is
+                    // active, enter cursor mode and return.
+                    if (self.seat.pointer_modifier) {
+                        switch (event.button) {
+                            c.BTN_LEFT => enterCursorMode(self, event, view, CursorMode.Move),
+                            c.BTN_RIGHT => {}, // TODO Resize
+                            c.BTN_MIDDLE => {}, // TODO Some useful operation, maybe kill
+
+                            // TODO Some mice have additional buttons. These
+                            // could also be bound to some useful action.
+                            else => {},
+                        }
+                        return;
+                    }
+                } else if (self.mode != CursorMode.Passthrough) {
+                    // If the button is released and the current cursor mode is
+                    // not passthrough, leave cursor mode and return.
+                    leaveCursorMode(self, event);
+                    return;
+                }
             }
         }
 
@@ -202,8 +296,20 @@ fn handleMotionAbsolute(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) 
     // emits these events.
     const self = @fieldParentPtr(Self, "listen_motion_absolute", listener.?);
     const event = util.voidCast(c.wlr_event_pointer_motion_absolute, data.?);
-    c.wlr_cursor_warp_absolute(self.wlr_cursor, event.device, event.x, event.y);
-    self.processMotion(event.time_msec);
+    switch (self.mode) {
+        CursorMode.Passthrough => {
+            c.wlr_cursor_warp_absolute(self.wlr_cursor, event.device, event.x, event.y);
+            processMotionPassthrough(self, event.time_msec);
+        },
+        CursorMode.Move => {
+            var x_layout: f64 = undefined;
+            var y_layout: f64 = undefined;
+            c.wlr_cursor_absolute_to_layout_coords(self.wlr_cursor, event.device, event.x, event.y, &x_layout, &y_layout);
+            var cursor: CursorPosition = processMotionMove(self, x_layout, y_layout);
+            _ = c.wlr_cursor_warp(self.wlr_cursor, event.device, cursor.x, cursor.y);
+        },
+        CursorMode.Resize => {},
+    }
 }
 
 fn handleMotion(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -211,13 +317,22 @@ fn handleMotion(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     // pointer motion event (i.e. a delta)
     const self = @fieldParentPtr(Self, "listen_motion", listener.?);
     const event = util.voidCast(c.wlr_event_pointer_motion, data.?);
-    // The cursor doesn't move unless we tell it to. The cursor automatically
-    // handles constraining the motion to the output layout, as well as any
-    // special configuration applied for the specific input device which
-    // generated the event. You can pass NULL for the device if you want to move
-    // the cursor around without any input.
-    c.wlr_cursor_move(self.wlr_cursor, event.device, event.delta_x, event.delta_y);
-    self.processMotion(event.time_msec);
+    switch (self.mode) {
+        CursorMode.Passthrough => {
+            // The cursor doesn't move unless we tell it to. The cursor automatically
+            // handles constraining the motion to the output layout, as well as any
+            // special configuration applied for the specific input device which
+            // generated the event. You can pass NULL for the device if you want to move
+            // the cursor around without any input.
+            c.wlr_cursor_move(self.wlr_cursor, event.device, event.delta_x, event.delta_y);
+            processMotionPassthrough(self, event.time_msec);
+        },
+        CursorMode.Move => {
+            var cursor: CursorPosition = processMotionMove(self, event.delta_x + self.wlr_cursor.x, event.delta_y + self.wlr_cursor.y);
+            _ = c.wlr_cursor_warp(self.wlr_cursor, event.device, cursor.x, cursor.y);
+        },
+        CursorMode.Resize => {},
+    }
 }
 
 fn handleRequestSetCursor(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -243,7 +358,50 @@ fn handleRequestSetCursor(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C
     }
 }
 
-fn processMotion(self: Self, time: u32) void {
+fn cursorMoveConstraints(self: *Self, _position: f64, _output: u64, _view: u64) i32 {
+    const position: i32 = @floatToInt(i32, _position);
+    const view: i32 = @intCast(i32, _view);
+    const border_width = @intCast(i32, self.grabbed_view.output.root.server.config.border_width);
+    const useable: i32 = @intCast(i32, _output - _view) - border_width;
+
+    var new: i32 = position;
+    if (position > useable) {
+        new = useable;
+    } else if (position < border_width) {
+        new = border_width;
+    }
+    return new;
+}
+
+/// Moves grabbed view and returns new cursor position
+fn processMotionMove(self: *Self, x_in: f64, y_in: f64) CursorPosition {
+    // Get new X and Y of cursor and view.
+    // Width and height of surface will stay the same.
+    self.grabbed_view.pending.box.x = cursorMoveConstraints(
+        self,
+        x_in - self.grab_delta_x,
+        self.grab_output_width,
+        self.grabbed_view.pending.box.width,
+    );
+    self.grabbed_view.pending.box.y = cursorMoveConstraints(
+        self,
+        y_in - self.grab_delta_y,
+        self.grab_output_height,
+        self.grabbed_view.pending.box.height,
+    );
+
+    // Apply new pending state (no need for a transaction as size didn't change)
+    self.grabbed_view.current = self.grabbed_view.pending;
+
+    // This function returns the cursor position so that the calling function
+    // can do the cursor movement.
+    return .{
+        .x = @intToFloat(f64, self.grabbed_view.current.box.x) + self.grab_delta_x,
+        .y = @intToFloat(f64, self.grabbed_view.current.box.y) + self.grab_delta_y,
+    };
+}
+
+fn processMotionPassthrough(self: *Self, time: u32) void {
     var sx: f64 = undefined;
     var sy: f64 = undefined;
     if (self.surfaceAt(self.wlr_cursor.x, self.wlr_cursor.y, &sx, &sy)) |wlr_surface| {
