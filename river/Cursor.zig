@@ -246,12 +246,12 @@ fn handleButton(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 
                 if (event.state == .WLR_BUTTON_PRESSED) {
                     // If the button is pressed and the pointer modifier is
-                    // active, enter cursor mode and return.
+                    // active, enter cursor mode or close view and return.
                     if (self.seat.pointer_modifier) {
                         switch (event.button) {
                             c.BTN_LEFT => enterCursorMode(self, event, view, CursorMode.Move),
+                            c.BTN_MIDDLE => view.close(),
                             c.BTN_RIGHT => {}, // TODO Resize
-                            c.BTN_MIDDLE => {}, // TODO Some useful operation, maybe kill
 
                             // TODO Some mice have additional buttons. These
                             // could also be bound to some useful action.
