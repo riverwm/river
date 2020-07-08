@@ -19,9 +19,12 @@ pub usingnamespace @cImport({
     @cDefine("_POSIX_C_SOURCE", "200809L");
     @cDefine("WLR_USE_UNSTABLE", {});
 
-    @cInclude("time.h");
     @cInclude("stdlib.h");
+    @cInclude("time.h");
+    @cInclude("unistd.h");
+
     @cInclude("linux/input-event-codes.h");
+
     @cInclude("wayland-server-core.h");
     //@cInclude("wlr/backend.h");
     //@cInclude("wlr/render/wlr_renderer.h");
