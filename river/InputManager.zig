@@ -17,6 +17,7 @@
 
 const Self = @This();
 
+const build_options = @import("build_options");
 const std = @import("std");
 
 const c = @import("c.zig");
@@ -54,6 +55,8 @@ pub fn init(self: *Self, server: *Server) !void {
     try seat_node.data.init(self, default_seat_name);
     self.default_seat = &seat_node.data;
     self.seats.prepend(seat_node);
+
+    if (build_options.xwayland) c.wlr_xwayland_set_seat(server.wlr_xwayland, self.default_seat.wlr_seat);
 
     self.exclusive_client = null;
 
