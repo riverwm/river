@@ -48,15 +48,17 @@ pub fn spawn(
         if (c.setsid() < 0) unreachable;
         if (std.os.system.sigprocmask(std.os.SIG_SETMASK, &std.os.empty_sigset, null) < 0) unreachable;
 
-        const pid2 = std.os.fork() catch std.os.exit(1);
-        if (pid2 == 0) std.os.execveZ("/bin/sh", &child_args, std.c.environ) catch std.os.exit(1);
+        const pid2 = std.os.fork() catch c._exit(1);
+        if (pid2 == 0) std.os.execveZ("/bin/sh", &child_args, std.c.environ) catch c._exit(1);
 
-        std.os.exit(0);
+        c._exit(0);
     }
 
     // Wait the intermediate child.
     const status = std.os.waitpid(pid, 0);
-    if (std.os.WIFEXITED(status) and std.os.WEXITSTATUS(status) != 0) {
+    if (!std.os.WIFEXITED(status) or
+        (std.os.WIFEXITED(status) and std.os.WEXITSTATUS(status) != 0))
+    {
         out.* = try std.fmt.allocPrint(allocator, "fork/execve failed", .{});
         return Error.Other;
     }
