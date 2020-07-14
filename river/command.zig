@@ -39,6 +39,7 @@ const impl = struct {
     const toggleFocusedTags = @import("command/tags.zig").toggleFocusedTags;
     const toggleFullscreen = @import("command/toggle_fullscreen.zig").toggleFullscreen;
     const toggleViewTags = @import("command/tags.zig").toggleViewTags;
+    const xcursorTheme = @import("command/xcursor_theme.zig").xcursorTheme;
     const zoom = @import("command/zoom.zig").zoom;
 };
 
@@ -79,9 +80,10 @@ const str_to_impl_fn = [_]struct {
     .{ .name = "spawn",               .impl = impl.spawn },
     .{ .name = "toggle-float",        .impl = impl.toggleFloat },
     .{ .name = "toggle-focused-tags", .impl = impl.toggleFocusedTags },
-    .{ .name = "toggle-view-tags",    .impl = impl.toggleViewTags },
-    .{ .name = "zoom",                .impl = impl.zoom },
     .{ .name = "toggle-fullscreen",   .impl = impl.toggleFullscreen },
+    .{ .name = "toggle-view-tags",    .impl = impl.toggleViewTags },
+    .{ .name = "xcursor-theme",       .impl = impl.xcursorTheme },
+    .{ .name = "zoom",                .impl = impl.zoom },
 };
 // zig fmt: on
 

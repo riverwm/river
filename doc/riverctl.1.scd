@@ -124,6 +124,12 @@ that tag 1 through 9 are visible.
 	- *outer_padding* _non-negative_integer_
 	- *view_padding* _non-negative_integer_
 
+*xcursor-theme* _theme_name_ [_size_]
+	Set the xcursor theme to _theme_name_ and optionally set the
+	_size_. The theme of the default seat determines the default
+	for XWayland and made available through the _XCURSOR_THEME_ and
+	_XCURSOR_SIZE_ environment variables.
+
 # EXAMPLES
 
 Bind bemenu-run to Super+P:

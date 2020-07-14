@@ -39,6 +39,8 @@ const CursorMode = enum {
     Resize,
 };
 
+const default_size = 24;
+
 seat: *Seat,
 wlr_cursor: *c.wlr_cursor,
 wlr_xcursor_manager: *c.wlr_xcursor_manager,
@@ -71,35 +73,14 @@ pub fn init(self: *Self, seat: *Seat) !void {
 
     // Creates a wlroots utility for tracking the cursor image shown on screen.
     self.wlr_cursor = c.wlr_cursor_create() orelse return error.OutOfMemory;
-
-    // Creates an xcursor manager, another wlroots utility which loads up
-    // Xcursor themes to source cursor images from and makes sure that cursor
-    // images are available at all scale factors on the screen (necessary for
-    // HiDPI support). We add a cursor theme at scale factor 1 to begin with.
-    self.wlr_xcursor_manager = c.wlr_xcursor_manager_create(null, 24) orelse return error.OutOfMemory;
     c.wlr_cursor_attach_output_layout(self.wlr_cursor, seat.input_manager.server.root.wlr_output_layout);
-    if (c.wlr_xcursor_manager_load(self.wlr_xcursor_manager, 1) == 0) {
-        if (build_options.xwayland) {
-            if (c.wlr_xcursor_manager_get_xcursor(
-                self.wlr_xcursor_manager,
-                "left_ptr",
-                1,
-            )) |wlr_xcursor| {
-                const image: *c.wlr_xcursor_image = wlr_xcursor.*.images[0];
-                c.wlr_xwayland_set_cursor(
-                    seat.input_manager.server.wlr_xwayland,
-                    image.buffer,
-                    image.width * 4,
-                    image.width,
-                    image.height,
-                    @intCast(i32, image.hotspot_x),
-                    @intCast(i32, image.hotspot_y),
-                );
-            }
-        }
-    } else {
-        log.err(.cursor, "failed to load an xcursor theme", .{});
-    }
+
+    // This is here so that self.wlr_xcursor_manager doesn't need to be an
+    // optional pointer. This isn't optimal as it does a needless allocation,
+    // but this is not a hot path.
+    self.wlr_xcursor_manager = c.wlr_xcursor_manager_create(null, default_size) orelse
+        return error.OutOfMemory;
+    try self.setTheme(null, null);
 
     self.mode = CursorMode.Passthrough;
     self.grabbed_view = undefined;
@@ -134,6 +115,49 @@ pub fn init(self: *Self, seat: *Seat) !void {
 pub fn deinit(self: *Self) void {
     c.wlr_xcursor_manager_destroy(self.wlr_xcursor_manager);
     c.wlr_cursor_destroy(self.wlr_cursor);
+}
+
+/// Set the cursor theme for the given seat, as well as the xwayland theme if
+/// this is the default seat.
+pub fn setTheme(self: *Self, theme: ?[*:0]const u8, size: ?u32) !void {
+    const server = self.seat.input_manager.server;
+
+    c.wlr_xcursor_manager_destroy(self.wlr_xcursor_manager);
+    self.wlr_xcursor_manager = c.wlr_xcursor_manager_create(theme, size orelse default_size) orelse
+        return error.OutOfMemory;
+
+    // For each output, ensure a theme of the proper scale is loaded
+    var it = server.root.outputs.first;
+    while (it) |node| : (it = node.next) {
+        const wlr_output = node.data.wlr_output;
+        if (c.wlr_xcursor_manager_load(self.wlr_xcursor_manager, wlr_output.scale) != 0)
+            log.err(.cursor, "failed to load xcursor theme '{}' at scale {}", .{ theme, wlr_output.scale });
+    }
+
+    // If this cursor belongs to the default seat, set the xcursor environment
+    // variables and the xwayland cursor theme.
+    if (self.seat == self.seat.input_manager.default_seat) {
+        const size_str = try std.fmt.allocPrint0(util.gpa, "{}", .{size});
+        defer util.gpa.free(size_str);
+        if (c.setenv("XCURSOR_SIZE", size_str, 1) < 0) return error.OutOfMemory;
+        if (theme) |t| if (c.setenv("XCURSOR_THEME", t, 1) < 0) return error.OutOfMemory;
+
+        if (build_options.xwayland) {
+            if (c.wlr_xcursor_manager_load(self.wlr_xcursor_manager, 1) == 0) {
+                const wlr_xcursor = c.wlr_xcursor_manager_get_xcursor(self.wlr_xcursor_manager, "left_ptr", 1).?;
+                const image: *c.wlr_xcursor_image = wlr_xcursor.*.images[0];
+                c.wlr_xwayland_set_cursor(
+                    server.wlr_xwayland,
+                    image.buffer,
+                    image.width * 4,
+                    image.width,
+                    image.height,
+                    @intCast(i32, image.hotspot_x),
+                    @intCast(i32, image.hotspot_y),
+                );
+            } else log.err(.cursor, "failed to load xcursor theme '{}' at scale 1", .{theme});
+        }
+    }
 }
 
 fn handleAxis(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
