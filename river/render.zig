@@ -88,7 +88,7 @@ pub fn renderOutput(output: *Output) void {
             if (view.focused) continue;
 
             renderView(output.*, view, &now);
-            renderBorders(output.*, view, &now);
+            if (view.draw_borders) renderBorders(output.*, view, &now);
         }
 
         // Render focused views
@@ -104,7 +104,7 @@ pub fn renderOutput(output: *Output) void {
             if (!view.focused) continue;
 
             renderView(output.*, view, &now);
-            renderBorders(output.*, view, &now);
+            if (view.draw_borders) renderBorders(output.*, view, &now);
         }
 
         if (build_options.xwayland) renderXwaylandUnmanaged(output.*, &now);

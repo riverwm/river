@@ -25,6 +25,8 @@ const util = @import("util.zig");
 const Decoration = @import("Decoration.zig");
 const Server = @import("Server.zig");
 
+server: *Server,
+
 wlr_xdg_decoration_manager: *c.wlr_xdg_decoration_manager_v1,
 
 decorations: std.SinglyLinkedList(Decoration),
@@ -34,6 +36,8 @@ listen_new_toplevel_decoration: c.wl_listener,
 pub fn init(self: *Self, server: *Server) !void {
     self.wlr_xdg_decoration_manager = c.wlr_xdg_decoration_manager_v1_create(server.wl_display) orelse
         return error.OutOfMemory;
+
+    self.server = server;
 
     self.listen_new_toplevel_decoration.notify = handleNewToplevelDecoration;
     c.wl_signal_add(
@@ -50,5 +54,5 @@ fn handleNewToplevelDecoration(listener: ?*c.wl_listener, data: ?*c_void) callco
         c.wl_resource_post_no_memory(wlr_xdg_toplevel_decoration.resource);
         return;
     };
-    decoration.init(wlr_xdg_toplevel_decoration);
+    decoration.init(self.server, wlr_xdg_toplevel_decoration);
 }
