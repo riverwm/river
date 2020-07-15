@@ -19,35 +19,6 @@ const std = @import("std");
 
 const Seat = @import("Seat.zig");
 
-const impl = struct {
-    const backgroundColor = @import("command/config.zig").backgroundColor;
-    const borderColorFocused = @import("command/config.zig").borderColorFocused;
-    const borderColorUnfocused = @import("command/config.zig").borderColorUnfocused;
-    const borderWidth = @import("command/config.zig").borderWidth;
-    const close = @import("command/close.zig").close;
-    const declareMode = @import("command/declare_mode.zig").declareMode;
-    const enterMode = @import("command/enter_mode.zig").enterMode;
-    const exit = @import("command/exit.zig").exit;
-    const focusOutput = @import("command/focus_output.zig").focusOutput;
-    const focusView = @import("command/focus_view.zig").focusView;
-    const layout = @import("command/layout.zig").layout;
-    const map = @import("command/map.zig").map;
-    const modMasterCount = @import("command/mod_master_count.zig").modMasterCount;
-    const modMasterFactor = @import("command/mod_master_factor.zig").modMasterFactor;
-    const outerPadding = @import("command/config.zig").outerPadding;
-    const sendToOutput = @import("command/send_to_output.zig").sendToOutput;
-    const setFocusedTags = @import("command/tags.zig").setFocusedTags;
-    const setViewTags = @import("command/tags.zig").setViewTags;
-    const spawn = @import("command/spawn.zig").spawn;
-    const toggleFloat = @import("command/toggle_float.zig").toggleFloat;
-    const toggleFocusedTags = @import("command/tags.zig").toggleFocusedTags;
-    const toggleFullscreen = @import("command/toggle_fullscreen.zig").toggleFullscreen;
-    const toggleViewTags = @import("command/tags.zig").toggleViewTags;
-    const viewPadding = @import("command/config.zig").viewPadding;
-    const xcursorTheme = @import("command/xcursor_theme.zig").xcursorTheme;
-    const zoom = @import("command/zoom.zig").zoom;
-};
-
 pub const Direction = enum {
     Next,
     Prev,
@@ -68,32 +39,32 @@ const str_to_impl_fn = [_]struct {
     name: []const u8,
     impl: fn (*std.mem.Allocator, *Seat, []const []const u8, *?[]const u8) Error!void,
 }{
-    .{ .name = "background-color",       .impl = impl.backgroundColor },
-    .{ .name = "border-color-focused",   .impl = impl.borderColorFocused },
-    .{ .name = "border-color-unfocused", .impl = impl.borderColorUnfocused },
-    .{ .name = "border-width",           .impl = impl.borderWidth },
-    .{ .name = "close",                  .impl = impl.close },
-    .{ .name = "declare-mode",           .impl = impl.declareMode },
-    .{ .name = "enter-mode",             .impl = impl.enterMode },
-    .{ .name = "exit",                   .impl = impl.exit },
-    .{ .name = "focus-output",           .impl = impl.focusOutput },
-    .{ .name = "focus-view",             .impl = impl.focusView },
-    .{ .name = "layout",                 .impl = impl.layout },
-    .{ .name = "map",                    .impl = impl.map },
-    .{ .name = "mod-master-count",       .impl = impl.modMasterCount },
-    .{ .name = "mod-master-factor",      .impl = impl.modMasterFactor },
-    .{ .name = "outer-padding",          .impl = impl.outerPadding },
-    .{ .name = "send-to-output",         .impl = impl.sendToOutput },
-    .{ .name = "set-focused-tags",       .impl = impl.setFocusedTags },
-    .{ .name = "set-view-tags",          .impl = impl.setViewTags },
-    .{ .name = "spawn",                  .impl = impl.spawn },
-    .{ .name = "toggle-float",           .impl = impl.toggleFloat },
-    .{ .name = "toggle-focused-tags",    .impl = impl.toggleFocusedTags },
-    .{ .name = "toggle-fullscreen",      .impl = impl.toggleFullscreen },
-    .{ .name = "toggle-view-tags",       .impl = impl.toggleViewTags },
-    .{ .name = "view-padding",           .impl = impl.viewPadding },
-    .{ .name = "xcursor-theme",          .impl = impl.xcursorTheme },
-    .{ .name = "zoom",                   .impl = impl.zoom },
+    .{ .name = "background-color",       .impl = @import("command/config.zig").backgroundColor },
+    .{ .name = "border-color-focused",   .impl = @import("command/config.zig").borderColorFocused },
+    .{ .name = "border-color-unfocused", .impl = @import("command/config.zig").borderColorUnfocused },
+    .{ .name = "border-width",           .impl = @import("command/config.zig").borderWidth },
+    .{ .name = "close",                  .impl = @import("command/close.zig").close },
+    .{ .name = "declare-mode",           .impl = @import("command/declare_mode.zig").declareMode },
+    .{ .name = "enter-mode",             .impl = @import("command/enter_mode.zig").enterMode },
+    .{ .name = "exit",                   .impl = @import("command/exit.zig").exit },
+    .{ .name = "focus-output",           .impl = @import("command/focus_output.zig").focusOutput },
+    .{ .name = "focus-view",             .impl = @import("command/focus_view.zig").focusView },
+    .{ .name = "layout",                 .impl = @import("command/layout.zig").layout },
+    .{ .name = "map",                    .impl = @import("command/map.zig").map },
+    .{ .name = "mod-master-count",       .impl = @import("command/mod_master_count.zig").modMasterCount },
+    .{ .name = "mod-master-factor",      .impl = @import("command/mod_master_factor.zig").modMasterFactor },
+    .{ .name = "outer-padding",          .impl = @import("command/config.zig").outerPadding },
+    .{ .name = "send-to-output",         .impl = @import("command/send_to_output.zig").sendToOutput },
+    .{ .name = "set-focused-tags",       .impl = @import("command/tags.zig").setFocusedTags },
+    .{ .name = "set-view-tags",          .impl = @import("command/tags.zig").setViewTags },
+    .{ .name = "spawn",                  .impl = @import("command/spawn.zig").spawn },
+    .{ .name = "toggle-float",           .impl = @import("command/toggle_float.zig").toggleFloat },
+    .{ .name = "toggle-focused-tags",    .impl = @import("command/tags.zig").toggleFocusedTags },
+    .{ .name = "toggle-fullscreen",      .impl = @import("command/toggle_fullscreen.zig").toggleFullscreen },
+    .{ .name = "toggle-view-tags",       .impl = @import("command/tags.zig").toggleViewTags },
+    .{ .name = "view-padding",           .impl = @import("command/config.zig").viewPadding },
+    .{ .name = "xcursor-theme",          .impl = @import("command/xcursor_theme.zig").xcursorTheme },
+    .{ .name = "zoom",                   .impl = @import("command/zoom.zig").zoom },
 };
 // zig fmt: on
 
