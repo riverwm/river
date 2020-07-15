@@ -33,7 +33,7 @@ pub fn sendToOutput(
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
 
-    const direction = try Direction.parse(args[1]);
+    const direction = std.meta.stringToEnum(Direction, args[1]) orelse return Error.InvalidDirection;
     const root = &seat.input_manager.server.root;
 
     if (seat.focused_view) |view| {
@@ -46,8 +46,8 @@ pub fn sendToOutput(
         // Send to the next/prev output in the list if there is one, else wrap
         const current_node = @fieldParentPtr(std.TailQueue(Output).Node, "data", view.output);
         const destination_output = switch (direction) {
-            .Next => if (current_node.next) |node| &node.data else &root.outputs.first.?.data,
-            .Prev => if (current_node.prev) |node| &node.data else &root.outputs.last.?.data,
+            .next => if (current_node.next) |node| &node.data else &root.outputs.first.?.data,
+            .previous => if (current_node.prev) |node| &node.data else &root.outputs.last.?.data,
         };
 
         // Move the view to the target output

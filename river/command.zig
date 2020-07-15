@@ -20,17 +20,8 @@ const std = @import("std");
 const Seat = @import("Seat.zig");
 
 pub const Direction = enum {
-    Next,
-    Prev,
-
-    pub fn parse(str: []const u8) error{InvalidDirection}!Direction {
-        return if (std.mem.eql(u8, str, "next"))
-            Direction.Next
-        else if (std.mem.eql(u8, str, "previous"))
-            Direction.Prev
-        else
-            error.InvalidDirection;
-    }
+    next,
+    previous,
 };
 
 // TODO: this could be replaced with a comptime hashmap

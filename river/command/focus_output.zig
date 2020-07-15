@@ -33,7 +33,7 @@ pub fn focusOutput(
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
 
-    const direction = try Direction.parse(args[1]);
+    const direction = std.meta.stringToEnum(Direction, args[1]) orelse return Error.InvalidDirection;
     const root = &seat.input_manager.server.root;
 
     // If the noop output is focused, there are no other outputs to switch to
@@ -45,8 +45,8 @@ pub fn focusOutput(
     // Focus the next/prev output in the list if there is one, else wrap
     const focused_node = @fieldParentPtr(std.TailQueue(Output).Node, "data", seat.focused_output);
     seat.focusOutput(switch (direction) {
-        .Next => if (focused_node.next) |node| &node.data else &root.outputs.first.?.data,
-        .Prev => if (focused_node.prev) |node| &node.data else &root.outputs.last.?.data,
+        .next => if (focused_node.next) |node| &node.data else &root.outputs.first.?.data,
+        .previous => if (focused_node.prev) |node| &node.data else &root.outputs.last.?.data,
     });
 
     seat.focus(null);
