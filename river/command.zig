@@ -20,6 +20,10 @@ const std = @import("std");
 const Seat = @import("Seat.zig");
 
 const impl = struct {
+    const backgroundColor = @import("command/config.zig").backgroundColor;
+    const borderColorFocused = @import("command/config.zig").borderColorFocused;
+    const borderColorUnfocused = @import("command/config.zig").borderColorUnfocused;
+    const borderWidth = @import("command/config.zig").borderWidth;
     const close = @import("command/close.zig").close;
     const declareMode = @import("command/declare_mode.zig").declareMode;
     const enterMode = @import("command/enter_mode.zig").enterMode;
@@ -30,15 +34,16 @@ const impl = struct {
     const map = @import("command/map.zig").map;
     const modMasterCount = @import("command/mod_master_count.zig").modMasterCount;
     const modMasterFactor = @import("command/mod_master_factor.zig").modMasterFactor;
+    const outerPadding = @import("command/config.zig").outerPadding;
     const sendToOutput = @import("command/send_to_output.zig").sendToOutput;
     const setFocusedTags = @import("command/tags.zig").setFocusedTags;
-    const setOption = @import("command/set_option.zig").setOption;
     const setViewTags = @import("command/tags.zig").setViewTags;
     const spawn = @import("command/spawn.zig").spawn;
     const toggleFloat = @import("command/toggle_float.zig").toggleFloat;
     const toggleFocusedTags = @import("command/tags.zig").toggleFocusedTags;
     const toggleFullscreen = @import("command/toggle_fullscreen.zig").toggleFullscreen;
     const toggleViewTags = @import("command/tags.zig").toggleViewTags;
+    const viewPadding = @import("command/config.zig").viewPadding;
     const xcursorTheme = @import("command/xcursor_theme.zig").xcursorTheme;
     const zoom = @import("command/zoom.zig").zoom;
 };
@@ -63,27 +68,32 @@ const str_to_impl_fn = [_]struct {
     name: []const u8,
     impl: fn (*std.mem.Allocator, *Seat, []const []const u8, *?[]const u8) Error!void,
 }{
-    .{ .name = "close",               .impl = impl.close },
-    .{ .name = "declare-mode",        .impl = impl.declareMode },
-    .{ .name = "enter-mode",          .impl = impl.enterMode },
-    .{ .name = "exit",                .impl = impl.exit },
-    .{ .name = "focus-output",        .impl = impl.focusOutput },
-    .{ .name = "focus-view",          .impl = impl.focusView },
-    .{ .name = "layout",              .impl = impl.layout },
-    .{ .name = "map",                 .impl = impl.map },
-    .{ .name = "mod-master-count",    .impl = impl.modMasterCount },
-    .{ .name = "mod-master-factor",   .impl = impl.modMasterFactor },
-    .{ .name = "send-to-output",      .impl = impl.sendToOutput },
-    .{ .name = "set-focused-tags",    .impl = impl.setFocusedTags },
-    .{ .name = "set-option",          .impl = impl.setOption },
-    .{ .name = "set-view-tags",       .impl = impl.setViewTags },
-    .{ .name = "spawn",               .impl = impl.spawn },
-    .{ .name = "toggle-float",        .impl = impl.toggleFloat },
-    .{ .name = "toggle-focused-tags", .impl = impl.toggleFocusedTags },
-    .{ .name = "toggle-fullscreen",   .impl = impl.toggleFullscreen },
-    .{ .name = "toggle-view-tags",    .impl = impl.toggleViewTags },
-    .{ .name = "xcursor-theme",       .impl = impl.xcursorTheme },
-    .{ .name = "zoom",                .impl = impl.zoom },
+    .{ .name = "background-color",       .impl = impl.backgroundColor },
+    .{ .name = "border-color-focused",   .impl = impl.borderColorFocused },
+    .{ .name = "border-color-unfocused", .impl = impl.borderColorUnfocused },
+    .{ .name = "border-width",           .impl = impl.borderWidth },
+    .{ .name = "close",                  .impl = impl.close },
+    .{ .name = "declare-mode",           .impl = impl.declareMode },
+    .{ .name = "enter-mode",             .impl = impl.enterMode },
+    .{ .name = "exit",                   .impl = impl.exit },
+    .{ .name = "focus-output",           .impl = impl.focusOutput },
+    .{ .name = "focus-view",             .impl = impl.focusView },
+    .{ .name = "layout",                 .impl = impl.layout },
+    .{ .name = "map",                    .impl = impl.map },
+    .{ .name = "mod-master-count",       .impl = impl.modMasterCount },
+    .{ .name = "mod-master-factor",      .impl = impl.modMasterFactor },
+    .{ .name = "outer-padding",          .impl = impl.outerPadding },
+    .{ .name = "send-to-output",         .impl = impl.sendToOutput },
+    .{ .name = "set-focused-tags",       .impl = impl.setFocusedTags },
+    .{ .name = "set-view-tags",          .impl = impl.setViewTags },
+    .{ .name = "spawn",                  .impl = impl.spawn },
+    .{ .name = "toggle-float",           .impl = impl.toggleFloat },
+    .{ .name = "toggle-focused-tags",    .impl = impl.toggleFocusedTags },
+    .{ .name = "toggle-fullscreen",      .impl = impl.toggleFullscreen },
+    .{ .name = "toggle-view-tags",       .impl = impl.toggleViewTags },
+    .{ .name = "view-padding",           .impl = impl.viewPadding },
+    .{ .name = "xcursor-theme",          .impl = impl.xcursorTheme },
+    .{ .name = "zoom",                   .impl = impl.zoom },
 };
 // zig fmt: on
 

@@ -88,6 +88,18 @@ that tag 1 through 9 are visible.
 
 ## CONFIGURATION COMMANDS
 
+*background-color* _#RRGGBB_|_#RRGGBBAA_
+	Set the background color.
+
+*border-color-focused* _#RRGGBB_|_#RRGGBBAA_
+	Set the border color of focused views.
+
+*border-color-unfocused* _#RRGGBB_|_#RRGGBBAA_
+	Set the border color of unfocused views.
+
+*border-width* _pixels_
+	Set the border width to _pixels_.
+
 *declare-mode* _name_
 	Create a new mode called _name_ for use in mappings.
 
@@ -114,15 +126,11 @@ that tag 1 through 9 are visible.
 	A mapping without modifiers can be created by passing an empty string as
 	the modifiers argument.
 
-*set-option* _option_ _value_
-	Set _option_ to a specified _value_. List of valid options:
+*outer-padding* _pixels_
+	Set the padding around the edge of the screen to _pixels_.
 
-	- *background_color* _RGB/RGBA_hex_code_
-	- *border_width* _non-negative_integer_
-	- *border_color_focused* _RGB/RGBA_hex_code_
-	- *border_color_unfocused* _RGB/RGBA_hex_code_
-	- *outer_padding* _non-negative_integer_
-	- *view_padding* _non-negative_integer_
+*view-padding* _pixels_
+	Set the padding around the edge of each view to _pixels_.
 
 *xcursor-theme* _theme_name_ [_size_]
 	Set the xcursor theme to _theme_name_ and optionally set the
