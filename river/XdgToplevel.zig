@@ -189,13 +189,23 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         }
     }
 
-    // If the toplevel has no parent, inform it that it is tiled. This
+    // If the toplevel has no parent and has an app_id which is not configured
+    // to use client side decorations, inform it that it is tiled. This
     // prevents firefox, for example, from drawing shadows around itself.
-    if (wlr_xdg_toplevel.parent == null)
-        _ = c.wlr_xdg_toplevel_set_tiled(
-            self.wlr_xdg_surface,
-            c.WLR_EDGE_LEFT | c.WLR_EDGE_RIGHT | c.WLR_EDGE_TOP | c.WLR_EDGE_BOTTOM,
-        );
+    if (wlr_xdg_toplevel.parent == null) {
+        const use_csd = for (root.server.config.csd_filter.items) |filter_app_id| {
+            if (std.mem.eql(u8, std.mem.span(app_id), filter_app_id)) break true;
+        } else false;
+
+        if (use_csd) {
+            view.draw_borders = false;
+        } else {
+            _ = c.wlr_xdg_toplevel_set_tiled(
+                self.wlr_xdg_surface,
+                c.WLR_EDGE_LEFT | c.WLR_EDGE_RIGHT | c.WLR_EDGE_TOP | c.WLR_EDGE_BOTTOM,
+            );
+        }
+    }
 
     view.map();
 }

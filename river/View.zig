@@ -89,6 +89,8 @@ saved_buffers: std.ArrayList(SavedBuffer),
 /// view returns to floating mode.
 float_box: Box,
 
+draw_borders: bool,
+
 pub fn init(self: *Self, output: *Output, tags: u32, surface: var) void {
     self.output = output;
 
@@ -112,6 +114,8 @@ pub fn init(self: *Self, output: *Output, tags: u32, surface: var) void {
     self.pending_serial = null;
 
     self.saved_buffers = std.ArrayList(SavedBuffer).init(util.gpa);
+
+    self.draw_borders = true;
 
     if (@TypeOf(surface) == *c.wlr_xdg_surface) {
         self.impl = .{ .xdg_toplevel = undefined };

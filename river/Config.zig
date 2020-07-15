@@ -52,6 +52,9 @@ modes: std.ArrayList(std.ArrayList(Mapping)),
 /// List of app_ids which will be started floating
 float_filter: std.ArrayList([*:0]const u8),
 
+/// List of app_ids which are allowed to use client side decorations
+csd_filter: std.ArrayList([]const u8),
+
 pub fn init(self: *Self) !void {
     self.background_color = [_]f32{ 0.0, 0.16862745, 0.21176471, 1.0 }; // Solarized base03
     self.border_width = 2;
@@ -73,8 +76,14 @@ pub fn init(self: *Self) !void {
     self.float_filter = std.ArrayList([*:0]const u8).init(util.gpa);
     errdefer self.float_filter.deinit();
 
+    self.csd_filter = std.ArrayList([]const u8).init(util.gpa);
+    errdefer self.csd_filter.deinit();
+
     // Float views with app_id "float"
     try self.float_filter.append("float");
+
+    // Client side decorations for views with app_id "csd"
+    try self.csd_filter.append("csd");
 }
 
 pub fn deinit(self: Self) void {
@@ -89,4 +98,5 @@ pub fn deinit(self: Self) void {
     self.modes.deinit();
 
     self.float_filter.deinit();
+    self.csd_filter.deinit();
 }
