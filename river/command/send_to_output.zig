@@ -36,22 +36,22 @@ pub fn sendToOutput(
     const direction = std.meta.stringToEnum(Direction, args[1]) orelse return Error.InvalidDirection;
     const root = &seat.input_manager.server.root;
 
-    if (seat.focused_view) |view| {
+    if (seat.focused == .view) {
         // If the noop output is focused, there is nowhere to send the view
-        if (view.output == &root.noop_output) {
+        if (seat.focused_output == &root.noop_output) {
             std.debug.assert(root.outputs.len == 0);
             return;
         }
 
         // Send to the next/prev output in the list if there is one, else wrap
-        const current_node = @fieldParentPtr(std.TailQueue(Output).Node, "data", view.output);
+        const current_node = @fieldParentPtr(std.TailQueue(Output).Node, "data", seat.focused_output);
         const destination_output = switch (direction) {
             .next => if (current_node.next) |node| &node.data else &root.outputs.first.?.data,
             .previous => if (current_node.prev) |node| &node.data else &root.outputs.last.?.data,
         };
 
         // Move the view to the target output
-        view.sendToOutput(destination_output);
+        seat.focused.view.sendToOutput(destination_output);
 
         // Handle the change and focus whatever's next in the focus stack
         root.arrange();

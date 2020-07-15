@@ -139,11 +139,8 @@ fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     var it = self.output.root.server.input_manager.seats.first;
     while (it) |node| : (it = node.next) {
         const seat = &node.data;
-        if (seat.focused_layer) |current_focus| {
-            if (current_focus == self) {
-                seat.setFocusRaw(.{ .none = {} });
-            }
-        }
+        if (seat.focused == .layer and seat.focused.layer == self)
+            seat.setFocusRaw(.{ .none = {} });
     }
 
     // This gives exclusive focus to a keyboard interactive top or overlay layer

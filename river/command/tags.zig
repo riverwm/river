@@ -42,9 +42,9 @@ pub fn setViewTags(
     out: *?[]const u8,
 ) Error!void {
     const tags = try parseTags(allocator, args, out);
-    if (seat.focused_view) |view| {
-        view.pending.tags = tags;
-        view.output.root.arrange();
+    if (seat.focused == .view) {
+        seat.focused.view.pending.tags = tags;
+        seat.focused.view.output.root.arrange();
     }
 }
 
@@ -72,11 +72,11 @@ pub fn toggleViewTags(
     out: *?[]const u8,
 ) Error!void {
     const tags = try parseTags(allocator, args, out);
-    if (seat.focused_view) |view| {
-        const new_tags = view.current.tags ^ tags;
+    if (seat.focused == .view) {
+        const new_tags = seat.focused.view.current.tags ^ tags;
         if (new_tags != 0) {
-            view.pending.tags = new_tags;
-            view.output.root.arrange();
+            seat.focused.view.pending.tags = new_tags;
+            seat.focused.view.output.root.arrange();
         }
     }
 }

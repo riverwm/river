@@ -32,19 +32,19 @@ pub fn zoom(
 ) Error!void {
     if (args.len > 1) return Error.TooManyArguments;
 
-    if (seat.focused_view) |current_focus| {
-        const output = seat.focused_output;
-        const focused_node = @fieldParentPtr(ViewStack(View).Node, "view", current_focus);
-
+    if (seat.focused == .view) {
         // Only zoom views that are part of the layout
-        if (current_focus.pending.float or current_focus.pending.fullscreen) return;
+        if (seat.focused.view.pending.float or seat.focused.view.pending.fullscreen) return;
 
-        // If the the first view that is part of the layout is focused, zoom
+        // If the first view that is part of the layout is focused, zoom
         // the next view in the layout. Otherwise zoom the focused view.
+        const output = seat.focused_output;
         var it = ViewStack(View).iterator(output.views.first, output.current.tags);
         const layout_first = while (it.next()) |node| {
             if (!node.view.pending.float and !node.view.pending.fullscreen) break node;
         } else unreachable;
+
+        const focused_node = @fieldParentPtr(ViewStack(View).Node, "view", seat.focused.view);
         const zoom_node = if (focused_node == layout_first) blk: {
             while (it.next()) |node| {
                 if (!node.view.pending.float and !node.view.pending.fullscreen) break :blk node;

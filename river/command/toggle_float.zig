@@ -30,7 +30,9 @@ pub fn toggleFloat(
 ) Error!void {
     if (args.len > 1) return Error.TooManyArguments;
 
-    if (seat.focused_view) |view| {
+    if (seat.focused == .view) {
+        const view = seat.focused.view;
+
         // Don't float fullscreen views
         if (view.pending.fullscreen) return;
 

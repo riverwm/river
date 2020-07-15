@@ -37,12 +37,12 @@ pub fn focusView(
     const direction = std.meta.stringToEnum(Direction, args[1]) orelse return Error.InvalidDirection;
     const output = seat.focused_output;
 
-    if (seat.focused_view) |current_focus| {
+    if (seat.focused == .view) {
         // If the focused view is fullscreen, do nothing
-        if (current_focus.current.fullscreen) return;
+        if (seat.focused.view.current.fullscreen) return;
 
         // If there is a currently focused view, focus the next visible view in the stack.
-        const focused_node = @fieldParentPtr(ViewStack(View).Node, "view", current_focus);
+        const focused_node = @fieldParentPtr(ViewStack(View).Node, "view", seat.focused.view);
         var it = switch (direction) {
             .next => ViewStack(View).iterator(focused_node, output.current.tags),
             .previous => ViewStack(View).reverseIterator(focused_node, output.current.tags),

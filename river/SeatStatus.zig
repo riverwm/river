@@ -75,8 +75,6 @@ pub fn sendOutput(self: Self, state: FocusState) void {
 }
 
 pub fn sendFocusedView(self: Self) void {
-    c.zriver_seat_status_v1_send_focused_view(self.wl_resource, if (self.seat.focused_view) |v|
-        v.getTitle()
-    else
-        "");
+    const title: [*:0]const u8 = if (self.seat.focused == .view) self.seat.focused.view.getTitle() else "";
+    c.zriver_seat_status_v1_send_focused_view(self.wl_resource, title);
 }

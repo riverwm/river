@@ -29,5 +29,5 @@ pub fn close(
 ) Error!void {
     // Note: we don't call arrange() here as it will be called
     // automatically when the view is unmapped.
-    if (seat.focused_view) |view| view.close();
+    if (seat.focused == .view) seat.focused.view.close();
 }

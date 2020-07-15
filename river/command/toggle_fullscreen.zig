@@ -29,8 +29,8 @@ pub fn toggleFullscreen(
 ) Error!void {
     if (args.len > 1) return Error.TooManyArguments;
 
-    if (seat.focused_view) |view| {
-        view.setFullscreen(!view.pending.fullscreen);
-        view.output.root.arrange();
+    if (seat.focused == .view) {
+        seat.focused.view.setFullscreen(!seat.focused.view.pending.fullscreen);
+        seat.focused.view.output.root.arrange();
     }
 }

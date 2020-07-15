@@ -393,18 +393,16 @@ pub fn arrangeLayers(self: *Self) void {
         const seat = &node.data;
 
         // Only grab focus of seats which have the output focused
-        if (seat.focused_output != self) {
-            continue;
-        }
+        if (seat.focused_output != self) continue;
 
         if (topmost_surface) |to_focus| {
             // If we found a surface that requires focus, grab the focus of all
             // seats.
             seat.setFocusRaw(.{ .layer = to_focus });
-        } else if (seat.focused_layer) |current_focus| {
+        } else if (seat.focused == .layer) {
             // If the seat is currently focusing a layer without keyboard
-            // interactivity, clear the focused layer.
-            if (!current_focus.wlr_layer_surface.current.keyboard_interactive) {
+            // interactivity, stop focusing that layer.
+            if (!seat.focused.layer.wlr_layer_surface.current.keyboard_interactive) {
                 seat.setFocusRaw(.{ .none = {} });
                 seat.focus(null);
             }
