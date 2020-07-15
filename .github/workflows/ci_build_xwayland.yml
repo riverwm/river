@@ -1,13 +1,7 @@
 # Build river and run the test suite with xwayland enabled every time a commit
 # is pushed to master or a pull request is opened against master.
 
-on:
-  push:
-    branches:
-      - master
-  pull_request:
-    branches:
-      - master
+on: [push, pull_request]
 
 name: Archliunx + Xwayland
 
