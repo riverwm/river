@@ -50,7 +50,7 @@ mode_to_id: std.StringHashMap(usize),
 modes: std.ArrayList(std.ArrayList(Mapping)),
 
 /// List of app_ids which will be started floating
-float_filter: std.ArrayList([*:0]const u8),
+float_filter: std.ArrayList([]const u8),
 
 /// List of app_ids which are allowed to use client side decorations
 csd_filter: std.ArrayList([]const u8),
@@ -73,7 +73,7 @@ pub fn init(self: *Self) !void {
     errdefer self.modes.deinit();
     try self.modes.append(std.ArrayList(Mapping).init(util.gpa));
 
-    self.float_filter = std.ArrayList([*:0]const u8).init(util.gpa);
+    self.float_filter = std.ArrayList([]const u8).init(util.gpa);
     errdefer self.float_filter.deinit();
 
     self.csd_filter = std.ArrayList([]const u8).init(util.gpa);
