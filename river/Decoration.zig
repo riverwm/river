@@ -61,19 +61,12 @@ fn handleRequestMode(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) voi
     const wlr_xdg_toplevel: *c.wlr_xdg_toplevel = @field(wlr_xdg_surface, c.wlr_xdg_surface_union).toplevel;
     const app_id: [*:0]const u8 = if (wlr_xdg_toplevel.app_id) |id| id else "NULL";
 
-    const use_csd = for (self.server.config.csd_filter.items) |filter_app_id| {
-        if (std.mem.eql(u8, std.mem.span(app_id), filter_app_id)) break true;
-    } else false;
-
-    if (use_csd) {
-        _ = c.wlr_xdg_toplevel_decoration_v1_set_mode(
-            self.wlr_xdg_toplevel_decoration,
-            .WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE,
-        );
-    } else {
-        _ = c.wlr_xdg_toplevel_decoration_v1_set_mode(
-            self.wlr_xdg_toplevel_decoration,
-            .WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE,
-        );
-    }
+    _ = c.wlr_xdg_toplevel_decoration_v1_set_mode(
+        self.wlr_xdg_toplevel_decoration,
+        for (self.server.config.csd_filter.items) |filter_app_id| {
+            if (std.mem.eql(u8, std.mem.span(app_id), filter_app_id)) {
+                break .WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE;
+            }
+        } else .WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE,
+    );
 }
