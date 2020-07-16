@@ -46,18 +46,17 @@ pub fn init(self: *Self, seat: *Seat, wlr_input_device: *c.wlr_input_device) !vo
         .variant = null,
         .options = null,
     };
-    const context = c.xkb_context_new(.XKB_CONTEXT_NO_FLAGS) orelse return error.CreateXkbContextError;
+    const context = c.xkb_context_new(.XKB_CONTEXT_NO_FLAGS) orelse return error.XkbContextFailed;
     defer c.xkb_context_unref(context);
 
     const keymap = c.xkb_keymap_new_from_names(
         context,
         &rules,
         .XKB_KEYMAP_COMPILE_NO_FLAGS,
-    ) orelse return error.CreateXkbKeymapError;
+    ) orelse return error.XkbKeymapFailed;
     defer c.xkb_keymap_unref(keymap);
 
-    // TODO: handle failure after https://github.com/swaywm/wlroots/pull/2081
-    c.wlr_keyboard_set_keymap(self.wlr_keyboard, keymap);
+    if (!c.wlr_keyboard_set_keymap(self.wlr_keyboard, keymap)) return error.SetKeymapFailed;
     c.wlr_keyboard_set_repeat_info(self.wlr_keyboard, 25, 600);
 
     // Setup listeners for keyboard events

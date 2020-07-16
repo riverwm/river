@@ -50,7 +50,7 @@ const State = struct {
 };
 
 const SavedBuffer = struct {
-    wlr_buffer: *c.wlr_buffer,
+    wlr_client_buffer: *c.wlr_client_buffer,
     box: Box,
     transform: c.wl_output_transform,
 };
@@ -127,7 +127,7 @@ pub fn init(self: *Self, output: *Output, tags: u32, surface: var) void {
 }
 
 pub fn deinit(self: Self) void {
-    for (self.saved_buffers.items) |buffer| c.wlr_buffer_unref(buffer.wlr_buffer);
+    for (self.saved_buffers.items) |buffer| c.wlr_buffer_unlock(&buffer.wlr_client_buffer.*.base);
     self.saved_buffers.deinit();
 }
 
@@ -152,7 +152,7 @@ pub fn sendFrameDone(self: Self) void {
 }
 
 pub fn dropSavedBuffers(self: *Self) void {
-    for (self.saved_buffers.items) |buffer| c.wlr_buffer_unref(buffer.wlr_buffer);
+    for (self.saved_buffers.items) |buffer| c.wlr_buffer_unlock(&buffer.wlr_client_buffer.*.base);
     self.saved_buffers.items.len = 0;
 }
 
@@ -176,7 +176,7 @@ fn saveBuffersIterator(
     if (wlr_surface) |surface| {
         if (c.wlr_surface_has_buffer(surface)) {
             saved_buffers.append(.{
-                .wlr_buffer = surface.buffer,
+                .wlr_client_buffer = surface.buffer,
                 .box = Box{
                     .x = surface_x,
                     .y = surface_y,
@@ -185,7 +185,7 @@ fn saveBuffersIterator(
                 },
                 .transform = surface.current.transform,
             }) catch return;
-            _ = c.wlr_buffer_ref(surface.buffer);
+            _ = c.wlr_buffer_lock(&surface.buffer.*.base);
         }
     }
 }

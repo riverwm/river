@@ -156,7 +156,7 @@ fn renderView(output: Output, view: *View, now: *c.timespec) void {
         for (view.saved_buffers.items) |saved_buffer|
             renderTexture(
                 output,
-                saved_buffer.wlr_buffer.texture,
+                saved_buffer.wlr_client_buffer.texture,
                 .{
                     .x = saved_buffer.box.x + view.current.box.x - view.saved_surface_box.x,
                     .y = saved_buffer.box.y + view.current.box.y - view.saved_surface_box.y,

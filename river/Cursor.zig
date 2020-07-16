@@ -130,7 +130,7 @@ pub fn setTheme(self: *Self, theme: ?[*:0]const u8, size: ?u32) !void {
     var it = server.root.outputs.first;
     while (it) |node| : (it = node.next) {
         const wlr_output = node.data.wlr_output;
-        if (c.wlr_xcursor_manager_load(self.wlr_xcursor_manager, wlr_output.scale) != 0)
+        if (!c.wlr_xcursor_manager_load(self.wlr_xcursor_manager, wlr_output.scale))
             log.err(.cursor, "failed to load xcursor theme '{}' at scale {}", .{ theme, wlr_output.scale });
     }
 
@@ -143,7 +143,7 @@ pub fn setTheme(self: *Self, theme: ?[*:0]const u8, size: ?u32) !void {
         if (theme) |t| if (c.setenv("XCURSOR_THEME", t, 1) < 0) return error.OutOfMemory;
 
         if (build_options.xwayland) {
-            if (c.wlr_xcursor_manager_load(self.wlr_xcursor_manager, 1) == 0) {
+            if (c.wlr_xcursor_manager_load(self.wlr_xcursor_manager, 1)) {
                 const wlr_xcursor = c.wlr_xcursor_manager_get_xcursor(self.wlr_xcursor_manager, "left_ptr", 1).?;
                 const image: *c.wlr_xcursor_image = wlr_xcursor.*.images[0];
                 c.wlr_xwayland_set_cursor(

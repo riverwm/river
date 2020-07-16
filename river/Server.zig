@@ -84,9 +84,8 @@ pub fn init(self: *Self) !void {
     // The renderer is responsible for defining the various pixel formats it
     // supports for shared memory, this configures that for clients.
     const wlr_renderer = c.river_wlr_backend_get_renderer(self.wlr_backend).?;
-    // TODO: Handle failure after https://github.com/swaywm/wlroots/pull/2080
-    c.wlr_renderer_init_wl_display(wlr_renderer, self.wl_display); // orelse
-    //    return error.CantInitWlDisplay;
+    if (!c.wlr_renderer_init_wl_display(wlr_renderer, self.wl_display)) return error.DisplayInitFailed;
+
     self.listen_new_output.notify = handleNewOutput;
     c.wl_signal_add(&self.wlr_backend.events.new_output, &self.listen_new_output);
 
@@ -149,7 +148,7 @@ pub fn start(self: Self) !void {
     if (!c.river_wlr_backend_start(self.wlr_backend)) return error.StartBackendError;
     if (c.setenv("WAYLAND_DISPLAY", socket, 1) < 0) return error.SetenvError;
     if (build_options.xwayland) {
-        if (c.setenv("DISPLAY", &self.wlr_xwayland.display_name, 1) < 0) return error.SetenvError;
+        if (c.setenv("DISPLAY", self.wlr_xwayland.display_name, 1) < 0) return error.SetenvError;
     }
 }
 

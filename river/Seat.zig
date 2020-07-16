@@ -294,8 +294,9 @@ fn addKeyboard(self: *Self, device: *c.wlr_input_device) !void {
     const node = try self.keyboards.allocateNode(util.gpa);
     node.data.init(self, device) catch |err| {
         switch (err) {
-            error.CreateXkbContextError => log.err(.keyboard, "Failed to create XKB context", .{}),
-            error.CreateXkbKeymapError => log.err(.keyboard, "Failed to create XKB keymap", .{}),
+            error.XkbContextFailed => log.err(.keyboard, "Failed to create XKB context", .{}),
+            error.XkbKeymapFailed => log.err(.keyboard, "Failed to create XKB keymap", .{}),
+            error.SetKeymapFailed => log.err(.keyboard, "Failed to set wlr keyboard keymap", .{}),
         }
         return;
     };
