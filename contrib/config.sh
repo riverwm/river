@@ -86,3 +86,11 @@ riverctl map passthrough $mod F11 enter-mode normal
 
 # Set the layout on startup
 riverctl layout rivertile left
+
+# Set app-ids of views which should float
+riverctl float-filter-add "float"
+riverctl float-filter-add "popup"
+
+# Set app-ids of views which should use client side decorations
+riverctl csd-filter-add "gedit"
+

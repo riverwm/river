@@ -78,12 +78,6 @@ pub fn init(self: *Self) !void {
 
     self.csd_filter = std.ArrayList([]const u8).init(util.gpa);
     errdefer self.csd_filter.deinit();
-
-    // Float views with app_id "float"
-    try self.float_filter.append("float");
-
-    // Client side decorations for views with app_id "csd"
-    try self.csd_filter.append("csd");
 }
 
 pub fn deinit(self: Self) void {
