@@ -20,8 +20,16 @@ used to control and configure river.
 *close*
 	Close the focused view.
 
+*csd-filter-add* _app-id_
+	Add an app-id to the CSD filter list. Windows with this app-id are allowed
+	to use client side decoration instead of the default server side decoration.
+
 *exit*
 	Exit the compositor, terminating the Wayland session.
+
+*float-filter-add* _app-id_
+	Add an app-id to the float filter list. Windows with this app-id will start
+	floating.
 
 *focus-output* *next*|*previous*
 	Focus next or previous output.
