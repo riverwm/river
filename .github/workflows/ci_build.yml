@@ -3,18 +3,22 @@
 
 on: [push, pull_request]
 
-name: Archliunx
+name: voidlinux
 
 jobs:
-  build:
-    name: Archliunx
+  default_build:
+    name: default build
     runs-on: ubuntu-latest
-    container: archlinux:latest
+    container: voidlinux/voidlinux:latest
 
     steps:
       - name: Install Dependencies
         run: |
-          pacman -Syu --noconfirm zig wayland-protocols wlroots pkgconf
+          xbps-install -S
+          xbps-install -uy xbps
+          xbps-install -uy
+          xbps-install -uy zig wayland-devel wayland-protocols wlroots-devel \
+          	libxkbcommon-devel pixman-devel pkgconf scdoc
 
       - name: Checkout Code
         uses: actions/checkout@master
@@ -27,6 +31,47 @@ jobs:
         run: |
           zig build test
 
-      - name: zig fmt
+  xwayland_build:
+    name: xwayland build
+    runs-on: ubuntu-latest
+    container: voidlinux/voidlinux:latest
+
+    steps:
+      - name: install deps
+        run: |
+          xbps-install -S
+          xbps-install -uy xbps
+          xbps-install -uy
+          xbps-install -uy zig wayland-devel wayland-protocols wlroots-devel \
+          	libxkbcommon-devel pixman-devel pkgconf scdoc
+
+      - name: checkout
+        uses: actions/checkout@master
+
+      - name: build
+        run: |
+          zig build -Dxwayland=true
+
+      - name: test
+        run: |
+          zig build -Dxwayland=true test
+
+  zig_fmt:
+    name: zig fmt
+    runs-on: ubuntu-latest
+    container: voidlinux/voidlinux:latest
+
+    steps:
+      - name: install deps
+        run: |
+          xbps-install -S
+          xbps-install -uy xbps
+          xbps-install -uy
+          xbps-install -uy zig
+
+      - name: checkout
+        uses: actions/checkout@master
+
+      - name: fmt
         run: |
           find . -path ./zig-cache -prune -o -name "*.zig" -exec zig fmt --check {} ";"
