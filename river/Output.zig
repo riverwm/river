@@ -610,6 +610,9 @@ fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     // Clean up the wlr_output
     self.wlr_output.data = null;
 
+    // Free the layout command
+    util.gpa.free(self.layout);
+
     // Remove the destroyed output from the list
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
     root.outputs.remove(node);

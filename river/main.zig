@@ -93,6 +93,7 @@ pub fn main() anyerror!void {
     } else null;
     defer if (startup_process) |child| {
         _ = child.kill() catch |e| log.err(.server, "failed to terminate startup process: {}", .{e});
+        child.deinit();
     };
 
     log.info(.server, "running...", .{});
