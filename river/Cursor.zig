@@ -118,7 +118,8 @@ pub fn deinit(self: *Self) void {
 }
 
 /// Set the cursor theme for the given seat, as well as the xwayland theme if
-/// this is the default seat.
+/// this is the default seat. Either argument may be null, in which case a
+/// default will be used.
 pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
     const server = self.seat.input_manager.server;
     const size = _size orelse default_size;

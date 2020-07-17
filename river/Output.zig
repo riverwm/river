@@ -142,6 +142,15 @@ pub fn init(self: *Self, root: *Root, wlr_output: *c.wlr_output) !void {
         // layout. This automatically creates an output global on the wl_display.
         c.wlr_output_layout_add_auto(root.wlr_output_layout, wlr_output);
 
+        // Ensure that a cursor image at the output's scale factor is loaded
+        // for each seat.
+        var it = root.server.input_manager.seats.first;
+        while (it) |node| : (it = node.next) {
+            const seat = &node.data;
+            if (!c.wlr_xcursor_manager_load(seat.cursor.wlr_xcursor_manager, wlr_output.scale))
+                log.err(.cursor, "failed to load xcursor theme at scale {}", .{wlr_output.scale});
+        }
+
         var width: c_int = undefined;
         var height: c_int = undefined;
         c.wlr_output_effective_resolution(wlr_output, &width, &height);
