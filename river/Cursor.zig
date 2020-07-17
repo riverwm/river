@@ -119,11 +119,12 @@ pub fn deinit(self: *Self) void {
 
 /// Set the cursor theme for the given seat, as well as the xwayland theme if
 /// this is the default seat.
-pub fn setTheme(self: *Self, theme: ?[*:0]const u8, size: ?u32) !void {
+pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
     const server = self.seat.input_manager.server;
+    const size = _size orelse default_size;
 
     c.wlr_xcursor_manager_destroy(self.wlr_xcursor_manager);
-    self.wlr_xcursor_manager = c.wlr_xcursor_manager_create(theme, size orelse default_size) orelse
+    self.wlr_xcursor_manager = c.wlr_xcursor_manager_create(theme, size) orelse
         return error.OutOfMemory;
 
     // For each output, ensure a theme of the proper scale is loaded
