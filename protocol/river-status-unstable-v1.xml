@@ -80,7 +80,8 @@
   <interface name="zriver_seat_status_v1" version="1">
     <description summary="track seat focus">
       This interface allows clients to receive information about the current
-      focus of a seat.
+      focus of a seat. Note that (un)focused_output events will only be sent
+      if the client has bound the relevant wl_output globals.
     </description>
 
     <request name="destroy" type="destructor">
