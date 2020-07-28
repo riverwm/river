@@ -25,7 +25,7 @@
     THIS SOFTWARE.
   </copyright>
 
-  <interface name="zwlr_layer_shell_v1" version="2">
+  <interface name="zwlr_layer_shell_v1" version="3">
     <description summary="create surfaces that are layers of the desktop">
       Clients can use this interface to assign the surface_layer role to
       wl_surfaces. Such surfaces are assigned to a "layer" of the output and
@@ -82,9 +82,19 @@
       <entry name="top" value="2"/>
       <entry name="overlay" value="3"/>
     </enum>
+
+    <!-- Version 3 additions -->
+
+    <request name="destroy" type="destructor" since="3">
+      <description summary="destroy the layer_shell object">
+        This request indicates that the client will not use the layer_shell
+        object any more. Objects that have been created through this instance
+        are not affected.
+      </description>
+    </request>
   </interface>
 
-  <interface name="zwlr_layer_surface_v1" version="2">
+  <interface name="zwlr_layer_surface_v1" version="3">
     <description summary="layer metadata interface">
       An interface that may be implemented by a wl_surface, for surfaces that
       are designed to be rendered as a layer of a stacked desktop-like
