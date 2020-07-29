@@ -30,7 +30,12 @@ pub fn toggleFullscreen(
     if (args.len > 1) return Error.TooManyArguments;
 
     if (seat.focused == .view) {
-        seat.focused.view.setFullscreen(!seat.focused.view.pending.fullscreen);
-        seat.focused.view.output.root.arrange();
+        const view = seat.focused.view;
+
+        // Don't modify views which are the target of a cursor action
+        if (seat.input_manager.isCursorActionTarget(view)) return;
+
+        view.setFullscreen(!seat.focused.view.pending.fullscreen);
+        view.output.root.arrange();
     }
 }

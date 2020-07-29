@@ -36,6 +36,9 @@ pub fn toggleFloat(
         // Don't float fullscreen views
         if (view.pending.fullscreen) return;
 
+        // Don't modify views which are the target of a cursor action
+        if (seat.input_manager.isCursorActionTarget(view)) return;
+
         if (!view.pending.float) view.pending.box = view.float_box;
         view.pending.float = !view.pending.float;
         view.output.root.arrange();

@@ -26,6 +26,7 @@ const util = @import("util.zig");
 
 const Seat = @import("Seat.zig");
 const Server = @import("Server.zig");
+const View = @import("View.zig");
 
 const default_seat_name = "default";
 
@@ -99,6 +100,18 @@ pub fn inputAllowed(self: Self, wlr_surface: *c.wlr_surface) bool {
         exclusive_client == c.wl_resource_get_client(wlr_surface.resource)
     else
         true;
+}
+
+pub fn isCursorActionTarget(self: Self, view: *View) bool {
+    var it = self.seats.first;
+    return while (it) |node| : (it = node.next) {
+        const seat = &node.data;
+        switch (seat.cursor.mode) {
+            .passthrough => {},
+            .move => |data| if (data.view == view) break true,
+            .resize => |data| if (data.view == view) break true,
+        }
+    } else false;
 }
 
 fn handleInhibitActivate(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
