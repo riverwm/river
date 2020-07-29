@@ -274,11 +274,12 @@ fn handleButton(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
                 if (event.state == .WLR_BUTTON_PRESSED and self.pressed_count == 1) {
                     // If the button is pressed and the pointer modifier is
                     // active, enter cursor mode or close view and return.
+                    const fullscreen = view.current.fullscreen or view.pending.fullscreen;
                     if (self.seat.pointer_modifier) {
                         switch (event.button) {
-                            c.BTN_LEFT => self.enterCursorMode(event, view, .move),
+                            c.BTN_LEFT => if (!fullscreen) self.enterCursorMode(event, view, .move),
                             c.BTN_MIDDLE => view.close(),
-                            c.BTN_RIGHT => self.enterCursorMode(event, view, .resize),
+                            c.BTN_RIGHT => if (!fullscreen) self.enterCursorMode(event, view, .resize),
 
                             // TODO Some mice have additional buttons. These
                             // could also be bound to some useful action.
