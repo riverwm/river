@@ -32,14 +32,6 @@ const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const OutputStatus = @import("OutputStatus.zig");
 
-// Minimum width/height for surfaces.
-// This is needed, because external layouts and large padding and border sizes
-// may cause surfaces so small, that bugs in client applications are encountered,
-// or even surfaces of zero or negative size,which are a protocol error and would
-// likely cause river to crash. The value is totally arbitrary and low enough,
-// that it should never be encountered during normal usage.
-const minimum_size = 50;
-
 const State = struct {
     /// A bit field of focused tags
     tags: u32,
@@ -187,18 +179,13 @@ fn layoutFull(self: *Self, visible_count: u32, output_tags: u32) void {
         .height = self.usable_box.height - (2 * xy_offset),
     };
 
-    // Apply minimum view size
-    if (full_box.width < minimum_size) {
-        full_box.width = minimum_size;
-    }
-    if (full_box.height < minimum_size) {
-        full_box.height = minimum_size;
-    }
-
     var it = ViewStack(View).pendingIterator(self.views.first, output_tags);
     while (it.next()) |node| {
         const view = &node.view;
-        if (!view.pending.float and !view.pending.fullscreen) view.pending.box = full_box;
+        if (!view.pending.float and !view.pending.fullscreen) {
+            view.pending.box = full_box;
+            view.applyConstraints();
+        }
     }
 }
 
@@ -285,14 +272,6 @@ fn layoutExternal(self: *Self, visible_count: u32, output_tags: u32) !void {
         box.y += self.usable_box.y + xy_offset;
         box.width -= delta_size;
         box.height -= delta_size;
-        if (box.width < minimum_size) {
-            box.width = minimum_size;
-            log.notice(.layout, "window hits minimum view width.", .{});
-        }
-        if (box.height < minimum_size) {
-            box.height = minimum_size;
-            log.notice(.layout, "window hits minimum view height.", .{});
-        }
         try view_boxen.append(box);
     }
 
@@ -305,6 +284,7 @@ fn layoutExternal(self: *Self, visible_count: u32, output_tags: u32) !void {
         const view = &node.view;
         if (!view.pending.float and !view.pending.fullscreen) {
             view.pending.box = view_boxen.items[i];
+            view.applyConstraints();
             i += 1;
         }
     }
