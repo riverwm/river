@@ -31,6 +31,21 @@ const ViewStack = @import("view_stack.zig").ViewStack;
 const XdgToplevel = @import("XdgToplevel.zig");
 const XwaylandView = if (build_options.xwayland) @import("XwaylandView.zig") else @import("VoidView.zig");
 
+pub const Constraints = struct {
+    min_width: u32,
+    max_width: u32,
+    min_height: u32,
+    max_height: u32,
+};
+
+// Minimum width/height for surfaces.
+// This is needed, because external layouts and large padding and border sizes
+// may cause surfaces so small, that bugs in client applications are encountered,
+// or even surfaces of zero or negative size,which are a protocol error and would
+// likely cause river to crash. The value is totally arbitrary and low enough,
+// that it should never be encountered during normal usage.
+pub const min_size = 50;
+
 const Impl = union(enum) {
     xdg_toplevel: XdgToplevel,
     xwayland_view: XwaylandView,
@@ -262,6 +277,22 @@ pub fn getTitle(self: Self) [*:0]const u8 {
     return switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.getTitle(),
         .xwayland_view => |xwayland_view| xwayland_view.getTitle(),
+    };
+}
+
+/// Clamp the width/height of the pending state to the constraints of the view
+pub fn applyConstraints(self: *Self) void {
+    const constraints = self.getConstraints();
+    const box = &self.pending.box;
+    box.width = std.math.clamp(box.width, constraints.min_width, constraints.max_width);
+    box.height = std.math.clamp(box.height, constraints.min_height, constraints.max_height);
+}
+
+/// Return bounds on the dimensions of the view
+pub fn getConstraints(self: Self) Constraints {
+    return switch (self.impl) {
+        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.getConstraints(),
+        .xwayland_view => |xwayland_view| xwayland_view.getConstraints(),
     };
 }
 

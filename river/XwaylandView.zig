@@ -118,6 +118,22 @@ pub fn getTitle(self: Self) [*:0]const u8 {
     return self.wlr_xwayland_surface.title orelse "";
 }
 
+/// Return bounds on the dimensions of the view
+pub fn getConstraints(self: Self) View.Constraints {
+    const hints: *c.wlr_xwayland_surface_size_hints = self.wlr_xwayland_surface.size_hints orelse return .{
+        .min_width = View.min_size,
+        .max_width = std.math.maxInt(u32),
+        .min_height = View.min_size,
+        .max_height = std.math.maxInt(u32),
+    };
+    return .{
+        .min_width = if (hints.min_width > 0) @intCast(u32, hints.min_width) else View.min_size,
+        .max_width = if (hints.max_width > 0) @intCast(u32, hints.max_width) else std.math.maxInt(u32),
+        .min_height = if (hints.min_height > 0) @intCast(u32, hints.min_height) else View.min_size,
+        .max_height = if (hints.max_height > 0) @intCast(u32, hints.max_height) else std.math.maxInt(u32),
+    };
+}
+
 /// Called when the xwayland surface is destroyed
 fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_destroy", listener.?);

@@ -128,6 +128,17 @@ pub fn getTitle(self: Self) [*:0]const u8 {
     return wlr_xdg_toplevel.title orelse "NULL";
 }
 
+/// Return bounds on the dimensions of the toplevel.
+pub fn getConstraints(self: Self) View.Constraints {
+    const state = @field(self.wlr_xdg_surface, c.wlr_xdg_surface_union).toplevel.*.current;
+    return .{
+        .min_width = if (state.min_width > 0) state.min_width else View.min_size,
+        .max_width = if (state.max_width > 0) state.max_width else std.math.maxInt(u32),
+        .min_height = if (state.min_height > 0) state.min_height else View.min_size,
+        .max_height = if (state.max_height > 0) state.max_height else std.math.maxInt(u32),
+    };
+}
+
 /// Called when the xdg surface is destroyed
 fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_destroy", listener.?);
@@ -234,10 +245,14 @@ fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         view.surface_box = new_box;
 
         if (s == self.wlr_xdg_surface.configure_serial) {
-            // If this commit is in response to our configure, notify the
-            // transaction code.
-            view.output.root.notifyConfigured();
+            // If this commit is in response to our configure, either notify
+            // the transaction code or apply the pending state immediately,
+            // depending on whether or not the view is floating.
             view.pending_serial = null;
+            if (view.current.float and view.pending.float)
+                view.current = view.pending
+            else
+                view.output.root.notifyConfigured();
         } else {
             // If the client has not yet acked our configure, we need to send a
             // frame done event so that it commits another buffer. These
