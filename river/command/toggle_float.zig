@@ -39,8 +39,14 @@ pub fn toggleFloat(
         // Don't modify views which are the target of a cursor action
         if (seat.input_manager.isCursorActionTarget(view)) return;
 
-        if (!view.pending.float) view.pending.box = view.float_box;
         view.pending.float = !view.pending.float;
+
+        // If switching from layout to float, restore the previous floating dimensions
+        if (view.pending.float) {
+            view.pending.box = view.float_box;
+            view.configure();
+        }
+
         view.output.root.arrange();
     }
 }

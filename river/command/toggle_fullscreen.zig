@@ -17,6 +17,9 @@
 
 const std = @import("std");
 
+const c = @import("../c.zig");
+
+const Box = @import("../Box.zig");
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
@@ -35,7 +38,22 @@ pub fn toggleFullscreen(
         // Don't modify views which are the target of a cursor action
         if (seat.input_manager.isCursorActionTarget(view)) return;
 
-        view.setFullscreen(!seat.focused.view.pending.fullscreen);
-        view.output.root.arrange();
+        view.setFullscreen(!view.pending.fullscreen);
+
+        if (view.pending.fullscreen) {
+            const output = view.output;
+            view.pending.box = Box.fromWlrBox(
+                c.wlr_output_layout_get_box(output.root.wlr_output_layout, output.wlr_output).*,
+            );
+            view.configure();
+        } else if (view.pending.float) {
+            // If transitioning from fullscreen -> float, return to the saved
+            // floating dimensions.
+            view.pending.box = view.float_box;
+            view.configure();
+        } else {
+            // Transitioning to layout, arrange and start a transaction
+            view.output.root.arrange();
+        }
     }
 }
