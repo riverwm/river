@@ -263,30 +263,26 @@ fn handleButton(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
             }
         }
 
-        // If the found surface is an xdg toplevel surface, send keyboard
-        // focus to the view.
-        if (c.wlr_surface_is_xdg_surface(wlr_surface)) {
-            const wlr_xdg_surface = c.wlr_xdg_surface_from_wlr_surface(wlr_surface);
-            if (wlr_xdg_surface.*.role == .WLR_XDG_SURFACE_ROLE_TOPLEVEL) {
-                const view = util.voidCast(View, wlr_xdg_surface.*.data.?);
-                self.seat.focus(view);
+        // If the target surface has a view, give that view keyboard focus and
+        // perhaps enter move/resize mode.
+        if (View.fromWlrSurface(wlr_surface)) |view| {
+            self.seat.focus(view);
 
-                if (event.state == .WLR_BUTTON_PRESSED and self.pressed_count == 1) {
-                    // If the button is pressed and the pointer modifier is
-                    // active, enter cursor mode or close view and return.
-                    const fullscreen = view.current.fullscreen or view.pending.fullscreen;
-                    if (self.seat.pointer_modifier) {
-                        switch (event.button) {
-                            c.BTN_LEFT => if (!fullscreen) self.enterCursorMode(event, view, .move),
-                            c.BTN_MIDDLE => view.close(),
-                            c.BTN_RIGHT => if (!fullscreen) self.enterCursorMode(event, view, .resize),
+            if (event.state == .WLR_BUTTON_PRESSED and self.pressed_count == 1) {
+                // If the button is pressed and the pointer modifier is
+                // active, enter cursor mode or close view and return.
+                const fullscreen = view.current.fullscreen or view.pending.fullscreen;
+                if (self.seat.pointer_modifier) {
+                    switch (event.button) {
+                        c.BTN_LEFT => if (!fullscreen) self.enterCursorMode(event, view, .move),
+                        c.BTN_MIDDLE => view.close(),
+                        c.BTN_RIGHT => if (!fullscreen) self.enterCursorMode(event, view, .resize),
 
-                            // TODO Some mice have additional buttons. These
-                            // could also be bound to some useful action.
-                            else => {},
-                        }
-                        return;
+                        // TODO Some mice have additional buttons. These
+                        // could also be bound to some useful action.
+                        else => {},
                     }
+                    return;
                 }
             }
         }
