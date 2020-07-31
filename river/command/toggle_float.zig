@@ -41,10 +41,15 @@ pub fn toggleFloat(
 
         view.pending.float = !view.pending.float;
 
-        // If switching from layout to float, restore the previous floating dimensions
         if (view.pending.float) {
+            // If switching from layout to float, restore the previous floating
+            // dimensions.
             view.pending.box = view.float_box;
             view.configure();
+        } else {
+            // If switching from float to layout save the floating dimensions
+            // for next time.
+            view.float_box = view.current.box;
         }
 
         view.output.root.arrange();
