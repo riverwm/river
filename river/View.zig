@@ -293,6 +293,23 @@ pub fn getConstraints(self: Self) Constraints {
     };
 }
 
+/// Find and return the view corresponding to a given wlr_surface, if any
+pub fn fromWlrSurface(wlr_surface: *c.wlr_surface) ?*Self {
+    if (c.wlr_surface_is_xdg_surface(wlr_surface)) {
+        const wlr_xdg_surface = c.wlr_xdg_surface_from_wlr_surface(wlr_surface);
+        if (wlr_xdg_surface.*.role == .WLR_XDG_SURFACE_ROLE_TOPLEVEL) {
+            return util.voidCast(Self, wlr_xdg_surface.*.data.?);
+        }
+    }
+    if (build_options.xwayland) {
+        if (c.wlr_surface_is_xwayland_surface(wlr_surface)) {
+            const wlr_xwayland_surface = c.wlr_xwayland_surface_from_wlr_surface(wlr_surface);
+            return util.voidCast(Self, wlr_xwayland_surface.*.data.?);
+        }
+    }
+    return null;
+}
+
 /// Called by the impl when the surface is ready to be displayed
 pub fn map(self: *Self) void {
     const root = self.output.root;

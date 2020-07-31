@@ -57,8 +57,10 @@ pub fn init(self: *Self, view: *View, wlr_xwayland_surface: *c.wlr_xwayland_surf
 }
 
 pub fn needsConfigure(self: Self) bool {
-    return self.view.current.box.width != self.view.pending.box.width or
-        self.view.current.box.height != self.view.pending.box.height;
+    return self.wlr_xwayland_surface.x != self.view.pending.box.x or
+        self.wlr_xwayland_surface.y != self.view.pending.box.y or
+        self.wlr_xwayland_surface.width != self.view.pending.box.width or
+        self.wlr_xwayland_surface.height != self.view.pending.box.height;
 }
 
 /// Tell the client to take a new size
@@ -195,7 +197,12 @@ fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 
     // See comment in XwaylandView.configure()
     if (view.pending_serial != null) {
-        view.output.root.notifyConfigured();
+        // If the view is part of the layout, notify the transaction code. If
+        // the view is floating or fullscreen apply the pending state immediately.
         view.pending_serial = null;
+        if (!view.pending.float and !view.pending.fullscreen)
+            view.output.root.notifyConfigured()
+        else
+            view.current = view.pending;
     }
 }
