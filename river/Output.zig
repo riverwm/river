@@ -296,17 +296,12 @@ fn layoutExternal(self: *Self, visible_count: u32, output_tags: u32) !void {
 pub fn arrangeViews(self: *Self) void {
     const full_area = Box.fromWlrBox(c.wlr_output_layout_get_box(self.root.wlr_output_layout, self.wlr_output).*);
 
-    // Make fullscreen views take the full area, count up views that will be
-    // arranged by the layout.
+    // Count up views that will be arranged by the layout
     var layout_count: u32 = 0;
     var it = ViewStack(View).pendingIterator(self.views.first, self.pending.tags);
     while (it.next()) |node| {
         const view = &node.view;
-        if (view.pending.fullscreen) {
-            view.pending.box = full_area;
-        } else if (!view.pending.float) {
-            layout_count += 1;
-        }
+        if (!view.pending.float) layout_count += 1;
     }
 
     // If the usable area has a zero dimension, trying to arrange the layout

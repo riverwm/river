@@ -245,14 +245,14 @@ fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         view.surface_box = new_box;
 
         if (s == self.wlr_xdg_surface.configure_serial) {
-            // If this commit is in response to our configure, either notify
-            // the transaction code or apply the pending state immediately,
-            // depending on whether or not the view is floating.
+            // If this commit is in response to our configure and the view is
+            // part of the layout, notify the transaction code. If floating or
+            // fullscreen apply the pending state immediately.
             view.pending_serial = null;
-            if (view.current.float and view.pending.float)
-                view.current = view.pending
+            if (!view.pending.float and !view.pending.fullscreen)
+                view.output.root.notifyConfigured()
             else
-                view.output.root.notifyConfigured();
+                view.current = view.pending;
         } else {
             // If the client has not yet acked our configure, we need to send a
             // frame done event so that it commits another buffer. These

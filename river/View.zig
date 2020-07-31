@@ -218,9 +218,6 @@ pub fn setFocused(self: *Self, focused: bool) void {
 /// Set the pending state to fullscren and inform the client. Should be
 /// followed by starting a transaction to apply the pending state.
 pub fn setFullscreen(self: *Self, fullscreen: bool) void {
-    // If transitionng from fullscreen -> float, return to the saved
-    // floating dimensions.
-    if (self.pending.fullscreen and self.pending.float) self.pending.box = self.float_box;
     self.pending.fullscreen = fullscreen;
     switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.setFullscreen(fullscreen),
@@ -315,7 +312,7 @@ pub fn map(self: *Self) void {
 
     self.output.sendViewTags();
 
-    root.arrange();
+    if (self.pending.float) self.configure() else root.arrange();
 }
 
 /// Called by the impl when the surface will no longer be displayed
@@ -339,7 +336,7 @@ pub fn unmap(self: *Self) void {
 
     self.output.sendViewTags();
 
-    root.arrange();
+    if (!self.current.float and !self.current.fullscreen) root.arrange();
 }
 
 /// Destory the view and free the ViewStack node holding it.
