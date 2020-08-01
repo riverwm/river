@@ -39,25 +39,5 @@ pub fn toggleFullscreen(
         if (seat.input_manager.isCursorActionTarget(view)) return;
 
         view.setFullscreen(!view.pending.fullscreen);
-
-        if (view.pending.fullscreen) {
-            // If transitioning from float -> fullscreen, save the floating
-            // dimensions.
-            if (view.pending.float) view.float_box = view.current.box;
-
-            const output = view.output;
-            view.pending.box = Box.fromWlrBox(
-                c.wlr_output_layout_get_box(output.root.wlr_output_layout, output.wlr_output).*,
-            );
-            view.configure();
-        } else if (view.pending.float) {
-            // If transitioning from fullscreen -> float, return to the saved
-            // floating dimensions.
-            view.pending.box = view.float_box;
-            view.configure();
-        } else {
-            // Transitioning to layout, arrange and start a transaction
-            view.output.root.arrange();
-        }
     }
 }

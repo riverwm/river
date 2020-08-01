@@ -287,5 +287,4 @@ fn handleRequestFullscreen(listener: ?*c.wl_listener, data: ?*c_void) callconv(.
     const self = @fieldParentPtr(Self, "listen_request_fullscreen", listener.?);
     const event = util.voidCast(c.wlr_xdg_toplevel_set_fullscreen_event, data.?);
     self.view.setFullscreen(event.fullscreen);
-    self.view.output.root.arrange();
 }

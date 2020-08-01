@@ -215,10 +215,30 @@ pub fn setFocused(self: *Self, focused: bool) void {
     }
 }
 
-/// Set the pending state to fullscren and inform the client. Should be
-/// followed by starting a transaction to apply the pending state.
+/// Set the pending state, set the size, and inform the client.
 pub fn setFullscreen(self: *Self, fullscreen: bool) void {
     self.pending.fullscreen = fullscreen;
+
+    if (fullscreen) {
+        // If transitioning from float -> fullscreen, save the floating
+        // dimensions.
+        if (self.pending.float) self.float_box = self.current.box;
+
+        const output = self.output;
+        self.pending.box = Box.fromWlrBox(
+            c.wlr_output_layout_get_box(output.root.wlr_output_layout, output.wlr_output).*,
+        );
+        self.configure();
+    } else if (self.pending.float) {
+        // If transitioning from fullscreen -> float, return to the saved
+        // floating dimensions.
+        self.pending.box = self.float_box;
+        self.configure();
+    } else {
+        // Transitioning to layout, arrange and start a transaction
+        self.output.root.arrange();
+    }
+
     switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.setFullscreen(fullscreen),
         .xwayland_view => |xwayland_view| xwayland_view.setFullscreen(fullscreen),
