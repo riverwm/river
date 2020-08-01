@@ -232,32 +232,34 @@ fn layoutExternal(self: *Self, visible_count: u32) !void {
     defer arena.deinit();
 
     // Assemble command
-    const layout_command = std.fmt.allocPrint(&arena.allocator, "{} {} {} {d} {} {}", .{
+    const layout_command = try std.fmt.allocPrint0(&arena.allocator, "{} {} {} {d} {} {}", .{
         self.layout,
         visible_count,
         self.master_count,
         self.master_factor,
         layout_width,
         layout_height,
-    }) catch @panic("Out of memory.");
-    const cmd = [_][]const u8{ "/bin/sh", "-c", layout_command };
+    });
+    const cmd = [_:null]?[*:0]const u8{ "/bin/sh", "-c", layout_command, null };
+    const stdout_pipe = try std.os.pipe();
 
-    // Execute layout executable
-    // TODO abort after 1 second
-    const child = try std.ChildProcess.init(&cmd, &arena.allocator);
-    child.stdin_behavior = .Ignore;
-    child.stdout_behavior = .Pipe;
-    try std.ChildProcess.spawn(child);
-    const max_output_size = 400 * 1024;
-    const buffer = try child.stdout.?.inStream().readAllAlloc(&arena.allocator, max_output_size);
-    const term = try child.wait();
-    switch (term) {
-        .Exited, .Signal, .Stopped, .Unknown => |code| {
-            if (code != 0) {
-                return LayoutError.BadExitCode;
-            }
-        },
+    const pid = try std.os.fork();
+    if (pid == 0) {
+        std.os.dup2(stdout_pipe[1], std.os.STDOUT_FILENO) catch c._exit(1);
+        std.os.close(stdout_pipe[0]);
+        std.os.close(stdout_pipe[1]);
+        std.os.execveZ("/bin/sh", &cmd, std.c.environ) catch c._exit(1);
     }
+    std.os.close(stdout_pipe[1]);
+    const stdout = std.fs.File{ .handle = stdout_pipe[0], .io_mode = std.io.mode };
+    defer stdout.close();
+
+    // TODO abort after a timeout
+    const status = std.os.waitpid(pid, 0);
+    if (!std.os.WIFEXITED(status) or std.os.WEXITSTATUS(status) != 0)
+        return LayoutError.BadExitCode;
+
+    const buffer = try stdout.inStream().readAllAlloc(&arena.allocator, 1024);
 
     // Parse layout command output
     var view_boxen = std.ArrayList(Box).init(&arena.allocator);
