@@ -373,7 +373,8 @@ pub fn unmap(self: *Self) void {
 
     self.output.sendViewTags();
 
-    if (!self.current.float and !self.current.fullscreen) root.arrange();
+    // Still need to arrange if fullscreened from the layout
+    if (!self.current.float) root.arrange();
 }
 
 /// Destory the view and free the ViewStack node holding it.
