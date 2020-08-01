@@ -35,7 +35,7 @@ const usage: []const u8 =
 var server: Server = undefined;
 
 pub fn main() anyerror!void {
-    var startup_command: ?[]const u8 = null;
+    var startup_command: ?[*:0]const u8 = null;
     {
         var it = std.process.args();
         // Skip our name
@@ -47,7 +47,7 @@ pub fn main() anyerror!void {
                 std.os.exit(0);
             } else if (std.mem.eql(u8, arg, "-c")) {
                 if (it.nextPosix()) |command| {
-                    startup_command = command;
+                    startup_command = @ptrCast([*:0]const u8, command.ptr);
                 } else {
                     printErrorExit("Error: flag '-c' requires exactly one argument", .{});
                 }
@@ -85,16 +85,17 @@ pub fn main() anyerror!void {
 
     try server.start();
 
-    const startup_process = if (startup_command) |cmd| blk: {
-        const child_args = [_][]const u8{ "/bin/sh", "-c", cmd };
-        const child = try std.ChildProcess.init(&child_args, util.gpa);
-        try std.ChildProcess.spawn(child);
-        break :blk child;
+    const child_pid = if (startup_command) |cmd| blk: {
+        const child_args = [_:null]?[*:0]const u8{ "/bin/sh", "-c", cmd, null };
+        const pid = try std.os.fork();
+        if (pid == 0) {
+            if (std.os.system.sigprocmask(std.os.SIG_SETMASK, &std.os.empty_sigset, null) < 0) unreachable;
+            std.os.execveZ("/bin/sh", &child_args, std.c.environ) catch c._exit(1);
+        }
+        break :blk pid;
     } else null;
-    defer if (startup_process) |child| {
-        _ = child.kill() catch |e| log.err(.server, "failed to terminate startup process: {}", .{e});
-        child.deinit();
-    };
+    defer if (child_pid) |pid|
+        std.os.kill(pid, std.os.SIGTERM) catch |e| log.err(.server, "failed to kill startup process: {}", .{e});
 
     log.info(.server, "running...", .{});
 
