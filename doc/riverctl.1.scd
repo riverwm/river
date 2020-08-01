@@ -5,8 +5,7 @@ riverctl - command-line interface for controlling river
 
 # SYNOPSIS
 
-*riverctl*
-*close*|*declare-mode*|*enter-mode*|*exit*|*focus-output*|*focus-view*|*layout*|*map*|*mod-master-count*|*mod-master-factor*|*send-to-output*|*set-focused-tags*|*set-option*|*set-view-tags*|*spawn*|*toggle-float*|*toggle-focused-tags*|*toggle-view-tags*|*zoom* [_command specific arguments_]
+*riverctl* _command_ [_command specific arguments_]
 
 # DESCRIPTION
 
