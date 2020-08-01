@@ -37,7 +37,9 @@ const ViewStack = @import("view_stack.zig").ViewStack;
 const XwaylandUnmanaged = @import("XwaylandUnmanaged.zig");
 
 wl_display: *c.wl_display,
-wl_event_loop: *c.wl_event_loop,
+
+sigint_source: *c.wl_event_source,
+sigterm_source: *c.wl_event_source,
 
 wlr_backend: *c.wlr_backend,
 noop_backend: *c.wlr_backend,
@@ -66,7 +68,13 @@ pub fn init(self: *Self) !void {
     errdefer c.wl_display_destroy(self.wl_display);
 
     // Never returns null if the display was created successfully
-    self.wl_event_loop = c.wl_display_get_event_loop(self.wl_display).?;
+    const wl_event_loop = c.wl_display_get_event_loop(self.wl_display);
+    self.sigint_source = c.wl_event_loop_add_signal(wl_event_loop, std.os.SIGINT, terminate, self.wl_display) orelse
+        return error.AddEventSourceFailed;
+    errdefer _ = c.wl_event_source_remove(self.sigint_source);
+    self.sigterm_source = c.wl_event_loop_add_signal(wl_event_loop, std.os.SIGTERM, terminate, self.wl_display) orelse
+        return error.AddEventSourceFailed;
+    errdefer _ = c.wl_event_source_remove(self.sigterm_source);
 
     // The wlr_backend abstracts the input/output hardware. Autocreate chooses
     // the best option based on the environment, for example DRM when run from
@@ -129,6 +137,9 @@ pub fn init(self: *Self) !void {
 /// Free allocated memory and clean up
 pub fn deinit(self: *Self) void {
     // Note: order is important here
+    _ = c.wl_event_source_remove(self.sigint_source);
+    _ = c.wl_event_source_remove(self.sigterm_source);
+
     if (build_options.xwayland) c.wlr_xwayland_destroy(self.wlr_xwayland);
 
     c.wl_display_destroy_clients(self.wl_display);
@@ -155,6 +166,13 @@ pub fn start(self: Self) !void {
 /// Enter the wayland event loop and block until the compositor is exited
 pub fn run(self: Self) void {
     c.wl_display_run(self.wl_display);
+}
+
+/// Handle SIGINT and SIGTERM by gracefully stopping the server
+fn terminate(signal: c_int, data: ?*c_void) callconv(.C) c_int {
+    const wl_display = util.voidCast(c.wl_display, data.?);
+    c.wl_display_terminate(wl_display);
+    return 0;
 }
 
 fn handleNewOutput(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {

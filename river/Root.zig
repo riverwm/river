@@ -69,7 +69,7 @@ pub fn init(self: *Self, server: *Server) !void {
     self.pending_configures = 0;
 
     self.transaction_timer = c.wl_event_loop_add_timer(
-        self.server.wl_event_loop,
+        c.wl_display_get_event_loop(self.server.wl_display),
         handleTimeout,
         self,
     ) orelse return error.AddTimerError;
