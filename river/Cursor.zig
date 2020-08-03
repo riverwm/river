@@ -555,7 +555,7 @@ fn viewSurfaceAt(output: Output, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*c.wlr_s
     // Focused views are rendered on top, so look for them first.
     var it = ViewStack(View).iterator(output.views.first, output.current.tags);
     while (it.next()) |node| {
-        if (!node.view.focused) continue;
+        if (node.view.current.focus == 0) continue;
         if (node.view.surfaceAt(ox, oy, sx, sy)) |found| return found;
     }
 

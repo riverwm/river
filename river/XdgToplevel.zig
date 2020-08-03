@@ -63,30 +63,30 @@ pub fn init(self: *Self, view: *View, wlr_xdg_surface: *c.wlr_xdg_surface) void 
 /// Returns true if a configure must be sent to ensure the dimensions of the
 /// pending_box are applied.
 pub fn needsConfigure(self: Self) bool {
-    const wlr_xdg_toplevel: *c.wlr_xdg_toplevel = @field(
+    const server_pending = &@field(
         self.wlr_xdg_surface,
         c.wlr_xdg_surface_union,
-    ).toplevel;
+    ).toplevel.*.server_pending;
+    const state = &self.view.pending;
 
     // Checking server_pending is sufficient here since it will be either in
     // sync with the current dimensions or be the dimensions sent with the
     // most recent configure. In both cases server_pending has the values we
     // want to check against.
-    return self.view.pending.box.width != wlr_xdg_toplevel.server_pending.width or
-        self.view.pending.box.height != wlr_xdg_toplevel.server_pending.height;
+    return (state.focus != 0) != server_pending.activated or
+        state.box.width != server_pending.width or
+        state.box.height != server_pending.height;
 }
 
-/// Send a configure event, applying the width/height of the pending box.
-pub fn configure(self: Self, pending_box: Box) void {
+/// Send a configure event, applying the pending state of the view.
+pub fn configure(self: Self) void {
+    const state = &self.view.pending;
+    _ = c.wlr_xdg_toplevel_set_activated(self.wlr_xdg_surface, state.focus != 0);
     self.view.pending_serial = c.wlr_xdg_toplevel_set_size(
         self.wlr_xdg_surface,
-        pending_box.width,
-        pending_box.height,
+        state.box.width,
+        state.box.height,
     );
-}
-
-pub fn setActivated(self: Self, activated: bool) void {
-    _ = c.wlr_xdg_toplevel_set_activated(self.wlr_xdg_surface, activated);
 }
 
 pub fn setFullscreen(self: Self, fullscreen: bool) void {

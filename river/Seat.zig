@@ -17,6 +17,7 @@
 
 const Self = @This();
 
+const build_options = @import("build_options");
 const std = @import("std");
 
 const c = @import("c.zig");
@@ -182,14 +183,24 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
     // still clear the focus.
     if (if (target_wlr_surface) |wlr_surface| self.input_manager.inputAllowed(wlr_surface) else true) {
         // First clear the current focus
-        if (self.focused == .view) self.focused.view.setFocused(false);
+        if (self.focused == .view) {
+            self.focused.view.pending.focus -= 1;
+            // This is needed because xwayland views don't double buffer
+            // activated state.
+            if (build_options.xwayland and self.focused.view.impl == .xwayland_view)
+                c.wlr_xwayland_surface_activate(self.focused.view.impl.xwayland_view.wlr_xwayland_surface, false);
+        }
         c.wlr_seat_keyboard_clear_focus(self.wlr_seat);
 
         // Set the new focus
         switch (new_focus) {
             .view => |target_view| {
                 std.debug.assert(self.focused_output == target_view.output);
-                target_view.setFocused(true);
+                target_view.pending.focus += 1;
+                // This is needed because xwayland views don't double buffer
+                // activated state.
+                if (build_options.xwayland and target_view.impl == .xwayland_view)
+                    c.wlr_xwayland_surface_activate(target_view.impl.xwayland_view.wlr_xwayland_surface, true);
             },
             .layer => |target_layer| std.debug.assert(self.focused_output == target_layer.output),
             .none => {},
@@ -212,6 +223,9 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
     // Inform any clients tracking status of the change
     var it = self.status_trackers.first;
     while (it) |node| : (it = node.next) node.data.sendFocusedView();
+
+    // Start a transaction to apply the pending focus state
+    self.input_manager.server.root.startTransaction();
 }
 
 /// Focus the given output, notifying any listening clients of the change.

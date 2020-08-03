@@ -28,11 +28,7 @@ pub fn needsConfigure(self: Self) bool {
     unreachable;
 }
 
-pub fn configure(self: Self, pending_box: Box) void {
-    unreachable;
-}
-
-pub fn setActivated(self: Self, activated: bool) void {
+pub fn configure(self: Self) void {
     unreachable;
 }
 

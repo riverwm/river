@@ -141,7 +141,7 @@ fn startTransaction(self: *Self) void {
 
             if (view.needsConfigure()) {
                 view.configure();
-                self.pending_configures += 1;
+                if (!view.pending.float) self.pending_configures += 1;
 
                 // Send a frame done that the client will commit a new frame
                 // with the dimensions we sent in the configure. Normally this
