@@ -85,7 +85,7 @@ pub fn renderOutput(output: *Output) void {
             if (view.current.box.width == 0 or view.current.box.height == 0) continue;
 
             // Focused views are rendered on top of normal views, skip them for now
-            if (view.focused) continue;
+            if (view.current.focus != 0) continue;
 
             renderView(output.*, view, &now);
             if (view.draw_borders) renderBorders(output.*, view, &now);
@@ -101,7 +101,7 @@ pub fn renderOutput(output: *Output) void {
             if (view.current.box.width == 0 or view.current.box.height == 0) continue;
 
             // Skip unfocused views since we already rendered them
-            if (!view.focused) continue;
+            if (view.current.focus == 0) continue;
 
             renderView(output.*, view, &now);
             if (view.draw_borders) renderBorders(output.*, view, &now);
@@ -254,7 +254,7 @@ fn renderTexture(
 
 fn renderBorders(output: Output, view: *View, now: *c.timespec) void {
     const config = &output.root.server.config;
-    const color = if (view.focused) &config.border_color_focused else &config.border_color_unfocused;
+    const color = if (view.current.focus != 0) &config.border_color_focused else &config.border_color_unfocused;
     const border_width = config.border_width;
     const actual_box = if (view.saved_buffers.items.len != 0) view.saved_surface_box else view.surface_box;
 

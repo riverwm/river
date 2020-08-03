@@ -60,6 +60,9 @@ const State = struct {
     /// The tags of the view, as a bitmask
     tags: u32,
 
+    /// Number of seats currently focusing the view
+    focus: u32,
+
     float: bool,
     fullscreen: bool,
 };
@@ -78,9 +81,6 @@ output: *Output,
 
 /// This is non-null exactly when the view is mapped
 wlr_surface: ?*c.wlr_surface,
-
-/// True if the view is currently focused by at least one seat
-focused: bool,
 
 /// The double-buffered state of the view
 current: State,
@@ -111,8 +111,6 @@ pub fn init(self: *Self, output: *Output, tags: u32, surface: var) void {
 
     self.wlr_surface = null;
 
-    self.focused = false;
-
     self.current = .{
         .box = .{
             .x = 0,
@@ -121,6 +119,7 @@ pub fn init(self: *Self, output: *Output, tags: u32, surface: var) void {
             .width = 0,
         },
         .tags = tags,
+        .focus = 0,
         .float = false,
         .fullscreen = false,
     };
@@ -155,8 +154,8 @@ pub fn needsConfigure(self: Self) bool {
 
 pub fn configure(self: Self) void {
     switch (self.impl) {
-        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.configure(self.pending.box),
-        .xwayland_view => |xwayland_view| xwayland_view.configure(self.pending.box),
+        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.configure(),
+        .xwayland_view => |xwayland_view| xwayland_view.configure(),
     }
 }
 
@@ -202,16 +201,6 @@ fn saveBuffersIterator(
             }) catch return;
             _ = c.wlr_buffer_lock(&surface.buffer.*.base);
         }
-    }
-}
-
-/// Set the focused bool and the active state of the view if it is a toplevel
-/// TODO: This is insufficient for multi-seat, probably need a focus counter.
-pub fn setFocused(self: *Self, focused: bool) void {
-    self.focused = focused;
-    switch (self.impl) {
-        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.setActivated(focused),
-        .xwayland_view => |xwayland_view| xwayland_view.setActivated(focused),
     }
 }
 
@@ -358,14 +347,14 @@ pub fn unmap(self: *Self) void {
 
     log.debug(.server, "view '{}' unmapped", .{self.getTitle()});
 
-    self.wlr_surface = null;
-
     // Inform all seats that the view has been unmapped so they can handle focus
     var it = root.server.input_manager.seats.first;
     while (it) |node| : (it = node.next) {
         const seat = &node.data;
         seat.handleViewUnmap(self);
     }
+
+    self.wlr_surface = null;
 
     // Remove the view from its output's stack
     const node = @fieldParentPtr(ViewStack(Self).Node, "view", self);

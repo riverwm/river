@@ -63,14 +63,15 @@ pub fn needsConfigure(self: Self) bool {
         self.wlr_xwayland_surface.height != self.view.pending.box.height;
 }
 
-/// Tell the client to take a new size
-pub fn configure(self: Self, pending_box: Box) void {
+/// Apply pending state
+pub fn configure(self: Self) void {
+    const state = &self.view.pending;
     c.wlr_xwayland_surface_configure(
         self.wlr_xwayland_surface,
-        @intCast(i16, pending_box.x),
-        @intCast(i16, pending_box.y),
-        @intCast(u16, pending_box.width),
-        @intCast(u16, pending_box.height),
+        @intCast(i16, state.box.x),
+        @intCast(i16, state.box.y),
+        @intCast(u16, state.box.width),
+        @intCast(u16, state.box.height),
     );
     // Xwayland surfaces don't use serials, so we will just assume they have
     // configured the next time they commit. Set pending serial to a dummy
@@ -78,11 +79,6 @@ pub fn configure(self: Self, pending_box: Box) void {
     // call notifyConfigured() here as the transaction has not yet been fully
     // initiated.
     self.view.pending_serial = 0x66666666;
-}
-
-/// Inform the xwayland surface that it has gained focus
-pub fn setActivated(self: Self, activated: bool) void {
-    c.wlr_xwayland_surface_activate(self.wlr_xwayland_surface, activated);
 }
 
 pub fn setFullscreen(self: Self, fullscreen: bool) void {
