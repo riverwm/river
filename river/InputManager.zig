@@ -108,6 +108,7 @@ pub fn isCursorActionTarget(self: Self, view: *View) bool {
         const seat = &node.data;
         switch (seat.cursor.mode) {
             .passthrough => {},
+            .down => |target_view| if (target_view == view) break true,
             .move => |target_view| if (target_view == view) break true,
             .resize => |data| if (data.view == view) break true,
         }

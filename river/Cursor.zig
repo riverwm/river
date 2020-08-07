@@ -42,51 +42,65 @@ const ResizeData = struct {
 
 const Mode = union(enum) {
     passthrough: void,
+    down: *View,
     move: *View,
     resize: ResizeData,
 
     /// Enter move or resize mode
     fn enter(self: *Self, mode: @TagType(Mode), event: *c.wlr_event_pointer_button, view: *View) void {
-        std.debug.assert(self.mode == .passthrough);
-
         log.debug(.cursor, "enter {} mode", .{@tagName(mode)});
 
-        const cur_box = &view.current.box;
-        self.mode = switch (mode) {
+        switch (mode) {
             .passthrough => unreachable,
-            .move => .{ .move = view },
-            .resize => .{
-                .resize = .{
-                    .view = view,
-                    .x_offset = cur_box.x + @intCast(i32, cur_box.width) - @floatToInt(i32, self.wlr_cursor.x),
-                    .y_offset = cur_box.y + @intCast(i32, cur_box.height) - @floatToInt(i32, self.wlr_cursor.y),
-                },
+            .down => self.mode = .{ .down = view },
+            .move, .resize => {
+                const cur_box = &view.current.box;
+                self.mode = switch (mode) {
+                    .passthrough, .down => unreachable,
+                    .move => .{ .move = view },
+                    .resize => .{
+                        .resize = .{
+                            .view = view,
+                            .x_offset = cur_box.x + @intCast(i32, cur_box.width) - @floatToInt(i32, self.wlr_cursor.x),
+                            .y_offset = cur_box.y + @intCast(i32, cur_box.height) - @floatToInt(i32, self.wlr_cursor.y),
+                        },
+                    },
+                };
+
+                // Automatically float all views being moved by the pointer
+                if (!view.current.float) {
+                    view.pending.float = true;
+                    // Start a transaction to apply the pending state of the grabbed
+                    // view and rearrange the layout to fill the hole.
+                    view.output.root.arrange();
+                }
+
+                // Clear cursor focus, so that the surface does not receive events
+                c.wlr_seat_pointer_clear_focus(self.seat.wlr_seat);
+
+                c.wlr_xcursor_manager_set_cursor_image(
+                    self.wlr_xcursor_manager,
+                    if (mode == .move) "move" else "se-resize",
+                    self.wlr_cursor,
+                );
             },
-        };
-
-        // Automatically float all views being moved by the pointer
-        if (!view.current.float) {
-            view.pending.float = true;
-            // Start a transaction to apply the pending state of the grabbed
-            // view and rearrange the layout to fill the hole.
-            view.output.root.arrange();
         }
-
-        // Clear cursor focus, so that the surface does not receive events
-        c.wlr_seat_pointer_clear_focus(self.seat.wlr_seat);
-
-        c.wlr_xcursor_manager_set_cursor_image(
-            self.wlr_xcursor_manager,
-            if (mode == .move) "move" else "se-resize",
-            self.wlr_cursor,
-        );
     }
 
-    /// Return from move/resize to passthrough
+    /// Return from down/move/resize to passthrough
     fn leave(self: *Self, event: *c.wlr_event_pointer_button) void {
         std.debug.assert(self.mode != .passthrough);
 
         log.debug(.cursor, "leave {} mode", .{@tagName(self.mode)});
+
+        // If we were in down mode, we need pass along the release event
+        if (self.mode == .down)
+            _ = c.wlr_seat_pointer_notify_button(
+                self.seat.wlr_seat,
+                event.time_msec,
+                event.button,
+                event.state,
+            );
 
         self.mode = .passthrough;
         passthrough(self, event.time_msec);
@@ -99,6 +113,15 @@ const Mode = union(enum) {
             .passthrough => {
                 c.wlr_cursor_move(self.wlr_cursor, device, delta_x, delta_y);
                 passthrough(self, time);
+            },
+            .down => |view| {
+                c.wlr_cursor_move(self.wlr_cursor, device, delta_x, delta_y);
+                c.wlr_seat_pointer_notify_motion(
+                    self.seat.wlr_seat,
+                    time,
+                    self.wlr_cursor.x - @intToFloat(f64, view.current.box.x),
+                    self.wlr_cursor.y - @intToFloat(f64, view.current.box.y),
+                );
             },
             .move => |view| {
                 var output_width: c_int = undefined;
@@ -364,6 +387,8 @@ fn handleButton(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
                         else => {},
                     }
                     return;
+                } else {
+                    Mode.enter(self, .down, event, view);
                 }
             }
         }
