@@ -33,21 +33,157 @@ const Seat = @import("Seat.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 
-const Mode = union(enum) {
-    passthrough: void,
-    move: MoveData,
-    resize: ResizeData,
-};
-
-const MoveData = struct {
-    view: *View,
-};
-
 const ResizeData = struct {
     view: *View,
     /// Offset from the lower right corner of the view
     x_offset: i32,
     y_offset: i32,
+};
+
+const Mode = union(enum) {
+    passthrough: void,
+    move: *View,
+    resize: ResizeData,
+
+    /// Enter move or resize mode
+    fn enter(self: *Self, mode: @TagType(Mode), event: *c.wlr_event_pointer_button, view: *View) void {
+        std.debug.assert(self.mode == .passthrough);
+
+        log.debug(.cursor, "enter {} mode", .{@tagName(mode)});
+
+        const cur_box = &view.current.box;
+        self.mode = switch (mode) {
+            .passthrough => unreachable,
+            .move => .{ .move = view },
+            .resize => .{
+                .resize = .{
+                    .view = view,
+                    .x_offset = cur_box.x + @intCast(i32, cur_box.width) - @floatToInt(i32, self.wlr_cursor.x),
+                    .y_offset = cur_box.y + @intCast(i32, cur_box.height) - @floatToInt(i32, self.wlr_cursor.y),
+                },
+            },
+        };
+
+        // Automatically float all views being moved by the pointer
+        if (!view.current.float) {
+            view.pending.float = true;
+            // Start a transaction to apply the pending state of the grabbed
+            // view and rearrange the layout to fill the hole.
+            view.output.root.arrange();
+        }
+
+        // Clear cursor focus, so that the surface does not receive events
+        c.wlr_seat_pointer_clear_focus(self.seat.wlr_seat);
+
+        c.wlr_xcursor_manager_set_cursor_image(
+            self.wlr_xcursor_manager,
+            if (mode == .move) "move" else "se-resize",
+            self.wlr_cursor,
+        );
+    }
+
+    /// Return from move/resize to passthrough
+    fn leave(self: *Self, event: *c.wlr_event_pointer_button) void {
+        std.debug.assert(self.mode != .passthrough);
+
+        log.debug(.cursor, "leave {} mode", .{@tagName(self.mode)});
+
+        self.mode = .passthrough;
+        passthrough(self, event.time_msec);
+    }
+
+    fn processMotion(self: *Self, device: *c.wlr_input_device, time: u32, delta_x: f64, delta_y: f64) void {
+        const border_width = self.seat.input_manager.server.config.border_width;
+
+        switch (self.mode) {
+            .passthrough => {
+                c.wlr_cursor_move(self.wlr_cursor, device, delta_x, delta_y);
+                passthrough(self, time);
+            },
+            .move => |view| {
+                var output_width: c_int = undefined;
+                var output_height: c_int = undefined;
+                c.wlr_output_effective_resolution(view.output.wlr_output, &output_width, &output_height);
+
+                // Set x/y of cursor and view, clamp to output dimensions
+                view.pending.box.x = std.math.clamp(
+                    view.pending.box.x + @floatToInt(i32, delta_x),
+                    @intCast(i32, border_width),
+                    output_width - @intCast(i32, view.pending.box.width + border_width),
+                );
+                view.pending.box.y = std.math.clamp(
+                    view.pending.box.y + @floatToInt(i32, delta_y),
+                    @intCast(i32, border_width),
+                    output_height - @intCast(i32, view.pending.box.height + border_width),
+                );
+
+                c.wlr_cursor_move(
+                    self.wlr_cursor,
+                    device,
+                    @intToFloat(f64, view.pending.box.x - view.current.box.x),
+                    @intToFloat(f64, view.pending.box.y - view.current.box.y),
+                );
+
+                // Apply new pending state (no need for a configure as size didn't change)
+                view.current = view.pending;
+            },
+            .resize => |data| {
+                var output_width: c_int = undefined;
+                var output_height: c_int = undefined;
+                c.wlr_output_effective_resolution(data.view.output.wlr_output, &output_width, &output_height);
+
+                // Set width/height of view, clamp to view size constraints and output dimensions
+                const box = &data.view.pending.box;
+                box.width = @intCast(u32, std.math.max(0, @intCast(i32, box.width) + @floatToInt(i32, delta_x)));
+                box.height = @intCast(u32, std.math.max(0, @intCast(i32, box.height) + @floatToInt(i32, delta_y)));
+
+                data.view.applyConstraints();
+
+                box.width = std.math.min(box.width, @intCast(u32, output_width - box.x - @intCast(i32, border_width)));
+                box.height = std.math.min(box.height, @intCast(u32, output_height - box.y - @intCast(i32, border_width)));
+
+                if (data.view.needsConfigure()) data.view.configure();
+
+                // Keep cursor locked to the original offset from the bottom right corner
+                c.wlr_cursor_warp_closest(
+                    self.wlr_cursor,
+                    device,
+                    @intToFloat(f64, box.x + @intCast(i32, box.width) - data.x_offset),
+                    @intToFloat(f64, box.y + @intCast(i32, box.height) - data.y_offset),
+                );
+            },
+        }
+    }
+
+    /// Pass an event on to the surface under the cursor, if any.
+    fn passthrough(self: *Self, time: u32) void {
+        var sx: f64 = undefined;
+        var sy: f64 = undefined;
+        if (self.surfaceAt(self.wlr_cursor.x, self.wlr_cursor.y, &sx, &sy)) |wlr_surface| {
+            // If input is allowed on the surface, send a pointer enter
+            // or motion even as needed.
+            if (self.seat.input_manager.inputAllowed(wlr_surface)) {
+                const wlr_seat = self.seat.wlr_seat;
+                const focus_change = wlr_seat.pointer_state.focused_surface != wlr_surface;
+                if (focus_change) {
+                    log.debug(.cursor, "pointer notify enter at ({},{})", .{ sx, sy });
+                    c.wlr_seat_pointer_notify_enter(wlr_seat, wlr_surface, sx, sy);
+                } else {
+                    c.wlr_seat_pointer_notify_motion(wlr_seat, time, sx, sy);
+                }
+                return;
+            }
+        }
+
+        // There is either no surface under the cursor or input is disallowed
+        // Reset the cursor image to the default and clear focus.
+        c.wlr_xcursor_manager_set_cursor_image(
+            self.wlr_xcursor_manager,
+            "left_ptr",
+            self.wlr_cursor,
+        );
+        c.wlr_seat_pointer_clear_focus(self.seat.wlr_seat);
+    }
 };
 
 const default_size = 24;
@@ -178,61 +314,6 @@ fn handleAxis(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     );
 }
 
-/// Enter move or resize mode
-fn enterCursorMode(self: *Self, event: *c.wlr_event_pointer_button, view: *View, mode: @TagType(Mode)) void {
-    std.debug.assert(self.mode == .passthrough);
-
-    log.debug(.cursor, "enter {} mode", .{@tagName(mode)});
-
-    const cur_box = &view.current.box;
-    self.mode = switch (mode) {
-        .passthrough => unreachable,
-        .move => .{ .move = .{ .view = view } },
-        .resize => .{
-            .resize = .{
-                .view = view,
-                .x_offset = cur_box.x + @intCast(i32, cur_box.width) - @floatToInt(i32, self.wlr_cursor.x),
-                .y_offset = cur_box.y + @intCast(i32, cur_box.height) - @floatToInt(i32, self.wlr_cursor.y),
-            },
-        },
-    };
-
-    // Automatically float all views being moved by the pointer
-    if (!view.current.float) {
-        view.pending.float = true;
-        // Start a transaction to apply the pending state of the grabbed
-        // view and rearrange the layout to fill the hole.
-        view.output.root.arrange();
-    }
-
-    // Clear cursor focus, so that the surface does not receive events
-    c.wlr_seat_pointer_clear_focus(self.seat.wlr_seat);
-
-    c.wlr_xcursor_manager_set_cursor_image(
-        self.wlr_xcursor_manager,
-        if (mode == .move) "move" else "se-resize",
-        self.wlr_cursor,
-    );
-}
-
-/// Return from move/resize to passthrough
-fn leaveCursorMode(self: *Self, event: *c.wlr_event_pointer_button) void {
-    std.debug.assert(self.mode != .passthrough);
-
-    log.debug(.cursor, "leave {} mode", .{@tagName(self.mode)});
-
-    self.mode = .passthrough;
-
-    c.wlr_xcursor_manager_set_cursor_image(
-        self.wlr_xcursor_manager,
-        "left_ptr",
-        self.wlr_cursor,
-    );
-
-    // Cursor-Reentry by notifying surface underneath cursor.
-    processMotionPassthrough(self, event.time_msec);
-}
-
 fn handleButton(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     // This event is forwarded by the cursor when a pointer emits a button
     // event.
@@ -245,7 +326,7 @@ fn handleButton(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         std.debug.assert(self.pressed_count > 0);
         self.pressed_count -= 1;
         if (self.pressed_count == 0 and self.mode != .passthrough) {
-            self.leaveCursorMode(event);
+            Mode.leave(self, event);
             return;
         }
     }
@@ -274,9 +355,9 @@ fn handleButton(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
                 const fullscreen = view.current.fullscreen or view.pending.fullscreen;
                 if (self.seat.pointer_modifier) {
                     switch (event.button) {
-                        c.BTN_LEFT => if (!fullscreen) self.enterCursorMode(event, view, .move),
+                        c.BTN_LEFT => if (!fullscreen) Mode.enter(self, .move, event, view),
                         c.BTN_MIDDLE => view.close(),
-                        c.BTN_RIGHT => if (!fullscreen) self.enterCursorMode(event, view, .resize),
+                        c.BTN_RIGHT => if (!fullscreen) Mode.enter(self, .resize, event, view),
 
                         // TODO Some mice have additional buttons. These
                         // could also be bound to some useful action.
@@ -315,21 +396,12 @@ fn handleMotionAbsolute(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) 
     // emits these events.
     const self = @fieldParentPtr(Self, "listen_motion_absolute", listener.?);
     const event = util.voidCast(c.wlr_event_pointer_motion_absolute, data.?);
-    switch (self.mode) {
-        .passthrough => {
-            c.wlr_cursor_warp_absolute(self.wlr_cursor, event.device, event.x, event.y);
-            processMotionPassthrough(self, event.time_msec);
-        },
-        .move, .resize => {
-            var lx: f64 = undefined;
-            var ly: f64 = undefined;
-            c.wlr_cursor_absolute_to_layout_coords(self.wlr_cursor, event.device, event.x, event.y, &lx, &ly);
-            if (self.mode == .move)
-                self.processMotionMove(event.device, lx - self.wlr_cursor.x, ly - self.wlr_cursor.y)
-            else
-                self.processMotionResize(event.device, lx - self.wlr_cursor.x, ly - self.wlr_cursor.y);
-        },
-    }
+
+    var lx: f64 = undefined;
+    var ly: f64 = undefined;
+    c.wlr_cursor_absolute_to_layout_coords(self.wlr_cursor, event.device, event.x, event.y, &lx, &ly);
+
+    Mode.processMotion(self, event.device, event.time_msec, lx - self.wlr_cursor.x, ly - self.wlr_cursor.y);
 }
 
 fn handleMotion(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -337,19 +409,8 @@ fn handleMotion(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     // pointer motion event (i.e. a delta)
     const self = @fieldParentPtr(Self, "listen_motion", listener.?);
     const event = util.voidCast(c.wlr_event_pointer_motion, data.?);
-    switch (self.mode) {
-        .passthrough => {
-            // The cursor doesn't move unless we tell it to. The cursor automatically
-            // handles constraining the motion to the output layout, as well as any
-            // special configuration applied for the specific input device which
-            // generated the event. You can pass NULL for the device if you want to move
-            // the cursor around without any input.
-            c.wlr_cursor_move(self.wlr_cursor, event.device, event.delta_x, event.delta_y);
-            processMotionPassthrough(self, event.time_msec);
-        },
-        .move => self.processMotionMove(event.device, event.delta_x, event.delta_y),
-        .resize => self.processMotionResize(event.device, event.delta_x, event.delta_y),
-    }
+
+    Mode.processMotion(self, event.device, event.time_msec, event.delta_x, event.delta_y);
 }
 
 fn handleRequestSetCursor(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -373,104 +434,6 @@ fn handleRequestSetCursor(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C
             event.hotspot_y,
         );
     }
-}
-
-/// Move the cursor and the target view, constraining the view to the
-/// dimensions of the output.
-fn processMotionMove(self: *Self, device: *c.wlr_input_device, delta_x: f64, delta_y: f64) void {
-    const view = self.mode.move.view;
-    const border_width = self.seat.input_manager.server.config.border_width;
-
-    var output_width: c_int = undefined;
-    var output_height: c_int = undefined;
-    c.wlr_output_effective_resolution(view.output.wlr_output, &output_width, &output_height);
-
-    // Set x/y of cursor and view, clamp to output dimensions
-    view.pending.box.x = std.math.clamp(
-        view.pending.box.x + @floatToInt(i32, delta_x),
-        @intCast(i32, border_width),
-        output_width - @intCast(i32, view.pending.box.width + border_width),
-    );
-    view.pending.box.y = std.math.clamp(
-        view.pending.box.y + @floatToInt(i32, delta_y),
-        @intCast(i32, border_width),
-        output_height - @intCast(i32, view.pending.box.height + border_width),
-    );
-
-    c.wlr_cursor_move(
-        self.wlr_cursor,
-        device,
-        @intToFloat(f64, view.pending.box.x - view.current.box.x),
-        @intToFloat(f64, view.pending.box.y - view.current.box.y),
-    );
-
-    // Apply new pending state (no need for a configure as size didn't change)
-    view.current = view.pending;
-}
-
-fn processMotionResize(self: *Self, device: *c.wlr_input_device, delta_x: f64, delta_y: f64) void {
-    // Must be non-null if we are in resize mode
-    const view = self.mode.resize.view;
-    const border_width = self.seat.input_manager.server.config.border_width;
-
-    var output_width: c_int = undefined;
-    var output_height: c_int = undefined;
-    c.wlr_output_effective_resolution(view.output.wlr_output, &output_width, &output_height);
-
-    // Set width/height of view, clamp to view size constraints and output dimensions
-    const box = &view.pending.box;
-    box.width = @intCast(u32, std.math.max(0, @intCast(i32, box.width) + @floatToInt(i32, delta_x)));
-    box.height = @intCast(u32, std.math.max(0, @intCast(i32, box.height) + @floatToInt(i32, delta_y)));
-    view.applyConstraints();
-    box.width = std.math.min(box.width, @intCast(u32, output_width - box.x - @intCast(i32, border_width)));
-    box.height = std.math.min(box.height, @intCast(u32, output_height - box.y - @intCast(i32, border_width)));
-
-    if (view.needsConfigure()) view.configure();
-
-    // Keep cursor locked to the original offset from the bottom right corner
-    c.wlr_cursor_warp_closest(
-        self.wlr_cursor,
-        device,
-        @intToFloat(f64, box.x + @intCast(i32, box.width) - self.mode.resize.x_offset),
-        @intToFloat(f64, box.y + @intCast(i32, box.height) - self.mode.resize.y_offset),
-    );
-}
-
-fn processMotionPassthrough(self: *Self, time: u32) void {
-    var sx: f64 = undefined;
-    var sy: f64 = undefined;
-    if (self.surfaceAt(self.wlr_cursor.x, self.wlr_cursor.y, &sx, &sy)) |wlr_surface| {
-        // "Enter" the surface if necessary. This lets the client know that the
-        // cursor has entered one of its surfaces.
-        //
-        // Note that this gives the surface "pointer focus", which is distinct
-        // from keyboard focus. You get pointer focus by moving the pointer over
-        // a window.
-        if (self.seat.input_manager.inputAllowed(wlr_surface)) {
-            const wlr_seat = self.seat.wlr_seat;
-            const focus_change = wlr_seat.pointer_state.focused_surface != wlr_surface;
-            if (focus_change) {
-                log.debug(.cursor, "pointer notify enter at ({},{})", .{ sx, sy });
-                c.wlr_seat_pointer_notify_enter(wlr_seat, wlr_surface, sx, sy);
-            } else {
-                // The enter event contains coordinates, so we only need to notify
-                // on motion if the focus did not change.
-                c.wlr_seat_pointer_notify_motion(wlr_seat, time, sx, sy);
-            }
-            return;
-        }
-    }
-
-    // There is either no surface under the cursor or input is disallowed
-    // Reset the cursor image to the default
-    c.wlr_xcursor_manager_set_cursor_image(
-        self.wlr_xcursor_manager,
-        "left_ptr",
-        self.wlr_cursor,
-    );
-    // Clear pointer focus so future button events and such are not sent to
-    // the last client to have the cursor over it.
-    c.wlr_seat_pointer_clear_focus(self.seat.wlr_seat);
 }
 
 /// Find the topmost surface under the output layout coordinates lx/ly
