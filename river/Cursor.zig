@@ -33,18 +33,16 @@ const Seat = @import("Seat.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 
-const ResizeData = struct {
-    view: *View,
-    /// Offset from the lower right corner of the view
-    x_offset: i32,
-    y_offset: i32,
-};
-
 const Mode = union(enum) {
     passthrough: void,
     down: *View,
     move: *View,
-    resize: ResizeData,
+    resize: struct {
+        view: *View,
+        /// Offset from the lower right corner of the view
+        offset_x: i32,
+        offset_y: i32,
+    },
 
     /// Enter move or resize mode
     fn enter(self: *Self, mode: @TagType(Mode), event: *c.wlr_event_pointer_button, view: *View) void {
@@ -61,8 +59,8 @@ const Mode = union(enum) {
                     .resize => .{
                         .resize = .{
                             .view = view,
-                            .x_offset = cur_box.x + @intCast(i32, cur_box.width) - @floatToInt(i32, self.wlr_cursor.x),
-                            .y_offset = cur_box.y + @intCast(i32, cur_box.height) - @floatToInt(i32, self.wlr_cursor.y),
+                            .offset_x = cur_box.x + @intCast(i32, cur_box.width) - @floatToInt(i32, self.wlr_cursor.x),
+                            .offset_y = cur_box.y + @intCast(i32, cur_box.height) - @floatToInt(i32, self.wlr_cursor.y),
                         },
                     },
                 };
@@ -171,8 +169,8 @@ const Mode = union(enum) {
                 c.wlr_cursor_warp_closest(
                     self.wlr_cursor,
                     device,
-                    @intToFloat(f64, box.x + @intCast(i32, box.width) - data.x_offset),
-                    @intToFloat(f64, box.y + @intCast(i32, box.height) - data.y_offset),
+                    @intToFloat(f64, box.x + @intCast(i32, box.width) - data.offset_x),
+                    @intToFloat(f64, box.y + @intCast(i32, box.height) - data.offset_y),
                 );
             },
         }
