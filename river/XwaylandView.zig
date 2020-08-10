@@ -125,9 +125,9 @@ pub fn getConstraints(self: Self) View.Constraints {
         .max_height = std.math.maxInt(u32),
     };
     return .{
-        .min_width = if (hints.min_width > 0) @intCast(u32, hints.min_width) else View.min_size,
+        .min_width = std.math.max(@intCast(u32, hints.min_width), View.min_size),
         .max_width = if (hints.max_width > 0) @intCast(u32, hints.max_width) else std.math.maxInt(u32),
-        .min_height = if (hints.min_height > 0) @intCast(u32, hints.min_height) else View.min_size,
+        .min_height = std.math.max(@intCast(u32, hints.min_height), View.min_size),
         .max_height = if (hints.max_height > 0) @intCast(u32, hints.max_height) else std.math.maxInt(u32),
     };
 }
