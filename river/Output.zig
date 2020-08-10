@@ -269,8 +269,10 @@ fn layoutExternal(self: *Self, visible_count: u32) !void {
         var box = try parseBox(token);
         box.x += self.usable_box.x + xy_offset;
         box.y += self.usable_box.y + xy_offset;
-        box.width -= delta_size;
-        box.height -= delta_size;
+
+        if (box.width > delta_size) box.width -= delta_size;
+        if (box.height > delta_size) box.height -= delta_size;
+
         try view_boxen.append(box);
     }
 
