@@ -30,7 +30,8 @@ pub fn setFocusedTags(
     const tags = try parseTags(allocator, args, out);
     if (seat.focused_output.pending.tags != tags) {
         seat.focused_output.pending.tags = tags;
-        seat.input_manager.server.root.arrange();
+        seat.focused_output.arrangeViews();
+        seat.focused_output.root.startTransaction();
     }
 }
 
@@ -44,7 +45,7 @@ pub fn setViewTags(
     const tags = try parseTags(allocator, args, out);
     if (seat.focused == .view) {
         seat.focused.view.pending.tags = tags;
-        seat.focused.view.output.root.arrange();
+        seat.focused.view.applyPending();
     }
 }
 
@@ -60,7 +61,8 @@ pub fn toggleFocusedTags(
     const new_focused_tags = output.pending.tags ^ tags;
     if (new_focused_tags != 0) {
         output.pending.tags = new_focused_tags;
-        seat.input_manager.server.root.arrange();
+        output.arrangeViews();
+        output.root.startTransaction();
     }
 }
 
@@ -76,7 +78,7 @@ pub fn toggleViewTags(
         const new_tags = seat.focused.view.current.tags ^ tags;
         if (new_tags != 0) {
             seat.focused.view.pending.tags = new_tags;
-            seat.focused.view.output.root.arrange();
+            seat.focused.view.applyPending();
         }
     }
 }

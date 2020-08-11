@@ -112,23 +112,20 @@ pub fn addOutput(self: *Self, wlr_output: *c.wlr_output) void {
     }
 }
 
-/// Arrange all views on all outputs and then start a transaction.
-pub fn arrange(self: *Self) void {
+/// Arrange all views on all outputs
+pub fn arrangeAll(self: *Self) void {
     var it = self.outputs.first;
-    while (it) |output_node| : (it = output_node.next) {
-        output_node.data.arrangeViews();
-    }
-    self.startTransaction();
+    while (it) |node| : (it = node.next) node.data.arrangeViews();
 }
 
 /// Initiate an atomic change to the layout. This change will not be
 /// applied until all affected clients ack a configure and commit a buffer.
-fn startTransaction(self: *Self) void {
+pub fn startTransaction(self: *Self) void {
     // If a new transaction is started while another is in progress, we need
     // to reset the pending count to 0 and clear serials from the views
     self.pending_configures = 0;
 
-    // Iterate over all views of all outputs
+    // Iterate over all layout views of all outputs
     var output_it = self.outputs.first;
     while (output_it) |node| : (output_it = node.next) {
         const output = &node.data;
@@ -136,23 +133,25 @@ fn startTransaction(self: *Self) void {
         while (view_it.next()) |view_node| {
             const view = &view_node.view;
 
-            // Clear the serial in case this transaction is interrupting a prior one.
-            view.pending_serial = null;
+            if (view.shouldTrackConfigure()) {
+                // Clear the serial in case this transaction is interrupting a prior one.
+                view.pending_serial = null;
 
-            if (view.needsConfigure()) {
-                view.configure();
-                if (!view.pending.float) self.pending_configures += 1;
+                if (view.needsConfigure()) {
+                    view.configure();
+                    self.pending_configures += 1;
 
-                // Send a frame done that the client will commit a new frame
-                // with the dimensions we sent in the configure. Normally this
-                // event would be sent in the render function.
-                view.sendFrameDone();
-            }
+                    // Send a frame done that the client will commit a new frame
+                    // with the dimensions we sent in the configure. Normally this
+                    // event would be sent in the render function.
+                    view.sendFrameDone();
+                }
 
-            // If there are saved buffers present, then this transaction is interrupting
-            // a previous transaction and we should keep the old buffers.
-            if (view.saved_buffers.items.len == 0) {
-                view.saveBuffers();
+                // If there are saved buffers present, then this transaction is interrupting
+                // a previous transaction and we should keep the old buffers.
+                if (view.saved_buffers.items.len == 0) view.saveBuffers();
+            } else {
+                if (view.needsConfigure()) view.configure();
             }
         }
     }
@@ -183,6 +182,8 @@ fn handleTimeout(data: ?*c_void) callconv(.C) c_int {
 
     log.err(.transaction, "timeout occurred, some imperfect frames may be shown", .{});
 
+    self.pending_configures = 0;
+
     self.commitTransaction();
 
     return 0;
@@ -203,10 +204,7 @@ pub fn notifyConfigured(self: *Self) void {
 /// layout. Should only be called after all clients have configured for
 /// the new layout. If called early imperfect frames may be drawn.
 fn commitTransaction(self: *Self) void {
-    // TODO: apply damage properly
-
-    // Ensure this is set to 0 to avoid entering invalid state (e.g. if called due to timeout)
-    self.pending_configures = 0;
+    std.debug.assert(self.pending_configures == 0);
 
     // Iterate over all views of all outputs
     var output_it = self.outputs.first;
@@ -231,6 +229,8 @@ fn commitTransaction(self: *Self) void {
         var view_it = ViewStack(View).iterator(output.views.first, std.math.maxInt(u32));
         while (view_it.next()) |view_node| {
             const view = &view_node.view;
+            if (!view.shouldTrackConfigure() and view.pending_serial != null) continue;
+
             // Apply pending state of the view
             view.pending_serial = null;
             if (view.pending.tags != view.current.tags) view_tags_changed = true;

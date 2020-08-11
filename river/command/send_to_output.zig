@@ -54,7 +54,9 @@ pub fn sendToOutput(
         seat.focused.view.sendToOutput(destination_output);
 
         // Handle the change and focus whatever's next in the focus stack
-        root.arrange();
         seat.focus(null);
+        seat.focused_output.arrangeViews();
+        destination_output.arrangeViews();
+        root.startTransaction();
     }
 }

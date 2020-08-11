@@ -56,8 +56,9 @@ pub fn zoom(
         if (zoom_node) |to_bump| {
             output.views.remove(to_bump);
             output.views.push(to_bump);
-            seat.input_manager.server.root.arrange();
             seat.focus(&to_bump.view);
+            output.arrangeViews();
+            output.root.startTransaction();
         }
     }
 }

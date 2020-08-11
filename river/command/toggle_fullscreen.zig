@@ -38,6 +38,7 @@ pub fn toggleFullscreen(
         // Don't modify views which are the target of a cursor action
         if (seat.input_manager.isCursorActionTarget(view)) return;
 
-        view.setFullscreen(!view.pending.fullscreen);
+        view.pending.fullscreen = !view.pending.fullscreen;
+        view.applyPending();
     }
 }
