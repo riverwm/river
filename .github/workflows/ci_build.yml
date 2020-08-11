@@ -1,7 +1,13 @@
 # Build river and run the test suite every time a commit is pushed to master or
 # a pull request is opened against master.
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
 
 name: voidlinux
 
