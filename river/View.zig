@@ -167,16 +167,10 @@ pub fn applyPending(self: *Self) void {
         self.pending.box = self.float_box;
 
     // If switching to fullscreen set the dimensions to the full area of the output
-    if (!self.current.fullscreen and self.pending.fullscreen) {
+    if (!self.current.fullscreen and self.pending.fullscreen)
         self.pending.box = Box.fromWlrBox(
             c.wlr_output_layout_get_box(self.output.root.wlr_output_layout, self.output.wlr_output).*,
         );
-        // TODO: move this to configure
-        switch (self.impl) {
-            .xdg_toplevel => |xdg_toplevel| xdg_toplevel.setFullscreen(self.pending.fullscreen),
-            .xwayland_view => |xwayland_view| xwayland_view.setFullscreen(self.pending.fullscreen),
-        }
-    }
 
     // If switching from fullscreen to layout, arrange the output to get
     // assigned the proper size.

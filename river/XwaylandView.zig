@@ -66,6 +66,7 @@ pub fn needsConfigure(self: Self) bool {
 /// Apply pending state
 pub fn configure(self: Self) void {
     const state = &self.view.pending;
+    c.wlr_xwayland_surface_set_fullscreen(self.wlr_xwayland_surface, state.fullscreen);
     c.wlr_xwayland_surface_configure(
         self.wlr_xwayland_surface,
         @intCast(i16, state.box.x),
@@ -79,10 +80,6 @@ pub fn configure(self: Self) void {
     // call notifyConfigured() here as the transaction has not yet been fully
     // initiated.
     self.view.pending_serial = 0x66666666;
-}
-
-pub fn setFullscreen(self: Self, fullscreen: bool) void {
-    c.wlr_xwayland_surface_set_fullscreen(self.wlr_xwayland_surface, fullscreen);
 }
 
 /// Close the view. This will lead to the unmap and destroy events being sent

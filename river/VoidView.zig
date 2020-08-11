@@ -32,10 +32,6 @@ pub fn configure(self: Self) void {
     unreachable;
 }
 
-pub fn setFullscreen(self: Self, fullscreen: bool) void {
-    unreachable;
-}
-
 pub fn close(self: Self) void {
     unreachable;
 }
