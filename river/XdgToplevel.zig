@@ -193,6 +193,7 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // Make views with app_ids listed in the float filter float
         for (root.server.config.float_filter.items) |filter_app_id| {
             if (std.mem.eql(u8, std.mem.span(app_id), std.mem.span(filter_app_id))) {
+                view.current.float = true;
                 view.pending.float = true;
                 view.pending.box = view.float_box;
                 break;
@@ -245,11 +246,11 @@ fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         view.surface_box = new_box;
 
         if (s == self.wlr_xdg_surface.configure_serial) {
-            // If this commit is in response to our configure and the view is
-            // part of the layout, notify the transaction code. If floating or
-            // fullscreen apply the pending state immediately.
+            // If this commit is in response to our configure and the
+            // transaction code is tracking this configure, notify it.
+            // Otherwise, apply the pending state immediately.
             view.pending_serial = null;
-            if (!view.pending.float and !view.pending.fullscreen)
+            if (view.shouldTrackConfigure())
                 view.output.root.notifyConfigured()
             else
                 view.current = view.pending;
@@ -286,5 +287,6 @@ fn handleNewPopup(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 fn handleRequestFullscreen(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_request_fullscreen", listener.?);
     const event = util.voidCast(c.wlr_xdg_toplevel_set_fullscreen_event, data.?);
-    self.view.setFullscreen(event.fullscreen);
+    self.view.pending.fullscreen = event.fullscreen;
+    self.view.applyPending();
 }

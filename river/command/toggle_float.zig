@@ -40,18 +40,6 @@ pub fn toggleFloat(
         if (seat.input_manager.isCursorActionTarget(view)) return;
 
         view.pending.float = !view.pending.float;
-
-        if (view.pending.float) {
-            // If switching from layout to float, restore the previous floating
-            // dimensions.
-            view.pending.box = view.float_box;
-            view.configure();
-        } else {
-            // If switching from float to layout save the floating dimensions
-            // for next time.
-            view.float_box = view.current.box;
-        }
-
-        view.output.root.arrange();
+        view.applyPending();
     }
 }

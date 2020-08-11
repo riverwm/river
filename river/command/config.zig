@@ -31,7 +31,8 @@ pub fn borderWidth(
 
     const server = seat.input_manager.server;
     server.config.border_width = try std.fmt.parseInt(u32, args[1], 10);
-    server.root.arrange();
+    server.root.arrangeAll();
+    server.root.startTransaction();
 }
 
 pub fn viewPadding(
@@ -45,7 +46,8 @@ pub fn viewPadding(
 
     const server = seat.input_manager.server;
     server.config.view_padding = try std.fmt.parseInt(u32, args[1], 10);
-    server.root.arrange();
+    server.root.arrangeAll();
+    server.root.startTransaction();
 }
 
 pub fn outerPadding(
@@ -59,7 +61,8 @@ pub fn outerPadding(
 
     const server = seat.input_manager.server;
     server.config.outer_padding = try std.fmt.parseInt(u32, args[1], 10);
-    server.root.arrange();
+    server.root.arrangeAll();
+    server.root.startTransaction();
 }
 
 pub fn backgroundColor(

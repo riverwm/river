@@ -33,5 +33,6 @@ pub fn modMasterCount(
     const delta = try std.fmt.parseInt(i32, args[1], 10);
     const output = seat.focused_output;
     output.master_count = @intCast(u32, std.math.max(0, @intCast(i32, output.master_count) + delta));
-    seat.input_manager.server.root.arrange();
+    output.arrangeViews();
+    output.root.startTransaction();
 }

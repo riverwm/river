@@ -295,6 +295,8 @@ fn layoutExternal(self: *Self, visible_count: u32) !void {
 /// pending state, the changes are not appplied until a transaction is started
 /// and completed.
 pub fn arrangeViews(self: *Self) void {
+    if (self == &self.root.noop_output) return;
+
     const full_area = Box.fromWlrBox(c.wlr_output_layout_get_box(self.root.wlr_output_layout, self.wlr_output).*);
 
     // Count up views that will be arranged by the layout
@@ -353,7 +355,7 @@ pub fn arrangeLayers(self: *Self) void {
     // If the the usable_box has changed, we need to rearrange the output
     if (!std.meta.eql(self.usable_box, usable_box)) {
         self.usable_box = usable_box;
-        self.root.arrange();
+        self.arrangeViews();
     }
 
     // Arrange the layers without exclusive zones
@@ -392,6 +394,8 @@ pub fn arrangeLayers(self: *Self) void {
             }
         }
     }
+
+    self.root.startTransaction();
 }
 
 /// Arrange the layer surfaces of a given layer
@@ -603,7 +607,8 @@ fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     util.gpa.destroy(node);
 
     // Arrange the root in case evacuated views affect the layout
-    root.arrange();
+    fallback_output.arrangeViews();
+    root.startTransaction();
 }
 
 fn handleFrame(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -616,5 +621,6 @@ fn handleFrame(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 fn handleMode(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_mode", listener.?);
     self.arrangeLayers();
-    self.root.arrange();
+    self.arrangeViews();
+    self.root.startTransaction();
 }

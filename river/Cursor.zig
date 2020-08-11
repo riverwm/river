@@ -68,9 +68,8 @@ const Mode = union(enum) {
                 // Automatically float all views being moved by the pointer
                 if (!view.current.float) {
                     view.pending.float = true;
-                    // Start a transaction to apply the pending state of the grabbed
-                    // view and rearrange the layout to fill the hole.
-                    view.output.root.arrange();
+                    view.float_box = view.current.box;
+                    view.applyPending();
                 }
 
                 // Clear cursor focus, so that the surface does not receive events
@@ -145,8 +144,7 @@ const Mode = union(enum) {
                     @intToFloat(f64, view.pending.box.y - view.current.box.y),
                 );
 
-                // Apply new pending state (no need for a configure as size didn't change)
-                view.current = view.pending;
+                view.applyPending();
             },
             .resize => |data| {
                 var output_width: c_int = undefined;
@@ -163,7 +161,7 @@ const Mode = union(enum) {
                 box.width = std.math.min(box.width, @intCast(u32, output_width - box.x - @intCast(i32, border_width)));
                 box.height = std.math.min(box.height, @intCast(u32, output_height - box.y - @intCast(i32, border_width)));
 
-                if (data.view.needsConfigure()) data.view.configure();
+                data.view.applyPending();
 
                 // Keep cursor locked to the original offset from the bottom right corner
                 c.wlr_cursor_warp_closest(

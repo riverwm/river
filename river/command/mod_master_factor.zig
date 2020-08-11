@@ -35,6 +35,7 @@ pub fn modMasterFactor(
     const new_master_factor = std.math.min(std.math.max(output.master_factor + delta, 0.05), 0.95);
     if (new_master_factor != output.master_factor) {
         output.master_factor = new_master_factor;
-        seat.input_manager.server.root.arrange();
+        output.arrangeViews();
+        output.root.startTransaction();
     }
 }

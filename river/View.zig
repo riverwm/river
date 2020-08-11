@@ -145,6 +145,49 @@ pub fn deinit(self: Self) void {
     self.saved_buffers.deinit();
 }
 
+/// Handle changes to pending state and start a transaction to apply them
+pub fn applyPending(self: *Self) void {
+    var arrange_output = false;
+
+    if (self.current.tags != self.pending.tags)
+        arrange_output = true;
+
+    // If switching from float -> layout or layout -> float arrange the output
+    // to get assigned a new size or fill the hole in the layout left behind
+    if (self.current.float != self.pending.float)
+        arrange_output = true;
+
+    // If switching from float to something else save the dimensions
+    if (self.current.float and !self.pending.float)
+        self.float_box = self.current.box;
+
+    // If switching from something else to float restore the dimensions
+    if ((!self.current.float and self.pending.float) or
+        (self.current.fullscreen and !self.pending.fullscreen and self.pending.float))
+        self.pending.box = self.float_box;
+
+    // If switching to fullscreen set the dimensions to the full area of the output
+    if (!self.current.fullscreen and self.pending.fullscreen) {
+        self.pending.box = Box.fromWlrBox(
+            c.wlr_output_layout_get_box(self.output.root.wlr_output_layout, self.output.wlr_output).*,
+        );
+        // TODO: move this to configure
+        switch (self.impl) {
+            .xdg_toplevel => |xdg_toplevel| xdg_toplevel.setFullscreen(self.pending.fullscreen),
+            .xwayland_view => |xwayland_view| xwayland_view.setFullscreen(self.pending.fullscreen),
+        }
+    }
+
+    // If switching from fullscreen to layout, arrange the output to get
+    // assigned the proper size.
+    if (self.current.fullscreen and !self.pending.fullscreen and !self.pending.float)
+        arrange_output = true;
+
+    if (arrange_output) self.output.arrangeViews();
+
+    self.output.root.startTransaction();
+}
+
 pub fn needsConfigure(self: Self) bool {
     return switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.needsConfigure(),
@@ -171,11 +214,7 @@ pub fn dropSavedBuffers(self: *Self) void {
 }
 
 pub fn saveBuffers(self: *Self) void {
-    if (self.saved_buffers.items.len > 0) {
-        log.err(.transaction, "view already has buffers saved, overwriting", .{});
-        self.saved_buffers.items.len = 0;
-    }
-
+    std.debug.assert(self.saved_buffers.items.len == 0);
     self.saved_surface_box = self.surface_box;
     self.forEachSurface(saveBuffersIterator, &self.saved_buffers);
 }
@@ -201,36 +240,6 @@ fn saveBuffersIterator(
             }) catch return;
             _ = c.wlr_buffer_lock(&surface.buffer.*.base);
         }
-    }
-}
-
-/// Set the pending state, set the size, and inform the client.
-pub fn setFullscreen(self: *Self, fullscreen: bool) void {
-    self.pending.fullscreen = fullscreen;
-
-    if (fullscreen) {
-        // If transitioning from float -> fullscreen, save the floating
-        // dimensions.
-        if (self.pending.float) self.float_box = self.current.box;
-
-        const output = self.output;
-        self.pending.box = Box.fromWlrBox(
-            c.wlr_output_layout_get_box(output.root.wlr_output_layout, output.wlr_output).*,
-        );
-        self.configure();
-    } else if (self.pending.float) {
-        // If transitioning from fullscreen -> float, return to the saved
-        // floating dimensions.
-        self.pending.box = self.float_box;
-        self.configure();
-    } else {
-        // Transitioning to layout, arrange and start a transaction
-        self.output.root.arrange();
-    }
-
-    switch (self.impl) {
-        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.setFullscreen(fullscreen),
-        .xwayland_view => |xwayland_view| xwayland_view.setFullscreen(fullscreen),
     }
 }
 
@@ -319,6 +328,16 @@ pub fn fromWlrSurface(wlr_surface: *c.wlr_surface) ?*Self {
     return null;
 }
 
+pub fn shouldTrackConfigure(self: Self) bool {
+    // There are exactly three cases in which we do not track configures
+    // 1. the view was and remains floating
+    // 2. the view is changing from float/layout to fullscreen
+    // 3. the view is changing from fullscreen to float
+    return !((self.pending.float and self.current.float) or
+        (self.pending.fullscreen and !self.current.fullscreen) or
+        (self.pending.float and !self.pending.fullscreen and self.current.fullscreen));
+}
+
 /// Called by the impl when the surface is ready to be displayed
 pub fn map(self: *Self) void {
     const root = self.output.root;
@@ -338,7 +357,8 @@ pub fn map(self: *Self) void {
 
     self.output.sendViewTags();
 
-    if (self.pending.float) self.configure() else root.arrange();
+    self.output.arrangeViews();
+    self.output.root.startTransaction();
 }
 
 /// Called by the impl when the surface will no longer be displayed
@@ -363,7 +383,10 @@ pub fn unmap(self: *Self) void {
     self.output.sendViewTags();
 
     // Still need to arrange if fullscreened from the layout
-    if (!self.current.float) root.arrange();
+    if (!self.current.float) {
+        self.output.arrangeViews();
+        root.startTransaction();
+    }
 }
 
 /// Destory the view and free the ViewStack node holding it.
