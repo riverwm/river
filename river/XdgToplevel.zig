@@ -82,15 +82,12 @@ pub fn needsConfigure(self: Self) bool {
 pub fn configure(self: Self) void {
     const state = &self.view.pending;
     _ = c.wlr_xdg_toplevel_set_activated(self.wlr_xdg_surface, state.focus != 0);
+    _ = c.wlr_xdg_toplevel_set_fullscreen(self.wlr_xdg_surface, state.fullscreen);
     self.view.pending_serial = c.wlr_xdg_toplevel_set_size(
         self.wlr_xdg_surface,
         state.box.width,
         state.box.height,
     );
-}
-
-pub fn setFullscreen(self: Self, fullscreen: bool) void {
-    _ = c.wlr_xdg_toplevel_set_fullscreen(self.wlr_xdg_surface, fullscreen);
 }
 
 /// Close the view. This will lead to the unmap and destroy events being sent
