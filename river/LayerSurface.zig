@@ -31,7 +31,7 @@ output: *Output,
 wlr_layer_surface: *c.wlr_layer_surface_v1,
 
 box: Box,
-layer: c.zwlr_layer_shell_v1_layer,
+state: c.wlr_layer_surface_v1_state,
 
 // Listeners active the entire lifetime of the layser surface
 listen_destroy: c.wl_listener,
@@ -49,20 +49,16 @@ pub fn init(
 ) void {
     self.output = output;
     self.wlr_layer_surface = wlr_layer_surface;
+    self.state = wlr_layer_surface.current;
     wlr_layer_surface.data = self;
 
-    self.layer = wlr_layer_surface.client_pending.layer;
-
-    // Temporarily add to the output's list and apply the pending state to allow
-    // for inital arrangement which sends the first configure.
+    // Temporarily add to the output's list to allow for inital arrangement
+    // which sends the first configure.
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-    const list = &output.layers[@intCast(usize, @enumToInt(self.layer))];
-    const stashed_state = wlr_layer_surface.current;
-    wlr_layer_surface.current = wlr_layer_surface.client_pending;
+    const list = &output.layers[@intCast(usize, @enumToInt(self.state.layer))];
     list.append(node);
     output.arrangeLayers();
     list.remove(node);
-    wlr_layer_surface.current = stashed_state;
 
     // Set up listeners that are active for the entire lifetime of the layer surface
     self.listen_destroy.notify = handleDestroy;
@@ -109,7 +105,7 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     );
 
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-    self.output.layers[@intCast(usize, @enumToInt(self.layer))].append(node);
+    self.output.layers[@intCast(usize, @enumToInt(self.state.layer))].append(node);
 }
 
 fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -133,7 +129,7 @@ fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 
     // Remove from the output's list of layer surfaces
     const self_node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-    self.output.layers[@intCast(usize, @enumToInt(self.layer))].remove(self_node);
+    self.output.layers[@intCast(usize, @enumToInt(self.state.layer))].remove(self_node);
 
     // If the unmapped surface is focused, clear focus
     var it = self.output.root.server.input_manager.seats.first;
@@ -160,30 +156,26 @@ fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 
 fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_commit", listener.?);
-    const wlr_layer_surface = self.wlr_layer_surface;
 
     if (self.wlr_layer_surface.output == null) {
         log.err(.layer_shell, "layer surface committed with null output", .{});
         return;
     }
 
-    // If the layer changed, move the LayerSurface to the proper list
-    if (self.layer != self.wlr_layer_surface.current.layer) {
-        const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
+    const new_state = &self.wlr_layer_surface.current;
+    if (!std.meta.eql(self.state, new_state.*)) {
+        // If the layer changed, move the LayerSurface to the proper list
+        if (self.state.layer != new_state.layer) {
+            const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
+            self.output.layers[@intCast(usize, @enumToInt(self.state.layer))].remove(node);
+            self.output.layers[@intCast(usize, @enumToInt(new_state.layer))].append(node);
+        }
 
-        const old_layer_idx = @intCast(usize, @enumToInt(self.layer));
-        self.output.layers[old_layer_idx].remove(node);
+        self.state = new_state.*;
 
-        self.layer = self.wlr_layer_surface.current.layer;
-
-        const new_layer_idx = @intCast(usize, @enumToInt(self.layer));
-        self.output.layers[new_layer_idx].append(node);
+        self.output.arrangeLayers();
+        self.output.root.startTransaction();
     }
-
-    // TODO: only reconfigure if things haven't changed
-    // https://github.com/swaywm/wlroots/issues/1079
-    self.output.arrangeLayers();
-    self.output.root.startTransaction();
 }
 
 fn handleNewPopup(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
