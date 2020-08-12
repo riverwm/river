@@ -154,6 +154,8 @@ fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         const seat = &node.data;
         seat.focus(null);
     }
+
+    self.output.root.startTransaction();
 }
 
 fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -181,6 +183,7 @@ fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     // TODO: only reconfigure if things haven't changed
     // https://github.com/swaywm/wlroots/issues/1079
     self.output.arrangeLayers();
+    self.output.root.startTransaction();
 }
 
 fn handleNewPopup(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {

@@ -53,6 +53,7 @@ pub fn focusView(
         // Focus the next visible node if there is one
         if (it.next()) |node| {
             seat.focus(&node.view);
+            output.root.startTransaction();
             return;
         }
     }
@@ -65,4 +66,5 @@ pub fn focusView(
     };
 
     seat.focus(if (it.next()) |node| &node.view else null);
+    output.root.startTransaction();
 }

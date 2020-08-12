@@ -149,6 +149,8 @@ fn handleInhibitDeactivate(listener: ?*c.wl_listener, data: ?*c_void) callconv(.
     while (seat_it) |seat_node| : (seat_it = seat_node.next) {
         seat_node.data.focus(null);
     }
+
+    self.server.root.startTransaction();
 }
 
 /// This event is raised by the backend when a new input device becomes available.

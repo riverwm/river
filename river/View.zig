@@ -351,7 +351,8 @@ pub fn map(self: *Self) void {
 
     self.output.sendViewTags();
 
-    self.output.arrangeViews();
+    if (!self.current.float) self.output.arrangeViews();
+
     self.output.root.startTransaction();
 }
 
@@ -377,10 +378,9 @@ pub fn unmap(self: *Self) void {
     self.output.sendViewTags();
 
     // Still need to arrange if fullscreened from the layout
-    if (!self.current.float) {
-        self.output.arrangeViews();
-        root.startTransaction();
-    }
+    if (!self.current.float) self.output.arrangeViews();
+
+    root.startTransaction();
 }
 
 /// Destory the view and free the ViewStack node holding it.
