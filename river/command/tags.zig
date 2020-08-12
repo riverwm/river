@@ -31,6 +31,7 @@ pub fn setFocusedTags(
     if (seat.focused_output.pending.tags != tags) {
         seat.focused_output.pending.tags = tags;
         seat.focused_output.arrangeViews();
+        seat.focus(null);
         seat.focused_output.root.startTransaction();
     }
 }
@@ -44,8 +45,10 @@ pub fn setViewTags(
 ) Error!void {
     const tags = try parseTags(allocator, args, out);
     if (seat.focused == .view) {
-        seat.focused.view.pending.tags = tags;
-        seat.focused.view.applyPending();
+        const view = seat.focused.view;
+        view.pending.tags = tags;
+        seat.focus(null);
+        view.applyPending();
     }
 }
 
@@ -62,6 +65,7 @@ pub fn toggleFocusedTags(
     if (new_focused_tags != 0) {
         output.pending.tags = new_focused_tags;
         output.arrangeViews();
+        seat.focus(null);
         output.root.startTransaction();
     }
 }
@@ -75,10 +79,12 @@ pub fn toggleViewTags(
 ) Error!void {
     const tags = try parseTags(allocator, args, out);
     if (seat.focused == .view) {
-        const new_tags = seat.focused.view.current.tags ^ tags;
+        const new_tags = seat.focused.view.pending.tags ^ tags;
         if (new_tags != 0) {
-            seat.focused.view.pending.tags = new_tags;
-            seat.focused.view.applyPending();
+            const view = seat.focused.view;
+            view.pending.tags = new_tags;
+            seat.focus(null);
+            view.applyPending();
         }
     }
 }

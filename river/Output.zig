@@ -304,7 +304,7 @@ pub fn arrangeViews(self: *Self) void {
     var it = ViewStack(View).pendingIterator(self.views.first, self.pending.tags);
     while (it.next()) |node| {
         const view = &node.view;
-        if (!view.pending.float) layout_count += 1;
+        if (!view.pending.float and !view.pending.fullscreen) layout_count += 1;
     }
 
     // If the usable area has a zero dimension, trying to arrange the layout
@@ -394,8 +394,6 @@ pub fn arrangeLayers(self: *Self) void {
             }
         }
     }
-
-    self.root.startTransaction();
 }
 
 /// Arrange the layer surfaces of a given layer
@@ -585,7 +583,7 @@ fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     while (seat_it) |seat_node| : (seat_it = seat_node.next) {
         const seat = &seat_node.data;
         if (seat.focused_output == self) {
-            seat.focusOutput(self);
+            seat.focusOutput(fallback_output);
             seat.focus(null);
         }
     }

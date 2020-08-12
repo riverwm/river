@@ -241,8 +241,4 @@ fn commitTransaction(self: *Self) void {
 
         if (view_tags_changed) output.sendViewTags();
     }
-
-    // Iterate over all seats and update focus
-    var it = self.server.input_manager.seats.first;
-    while (it) |seat_node| : (it = seat_node.next) seat_node.data.focus(null);
 }

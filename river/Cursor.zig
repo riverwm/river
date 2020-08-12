@@ -48,9 +48,14 @@ const Mode = union(enum) {
     fn enter(self: *Self, mode: @TagType(Mode), event: *c.wlr_event_pointer_button, view: *View) void {
         log.debug(.cursor, "enter {} mode", .{@tagName(mode)});
 
+        self.seat.focus(view);
+
         switch (mode) {
             .passthrough => unreachable,
-            .down => self.mode = .{ .down = view },
+            .down => {
+                self.mode = .{ .down = view };
+                view.output.root.startTransaction();
+            },
             .move, .resize => {
                 const cur_box = &view.current.box;
                 self.mode = switch (mode) {
@@ -366,8 +371,6 @@ fn handleButton(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // If the target surface has a view, give that view keyboard focus and
         // perhaps enter move/resize mode.
         if (View.fromWlrSurface(wlr_surface)) |view| {
-            self.seat.focus(view);
-
             if (event.state == .WLR_BUTTON_PRESSED and self.pressed_count == 1) {
                 // If the button is pressed and the pointer modifier is
                 // active, enter cursor mode or close view and return.
