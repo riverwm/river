@@ -33,6 +33,7 @@ pub usingnamespace @cImport({
     @cInclude("wlr/types/wlr_cursor.h");
     @cInclude("wlr/types/wlr_data_control_v1.h");
     @cInclude("wlr/types/wlr_data_device.h");
+    @cInclude("wlr/types/wlr_idle.h");
     @cInclude("wlr/types/wlr_input_device.h");
     @cInclude("wlr/types/wlr_input_inhibitor.h");
     @cInclude("wlr/types/wlr_keyboard.h");

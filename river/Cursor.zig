@@ -324,12 +324,14 @@ pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
 fn handleAxis(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     // This event is forwarded by the cursor when a pointer emits an axis event,
     // for example when you move the scroll wheel.
-    const cursor = @fieldParentPtr(Self, "listen_axis", listener.?);
+    const self = @fieldParentPtr(Self, "listen_axis", listener.?);
     const event = util.voidCast(c.wlr_event_pointer_axis, data.?);
+
+    self.seat.handleActivity();
 
     // Notify the client with pointer focus of the axis event.
     c.wlr_seat_pointer_notify_axis(
-        cursor.seat.wlr_seat,
+        self.seat.wlr_seat,
         event.time_msec,
         event.orientation,
         event.delta,
@@ -343,6 +345,8 @@ fn handleButton(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     // event.
     const self = @fieldParentPtr(Self, "listen_button", listener.?);
     const event = util.voidCast(c.wlr_event_pointer_button, data.?);
+
+    self.seat.handleActivity();
 
     if (event.state == .WLR_BUTTON_PRESSED) {
         self.pressed_count += 1;
@@ -421,6 +425,8 @@ fn handleMotionAbsolute(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) 
     const self = @fieldParentPtr(Self, "listen_motion_absolute", listener.?);
     const event = util.voidCast(c.wlr_event_pointer_motion_absolute, data.?);
 
+    self.seat.handleActivity();
+
     var lx: f64 = undefined;
     var ly: f64 = undefined;
     c.wlr_cursor_absolute_to_layout_coords(self.wlr_cursor, event.device, event.x, event.y, &lx, &ly);
@@ -433,6 +439,8 @@ fn handleMotion(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     // pointer motion event (i.e. a delta)
     const self = @fieldParentPtr(Self, "listen_motion", listener.?);
     const event = util.voidCast(c.wlr_event_pointer_motion, data.?);
+
+    self.seat.handleActivity();
 
     Mode.processMotion(self, event.device, event.time_msec, event.delta_x, event.delta_y);
 }

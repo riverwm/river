@@ -238,6 +238,10 @@ pub fn focusOutput(self: *Self, output: *Output) void {
     while (it) |node| : (it = node.next) node.data.sendOutput(.focused);
 }
 
+pub fn handleActivity(self: Self) void {
+    c.wlr_idle_notify_activity(self.input_manager.wlr_idle, self.wlr_seat);
+}
+
 /// Handle the unmapping of a view, removing it from the focus stack and
 /// setting the focus if needed.
 pub fn handleViewUnmap(self: *Self, view: *View) void {

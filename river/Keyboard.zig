@@ -71,8 +71,9 @@ fn handleKey(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     // This event is raised when a key is pressed or released.
     const self = @fieldParentPtr(Self, "listen_key", listener.?);
     const event = util.voidCast(c.wlr_event_keyboard_key, data.?);
-
     const wlr_keyboard = self.wlr_keyboard;
+
+    self.seat.handleActivity();
 
     // Translate libinput keycode -> xkbcommon
     const keycode = event.keycode + 8;

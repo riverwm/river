@@ -32,6 +32,7 @@ const default_seat_name = "default";
 
 server: *Server,
 
+wlr_idle: *c.wlr_idle,
 wlr_input_inhibit_manager: *c.wlr_input_inhibit_manager,
 
 seats: std.TailQueue(Seat),
@@ -46,9 +47,10 @@ listen_new_input: c.wl_listener,
 pub fn init(self: *Self, server: *Server) !void {
     self.server = server;
 
-    // This is automatically freed when the display is destroyed
-    self.wlr_input_inhibit_manager =
-        c.wlr_input_inhibit_manager_create(server.wl_display) orelse return error.OutOfMemory;
+    // These are automatically freed when the display is destroyed
+    self.wlr_idle = c.wlr_idle_create(server.wl_display) orelse return error.OutOfMemory;
+    self.wlr_input_inhibit_manager = c.wlr_input_inhibit_manager_create(server.wl_display) orelse
+        return error.OutOfMemory;
 
     self.seats = std.TailQueue(Seat).init();
 
