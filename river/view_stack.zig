@@ -17,6 +17,11 @@
 
 const View = @import("View.zig");
 
+pub const AttachMode = enum {
+    top,
+    bottom,
+};
+
 /// A specialized doubly-linked stack that allows for filtered iteration
 /// over the nodes. T must be View or *View.
 pub fn ViewStack(comptime T: type) type {
@@ -62,6 +67,33 @@ pub fn ViewStack(comptime T: type) type {
 
             // Set the first pointer to the new node
             self.first = new_node;
+        }
+
+        /// Add a node to the bottom of the stack.
+        pub fn append(self: *Self, new_node: *Node) void {
+            // Set the prev/next pointers of the new node
+            new_node.prev = self.last;
+            new_node.next = null;
+
+            if (self.last) |last| {
+                // If the list is not empty, set the next pointer of the current
+                // first node to the new node.
+                last.next = new_node;
+            } else {
+                // If the list is empty set the first pointer to the new node.
+                self.first = new_node;
+            }
+
+            // Set the last pointer to the new node
+            self.last = new_node;
+        }
+
+        /// Attach a node into the viewstack based on the attach mode
+        pub fn attach(self: *Self, new_node: *Node, mode: AttachMode) void {
+            switch (mode) {
+                .top => self.push(new_node),
+                .bottom => self.append(new_node),
+            }
         }
 
         /// Remove a node from the view stack. This removes it from the stack of

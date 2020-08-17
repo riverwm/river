@@ -243,7 +243,7 @@ pub fn sendToOutput(self: *Self, destination_output: *Output) void {
     const node = @fieldParentPtr(ViewStack(Self).Node, "view", self);
 
     self.output.views.remove(node);
-    destination_output.views.push(node);
+    destination_output.views.attach(node, destination_output.attach_mode);
 
     self.output.sendViewTags();
     destination_output.sendViewTags();
@@ -340,7 +340,7 @@ pub fn map(self: *Self) void {
 
     // Add the view to the stack of its output
     const node = @fieldParentPtr(ViewStack(Self).Node, "view", self);
-    self.output.views.push(node);
+    self.output.views.attach(node, self.output.attach_mode);
 
     // Focus the new view, assuming the seat is focusing the proper output
     // and there isn't something else like a fullscreen view grabbing focus.

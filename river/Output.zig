@@ -30,12 +30,15 @@ const LayerSurface = @import("LayerSurface.zig");
 const Root = @import("Root.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
+const AttachMode = @import("view_stack.zig").AttachMode;
 const OutputStatus = @import("OutputStatus.zig");
 
 const State = struct {
     /// A bit field of focused tags
     tags: u32,
 };
+
+attach_mode: AttachMode,
 
 root: *Root,
 wlr_output: *c.wlr_output,
@@ -106,6 +109,8 @@ pub fn init(self: *Self, root: *Root, wlr_output: *c.wlr_output) !void {
     self.master_factor = 0.6;
 
     self.layout = try std.mem.dupe(util.gpa, u8, "full");
+
+    self.attach_mode = .top;
 
     self.status_trackers = std.SinglyLinkedList(OutputStatus).init();
 
