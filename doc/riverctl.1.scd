@@ -95,6 +95,9 @@ that tag 1 through 9 are visible.
 
 ## CONFIGURATION COMMANDS
 
+*attach-mode* *top*|*bottom*
+	Configure where new views should attach in the view stack for the currently focused output.
+
 *background-color* _#RRGGBB_|_#RRGGBBAA_
 	Set the background color.
 
