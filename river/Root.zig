@@ -133,6 +133,11 @@ pub fn startTransaction(self: *Self) void {
         while (view_it.next()) |view_node| {
             const view = &view_node.view;
 
+            if (view.destroying) {
+                if (view.saved_buffers.items.len == 0) view.saveBuffers();
+                continue;
+            }
+
             if (view.shouldTrackConfigure()) {
                 // Clear the serial in case this transaction is interrupting a prior one.
                 view.pending_serial = null;
@@ -226,9 +231,17 @@ fn commitTransaction(self: *Self) void {
 
         var view_tags_changed = false;
 
-        var view_it = ViewStack(View).iterator(output.views.first, std.math.maxInt(u32));
-        while (view_it.next()) |view_node| {
+        var view_it = output.views.first;
+        while (view_it) |view_node| {
             const view = &view_node.view;
+
+            if (view.destroying) {
+                view_it = view_node.next;
+                view.destroy();
+                continue;
+            }
+            defer view_it = view_node.next;
+
             if (!view.shouldTrackConfigure() and view.pending_serial != null) continue;
 
             // Apply pending state of the view

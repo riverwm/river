@@ -79,8 +79,13 @@ impl: Impl,
 /// The output this view is currently associated with
 output: *Output,
 
-/// This is non-null exactly when the view is mapped
+/// This is from the point where the view is mapped until the surface
+/// is destroyed by wlroots.
 wlr_surface: ?*c.wlr_surface,
+
+/// This View struct outlasts the wlroots object it wraps. This bool is set to
+/// true when the backing wlr_xdg_toplevel or equivalent has been destroyed.
+destroying: bool,
 
 /// The double-buffered state of the view
 current: State,
@@ -110,6 +115,7 @@ pub fn init(self: *Self, output: *Output, tags: u32, surface: var) void {
     self.output = output;
 
     self.wlr_surface = null;
+    self.destroying = false;
 
     self.current = .{
         .box = .{
@@ -140,9 +146,17 @@ pub fn init(self: *Self, output: *Output, tags: u32, surface: var) void {
     } else unreachable;
 }
 
-pub fn deinit(self: Self) void {
+/// Deinit the view, remove it from the view stack and free the memory.
+pub fn destroy(self: *Self) void {
     for (self.saved_buffers.items) |buffer| c.wlr_buffer_unlock(&buffer.wlr_client_buffer.*.base);
     self.saved_buffers.deinit();
+    switch (self.impl) {
+        .xdg_toplevel => |*xdg_toplevel| xdg_toplevel.deinit(),
+        .xwayland_view => |*xwayland_view| xwayland_view.deinit(),
+    }
+    const node = @fieldParentPtr(ViewStack(Self).Node, "view", self);
+    self.output.views.remove(node);
+    util.gpa.destroy(node);
 }
 
 /// Handle changes to pending state and start a transaction to apply them
@@ -362,6 +376,8 @@ pub fn unmap(self: *Self) void {
 
     log.debug(.server, "view '{}' unmapped", .{self.getTitle()});
 
+    self.destroying = true;
+
     // Inform all seats that the view has been unmapped so they can handle focus
     var it = root.server.input_manager.seats.first;
     while (it) |node| : (it = node.next) {
@@ -369,23 +385,10 @@ pub fn unmap(self: *Self) void {
         seat.handleViewUnmap(self);
     }
 
-    self.wlr_surface = null;
-
-    // Remove the view from its output's stack
-    const node = @fieldParentPtr(ViewStack(Self).Node, "view", self);
-    self.output.views.remove(node);
-
     self.output.sendViewTags();
 
     // Still need to arrange if fullscreened from the layout
     if (!self.current.float) self.output.arrangeViews();
 
     root.startTransaction();
-}
-
-/// Destory the view and free the ViewStack node holding it.
-pub fn destroy(self: *const Self) void {
-    self.deinit();
-    const node = @fieldParentPtr(ViewStack(Self).Node, "view", self);
-    util.gpa.destroy(node);
 }

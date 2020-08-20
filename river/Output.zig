@@ -288,7 +288,7 @@ fn layoutExternal(self: *Self, visible_count: u32) !void {
     var view_it = ViewStack(View).pendingIterator(self.views.first, self.pending.tags);
     while (view_it.next()) |node| {
         const view = &node.view;
-        if (!view.pending.float and !view.pending.fullscreen) {
+        if (!view.pending.float and !view.pending.fullscreen and !view.destroying) {
             view.pending.box = view_boxen.items[i];
             view.applyConstraints();
             i += 1;
@@ -309,7 +309,7 @@ pub fn arrangeViews(self: *Self) void {
     var it = ViewStack(View).pendingIterator(self.views.first, self.pending.tags);
     while (it.next()) |node| {
         const view = &node.view;
-        if (!view.pending.float and !view.pending.fullscreen) layout_count += 1;
+        if (!view.pending.float and !view.pending.fullscreen and !view.destroying) layout_count += 1;
     }
 
     // If the usable area has a zero dimension, trying to arrange the layout

@@ -56,6 +56,15 @@ pub fn init(self: *Self, view: *View, wlr_xwayland_surface: *c.wlr_xwayland_surf
     c.wl_signal_add(&self.wlr_xwayland_surface.events.unmap, &self.listen_unmap);
 }
 
+pub fn deinit(self: *Self) void {
+    if (self.view.wlr_surface != null) {
+        // Remove listeners that are active for the entire lifetime of the view
+        c.wl_list_remove(&self.listen_destroy.link);
+        c.wl_list_remove(&self.listen_map.link);
+        c.wl_list_remove(&self.listen_unmap.link);
+    }
+}
+
 pub fn needsConfigure(self: Self) bool {
     return self.wlr_xwayland_surface.x != self.view.pending.box.x or
         self.wlr_xwayland_surface.y != self.view.pending.box.y or
@@ -132,13 +141,8 @@ pub fn getConstraints(self: Self) View.Constraints {
 /// Called when the xwayland surface is destroyed
 fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_destroy", listener.?);
-
-    // Remove listeners that are active for the entire lifetime of the view
-    c.wl_list_remove(&self.listen_destroy.link);
-    c.wl_list_remove(&self.listen_map.link);
-    c.wl_list_remove(&self.listen_unmap.link);
-
-    self.view.destroy();
+    self.deinit();
+    self.view.wlr_surface = null;
 }
 
 /// Called when the xwayland surface is mapped, or ready to display on-screen.
