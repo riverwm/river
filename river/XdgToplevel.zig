@@ -60,6 +60,15 @@ pub fn init(self: *Self, view: *View, wlr_xdg_surface: *c.wlr_xdg_surface) void 
     c.wl_signal_add(&self.wlr_xdg_surface.events.unmap, &self.listen_unmap);
 }
 
+pub fn deinit(self: *Self) void {
+    if (self.view.wlr_surface != null) {
+        // Remove listeners that are active for the entire lifetime of the view
+        c.wl_list_remove(&self.listen_destroy.link);
+        c.wl_list_remove(&self.listen_map.link);
+        c.wl_list_remove(&self.listen_unmap.link);
+    }
+}
+
 /// Returns true if a configure must be sent to ensure the dimensions of the
 /// pending_box are applied.
 pub fn needsConfigure(self: Self) bool {
@@ -139,14 +148,8 @@ pub fn getConstraints(self: Self) View.Constraints {
 /// Called when the xdg surface is destroyed
 fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_destroy", listener.?);
-    const output = self.view.output;
-
-    // Remove listeners that are active for the entire lifetime of the view
-    c.wl_list_remove(&self.listen_destroy.link);
-    c.wl_list_remove(&self.listen_map.link);
-    c.wl_list_remove(&self.listen_unmap.link);
-
-    self.view.destroy();
+    self.deinit();
+    self.view.wlr_surface = null;
 }
 
 /// Called when the xdg surface is mapped, or ready to display on-screen.
