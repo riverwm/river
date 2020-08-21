@@ -201,12 +201,7 @@ const Mode = union(enum) {
 
         // There is either no surface under the cursor or input is disallowed
         // Reset the cursor image to the default and clear focus.
-        c.wlr_xcursor_manager_set_cursor_image(
-            self.wlr_xcursor_manager,
-            "left_ptr",
-            self.wlr_cursor,
-        );
-        c.wlr_seat_pointer_clear_focus(self.seat.wlr_seat);
+        self.clearFocus();
     }
 };
 
@@ -319,6 +314,31 @@ pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
             } else log.err(.cursor, "failed to load xcursor theme '{}' at scale 1", .{theme});
         }
     }
+}
+
+pub fn isCursorActionTarget(self: Self, view: *const View) bool {
+    return switch (self.mode) {
+        .passthrough => false,
+        .down => |target_view| target_view == view,
+        .move => |target_view| target_view == view,
+        .resize => |data| data.view == view,
+    };
+}
+
+pub fn handleViewUnmap(self: *Self, view: *View) void {
+    if (self.isCursorActionTarget(view)) {
+        self.mode = .passthrough;
+        self.clearFocus();
+    }
+}
+
+fn clearFocus(self: Self) void {
+    c.wlr_xcursor_manager_set_cursor_image(
+        self.wlr_xcursor_manager,
+        "left_ptr",
+        self.wlr_cursor,
+    );
+    c.wlr_seat_pointer_clear_focus(self.seat.wlr_seat);
 }
 
 fn handleAxis(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {

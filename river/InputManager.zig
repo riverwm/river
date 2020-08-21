@@ -107,13 +107,7 @@ pub fn inputAllowed(self: Self, wlr_surface: *c.wlr_surface) bool {
 pub fn isCursorActionTarget(self: Self, view: *View) bool {
     var it = self.seats.first;
     return while (it) |node| : (it = node.next) {
-        const seat = &node.data;
-        switch (seat.cursor.mode) {
-            .passthrough => {},
-            .down => |target_view| if (target_view == view) break true,
-            .move => |target_view| if (target_view == view) break true,
-            .resize => |data| if (data.view == view) break true,
-        }
+        if (node.data.cursor.isCursorActionTarget(view)) break true;
     } else false;
 }
 

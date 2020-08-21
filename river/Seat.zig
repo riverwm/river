@@ -261,6 +261,8 @@ pub fn handleViewUnmap(self: *Self, view: *View) void {
         }
     }
 
+    self.cursor.handleViewUnmap(view);
+
     // If the unmapped view is focused, choose a new focus
     if (self.focused == .view and self.focused.view == view) self.focus(null);
 }
