@@ -30,26 +30,24 @@ const XdgPopup = @import("XdgPopup.zig");
 output: *Output,
 wlr_layer_surface: *c.wlr_layer_surface_v1,
 
-box: Box,
+box: Box = undefined,
 state: c.wlr_layer_surface_v1_state,
 
 // Listeners active the entire lifetime of the layser surface
-listen_destroy: c.wl_listener,
-listen_map: c.wl_listener,
-listen_unmap: c.wl_listener,
+listen_destroy: c.wl_listener = undefined,
+listen_map: c.wl_listener = undefined,
+listen_unmap: c.wl_listener = undefined,
 
 // Listeners only active while the layer surface is mapped
-listen_commit: c.wl_listener,
-listen_new_popup: c.wl_listener,
+listen_commit: c.wl_listener = undefined,
+listen_new_popup: c.wl_listener = undefined,
 
-pub fn init(
-    self: *Self,
-    output: *Output,
-    wlr_layer_surface: *c.wlr_layer_surface_v1,
-) void {
-    self.output = output;
-    self.wlr_layer_surface = wlr_layer_surface;
-    self.state = wlr_layer_surface.current;
+pub fn init(self: *Self, output: *Output, wlr_layer_surface: *c.wlr_layer_surface_v1) void {
+    self.* = .{
+        .output = output,
+        .wlr_layer_surface = wlr_layer_surface,
+        .state = wlr_layer_surface.current,
+    };
     wlr_layer_surface.data = self;
 
     // Temporarily add to the output's list to allow for inital arrangement
