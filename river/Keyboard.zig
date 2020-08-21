@@ -29,13 +29,15 @@ seat: *Seat,
 wlr_input_device: *c.wlr_input_device,
 wlr_keyboard: *c.wlr_keyboard,
 
-listen_key: c.wl_listener,
-listen_modifiers: c.wl_listener,
+listen_key: c.wl_listener = undefined,
+listen_modifiers: c.wl_listener = undefined,
 
 pub fn init(self: *Self, seat: *Seat, wlr_input_device: *c.wlr_input_device) !void {
-    self.seat = seat;
-    self.wlr_input_device = wlr_input_device;
-    self.wlr_keyboard = @field(wlr_input_device, c.wlr_input_device_union).keyboard;
+    self.* = .{
+        .seat = seat,
+        .wlr_input_device = wlr_input_device,
+        .wlr_keyboard = @field(wlr_input_device, c.wlr_input_device_union).keyboard,
+    };
 
     // We need to prepare an XKB keymap and assign it to the keyboard. This
     // assumes the defaults (e.g. layout = "us").
