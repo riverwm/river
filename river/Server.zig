@@ -118,7 +118,7 @@ pub fn init(self: *Self) !void {
         c.wl_signal_add(&self.wlr_xwayland.events.new_surface, &self.listen_new_xwayland_surface);
     }
 
-    try self.config.init();
+    self.config = try Config.init();
     try self.decoration_manager.init(self);
     try self.root.init(self);
     // Must be called after root is initialized
