@@ -38,18 +38,19 @@ wl_global: *c.wl_global,
 
 args_map: std.AutoHashMap(u32, std.ArrayList([]const u8)),
 
-listen_display_destroy: c.wl_listener,
+listen_display_destroy: c.wl_listener = undefined,
 
 pub fn init(self: *Self, server: *Server) !void {
-    self.wl_global = c.wl_global_create(
-        server.wl_display,
-        &c.zriver_control_v1_interface,
-        protocol_version,
-        self,
-        bind,
-    ) orelse return error.OutOfMemory;
-
-    self.args_map = std.AutoHashMap(u32, std.ArrayList([]const u8)).init(util.gpa);
+    self.* = .{
+        .wl_global = c.wl_global_create(
+            server.wl_display,
+            &c.zriver_control_v1_interface,
+            protocol_version,
+            self,
+            bind,
+        ) orelse return error.OutOfMemory,
+        .args_map = std.AutoHashMap(u32, std.ArrayList([]const u8)).init(util.gpa),
+    };
 
     self.listen_display_destroy.notify = handleDisplayDestroy;
     c.wl_display_add_destroy_listener(server.wl_display, &self.listen_display_destroy);
