@@ -34,18 +34,15 @@ parent_box: *const Box,
 /// The corresponding wlroots object
 wlr_xdg_popup: *c.wlr_xdg_popup,
 
-listen_destroy: c.wl_listener,
-listen_new_popup: c.wl_listener,
+listen_destroy: c.wl_listener = undefined,
+listen_new_popup: c.wl_listener = undefined,
 
-pub fn init(
-    self: *Self,
-    output: *Output,
-    parent_box: *const Box,
-    wlr_xdg_popup: *c.wlr_xdg_popup,
-) void {
-    self.output = output;
-    self.parent_box = parent_box;
-    self.wlr_xdg_popup = wlr_xdg_popup;
+pub fn init(self: *Self, output: *Output, parent_box: *const Box, wlr_xdg_popup: *c.wlr_xdg_popup) void {
+    self.* = .{
+        .output = output,
+        .parent_box = parent_box,
+        .wlr_xdg_popup = wlr_xdg_popup,
+    };
 
     // The output box relative to the parent of the popup
     var box = c.wlr_output_layout_get_box(output.root.wlr_output_layout, output.wlr_output).*;
