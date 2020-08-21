@@ -212,34 +212,35 @@ wlr_cursor: *c.wlr_cursor,
 wlr_xcursor_manager: *c.wlr_xcursor_manager,
 
 /// Number of distinct buttons currently pressed
-pressed_count: u32,
+pressed_count: u32 = 0,
 
 /// Current cursor mode as well as any state needed to implement that mode
-mode: Mode,
+mode: Mode = .passthrough,
 
-listen_axis: c.wl_listener,
-listen_button: c.wl_listener,
-listen_frame: c.wl_listener,
-listen_motion_absolute: c.wl_listener,
-listen_motion: c.wl_listener,
-listen_request_set_cursor: c.wl_listener,
+listen_axis: c.wl_listener = undefined,
+listen_button: c.wl_listener = undefined,
+listen_frame: c.wl_listener = undefined,
+listen_motion_absolute: c.wl_listener = undefined,
+listen_motion: c.wl_listener = undefined,
+listen_request_set_cursor: c.wl_listener = undefined,
 
 pub fn init(self: *Self, seat: *Seat) !void {
-    self.seat = seat;
-
-    // Creates a wlroots utility for tracking the cursor image shown on screen.
-    self.wlr_cursor = c.wlr_cursor_create() orelse return error.OutOfMemory;
-    c.wlr_cursor_attach_output_layout(self.wlr_cursor, seat.input_manager.server.root.wlr_output_layout);
+    const wlr_cursor = c.wlr_cursor_create() orelse return error.OutOfMemory;
+    errdefer c.wlr_cursor_destroy(wlr_cursor);
+    c.wlr_cursor_attach_output_layout(wlr_cursor, seat.input_manager.server.root.wlr_output_layout);
 
     // This is here so that self.wlr_xcursor_manager doesn't need to be an
     // optional pointer. This isn't optimal as it does a needless allocation,
     // but this is not a hot path.
-    self.wlr_xcursor_manager = c.wlr_xcursor_manager_create(null, default_size) orelse
-        return error.OutOfMemory;
-    try self.setTheme(null, null);
+    const wlr_xcursor_manager = c.wlr_xcursor_manager_create(null, default_size) orelse return error.OutOfMemory;
+    errdefer c.wlr_xcursor_manager_destroy(wlr_xcursor_manager);
 
-    self.pressed_count = 0;
-    self.mode = .passthrough;
+    self.* = .{
+        .seat = seat,
+        .wlr_cursor = wlr_cursor,
+        .wlr_xcursor_manager = wlr_xcursor_manager,
+    };
+    try self.setTheme(null, null);
 
     // wlr_cursor *only* displays an image on screen. It does not move around
     // when the pointer moves. However, we can attach input devices to it, and

@@ -44,55 +44,42 @@ input_manager: *InputManager,
 wlr_seat: *c.wlr_seat,
 
 /// Multiple mice are handled by the same Cursor
-cursor: Cursor,
+cursor: Cursor = undefined,
 
 /// Mulitple keyboards are handled separately
-keyboards: std.TailQueue(Keyboard),
+keyboards: std.TailQueue(Keyboard) = std.TailQueue(Keyboard).init(),
 
 /// ID of the current keymap mode
-mode_id: usize,
+mode_id: usize = 0,
 
 /// Currently focused output, may be the noop output if no
 focused_output: *Output,
 
 /// Currently focused view/layer surface if any
-focused: FocusTarget,
+focused: FocusTarget = .none,
 
 /// Stack of views in most recently focused order
 /// If there is a currently focused view, it is on top.
-focus_stack: ViewStack(*View),
+focus_stack: ViewStack(*View) = ViewStack(*View){},
 
 /// List of status tracking objects relaying changes to this seat to clients.
-status_trackers: std.SinglyLinkedList(SeatStatus),
+status_trackers: std.SinglyLinkedList(SeatStatus) = std.SinglyLinkedList(SeatStatus).init(),
 
 /// State of pointer modifier; Used for pointer operations such as move ans resize.
-pointer_modifier: bool,
+pointer_modifier: bool = false,
 
-listen_request_set_selection: c.wl_listener,
+listen_request_set_selection: c.wl_listener = undefined,
 
 pub fn init(self: *Self, input_manager: *InputManager, name: [*:0]const u8) !void {
-    self.input_manager = input_manager;
-
-    // This will be automatically destroyed when the display is destroyed
-    self.wlr_seat = c.wlr_seat_create(input_manager.server.wl_display, name) orelse return error.OutOfMemory;
+    self.* = .{
+        .input_manager = input_manager,
+        // This will be automatically destroyed when the display is destroyed
+        .wlr_seat = c.wlr_seat_create(input_manager.server.wl_display, name) orelse return error.OutOfMemory,
+        .focused_output = &self.input_manager.server.root.noop_output,
+    };
     self.wlr_seat.data = self;
 
     try self.cursor.init(self);
-    errdefer self.cursor.deinit();
-
-    self.keyboards = std.TailQueue(Keyboard).init();
-
-    self.mode_id = 0;
-
-    self.focused_output = &self.input_manager.server.root.noop_output;
-
-    self.focused = .none;
-
-    self.focus_stack = ViewStack(*View){};
-
-    self.status_trackers = std.SinglyLinkedList(SeatStatus).init();
-
-    self.pointer_modifier = false;
 
     self.listen_request_set_selection.notify = handleRequestSetSelection;
     c.wl_signal_add(&self.wlr_seat.events.request_set_selection, &self.listen_request_set_selection);

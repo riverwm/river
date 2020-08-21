@@ -35,46 +35,38 @@ server: *Server,
 wlr_idle: *c.wlr_idle,
 wlr_input_inhibit_manager: *c.wlr_input_inhibit_manager,
 
-seats: std.TailQueue(Seat),
+seats: std.TailQueue(Seat) = std.TailQueue(Seat).init(),
 default_seat: *Seat,
 
-exclusive_client: ?*c.wl_client,
+exclusive_client: ?*c.wl_client = null,
 
-listen_inhibit_activate: c.wl_listener,
-listen_inhibit_deactivate: c.wl_listener,
-listen_new_input: c.wl_listener,
+listen_inhibit_activate: c.wl_listener = undefined,
+listen_inhibit_deactivate: c.wl_listener = undefined,
+listen_new_input: c.wl_listener = undefined,
 
 pub fn init(self: *Self, server: *Server) !void {
-    self.server = server;
-
-    // These are automatically freed when the display is destroyed
-    self.wlr_idle = c.wlr_idle_create(server.wl_display) orelse return error.OutOfMemory;
-    self.wlr_input_inhibit_manager = c.wlr_input_inhibit_manager_create(server.wl_display) orelse
-        return error.OutOfMemory;
-
-    self.seats = std.TailQueue(Seat).init();
-
     const seat_node = try util.gpa.create(std.TailQueue(Seat).Node);
+
+    self.* = .{
+        .server = server,
+        // These are automatically freed when the display is destroyed
+        .wlr_idle = c.wlr_idle_create(server.wl_display) orelse return error.OutOfMemory,
+        .wlr_input_inhibit_manager = c.wlr_input_inhibit_manager_create(server.wl_display) orelse
+            return error.OutOfMemory,
+        .default_seat = &seat_node.data,
+    };
+
     try seat_node.data.init(self, default_seat_name);
-    self.default_seat = &seat_node.data;
     self.seats.prepend(seat_node);
 
     if (build_options.xwayland) c.wlr_xwayland_set_seat(server.wlr_xwayland, self.default_seat.wlr_seat);
 
-    self.exclusive_client = null;
-
     // Set up all listeners
     self.listen_inhibit_activate.notify = handleInhibitActivate;
-    c.wl_signal_add(
-        &self.wlr_input_inhibit_manager.events.activate,
-        &self.listen_inhibit_activate,
-    );
+    c.wl_signal_add(&self.wlr_input_inhibit_manager.events.activate, &self.listen_inhibit_activate);
 
     self.listen_inhibit_deactivate.notify = handleInhibitDeactivate;
-    c.wl_signal_add(
-        &self.wlr_input_inhibit_manager.events.deactivate,
-        &self.listen_inhibit_deactivate,
-    );
+    c.wl_signal_add(&self.wlr_input_inhibit_manager.events.deactivate, &self.listen_inhibit_deactivate);
 
     self.listen_new_input.notify = handleNewInput;
     c.wl_signal_add(&self.server.wlr_backend.events.new_input, &self.listen_new_input);
