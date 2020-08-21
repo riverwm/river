@@ -26,21 +26,13 @@ const Seat = @import("Seat.zig");
 const Output = @import("Output.zig");
 const View = @import("View.zig");
 
-const FocusState = enum {
-    focused,
-    unfocused,
-};
-
-const implementation = c.struct_zriver_seat_status_v1_interface{
-    .destroy = destroy,
-};
+const implementation = c.struct_zriver_seat_status_v1_interface{ .destroy = destroy };
 
 seat: *Seat,
 wl_resource: *c.wl_resource,
 
 pub fn init(self: *Self, seat: *Seat, wl_resource: *c.wl_resource) void {
-    self.seat = seat;
-    self.wl_resource = wl_resource;
+    self.* = .{ .seat = seat, .wl_resource = wl_resource };
 
     c.wl_resource_set_implementation(wl_resource, &implementation, self, handleResourceDestroy);
 
@@ -60,7 +52,7 @@ fn destroy(wl_client: ?*c.wl_client, wl_resource: ?*c.wl_resource) callconv(.C) 
     c.wl_resource_destroy(wl_resource);
 }
 
-pub fn sendOutput(self: Self, state: FocusState) void {
+pub fn sendOutput(self: Self, state: enum { focused, unfocused }) void {
     const wl_client = c.wl_resource_get_client(self.wl_resource);
     const output_resources = &self.seat.focused_output.wlr_output.resources;
     var output_resource = c.wl_resource_from_link(output_resources.next);

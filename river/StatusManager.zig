@@ -37,21 +37,20 @@ const implementation = c.struct_zriver_status_manager_v1_interface{
     .get_river_seat_status = getRiverSeatStatus,
 };
 
-// TODO: remove this field, move allocator to util or something
-server: *Server,
 wl_global: *c.wl_global,
 
-listen_display_destroy: c.wl_listener,
+listen_display_destroy: c.wl_listener = undefined,
 
 pub fn init(self: *Self, server: *Server) !void {
-    self.server = server;
-    self.wl_global = c.wl_global_create(
-        server.wl_display,
-        &c.zriver_status_manager_v1_interface,
-        protocol_version,
-        self,
-        bind,
-    ) orelse return error.OutOfMemory;
+    self.* = .{
+        .wl_global = c.wl_global_create(
+            server.wl_display,
+            &c.zriver_status_manager_v1_interface,
+            protocol_version,
+            self,
+            bind,
+        ) orelse return error.OutOfMemory,
+    };
 
     self.listen_display_destroy.notify = handleDisplayDestroy;
     c.wl_display_add_destroy_listener(server.wl_display, &self.listen_display_destroy);

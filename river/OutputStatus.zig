@@ -27,16 +27,13 @@ const Output = @import("Output.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 
-const implementation = c.struct_zriver_output_status_v1_interface{
-    .destroy = destroy,
-};
+const implementation = c.struct_zriver_output_status_v1_interface{ .destroy = destroy };
 
 output: *Output,
 wl_resource: *c.wl_resource,
 
 pub fn init(self: *Self, output: *Output, wl_resource: *c.wl_resource) void {
-    self.output = output;
-    self.wl_resource = wl_resource;
+    self.* = .{ .output = output, .wl_resource = wl_resource };
 
     c.wl_resource_set_implementation(wl_resource, &implementation, self, handleResourceDestroy);
 
