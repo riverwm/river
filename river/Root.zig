@@ -34,45 +34,43 @@ const XwaylandUnmanaged = @import("XwaylandUnmanaged.zig");
 server: *Server,
 
 wlr_output_layout: *c.wlr_output_layout,
-outputs: std.TailQueue(Output),
+outputs: std.TailQueue(Output) = std.TailQueue(Output).init(),
 
 /// This output is used internally when no real outputs are available.
 /// It is not advertised to clients.
-noop_output: Output,
+noop_output: Output = undefined,
 
 /// This list stores all unmanaged Xwayland windows. This needs to be in root
 /// since X is like the wild west and who knows where these things will go.
-xwayland_unmanaged_views: if (build_options.xwayland) std.TailQueue(XwaylandUnmanaged) else void,
+xwayland_unmanaged_views: if (build_options.xwayland)
+    std.TailQueue(XwaylandUnmanaged)
+else
+    void = if (build_options.xwayland) std.TailQueue(XwaylandUnmanaged).init(),
 
 /// Number of pending configures sent in the current transaction.
 /// A value of 0 means there is no current transaction.
-pending_configures: u32,
+pending_configures: u32 = 0,
 
 /// Handles timeout of transactions
 transaction_timer: *c.wl_event_source,
 
 pub fn init(self: *Self, server: *Server) !void {
-    self.server = server;
-
     // Create an output layout, which a wlroots utility for working with an
     // arrangement of screens in a physical layout.
-    self.wlr_output_layout = c.wlr_output_layout_create() orelse return error.OutOfMemory;
     errdefer c.wlr_output_layout_destroy(self.wlr_output_layout);
-
-    self.outputs = std.TailQueue(Output).init();
+    self.* = .{
+        .server = server,
+        .wlr_output_layout = c.wlr_output_layout_create() orelse return error.OutOfMemory,
+        .transaction_timer = c.wl_event_loop_add_timer(
+            c.wl_display_get_event_loop(self.server.wl_display),
+            handleTimeout,
+            self,
+        ) orelse return error.AddTimerError,
+        .noop_output = undefined,
+    };
 
     const noop_wlr_output = c.river_wlr_noop_add_output(server.noop_backend) orelse return error.OutOfMemory;
     try self.noop_output.init(self, noop_wlr_output);
-
-    if (build_options.xwayland) self.xwayland_unmanaged_views = std.TailQueue(XwaylandUnmanaged).init();
-
-    self.pending_configures = 0;
-
-    self.transaction_timer = c.wl_event_loop_add_timer(
-        c.wl_display_get_event_loop(self.server.wl_display),
-        handleTimeout,
-        self,
-    ) orelse return error.AddTimerError;
 }
 
 pub fn deinit(self: *Self) void {
