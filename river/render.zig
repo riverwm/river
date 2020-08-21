@@ -57,9 +57,9 @@ pub fn renderOutput(output: *Output) void {
     c.wlr_renderer_begin(wlr_renderer, width, height);
 
     // Find the first visible fullscreen view in the stack if there is one
-    var it = ViewStack(View).iterator(output.views.first, output.current.tags);
-    const fullscreen_view = while (it.next()) |node| {
-        if (node.view.current.fullscreen) break &node.view;
+    var it = ViewStack(View).iter(output.views.first, .forward, output.current.tags, renderFilter);
+    const fullscreen_view = while (it.next()) |view| {
+        if (view.current.fullscreen) break view;
     } else null;
 
     // If we have a fullscreen view to render, render it.
@@ -76,14 +76,8 @@ pub fn renderOutput(output: *Output) void {
         renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM], &now);
 
         // The first view in the list is "on top" so iterate in reverse.
-        it = ViewStack(View).reverseIterator(output.views.last, output.current.tags);
-        while (it.next()) |node| {
-            const view = &node.view;
-
-            // This check prevents a race condition when a frame is requested
-            // between mapping of a view and the first configure being handled.
-            if (view.current.box.width == 0 or view.current.box.height == 0) continue;
-
+        it = ViewStack(View).iter(output.views.last, .reverse, output.current.tags, renderFilter);
+        while (it.next()) |view| {
             // Focused views are rendered on top of normal views, skip them for now
             if (view.current.focus != 0) continue;
 
@@ -92,14 +86,8 @@ pub fn renderOutput(output: *Output) void {
         }
 
         // Render focused views
-        it = ViewStack(View).reverseIterator(output.views.last, output.current.tags);
-        while (it.next()) |node| {
-            const view = &node.view;
-
-            // This check prevents a race condition when a frame is requested
-            // between mapping of a view and the first configure being handled.
-            if (view.current.box.width == 0 or view.current.box.height == 0) continue;
-
+        it = ViewStack(View).iter(output.views.last, .reverse, output.current.tags, renderFilter);
+        while (it.next()) |view| {
             // Skip unfocused views since we already rendered them
             if (view.current.focus == 0) continue;
 
@@ -128,6 +116,14 @@ pub fn renderOutput(output: *Output) void {
     c.wlr_renderer_end(wlr_renderer);
     // TODO: handle failure
     _ = c.wlr_output_commit(output.wlr_output);
+}
+
+fn renderFilter(view: *View, filter_tags: u32) bool {
+    // This check prevents a race condition when a frame is requested
+    // between mapping of a view and the first configure being handled.
+    if (view.current.box.width == 0 or view.current.box.height == 0)
+        return false;
+    return view.current.tags & filter_tags != 0;
 }
 
 /// Render all surfaces on the passed layer

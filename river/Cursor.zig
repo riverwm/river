@@ -548,16 +548,20 @@ fn layerSurfaceAt(
 /// Find the topmost visible view surface (incl. popups) at ox,oy.
 fn viewSurfaceAt(output: Output, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*c.wlr_surface {
     // Focused views are rendered on top, so look for them first.
-    var it = ViewStack(View).iterator(output.views.first, output.current.tags);
-    while (it.next()) |node| {
-        if (node.view.current.focus == 0) continue;
-        if (node.view.surfaceAt(ox, oy, sx, sy)) |found| return found;
+    var it = ViewStack(View).iter(output.views.first, .forward, output.current.tags, surfaceAtFilter);
+    while (it.next()) |view| {
+        if (view.current.focus == 0) continue;
+        if (view.surfaceAt(ox, oy, sx, sy)) |found| return found;
     }
 
-    it = ViewStack(View).iterator(output.views.first, output.current.tags);
-    while (it.next()) |node| {
-        if (node.view.surfaceAt(ox, oy, sx, sy)) |found| return found;
+    it = ViewStack(View).iter(output.views.first, .forward, output.current.tags, surfaceAtFilter);
+    while (it.next()) |view| {
+        if (view.surfaceAt(ox, oy, sx, sy)) |found| return found;
     }
 
     return null;
+}
+
+fn surfaceAtFilter(view: *View, filter_tags: u32) bool {
+    return !view.destroying and view.current.tags & filter_tags != 0;
 }

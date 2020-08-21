@@ -60,13 +60,14 @@ pub fn sendViewTags(self: Self) void {
     var view_tags = std.ArrayList(u32).init(util.gpa);
     defer view_tags.deinit();
 
-    var it = ViewStack(View).iterator(self.output.views.first, std.math.maxInt(u32));
-    while (it.next()) |node|
+    var it = self.output.views.first;
+    while (it) |node| : (it = node.next) {
         view_tags.append(node.view.current.tags) catch {
-        c.wl_resource_post_no_memory(self.wl_resource);
-        log.crit(.river_status, "out of memory", .{});
-        return;
-    };
+            c.wl_resource_post_no_memory(self.wl_resource);
+            log.crit(.river_status, "out of memory", .{});
+            return;
+        };
+    }
 
     var wl_array = c.wl_array{
         .size = view_tags.items.len * @sizeOf(u32),
