@@ -31,8 +31,12 @@ pub fn init(
     modifiers: u32,
     command_args: []const []const u8,
 ) !Self {
-    var owned_args = try allocator.alloc([]u8, command_args.len);
-    for (command_args) |arg, i| owned_args[i] = try std.mem.dupe(allocator, u8, arg);
+    const owned_args = try allocator.alloc([]u8, command_args.len);
+    errdefer allocator.free(owned_args);
+    for (command_args) |arg, i| {
+        errdefer for (owned_args[0..i]) |a| allocator.free(a);
+        owned_args[i] = try std.mem.dupe(allocator, u8, arg);
+    }
     return Self{
         .keysym = keysym,
         .modifiers = modifiers,
