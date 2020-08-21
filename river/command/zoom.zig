@@ -39,19 +39,14 @@ pub fn zoom(
         // If the first view that is part of the layout is focused, zoom
         // the next view in the layout. Otherwise zoom the focused view.
         const output = seat.focused_output;
-        var it = ViewStack(View).iterator(output.views.first, output.current.tags);
-        const layout_first = while (it.next()) |node| {
-            if (!node.view.pending.float and !node.view.pending.fullscreen) break node;
-        } else unreachable;
+        var it = ViewStack(View).iter(output.views.first, .forward, output.pending.tags, filter);
+        const layout_first = @fieldParentPtr(ViewStack(View).Node, "view", it.next().?);
 
         const focused_node = @fieldParentPtr(ViewStack(View).Node, "view", seat.focused.view);
-        const zoom_node = if (focused_node == layout_first) blk: {
-            while (it.next()) |node| {
-                if (!node.view.pending.float and !node.view.pending.fullscreen) break :blk node;
-            } else {
-                break :blk null;
-            }
-        } else focused_node;
+        const zoom_node = if (focused_node == layout_first)
+            if (it.next()) |view| @fieldParentPtr(ViewStack(View).Node, "view", view) else null
+        else
+            focused_node;
 
         if (zoom_node) |to_bump| {
             output.views.remove(to_bump);
@@ -61,4 +56,9 @@ pub fn zoom(
             output.root.startTransaction();
         }
     }
+}
+
+fn filter(view: *View, filter_tags: u32) bool {
+    return !view.destroying and !view.pending.float and
+        !view.pending.fullscreen and view.pending.tags & filter_tags != 0;
 }

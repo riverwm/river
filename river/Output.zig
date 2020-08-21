@@ -97,7 +97,7 @@ pub fn init(self: *Self, root: *Root, wlr_output: *c.wlr_output) !void {
         layer.* = std.TailQueue(LayerSurface).init();
     }
 
-    self.views.init();
+    self.views = ViewStack(View){};
 
     self.current = .{
         .tags = 1 << 0,
@@ -184,13 +184,10 @@ fn layoutFull(self: *Self, visible_count: u32) void {
         .height = self.usable_box.height - (2 * xy_offset),
     };
 
-    var it = ViewStack(View).pendingIterator(self.views.first, self.pending.tags);
-    while (it.next()) |node| {
-        const view = &node.view;
-        if (!view.pending.float and !view.pending.fullscreen) {
-            view.pending.box = full_box;
-            view.applyConstraints();
-        }
+    var it = ViewStack(View).iter(self.views.first, .forward, self.pending.tags, arrangeFilter);
+    while (it.next()) |view| {
+        view.pending.box = full_box;
+        view.applyConstraints();
     }
 }
 
@@ -285,15 +282,16 @@ fn layoutExternal(self: *Self, visible_count: u32) !void {
 
     // Apply window configuration to views
     var i: u32 = 0;
-    var view_it = ViewStack(View).pendingIterator(self.views.first, self.pending.tags);
-    while (view_it.next()) |node| {
-        const view = &node.view;
-        if (!view.pending.float and !view.pending.fullscreen and !view.destroying) {
-            view.pending.box = view_boxen.items[i];
-            view.applyConstraints();
-            i += 1;
-        }
+    var view_it = ViewStack(View).iter(self.views.first, .forward, self.pending.tags, arrangeFilter);
+    while (view_it.next()) |view| : (i += 1) {
+        view.pending.box = view_boxen.items[i];
+        view.applyConstraints();
     }
+}
+
+fn arrangeFilter(view: *View, filter_tags: u32) bool {
+    return !view.destroying and !view.pending.float and
+        !view.pending.fullscreen and view.pending.tags & filter_tags != 0;
 }
 
 /// Arrange all views on the output for the current layout. Modifies only
@@ -302,15 +300,10 @@ fn layoutExternal(self: *Self, visible_count: u32) !void {
 pub fn arrangeViews(self: *Self) void {
     if (self == &self.root.noop_output) return;
 
-    const full_area = Box.fromWlrBox(c.wlr_output_layout_get_box(self.root.wlr_output_layout, self.wlr_output).*);
-
     // Count up views that will be arranged by the layout
     var layout_count: u32 = 0;
-    var it = ViewStack(View).pendingIterator(self.views.first, self.pending.tags);
-    while (it.next()) |node| {
-        const view = &node.view;
-        if (!view.pending.float and !view.pending.fullscreen and !view.destroying) layout_count += 1;
-    }
+    var it = ViewStack(View).iter(self.views.first, .forward, self.pending.tags, arrangeFilter);
+    while (it.next() != null) layout_count += 1;
 
     // If the usable area has a zero dimension, trying to arrange the layout
     // would cause an underflow and is pointless anyway.

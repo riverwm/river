@@ -41,14 +41,8 @@ pub fn ViewStack(comptime T: type) type {
         };
 
         /// Top/bottom nodes in the stack
-        first: ?*Node,
-        last: ?*Node,
-
-        /// Initialize an undefined stack
-        pub fn init(self: *Self) void {
-            self.first = null;
-            self.last = null;
-        }
+        first: ?*Node = null,
+        last: ?*Node = null,
 
         /// Add a node to the top of the stack.
         pub fn push(self: *Self, new_node: *Node) void {
@@ -114,60 +108,42 @@ pub fn ViewStack(comptime T: type) type {
             }
         }
 
-        const Iterator = struct {
-            it: ?*Node,
-            tags: u32,
-            reverse: bool,
-            pending: bool,
-
-            /// Returns the next node in iteration order, or null if done.
-            /// This function is horribly ugly, but it's well tested below.
-            pub fn next(self: *Iterator) ?*Node {
-                while (self.it) |node| : (self.it = if (self.reverse) node.prev else node.next) {
-                    if (if (self.pending)
-                        self.tags & node.view.pending.tags != 0
-                    else
-                        self.tags & node.view.current.tags != 0) {
-                        self.it = if (self.reverse) node.prev else node.next;
-                        return node;
-                    }
-                }
-                return null;
-            }
+        const Direction = enum {
+            forward,
+            reverse,
         };
 
-        /// Returns an iterator starting at the passed node and filtered by
-        /// checking the passed tags against the current tags of each view.
-        pub fn iterator(start: ?*Node, tags: u32) Iterator {
-            return Iterator{
-                .it = start,
-                .tags = tags,
-                .reverse = false,
-                .pending = false,
+        fn Iter(comptime Context: type) type {
+            return struct {
+                it: ?*Node,
+                dir: Direction,
+                context: Context,
+                filter: fn (*View, Context) bool,
+
+                /// Returns the next node in iteration order which passes the
+                /// filter, or null if done.
+                pub fn next(self: *@This()) ?*View {
+                    return while (self.it) |node| : (self.it = if (self.dir == .forward) node.next else node.prev) {
+                        const view = if (T == View) &node.view else node.view;
+                        if (self.filter(view, self.context)) {
+                            self.it = if (self.dir == .forward) node.next else node.prev;
+                            break view;
+                        }
+                    } else null;
+                }
             };
         }
 
-        /// Returns a reverse iterator starting at the passed node and filtered by
-        /// checking the passed tags against the current tags of each view.
-        pub fn reverseIterator(start: ?*Node, tags: u32) Iterator {
-            return Iterator{
-                .it = start,
-                .tags = tags,
-                .reverse = true,
-                .pending = false,
-            };
-        }
-
-        /// Returns an iterator starting at the passed node and filtered by
-        /// checking the passed tags against the pending tags of each view.
-        /// If a view has no pending tags, the current tags are used.
-        pub fn pendingIterator(start: ?*Node, tags: u32) Iterator {
-            return Iterator{
-                .it = start,
-                .tags = tags,
-                .reverse = false,
-                .pending = true,
-            };
+        /// Return a filtered iterator over the stack given a start node,
+        /// iteration direction, and filter function. Views for which the
+        /// filter function returns false will be skipped.
+        pub fn iter(
+            start: ?*Node,
+            dir: Direction,
+            context: var,
+            filter: fn (*View, @TypeOf(context)) bool,
+        ) Iter(@TypeOf(context)) {
+            return .{ .it = start, .dir = dir, .context = context, .filter = filter };
         }
     };
 }
@@ -177,8 +153,7 @@ test "push/remove (*View)" {
 
     const allocator = testing.allocator;
 
-    var views: ViewStack(*View) = undefined;
-    views.init();
+    var views = ViewStack(*View){};
 
     const one = try allocator.create(ViewStack(*View).Node);
     defer allocator.destroy(one);
@@ -309,8 +284,21 @@ test "iteration (View)" {
 
     const allocator = testing.allocator;
 
-    var views: ViewStack(View) = undefined;
-    views.init();
+    const filters = struct {
+        fn all(view: *View, context: void) bool {
+            return true;
+        }
+
+        fn none(view: *View, context: void) bool {
+            return false;
+        }
+
+        fn current(view: *View, filter_tags: u32) bool {
+            return view.current.tags & filter_tags != 0;
+        }
+    };
+
+    var views = ViewStack(View){};
 
     const one_a_pb = try allocator.create(ViewStack(View).Node);
     defer allocator.destroy(one_a_pb);
@@ -343,94 +331,71 @@ test "iteration (View)" {
     views.push(five_b); // {5, 4, 1, 3}
     views.push(two_a); // {2, 5, 4, 1, 3}
 
-    // Iteration over all tags
+    // Iteration over all views
     {
-        var it = ViewStack(View).iterator(views.first, std.math.maxInt(u32));
-        testing.expect((if (it.next()) |node| &node.view else null) == &two_a.view);
-        testing.expect((if (it.next()) |node| &node.view else null) == &five_b.view);
-        testing.expect((if (it.next()) |node| &node.view else null) == &four_b.view);
-        testing.expect((if (it.next()) |node| &node.view else null) == &one_a_pb.view);
-        testing.expect((if (it.next()) |node| &node.view else null) == &three_b_pa.view);
+        var it = ViewStack(View).iter(views.first, .forward, {}, filters.all);
+        testing.expect(it.next() == &two_a.view);
+        testing.expect(it.next() == &five_b.view);
+        testing.expect(it.next() == &four_b.view);
+        testing.expect(it.next() == &one_a_pb.view);
+        testing.expect(it.next() == &three_b_pa.view);
+        testing.expect(it.next() == null);
+    }
+
+    // Iteration over no views
+    {
+        var it = ViewStack(View).iter(views.first, .forward, {}, filters.none);
         testing.expect(it.next() == null);
     }
 
     // Iteration over 'a' tags
     {
-        var it = ViewStack(View).iterator(views.first, 1 << 0);
-        testing.expect((if (it.next()) |node| &node.view else null) == &two_a.view);
-        testing.expect((if (it.next()) |node| &node.view else null) == &one_a_pb.view);
+        var it = ViewStack(View).iter(views.first, .forward, @as(u32, 1 << 0), filters.current);
+        testing.expect(it.next() == &two_a.view);
+        testing.expect(it.next() == &one_a_pb.view);
         testing.expect(it.next() == null);
     }
 
     // Iteration over 'b' tags
     {
-        var it = ViewStack(View).iterator(views.first, 1 << 1);
-        testing.expect((if (it.next()) |node| &node.view else null) == &five_b.view);
-        testing.expect((if (it.next()) |node| &node.view else null) == &four_b.view);
-        testing.expect((if (it.next()) |node| &node.view else null) == &three_b_pa.view);
+        var it = ViewStack(View).iter(views.first, .forward, @as(u32, 1 << 1), filters.current);
+        testing.expect(it.next() == &five_b.view);
+        testing.expect(it.next() == &four_b.view);
+        testing.expect(it.next() == &three_b_pa.view);
         testing.expect(it.next() == null);
     }
 
-    // Iteration over tags that aren't present
+    // Reverse iteration over all views
     {
-        var it = ViewStack(View).iterator(views.first, 1 << 2);
+        var it = ViewStack(View).iter(views.last, .reverse, {}, filters.all);
+        testing.expect(it.next() == &three_b_pa.view);
+        testing.expect(it.next() == &one_a_pb.view);
+        testing.expect(it.next() == &four_b.view);
+        testing.expect(it.next() == &five_b.view);
+        testing.expect(it.next() == &two_a.view);
         testing.expect(it.next() == null);
     }
 
-    // Reverse iteration over all tags
+    // Reverse iteration over no views
     {
-        var it = ViewStack(View).reverseIterator(views.last, std.math.maxInt(u32));
-        testing.expect((if (it.next()) |node| &node.view else null) == &three_b_pa.view);
-        testing.expect((if (it.next()) |node| &node.view else null) == &one_a_pb.view);
-        testing.expect((if (it.next()) |node| &node.view else null) == &four_b.view);
-        testing.expect((if (it.next()) |node| &node.view else null) == &five_b.view);
-        testing.expect((if (it.next()) |node| &node.view else null) == &two_a.view);
+        var it = ViewStack(View).iter(views.last, .reverse, {}, filters.none);
         testing.expect(it.next() == null);
     }
 
     // Reverse iteration over 'a' tags
     {
-        var it = ViewStack(View).reverseIterator(views.last, 1 << 0);
-        testing.expect((if (it.next()) |node| &node.view else null) == &one_a_pb.view);
-        testing.expect((if (it.next()) |node| &node.view else null) == &two_a.view);
+        var it = ViewStack(View).iter(views.last, .reverse, @as(u32, 1 << 0), filters.current);
+        testing.expect(it.next() == &one_a_pb.view);
+        testing.expect(it.next() == &two_a.view);
         testing.expect(it.next() == null);
     }
 
     // Reverse iteration over 'b' tags
     {
-        var it = ViewStack(View).reverseIterator(views.last, 1 << 1);
-        testing.expect((if (it.next()) |node| &node.view else null) == &three_b_pa.view);
-        testing.expect((if (it.next()) |node| &node.view else null) == &four_b.view);
-        testing.expect((if (it.next()) |node| &node.view else null) == &five_b.view);
-        testing.expect(it.next() == null);
-    }
-
-    // Reverse iteration over tags that aren't present
-    {
-        var it = ViewStack(View).reverseIterator(views.first, 1 << 2);
-        testing.expect(it.next() == null);
-    }
-
-    // Iteration over (pending) 'a' tags
-    {
-        var it = ViewStack(View).pendingIterator(views.first, 1 << 0);
-        testing.expect((if (it.next()) |node| &node.view else null) == &two_a.view);
-        testing.expect((if (it.next()) |node| &node.view else null) == &three_b_pa.view);
-        testing.expect(it.next() == null);
-    }
-
-    // Iteration over (pending) 'b' tags
-    {
-        var it = ViewStack(View).pendingIterator(views.first, 1 << 1);
-        testing.expect((if (it.next()) |node| &node.view else null) == &five_b.view);
-        testing.expect((if (it.next()) |node| &node.view else null) == &four_b.view);
-        testing.expect((if (it.next()) |node| &node.view else null) == &one_a_pb.view);
-        testing.expect(it.next() == null);
-    }
-
-    // Iteration over (pending) tags that aren't present
-    {
-        var it = ViewStack(View).pendingIterator(views.first, 1 << 2);
+        var it = ViewStack(View).iter(views.last, .reverse, @as(u32, 1 << 1), filters.current);
+        testing.expect(it.next() == &three_b_pa.view);
+        testing.expect(it.next() == &four_b.view);
+        testing.expect(it.next() == &five_b.view);
         testing.expect(it.next() == null);
     }
 }

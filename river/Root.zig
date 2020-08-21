@@ -125,12 +125,11 @@ pub fn startTransaction(self: *Self) void {
     // to reset the pending count to 0 and clear serials from the views
     self.pending_configures = 0;
 
-    // Iterate over all layout views of all outputs
+    // Iterate over all views of all outputs
     var output_it = self.outputs.first;
-    while (output_it) |node| : (output_it = node.next) {
-        const output = &node.data;
-        var view_it = ViewStack(View).iterator(output.views.first, std.math.maxInt(u32));
-        while (view_it.next()) |view_node| {
+    while (output_it) |output_node| : (output_it = output_node.next) {
+        var view_it = output_node.data.views.first;
+        while (view_it) |view_node| : (view_it = view_node.next) {
             const view = &view_node.view;
 
             if (view.destroying) {

@@ -88,7 +88,7 @@ pub fn init(self: *Self, input_manager: *InputManager, name: [*:0]const u8) !voi
 
     self.focused = .none;
 
-    self.focus_stack.init();
+    self.focus_stack = ViewStack(*View){};
 
     self.status_trackers = std.SinglyLinkedList(SeatStatus).init();
 
@@ -111,41 +111,43 @@ pub fn deinit(self: *Self) void {
 
 /// Set the current focus. If a visible view is passed it will be focused.
 /// If null is passed, the first visible view in the focus stack will be focused.
-pub fn focus(self: *Self, _view: ?*View) void {
-    var view = _view;
+pub fn focus(self: *Self, _target: ?*View) void {
+    var target = _target;
 
     // While a layer surface is focused, views may not recieve focus
     if (self.focused == .layer) return;
 
     // If the view is not currently visible, behave as if null was passed
-    if (view) |v| {
-        if (v.output != self.focused_output or
-            v.pending.tags & self.focused_output.pending.tags == 0) view = null;
+    if (target) |view| {
+        if (view.output != self.focused_output or
+            view.pending.tags & self.focused_output.pending.tags == 0) target = null;
     }
 
     // If the target view is not fullscreen or null, then a fullscreen view
     // will grab focus if visible.
-    if (if (view) |v| !v.pending.fullscreen else true) {
-        var it = ViewStack(*View).pendingIterator(self.focus_stack.first, self.focused_output.pending.tags);
-        view = while (it.next()) |node| {
-            if (node.view.output == self.focused_output and node.view.pending.fullscreen) break node.view;
-        } else view;
+    if (if (target) |v| !v.pending.fullscreen else true) {
+        const tags = self.focused_output.pending.tags;
+        var it = ViewStack(*View).iter(self.focus_stack.first, .forward, tags, pendingFilter);
+        target = while (it.next()) |view| {
+            if (view.output == self.focused_output and view.pending.fullscreen) break view;
+        } else target;
     }
 
-    if (view == null) {
+    if (target == null) {
         // Set view to the first currently visible view in the focus stack if any
-        var it = ViewStack(*View).pendingIterator(self.focus_stack.first, self.focused_output.pending.tags);
-        view = while (it.next()) |node| {
-            if (node.view.output == self.focused_output) break node.view;
+        const tags = self.focused_output.pending.tags;
+        var it = ViewStack(*View).iter(self.focus_stack.first, .forward, tags, pendingFilter);
+        target = while (it.next()) |view| {
+            if (view.output == self.focused_output) break view;
         } else null;
     }
 
-    if (view) |view_to_focus| {
+    if (target) |view| {
         // Find or allocate a new node in the focus stack for the target view
         var it = self.focus_stack.first;
         while (it) |node| : (it = node.next) {
             // If the view is found, move it to the top of the stack
-            if (node.view == view_to_focus) {
+            if (node.view == view) {
                 const new_focus_node = self.focus_stack.remove(node);
                 self.focus_stack.push(node);
                 break;
@@ -153,16 +155,20 @@ pub fn focus(self: *Self, _view: ?*View) void {
         } else {
             // The view is not in the stack, so allocate a new node and prepend it
             const new_focus_node = util.gpa.create(ViewStack(*View).Node) catch return;
-            new_focus_node.view = view_to_focus;
+            new_focus_node.view = view;
             self.focus_stack.push(new_focus_node);
         }
 
         // Focus the target view
-        self.setFocusRaw(.{ .view = view_to_focus });
+        self.setFocusRaw(.{ .view = view });
     } else {
         // Otherwise clear the focus
         self.setFocusRaw(.{ .none = {} });
     }
+}
+
+fn pendingFilter(view: *View, filter_tags: u32) bool {
+    return !view.destroying and view.pending.tags & filter_tags != 0;
 }
 
 /// Switch focus to the target, handling unfocus and input inhibition

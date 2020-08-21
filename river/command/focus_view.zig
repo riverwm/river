@@ -44,15 +44,15 @@ pub fn focusView(
         // If there is a currently focused view, focus the next visible view in the stack.
         const focused_node = @fieldParentPtr(ViewStack(View).Node, "view", seat.focused.view);
         var it = switch (direction) {
-            .next => ViewStack(View).iterator(focused_node, output.current.tags),
-            .previous => ViewStack(View).reverseIterator(focused_node, output.current.tags),
+            .next => ViewStack(View).iter(focused_node, .forward, output.pending.tags, filter),
+            .previous => ViewStack(View).iter(focused_node, .reverse, output.pending.tags, filter),
         };
 
         // Skip past the focused node
         _ = it.next();
         // Focus the next visible node if there is one
-        if (it.next()) |node| {
-            seat.focus(&node.view);
+        if (it.next()) |view| {
+            seat.focus(view);
             output.root.startTransaction();
             return;
         }
@@ -61,10 +61,14 @@ pub fn focusView(
     // There is either no currently focused view or the last visible view in the
     // stack is focused and we need to wrap.
     var it = switch (direction) {
-        .next => ViewStack(View).iterator(output.views.first, output.current.tags),
-        .previous => ViewStack(View).reverseIterator(output.views.last, output.current.tags),
+        .next => ViewStack(View).iter(output.views.first, .forward, output.pending.tags, filter),
+        .previous => ViewStack(View).iter(output.views.last, .reverse, output.pending.tags, filter),
     };
 
-    seat.focus(if (it.next()) |node| &node.view else null);
+    seat.focus(it.next());
     output.root.startTransaction();
+}
+
+fn filter(view: *View, filter_tags: u32) bool {
+    return !view.destroying and view.pending.tags & filter_tags != 0;
 }
