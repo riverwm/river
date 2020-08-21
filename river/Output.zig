@@ -38,13 +38,11 @@ const State = struct {
     tags: u32,
 };
 
-attach_mode: AttachMode,
-
 root: *Root,
 wlr_output: *c.wlr_output,
 
 /// All layer surfaces on the output, indexed by the layer enum.
-layers: [4]std.TailQueue(LayerSurface),
+layers: [4]std.TailQueue(LayerSurface) = [1]std.TailQueue(LayerSurface){std.TailQueue(LayerSurface).init()} ** 4,
 
 /// The area left for views and other layer surfaces after applying the
 /// exclusive zones of exclusive layer surfaces.
@@ -52,30 +50,33 @@ layers: [4]std.TailQueue(LayerSurface),
 usable_box: Box,
 
 /// The top of the stack is the "most important" view.
-views: ViewStack(View),
+views: ViewStack(View) = ViewStack(View){},
 
 /// The double-buffered state of the output.
-current: State,
-pending: State,
+current: State = State{ .tags = 1 << 0 },
+pending: State = State{ .tags = 1 << 0 },
 
 /// Number of views in "master" section of the screen.
-master_count: u32,
+master_count: u32 = 1,
 
 /// Percentage of the total screen that the master section takes up.
-master_factor: f64,
+master_factor: f64 = 0.6,
 
 /// Current layout of the output. If it is "full", river will use the full
 /// layout. Otherwise river assumes it contains a string which, when executed
 /// with sh, will result in a layout.
 layout: []const u8,
 
+/// Determines where new views will be attached to the view stack.
+attach_mode: AttachMode = .top,
+
 /// List of status tracking objects relaying changes to this output to clients.
-status_trackers: std.SinglyLinkedList(OutputStatus),
+status_trackers: std.SinglyLinkedList(OutputStatus) = std.SinglyLinkedList(OutputStatus).init(),
 
 // All listeners for this output, in alphabetical order
-listen_destroy: c.wl_listener,
-listen_frame: c.wl_listener,
-listen_mode: c.wl_listener,
+listen_destroy: c.wl_listener = undefined,
+listen_frame: c.wl_listener = undefined,
+listen_mode: c.wl_listener = undefined,
 
 pub fn init(self: *Self, root: *Root, wlr_output: *c.wlr_output) !void {
     // Some backends don't have modes. DRM+KMS does, and we need to set a mode
@@ -89,30 +90,16 @@ pub fn init(self: *Self, root: *Root, wlr_output: *c.wlr_output) !void {
         if (!c.wlr_output_commit(wlr_output)) return error.OutputCommitFailed;
     }
 
-    self.root = root;
-    self.wlr_output = wlr_output;
-    wlr_output.data = self;
+    const layout = try std.mem.dupe(util.gpa, u8, "full");
+    errdefer util.gpa.free(layout);
 
-    for (self.layers) |*layer| {
-        layer.* = std.TailQueue(LayerSurface).init();
-    }
-
-    self.views = ViewStack(View){};
-
-    self.current = .{
-        .tags = 1 << 0,
+    self.* = .{
+        .root = root,
+        .wlr_output = wlr_output,
+        .layout = layout,
+        .usable_box = undefined,
     };
-    self.pending = self.current;
-
-    self.master_count = 1;
-
-    self.master_factor = 0.6;
-
-    self.layout = try std.mem.dupe(util.gpa, u8, "full");
-
-    self.attach_mode = .top;
-
-    self.status_trackers = std.SinglyLinkedList(OutputStatus).init();
+    wlr_output.data = self;
 
     // Set up listeners
     self.listen_destroy.notify = handleDestroy;
