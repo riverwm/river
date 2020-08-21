@@ -33,16 +33,15 @@ view: *View,
 wlr_xwayland_surface: *c.wlr_xwayland_surface,
 
 // Listeners that are always active over the view's lifetime
-listen_destroy: c.wl_listener,
-listen_map: c.wl_listener,
-listen_unmap: c.wl_listener,
+listen_destroy: c.wl_listener = undefined,
+listen_map: c.wl_listener = undefined,
+listen_unmap: c.wl_listener = undefined,
 
 // Listeners that are only active while the view is mapped
-listen_commit: c.wl_listener,
+listen_commit: c.wl_listener = undefined,
 
 pub fn init(self: *Self, view: *View, wlr_xwayland_surface: *c.wlr_xwayland_surface) void {
-    self.view = view;
-    self.wlr_xwayland_surface = wlr_xwayland_surface;
+    self.* = .{ .view = view, .wlr_xwayland_surface = wlr_xwayland_surface };
     wlr_xwayland_surface.data = self;
 
     // Add listeners that are active over the view's entire lifetime

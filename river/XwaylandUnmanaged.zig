@@ -31,17 +31,16 @@ root: *Root,
 wlr_xwayland_surface: *c.wlr_xwayland_surface,
 
 // Listeners that are always active over the view's lifetime
-liseten_request_configure: c.wl_listener,
-listen_destroy: c.wl_listener,
-listen_map: c.wl_listener,
-listen_unmap: c.wl_listener,
+liseten_request_configure: c.wl_listener = undefined,
+listen_destroy: c.wl_listener = undefined,
+listen_map: c.wl_listener = undefined,
+listen_unmap: c.wl_listener = undefined,
 
 // Listeners that are only active while the view is mapped
-listen_commit: c.wl_listener,
+listen_commit: c.wl_listener = undefined,
 
 pub fn init(self: *Self, root: *Root, wlr_xwayland_surface: *c.wlr_xwayland_surface) void {
-    self.root = root;
-    self.wlr_xwayland_surface = wlr_xwayland_surface;
+    self.* = .{ .root = root, .wlr_xwayland_surface = wlr_xwayland_surface };
 
     // Add listeners that are active over the view's entire lifetime
     self.liseten_request_configure.notify = handleRequestConfigure;
