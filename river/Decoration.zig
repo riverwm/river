@@ -28,17 +28,15 @@ server: *Server,
 
 wlr_xdg_toplevel_decoration: *c.wlr_xdg_toplevel_decoration_v1,
 
-listen_destroy: c.wl_listener,
-listen_request_mode: c.wl_listener,
+listen_destroy: c.wl_listener = undefined,
+listen_request_mode: c.wl_listener = undefined,
 
 pub fn init(
     self: *Self,
     server: *Server,
     wlr_xdg_toplevel_decoration: *c.wlr_xdg_toplevel_decoration_v1,
 ) void {
-    self.server = server;
-
-    self.wlr_xdg_toplevel_decoration = wlr_xdg_toplevel_decoration;
+    self.* = .{ .server = server, .wlr_xdg_toplevel_decoration = wlr_xdg_toplevel_decoration };
 
     self.listen_destroy.notify = handleDestroy;
     c.wl_signal_add(&self.wlr_xdg_toplevel_decoration.events.destroy, &self.listen_destroy);
