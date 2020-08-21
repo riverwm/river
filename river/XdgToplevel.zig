@@ -35,18 +35,17 @@ view: *View,
 wlr_xdg_surface: *c.wlr_xdg_surface,
 
 // Listeners that are always active over the view's lifetime
-listen_destroy: c.wl_listener,
-listen_map: c.wl_listener,
-listen_unmap: c.wl_listener,
+listen_destroy: c.wl_listener = undefined,
+listen_map: c.wl_listener = undefined,
+listen_unmap: c.wl_listener = undefined,
 
 // Listeners that are only active while the view is mapped
-listen_commit: c.wl_listener,
-listen_new_popup: c.wl_listener,
-listen_request_fullscreen: c.wl_listener,
+listen_commit: c.wl_listener = undefined,
+listen_new_popup: c.wl_listener = undefined,
+listen_request_fullscreen: c.wl_listener = undefined,
 
 pub fn init(self: *Self, view: *View, wlr_xdg_surface: *c.wlr_xdg_surface) void {
-    self.view = view;
-    self.wlr_xdg_surface = wlr_xdg_surface;
+    self.* = .{ .view = view, .wlr_xdg_surface = wlr_xdg_surface };
     wlr_xdg_surface.data = self;
 
     // Add listeners that are active over the view's entire lifetime
