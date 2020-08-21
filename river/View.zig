@@ -55,16 +55,16 @@ const State = struct {
     /// The output-relative coordinates and dimensions of the view. The
     /// surface itself may have other dimensions which are stored in the
     /// surface_box member.
-    box: Box,
+    box: Box = Box{ .x = 0, .y = 0, .width = 0, .height = 0 },
 
     /// The tags of the view, as a bitmask
     tags: u32,
 
     /// Number of seats currently focusing the view
-    focus: u32,
+    focus: u32 = 0,
 
-    float: bool,
-    fullscreen: bool,
+    float: bool = false,
+    fullscreen: bool = false,
 };
 
 const SavedBuffer = struct {
@@ -74,68 +74,50 @@ const SavedBuffer = struct {
 };
 
 /// The implementation of this view
-impl: Impl,
+impl: Impl = undefined,
 
 /// The output this view is currently associated with
 output: *Output,
 
 /// This is from the point where the view is mapped until the surface
 /// is destroyed by wlroots.
-wlr_surface: ?*c.wlr_surface,
+wlr_surface: ?*c.wlr_surface = null,
 
 /// This View struct outlasts the wlroots object it wraps. This bool is set to
 /// true when the backing wlr_xdg_toplevel or equivalent has been destroyed.
-destroying: bool,
+destroying: bool = false,
 
 /// The double-buffered state of the view
 current: State,
 pending: State,
 
 /// The serial sent with the currently pending configure event
-pending_serial: ?u32,
+pending_serial: ?u32 = null,
 
 /// The currently commited geometry of the surface. The x/y may be negative if
 /// for example the client has decided to draw CSD shadows a la GTK.
-surface_box: Box,
+surface_box: Box = undefined,
 
 /// The geometry the view's surface had when the transaction started and
 /// buffers were saved.
-saved_surface_box: Box,
+saved_surface_box: Box = undefined,
 
 /// These are what we render while a transaction is in progress
 saved_buffers: std.ArrayList(SavedBuffer),
 
 /// The floating dimensions the view, saved so that they can be restored if the
 /// view returns to floating mode.
-float_box: Box,
+float_box: Box = undefined,
 
-draw_borders: bool,
+draw_borders: bool = true,
 
 pub fn init(self: *Self, output: *Output, tags: u32, surface: var) void {
-    self.output = output;
-
-    self.wlr_surface = null;
-    self.destroying = false;
-
-    self.current = .{
-        .box = .{
-            .x = 0,
-            .y = 0,
-            .height = 0,
-            .width = 0,
-        },
-        .tags = tags,
-        .focus = 0,
-        .float = false,
-        .fullscreen = false,
+    self.* = .{
+        .output = output,
+        .current = .{ .tags = tags },
+        .pending = .{ .tags = tags },
+        .saved_buffers = std.ArrayList(SavedBuffer).init(util.gpa),
     };
-    self.pending = self.current;
-
-    self.pending_serial = null;
-
-    self.saved_buffers = std.ArrayList(SavedBuffer).init(util.gpa);
-
-    self.draw_borders = true;
 
     if (@TypeOf(surface) == *c.wlr_xdg_surface) {
         self.impl = .{ .xdg_toplevel = undefined };
