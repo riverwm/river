@@ -59,6 +59,7 @@ pub fn sendViewTags(self: Self) void {
 
     var it = self.output.views.first;
     while (it) |node| : (it = node.next) {
+        if (node.view.destroying) continue;
         view_tags.append(node.view.current.tags) catch {
             c.wl_resource_post_no_memory(self.wl_resource);
             log.crit(.river_status, "out of memory", .{});
