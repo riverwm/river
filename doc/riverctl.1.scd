@@ -136,6 +136,23 @@ that tag 1 through 9 are visible.
 	A mapping without modifiers can be created by passing an empty string as
 	the modifiers argument.
 
+*map-pointer* _mode_ _modifiers_ _button_ _action_
+	_mode_ and _modifiers_ are the same as for *map*.
+
+	_button_ is the name of a linux input event code. The most commonly used
+	values are:
+
+	- BTN_LEFT - left mouse button
+	- BTN_RIGHT - right mouse button
+	- BTN_MIDDLE - middle mouse button
+
+	A complete list may be found in _/usr/include/linux/input-event-codes.h_
+
+	_action_ is one of the following values:
+
+	- move-view
+	- resize-view
+
 *outer-padding* _pixels_
 	Set the padding around the edge of the screen to _pixels_.
 

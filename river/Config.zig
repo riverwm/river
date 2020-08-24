@@ -23,7 +23,7 @@ const c = @import("c.zig");
 const util = @import("util.zig");
 
 const Server = @import("Server.zig");
-const Mapping = @import("Mapping.zig");
+const Mode = @import("Mode.zig");
 
 /// Color of background in RGBA (alpha should only affect nested sessions)
 background_color: [4]f32 = [_]f32{ 0.0, 0.16862745, 0.21176471, 1.0 }, // Solarized base03
@@ -47,7 +47,7 @@ outer_padding: u32 = 8,
 mode_to_id: std.StringHashMap(usize),
 
 /// All user-defined keymap modes, indexed by mode id
-modes: std.ArrayList(std.ArrayList(Mapping)),
+modes: std.ArrayList(Mode),
 
 /// List of app_ids which will be started floating
 float_filter: std.ArrayList([]const u8),
@@ -56,22 +56,20 @@ float_filter: std.ArrayList([]const u8),
 csd_filter: std.ArrayList([]const u8),
 
 pub fn init() !Self {
-    var mode_to_id = std.StringHashMap(usize).init(util.gpa);
-    errdefer mode_to_id.deinit();
-    const owned_slice = try std.mem.dupe(util.gpa, u8, "normal");
-    errdefer util.gpa.free(owned_slice);
-    try mode_to_id.putNoClobber(owned_slice, 0);
-
-    var modes = std.ArrayList(std.ArrayList(Mapping)).init(util.gpa);
-    errdefer modes.deinit();
-    try modes.append(std.ArrayList(Mapping).init(util.gpa));
-
-    return Self{
-        .mode_to_id = mode_to_id,
-        .modes = modes,
+    var self = Self{
+        .mode_to_id = std.StringHashMap(usize).init(util.gpa),
+        .modes = std.ArrayList(Mode).init(util.gpa),
         .float_filter = std.ArrayList([]const u8).init(util.gpa),
         .csd_filter = std.ArrayList([]const u8).init(util.gpa),
     };
+
+    // Start with a single, empty mode called normal
+    errdefer self.deinit();
+    const owned_slice = try std.mem.dupe(util.gpa, u8, "normal");
+    try self.mode_to_id.putNoClobber(owned_slice, 0);
+    try self.modes.append(Mode.init());
+
+    return self;
 }
 
 pub fn deinit(self: Self) void {
@@ -79,10 +77,7 @@ pub fn deinit(self: Self) void {
     while (it.next()) |kv| util.gpa.free(kv.key);
     self.mode_to_id.deinit();
 
-    for (self.modes.items) |mode| {
-        for (mode.items) |mapping| mapping.deinit(util.gpa);
-        mode.deinit();
-    }
+    for (self.modes.items) |mode| mode.deinit();
     self.modes.deinit();
 
     self.float_filter.deinit();

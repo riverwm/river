@@ -65,9 +65,6 @@ focus_stack: ViewStack(*View) = ViewStack(*View){},
 /// List of status tracking objects relaying changes to this seat to clients.
 status_trackers: std.SinglyLinkedList(SeatStatus) = std.SinglyLinkedList(SeatStatus).init(),
 
-/// State of pointer modifier; Used for pointer operations such as move ans resize.
-pointer_modifier: bool = false,
-
 listen_request_set_selection: c.wl_listener = undefined,
 
 pub fn init(self: *Self, input_manager: *InputManager, name: [*:0]const u8) !void {
@@ -258,7 +255,7 @@ pub fn handleViewUnmap(self: *Self, view: *View) void {
 /// Returns true if the key was handled
 pub fn handleMapping(self: *Self, keysym: c.xkb_keysym_t, modifiers: u32) bool {
     const modes = &self.input_manager.server.config.modes;
-    for (modes.items[self.mode_id].items) |mapping| {
+    for (modes.items[self.mode_id].mappings.items) |mapping| {
         if (modifiers == mapping.modifiers and keysym == mapping.keysym) {
             // Execute the bound command
             const args = mapping.command_args;

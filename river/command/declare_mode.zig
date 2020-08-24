@@ -19,6 +19,7 @@ const std = @import("std");
 
 const util = @import("../util.zig");
 
+const Mode = @import("../Mode.zig");
 const Error = @import("../command.zig").Error;
 const Mapping = @import("../Mapping.zig");
 const Seat = @import("../Seat.zig");
@@ -45,9 +46,9 @@ pub fn declareMode(
         return Error.Other;
     }
 
+    try config.modes.ensureCapacity(config.modes.items.len + 1);
     const owned_name = try std.mem.dupe(util.gpa, u8, new_mode_name);
     errdefer util.gpa.free(owned_name);
     try config.mode_to_id.putNoClobber(owned_name, config.modes.items.len);
-    errdefer _ = config.mode_to_id.remove(owned_name);
-    try config.modes.append(std.ArrayList(Mapping).init(util.gpa));
+    config.modes.appendAssumeCapacity(Mode.init());
 }

@@ -24,6 +24,7 @@ pub usingnamespace @cImport({
     @cInclude("unistd.h");
 
     @cInclude("linux/input-event-codes.h");
+    @cInclude("libevdev/libevdev.h");
 
     @cInclude("wayland-server-core.h");
     //@cInclude("wlr/backend.h");

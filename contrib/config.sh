@@ -37,6 +37,12 @@ riverctl map normal $mod L mod-master-factor +0.05
 riverctl map normal $mod+Shift H mod-master-count +1
 riverctl map normal $mod+Shift L mod-master-count -1
 
+# Mod + Left Mouse Button to move views
+riverctl map-pointer normal $mod BTN_LEFT move-view
+
+# Mod + Right Mouse Button to resize views
+riverctl map-pointer normal $mod BTN_RIGHT resize-view
+
 for i in $(seq 1 9); do
     tagmask=$((1 << ($i - 1)))
 

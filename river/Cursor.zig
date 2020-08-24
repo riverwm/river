@@ -397,23 +397,11 @@ fn handleButton(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // perhaps enter move/resize mode.
         if (View.fromWlrSurface(wlr_surface)) |view| {
             if (event.state == .WLR_BUTTON_PRESSED and self.pressed_count == 1) {
-                // If the button is pressed and the pointer modifier is
-                // active, enter cursor mode or close view and return.
-                const fullscreen = view.current.fullscreen or view.pending.fullscreen;
-                if (self.seat.pointer_modifier) {
-                    switch (event.button) {
-                        c.BTN_LEFT => if (!fullscreen) Mode.enter(self, .move, event, view),
-                        c.BTN_MIDDLE => view.close(),
-                        c.BTN_RIGHT => if (!fullscreen) Mode.enter(self, .resize, event, view),
-
-                        // TODO Some mice have additional buttons. These
-                        // could also be bound to some useful action.
-                        else => {},
-                    }
-                    return;
-                } else {
-                    Mode.enter(self, .down, event, view);
-                }
+                // If there is an active mapping for this button which is
+                // handled we are done here
+                if (self.handlePointerMapping(event, view)) return;
+                // Otherwise enter cursor down mode
+                Mode.enter(self, .down, event, view);
             }
         }
 
@@ -424,6 +412,26 @@ fn handleButton(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
             event.state,
         );
     }
+}
+
+/// Handle the mapping for the passed button if any. Returns true if there
+/// was a mapping and the button was handled.
+fn handlePointerMapping(self: *Self, event: *c.wlr_event_pointer_button, view: *View) bool {
+    const wlr_keyboard = c.wlr_seat_get_keyboard(self.seat.wlr_seat);
+    const modifiers = c.wlr_keyboard_get_modifiers(wlr_keyboard);
+
+    const fullscreen = view.current.fullscreen or view.pending.fullscreen;
+
+    const config = self.seat.input_manager.server.config;
+    return for (config.modes.items[self.seat.mode_id].pointer_mappings.items) |mapping| {
+        if (event.button == mapping.event_code and modifiers == mapping.modifiers) {
+            switch (mapping.action) {
+                .move => if (!fullscreen) Mode.enter(self, .move, event, view),
+                .resize => if (!fullscreen) Mode.enter(self, .resize, event, view),
+            }
+            break true;
+        }
+    } else false;
 }
 
 fn handleFrame(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {

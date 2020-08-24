@@ -153,13 +153,7 @@ fn handleModifiers(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void 
     c.wlr_seat_set_keyboard(self.seat.wlr_seat, self.wlr_input_device);
 
     // Send modifiers to the client.
-    c.wlr_seat_keyboard_notify_modifiers(
-        self.seat.wlr_seat,
-        &self.wlr_keyboard.modifiers,
-    );
-
-    const modifiers = c.wlr_keyboard_get_modifiers(self.wlr_keyboard);
-    self.seat.pointer_modifier = modifiers == c.WLR_MODIFIER_LOGO;
+    c.wlr_seat_keyboard_notify_modifiers(self.seat.wlr_seat, &self.wlr_keyboard.modifiers);
 }
 
 /// Handle any builtin, harcoded compsitor mappings such as VT switching.

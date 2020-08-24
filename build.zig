@@ -112,6 +112,7 @@ fn addServerDeps(exe: *std.build.LibExeObjStep) void {
     exe.addIncludeDir(".");
 
     exe.linkLibC();
+    exe.linkSystemLibrary("libevdev");
     exe.linkSystemLibrary("pixman-1");
     exe.linkSystemLibrary("wayland-server");
     exe.linkSystemLibrary("wlroots");

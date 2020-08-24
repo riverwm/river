@@ -28,6 +28,7 @@ installed:
 - wayland-protocols
 - [wlroots](https://github.com/swaywm/wlroots) 0.11.0
 - xkbcommon
+- libevdev
 - pixman
 - pkg-config
 - scdoc (optional, but required for man page generation)
