@@ -22,7 +22,7 @@ const util = @import("../util.zig");
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
-pub fn attach_mode(
+pub fn attachMode(
     allocator: *std.mem.Allocator,
     seat: *Seat,
     args: []const []const u8,

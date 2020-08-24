@@ -30,7 +30,7 @@ const str_to_impl_fn = [_]struct {
     name: []const u8,
     impl: fn (*std.mem.Allocator, *Seat, []const []const u8, *?[]const u8) Error!void,
 }{
-    .{ .name = "attach-mode",            .impl = @import("command/attach_mode.zig").attach_mode },
+    .{ .name = "attach-mode",            .impl = @import("command/attach_mode.zig").attachMode },
     .{ .name = "background-color",       .impl = @import("command/config.zig").backgroundColor },
     .{ .name = "border-color-focused",   .impl = @import("command/config.zig").borderColorFocused },
     .{ .name = "border-color-unfocused", .impl = @import("command/config.zig").borderColorUnfocused },
