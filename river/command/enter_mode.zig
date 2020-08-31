@@ -32,7 +32,7 @@ pub fn enterMode(
 
     const config = seat.input_manager.server.config;
     const target_mode = args[1];
-    seat.mode_id = config.mode_to_id.getValue(target_mode) orelse {
+    seat.mode_id = config.mode_to_id.get(target_mode) orelse {
         out.* = try std.fmt.allocPrint(
             allocator,
             "cannot enter non-existant mode '{}'",

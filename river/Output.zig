@@ -42,7 +42,7 @@ root: *Root,
 wlr_output: *c.wlr_output,
 
 /// All layer surfaces on the output, indexed by the layer enum.
-layers: [4]std.TailQueue(LayerSurface) = [1]std.TailQueue(LayerSurface){std.TailQueue(LayerSurface).init()} ** 4,
+layers: [4]std.TailQueue(LayerSurface) = [1]std.TailQueue(LayerSurface){.{}} ** 4,
 
 /// The area left for views and other layer surfaces after applying the
 /// exclusive zones of exclusive layer surfaces.
@@ -50,7 +50,7 @@ layers: [4]std.TailQueue(LayerSurface) = [1]std.TailQueue(LayerSurface){std.Tail
 usable_box: Box,
 
 /// The top of the stack is the "most important" view.
-views: ViewStack(View) = ViewStack(View){},
+views: ViewStack(View) = .{},
 
 /// The double-buffered state of the output.
 current: State = State{ .tags = 1 << 0 },
@@ -71,7 +71,7 @@ layout: []const u8,
 attach_mode: AttachMode = .top,
 
 /// List of status tracking objects relaying changes to this output to clients.
-status_trackers: std.SinglyLinkedList(OutputStatus) = std.SinglyLinkedList(OutputStatus).init(),
+status_trackers: std.SinglyLinkedList(OutputStatus) = .{},
 
 // All listeners for this output, in alphabetical order
 listen_destroy: c.wl_listener = undefined,
@@ -240,7 +240,7 @@ fn layoutExternal(self: *Self, visible_count: u32) !void {
         std.os.execveZ("/bin/sh", &cmd, std.c.environ) catch c._exit(1);
     }
     std.os.close(stdout_pipe[1]);
-    const stdout = std.fs.File{ .handle = stdout_pipe[0], .io_mode = std.io.mode };
+    const stdout = std.fs.File{ .handle = stdout_pipe[0] };
     defer stdout.close();
 
     // TODO abort after a timeout

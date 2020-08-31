@@ -48,7 +48,7 @@ wlr_seat: *c.wlr_seat,
 cursor: Cursor = undefined,
 
 /// Mulitple keyboards are handled separately
-keyboards: std.TailQueue(Keyboard) = std.TailQueue(Keyboard).init(),
+keyboards: std.TailQueue(Keyboard) = .{},
 
 /// ID of the current keymap mode
 mode_id: usize = 0,
@@ -61,10 +61,10 @@ focused: FocusTarget = .none,
 
 /// Stack of views in most recently focused order
 /// If there is a currently focused view, it is on top.
-focus_stack: ViewStack(*View) = ViewStack(*View){},
+focus_stack: ViewStack(*View) = .{},
 
 /// List of status tracking objects relaying changes to this seat to clients.
-status_trackers: std.SinglyLinkedList(SeatStatus) = std.SinglyLinkedList(SeatStatus).init(),
+status_trackers: std.SinglyLinkedList(SeatStatus) = .{},
 
 listen_request_set_selection: c.wl_listener = undefined,
 listen_request_start_drag: c.wl_listener = undefined,
@@ -307,7 +307,7 @@ pub fn addDevice(self: *Self, device: *c.wlr_input_device) void {
 }
 
 fn addKeyboard(self: *Self, device: *c.wlr_input_device) !void {
-    const node = try self.keyboards.allocateNode(util.gpa);
+    const node = try util.gpa.create(std.TailQueue(Keyboard).Node);
     node.data.init(self, device) catch |err| {
         switch (err) {
             error.XkbContextFailed => log.err(.keyboard, "Failed to create XKB context", .{}),

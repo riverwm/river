@@ -139,7 +139,7 @@ const ScanProtocolsStep = struct {
     fn init(builder: *std.build.Builder) ScanProtocolsStep {
         return ScanProtocolsStep{
             .builder = builder,
-            .step = std.build.Step.init("Scan Protocols", builder.allocator, make),
+            .step = std.build.Step.init(.Custom, "Scan Protocols", builder.allocator, make),
         };
     }
 
@@ -234,7 +234,7 @@ const ScdocStep = struct {
     fn init(builder: *std.build.Builder) ScdocStep {
         return ScdocStep{
             .builder = builder,
-            .step = std.build.Step.init("Generate man pages", builder.allocator, make),
+            .step = std.build.Step.init(.Custom, "Generate man pages", builder.allocator, make),
         };
     }
 

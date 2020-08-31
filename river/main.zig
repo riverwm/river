@@ -94,7 +94,7 @@ pub fn main() anyerror!void {
     log.info(.server, "shutting down", .{});
 }
 
-fn printErrorExit(comptime format: []const u8, args: var) noreturn {
+fn printErrorExit(comptime format: []const u8, args: anytype) noreturn {
     const stderr = std.io.getStdErr().outStream();
     stderr.print(format ++ "\n", args) catch std.os.exit(1);
     std.os.exit(1);

@@ -35,7 +35,7 @@ server: *Server,
 wlr_idle: *c.wlr_idle,
 wlr_input_inhibit_manager: *c.wlr_input_inhibit_manager,
 
-seats: std.TailQueue(Seat) = std.TailQueue(Seat).init(),
+seats: std.TailQueue(Seat) = .{},
 
 exclusive_client: ?*c.wl_client = null,
 

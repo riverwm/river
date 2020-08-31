@@ -149,7 +149,7 @@ pub fn mapPointer(
 
 fn modeNameToId(allocator: *std.mem.Allocator, seat: *Seat, mode_name: []const u8, out: *?[]const u8) !usize {
     const config = seat.input_manager.server.config;
-    return config.mode_to_id.getValue(mode_name) orelse {
+    return config.mode_to_id.get(mode_name) orelse {
         out.* = try std.fmt.allocPrint(
             allocator,
             "cannot add mapping to non-existant mode '{}p'",

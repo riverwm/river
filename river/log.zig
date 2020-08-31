@@ -55,12 +55,12 @@ fn log(
     comptime message_level: Level,
     comptime scope: @TypeOf(.foobar),
     comptime format: []const u8,
-    args: var,
+    args: anytype,
 ) void {
     if (@enumToInt(message_level) <= @enumToInt(level)) {
         // Don't store/log messages in release small mode to save space
         if (std.builtin.mode != .ReleaseSmall) {
-            const stderr = std.debug.getStderrStream();
+            const stderr = std.io.getStdErr().writer();
             stderr.print(@tagName(message_level) ++ ": (" ++ @tagName(scope) ++ ") " ++
                 format ++ "\n", args) catch return;
         }
@@ -72,7 +72,7 @@ fn log(
 pub fn emerg(
     comptime scope: @TypeOf(.foobar),
     comptime format: []const u8,
-    args: var,
+    args: anytype,
 ) void {
     @setCold(true);
     log(.emerg, scope, format, args);
@@ -83,7 +83,7 @@ pub fn emerg(
 pub fn alert(
     comptime scope: @TypeOf(.foobar),
     comptime format: []const u8,
-    args: var,
+    args: anytype,
 ) void {
     @setCold(true);
     log(.alert, scope, format, args);
@@ -95,7 +95,7 @@ pub fn alert(
 pub fn crit(
     comptime scope: @TypeOf(.foobar),
     comptime format: []const u8,
-    args: var,
+    args: anytype,
 ) void {
     @setCold(true);
     log(.crit, scope, format, args);
@@ -106,7 +106,7 @@ pub fn crit(
 pub fn err(
     comptime scope: @TypeOf(.foobar),
     comptime format: []const u8,
-    args: var,
+    args: anytype,
 ) void {
     @setCold(true);
     log(.err, scope, format, args);
@@ -118,7 +118,7 @@ pub fn err(
 pub fn warn(
     comptime scope: @TypeOf(.foobar),
     comptime format: []const u8,
-    args: var,
+    args: anytype,
 ) void {
     log(.warn, scope, format, args);
 }
@@ -128,7 +128,7 @@ pub fn warn(
 pub fn notice(
     comptime scope: @TypeOf(.foobar),
     comptime format: []const u8,
-    args: var,
+    args: anytype,
 ) void {
     log(.notice, scope, format, args);
 }
@@ -138,7 +138,7 @@ pub fn notice(
 pub fn info(
     comptime scope: @TypeOf(.foobar),
     comptime format: []const u8,
-    args: var,
+    args: anytype,
 ) void {
     log(.info, scope, format, args);
 }
@@ -148,7 +148,7 @@ pub fn info(
 pub fn debug(
     comptime scope: @TypeOf(.foobar),
     comptime format: []const u8,
-    args: var,
+    args: anytype,
 ) void {
     log(.debug, scope, format, args);
 }

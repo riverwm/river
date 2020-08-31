@@ -23,7 +23,7 @@ pub const gpa = std.heap.c_allocator;
 /// Take a pointer to c_void and cast it to a pointer to T. This function
 /// exists to avoid having the verbosity of the required alignment casts all
 /// over the code.
-pub fn voidCast(comptime T: type, ptr: var) *T {
+pub fn voidCast(comptime T: type, ptr: anytype) *T {
     // See https://github.com/ziglang/zig/issues/5618
     if (@TypeOf(ptr) != *c_void)
         @compileError("voidCast takes *c_void but " ++ @typeName(@TypeOf(ptr)) ++ " was provided");

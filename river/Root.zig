@@ -35,20 +35,20 @@ const DragIcon = @import("DragIcon.zig");
 server: *Server,
 
 wlr_output_layout: *c.wlr_output_layout,
-outputs: std.TailQueue(Output) = std.TailQueue(Output).init(),
+outputs: std.TailQueue(Output) = .{},
 
 /// This output is used internally when no real outputs are available.
 /// It is not advertised to clients.
 noop_output: Output = undefined,
 
-drag_icons: std.SinglyLinkedList(DragIcon) = std.SinglyLinkedList(DragIcon).init(),
+drag_icons: std.SinglyLinkedList(DragIcon) = .{},
 
 /// This list stores all unmanaged Xwayland windows. This needs to be in root
 /// since X is like the wild west and who knows where these things will go.
 xwayland_unmanaged_views: if (build_options.xwayland)
     std.TailQueue(XwaylandUnmanaged)
 else
-    void = if (build_options.xwayland) std.TailQueue(XwaylandUnmanaged).init(),
+    void = if (build_options.xwayland) .{},
 
 /// Number of pending configures sent in the current transaction.
 /// A value of 0 means there is no current transaction.
@@ -92,7 +92,7 @@ pub fn deinit(self: *Self) void {
 }
 
 pub fn addOutput(self: *Self, wlr_output: *c.wlr_output) void {
-    const node = self.outputs.allocateNode(util.gpa) catch {
+    const node = util.gpa.create(std.TailQueue(Output).Node) catch {
         c.wlr_output_destroy(wlr_output);
         return;
     };

@@ -140,7 +140,7 @@ pub fn ViewStack(comptime T: type) type {
         pub fn iter(
             start: ?*Node,
             dir: Direction,
-            context: var,
+            context: anytype,
             filter: fn (*View, @TypeOf(context)) bool,
         ) Iter(@TypeOf(context)) {
             return .{ .it = start, .dir = dir, .context = context, .filter = filter };

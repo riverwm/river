@@ -104,7 +104,7 @@ fn addArgument(wl_client: ?*c.wl_client, wl_resource: ?*c.wl_resource, arg: ?[*:
         return;
     };
 
-    self.args_map.get(id).?.value.append(owned_slice) catch {
+    self.args_map.getEntry(id).?.value.append(owned_slice) catch {
         c.wl_client_post_no_memory(wl_client);
         util.gpa.free(owned_slice);
         return;
@@ -133,7 +133,7 @@ fn runCommand(
     };
     c.wl_resource_set_implementation(callback_resource, null, null, null);
 
-    const args = self.args_map.get(c.wl_resource_get_id(wl_resource)).?.value.items;
+    const args = self.args_map.get(c.wl_resource_get_id(wl_resource)).?.items;
 
     var out: ?[]const u8 = null;
     defer if (out) |s| util.gpa.free(s);

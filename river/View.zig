@@ -111,7 +111,7 @@ float_box: Box = undefined,
 
 draw_borders: bool = true,
 
-pub fn init(self: *Self, output: *Output, tags: u32, surface: var) void {
+pub fn init(self: *Self, output: *Output, tags: u32, surface: anytype) void {
     self.* = .{
         .output = output,
         .current = .{ .tags = tags },

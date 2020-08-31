@@ -83,9 +83,9 @@ pub fn init() !Self {
     return self;
 }
 
-pub fn deinit(self: Self) void {
+pub fn deinit(self: *Self) void {
     var it = self.mode_to_id.iterator();
-    while (it.next()) |kv| util.gpa.free(kv.key);
+    while (it.next()) |e| util.gpa.free(e.key);
     self.mode_to_id.deinit();
 
     for (self.modes.items) |mode| mode.deinit();
