@@ -109,7 +109,7 @@ const Mode = union(enum) {
     }
 
     fn processMotion(self: *Self, device: *c.wlr_input_device, time: u32, delta_x: f64, delta_y: f64) void {
-        const border_width = self.seat.input_manager.server.config.border_width;
+        const config = self.seat.input_manager.server.config;
 
         switch (self.mode) {
             .passthrough => {
@@ -126,6 +126,8 @@ const Mode = union(enum) {
                 );
             },
             .move => |view| {
+                const border_width = if (view.draw_borders) config.border_width else 0;
+
                 var output_width: c_int = undefined;
                 var output_height: c_int = undefined;
                 c.wlr_output_effective_resolution(view.output.wlr_output, &output_width, &output_height);
@@ -152,6 +154,8 @@ const Mode = union(enum) {
                 view.applyPending();
             },
             .resize => |data| {
+                const border_width = if (data.view.draw_borders) config.border_width else 0;
+
                 var output_width: c_int = undefined;
                 var output_height: c_int = undefined;
                 c.wlr_output_effective_resolution(data.view.output.wlr_output, &output_width, &output_height);
