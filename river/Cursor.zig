@@ -188,24 +188,18 @@ const Mode = union(enum) {
         var sx: f64 = undefined;
         var sy: f64 = undefined;
         if (self.surfaceAt(self.wlr_cursor.x, self.wlr_cursor.y, &sx, &sy)) |wlr_surface| {
-            // If input is allowed on the surface, send a pointer enter
-            // or motion even as needed.
+            // If input is allowed on the surface, send pointer enter and motion
+            // events. Note that wlroots won't actually send an enter event if
+            // the surface has already been entered.
             if (self.seat.input_manager.inputAllowed(wlr_surface)) {
-                const wlr_seat = self.seat.wlr_seat;
-                const focus_change = wlr_seat.pointer_state.focused_surface != wlr_surface;
-                if (focus_change) {
-                    log.debug(.cursor, "pointer notify enter at ({},{})", .{ sx, sy });
-                    c.wlr_seat_pointer_notify_enter(wlr_seat, wlr_surface, sx, sy);
-                } else {
-                    c.wlr_seat_pointer_notify_motion(wlr_seat, time, sx, sy);
-                }
-                return;
+                c.wlr_seat_pointer_notify_enter(self.seat.wlr_seat, wlr_surface, sx, sy);
+                c.wlr_seat_pointer_notify_motion(self.seat.wlr_seat, time, sx, sy);
             }
+        } else {
+            // There is either no surface under the cursor or input is disallowed
+            // Reset the cursor image to the default and clear focus.
+            self.clearFocus();
         }
-
-        // There is either no surface under the cursor or input is disallowed
-        // Reset the cursor image to the default and clear focus.
-        self.clearFocus();
     }
 };
 

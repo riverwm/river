@@ -103,6 +103,8 @@ pub fn renderOutput(output: *Output) void {
     // The overlay layer is rendered in both fullscreen and normal cases
     renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY], &now);
 
+    renderDragIcons(output.*, &now);
+
     // Hardware cursors are rendered by the GPU on a separate plane, and can be
     // moved around without re-rendering what's beneath them - which is more
     // efficient. However, not all hardware supports hardware cursors. For this
@@ -175,13 +177,28 @@ fn renderView(output: Output, view: *View, now: *c.timespec) void {
     }
 }
 
+fn renderDragIcons(output: Output, now: *c.timespec) void {
+    const output_box = c.wlr_output_layout_get_box(output.root.wlr_output_layout, output.wlr_output);
+
+    var it = output.root.drag_icons.first;
+    while (it) |node| : (it = node.next) {
+        const drag_icon = &node.data;
+
+        var rdata = SurfaceRenderData{
+            .output = &output,
+            .output_x = @floatToInt(i32, drag_icon.seat.cursor.wlr_cursor.x) +
+                drag_icon.wlr_drag_icon.surface.*.sx - output_box.*.x,
+            .output_y = @floatToInt(i32, drag_icon.seat.cursor.wlr_cursor.y) +
+                drag_icon.wlr_drag_icon.surface.*.sy - output_box.*.y,
+            .when = now,
+        };
+        c.wlr_surface_for_each_surface(drag_icon.wlr_drag_icon.surface, renderSurfaceIterator, &rdata);
+    }
+}
+
 /// Render all xwayland unmanaged windows that appear on the output
 fn renderXwaylandUnmanaged(output: Output, now: *c.timespec) void {
-    const root = output.root;
-    const output_box: *c.wlr_box = c.wlr_output_layout_get_box(
-        root.wlr_output_layout,
-        output.wlr_output,
-    );
+    const output_box = c.wlr_output_layout_get_box(output.root.wlr_output_layout, output.wlr_output);
 
     var it = output.root.xwayland_unmanaged_views.first;
     while (it) |node| : (it = node.next) {
@@ -189,8 +206,8 @@ fn renderXwaylandUnmanaged(output: Output, now: *c.timespec) void {
 
         var rdata = SurfaceRenderData{
             .output = &output,
-            .output_x = wlr_xwayland_surface.x - output_box.x,
-            .output_y = wlr_xwayland_surface.y - output_box.y,
+            .output_x = wlr_xwayland_surface.x - output_box.*.x,
+            .output_y = wlr_xwayland_surface.y - output_box.*.y,
             .when = now,
         };
         c.wlr_surface_for_each_surface(wlr_xwayland_surface.surface, renderSurfaceIterator, &rdata);

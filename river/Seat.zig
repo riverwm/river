@@ -25,6 +25,7 @@ const command = @import("command.zig");
 const log = @import("log.zig");
 const util = @import("util.zig");
 
+const DragIcon = @import("DragIcon.zig");
 const Cursor = @import("Cursor.zig");
 const InputManager = @import("InputManager.zig");
 const Keyboard = @import("Keyboard.zig");
@@ -66,6 +67,8 @@ focus_stack: ViewStack(*View) = ViewStack(*View){},
 status_trackers: std.SinglyLinkedList(SeatStatus) = std.SinglyLinkedList(SeatStatus).init(),
 
 listen_request_set_selection: c.wl_listener = undefined,
+listen_request_start_drag: c.wl_listener = undefined,
+listen_start_drag: c.wl_listener = undefined,
 
 pub fn init(self: *Self, input_manager: *InputManager, name: [*:0]const u8) !void {
     self.* = .{
@@ -80,6 +83,12 @@ pub fn init(self: *Self, input_manager: *InputManager, name: [*:0]const u8) !voi
 
     self.listen_request_set_selection.notify = handleRequestSetSelection;
     c.wl_signal_add(&self.wlr_seat.events.request_set_selection, &self.listen_request_set_selection);
+
+    self.listen_request_start_drag.notify = handleRequestStartDrag;
+    c.wl_signal_add(&self.wlr_seat.events.request_start_drag, &self.listen_request_start_drag);
+
+    self.listen_start_drag.notify = handleStartDrag;
+    c.wl_signal_add(&self.wlr_seat.events.start_drag, &self.listen_start_drag);
 }
 
 pub fn deinit(self: *Self) void {
@@ -323,4 +332,33 @@ fn handleRequestSetSelection(listener: ?*c.wl_listener, data: ?*c_void) callconv
     const self = @fieldParentPtr(Self, "listen_request_set_selection", listener.?);
     const event = util.voidCast(c.wlr_seat_request_set_selection_event, data.?);
     c.wlr_seat_set_selection(self.wlr_seat, event.source, event.serial);
+}
+
+fn handleRequestStartDrag(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    const self = @fieldParentPtr(Self, "listen_request_start_drag", listener.?);
+    const event = util.voidCast(c.wlr_seat_request_start_drag_event, data.?);
+
+    if (c.wlr_seat_validate_pointer_grab_serial(self.wlr_seat, event.origin, event.serial)) {
+        log.debug(.seat, "starting pointer drag", .{});
+        c.wlr_seat_start_pointer_drag(self.wlr_seat, event.drag, event.serial);
+        return;
+    }
+
+    log.debug(.seat, "ignoring request to start drag, failed to validate serial {}", .{event.serial});
+    c.wlr_data_source_destroy(event.drag.*.source);
+}
+
+fn handleStartDrag(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    const self = @fieldParentPtr(Self, "listen_start_drag", listener.?);
+    const wlr_drag = util.voidCast(c.wlr_drag, data.?);
+
+    if (wlr_drag.icon) |wlr_drag_icon| {
+        const node = util.gpa.create(std.SinglyLinkedList(DragIcon).Node) catch {
+            log.crit(.seat, "out of memory", .{});
+            return;
+        };
+        node.data.init(self, wlr_drag_icon);
+        self.input_manager.server.root.drag_icons.prepend(node);
+    }
+    self.cursor.mode = .passthrough;
 }
