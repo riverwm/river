@@ -25,6 +25,14 @@ const util = @import("util.zig");
 const Server = @import("Server.zig");
 const Mode = @import("Mode.zig");
 
+pub const FocusFollowsCursorMode = enum {
+    disabled,
+    /// Only change focus on entering a surface
+    normal,
+    /// On cursor movement the focus will be updated to the surface below the cursor
+    strict,
+};
+
 /// Color of background in RGBA (alpha should only affect nested sessions)
 background_color: [4]f32 = [_]f32{ 0.0, 0.16862745, 0.21176471, 1.0 }, // Solarized base03
 
@@ -54,6 +62,9 @@ float_filter: std.ArrayList([]const u8),
 
 /// List of app_ids which are allowed to use client side decorations
 csd_filter: std.ArrayList([]const u8),
+
+/// The selected focus_follows_cursor mode
+focus_follows_cursor: FocusFollowsCursorMode = .disabled,
 
 pub fn init() !Self {
     var self = Self{

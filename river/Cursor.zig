@@ -185,6 +185,9 @@ const Mode = union(enum) {
 
     /// Pass an event on to the surface under the cursor, if any.
     fn passthrough(self: *Self, time: u32) void {
+        const root = &self.seat.input_manager.server.root;
+        const config = self.seat.input_manager.server.config;
+
         var sx: f64 = undefined;
         var sy: f64 = undefined;
         if (self.surfaceAt(self.wlr_cursor.x, self.wlr_cursor.y, &sx, &sy)) |wlr_surface| {
@@ -192,8 +195,30 @@ const Mode = union(enum) {
             // events. Note that wlroots won't actually send an enter event if
             // the surface has already been entered.
             if (self.seat.input_manager.inputAllowed(wlr_surface)) {
+                // The focus change must be checked before sending enter events
+                const focus_change = self.seat.wlr_seat.pointer_state.focused_surface != wlr_surface;
+
                 c.wlr_seat_pointer_notify_enter(self.seat.wlr_seat, wlr_surface, sx, sy);
                 c.wlr_seat_pointer_notify_motion(self.seat.wlr_seat, time, sx, sy);
+                if (View.fromWlrSurface(wlr_surface)) |view| {
+                    // Change focus according to config
+                    switch (config.focus_follows_cursor) {
+                        .disabled => {},
+                        .normal => {
+                            // Only refocus when the cursor entered a new surface
+                            if (focus_change) {
+                                self.seat.focus(view);
+                                root.startTransaction();
+                            }
+                        },
+                        .strict => {
+                            self.seat.focus(view);
+                            root.startTransaction();
+                        },
+                    }
+                }
+
+                return;
             }
         } else {
             // There is either no surface under the cursor or input is disallowed
