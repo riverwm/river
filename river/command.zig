@@ -42,6 +42,7 @@ const str_to_impl_fn = [_]struct {
     .{ .name = "exit",                   .impl = @import("command/exit.zig").exit },
     .{ .name = "float-filter-add",       .impl = @import("command/filter.zig").floatFilterAdd },
     .{ .name = "focus-output",           .impl = @import("command/focus_output.zig").focusOutput },
+    .{ .name = "focus-follows-cursor",   .impl = @import("command/focus_follows_cursor.zig").focusFollowsCursor },
     .{ .name = "focus-view",             .impl = @import("command/focus_view.zig").focusView },
     .{ .name = "layout",                 .impl = @import("command/layout.zig").layout },
     .{ .name = "map",                    .impl = @import("command/map.zig").map },
