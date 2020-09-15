@@ -116,7 +116,7 @@ that tag 1 through 9 are visible.
 *enter-mode* _name_
 	Switch to given mode if it exits.
 
-*focus-follows-cursor* _disabled_|_normal_|_strict_
+*focus-follows-cursor* *disabled*|*normal*|*strict*
 	When _disabled_ moving the cursor will not influence the focus. This is the default setting.
 	If set to _normal_ moving the cursor over a window will focus that window.
 	The focus still can be changed and moving the cursor within the (now unfocused) window will not change the focus to that window
