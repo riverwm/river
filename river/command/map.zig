@@ -50,20 +50,23 @@ pub fn map(
     args: []const []const u8,
     out: *?[]const u8,
 ) Error!void {
-    if (args.len < 5) return Error.NotEnoughArguments;
+    const optionals = parseOptionalArgs(args[1..]);
+    // offset caused by optional arguments
+    const offset = optionals.i;
+    if (args.len - offset < 5) return Error.NotEnoughArguments;
 
-    const mode_id = try modeNameToId(allocator, seat, args[1], out);
-    const modifiers = try parseModifiers(allocator, args[2], out);
+    const mode_id = try modeNameToId(allocator, seat, args[1 + offset], out);
+    const modifiers = try parseModifiers(allocator, args[2 + offset], out);
 
     // Parse the keysym
-    const keysym_name = try std.cstr.addNullByte(allocator, args[3]);
+    const keysym_name = try std.cstr.addNullByte(allocator, args[3 + offset]);
     defer allocator.free(keysym_name);
     const keysym = c.xkb_keysym_from_name(keysym_name, .XKB_KEYSYM_CASE_INSENSITIVE);
     if (keysym == c.XKB_KEY_NoSymbol) {
         out.* = try std.fmt.allocPrint(
             allocator,
             "invalid keysym '{}'",
-            .{args[3]},
+            .{args[3 + offset]},
         );
         return Error.Other;
     }
@@ -71,17 +74,17 @@ pub fn map(
     // Check if the mapping already exists
     const mode_mappings = &seat.input_manager.server.config.modes.items[mode_id].mappings;
     for (mode_mappings.items) |existant_mapping| {
-        if (existant_mapping.modifiers == modifiers and existant_mapping.keysym == keysym) {
+        if (existant_mapping.modifiers == modifiers and existant_mapping.keysym == keysym and existant_mapping.release == optionals.release) {
             out.* = try std.fmt.allocPrint(
                 allocator,
                 "a mapping for modifiers '{}' and keysym '{}' already exists",
-                .{ args[2], args[3] },
+                .{ args[2 + offset], args[3 + offset] },
             );
             return Error.Other;
         }
     }
 
-    try mode_mappings.append(try Mapping.init(util.gpa, keysym, modifiers, args[4..]));
+    try mode_mappings.append(try Mapping.init(util.gpa, keysym, modifiers, optionals.release, args[4 + offset ..]));
 }
 
 /// Create a new pointer mapping for a given mode
@@ -175,4 +178,36 @@ fn parseModifiers(allocator: *std.mem.Allocator, modifiers_str: []const u8, out:
         }
     }
     return modifiers;
+}
+
+const OptionalArgsContainer = struct {
+    i: usize,
+    release: bool,
+};
+
+/// Parses optional args (such as -release) and return the index of the first argument that is
+/// not an optional argument
+/// Returns an OptionalArgsContainer with the settings set according to the args
+/// Errors cant occur because it returns as soon as it gets an unknown argument
+fn parseOptionalArgs(args: []const []const u8) OptionalArgsContainer {
+    // Set to defaults
+    var parsed = OptionalArgsContainer{
+        // i is the number of arguments consumed
+        .i = 0,
+        .release = false,
+    };
+
+    var i: usize = 0;
+    for (args) |arg| {
+        if (std.mem.eql(u8, arg, "-release")) {
+            parsed.release = true;
+            i += 1;
+        } else {
+            // Break if the arg is not an option
+            parsed.i = i;
+            break;
+        }
+    }
+
+    return parsed;
 }

@@ -103,27 +103,29 @@ fn handleKey(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     var handled = false;
     // TODO: These modifiers aren't properly handled, see sway's code
     const modifiers = c.wlr_keyboard_get_modifiers(wlr_keyboard);
-    if (event.state == .WLR_KEY_PRESSED) {
-        var i: usize = 0;
-        while (i < translated_keysyms_len) : (i += 1) {
-            if (self.handleBuiltinMapping(translated_keysyms.?[i])) {
-                handled = true;
-                break;
-            } else if (self.seat.handleMapping(translated_keysyms.?[i], modifiers)) {
-                handled = true;
-                break;
-            }
+    const released = event.state == .WLR_KEY_RELEASED;
+
+    var i: usize = 0;
+    while (i < translated_keysyms_len) : (i += 1) {
+        // Handle builtin mapping only when keys are pressed
+        if (!released and self.handleBuiltinMapping(translated_keysyms.?[i])) {
+            handled = true;
+            break;
+        } else if (self.seat.handleMapping(translated_keysyms.?[i], modifiers, released)) {
+            handled = true;
+            break;
         }
-        if (!handled) {
-            i = 0;
-            while (i < raw_keysyms_len) : (i += 1) {
-                if (self.handleBuiltinMapping(raw_keysyms.?[i])) {
-                    handled = true;
-                    break;
-                } else if (self.seat.handleMapping(raw_keysyms.?[i], modifiers)) {
-                    handled = true;
-                    break;
-                }
+    }
+    if (!handled) {
+        i = 0;
+        while (i < raw_keysyms_len) : (i += 1) {
+            // Handle builtin mapping only when keys are pressed
+            if (!released and self.handleBuiltinMapping(raw_keysyms.?[i])) {
+                handled = true;
+                break;
+            } else if (self.seat.handleMapping(raw_keysyms.?[i], modifiers, released)) {
+                handled = true;
+                break;
             }
         }
     }

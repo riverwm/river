@@ -25,10 +25,14 @@ keysym: c.xkb_keysym_t,
 modifiers: u32,
 command_args: []const []const u8,
 
+/// When set to true the mapping will be executed on key release rather than on press
+release: bool,
+
 pub fn init(
     allocator: *std.mem.Allocator,
     keysym: c.xkb_keysym_t,
     modifiers: u32,
+    release: bool,
     command_args: []const []const u8,
 ) !Self {
     const owned_args = try allocator.alloc([]u8, command_args.len);
@@ -40,6 +44,7 @@ pub fn init(
     return Self{
         .keysym = keysym,
         .modifiers = modifiers,
+        .release = release,
         .command_args = owned_args,
     };
 }
