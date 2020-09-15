@@ -262,10 +262,10 @@ pub fn handleViewUnmap(self: *Self, view: *View) void {
 
 /// Handle any user-defined mapping for the passed keysym and modifiers
 /// Returns true if the key was handled
-pub fn handleMapping(self: *Self, keysym: c.xkb_keysym_t, modifiers: u32) bool {
+pub fn handleMapping(self: *Self, keysym: c.xkb_keysym_t, modifiers: u32, released: bool) bool {
     const modes = &self.input_manager.server.config.modes;
     for (modes.items[self.mode_id].mappings.items) |mapping| {
-        if (modifiers == mapping.modifiers and keysym == mapping.keysym) {
+        if (modifiers == mapping.modifiers and keysym == mapping.keysym and released == mapping.release) {
             // Execute the bound command
             const args = mapping.command_args;
             var out: ?[]const u8 = null;
