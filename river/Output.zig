@@ -405,8 +405,8 @@ fn arrangeLayer(
         var new_box: Box = undefined;
 
         // Horizontal alignment
-        const anchor_left = @intCast(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT);
-        const anchor_right = @intCast(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT);
+        const anchor_left = @as(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT);
+        const anchor_right = @as(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT);
         if (current_state.desired_width == 0) {
             const anchor_left_right = anchor_left | anchor_right;
             if (current_state.anchor & anchor_left_right == anchor_left_right) {
@@ -416,10 +416,14 @@ fn arrangeLayer(
             } else {
                 log.err(
                     .layer_shell,
-                    "protocol error: layer surface '{}' requested width 0 without anchoring to opposite edges",
+                    "layer surface '{s}' requested width 0 without setting left and right anchors",
                     .{layer_surface.wlr_layer_surface.namespace},
                 );
-                c.wlr_layer_surface_v1_close(layer_surface.wlr_layer_surface);
+                c.wl_resource_post_error(
+                    layer_surface.wlr_layer_surface.resource,
+                    c.ZWLR_LAYER_SURFACE_V1_ERROR_INVALID_SIZE,
+                    "width 0 requested without setting left and right anchors",
+                );
                 continue;
             }
         } else if (current_state.anchor & anchor_left != 0) {
@@ -435,8 +439,8 @@ fn arrangeLayer(
         }
 
         // Vertical alignment
-        const anchor_top = @intCast(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP);
-        const anchor_bottom = @intCast(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM);
+        const anchor_top = @as(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP);
+        const anchor_bottom = @as(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM);
         if (current_state.desired_height == 0) {
             const anchor_top_bottom = anchor_top | anchor_bottom;
             if (current_state.anchor & anchor_top_bottom == anchor_top_bottom) {
@@ -446,10 +450,14 @@ fn arrangeLayer(
             } else {
                 log.err(
                     .layer_shell,
-                    "protocol error: layer surface '{}' requested height 0 without anchoring to opposite edges",
+                    "layer surface '{s}' requested height 0 without setting top and bottom anchors",
                     .{layer_surface.wlr_layer_surface.namespace},
                 );
-                c.wlr_layer_surface_v1_close(layer_surface.wlr_layer_surface);
+                c.wl_resource_post_error(
+                    layer_surface.wlr_layer_surface.resource,
+                    c.ZWLR_LAYER_SURFACE_V1_ERROR_INVALID_SIZE,
+                    "height 0 requested without setting top and bottom anchors",
+                );
                 continue;
             }
         } else if (current_state.anchor & anchor_top != 0) {
