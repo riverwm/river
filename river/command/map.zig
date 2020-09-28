@@ -43,7 +43,7 @@ const modifier_names = [_]struct {
 /// Create a new mapping for a given mode
 ///
 /// Example:
-/// map normal Mod4+Shift Return spawn alacritty
+/// map normal Mod4+Shift Return spawn foot
 pub fn map(
     allocator: *std.mem.Allocator,
     seat: *Seat,
