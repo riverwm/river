@@ -163,10 +163,15 @@ pub fn applyPending(self: *Self) void {
         self.pending.box = self.float_box;
 
     // If switching to fullscreen set the dimensions to the full area of the output
-    if (!self.current.fullscreen and self.pending.fullscreen)
-        self.pending.box = Box.fromWlrBox(
-            c.wlr_output_layout_get_box(self.output.root.wlr_output_layout, self.output.wlr_output).*,
-        );
+    if (!self.current.fullscreen and self.pending.fullscreen) {
+        const layout_box = c.wlr_output_layout_get_box(self.output.root.wlr_output_layout, self.output.wlr_output);
+        self.pending.box = .{
+            .x = 0,
+            .y = 0,
+            .width = @intCast(u32, layout_box.*.width),
+            .height = @intCast(u32, layout_box.*.height),
+        };
+    }
 
     // If switching from fullscreen to layout, arrange the output to get
     // assigned the proper size.
