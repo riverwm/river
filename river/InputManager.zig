@@ -36,7 +36,6 @@ wlr_idle: *c.wlr_idle,
 wlr_input_inhibit_manager: *c.wlr_input_inhibit_manager,
 
 seats: std.TailQueue(Seat) = std.TailQueue(Seat).init(),
-default_seat: *Seat,
 
 exclusive_client: ?*c.wl_client = null,
 
@@ -53,13 +52,12 @@ pub fn init(self: *Self, server: *Server) !void {
         .wlr_idle = c.wlr_idle_create(server.wl_display) orelse return error.OutOfMemory,
         .wlr_input_inhibit_manager = c.wlr_input_inhibit_manager_create(server.wl_display) orelse
             return error.OutOfMemory,
-        .default_seat = &seat_node.data,
     };
 
-    try seat_node.data.init(self, default_seat_name);
     self.seats.prepend(seat_node);
+    try seat_node.data.init(self, default_seat_name);
 
-    if (build_options.xwayland) c.wlr_xwayland_set_seat(server.wlr_xwayland, self.default_seat.wlr_seat);
+    if (build_options.xwayland) c.wlr_xwayland_set_seat(server.wlr_xwayland, self.defaultSeat().wlr_seat);
 
     // Set up all listeners
     self.listen_inhibit_activate.notify = handleInhibitActivate;
@@ -77,6 +75,10 @@ pub fn deinit(self: *Self) void {
         seat_node.data.deinit();
         util.gpa.destroy(seat_node);
     }
+}
+
+pub fn defaultSeat(self: Self) *Seat {
+    return &self.seats.first.?.data;
 }
 
 /// Must be called whenever a view is unmapped.
@@ -147,5 +149,5 @@ fn handleNewInput(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const device = util.voidCast(c.wlr_input_device, data.?);
 
     // TODO: suport multiple seats
-    self.default_seat.addDevice(device);
+    self.defaultSeat().addDevice(device);
 }

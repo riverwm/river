@@ -196,7 +196,7 @@ fn handleNewXdgSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) v
     log.debug(.server, "new xdg_toplevel", .{});
 
     // The View will add itself to the output's view stack on map
-    const output = self.input_manager.default_seat.focused_output;
+    const output = self.input_manager.defaultSeat().focused_output;
     const node = util.gpa.create(ViewStack(View).Node) catch {
         c.wl_resource_post_no_memory(wlr_xdg_surface.resource);
         return;
@@ -229,23 +229,19 @@ fn handleNewLayerSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C)
     // If the new layer surface does not have an output assigned to it, use the
     // first output or close the surface if none are available.
     if (wlr_layer_surface.output == null) {
-        if (self.root.outputs.first) |node| {
-            const output = &node.data;
-            log.debug(
-                .server,
-                "new layer surface had null output, assigning it to output '{}'",
-                .{output.wlr_output.name},
-            );
-            wlr_layer_surface.output = output.wlr_output;
-        } else {
-            log.err(
-                .server,
-                "no output available for layer surface '{}'",
-                .{wlr_layer_surface.namespace},
-            );
+        const output = self.input_manager.defaultSeat().focused_output;
+        if (output == &self.root.noop_output) {
+            log.err(.server, "no output available for layer surface '{s}'", .{wlr_layer_surface.namespace});
             c.wlr_layer_surface_v1_close(wlr_layer_surface);
             return;
         }
+
+        log.debug(
+            .server,
+            "new layer surface had null output, assigning it to output '{s}'",
+            .{output.wlr_output.name},
+        );
+        wlr_layer_surface.output = output.wlr_output;
     }
 
     // The layer surface will add itself to the proper list of the output on map
@@ -277,7 +273,7 @@ fn handleNewXwaylandSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(
     );
 
     // The View will add itself to the output's view stack on map
-    const output = self.input_manager.default_seat.focused_output;
+    const output = self.input_manager.defaultSeat().focused_output;
     const node = util.gpa.create(ViewStack(View).Node) catch return;
     node.view.init(output, output.current.tags, wlr_xwayland_surface);
 }

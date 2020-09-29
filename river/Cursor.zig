@@ -316,7 +316,7 @@ pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
 
     // If this cursor belongs to the default seat, set the xcursor environment
     // variables and the xwayland cursor theme.
-    if (self.seat == self.seat.input_manager.default_seat) {
+    if (self.seat == self.seat.input_manager.defaultSeat()) {
         const size_str = try std.fmt.allocPrint0(util.gpa, "{}", .{size});
         defer util.gpa.free(size_str);
         if (c.setenv("XCURSOR_SIZE", size_str, 1) < 0) return error.OutOfMemory;
