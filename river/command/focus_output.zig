@@ -50,4 +50,5 @@ pub fn focusOutput(
     });
 
     seat.focus(null);
+    root.startTransaction();
 }
