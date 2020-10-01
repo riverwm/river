@@ -35,6 +35,8 @@ const SurfaceRenderData = struct {
     output_x: i32,
     output_y: i32,
 
+    opacity: f32,
+
     when: *c.timespec,
 };
 
@@ -66,7 +68,7 @@ pub fn renderOutput(output: *Output) void {
     if (fullscreen_view) |view| {
         // Always clear with solid black for fullscreen
         c.wlr_renderer_clear(wlr_renderer, &[_]f32{ 0, 0, 0, 1 });
-        renderView(output.*, view, &now);
+        renderView(output.*, view, &now, 1.0);
         if (build_options.xwayland) renderXwaylandUnmanaged(output.*, &now);
     } else {
         // No fullscreen view, so render normal layers/views
@@ -81,7 +83,7 @@ pub fn renderOutput(output: *Output) void {
             // Focused views are rendered on top of normal views, skip them for now
             if (view.current.focus != 0) continue;
 
-            renderView(output.*, view, &now);
+            renderView(output.*, view, &now, 1.0);
             if (view.draw_borders) renderBorders(output.*, view, &now);
         }
 
@@ -91,7 +93,7 @@ pub fn renderOutput(output: *Output) void {
             // Skip unfocused views since we already rendered them
             if (view.current.focus == 0) continue;
 
-            renderView(output.*, view, &now);
+            renderView(output.*, view, &now, 0.7);
             if (view.draw_borders) renderBorders(output.*, view, &now);
         }
 
@@ -137,6 +139,7 @@ fn renderLayer(output: Output, layer: std.TailQueue(LayerSurface), now: *c.times
             .output = &output,
             .output_x = layer_surface.box.x,
             .output_y = layer_surface.box.y,
+            .opacity = 1.0,
             .when = now,
         };
         c.wlr_layer_surface_v1_for_each_surface(
@@ -147,7 +150,7 @@ fn renderLayer(output: Output, layer: std.TailQueue(LayerSurface), now: *c.times
     }
 }
 
-fn renderView(output: Output, view: *View, now: *c.timespec) void {
+fn renderView(output: Output, view: *View, now: *c.timespec, opacity: f32) void {
     // If we have saved buffers, we are in the middle of a transaction
     // and need to render those buffers until the transaction is complete.
     if (view.saved_buffers.items.len != 0) {
@@ -162,6 +165,7 @@ fn renderView(output: Output, view: *View, now: *c.timespec) void {
                     .height = @intCast(c_int, saved_buffer.box.height),
                 },
                 saved_buffer.transform,
+                opacity,
             );
     } else {
         // Since there is no stashed buffer, we are not in the middle of
@@ -170,6 +174,7 @@ fn renderView(output: Output, view: *View, now: *c.timespec) void {
             .output = &output,
             .output_x = view.current.box.x - view.surface_box.x,
             .output_y = view.current.box.y - view.surface_box.y,
+            .opacity = opacity,
             .when = now,
         };
 
@@ -190,6 +195,7 @@ fn renderDragIcons(output: Output, now: *c.timespec) void {
                 drag_icon.wlr_drag_icon.surface.*.sx - output_box.*.x,
             .output_y = @floatToInt(i32, drag_icon.seat.cursor.wlr_cursor.y) +
                 drag_icon.wlr_drag_icon.surface.*.sy - output_box.*.y,
+            .opacity = 1.0,
             .when = now,
         };
         c.wlr_surface_for_each_surface(drag_icon.wlr_drag_icon.surface, renderSurfaceIterator, &rdata);
@@ -208,6 +214,7 @@ fn renderXwaylandUnmanaged(output: Output, now: *c.timespec) void {
             .output = &output,
             .output_x = wlr_xwayland_surface.x - output_box.*.x,
             .output_y = wlr_xwayland_surface.y - output_box.*.y,
+            .opacity = 1.0,
             .when = now,
         };
         c.wlr_surface_for_each_surface(wlr_xwayland_surface.surface, renderSurfaceIterator, &rdata);
@@ -233,6 +240,7 @@ fn renderSurfaceIterator(
             .height = surface.?.current.height,
         },
         surface.?.current.transform,
+        rdata.opacity,
     );
 
     c.wlr_surface_send_frame_done(surface, rdata.when);
@@ -245,6 +253,7 @@ fn renderTexture(
     wlr_texture: ?*c.wlr_texture,
     wlr_box: c.wlr_box,
     transform: c.wl_output_transform,
+    opacity: f32,
 ) void {
     const texture = wlr_texture orelse return;
     var box = wlr_box;
@@ -262,7 +271,7 @@ fn renderTexture(
 
     // This takes our matrix, the texture, and an alpha, and performs the actual
     // rendering on the GPU.
-    _ = c.wlr_render_texture_with_matrix(output.getRenderer(), texture, &matrix, 1.0);
+    _ = c.wlr_render_texture_with_matrix(output.getRenderer(), texture, &matrix, opacity);
 }
 
 fn renderBorders(output: Output, view: *View, now: *c.timespec) void {
