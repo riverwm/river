@@ -61,8 +61,8 @@ const str_to_impl_fn = [_]struct {
     .{ .name = "view-padding",           .impl = @import("command/config.zig").viewPadding },
     .{ .name = "xcursor-theme",          .impl = @import("command/xcursor_theme.zig").xcursorTheme },
     .{ .name = "zoom",                   .impl = @import("command/zoom.zig").zoom },
-    .{ .name = "focused-view-opacity",   .impl = @import("command/focused_view_opacity.zig").opacity },
-    .{ .name = "focused-view-opacity-delta",   .impl = @import("command/focused_view_opacity.zig").delta },
+    .{ .name = "focused-view-opacity",   .impl = @import("command/focused_view_opacity.zig").opacity_cmd },
+    .{ .name = "focused-view-opacity-delta",   .impl = @import("command/focused_view_opacity.zig").delta_cmd },
 };
 // zig fmt: on
 

@@ -22,7 +22,7 @@ const Error = @import("../command.zig").Error;
 const Output = @import("../Output.zig");
 const Seat = @import("../Seat.zig");
 
-pub fn opacity(
+pub fn opacity_cmd(
     allocator: *std.mem.Allocator,
     seat: *Seat,
     args: []const []const u8,
@@ -31,14 +31,9 @@ pub fn opacity(
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
 
-    const op = std.fmt.parseFloat(f32, args[1]);
-    if (op) |num| {
-        Config.focused_view_opacity = num;
-    } else |err| {
-        return Error.InvalidFloat;
-    }
+    Config.focused_view_opacity = std.fmt.parseFloat(f32, args[1]) catch |err| return Error.InvalidFloat;
 }
-pub fn delta(
+pub fn delta_cmd(
     allocator: *std.mem.Allocator,
     seat: *Seat,
     args: []const []const u8,
@@ -47,10 +42,5 @@ pub fn delta(
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
 
-    const del = std.fmt.parseFloat(f32, args[1]);
-    if (del) |num| {
-        Config.focused_view_opacity_delta = num;
-    } else |err| {
-        return Error.InvalidFloat;
-    }
+    Config.focused_view_opacity_delta = std.fmt.parseFloat(f32, args[1]) catch |err| return Error.InvalidFloat;
 }
