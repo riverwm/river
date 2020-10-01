@@ -94,3 +94,16 @@ pub fn deinit(self: Self) void {
     self.float_filter.deinit();
     self.csd_filter.deinit();
 }
+
+pub var focused_view_opacity_delta : f32 = 0.0;
+var _last_get_time : u64 = 0;
+pub var focused_view_opacity : f32 = 1.0;
+pub fn get_focused_view_opacity() f32 {
+    var t : u64 = std.time.milliTimestamp();
+    var d = @floatCast(f32, @intToFloat(f64, t - _last_get_time) / 1000.0);
+    _last_get_time = t;
+    focused_view_opacity += d * focused_view_opacity_delta;
+    if (focused_view_opacity > 1.0) { focused_view_opacity = 1.0; }
+    if (focused_view_opacity < 0.0) { focused_view_opacity = 0.0; }
+    return focused_view_opacity;
+}

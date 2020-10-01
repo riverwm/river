@@ -61,6 +61,8 @@ const str_to_impl_fn = [_]struct {
     .{ .name = "view-padding",           .impl = @import("command/config.zig").viewPadding },
     .{ .name = "xcursor-theme",          .impl = @import("command/xcursor_theme.zig").xcursorTheme },
     .{ .name = "zoom",                   .impl = @import("command/zoom.zig").zoom },
+    .{ .name = "focused-view-opacity",   .impl = @import("command/focused_view_opacity.zig").opacity },
+    .{ .name = "focused-view-opacity-delta",   .impl = @import("command/focused_view_opacity.zig").delta },
 };
 // zig fmt: on
 
@@ -73,6 +75,7 @@ pub const Error = error{
     InvalidCharacter,
     InvalidDirection,
     InvalidRgba,
+    InvalidFloat,
     UnknownOption,
     OutOfMemory,
     Other,
@@ -113,6 +116,7 @@ pub fn errToMsg(err: Error) [:0]const u8 {
         Error.InvalidCharacter => "invalid character in argument",
         Error.InvalidDirection => "invalid direction. Must be 'next' or 'previous'",
         Error.InvalidRgba => "invalid color format, must be #RRGGBB or #RRGGBBAA",
+        Error.InvalidFloat => "invalid float",
         Error.OutOfMemory => "out of memory",
         Error.Other => unreachable,
     };

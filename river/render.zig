@@ -27,6 +27,7 @@ const Output = @import("Output.zig");
 const Server = @import("Server.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
+const Config = @import("Config.zig");
 
 const SurfaceRenderData = struct {
     output: *const Output,
@@ -93,7 +94,7 @@ pub fn renderOutput(output: *Output) void {
             // Skip unfocused views since we already rendered them
             if (view.current.focus == 0) continue;
 
-            renderView(output.*, view, &now, 0.7);
+            renderView(output.*, view, &now, Config.get_focused_view_opacity());
             if (view.draw_borders) renderBorders(output.*, view, &now);
         }
 
