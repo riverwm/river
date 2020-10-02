@@ -31,6 +31,7 @@ const Control = @import("Control.zig");
 const DecorationManager = @import("DecorationManager.zig");
 const InputManager = @import("InputManager.zig");
 const LayerSurface = @import("LayerSurface.zig");
+const LayoutManager = @import("LayoutManager.zig");
 const Output = @import("Output.zig");
 const Root = @import("Root.zig");
 const StatusManager = @import("StatusManager.zig");
@@ -66,6 +67,7 @@ config: Config,
 control: Control,
 status_manager: StatusManager,
 options_manager: OptionsManager,
+layout_manager: LayoutManager,
 
 pub fn init(self: *Self) !void {
     self.wl_server = try wl.Server.create();
@@ -119,6 +121,7 @@ pub fn init(self: *Self) !void {
     try self.input_manager.init(self);
     try self.control.init(self);
     try self.status_manager.init(self);
+    try self.layout_manager.init(self);
 
     // These all free themselves when the wl_server is destroyed
     _ = try wlr.DataDeviceManager.create(self.wl_server);

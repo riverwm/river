@@ -19,6 +19,7 @@ const Self = @This();
 
 const build_options = @import("build_options");
 const std = @import("std");
+const assert = std.debug.assert;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
@@ -76,10 +77,11 @@ xwayland_unmanaged_views: if (build_options.xwayland)
 else
     void = if (build_options.xwayland) .{},
 
+/// Number of layout demands pending before the transaction may be started.
+pending_layout_demands: u32 = 0,
 /// Number of pending configures sent in the current transaction.
 /// A value of 0 means there is no current transaction.
 pending_configures: u32 = 0,
-
 /// Handles timeout of transactions
 transaction_timer: *wl.EventSource,
 
@@ -89,12 +91,16 @@ pub fn init(self: *Self, server: *Server) !void {
 
     _ = try wlr.XdgOutputManagerV1.create(server.wl_server, output_layout);
 
+    const event_loop = server.wl_server.getEventLoop();
+    const transaction_timer = try event_loop.addTimer(*Self, handleTransactionTimeout, self);
+    errdefer transaction_timer.remove();
+
     self.* = .{
         .server = server,
         .output_layout = output_layout,
         .output_manager = try wlr.OutputManagerV1.create(server.wl_server),
         .power_manager = try wlr.OutputPowerManagerV1.create(server.wl_server),
-        .transaction_timer = try self.server.wl_server.getEventLoop().addTimer(*Self, handleTimeout, self),
+        .transaction_timer = transaction_timer,
         .noop_output = undefined,
     };
 
@@ -249,9 +255,33 @@ pub fn arrangeAll(self: *Self) void {
     while (it) |node| : (it = node.next) node.data.arrangeViews();
 }
 
+/// Record the number of currently pending layout demands so that a transaction
+/// can be started once all are either complete or have timed out.
+pub fn trackLayoutDemands(self: *Self) void {
+    self.pending_layout_demands = 0;
+
+    var it = self.outputs.first;
+    while (it) |node| : (it = node.next) {
+        if (node.data.layout_demand != null) self.pending_layout_demands += 1;
+    }
+    assert(self.pending_layout_demands > 0);
+}
+
+/// This function is used to inform the transaction system that a layout demand
+/// has either been completed or timed out. If it was the last pending layout
+/// demand in the current sequence, a transaction is started.
+pub fn notifyLayoutDemandDone(self: *Self) void {
+    self.pending_layout_demands -= 1;
+    if (self.pending_layout_demands == 0) self.startTransaction();
+}
+
 /// Initiate an atomic change to the layout. This change will not be
 /// applied until all affected clients ack a configure and commit a buffer.
 pub fn startTransaction(self: *Self) void {
+    // If one or more layout demands are currently in progress, postpone
+    // transactions until they complete. Every frame must be perfect.
+    if (self.pending_layout_demands > 0) return;
+
     // If a new transaction is started while another is in progress, we need
     // to reset the pending count to 0 and clear serials from the views
     self.pending_configures = 0;
@@ -263,10 +293,7 @@ pub fn startTransaction(self: *Self) void {
         while (view_it) |view_node| : (view_it = view_node.next) {
             const view = &view_node.view;
 
-            if (view.destroying) {
-                if (view.saved_buffers.items.len == 0) view.saveBuffers();
-                continue;
-            }
+            if (view.destroying) continue;
 
             if (view.shouldTrackConfigure()) {
                 // Clear the serial in case this transaction is interrupting a prior one.
@@ -310,7 +337,7 @@ pub fn startTransaction(self: *Self) void {
     }
 }
 
-fn handleTimeout(self: *Self) callconv(.C) c_int {
+fn handleTransactionTimeout(self: *Self) callconv(.C) c_int {
     std.log.scoped(.transaction).err("timeout occurred, some imperfect frames may be shown", .{});
 
     self.pending_configures = 0;
@@ -333,7 +360,7 @@ pub fn notifyConfigured(self: *Self) void {
 /// layout. Should only be called after all clients have configured for
 /// the new layout. If called early imperfect frames may be drawn.
 fn commitTransaction(self: *Self) void {
-    std.debug.assert(self.pending_configures == 0);
+    assert(self.pending_configures == 0);
 
     // Iterate over all views of all outputs
     var output_it = self.outputs.first;

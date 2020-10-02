@@ -182,6 +182,10 @@ fn handleMap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurfa
     view.float_box.y = std.math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.height) -
         @intCast(i32, view.float_box.height), 2));
 
+    // Also use the view's  "natural" size as the initial regular dimensions,
+    // for the case that it does not get arranged by a lyaout.
+    view.pending.box = view.float_box;
+
     const state = &toplevel.current;
     const has_fixed_size = state.min_width != 0 and state.min_height != 0 and
         (state.min_width == state.max_width or state.min_height == state.max_height);
@@ -296,14 +300,16 @@ fn handleRequestMove(
 ) void {
     const self = @fieldParentPtr(Self, "request_move", listener);
     const seat = @intToPtr(*Seat, event.seat.seat.data);
-    if (self.view.pending.float) seat.cursor.enterMode(.move, self.view);
+    if (self.view.pending.float or self.view.output.current.layout == null)
+        seat.cursor.enterMode(.move, self.view);
 }
 
 /// Called when the client asks to be resized via the cursor.
 fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), event: *wlr.XdgToplevel.event.Resize) void {
     const self = @fieldParentPtr(Self, "request_resize", listener);
     const seat = @intToPtr(*Seat, event.seat.seat.data);
-    if (self.view.pending.float) seat.cursor.enterMode(.resize, self.view);
+    if (self.view.pending.float or self.view.output.current.layout == null)
+        seat.cursor.enterMode(.resize, self.view);
 }
 
 /// Called when the client sets / updates its title

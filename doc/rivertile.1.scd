@@ -6,32 +6,19 @@ rivertile - Tiled layout generator for river
 
 # SYNOPSIS
 
-*rivertile* *left*|*right*|*top*|*bottom* [args passed by river]
+*rivertile*
 
 # DESCRIPTION
 
-*rivertile* is a layout generator for river. It produces tiled layouts with
-split main/secondary stacks in four configurable orientations.
+*rivertile* is a layout client for river. It provides four tiled layouts per
+output with split main/secondary stacks with the main area in different
+positions.
 
-# OPTIONS
+The namespaces of the four layouts are "tile-top", "tile-right", "tile-bottom"
+and "tile-left", corresponding to the position of the main area.
 
-*left*
-	Place the main stack on the left side of the output.
-
-*right*
-	Place the main stack on the right side of the output.
-
-*top*
-	Place the main stack at the top of the output.
-
-*bottom*
-	Place the main stack at the bottom of the output.
-
-# EXAMPLE
-
-Set river's layout to *rivertile*'s *left* layout using riverctl
-
-	riverctl layout rivertile left
+*rivertile* uses the *main_amount*, *main_factor*, *view_padding* and
+*outer_padding* options.
 
 # AUTHORS
 
@@ -41,4 +28,5 @@ source contributors. For more information about river's development, see
 
 # SEE ALSO
 
-*river-layouts*(7), *river*(1), *riverctl*(1)
+*river*(1), *riverctl*(1)
+

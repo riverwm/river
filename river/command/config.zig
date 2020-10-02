@@ -35,36 +35,6 @@ pub fn borderWidth(
     server.root.startTransaction();
 }
 
-pub fn viewPadding(
-    allocator: *std.mem.Allocator,
-    seat: *Seat,
-    args: []const []const u8,
-    out: *?[]const u8,
-) Error!void {
-    if (args.len < 2) return Error.NotEnoughArguments;
-    if (args.len > 2) return Error.TooManyArguments;
-
-    const server = seat.input_manager.server;
-    server.config.view_padding = try std.fmt.parseInt(u32, args[1], 10);
-    server.root.arrangeAll();
-    server.root.startTransaction();
-}
-
-pub fn outerPadding(
-    allocator: *std.mem.Allocator,
-    seat: *Seat,
-    args: []const []const u8,
-    out: *?[]const u8,
-) Error!void {
-    if (args.len < 2) return Error.NotEnoughArguments;
-    if (args.len > 2) return Error.TooManyArguments;
-
-    const server = seat.input_manager.server;
-    server.config.outer_padding = try std.fmt.parseInt(u32, args[1], 10);
-    server.root.arrangeAll();
-    server.root.startTransaction();
-}
-
 pub fn backgroundColor(
     allocator: *std.mem.Allocator,
     seat: *Seat,

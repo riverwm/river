@@ -44,12 +44,6 @@ border_color_focused: [4]f32 = [_]f32{ 0.57647059, 0.63137255, 0.63137255, 1.0 }
 /// Color of border of unfocused window in RGBA
 border_color_unfocused: [4]f32 = [_]f32{ 0.34509804, 0.43137255, 0.45882353, 1.0 }, // Solarized base0
 
-/// Amount of view padding in pixels
-view_padding: u32 = 8,
-
-/// Amount of padding arount the outer edge of the layout in pixels
-outer_padding: u32 = 8,
-
 /// Map of keymap mode name to mode id
 mode_to_id: std.StringHashMap(usize),
 

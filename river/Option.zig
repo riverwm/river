@@ -36,6 +36,17 @@ pub const Value = union(enum) {
     uint: u32,
     fixed: wl.Fixed,
     string: ?[*:0]const u8,
+
+    fn dupe(value: Value) !Value {
+        return switch (value) {
+            .string => |v| Value{ .string = if (v) |s| try util.gpa.dupeZ(u8, mem.span(s)) else null },
+            else => value,
+        };
+    }
+
+    fn deinit(value: *Value) void {
+        if (value.* == .string) if (value.string) |s| util.gpa.free(mem.span(s));
+    }
 };
 
 options_manager: *OptionsManager,
@@ -43,24 +54,31 @@ link: wl.list.Link = undefined,
 
 output: ?*Output,
 key: [*:0]const u8,
-value: Value = .unset,
+value: Value,
 
-/// Emitted whenever the value of the option changes.
-update: wl.Signal(*Self) = undefined,
+event: struct {
+    /// Emitted whenever the value of the option changes.
+    update: wl.Signal(*Self),
+} = undefined,
 
 handles: wl.list.Head(zriver.OptionHandleV1, null) = undefined,
 
-pub fn create(options_manager: *OptionsManager, output: ?*Output, key: [*:0]const u8) !*Self {
+/// Allocate a new option, duping the provided key and value
+pub fn create(options_manager: *OptionsManager, output: ?*Output, key: [*:0]const u8, value: Value) !*Self {
     const self = try util.gpa.create(Self);
     errdefer util.gpa.destroy(self);
+
+    var owned_value = try value.dupe();
+    errdefer owned_value.deinit();
 
     self.* = .{
         .options_manager = options_manager,
         .output = output,
         .key = try util.gpa.dupeZ(u8, mem.span(key)),
+        .value = owned_value,
     };
     self.handles.init();
-    self.update.init();
+    self.event.update.init();
 
     options_manager.options.append(self);
 
@@ -83,31 +101,23 @@ pub fn set(self: *Self, value: Value) !void {
     std.debug.assert(value != .unset);
     if (self.value != .unset and meta.activeTag(value) != meta.activeTag(self.value)) return;
 
-    if (self.value == .unset and value == .string) {
-        self.value = .{
-            .string = if (value.string) |s| (try util.gpa.dupeZ(u8, mem.span(s))).ptr else null,
-        };
-    } else if (self.value == .string and
+    if (switch (self.value) {
+        .unset => true,
         // TODO: std.mem needs a good way to compare optional sentinel pointers
-        (((self.value.string == null) != (value.string == null)) or
-        (self.value.string != null and value.string != null and
-        std.cstr.cmp(self.value.string.?, value.string.?) != 0)))
-    {
-        const owned_string = if (value.string) |s| (try util.gpa.dupeZ(u8, mem.span(s))).ptr else null;
-        if (self.value.string) |s| util.gpa.free(mem.span(s));
-        self.value.string = owned_string;
-    } else if (self.value == .unset or (self.value != .string and !std.meta.eql(self.value, value))) {
-        self.value = value;
-    } else {
-        // The value was not changed
-        return;
+        .string => ((self.value.string == null) != (value.string == null)) or
+            (self.value.string != null and value.string != null and
+            std.cstr.cmp(self.value.string.?, value.string.?) != 0),
+        else => !std.meta.eql(self.value, value),
+    }) {
+        self.value.deinit();
+        self.value = try value.dupe();
+
+        var it = self.handles.iterator(.forward);
+        while (it.next()) |handle| self.sendValue(handle);
+
+        // Call listeners, if any.
+        self.event.update.emit(self);
     }
-
-    var it = self.handles.iterator(.forward);
-    while (it.next()) |handle| self.sendValue(handle);
-
-    // Call listeners, if any.
-    self.update.emit(self);
 }
 
 fn sendValue(self: Self, handle: *zriver.OptionHandleV1) void {

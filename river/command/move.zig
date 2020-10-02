@@ -134,8 +134,13 @@ pub fn resize(
 }
 
 fn apply(view: *View) void {
-    // Set the view to floating but keep the position and dimensions
-    view.pending.float = true;
+    // Set the view to floating but keep the position and dimensions, if their
+    // dimensions are set by a layout client. If however the views are
+    // unarranged, leave them as non-floating so the next active layout can
+    // affect them.
+    if (view.output.current.layout != null)
+        view.pending.float = true;
+
     view.float_box = view.pending.box;
 
     view.applyPending();

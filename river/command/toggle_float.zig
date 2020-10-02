@@ -33,6 +33,12 @@ pub fn toggleFloat(
     if (seat.focused == .view) {
         const view = seat.focused.view;
 
+        // If views are unarranged, don't allow changing the views float status.
+        // It would just lead to confusing because this state would not be
+        // visible immediately, only after a layout is connected.
+        if (view.output.current.layout == null)
+            return;
+
         // Don't float fullscreen views
         if (view.pending.fullscreen) return;
 
