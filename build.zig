@@ -66,6 +66,7 @@ pub fn build(b: *zbs.Builder) !void {
     scanner.addProtocolPath("protocol/river-control-unstable-v1.xml");
     scanner.addProtocolPath("protocol/river-options-unstable-v1.xml");
     scanner.addProtocolPath("protocol/river-status-unstable-v1.xml");
+    scanner.addProtocolPath("protocol/river-layout-v1.xml");
     scanner.addProtocolPath("protocol/wlr-layer-shell-unstable-v1.xml");
     scanner.addProtocolPath("protocol/wlr-output-power-management-unstable-v1.xml");
 
@@ -100,6 +101,14 @@ pub fn build(b: *zbs.Builder) !void {
         const rivertile = b.addExecutable("rivertile", "rivertile/main.zig");
         rivertile.setTarget(target);
         rivertile.setBuildMode(mode);
+
+        rivertile.step.dependOn(&scanner.step);
+        rivertile.addPackage(scanner.getPkg());
+        rivertile.linkLibC();
+        rivertile.linkSystemLibrary("wayland-client");
+
+        scanner.addCSource(rivertile);
+
         rivertile.install();
     }
 
@@ -195,7 +204,6 @@ const ScdocStep = struct {
         "doc/river.1.scd",
         "doc/riverctl.1.scd",
         "doc/rivertile.1.scd",
-        "doc/river-layouts.7.scd",
     };
 
     builder: *zbs.Builder,

@@ -87,7 +87,7 @@ fn handleRequest(
                     break option;
                 }
             } else
-                Option.create(self, output, req.key) catch {
+                Option.create(self, output, req.key, .unset) catch {
                     options_manager.getClient().postNoMemory();
                     return;
                 };

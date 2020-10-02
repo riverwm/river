@@ -31,6 +31,8 @@ const util = @import("util.zig");
 
 const Box = @import("Box.zig");
 const LayerSurface = @import("LayerSurface.zig");
+const Layout = @import("Layout.zig");
+const LayoutDemand = @import("LayoutDemand.zig");
 const Root = @import("Root.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
@@ -41,9 +43,18 @@ const Option = @import("Option.zig");
 const State = struct {
     /// A bit field of focused tags
     tags: u32,
-};
 
-const log = std.log.scoped(.layout);
+    /// Active layout, or null if views are un-arranged.
+    ///
+    /// If null, views which are manually moved or resized (with the pointer or
+    /// or command) will not be automatically set to floating. Everything is
+    /// already floating, so this would be an unexpected change of a views state
+    /// the user will only notice once a layout affects the views. So instead we
+    /// "snap back" all manually moved views the next time a layout is active.
+    /// This is similar to dwms behvaviour. Note that this of course does not
+    /// affect already floating views.
+    layout: ?*Layout = null,
+};
 
 root: *Root,
 wlr_output: *wlr.Output,
@@ -63,16 +74,11 @@ views: ViewStack(View) = .{},
 current: State = State{ .tags = 1 << 0 },
 pending: State = State{ .tags = 1 << 0 },
 
-/// Number of views in "main" section of the screen.
-main_count: u32 = 1,
+/// The currently active LayoutDemand
+layout_demand: ?LayoutDemand = null,
 
-/// Percentage of the total screen that the "main" section takes up.
-main_factor: f64 = 0.6,
-
-/// Current layout of the output. If it is "full", river will use the full
-/// layout. Otherwise river assumes it contains a string which, when executed
-/// with sh, will result in a layout.
-layout: []const u8,
+/// List of all layouts
+layouts: std.TailQueue(Layout) = .{},
 
 /// Determines where new views will be attached to the view stack.
 attach_mode: AttachMode = .top,
@@ -88,8 +94,11 @@ enable: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleEnable),
 frame: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleFrame),
 mode: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleMode),
 
-// Listeners for options
+layout_option: *Option,
+
+/// Listeners for options
 output_title: wl.Listener(*Option) = wl.Listener(*Option).init(handleTitleChange),
+layout_change: wl.Listener(*Option) = wl.Listener(*Option).init(handleLayoutChange),
 
 pub fn init(self: *Self, root: *Root, wlr_output: *wlr.Output) !void {
     // Some backends don't have modes. DRM+KMS does, and we need to set a mode
@@ -103,14 +112,11 @@ pub fn init(self: *Self, root: *Root, wlr_output: *wlr.Output) !void {
         try wlr_output.commit();
     }
 
-    const layout = try std.mem.dupe(util.gpa, u8, "full");
-    errdefer util.gpa.free(layout);
-
     self.* = .{
         .root = root,
         .wlr_output = wlr_output,
-        .layout = layout,
         .usable_box = undefined,
+        .layout_option = undefined,
     };
     wlr_output.data = @ptrToInt(self);
 
@@ -146,9 +152,22 @@ pub fn init(self: *Self, root: *Root, wlr_output: *wlr.Output) !void {
         };
     }
 
+    // Set the default title of this output
     var buf: ["river - ".len + wlr_output.name.len + 1]u8 = undefined;
     const default_title = fmt.bufPrintZ(&buf, "river - {}", .{mem.spanZ(&wlr_output.name)}) catch unreachable;
-    try self.defaultOption("output_title", .{ .string = default_title.ptr }, &self.output_title);
+    self.setTitle(default_title);
+
+    // Create all default output options
+    const options_manager = &root.server.options_manager;
+    self.layout_option = try Option.create(options_manager, self, "layout", .{ .string = null });
+    const title_option = try Option.create(options_manager, self, "output_title", .{ .string = default_title.ptr });
+    _ = try Option.create(options_manager, self, "main_amount", .{ .uint = 1 });
+    _ = try Option.create(options_manager, self, "main_factor", .{ .fixed = wl.Fixed.fromDouble(0.6) });
+    _ = try Option.create(options_manager, self, "view_padding", .{ .uint = 10 });
+    _ = try Option.create(options_manager, self, "outer_padding", .{ .uint = 10 });
+
+    self.layout_option.event.update.add(&self.layout_change);
+    title_option.event.update.add(&self.output_title);
 }
 
 pub fn getLayer(self: *Self, layer: zwlr.LayerShellV1.Layer) *std.TailQueue(LayerSurface) {
@@ -160,157 +179,50 @@ pub fn sendViewTags(self: Self) void {
     while (it) |node| : (it = node.next) node.data.sendViewTags();
 }
 
-/// The single build in layout, which makes all views use the maximum available
-/// space.
-fn layoutFull(self: *Self, visible_count: u32) void {
-    const border_width = self.root.server.config.border_width;
-    const view_padding = self.root.server.config.view_padding;
-    const outer_padding = self.root.server.config.outer_padding;
-    const xy_offset = outer_padding + border_width + view_padding;
-
-    var full_box: Box = .{
-        .x = self.usable_box.x + @intCast(i32, xy_offset),
-        .y = self.usable_box.y + @intCast(i32, xy_offset),
-        .width = self.usable_box.width - (2 * xy_offset),
-        .height = self.usable_box.height - (2 * xy_offset),
-    };
-
-    var it = ViewStack(View).iter(self.views.first, .forward, self.pending.tags, arrangeFilter);
-    while (it.next()) |view| {
-        view.pending.box = full_box;
-        view.applyConstraints();
-    }
-}
-
-const LayoutError = error{
-    BadExitCode,
-    WrongViewCount,
-};
-
-/// Parse 4 integers separated by spaces into a Box
-fn parseBox(buffer: []const u8) !Box {
-    var it = std.mem.split(buffer, " ");
-
-    const box = Box{
-        .x = try std.fmt.parseInt(i32, it.next() orelse return error.NotEnoughArguments, 10),
-        .y = try std.fmt.parseInt(i32, it.next() orelse return error.NotEnoughArguments, 10),
-        .width = try std.fmt.parseInt(u32, it.next() orelse return error.NotEnoughArguments, 10),
-        .height = try std.fmt.parseInt(u32, it.next() orelse return error.NotEnoughArguments, 10),
-    };
-
-    if (it.next() != null) return error.TooManyArguments;
-
-    return box;
-}
-
-test "parse window configuration" {
-    const testing = @import("std").testing;
-    const box = try parseBox("5 10 100 200");
-    testing.expect(box.x == 5);
-    testing.expect(box.y == 10);
-    testing.expect(box.width == 100);
-    testing.expect(box.height == 200);
-}
-
-/// Execute an external layout function, parse its output and apply the layout
-/// to the output.
-fn layoutExternal(self: *Self, visible_count: u32) !void {
-    const config = self.root.server.config;
-    const xy_offset = @intCast(i32, config.border_width + config.outer_padding + config.view_padding);
-    const delta_size = (config.border_width + config.view_padding) * 2;
-    const layout_width = @intCast(u32, self.usable_box.width) - config.outer_padding * 2;
-    const layout_height = @intCast(u32, self.usable_box.height) - config.outer_padding * 2;
-
-    var arena = std.heap.ArenaAllocator.init(util.gpa);
-    defer arena.deinit();
-
-    // Assemble command
-    const layout_command = try std.fmt.allocPrint0(&arena.allocator, "{} {} {} {d} {} {}", .{
-        self.layout,
-        visible_count,
-        self.main_count,
-        self.main_factor,
-        layout_width,
-        layout_height,
-    });
-    const cmd = [_:null]?[*:0]const u8{ "/bin/sh", "-c", layout_command, null };
-    const stdout_pipe = try std.os.pipe();
-
-    const pid = try std.os.fork();
-    if (pid == 0) {
-        std.os.dup2(stdout_pipe[1], std.os.STDOUT_FILENO) catch c._exit(1);
-        std.os.close(stdout_pipe[0]);
-        std.os.close(stdout_pipe[1]);
-        std.os.execveZ("/bin/sh", &cmd, std.c.environ) catch c._exit(1);
-    }
-    std.os.close(stdout_pipe[1]);
-    const stdout = std.fs.File{ .handle = stdout_pipe[0] };
-    defer stdout.close();
-
-    // TODO abort after a timeout
-    const ret = std.os.waitpid(pid, 0);
-    if (!std.os.WIFEXITED(ret.status) or std.os.WEXITSTATUS(ret.status) != 0)
-        return LayoutError.BadExitCode;
-
-    const buffer = try stdout.inStream().readAllAlloc(&arena.allocator, 1024);
-
-    // Parse layout command output
-    var view_boxen = std.ArrayList(Box).init(&arena.allocator);
-    var parse_it = std.mem.split(buffer, "\n");
-    while (parse_it.next()) |token| {
-        if (std.mem.eql(u8, token, "")) break;
-        var box = try parseBox(token);
-        box.x += self.usable_box.x + xy_offset;
-        box.y += self.usable_box.y + xy_offset;
-
-        if (box.width > delta_size) box.width -= delta_size;
-        if (box.height > delta_size) box.height -= delta_size;
-
-        try view_boxen.append(box);
-    }
-
-    if (view_boxen.items.len != visible_count) return LayoutError.WrongViewCount;
-
-    // Apply window configuration to views
-    var i: u32 = 0;
-    var view_it = ViewStack(View).iter(self.views.first, .forward, self.pending.tags, arrangeFilter);
-    while (view_it.next()) |view| : (i += 1) {
-        view.pending.box = view_boxen.items[i];
-        view.applyConstraints();
-    }
-}
-
-fn arrangeFilter(view: *View, filter_tags: u32) bool {
+pub fn arrangeFilter(view: *View, filter_tags: u32) bool {
     return !view.destroying and !view.pending.float and
-        !view.pending.fullscreen and view.pending.tags & filter_tags != 0;
+        view.pending.tags & filter_tags != 0;
 }
 
-/// Arrange all views on the output for the current layout. Modifies only
-/// pending state, the changes are not appplied until a transaction is started
-/// and completed.
+/// Start a layout demand with the currently active (pending) layout.
+/// Note that this function does /not/ decide which layout shall be active. That
+/// is done in two places: 1) When the user changed the layout namespace option
+/// of this output and 2) when a new layout is added.
+///
+/// If no layout is active, all views will simply retain their current
+/// dimensions. So without any active layouts, river will function like a simple
+/// floating WM.
+///
+/// The changes of view dimensions are async. Therefore all transactions are
+/// blocked until the layout demand has either finished or was aborted. Both
+/// cases will start a transaction.
 pub fn arrangeViews(self: *Self) void {
     if (self == &self.root.noop_output) return;
 
-    // Count up views that will be arranged by the layout
-    var layout_count: u32 = 0;
-    var it = ViewStack(View).iter(self.views.first, .forward, self.pending.tags, arrangeFilter);
-    while (it.next() != null) layout_count += 1;
+    // If there is already an active layout demand, discard it.
+    if (self.layout_demand) |demand| {
+        demand.deinit();
+        self.layout_demand = null;
+    }
 
-    // If the usable area has a zero dimension, trying to arrange the layout
-    // would cause an underflow and is pointless anyway.
-    if (layout_count == 0 or self.usable_box.width == 0 or self.usable_box.height == 0) return;
+    // We only need to do something if there is an active layout.
+    if (self.pending.layout) |layout| {
+        // If the usable area has a zero dimension, trying to arrange the layout
+        // would cause an underflow and is pointless anyway.
+        if (self.usable_box.width == 0 or self.usable_box.height == 0) return;
 
-    if (std.mem.eql(u8, self.layout, "full")) return layoutFull(self, layout_count);
+        // How many views will be part of the layout?
+        var views: u32 = 0;
+        var view_it = ViewStack(View).iter(self.views.first, .forward, self.pending.tags, arrangeFilter);
+        while (view_it.next() != null) views += 1;
 
-    self.layoutExternal(layout_count) catch |err| {
-        switch (err) {
-            LayoutError.BadExitCode => log.err("layout command exited with non-zero return code", .{}),
-            LayoutError.WrongViewCount => log.err("mismatch between window configuration and visible window counts", .{}),
-            else => log.err("failed to use external layout: {}", .{err}),
-        }
-        log.err("falling back to internal layout", .{});
-        self.layoutFull(layout_count);
-    };
+        // No need to arrange an empty output.
+        if (views == 0) return;
+
+        // Note that this is async. A layout demand will start a transaction
+        // once its done.
+        layout.startLayoutDemand(views);
+    }
 }
 
 /// Arrange all layer surfaces of this output and adjust the usable area
@@ -547,9 +459,11 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) v
     self.frame.link.remove();
     self.mode.link.remove();
 
+    // Cleanup the layout demand, if any
+    if (self.layout_demand) |demand| demand.deinit();
+
     // Free all memory and clean up the wlr.Output
     self.wlr_output.data = undefined;
-    util.gpa.free(self.layout);
 
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
     util.gpa.destroy(node);
@@ -595,20 +509,20 @@ pub fn setTitle(self: *Self, title: [*:0]const u8) void {
     }
 }
 
-/// Create an option for this output, attach a listener which is called when
-/// the option changed and initialize with a default value. Note that the
-/// listener is called once through this function.
-fn defaultOption(
-    self: *Self,
-    key: [*:0]const u8,
-    value: Option.Value,
-    listener: *wl.Listener(*Option),
-) !void {
-    const option = try Option.create(&self.root.server.options_manager, self, key);
-    option.update.add(listener);
-    try option.set(value);
-}
-
 fn handleTitleChange(listener: *wl.Listener(*Option), option: *Option) void {
     if (option.value.string) |title| option.output.?.setTitle(title);
+}
+
+fn handleLayoutChange(listener: *wl.Listener(*Option), option: *Option) void {
+    // The user changed the layout namespace of this output. Try to find a
+    // matching layout.
+    const output = option.output.?;
+    output.pending.layout = if (option.value.string) |namespace| blk: {
+        var layout_it = output.layouts.first;
+        break :blk while (layout_it) |node| : (layout_it = node.next) {
+            if (mem.eql(u8, mem.span(namespace), node.data.namespace)) break &node.data;
+        } else null;
+    } else null;
+    output.arrangeViews();
+    output.root.startTransaction();
 }
