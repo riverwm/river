@@ -41,13 +41,19 @@ const SurfaceRenderData = struct {
     when: *c.timespec,
 };
 
+var last_render_output : u64 = 0;
+
 pub fn renderOutput(output: *Output) void {
     const config = &output.root.server.config;
     const wlr_renderer = output.getRenderer();
-
-Config.update_focused_view_opacity();
-Config.update_unfocused_view_opacity();
-
+    {
+        const now = std.time.milliTimestamp();
+        if (@intToFloat(f32, now - last_render_output) / 1000.0 > Config.focus_minimum_update_time) {
+            last_render_output = now;
+            Config.update_focused_view_opacity();
+            Config.update_unfocused_view_opacity(); ///// This is where we would damage
+        }
+    }
     var now: c.timespec = undefined;
     _ = c.clock_gettime(c.CLOCK_MONOTONIC, &now);
 
