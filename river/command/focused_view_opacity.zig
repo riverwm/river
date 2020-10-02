@@ -22,7 +22,7 @@ const Error = @import("../command.zig").Error;
 const Output = @import("../Output.zig");
 const Seat = @import("../Seat.zig");
 
-pub fn opacity_cmd(
+pub fn minimum_update_time(
     allocator: *std.mem.Allocator,
     seat: *Seat,
     args: []const []const u8,
@@ -30,10 +30,59 @@ pub fn opacity_cmd(
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
-
+    Config.focus_minimum_update_time = std.fmt.parseFloat(f32, args[1]) catch |err| return Error.InvalidFloat;
+}
+pub fn focused_view_opacity_speed(
+    allocator: *std.mem.Allocator,
+    seat: *Seat,
+    args: []const []const u8,
+    out: *?[]const u8,
+) Error!void {
+    if (args.len < 2) return Error.NotEnoughArguments;
+    if (args.len > 2) return Error.TooManyArguments;
+    Config.focused_view_opacity_speed = std.fmt.parseFloat(f32, args[1]) catch |err| return Error.InvalidFloat;
+}
+pub fn unfocused_view_opacity_speed(
+    allocator: *std.mem.Allocator,
+    seat: *Seat,
+    args: []const []const u8,
+    out: *?[]const u8,
+) Error!void {
+    if (args.len < 2) return Error.NotEnoughArguments;
+    if (args.len > 2) return Error.TooManyArguments;
+    Config.unfocused_view_opacity_speed = std.fmt.parseFloat(f32, args[1]) catch |err| return Error.InvalidFloat;
+}
+pub fn focused_view_opacity_target(
+    allocator: *std.mem.Allocator,
+    seat: *Seat,
+    args: []const []const u8,
+    out: *?[]const u8,
+) Error!void {
+    if (args.len < 2) return Error.NotEnoughArguments;
+    if (args.len > 2) return Error.TooManyArguments;
+    Config.focused_view_opacity_target = std.fmt.parseFloat(f32, args[1]) catch |err| return Error.InvalidFloat;
+}
+pub fn unfocused_view_opacity_target(
+    allocator: *std.mem.Allocator,
+    seat: *Seat,
+    args: []const []const u8,
+    out: *?[]const u8,
+) Error!void {
+    if (args.len < 2) return Error.NotEnoughArguments;
+    if (args.len > 2) return Error.TooManyArguments;
+    Config.unfocused_view_opacity_target = std.fmt.parseFloat(f32, args[1]) catch |err| return Error.InvalidFloat;
+}
+pub fn focused_view_opacity(
+    allocator: *std.mem.Allocator,
+    seat: *Seat,
+    args: []const []const u8,
+    out: *?[]const u8,
+) Error!void {
+    if (args.len < 2) return Error.NotEnoughArguments;
+    if (args.len > 2) return Error.TooManyArguments;
     Config.focused_view_opacity = std.fmt.parseFloat(f32, args[1]) catch |err| return Error.InvalidFloat;
 }
-pub fn delta_cmd(
+pub fn unfocused_view_opacity(
     allocator: *std.mem.Allocator,
     seat: *Seat,
     args: []const []const u8,
@@ -41,6 +90,5 @@ pub fn delta_cmd(
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
-
-    Config.focused_view_opacity_delta = std.fmt.parseFloat(f32, args[1]) catch |err| return Error.InvalidFloat;
+    Config.unfocused_view_opacity = std.fmt.parseFloat(f32, args[1]) catch |err| return Error.InvalidFloat;
 }

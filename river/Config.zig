@@ -95,15 +95,41 @@ pub fn deinit(self: Self) void {
     self.csd_filter.deinit();
 }
 
-pub var focused_view_opacity_delta : f32 = 0.0;
+// These can be set via riverctl
+pub var focus_minimum_update_time : f32 = 0.0;
+pub var focused_view_opacity_speed : f32 = 1.0;
+pub var unfocused_view_opacity_speed : f32 = 1.0;
+pub var focused_view_opacity_target : f32 = 1.0;
+pub var unfocused_view_opacity_target : f32 = 1.0;
+
 var _last_get_time : u64 = 0;
-pub var focused_view_opacity : f32 = 1.0;
-pub fn get_focused_view_opacity() f32 {
+pub var focused_view_opacity : f32 = 1.0; //this one too
+
+pub fn update_focused_view_opacity() void {
     var t : u64 = std.time.milliTimestamp();
     var d = @floatCast(f32, @intToFloat(f64, t - _last_get_time) / 1000.0);
     _last_get_time = t;
-    focused_view_opacity += d * focused_view_opacity_delta;
+    var move = d * 
+        std.math.copysign(f32, focused_view_opacity_speed, focused_view_opacity_target - focused_view_opacity);
+    focused_view_opacity += move;
+    if (move > 0.0 and focused_view_opacity > focused_view_opacity_target) { focused_view_opacity = focused_view_opacity_target; }
+    if (move < 0.0 and focused_view_opacity < focused_view_opacity_target) { focused_view_opacity = focused_view_opacity_target; }
     if (focused_view_opacity > 1.0) { focused_view_opacity = 1.0; }
     if (focused_view_opacity < 0.0) { focused_view_opacity = 0.0; }
-    return focused_view_opacity;
+}
+
+var _last_get_time2 : u64 = 0;                                         
+pub var unfocused_view_opacity : f32 = 1.0; //this one too
+
+pub fn update_unfocused_view_opacity() void {
+    var t : u64 = std.time.milliTimestamp();
+    var d = @floatCast(f32, @intToFloat(f64, t - _last_get_time2) / 1000.0);
+    _last_get_time2 = t;
+    var move = d * 
+        std.math.copysign(f32, unfocused_view_opacity_speed, unfocused_view_opacity_target - unfocused_view_opacity);
+    unfocused_view_opacity += move;
+    if (move > 0.0 and unfocused_view_opacity > unfocused_view_opacity_target) { unfocused_view_opacity = unfocused_view_opacity_target; }
+    if (move < 0.0 and unfocused_view_opacity < unfocused_view_opacity_target) { unfocused_view_opacity = unfocused_view_opacity_target; }
+    if (unfocused_view_opacity > 1.0) { unfocused_view_opacity = 1.0; }
+    if (unfocused_view_opacity < 0.0) { unfocused_view_opacity = 0.0; }
 }

@@ -45,6 +45,9 @@ pub fn renderOutput(output: *Output) void {
     const config = &output.root.server.config;
     const wlr_renderer = output.getRenderer();
 
+Config.update_focused_view_opacity();
+Config.update_unfocused_view_opacity();
+
     var now: c.timespec = undefined;
     _ = c.clock_gettime(c.CLOCK_MONOTONIC, &now);
 
@@ -84,7 +87,7 @@ pub fn renderOutput(output: *Output) void {
             // Focused views are rendered on top of normal views, skip them for now
             if (view.current.focus != 0) continue;
 
-            renderView(output.*, view, &now, 1.0);
+            renderView(output.*, view, &now, Config.unfocused_view_opacity);
             if (view.draw_borders) renderBorders(output.*, view, &now);
         }
 
@@ -94,7 +97,7 @@ pub fn renderOutput(output: *Output) void {
             // Skip unfocused views since we already rendered them
             if (view.current.focus == 0) continue;
 
-            renderView(output.*, view, &now, Config.get_focused_view_opacity());
+            renderView(output.*, view, &now, Config.focused_view_opacity);
             if (view.draw_borders) renderBorders(output.*, view, &now);
         }
 

@@ -61,8 +61,15 @@ const str_to_impl_fn = [_]struct {
     .{ .name = "view-padding",           .impl = @import("command/config.zig").viewPadding },
     .{ .name = "xcursor-theme",          .impl = @import("command/xcursor_theme.zig").xcursorTheme },
     .{ .name = "zoom",                   .impl = @import("command/zoom.zig").zoom },
-    .{ .name = "focused-view-opacity",   .impl = @import("command/focused_view_opacity.zig").opacity_cmd },
-    .{ .name = "focused-view-opacity-delta",   .impl = @import("command/focused_view_opacity.zig").delta_cmd },
+
+    .{ .name = "focus-minimum-update-time",   .impl = @import("command/focused_view_opacity.zig").minimum_update_time },
+    .{ .name = "focused-view-opacity-speed",   .impl = @import("command/focused_view_opacity.zig").focused_view_opacity_speed },
+    .{ .name = "unfocused-view-opacity-speed",   .impl = @import("command/focused_view_opacity.zig").unfocused_view_opacity_speed },
+    .{ .name = "focused-view-opacity-target",   .impl = @import("command/focused_view_opacity.zig").focused_view_opacity_target },
+    .{ .name = "unfocused-view-opacity-target",   .impl = @import("command/focused_view_opacity.zig").unfocused_view_opacity_target },
+
+    .{ .name = "focused-view-opacity",   .impl = @import("command/focused_view_opacity.zig").focused_view_opacity },
+    .{ .name = "unfocused-view-opacity",   .impl = @import("command/focused_view_opacity.zig").unfocused_view_opacity },
 };
 // zig fmt: on
 
