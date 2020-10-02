@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="river_layout_unstable_v1">
+  <copyright>
+    Copyright © 2020 Leon Henrik Plickat
+
+    Permission to use, copy, modify, and/or distribute this software for any
+    purpose with or without fee is hereby granted, provided that the above
+    copyright notice and this permission notice appear in all copies.
+
+    THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+    WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+    MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+    ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+    ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  </copyright>
+
+  <interface name="zriver_layout_manager_v1" version="1">
+    <description summary="receive layout requests">
+      A global factory for objects that receive layout request from the compositor.
+    </description>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the river_layout_manager object">
+        This request indicates that the client will not use the
+        river_layout_manager object any more. Objects that have been created
+        through this instance are not affected.
+      </description>
+    </request>
+
+    <request name="get_river_layout">
+      <description summary="create a layout object">
+        This creates a new river_layout object.
+      </description>
+      <arg name="id" type="new_id" interface="zriver_layout_v1"/>
+    </request>
+  </interface>
+
+  <interface name="zriver_layout_v1" version="1">
+    <description summary="receive and respond to river layout requests">
+      This interface allows clients to receive layout requests from the
+      compositor and subsequently change the position and dimensions of
+      individual views.
+    </description>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the river_layout object">
+        This request indicates that the client will not use the river_layout
+        object any more.
+      </description>
+    </request>
+
+    <event name="layout_request">
+      <description summary="the compositors layout may be changed">
+        The compositor raises this event to tell the client that it requires a
+        layout for a set amount of views on an output.
+
+        Layouts are logically a strictly linear list. Views are only
+        identifiable by their index, which resembles the logical position in the
+        layout. It is at minimum 0, which corresponds to the first view, and at
+        maximum one less than the total amount of views in the layout, which
+        corresponds to the last view.
+
+        The useable area of the output indicates the space in which the client
+        can safely position views without interfering with desktop widgets such
+        as panels. The client may ignore these. The position and dimensions of
+        the useable area are given in output local coordinates per XDG-output
+        protocol extensions.
+
+        Note that the master area related values are simply proposals and can
+        safely be ignored by the client.
+
+        The serial of this event is used to identify subsequent events and
+        request as belonging to this layout request. Beware that the client
+        might need to handle multiple layout requests at the same time.
+      </description>
+      <arg name="view_amount" type="uint" summary="amount of views which are part of the layout"/>
+      <arg name="m_amount" type="uint" summary="proposed views in the master area"/>
+      <arg name="m_fact" type="fixed" summary="proposed master area factor"/>
+      <arg name="x" type="int" summary="x coordinate of useable area on output"/>
+      <arg name="y" type="int" summary="y coordinate of useable area on output"/>
+      <arg name="width" type="uint" summary="width of useable area on output"/>
+      <arg name="height" type="uint" summary="height of useable area on output"/>
+      <arg name="output" type="object" interface="wl_output"/>
+      <arg name="serial" type="uint" summary="serial of request"/>
+    </event>
+
+    <event name="advertise_view">
+      <description summary="make layout client aware of view">
+        This event is raised by the compositor after a request_layout event,
+        whether the layout request has been ack'ed by the client or not.
+        It contains additional information about one of the views that are part
+        of the requested layout.
+
+        The view is identified by its index, which resembles its logical
+        position in the layout. It is at minimum 0, which corresponds to the
+        first view, and at maximum one less than the total amount of views in
+        the layout, which corresponds to the last view.
+
+        It is guaranteed that every view in the layout will be advertised
+        exactly once, in an undefined order.
+
+        A client not interested in the additional information may ignore this event.
+
+        The serial is the same as that of the layout request this event belongs to.
+      </description>
+      <arg name="index" type="uint" summary="index of view in layout"/>
+      <arg name="tag_set" type="uint" summary="bit field, active tags of view"/>
+      <arg name="app_id" type="string" summary="view app-id"/>
+      <arg name="title" type="string" summary="view title"/>
+      <arg name="x" type="int" summary="current x coordinate of view"/>
+      <arg name="y" type="int" summary="current y coordinate of view"/>
+      <arg name="width" type="uint" summary="current width of view"/>
+      <arg name="height" type="uint" summary="current height of view"/>
+      <arg name="serial" type="uint" summary="serial of layout request"/>
+    </event>
+
+    <event name="advertise_done">
+      <description summary="all views have been advertised">
+        The compositor raises this event when it has advertised all views that
+        are part of the requested layout, whether the client has ack'ed the
+        layout request or not.
+
+        A client not interested in the additional information may ignore this event.
+
+        The serial is the same as that of the layout request this event belongs to.
+      </description>
+      <arg name="serial" type="uint" summary="serial of layout request"/>
+    </event>
+
+    <request name="ack_layout_request">
+      <description summary="ack a layout request">
+        The client may use this to signal the compositor that it wants generate
+        the requested layout. The first client to send this request gains the
+        layout authority, all other clients will be ignored.
+
+        Beware that clients will not be informed whether they have layout
+        authority or not and are expected to send their layout "blindly". This
+        is due to this protocol extension being designed to avoid roundtrips.
+
+        A client may not respond to a layout request in any way without first
+        ack'ing it. However ack'ing does not force the client to send any
+        further responses to the layout request of this serial, in which case
+        the clients layout authority will silently time out with no feedback.
+
+        The serial is used to identify the layout request this request is a
+        response to.
+      </description>
+      <arg name="serial" type="uint" summary="serial of layout request"/>
+    </request>
+
+    <request name="set_view_dimensions">
+      <description summary="propose view dimensions">
+        A client may use this to propose changing the position and dimensions of
+        a view in the layout.
+
+        The view is identified by its index, which resembles its logical
+        position in the layout. It is at minimum 0, which corresponds to the
+        first view, and at maximum one less than the total amount of views in
+        the layout, which corresponds to the last view.
+
+        It is not necessary to propose changes for every view in the layout.
+        The position and dimensions of left-over views will be determined by the
+        compositor.
+
+        This request may be send before the view of the index has been
+        advertised by the compositor.
+
+        Dimensions are in output local coordinates per XDG-output protocol
+        extensions.
+
+        The serial is used to identify the layout request this request is a
+        response to.
+      </description>
+      <arg name="serial" type="uint" summary="serial of layout request"/>
+      <arg name="index" type="uint" summary="index of view in layout"/>
+      <arg name="x" type="int" summary="x coordinate of view"/>
+      <arg name="y" type="int" summary="y coordinate of view"/>
+      <arg name="width" type="uint" summary="width of view"/>
+      <arg name="height" type="uint" summary="height of view"/>
+    </request>
+
+    <request name="commit">
+      <description summary="commit a layout request">
+        The client may use this to signal the compositor that it has finished
+        proposing view dimensions for the requested layout.
+
+        The client will loose layout authority, if it had it.
+
+        Sending this event irrevocably marks the layout as finished. The client
+        may not send any other responses to the layout request.
+
+        Beware that the compositor may silently ignore the layout, even if the
+        client had the layout authority.
+
+        The serial is used to identify the layout request this request is a
+        response to.
+      </description>
+      <arg name="serial" type="uint" summary="serial of layout request"/>
+    </request>
+
+  </interface>
+</protocol>
