@@ -162,6 +162,21 @@ that tag 1 through 9 are visible.
 	- move-view
 	- resize-view
 
+*opacity* _focused-opacity_ _unfocused-opacity_ _starting-opacity_ _opacity-step_ _opacity-delta-t_
+	Set the server side opacity of views.
+
+	_focused-opacity_ sets the opacity of the focused window, _unfocused-opacity_
+	the opacity of every unfocused window while _starting-opacity_ sets the
+	opacity a window will have at startup before immediately transitioning to
+	either the focused or unfocused opacity. These settings require a floating
+	point number from 0.0 (fully transparent) to 1.0 (fully opaque).
+
+	Opacity transitions can be animated. _opacity-step_ sets the amount the
+	opacity should be increased or decreased per step of the transition. It
+	requires a floating point number from 0.05 to 1.0. If set to 1.0, animations
+	are disabled. _opacity-delta-t_ sets the time between the transition steps
+	in milliseconds.
+
 *outer-padding* _pixels_
 	Set the padding around the edge of the screen to _pixels_.
 

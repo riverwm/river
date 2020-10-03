@@ -1,6 +1,7 @@
 // This file is part of river, a dynamic tiling wayland compositor.
 //
 // Copyright 2020 Isaac Freund
+// Copyright 2020 Leon Henrik Plickat
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -65,6 +66,9 @@ const State = struct {
 
     float: bool = false,
     fullscreen: bool = false,
+
+    /// Opacity the view is transitioning to
+    target_opacity: f32,
 };
 
 const SavedBuffer = struct {
@@ -109,14 +113,27 @@ saved_buffers: std.ArrayList(SavedBuffer),
 /// view returns to floating mode.
 float_box: Box = undefined,
 
+/// The current opacity of this view
+opacity: f32,
+
+/// Opacity change timer event source
+opacity_timer: ?*c.wl_event_source = null,
+
 draw_borders: bool = true,
 
 pub fn init(self: *Self, output: *Output, tags: u32, surface: anytype) void {
     self.* = .{
         .output = output,
-        .current = .{ .tags = tags },
-        .pending = .{ .tags = tags },
+        .current = .{
+            .tags = tags,
+            .target_opacity = output.root.server.config.view_opacity_initial,
+        },
+        .pending = .{
+            .tags = tags,
+            .target_opacity = output.root.server.config.view_opacity_initial,
+        },
         .saved_buffers = std.ArrayList(SavedBuffer).init(util.gpa),
+        .opacity = output.root.server.config.view_opacity_initial,
     };
 
     if (@TypeOf(surface) == *c.wlr_xdg_surface) {
@@ -337,6 +354,8 @@ pub fn shouldTrackConfigure(self: Self) bool {
 pub fn map(self: *Self) void {
     const root = self.output.root;
 
+    self.pending.target_opacity = self.output.root.server.config.view_opacity_unfocused;
+
     log.debug(.server, "view '{}' mapped", .{self.getTitle()});
 
     // Add the view to the stack of its output
@@ -365,6 +384,10 @@ pub fn unmap(self: *Self) void {
 
     self.destroying = true;
 
+    if (self.opacity_timer != null) {
+        self.killOpacityTimer();
+    }
+
     // Inform all seats that the view has been unmapped so they can handle focus
     var it = root.server.input_manager.seats.first;
     while (it) |node| : (it = node.next) {
@@ -378,4 +401,73 @@ pub fn unmap(self: *Self) void {
     if (!self.current.float) self.output.arrangeViews();
 
     root.startTransaction();
+}
+
+/// Change the opacity of a view by config.view_opacity_delta.
+/// If the target opacity was reached, return true.
+fn incrementOpacity(self: *Self) bool {
+    // TODO damage view when implementing damage based rendering
+    const config = &self.output.root.server.config;
+    if (self.opacity < self.current.target_opacity) {
+        self.opacity += config.view_opacity_delta;
+        if (self.opacity < self.current.target_opacity) return false;
+    } else {
+        self.opacity -= config.view_opacity_delta;
+        if (self.opacity > self.current.target_opacity) return false;
+    }
+    self.opacity = self.current.target_opacity;
+    return true;
+}
+
+/// Destroy a views opacity timer
+fn killOpacityTimer(self: *Self) void {
+    if (c.wl_event_source_remove(self.opacity_timer) < 0) unreachable;
+    self.opacity_timer = null;
+}
+
+/// Set the timeout on a views opacity timer
+fn armOpacityTimer(self: *Self) void {
+    const delta_t = self.output.root.server.config.view_opacity_delta_t;
+    if (c.wl_event_source_timer_update(self.opacity_timer, delta_t) < 0) {
+        log.err(.view, "failed to update opacity timer", .{});
+        self.killOpacityTimer();
+    }
+}
+
+/// Called by the opacity timer
+fn handleOpacityTimer(data: ?*c_void) callconv(.C) c_int {
+    const self = util.voidCast(Self, data.?);
+    if (self.incrementOpacity()) {
+        self.killOpacityTimer();
+    } else {
+        self.armOpacityTimer();
+    }
+    return 0;
+}
+
+/// Create an opacity timer for a view and arm it
+fn attachOpacityTimer(self: *Self) void {
+    const server = self.output.root.server;
+    self.opacity_timer = c.wl_event_loop_add_timer(
+        c.wl_display_get_event_loop(server.wl_display),
+        handleOpacityTimer,
+        self,
+    ) orelse {
+        log.err(.view, "failed to create opacity timer for view '{}'", .{self.getTitle()});
+        return;
+    };
+    self.armOpacityTimer();
+}
+
+/// Commit an opacity transition
+pub fn commitOpacityTransition(self: *Self) void {
+    if (self.opacity == self.current.target_opacity) return;
+
+    // A running timer can handle a target_opacity change
+    if (self.opacity_timer != null) return;
+
+    // Do the first step now, if that step was not enough, attach timer
+    if (!self.incrementOpacity()) {
+        self.attachOpacityTimer();
+    }
 }

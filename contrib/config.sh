@@ -100,3 +100,5 @@ riverctl float-filter-add "popup"
 # Set app-ids of views which should use client side decorations
 riverctl csd-filter-add "gedit"
 
+# Set opacity and fade effect
+# riverctl opacity 1.0 0.75 0.0 0.1 20
