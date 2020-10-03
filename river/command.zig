@@ -49,6 +49,7 @@ const str_to_impl_fn = [_]struct {
     .{ .name = "map-pointer",            .impl = @import("command/map.zig").mapPointer },
     .{ .name = "mod-master-count",       .impl = @import("command/mod_master_count.zig").modMasterCount },
     .{ .name = "mod-master-factor",      .impl = @import("command/mod_master_factor.zig").modMasterFactor },
+    .{ .name = "opacity",                .impl = @import("command/opacity.zig").opacity },
     .{ .name = "outer-padding",          .impl = @import("command/config.zig").outerPadding },
     .{ .name = "send-to-output",         .impl = @import("command/send_to_output.zig").sendToOutput },
     .{ .name = "set-focused-tags",       .impl = @import("command/tags.zig").setFocusedTags },
@@ -73,6 +74,7 @@ pub const Error = error{
     InvalidCharacter,
     InvalidDirection,
     InvalidRgba,
+    InvalidValue,
     UnknownOption,
     OutOfMemory,
     Other,
@@ -113,6 +115,7 @@ pub fn errToMsg(err: Error) [:0]const u8 {
         Error.InvalidCharacter => "invalid character in argument",
         Error.InvalidDirection => "invalid direction. Must be 'next' or 'previous'",
         Error.InvalidRgba => "invalid color format, must be #RRGGBB or #RRGGBBAA",
+        Error.InvalidValue => "invalid value",
         Error.OutOfMemory => "out of memory",
         Error.Other => unreachable,
     };

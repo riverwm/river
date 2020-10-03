@@ -251,8 +251,10 @@ fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
             view.pending_serial = null;
             if (view.shouldTrackConfigure())
                 view.output.root.notifyConfigured()
-            else
+            else {
                 view.current = view.pending;
+                view.commitOpacityTransition();
+            }
         } else {
             // If the client has not yet acked our configure, we need to send a
             // frame done event so that it commits another buffer. These

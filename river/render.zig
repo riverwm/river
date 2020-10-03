@@ -36,6 +36,8 @@ const SurfaceRenderData = struct {
     output_y: i32,
 
     when: *c.timespec,
+
+    opacity: f32,
 };
 
 pub fn renderOutput(output: *Output) void {
@@ -138,6 +140,7 @@ fn renderLayer(output: Output, layer: std.TailQueue(LayerSurface), now: *c.times
             .output_x = layer_surface.box.x,
             .output_y = layer_surface.box.y,
             .when = now,
+            .opacity = 1.0,
         };
         c.wlr_layer_surface_v1_for_each_surface(
             layer_surface.wlr_layer_surface,
@@ -162,6 +165,7 @@ fn renderView(output: Output, view: *View, now: *c.timespec) void {
                     .height = @intCast(c_int, saved_buffer.box.height),
                 },
                 saved_buffer.transform,
+                view.opacity,
             );
     } else {
         // Since there is no stashed buffer, we are not in the middle of
@@ -171,6 +175,7 @@ fn renderView(output: Output, view: *View, now: *c.timespec) void {
             .output_x = view.current.box.x - view.surface_box.x,
             .output_y = view.current.box.y - view.surface_box.y,
             .when = now,
+            .opacity = view.opacity,
         };
 
         view.forEachSurface(renderSurfaceIterator, &rdata);
@@ -191,6 +196,7 @@ fn renderDragIcons(output: Output, now: *c.timespec) void {
             .output_y = @floatToInt(i32, drag_icon.seat.cursor.wlr_cursor.y) +
                 drag_icon.wlr_drag_icon.surface.*.sy - output_box.*.y,
             .when = now,
+            .opacity = 1.0,
         };
         c.wlr_surface_for_each_surface(drag_icon.wlr_drag_icon.surface, renderSurfaceIterator, &rdata);
     }
@@ -209,6 +215,7 @@ fn renderXwaylandUnmanaged(output: Output, now: *c.timespec) void {
             .output_x = wlr_xwayland_surface.x - output_box.*.x,
             .output_y = wlr_xwayland_surface.y - output_box.*.y,
             .when = now,
+            .opacity = 1.0,
         };
         c.wlr_surface_for_each_surface(wlr_xwayland_surface.surface, renderSurfaceIterator, &rdata);
     }
@@ -233,6 +240,7 @@ fn renderSurfaceIterator(
             .height = surface.?.current.height,
         },
         surface.?.current.transform,
+        rdata.opacity,
     );
 
     c.wlr_surface_send_frame_done(surface, rdata.when);
@@ -245,6 +253,7 @@ fn renderTexture(
     wlr_texture: ?*c.wlr_texture,
     wlr_box: c.wlr_box,
     transform: c.wl_output_transform,
+    opacity: f32,
 ) void {
     const texture = wlr_texture orelse return;
     var box = wlr_box;
@@ -262,7 +271,7 @@ fn renderTexture(
 
     // This takes our matrix, the texture, and an alpha, and performs the actual
     // rendering on the GPU.
-    _ = c.wlr_render_texture_with_matrix(output.getRenderer(), texture, &matrix, 1.0);
+    _ = c.wlr_render_texture_with_matrix(output.getRenderer(), texture, &matrix, opacity);
 }
 
 fn renderBorders(output: Output, view: *View, now: *c.timespec) void {
