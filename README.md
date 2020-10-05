@@ -23,7 +23,7 @@ separate `riverctl` binary implementing it.
 To compile river first ensure that you have the following dependencies
 installed:
 
-- [zig](https://github.com/ziglang/zig) 0.6.0
+- [zig](https://ziglang.org/download/) master (will stick with 0.7.0 when it is released)
 - wayland
 - wayland-protocols
 - [wlroots](https://github.com/swaywm/wlroots) 0.11.0
@@ -33,7 +33,7 @@ installed:
 - pkg-config
 - scdoc (optional, but required for man page generation)
 
-*Note: NixOS users should refer to the
+*Note: NixOS users may refer to the
 [Building on NixOS wiki page](https://github.com/ifreund/river/wiki/Building-on-NixOS)*
 
 Then run, for example,
