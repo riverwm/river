@@ -252,8 +252,10 @@ fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
             if (view.shouldTrackConfigure())
                 view.output.root.notifyConfigured()
             else {
+                const view_tags_changed = view.pending.tags != view.current.tags;
                 view.current = view.pending;
                 view.commitOpacityTransition();
+                if (view_tags_changed) view.output.sendViewTags();
             }
         } else {
             // If the client has not yet acked our configure, we need to send a
