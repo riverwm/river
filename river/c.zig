@@ -35,6 +35,7 @@ pub usingnamespace @cImport({
     @cInclude("wlr/types/wlr_data_control_v1.h");
     @cInclude("wlr/types/wlr_data_device.h");
     @cInclude("wlr/types/wlr_gamma_control_v1.h");
+    @cInclude("wlr/types/wlr_gtk_primary_selection.h");
     @cInclude("wlr/types/wlr_idle.h");
     @cInclude("wlr/types/wlr_input_device.h");
     @cInclude("wlr/types/wlr_input_inhibitor.h");
@@ -44,6 +45,8 @@ pub usingnamespace @cImport({
     @cInclude("wlr/types/wlr_output.h");
     @cInclude("wlr/types/wlr_output_layout.h");
     @cInclude("wlr/types/wlr_pointer.h");
+    @cInclude("wlr/types/wlr_primary_selection.h");
+    @cInclude("wlr/types/wlr_primary_selection_v1.h");
     @cInclude("wlr/types/wlr_screencopy_v1.h");
     @cInclude("wlr/types/wlr_seat.h");
     @cInclude("wlr/types/wlr_xcursor_manager.h");

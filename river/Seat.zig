@@ -69,6 +69,7 @@ status_trackers: std.SinglyLinkedList(SeatStatus) = .{},
 listen_request_set_selection: c.wl_listener = undefined,
 listen_request_start_drag: c.wl_listener = undefined,
 listen_start_drag: c.wl_listener = undefined,
+listen_request_set_primary_selection: c.wl_listener = undefined,
 
 pub fn init(self: *Self, input_manager: *InputManager, name: [*:0]const u8) !void {
     self.* = .{
@@ -89,6 +90,9 @@ pub fn init(self: *Self, input_manager: *InputManager, name: [*:0]const u8) !voi
 
     self.listen_start_drag.notify = handleStartDrag;
     c.wl_signal_add(&self.wlr_seat.events.start_drag, &self.listen_start_drag);
+
+    self.listen_request_set_primary_selection.notify = handleRequestPrimarySelection;
+    c.wl_signal_add(&self.wlr_seat.events.request_set_primary_selection, &self.listen_request_set_primary_selection);
 }
 
 pub fn deinit(self: *Self) void {
@@ -365,4 +369,10 @@ fn handleStartDrag(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void 
         self.input_manager.server.root.drag_icons.prepend(node);
     }
     self.cursor.mode = .passthrough;
+}
+
+fn handleRequestPrimarySelection(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    const self = @fieldParentPtr(Self, "listen_request_set_primary_selection", listener.?);
+    const event = util.voidCast(c.wlr_seat_request_set_primary_selection_event, data.?);
+    c.wlr_seat_set_primary_selection(self.wlr_seat, event.source, event.serial);
 }

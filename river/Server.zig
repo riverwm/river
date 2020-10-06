@@ -118,6 +118,10 @@ pub fn init(self: *Self) !void {
         c.wl_signal_add(&self.wlr_xwayland.events.new_surface, &self.listen_new_xwayland_surface);
     }
 
+    // Set up primary selection
+    _ = c.wlr_primary_selection_v1_device_manager_create(self.wl_display);
+    _ = c.wlr_gtk_primary_selection_device_manager_create(self.wl_display);
+
     self.config = try Config.init();
     try self.decoration_manager.init(self);
     try self.root.init(self);
