@@ -136,6 +136,7 @@ pub fn init(self: *Self) !void {
     _ = c.wlr_export_dmabuf_manager_v1_create(self.wl_display) orelse return error.OutOfMemory;
     _ = c.wlr_gamma_control_manager_v1_create(self.wl_display) orelse return error.OutOfMemory;
     _ = c.wlr_screencopy_manager_v1_create(self.wl_display) orelse return error.OutOfMemory;
+    _ = c.wlr_viewporter_create(self.wl_display) orelse return error.OutOfMemory;
     _ = c.wlr_xdg_output_manager_v1_create(self.wl_display, self.root.wlr_output_layout) orelse
         return error.OutOfMemory;
 }
