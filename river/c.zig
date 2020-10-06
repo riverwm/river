@@ -34,6 +34,7 @@ pub usingnamespace @cImport({
     @cInclude("wlr/types/wlr_cursor.h");
     @cInclude("wlr/types/wlr_data_control_v1.h");
     @cInclude("wlr/types/wlr_data_device.h");
+    @cInclude("wlr/types/wlr_export_dmabuf_v1.h");
     @cInclude("wlr/types/wlr_gamma_control_v1.h");
     @cInclude("wlr/types/wlr_gtk_primary_selection.h");
     @cInclude("wlr/types/wlr_idle.h");
