@@ -24,6 +24,18 @@ pub const Direction = enum {
     previous,
 };
 
+pub const PhysicalDirection = enum {
+    up,
+    down,
+    left,
+    right,
+};
+
+pub const Orientation = enum {
+    horizontal,
+    vertical,
+};
+
 // TODO: this could be replaced with a comptime hashmap
 // zig fmt: off
 const str_to_impl_fn = [_]struct {
@@ -49,11 +61,14 @@ const str_to_impl_fn = [_]struct {
     .{ .name = "map-pointer",            .impl = @import("command/map.zig").mapPointer },
     .{ .name = "mod-master-count",       .impl = @import("command/mod_master_count.zig").modMasterCount },
     .{ .name = "mod-master-factor",      .impl = @import("command/mod_master_factor.zig").modMasterFactor },
+    .{ .name = "move",                   .impl = @import("command/move.zig").move },
     .{ .name = "opacity",                .impl = @import("command/opacity.zig").opacity },
     .{ .name = "outer-padding",          .impl = @import("command/config.zig").outerPadding },
+    .{ .name = "resize",                 .impl = @import("command/move.zig").resize },
     .{ .name = "send-to-output",         .impl = @import("command/send_to_output.zig").sendToOutput },
     .{ .name = "set-focused-tags",       .impl = @import("command/tags.zig").setFocusedTags },
     .{ .name = "set-view-tags",          .impl = @import("command/tags.zig").setViewTags },
+    .{ .name = "snap",                   .impl = @import("command/move.zig").snap },
     .{ .name = "spawn",                  .impl = @import("command/spawn.zig").spawn },
     .{ .name = "toggle-float",           .impl = @import("command/toggle_float.zig").toggleFloat },
     .{ .name = "toggle-focused-tags",    .impl = @import("command/tags.zig").toggleFocusedTags },
@@ -73,6 +88,8 @@ pub const Error = error{
     Overflow,
     InvalidCharacter,
     InvalidDirection,
+    InvalidPhysicalDirection,
+    InvalidOrientation,
     InvalidRgba,
     InvalidValue,
     UnknownOption,
@@ -114,6 +131,8 @@ pub fn errToMsg(err: Error) [:0]const u8 {
         Error.Overflow => "value out of bounds",
         Error.InvalidCharacter => "invalid character in argument",
         Error.InvalidDirection => "invalid direction. Must be 'next' or 'previous'",
+        Error.InvalidPhysicalDirection => "invalid direction. Must be 'up', 'down', 'left' or 'right'",
+        Error.InvalidOrientation => "invalid orientation. Must be 'horizontal', or 'vertical'",
         Error.InvalidRgba => "invalid color format, must be #RRGGBB or #RRGGBBAA",
         Error.InvalidValue => "invalid value",
         Error.OutOfMemory => "out of memory",
