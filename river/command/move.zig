@@ -1,0 +1,192 @@
+// This file is part of river, a dynamic tiling wayland compositor.
+//
+// Copyright 2020 Leon Henrik Plickat
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+const std = @import("std");
+
+const c = @import("../c.zig");
+
+const Error = @import("../command.zig").Error;
+const PhysicalDirection = @import("../command.zig").PhysicalDirection;
+const Orientation = @import("../command.zig").Orientation;
+const Seat = @import("../Seat.zig");
+const View = @import("../View.zig");
+const Box = @import("../Box.zig");
+
+pub fn move(
+    allocator: *std.mem.Allocator,
+    seat: *Seat,
+    args: []const []const u8,
+    out: *?[]const u8,
+) Error!void {
+    if (args.len < 3) return Error.NotEnoughArguments;
+    if (args.len > 3) return Error.TooManyArguments;
+
+    const delta = try std.fmt.parseInt(i32, args[2], 10);
+    const direction = std.meta.stringToEnum(PhysicalDirection, args[1]) orelse
+        return Error.InvalidPhysicalDirection;
+
+    const view = getView(seat) orelse return;
+    switch (direction) {
+        .up => moveVertical(view, -1 * delta),
+        .down => moveVertical(view, delta),
+        .left => moveHorizontal(view, -1 * delta),
+        .right => moveHorizontal(view, delta),
+    }
+
+    apply(view);
+}
+
+pub fn snap(
+    allocator: *std.mem.Allocator,
+    seat: *Seat,
+    args: []const []const u8,
+    out: *?[]const u8,
+) Error!void {
+    if (args.len < 2) return Error.NotEnoughArguments;
+    if (args.len > 2) return Error.TooManyArguments;
+
+    const direction = std.meta.stringToEnum(PhysicalDirection, args[1]) orelse
+        return Error.InvalidPhysicalDirection;
+
+    const view = get_view(seat) orelse return;
+    const output_box = get_output_dimensions(view);
+    const view = getView(seat) orelse return;
+    const border_width = @intCast(i32, view.output.root.server.config.border_width);
+    switch (direction) {
+        .up => view.pending.box.y = border_width,
+        .down => view.pending.box.y =
+            @intCast(i32, output_box.height - view.pending.box.height) - border_width,
+        .left => view.pending.box.x = border_width,
+        .right => view.pending.box.x =
+            @intCast(i32, output_box.width - view.pending.box.width) - border_width,
+    }
+
+    apply(view);
+}
+
+pub fn resize(
+    allocator: *std.mem.Allocator,
+    seat: *Seat,
+    args: []const []const u8,
+    out: *?[]const u8,
+) Error!void {
+    if (args.len < 3) return Error.NotEnoughArguments;
+    if (args.len > 3) return Error.TooManyArguments;
+
+    const delta = try std.fmt.parseInt(i32, args[2], 10);
+    const orientation = std.meta.stringToEnum(Orientation, args[1]) orelse
+        return Error.InvalidOrientation;
+
+    const view = get_view(seat) orelse return;
+    const output_box = get_output_dimensions(view);
+    const view = getView(seat) orelse return;
+    const border_width = @intCast(i32, view.output.root.server.config.border_width);
+    switch (orientation) {
+        .horizontal => {
+            var real_delta: i32 = @intCast(i32, view.pending.box.width);
+            if (delta > 0) {
+                view.pending.box.width += @intCast(u32, delta);
+            } else {
+                // Prevent underflow
+                view.pending.box.width -=
+                    std.math.min(view.pending.box.width, @intCast(u32, -1 * delta));
+            }
+            view.applyConstraints();
+            // Do not grow bigger than the output
+            view.pending.box.width = std.math.min(
+                view.pending.box.width,
+                output_box.width - @intCast(u32, 2 * border_width),
+            );
+            real_delta -= @intCast(i32, view.pending.box.width);
+            moveHorizontal(view, @divFloor(real_delta, 2));
+        },
+        .vertical => {
+            var real_delta: i32 = @intCast(i32, view.pending.box.height);
+            if (delta > 0) {
+                view.pending.box.height += @intCast(u32, delta);
+            } else {
+                // Prevent underflow
+                view.pending.box.height -=
+                    std.math.min(view.pending.box.height, @intCast(u32, -1 * delta));
+            }
+            view.applyConstraints();
+            // Do not grow bigger than the output
+            view.pending.box.height = std.math.min(
+                view.pending.box.height,
+                output_box.height - @intCast(u32, 2 * border_width),
+            );
+            real_delta -= @intCast(i32, view.pending.box.height);
+            moveVertical(view, @divFloor(real_delta, 2));
+        },
+    }
+
+    apply(view);
+}
+
+fn apply(view: *View) void {
+    // Set the view to floating but keep the position and dimensions
+    view.pending.float = true;
+    view.float_box = view.pending.box;
+
+    view.applyPending();
+}
+
+fn getView(seat: *Seat) ?*View {
+    if (seat.focused != .view) return null;
+    const view = seat.focused.view;
+
+    // Do not touch fullscreen views
+    if (view.pending.fullscreen) return null;
+
+    // Do not touch views which are the target of a cursor action
+    if (seat.input_manager.isCursorActionTarget(view)) return null;
+
+    return view;
+}
+
+fn get_output_dimensions(view: *View) Box {
+    var output_width: c_int = undefined;
+    var output_height: c_int = undefined;
+    c.wlr_output_effective_resolution(view.output.wlr_output, &output_width, &output_height);
+    const box: Box = .{
+        .x = 0,
+        .y = 0,
+        .width = @intCast(u32, output_width),
+        .height = @intCast(u32, output_height),
+    };
+    return box;
+}
+
+fn moveVertical(view: *View, delta: i32) void {
+    const output_box = view.output.get_output_dimensions(view);
+    const border_width = @intCast(i32, view.output.root.server.config.border_width);
+    view.pending.box.y = std.math.clamp(
+        view.pending.box.y + delta,
+        border_width,
+        @intCast(i32, output_box.height - view.pending.box.height) - border_width,
+    );
+}
+
+fn moveHorizontal(view: *View, delta: i32) void {
+    const output_box = view.output.get_output_dimensions(view);
+    const border_width = @intCast(i32, view.output.root.server.config.border_width);
+    view.pending.box.x = std.math.clamp(
+        view.pending.box.x + delta,
+        border_width,
+        @intCast(i32, output_box.width - view.pending.box.width) - border_width,
+    );
+}

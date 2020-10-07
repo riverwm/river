@@ -37,6 +37,24 @@ riverctl map normal $mod L mod-master-factor +0.05
 riverctl map normal $mod+Shift H mod-master-count +1
 riverctl map normal $mod+Shift L mod-master-count -1
 
+# Mod+Alt+{H,J,K,L} to move views
+riverctl map normal $mod+Mod1 H move left 100
+riverctl map normal $mod+Mod1 J move down 100
+riverctl map normal $mod+Mod1 K move up 100
+riverctl map normal $mod+Mod1 L move right 100
+
+# Mod+Alt+Control+{H,J,K,L} to snap views to screen edges
+riverctl map normal $mod+Mod1+Control H snap left
+riverctl map normal $mod+Mod1+Control J snap down
+riverctl map normal $mod+Mod1+Control K snap up
+riverctl map normal $mod+Mod1+Control L snap right
+
+# Mod+Alt+Shif+{H,J,K,L} to resize views
+riverctl map normal $mod+Mod1+Shift H resize horizontal -100
+riverctl map normal $mod+Mod1+Shift J resize vertical 100
+riverctl map normal $mod+Mod1+Shift K resize vertical -100
+riverctl map normal $mod+Mod1+Shift L resize horizontal 100
+
 # Mod + Left Mouse Button to move views
 riverctl map-pointer normal $mod BTN_LEFT move-view
 

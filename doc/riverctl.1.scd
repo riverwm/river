@@ -53,6 +53,17 @@ used to control and configure river.
 	negative floating point number (such as 0.05) where 1 corresponds to
 	the whole screen.
 
+*move* *up*|*down*|*left*|*right* _delta_
+	Move the focused view in the specified direction by _delta_. The view will
+	be set to floating.
+
+*resize* *horizontal*|*vertical* _delta_
+	Resize the view in the given orientation by _delta_. The view will be set to
+	floating.
+
+*snap* *up*|*down*|*left*|*right*
+	Snap the view to the specified screen edge. The view will be set to floating.
+
 *send-to-output* *next*|*previous*
 	Send the focused view to the next or the previous output.
 
