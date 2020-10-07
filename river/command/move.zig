@@ -62,10 +62,9 @@ pub fn snap(
     const direction = std.meta.stringToEnum(PhysicalDirection, args[1]) orelse
         return Error.InvalidPhysicalDirection;
 
-    const view = get_view(seat) orelse return;
-    const output_box = get_output_dimensions(view);
     const view = getView(seat) orelse return;
     const border_width = @intCast(i32, view.output.root.server.config.border_width);
+    const output_box = view.output.getEffectiveResolution();
     switch (direction) {
         .up => view.pending.box.y = border_width,
         .down => view.pending.box.y =
@@ -91,10 +90,9 @@ pub fn resize(
     const orientation = std.meta.stringToEnum(Orientation, args[1]) orelse
         return Error.InvalidOrientation;
 
-    const view = get_view(seat) orelse return;
-    const output_box = get_output_dimensions(view);
     const view = getView(seat) orelse return;
     const border_width = @intCast(i32, view.output.root.server.config.border_width);
+    const output_box = view.output.getEffectiveResolution();
     switch (orientation) {
         .horizontal => {
             var real_delta: i32 = @intCast(i32, view.pending.box.width);
@@ -158,21 +156,8 @@ fn getView(seat: *Seat) ?*View {
     return view;
 }
 
-fn get_output_dimensions(view: *View) Box {
-    var output_width: c_int = undefined;
-    var output_height: c_int = undefined;
-    c.wlr_output_effective_resolution(view.output.wlr_output, &output_width, &output_height);
-    const box: Box = .{
-        .x = 0,
-        .y = 0,
-        .width = @intCast(u32, output_width),
-        .height = @intCast(u32, output_height),
-    };
-    return box;
-}
-
 fn moveVertical(view: *View, delta: i32) void {
-    const output_box = view.output.get_output_dimensions(view);
+    const output_box = view.output.getEffectiveResolution();
     const border_width = @intCast(i32, view.output.root.server.config.border_width);
     view.pending.box.y = std.math.clamp(
         view.pending.box.y + delta,
@@ -182,7 +167,7 @@ fn moveVertical(view: *View, delta: i32) void {
 }
 
 fn moveHorizontal(view: *View, delta: i32) void {
-    const output_box = view.output.get_output_dimensions(view);
+    const output_box = view.output.getEffectiveResolution();
     const border_width = @intCast(i32, view.output.root.server.config.border_width);
     view.pending.box.x = std.math.clamp(
         view.pending.box.x + delta,
