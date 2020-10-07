@@ -135,14 +135,12 @@ pub fn init(self: *Self, root: *Root, wlr_output: *c.wlr_output) !void {
                 log.err(.cursor, "failed to load xcursor theme at scale {}", .{wlr_output.scale});
         }
 
-        var width: c_int = undefined;
-        var height: c_int = undefined;
-        c.wlr_output_effective_resolution(wlr_output, &width, &height);
+        const effective_resolution = self.getEffectiveResolution();
         self.usable_box = .{
             .x = 0,
             .y = 0,
-            .width = @intCast(u32, width),
-            .height = @intCast(u32, height),
+            .width = effective_resolution.width,
+            .height = effective_resolution.height,
         };
     }
 }
@@ -311,16 +309,12 @@ pub fn arrangeViews(self: *Self) void {
 
 /// Arrange all layer surfaces of this output and adjust the usable area
 pub fn arrangeLayers(self: *Self) void {
-    const full_box = blk: {
-        var width: c_int = undefined;
-        var height: c_int = undefined;
-        c.wlr_output_effective_resolution(self.wlr_output, &width, &height);
-        break :blk Box{
-            .x = 0,
-            .y = 0,
-            .width = @intCast(u32, width),
-            .height = @intCast(u32, height),
-        };
+    const effective_resolution = self.getEffectiveResolution();
+    const full_box: Box = .{
+        .x = 0,
+        .y = 0,
+        .width = effective_resolution.width,
+        .height = effective_resolution.height,
     };
 
     // This box is modified as exclusive zones are applied
@@ -614,4 +608,14 @@ fn handleMode(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     self.arrangeLayers();
     self.arrangeViews();
     self.root.startTransaction();
+}
+
+pub fn getEffectiveResolution(self: *Self) struct { width: u32, height: u32 } {
+    var width: c_int = undefined;
+    var height: c_int = undefined;
+    c.wlr_output_effective_resolution(self.wlr_output, &width, &height);
+    return .{
+        .width = @intCast(u32, width),
+        .height = @intCast(u32, height),
+    };
 }

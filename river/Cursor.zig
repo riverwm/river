@@ -128,20 +128,17 @@ const Mode = union(enum) {
             .move => |view| {
                 const border_width = if (view.draw_borders) config.border_width else 0;
 
-                var output_width: c_int = undefined;
-                var output_height: c_int = undefined;
-                c.wlr_output_effective_resolution(view.output.wlr_output, &output_width, &output_height);
-
                 // Set x/y of cursor and view, clamp to output dimensions
+                const output_resolution = view.output.getEffectiveResolution();
                 view.pending.box.x = std.math.clamp(
                     view.pending.box.x + @floatToInt(i32, delta_x),
                     @intCast(i32, border_width),
-                    output_width - @intCast(i32, view.pending.box.width + border_width),
+                    @intCast(i32, output_resolution.width - view.pending.box.width - border_width),
                 );
                 view.pending.box.y = std.math.clamp(
                     view.pending.box.y + @floatToInt(i32, delta_y),
                     @intCast(i32, border_width),
-                    output_height - @intCast(i32, view.pending.box.height + border_width),
+                    @intCast(i32, output_resolution.height - view.pending.box.height - border_width),
                 );
 
                 c.wlr_cursor_move(
@@ -156,10 +153,6 @@ const Mode = union(enum) {
             .resize => |data| {
                 const border_width = if (data.view.draw_borders) config.border_width else 0;
 
-                var output_width: c_int = undefined;
-                var output_height: c_int = undefined;
-                c.wlr_output_effective_resolution(data.view.output.wlr_output, &output_width, &output_height);
-
                 // Set width/height of view, clamp to view size constraints and output dimensions
                 const box = &data.view.pending.box;
                 box.width = @intCast(u32, std.math.max(0, @intCast(i32, box.width) + @floatToInt(i32, delta_x)));
@@ -167,8 +160,9 @@ const Mode = union(enum) {
 
                 data.view.applyConstraints();
 
-                box.width = std.math.min(box.width, @intCast(u32, output_width - box.x - @intCast(i32, border_width)));
-                box.height = std.math.min(box.height, @intCast(u32, output_height - box.y - @intCast(i32, border_width)));
+                const output_resolution = data.view.output.getEffectiveResolution();
+                box.width = std.math.min(box.width, output_resolution.width - border_width - @intCast(u32, box.x));
+                box.height = std.math.min(box.height, output_resolution.height - border_width - @intCast(u32, box.y));
 
                 data.view.applyPending();
 
