@@ -180,7 +180,9 @@ pub fn applyPending(self: *Self) void {
         self.pending.box = self.float_box;
 
     // If switching to fullscreen set the dimensions to the full area of the output
+    // and turn the view fully opaque
     if (!self.current.fullscreen and self.pending.fullscreen) {
+        self.pending.target_opacity = 1.0;
         const layout_box = c.wlr_output_layout_get_box(self.output.root.wlr_output_layout, self.output.wlr_output);
         self.pending.box = .{
             .x = 0,
@@ -190,10 +192,18 @@ pub fn applyPending(self: *Self) void {
         };
     }
 
-    // If switching from fullscreen to layout, arrange the output to get
-    // assigned the proper size.
-    if (self.current.fullscreen and !self.pending.fullscreen and !self.pending.float)
-        arrange_output = true;
+    if (self.current.fullscreen and !self.pending.fullscreen) {
+        // If switching from fullscreen to layout, arrange the output to get
+        // assigned the proper size.
+        if (!self.pending.float)
+            arrange_output = true;
+
+        // Restore configured opacity
+        self.pending.target_opacity = if (self.pending.focus > 0)
+            self.output.root.server.config.view_opacity_focused
+        else
+            self.output.root.server.config.view_opacity_unfocused;
+    }
 
     if (arrange_output) self.output.arrangeViews();
 
