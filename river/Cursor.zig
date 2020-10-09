@@ -108,15 +108,33 @@ const Mode = union(enum) {
         passthrough(self, event.time_msec);
     }
 
-    fn processMotion(self: *Self, device: *c.wlr_input_device, time: u32, delta_x: f64, delta_y: f64) void {
+    fn processMotion(self: *Self, device: *c.wlr_input_device, time: u32, delta_x: f64, delta_y: f64, unaccel_dx: f64, unaccel_dy: f64) void {
         const config = self.seat.input_manager.server.config;
 
         switch (self.mode) {
             .passthrough => {
+                c.wlr_relative_pointer_manager_v1_send_relative_motion(
+                    self.seat.input_manager.wlr_relative_pointer_manager,
+                    self.seat.wlr_seat,
+                    time,
+                    delta_x,
+                    delta_y,
+                    unaccel_dx,
+                    unaccel_dy,
+                );
                 c.wlr_cursor_move(self.wlr_cursor, device, delta_x, delta_y);
                 passthrough(self, time);
             },
             .down => |view| {
+                c.wlr_relative_pointer_manager_v1_send_relative_motion(
+                    self.seat.input_manager.wlr_relative_pointer_manager,
+                    self.seat.wlr_seat,
+                    time,
+                    delta_x,
+                    delta_y,
+                    unaccel_dx,
+                    unaccel_dy,
+                );
                 c.wlr_cursor_move(self.wlr_cursor, device, delta_x, delta_y);
                 c.wlr_seat_pointer_notify_motion(
                     self.seat.wlr_seat,
@@ -477,7 +495,7 @@ fn handleMotionAbsolute(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) 
     var ly: f64 = undefined;
     c.wlr_cursor_absolute_to_layout_coords(self.wlr_cursor, event.device, event.x, event.y, &lx, &ly);
 
-    Mode.processMotion(self, event.device, event.time_msec, lx - self.wlr_cursor.x, ly - self.wlr_cursor.y);
+    Mode.processMotion(self, event.device, event.time_msec, lx - self.wlr_cursor.x, ly - self.wlr_cursor.y, lx - self.wlr_cursor.x, ly - self.wlr_cursor.y);
 }
 
 fn handleMotion(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -488,7 +506,7 @@ fn handleMotion(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 
     self.seat.handleActivity();
 
-    Mode.processMotion(self, event.device, event.time_msec, event.delta_x, event.delta_y);
+    Mode.processMotion(self, event.device, event.time_msec, event.delta_x, event.delta_y, event.unaccel_dx, event.unaccel_dy);
 }
 
 fn handleRequestSetCursor(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {

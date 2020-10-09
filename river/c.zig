@@ -48,6 +48,7 @@ pub usingnamespace @cImport({
     @cInclude("wlr/types/wlr_pointer.h");
     @cInclude("wlr/types/wlr_primary_selection.h");
     @cInclude("wlr/types/wlr_primary_selection_v1.h");
+    @cInclude("wlr/types/wlr_relative_pointer_v1.h");
     @cInclude("wlr/types/wlr_screencopy_v1.h");
     @cInclude("wlr/types/wlr_seat.h");
     @cInclude("wlr/types/wlr_viewporter.h");

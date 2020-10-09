@@ -34,6 +34,7 @@ server: *Server,
 
 wlr_idle: *c.wlr_idle,
 wlr_input_inhibit_manager: *c.wlr_input_inhibit_manager,
+wlr_relative_pointer_manager: *c.wlr_relative_pointer_manager_v1,
 
 seats: std.TailQueue(Seat) = .{},
 
@@ -51,6 +52,8 @@ pub fn init(self: *Self, server: *Server) !void {
         // These are automatically freed when the display is destroyed
         .wlr_idle = c.wlr_idle_create(server.wl_display) orelse return error.OutOfMemory,
         .wlr_input_inhibit_manager = c.wlr_input_inhibit_manager_create(server.wl_display) orelse
+            return error.OutOfMemory,
+        .wlr_relative_pointer_manager = c.wlr_relative_pointer_manager_v1_create(server.wl_display) orelse
             return error.OutOfMemory,
     };
 
