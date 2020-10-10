@@ -46,6 +46,7 @@ pub usingnamespace @cImport({
     @cInclude("wlr/types/wlr_output.h");
     @cInclude("wlr/types/wlr_output_layout.h");
     @cInclude("wlr/types/wlr_pointer.h");
+    @cInclude("wlr/types/wlr_pointer_constraints_v1.h");
     @cInclude("wlr/types/wlr_primary_selection.h");
     @cInclude("wlr/types/wlr_primary_selection_v1.h");
     @cInclude("wlr/types/wlr_screencopy_v1.h");

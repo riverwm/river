@@ -110,6 +110,9 @@ const Mode = union(enum) {
 
     fn processMotion(self: *Self, device: *c.wlr_input_device, time: u32, delta_x: f64, delta_y: f64) void {
         const config = self.seat.input_manager.server.config;
+        if (self.active_constraint != null) {
+            return;
+        }
 
         switch (self.mode) {
             .passthrough => {
@@ -228,6 +231,10 @@ seat: *Seat,
 wlr_cursor: *c.wlr_cursor,
 wlr_xcursor_manager: *c.wlr_xcursor_manager,
 
+active_constraint: ?*c.wlr_pointer_constraint_v1,
+active_confine_requires_warp: bool = undefined,
+constraint_commit: c.wl_listener = undefined,
+
 /// Number of distinct buttons currently pressed
 pressed_count: u32 = 0,
 
@@ -256,7 +263,10 @@ pub fn init(self: *Self, seat: *Seat) !void {
         .seat = seat,
         .wlr_cursor = wlr_cursor,
         .wlr_xcursor_manager = wlr_xcursor_manager,
+        .active_constraint = null,
     };
+        // .active_confine_requires_warp = false,
+        // .constraint_commit = unreachable,
     try self.setTheme(null, null);
 
     // wlr_cursor *only* displays an image on screen. It does not move around
