@@ -26,6 +26,8 @@ pub usingnamespace @cImport({
     @cInclude("linux/input-event-codes.h");
     @cInclude("libevdev/libevdev.h");
 
+    @cInclude("pixman.h");
+
     @cInclude("wayland-server-core.h");
     //@cInclude("wlr/backend.h");
     //@cInclude("wlr/render/wlr_renderer.h");
@@ -49,6 +51,7 @@ pub usingnamespace @cImport({
     @cInclude("wlr/types/wlr_pointer_constraints_v1.h");
     @cInclude("wlr/types/wlr_primary_selection.h");
     @cInclude("wlr/types/wlr_primary_selection_v1.h");
+    @cInclude("wlr/types/wlr_relative_pointer_v1.h");
     @cInclude("wlr/types/wlr_screencopy_v1.h");
     @cInclude("wlr/types/wlr_seat.h");
     @cInclude("wlr/types/wlr_viewporter.h");
@@ -58,6 +61,7 @@ pub usingnamespace @cImport({
     @cInclude("wlr/types/wlr_xdg_shell.h");
     if (@import("build_options").xwayland) @cInclude("wlr/xwayland.h");
     @cInclude("wlr/util/log.h");
+    @cInclude("wlr/util/region.h");
     @cInclude("xkbcommon/xkbcommon.h");
 
     // Contains a subset of functions from wlr/backend.h and wlr/render/wlr_renderer.h

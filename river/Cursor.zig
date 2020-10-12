@@ -108,19 +108,44 @@ const Mode = union(enum) {
         passthrough(self, event.time_msec);
     }
 
-    fn processMotion(self: *Self, device: *c.wlr_input_device, time: u32, delta_x: f64, delta_y: f64) void {
+    fn processMotion(self: *Self, device: *c.wlr_input_device, time: u32, delta_x: f64, delta_y: f64, unaccel_dx: f64, unaccel_dy: f64) void {
         const config = self.seat.input_manager.server.config;
+        c.wlr_relative_pointer_manager_v1_send_relative_motion(
+            self.seat.input_manager.wlr_relative_pointer_manager,
+            self.seat.wlr_seat,
+            time,
+            delta_x,
+            delta_y,
+            unaccel_dx,
+            unaccel_dy,
+        );
+        var dx: f64 = delta_x;
+        var dy: f64 = delta_y;
         if (self.active_constraint != null) {
-            return;
+            var sx: f64 = undefined;
+            var sy: f64 = undefined;
+            var sx_confined: f64 = undefined;
+            var sy_confined: f64 = undefined;
+
+            const surface: ?*c.wlr_surface = self.surfaceAt(self.wlr_cursor.x, self.wlr_cursor.y, &sx, &sy,);
+
+            if (self.active_constraint.?.surface != surface) {
+                return;
+            }
+            if (!c.wlr_region_confine(&self.confine, sx, sy, sx + delta_x, sy + delta_y, &sx_confined, &sy_confined,)) {
+                return;
+            }
+            dx = sx_confined - sx;
+            dy = sy_confined - sy;
         }
 
         switch (self.mode) {
             .passthrough => {
-                c.wlr_cursor_move(self.wlr_cursor, device, delta_x, delta_y);
+                c.wlr_cursor_move(self.wlr_cursor, device, dx, dy);
                 passthrough(self, time);
             },
             .down => |view| {
-                c.wlr_cursor_move(self.wlr_cursor, device, delta_x, delta_y);
+                c.wlr_cursor_move(self.wlr_cursor, device, dx, dy);
                 c.wlr_seat_pointer_notify_motion(
                     self.seat.wlr_seat,
                     time,
@@ -134,12 +159,12 @@ const Mode = union(enum) {
                 // Set x/y of cursor and view, clamp to output dimensions
                 const output_resolution = view.output.getEffectiveResolution();
                 view.pending.box.x = std.math.clamp(
-                    view.pending.box.x + @floatToInt(i32, delta_x),
+                    view.pending.box.x + @floatToInt(i32, dx),
                     @intCast(i32, border_width),
                     @intCast(i32, output_resolution.width - view.pending.box.width - border_width),
                 );
                 view.pending.box.y = std.math.clamp(
-                    view.pending.box.y + @floatToInt(i32, delta_y),
+                    view.pending.box.y + @floatToInt(i32, dy),
                     @intCast(i32, border_width),
                     @intCast(i32, output_resolution.height - view.pending.box.height - border_width),
                 );
@@ -158,8 +183,8 @@ const Mode = union(enum) {
 
                 // Set width/height of view, clamp to view size constraints and output dimensions
                 const box = &data.view.pending.box;
-                box.width = @intCast(u32, std.math.max(0, @intCast(i32, box.width) + @floatToInt(i32, delta_x)));
-                box.height = @intCast(u32, std.math.max(0, @intCast(i32, box.height) + @floatToInt(i32, delta_y)));
+                box.width = @intCast(u32, std.math.max(0, @intCast(i32, box.width) + @floatToInt(i32, dx)));
+                box.height = @intCast(u32, std.math.max(0, @intCast(i32, box.height) + @floatToInt(i32, dy)));
 
                 data.view.applyConstraints();
 
@@ -232,6 +257,7 @@ wlr_cursor: *c.wlr_cursor,
 wlr_xcursor_manager: *c.wlr_xcursor_manager,
 
 active_constraint: ?*c.wlr_pointer_constraint_v1,
+confine: c.pixman_region32_t = undefined,
 active_confine_requires_warp: bool = undefined,
 constraint_commit: c.wl_listener = undefined,
 
@@ -265,8 +291,7 @@ pub fn init(self: *Self, seat: *Seat) !void {
         .wlr_xcursor_manager = wlr_xcursor_manager,
         .active_constraint = null,
     };
-        // .active_confine_requires_warp = false,
-        // .constraint_commit = unreachable,
+    c.pixman_region32_init(&self.confine);
     try self.setTheme(null, null);
 
     // wlr_cursor *only* displays an image on screen. It does not move around
@@ -487,7 +512,7 @@ fn handleMotionAbsolute(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) 
     var ly: f64 = undefined;
     c.wlr_cursor_absolute_to_layout_coords(self.wlr_cursor, event.device, event.x, event.y, &lx, &ly);
 
-    Mode.processMotion(self, event.device, event.time_msec, lx - self.wlr_cursor.x, ly - self.wlr_cursor.y);
+    Mode.processMotion(self, event.device, event.time_msec, lx - self.wlr_cursor.x, ly - self.wlr_cursor.y, lx - self.wlr_cursor.x, ly - self.wlr_cursor.y);
 }
 
 fn handleMotion(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -498,7 +523,7 @@ fn handleMotion(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 
     self.seat.handleActivity();
 
-    Mode.processMotion(self, event.device, event.time_msec, event.delta_x, event.delta_y);
+    Mode.processMotion(self, event.device, event.time_msec, event.delta_x, event.delta_y, event.unaccel_dx, event.unaccel_dy);
 }
 
 fn handleRequestSetCursor(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
