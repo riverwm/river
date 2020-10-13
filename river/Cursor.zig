@@ -292,6 +292,7 @@ pub fn init(self: *Self, seat: *Seat) !void {
         .active_constraint = null,
     };
     c.pixman_region32_init(&self.confine);
+    c.wl_list_init(&self.constraint_commit.link);
     try self.setTheme(null, null);
 
     // wlr_cursor *only* displays an image on screen. It does not move around
