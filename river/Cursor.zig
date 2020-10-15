@@ -121,7 +121,7 @@ const Mode = union(enum) {
         );
         var dx: f64 = delta_x;
         var dy: f64 = delta_y;
-        if (self.active_constraint != null) {
+        if (self.active_constraint != null and device.type == @intToEnum(c.wlr_input_device_type, c.WLR_INPUT_DEVICE_POINTER)) {
             var sx: f64 = undefined;
             var sy: f64 = undefined;
             var sx_confined: f64 = undefined;
@@ -132,7 +132,7 @@ const Mode = union(enum) {
             if (self.active_constraint.?.surface != surface) {
                 return;
             }
-            if (!c.wlr_region_confine(&self.confine, sx, sy, sx + delta_x, sy + delta_y, &sx_confined, &sy_confined,)) {
+            if (!c.wlr_region_confine(&self.confine, sx, sy, sx + dx, sy + dy, &sx_confined, &sy_confined,)) {
                 return;
             }
             dx = sx_confined - sx;

@@ -174,7 +174,7 @@ const struct_pointer_constraint = struct {
 fn handleNewPointerConstraint(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_new_pointer_constraint", listener.?);
     const constraint: ?*c.wlr_pointer_constraint_v1 = util.voidCast(c.wlr_pointer_constraint_v1, data.?);
-    const cursor = &self.defaultSeat().cursor;
+    const cursor: *Cursor = &(util.voidCast(Seat, constraint.?.seat.*.data.?).cursor);
     const pointer_constraint = util.gpa.create(struct_pointer_constraint) catch {
         return;
     };
@@ -244,7 +244,7 @@ fn handlePointerConstraintSetRegion(listener: ?*c.wl_listener, data: ?*c_void) c
 fn handlePointerConstraintDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const pointer_constraint = @fieldParentPtr(struct_pointer_constraint, "destroy", listener.?);
     const constraint: ?*c.wlr_pointer_constraint_v1 = util.voidCast(c.wlr_pointer_constraint_v1, data.?);
-    const cursor = pointer_constraint.cursor;
+    const cursor: *Cursor = pointer_constraint.cursor;
 
     c.wl_list_remove(&pointer_constraint.set_region.link);
     c.wl_list_remove(&pointer_constraint.destroy.link);
@@ -262,7 +262,7 @@ fn handlePointerConstraintDestroy(listener: ?*c.wl_listener, data: ?*c_void) cal
     util.gpa.destroy(pointer_constraint);
 }
 fn handleConstraintCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const cursor = @fieldParentPtr(Cursor, "constraint_commit", listener.?);
+    const cursor: *Cursor = @fieldParentPtr(Cursor, "constraint_commit", listener.?);
     std.debug.assert(cursor.active_constraint.?.surface == util.voidCast(c.wlr_surface, data.?));
 
     checkConstraintRegion(cursor);
@@ -271,7 +271,7 @@ fn checkConstraintRegion(cursor: *Cursor) callconv(.C) void {
     const constraint: ?*c.wlr_pointer_constraint_v1 = cursor.active_constraint;
     var region: *c.pixman_region32_t = &constraint.?.region;
     const view: ?*View = View.fromWlrSurface(constraint.?.surface);
-    if (cursor.active_confine_requires_warp == true and view != null) {
+    if (cursor.active_confine_requires_warp and view != null) {
         cursor.active_confine_requires_warp = false;
 
         const cur = view.?.current;
@@ -291,7 +291,7 @@ fn checkConstraintRegion(cursor: *Cursor) callconv(.C) void {
         }
     }
 
-    if (@enumToInt(constraint.?.type) == c.WLR_POINTER_CONSTRAINT_V1_CONFINED) {
+    if (constraint.?.type == @intToEnum(c.wlr_pointer_constraint_v1_type, c.WLR_POINTER_CONSTRAINT_V1_CONFINED)) {
         const tst = c.pixman_region32_copy(&cursor.confine, region,);
     } else {
         c.pixman_region32_clear(&cursor.confine);
@@ -300,7 +300,7 @@ fn checkConstraintRegion(cursor: *Cursor) callconv(.C) void {
 fn warpToConstraintCursorHint(cursor: *Cursor) callconv(.C) void {
     const constraint: ?*c.wlr_pointer_constraint_v1 = cursor.active_constraint;
 
-    if (constraint.?.current.committed >= 1 and @intCast(u32, c.WLR_POINTER_CONSTRAINT_V1_STATE_CURSOR_HINT) >= 1) {
+    if (constraint.?.current.committed >= 0 and @intCast(u32, c.WLR_POINTER_CONSTRAINT_V1_STATE_CURSOR_HINT) >= 0) {
         const sx: f64 = constraint.?.current.cursor_hint.x;
         const sy: f64 = constraint.?.current.cursor_hint.y;
 
