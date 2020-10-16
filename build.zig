@@ -152,7 +152,7 @@ const ScanProtocolsStep = struct {
 
         const protocol_dir_paths = [_][]const []const u8{
             &[_][]const u8{ protocol_dir, "stable/xdg-shell/xdg-shell.xml" },
-            &[_][]const u8{ protocol_dir, "/unstable/pointer-constraints/pointer-constraints-unstable-v1.xml" },
+            &[_][]const u8{ protocol_dir, "unstable/pointer-constraints/pointer-constraints-unstable-v1.xml" },
             &[_][]const u8{ "protocol", "wlr-layer-shell-unstable-v1.xml" },
             &[_][]const u8{ "protocol", "river-control-unstable-v1.xml" },
             &[_][]const u8{ "protocol", "river-status-unstable-v1.xml" },

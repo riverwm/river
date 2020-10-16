@@ -262,7 +262,7 @@ seat: *Seat,
 wlr_cursor: *c.wlr_cursor,
 wlr_xcursor_manager: *c.wlr_xcursor_manager,
 
-active_constraint: ?*c.wlr_pointer_constraint_v1,
+active_constraint: ?*c.wlr_pointer_constraint_v1 = null,
 confine: c.pixman_region32_t = undefined,
 active_confine_requires_warp: bool = false,
 listen_constraint_commit: c.wl_listener = undefined,
@@ -478,7 +478,7 @@ fn checkConstraintRegion(self: *Self) void {
         }
     }
 
-    if (constraint.?.type == @intToEnum(c.wlr_pointer_constraint_v1_type, c.WLR_POINTER_CONSTRAINT_V1_CONFINED)) {
+    if (constraint.?.type == .WLR_POINTER_CONSTRAINT_V1_CONFINED)) {
         const tst = c.pixman_region32_copy(&self.confine, region,);
     } else {
         c.pixman_region32_clear(&self.confine);
