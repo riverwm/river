@@ -28,6 +28,8 @@ const Seat = @import("Seat.zig");
 const Server = @import("Server.zig");
 const View = @import("View.zig");
 
+const PointerConstraint = @import("PointerConstraint.zig");
+
 const default_seat_name = "default";
 
 server: *Server,
@@ -163,8 +165,14 @@ fn handleNewInput(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 }
 
 fn handleNewPointerConstraint(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const constraint = util.voidCast(c.wlr_pointer_constraint_v1, data.?);
-    const seat = util.voidCast(Seat, constraint.seat.*.data.?);
+    const self = @fieldParentPtr(Self, "listen_new_pointer_constraint", listener.?);
+    const constraint: ?*c.wlr_pointer_constraint_v1 = util.voidCast(c.wlr_pointer_constraint_v1, data.?);
 
-    seat.cursor.createNewPointerConstraint(constraint);
+    const node = util.gpa.create(std.SinglyLinkedList(PointerConstraint).Node) catch {
+        log.crit(.constraint, "out of memory", .{});
+        return;
+    };
+    node.data.init(constraint);
+    self.server.root.pointer_constraints.prepend(node);
+    //self.cursor.mode = .passthrough;
 }

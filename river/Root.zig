@@ -30,6 +30,7 @@ const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const XwaylandUnmanaged = @import("XwaylandUnmanaged.zig");
 const DragIcon = @import("DragIcon.zig");
+const PointerConstraint = @import("PointerConstraint.zig");
 
 /// Responsible for all windowing operations
 server: *Server,
@@ -42,6 +43,7 @@ outputs: std.TailQueue(Output) = .{},
 noop_output: Output = undefined,
 
 drag_icons: std.SinglyLinkedList(DragIcon) = .{},
+pointer_constraints: std.SinglyLinkedList(PointerConstraint) = .{},
 
 /// This list stores all unmanaged Xwayland windows. This needs to be in root
 /// since X is like the wild west and who knows where these things will go.
