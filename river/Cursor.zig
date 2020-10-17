@@ -45,7 +45,7 @@ const Mode = union(enum) {
     },
 
     /// Enter move or resize mode
-    fn enter(self: *Self, mode: @TagType(Mode), event: *c.wlr_event_pointer_button, view: *View) void {
+    pub fn enter(self: *Self, mode: @TagType(Mode), view: *View) void {
         log.debug(.cursor, "enter {} mode", .{@tagName(mode)});
 
         self.seat.focus(view);
@@ -418,7 +418,7 @@ fn handleButton(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
                 // handled we are done here
                 if (self.handlePointerMapping(event, view)) return;
                 // Otherwise enter cursor down mode
-                Mode.enter(self, .down, event, view);
+                Mode.enter(self, .down, view);
             }
         }
 
@@ -443,8 +443,8 @@ fn handlePointerMapping(self: *Self, event: *c.wlr_event_pointer_button, view: *
     return for (config.modes.items[self.seat.mode_id].pointer_mappings.items) |mapping| {
         if (event.button == mapping.event_code and modifiers == mapping.modifiers) {
             switch (mapping.action) {
-                .move => if (!fullscreen) Mode.enter(self, .move, event, view),
-                .resize => if (!fullscreen) Mode.enter(self, .resize, event, view),
+                .move => if (!fullscreen) Mode.enter(self, .move, view),
+                .resize => if (!fullscreen) Mode.enter(self, .resize, view),
             }
             break true;
         }
