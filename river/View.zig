@@ -171,7 +171,8 @@ pub fn applyPending(self: *Self) void {
         arrange_output = true;
 
     // If switching from float to something else save the dimensions
-    if (self.current.float and !self.pending.float)
+    if ((self.current.float and !self.pending.float) or
+        (self.current.float and !self.current.fullscreen and self.pending.fullscreen))
         self.float_box = self.current.box;
 
     // If switching from something else to float restore the dimensions
