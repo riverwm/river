@@ -33,7 +33,7 @@ const Seat = @import("Seat.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 
-const Mode = union(enum) {
+pub const Mode = union(enum) {
     passthrough: void,
     down: *View,
     move: *View,
