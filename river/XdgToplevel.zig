@@ -24,6 +24,8 @@ const log = @import("log.zig");
 const util = @import("util.zig");
 
 const Box = @import("Box.zig");
+const Mode = @import("Cursor.zig").Mode;
+const Seat = @import("Seat.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const XdgPopup = @import("XdgPopup.zig");
@@ -43,6 +45,8 @@ listen_unmap: c.wl_listener = undefined,
 listen_commit: c.wl_listener = undefined,
 listen_new_popup: c.wl_listener = undefined,
 listen_request_fullscreen: c.wl_listener = undefined,
+listen_request_move: c.wl_listener = undefined,
+listen_request_resize: c.wl_listener = undefined,
 
 pub fn init(self: *Self, view: *View, wlr_xdg_surface: *c.wlr_xdg_surface) void {
     self.* = .{ .view = view, .wlr_xdg_surface = wlr_xdg_surface };
@@ -168,6 +172,12 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     self.listen_request_fullscreen.notify = handleRequestFullscreen;
     c.wl_signal_add(&wlr_xdg_toplevel.events.request_fullscreen, &self.listen_request_fullscreen);
 
+    self.listen_request_move.notify = handleRequestMove;
+    c.wl_signal_add(&wlr_xdg_toplevel.events.request_move, &self.listen_request_move);
+
+    self.listen_request_resize.notify = handleRequestResize;
+    c.wl_signal_add(&wlr_xdg_toplevel.events.request_resize, &self.listen_request_resize);
+
     view.wlr_surface = self.wlr_xdg_surface.surface;
 
     // Use the view's "natural" size centered on the output as the default
@@ -228,6 +238,8 @@ fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     c.wl_list_remove(&self.listen_commit.link);
     c.wl_list_remove(&self.listen_new_popup.link);
     c.wl_list_remove(&self.listen_request_fullscreen.link);
+    c.wl_list_remove(&self.listen_request_move.link);
+    c.wl_list_remove(&self.listen_request_resize.link);
 }
 
 /// Called when the surface is comitted
@@ -292,4 +304,21 @@ fn handleRequestFullscreen(listener: ?*c.wl_listener, data: ?*c_void) callconv(.
     const event = util.voidCast(c.wlr_xdg_toplevel_set_fullscreen_event, data.?);
     self.view.pending.fullscreen = event.fullscreen;
     self.view.applyPending();
+}
+
+/// Called when the client asks to be moved via the cursor, for example when the
+/// user drags CSD titlebars.
+fn handleRequestMove(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    const self = @fieldParentPtr(Self, "listen_request_move", listener.?);
+    const event = util.voidCast(c.wlr_xdg_toplevel_move_event, data.?);
+    const seat = util.voidCast(Seat, event.seat.*.seat.*.data.?);
+    Mode.enter(&seat.cursor, .move, self.view);
+}
+
+/// Called when the client asks to be resized via the cursor.
+fn handleRequestResize(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    const self = @fieldParentPtr(Self, "listen_request_resize", listener.?);
+    const event = util.voidCast(c.wlr_xdg_toplevel_resize_event, data.?);
+    const seat = util.voidCast(Seat, event.seat.*.seat.*.data.?);
+    Mode.enter(&seat.cursor, .resize, self.view);
 }
