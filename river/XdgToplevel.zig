@@ -24,7 +24,6 @@ const log = @import("log.zig");
 const util = @import("util.zig");
 
 const Box = @import("Box.zig");
-const Mode = @import("Cursor.zig").Mode;
 const Seat = @import("Seat.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
@@ -312,7 +311,7 @@ fn handleRequestMove(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) voi
     const self = @fieldParentPtr(Self, "listen_request_move", listener.?);
     const event = util.voidCast(c.wlr_xdg_toplevel_move_event, data.?);
     const seat = util.voidCast(Seat, event.seat.*.seat.*.data.?);
-    Mode.enter(&seat.cursor, .move, self.view);
+    seat.cursor.enterMode(.move, self.view);
 }
 
 /// Called when the client asks to be resized via the cursor.
@@ -320,5 +319,5 @@ fn handleRequestResize(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) v
     const self = @fieldParentPtr(Self, "listen_request_resize", listener.?);
     const event = util.voidCast(c.wlr_xdg_toplevel_resize_event, data.?);
     const seat = util.voidCast(Seat, event.seat.*.seat.*.data.?);
-    Mode.enter(&seat.cursor, .resize, self.view);
+    seat.cursor.enterMode(.resize, self.view);
 }
