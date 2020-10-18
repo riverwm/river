@@ -80,14 +80,6 @@ fn handleKey(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     // Translate libinput keycode -> xkbcommon
     const keycode = event.keycode + 8;
 
-    // Get a list of keysyms as xkb reports them
-    var translated_keysyms: ?[*]c.xkb_keysym_t = undefined;
-    const translated_keysyms_len = c.xkb_state_key_get_syms(
-        wlr_keyboard.xkb_state,
-        keycode,
-        &translated_keysyms,
-    );
-
     // Get a list of keysyms ignoring modifiers (e.g. 1 instead of !)
     // Important for mappings like Mod+Shift+1
     var raw_keysyms: ?[*]c.xkb_keysym_t = undefined;
@@ -106,27 +98,14 @@ fn handleKey(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const released = event.state == .WLR_KEY_RELEASED;
 
     var i: usize = 0;
-    while (i < translated_keysyms_len) : (i += 1) {
+    while (i < raw_keysyms_len) : (i += 1) {
         // Handle builtin mapping only when keys are pressed
-        if (!released and self.handleBuiltinMapping(translated_keysyms.?[i])) {
+        if (!released and self.handleBuiltinMapping(raw_keysyms.?[i])) {
             handled = true;
             break;
-        } else if (self.seat.handleMapping(translated_keysyms.?[i], modifiers, released)) {
+        } else if (self.seat.handleMapping(raw_keysyms.?[i], modifiers, released)) {
             handled = true;
             break;
-        }
-    }
-    if (!handled) {
-        i = 0;
-        while (i < raw_keysyms_len) : (i += 1) {
-            // Handle builtin mapping only when keys are pressed
-            if (!released and self.handleBuiltinMapping(raw_keysyms.?[i])) {
-                handled = true;
-                break;
-            } else if (self.seat.handleMapping(raw_keysyms.?[i], modifiers, released)) {
-                handled = true;
-                break;
-            }
         }
     }
 
