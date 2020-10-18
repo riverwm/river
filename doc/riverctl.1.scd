@@ -153,8 +153,7 @@ that tag 1 through 9 are visible.
 	_key_ is an XKB key name. See _/usr/include/xkbcommon/xkbcommon-keysyms.h_
 	for a list of special key names. _command_ can be any of the above commands.
 
-	A mapping without modifiers can be created by passing an empty string as
-	the modifiers argument.
+	A mapping without modifiers can be created by using "None" as sole modifier.
 
 *map-pointer* _mode_ _modifiers_ _button_ _action_
 	_mode_ and _modifiers_ are the same as for *map*.

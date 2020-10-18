@@ -29,7 +29,7 @@ const modifier_names = [_]struct {
     name: []const u8,
     modifier: u32,
 }{
-    .{ .name = "", .modifier = 0 },
+    .{ .name = "None", .modifier = 0 },
     .{ .name = "Shift", .modifier = c.WLR_MODIFIER_SHIFT },
     .{ .name = "Lock", .modifier = c.WLR_MODIFIER_CAPS },
     .{ .name = "Control", .modifier = c.WLR_MODIFIER_CTRL },
