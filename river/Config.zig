@@ -89,11 +89,22 @@ pub fn init() !Self {
         .csd_filter = std.ArrayList([]const u8).init(util.gpa),
     };
 
-    // Start with a single, empty mode called normal
     errdefer self.deinit();
-    const owned_slice = try std.mem.dupe(util.gpa, u8, "normal");
-    try self.mode_to_id.putNoClobber(owned_slice, 0);
-    try self.modes.append(Mode.init());
+
+    // Start with two empty modes, "normal" and "locked"
+    try self.modes.ensureCapacity(2);
+    {
+        // Normal mode, id 0
+        const owned_slice = try std.mem.dupe(util.gpa, u8, "normal");
+        try self.mode_to_id.putNoClobber(owned_slice, 0);
+        self.modes.appendAssumeCapacity(Mode.init());
+    }
+    {
+        // Locked mode, id 1
+        const owned_slice = try std.mem.dupe(util.gpa, u8, "locked");
+        try self.mode_to_id.putNoClobber(owned_slice, 1);
+        self.modes.appendAssumeCapacity(Mode.init());
+    }
 
     return self;
 }

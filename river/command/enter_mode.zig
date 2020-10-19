@@ -30,9 +30,18 @@ pub fn enterMode(
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
 
+    if (seat.mode_id == 1) {
+        out.* = try std.fmt.allocPrint(
+            allocator,
+            "manually exiting mode 'locked' is not allowed",
+            .{},
+        );
+        return Error.Other;
+    }
+
     const config = seat.input_manager.server.config;
     const target_mode = args[1];
-    seat.mode_id = config.mode_to_id.get(target_mode) orelse {
+    const mode_id = config.mode_to_id.get(target_mode) orelse {
         out.* = try std.fmt.allocPrint(
             allocator,
             "cannot enter non-existant mode '{}'",
@@ -40,4 +49,15 @@ pub fn enterMode(
         );
         return Error.Other;
     };
+
+    if (mode_id == 1) {
+        out.* = try std.fmt.allocPrint(
+            allocator,
+            "manually entering mode 'locked' is not allowed",
+            .{},
+        );
+        return Error.Other;
+    }
+
+    seat.mode_id = mode_id;
 }
