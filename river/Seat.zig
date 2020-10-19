@@ -53,6 +53,9 @@ keyboards: std.TailQueue(Keyboard) = .{},
 /// ID of the current keymap mode
 mode_id: usize = 0,
 
+/// ID of previous keymap mode, used when returning from "locked" mode
+prev_mode_id: usize = 0,
+
 /// Currently focused output, may be the noop output if no
 focused_output: *Output,
 

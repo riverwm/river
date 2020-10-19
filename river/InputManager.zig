@@ -110,10 +110,14 @@ fn handleInhibitActivate(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C)
 
     log.debug(.input_manager, "input inhibitor activated", .{});
 
-    // Clear focus of all seats
     var seat_it = self.seats.first;
     while (seat_it) |seat_node| : (seat_it = seat_node.next) {
+        // Clear focus of all seats
         seat_node.data.setFocusRaw(.{ .none = {} });
+
+        // Enter locked mode
+        seat_node.data.prev_mode_id = seat_node.data.mode_id;
+        seat_node.data.mode_id = 1;
     }
 
     self.exclusive_client = self.wlr_input_inhibit_manager.active_client;
@@ -134,10 +138,11 @@ fn handleInhibitDeactivate(listener: ?*c.wl_listener, data: ?*c_void) callconv(.
     }
 
     // After ensuring that any possible layer surface focus grab has occured,
-    // have each Seat handle focus.
+    // have each Seat handle focus and enter their previous mode.
     var seat_it = self.seats.first;
     while (seat_it) |seat_node| : (seat_it = seat_node.next) {
         seat_node.data.focus(null);
+        seat_node.data.mode_id = seat_node.data.prev_mode_id;
     }
 
     self.server.root.startTransaction();
