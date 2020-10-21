@@ -55,7 +55,8 @@ pub fn map(
     const offset = optionals.i;
     if (args.len - offset < 5) return Error.NotEnoughArguments;
 
-    const mode_id = try modeNameToId(allocator, seat, args[1 + offset], out);
+    const mode_ids = try modeListToIds(allocator, seat, args[1 + offset], out);
+    defer allocator.free(mode_ids);
     const modifiers = try parseModifiers(allocator, args[2 + offset], out);
 
     // Parse the keysym
@@ -71,20 +72,25 @@ pub fn map(
         return Error.Other;
     }
 
-    // Check if the mapping already exists
-    const mode_mappings = &seat.input_manager.server.config.modes.items[mode_id].mappings;
-    for (mode_mappings.items) |existant_mapping| {
-        if (existant_mapping.modifiers == modifiers and existant_mapping.keysym == keysym and existant_mapping.release == optionals.release) {
-            out.* = try std.fmt.allocPrint(
-                allocator,
-                "a mapping for modifiers '{}' and keysym '{}' already exists",
-                .{ args[2 + offset], args[3 + offset] },
-            );
-            return Error.Other;
+    // Check if the mapping already exists in any given mode
+    for (mode_ids) |mode_id| {
+        const mode_mappings = &seat.input_manager.server.config.modes.items[mode_id].mappings;
+        for (mode_mappings.items) |existant_mapping| {
+            if (existant_mapping.modifiers == modifiers and existant_mapping.keysym == keysym and existant_mapping.release == optionals.release) {
+                out.* = try std.fmt.allocPrint(
+                    allocator,
+                    "a mapping for modifiers '{}' and keysym '{}' already exists",
+                    .{ args[2 + offset], args[3 + offset] },
+                );
+                return Error.Other;
+            }
         }
     }
 
-    try mode_mappings.append(try Mapping.init(util.gpa, keysym, modifiers, optionals.release, args[4 + offset ..]));
+    for (mode_ids) |mode_id| {
+        const mode_mappings = &seat.input_manager.server.config.modes.items[mode_id].mappings;
+        try mode_mappings.append(try Mapping.init(util.gpa, keysym, modifiers, optionals.release, args[4 + offset ..]));
+    }
 }
 
 /// Create a new pointer mapping for a given mode
@@ -100,7 +106,8 @@ pub fn mapPointer(
     if (args.len < 5) return Error.NotEnoughArguments;
     if (args.len > 5) return Error.TooManyArguments;
 
-    const mode_id = try modeNameToId(allocator, seat, args[1], out);
+    const mode_ids = try modeListToIds(allocator, seat, args[1], out);
+    defer allocator.free(mode_ids);
     const modifiers = try parseModifiers(allocator, args[2], out);
 
     const event_code = blk: {
@@ -114,16 +121,18 @@ pub fn mapPointer(
         break :blk @intCast(u32, ret);
     };
 
-    // Check if the mapping already exists
-    const mode_pointer_mappings = &seat.input_manager.server.config.modes.items[mode_id].pointer_mappings;
-    for (mode_pointer_mappings.items) |existing| {
-        if (existing.event_code == event_code and existing.modifiers == modifiers) {
-            out.* = try std.fmt.allocPrint(
-                allocator,
-                "a pointer mapping for modifiers '{}' and button '{}' already exists",
-                .{ args[2], args[3] },
-            );
-            return Error.Other;
+    // Check if the mapping already exists in any given mode
+    for (mode_ids) |mode_id| {
+        const mode_pointer_mappings = &seat.input_manager.server.config.modes.items[mode_id].pointer_mappings;
+        for (mode_pointer_mappings.items) |existing| {
+            if (existing.event_code == event_code and existing.modifiers == modifiers) {
+                out.* = try std.fmt.allocPrint(
+                    allocator,
+                    "a pointer mapping for modifiers '{}' and button '{}' already exists",
+                    .{ args[2], args[3] },
+                );
+                return Error.Other;
+            }
         }
     }
 
@@ -140,11 +149,14 @@ pub fn mapPointer(
         return Error.Other;
     };
 
-    try mode_pointer_mappings.append(.{
-        .event_code = event_code,
-        .modifiers = modifiers,
-        .action = action,
-    });
+    for (mode_ids) |mode_id| {
+        const mode_pointer_mappings = &seat.input_manager.server.config.modes.items[mode_id].pointer_mappings;
+        try mode_pointer_mappings.append(.{
+            .event_code = event_code,
+            .modifiers = modifiers,
+            .action = action,
+        });
+    }
 }
 
 fn modeNameToId(allocator: *std.mem.Allocator, seat: *Seat, mode_name: []const u8, out: *?[]const u8) !usize {
@@ -157,6 +169,17 @@ fn modeNameToId(allocator: *std.mem.Allocator, seat: *Seat, mode_name: []const u
         );
         return Error.Other;
     };
+}
+
+fn modeListToIds(allocator: *std.mem.Allocator, seat: *Seat, modes_str: []const u8, out: *?[]const u8) ![]usize {
+    var mode_ids = try std.ArrayList(usize).initCapacity(allocator, 2);
+    var it = std.mem.split(modes_str, ",");
+    while (it.next()) |mode_name| {
+        const mode_id = try modeNameToId(allocator, seat, mode_name, out);
+        try mode_ids.append(mode_id);
+    }
+
+    return mode_ids.toOwnedSlice();
 }
 
 fn parseModifiers(allocator: *std.mem.Allocator, modifiers_str: []const u8, out: *?[]const u8) !u32 {

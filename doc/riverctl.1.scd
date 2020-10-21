@@ -134,9 +134,10 @@ that tag 1 through 9 are visible.
 	but let the currently focused window in focus.
 	When set to _strict_ this is not the case. The focus will be updated on every cursor movement.
 
-*map* [-release] _mode_ _modifiers_ _key_ _command_
-	_mode_ is either "normal" (the default mode), "locked" (the mode entered when
-	an input inhibitor such as a lock screen is active) or a mode created with *declare-mode*.
+*map* [-release] _modes_ _modifiers_ _key_ _command_
+	_modes_ is a comma seperated list whose members are one of "normal" (the default mode),
+	"locked" (the mode entered when an input inhibitor such as a lock screen is active)
+	or a mode created with *declare-mode*.
 	If _-release_ is specified the mapping is executed on key release rather than key press.
 	_modifiers_ is a list of one or more of the following
 	modifiers separated with a plus sign:
@@ -155,8 +156,8 @@ that tag 1 through 9 are visible.
 
 	A mapping without modifiers can be created by using "None" as sole modifier.
 
-*map-pointer* _mode_ _modifiers_ _button_ _action_
-	_mode_ and _modifiers_ are the same as for *map*.
+*map-pointer* _modes_ _modifiers_ _button_ _action_
+	_modes_ and _modifiers_ are the same as for *map*.
 
 	_button_ is the name of a linux input event code. The most commonly used
 	values are:
