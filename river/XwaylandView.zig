@@ -165,6 +165,28 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     view.float_box.y = std.math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.height) -
         @intCast(i32, view.float_box.height), 2));
 
+    const size_hints = self.wlr_xwayland_surface.size_hints;
+    const has_fixed_size = size_hints.*.min_width != 0 and size_hints.*.min_height != 0 and
+        (size_hints.*.min_width == size_hints.*.max_width or size_hints.*.min_height == size_hints.*.max_height);
+    const app_id: [*:0]const u8 = if (self.wlr_xwayland_surface.class) |id| id else "NULL";
+
+    if (self.wlr_xwayland_surface.parent != null or has_fixed_size) {
+        // If the toplevel has a parent or has a fixed size make it float
+        view.current.float = true;
+        view.pending.float = true;
+        view.pending.box = view.float_box;
+    } else {
+        // Make views with app_ids listed in the float filter float
+        for (root.server.config.float_filter.items) |filter_app_id| {
+            if (std.mem.eql(u8, std.mem.span(app_id), std.mem.span(filter_app_id))) {
+                view.current.float = true;
+                view.pending.float = true;
+                view.pending.box = view.float_box;
+                break;
+            }
+        }
+    }
+
     view.map();
 }
 

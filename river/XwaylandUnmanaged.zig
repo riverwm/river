@@ -107,10 +107,6 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     self.listen_commit.notify = handleCommit;
     c.wl_signal_add(&self.wlr_xwayland_surface.surface.*.events.commit, &self.listen_commit);
 
-    const size_hints = self.wlr_xwayland_surface.size_hints;
-    const has_fixed_size = size_hints.*.min_width != 0 and size_hints.min_height != 0 and
-        (size_hints.min_width == size_hints.max_width or size_hints.min_height == size_hints.max_height);
-
     // TODO: handle keyboard focus
     // if (wlr_xwayland_or_surface_wants_focus(self.wlr_xwayland_surface)) { ...
 }
