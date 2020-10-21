@@ -25,6 +25,7 @@ const Box = @import("Box.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const XdgPopup = @import("XdgPopup.zig");
+const log = @import("log.zig");
 
 /// The view this xwayland view implements
 view: *View,
@@ -206,7 +207,8 @@ fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_commit", listener.?);
     const view = self.view;
 
-    view.surface_box = Box{
+    //view.surface_box = Box{
+    const new_box = Box{
         .x = 0,
         .y = 0,
         .width = @intCast(u32, self.wlr_xwayland_surface.surface.*.current.width),
@@ -215,12 +217,23 @@ fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 
     // See comment in XwaylandView.configure()
     if (view.pending_serial != null) {
+        // Update the stored dimensions of the surface
+        view.surface_box = new_box;
         // If the view is part of the layout, notify the transaction code. If
         // the view is floating or fullscreen apply the pending state immediately.
         view.pending_serial = null;
         if (!view.pending.float and !view.pending.fullscreen)
             view.output.root.notifyConfigured()
-        else
+        else {
+            const view_tags_changed = view.pending.tags != view.current.tags;
             view.current = view.pending;
+            view.commitOpacityTransition();
+            if (view_tags_changed) view.output.sendViewTags();
+        }
+    } else {
+        // TODO: handle unexpected change in dimensions
+        //if (!std.meta.eql(view.surface_box, new_box))
+        //    log.err(.xdg_shell, "view changed size unexpectedly", .{});
+        view.surface_box = new_box;
     }
 }
