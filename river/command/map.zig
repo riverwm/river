@@ -19,6 +19,7 @@
 const std = @import("std");
 
 const c = @import("../c.zig");
+const command = @import("../command.zig");
 const util = @import("../util.zig");
 
 const Error = @import("../command.zig").Error;
@@ -51,9 +52,11 @@ pub fn map(
     args: []const []const u8,
     out: *?[]const u8,
 ) Error!void {
-    const optionals = parseOptionalArgs(args[1..]);
+    var offset: usize = undefined;
+    const options = command.parse(args[1..], &offset, struct {
+        @"-release": bool = false,
+    });
     // offset caused by optional arguments
-    const offset = optionals.i;
     if (args.len - offset < 5) return Error.NotEnoughArguments;
 
     const mode_id = try modeNameToId(allocator, seat, args[1 + offset], out);
@@ -62,7 +65,7 @@ pub fn map(
 
     const mode_mappings = &seat.input_manager.server.config.modes.items[mode_id].mappings;
 
-    if (mappingExists(mode_mappings, modifiers, keysym, optionals.release)) |_| {
+    if (mappingExists(mode_mappings, modifiers, keysym, options.@"-release")) |_| {
         out.* = try std.fmt.allocPrint(
             allocator,
             "a mapping for modifiers '{}' and keysym '{}' already exists",
@@ -71,7 +74,7 @@ pub fn map(
         return Error.Other;
     }
 
-    try mode_mappings.append(try Mapping.init(keysym, modifiers, optionals.release, args[4 + offset ..]));
+    try mode_mappings.append(try Mapping.init(keysym, modifiers, options.@"-release", args[4 + offset ..]));
 }
 
 /// Create a new pointer mapping for a given mode
@@ -204,38 +207,6 @@ fn parseModifiers(allocator: *std.mem.Allocator, modifiers_str: []const u8, out:
     return modifiers;
 }
 
-const OptionalArgsContainer = struct {
-    i: usize,
-    release: bool,
-};
-
-/// Parses optional args (such as -release) and return the index of the first argument that is
-/// not an optional argument
-/// Returns an OptionalArgsContainer with the settings set according to the args
-/// Errors cant occur because it returns as soon as it gets an unknown argument
-fn parseOptionalArgs(args: []const []const u8) OptionalArgsContainer {
-    // Set to defaults
-    var parsed = OptionalArgsContainer{
-        // i is the number of arguments consumed
-        .i = 0,
-        .release = false,
-    };
-
-    var i: usize = 0;
-    for (args) |arg| {
-        if (std.mem.eql(u8, arg, "-release")) {
-            parsed.release = true;
-            i += 1;
-        } else {
-            // Break if the arg is not an option
-            parsed.i = i;
-            break;
-        }
-    }
-
-    return parsed;
-}
-
 /// Remove a mapping from a given mode
 ///
 /// Example:
@@ -246,9 +217,10 @@ pub fn unmap(
     args: []const []const u8,
     out: *?[]const u8,
 ) Error!void {
-    const optionals = parseOptionalArgs(args[1..]);
-    // offset caused by optional arguments
-    const offset = optionals.i;
+    var offset: usize = undefined;
+    const options = command.parse(args[1..], &offset, struct {
+        @"-release": bool = false,
+    });
     if (args.len - offset < 4) return Error.NotEnoughArguments;
 
     const mode_id = try modeNameToId(allocator, seat, args[1 + offset], out);
@@ -256,7 +228,7 @@ pub fn unmap(
     const keysym = try parseKeysym(allocator, args[3 + offset], out);
 
     const mode_mappings = &seat.input_manager.server.config.modes.items[mode_id].mappings;
-    const mapping_idx = mappingExists(mode_mappings, modifiers, keysym, optionals.release) orelse {
+    const mapping_idx = mappingExists(mode_mappings, modifiers, keysym, options.@"-release") orelse {
         out.* = try std.fmt.allocPrint(
             allocator,
             "there is no mapping for modifiers '{}' and keysym '{}'",
