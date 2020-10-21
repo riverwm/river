@@ -25,7 +25,6 @@ const Box = @import("Box.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const XdgPopup = @import("XdgPopup.zig");
-const log = @import("log.zig");
 
 /// The view this xwayland view implements
 view: *View,
@@ -207,7 +206,6 @@ fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const self = @fieldParentPtr(Self, "listen_commit", listener.?);
     const view = self.view;
 
-    //view.surface_box = Box{
     const new_box = Box{
         .x = 0,
         .y = 0,
@@ -231,9 +229,6 @@ fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
             if (view_tags_changed) view.output.sendViewTags();
         }
     } else {
-        // TODO: handle unexpected change in dimensions
-        //if (!std.meta.eql(view.surface_box, new_box))
-        //    log.err(.xdg_shell, "view changed size unexpectedly", .{});
         view.surface_box = new_box;
     }
 }
