@@ -172,7 +172,7 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 
     if (self.wlr_xwayland_surface.parent != null or has_fixed_size) {
         // If the toplevel has a parent or has a fixed size make it float
-        view.current.float = true;
+        //view.current.float = true;
         view.pending.float = true;
         view.pending.box = view.float_box;
     } else {
@@ -217,10 +217,11 @@ fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     if (view.pending_serial != null) {
         // Update the stored dimensions of the surface
         view.surface_box = new_box;
+
         // If the view is part of the layout, notify the transaction code. If
         // the view is floating or fullscreen apply the pending state immediately.
         view.pending_serial = null;
-        if (!view.pending.float and !view.pending.fullscreen)
+        if (view.shouldTrackConfigure())
             view.output.root.notifyConfigured()
         else {
             const view_tags_changed = view.pending.tags != view.current.tags;
