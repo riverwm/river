@@ -172,7 +172,6 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 
     if (self.wlr_xwayland_surface.parent != null or has_fixed_size) {
         // If the toplevel has a parent or has a fixed size make it float
-        //view.current.float = true;
         view.pending.float = true;
         view.pending.box = view.float_box;
     } else {
