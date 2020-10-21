@@ -142,3 +142,52 @@ pub fn errToMsg(err: Error) [:0]const u8 {
         Error.Other => unreachable,
     };
 }
+
+/// Parses a list of options specified by T
+/// args[0] must be the first option if any
+/// offset will be set to the index of the first entry in args that is not an option
+/// See test "optional args" for an example of T
+pub fn parse(args: []const []const u8, offset: *usize, comptime T: type) T {
+    var ret: T = T{};
+    // Make sure the format of T is valid
+    if (@typeInfo(T) != .Struct) @compileError("T must be a struct");
+    inline for (@typeInfo(T).Struct.fields) |field| {
+        if (@typeInfo(field.field_type) != .Bool)
+            @compileError("unsupported option type " ++ field.field_type);
+        if (field.default_value.?)
+            @compileError("bool options must be false by default");
+    }
+
+    offset.* = 0;
+    // Do the actual parsing of args
+    outer: for (args) |arg| {
+        inline for (@typeInfo(T).Struct.fields) |field| {
+            if (std.mem.eql(u8, arg, field.name)) {
+                @field(ret, field.name) = true;
+                offset.* += 1;
+                continue :outer;
+            }
+        }
+
+        // There are no options left
+        break;
+    }
+
+    return ret;
+}
+
+test "optional args" {
+    const testing = @import("std").testing;
+    const mem = @import("std").mem;
+
+    var offset: usize = 0;
+    const args = [_][]const u8{ "-bool-given", "not_an_option" };
+    const options = parse(&args, &offset, struct {
+        @"-bool-given": bool = false,
+        @"-bool-not-given": bool = false,
+    });
+
+    testing.expect(options.@"-bool-given" == true);
+    testing.expect(options.@"-bool-not-given" == false);
+    testing.expect(mem.eql(u8, args[offset], "not_an_option"));
+}
