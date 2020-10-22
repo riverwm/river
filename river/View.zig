@@ -242,6 +242,9 @@ pub fn saveBuffers(self: *Self) void {
     self.forEachSurface(saveBuffersIterator, &self.saved_buffers);
 }
 
+/// If this commit is in response to our configure and the
+/// transaction code is tracking this configure, notify it.
+/// Otherwise, apply the pending state immediately.
 pub fn notifyConfiguredOrApplyPending(self: *Self) void {
     self.pending_serial = null;
     if (self.shouldTrackConfigure())

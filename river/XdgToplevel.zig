@@ -257,9 +257,6 @@ fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         view.surface_box = new_box;
 
         if (s == self.wlr_xdg_surface.configure_serial) {
-            // If this commit is in response to our configure and the
-            // transaction code is tracking this configure, notify it.
-            // Otherwise, apply the pending state immediately.
             view.notifyConfiguredOrApplyPending();
         } else {
             // If the client has not yet acked our configure, we need to send a

@@ -215,8 +215,6 @@ fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 
     // See comment in XwaylandView.configure()
     if (view.pending_serial != null) {
-        // If the view is part of the layout, notify the transaction code. If
-        // the view is floating or fullscreen apply the pending state immediately.
         view.notifyConfiguredOrApplyPending();
     }
 }
