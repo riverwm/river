@@ -242,6 +242,18 @@ pub fn saveBuffers(self: *Self) void {
     self.forEachSurface(saveBuffersIterator, &self.saved_buffers);
 }
 
+pub fn notifyConfiguredOrApplyPending(self: *Self) void {
+    self.pending_serial = null;
+    if (self.shouldTrackConfigure())
+        self.output.root.notifyConfigured()
+    else {
+        const self_tags_changed = self.pending.tags != self.current.tags;
+        self.current = self.pending;
+        self.commitOpacityTransition();
+        if (self_tags_changed) self.output.sendViewTags();
+    }
+}
+
 fn saveBuffersIterator(
     wlr_surface: ?*c.wlr_surface,
     surface_x: c_int,
