@@ -242,8 +242,8 @@ fn layoutExternal(self: *Self, visible_count: u32) !void {
     defer stdout.close();
 
     // TODO abort after a timeout
-    const status = std.os.waitpid(pid, 0);
-    if (!std.os.WIFEXITED(status) or std.os.WEXITSTATUS(status) != 0)
+    const ret = std.os.waitpid(pid, 0);
+    if (!std.os.WIFEXITED(ret.status) or std.os.WEXITSTATUS(ret.status) != 0)
         return LayoutError.BadExitCode;
 
     const buffer = try stdout.inStream().readAllAlloc(&arena.allocator, 1024);

@@ -55,9 +55,9 @@ pub fn spawn(
     }
 
     // Wait the intermediate child.
-    const status = std.os.waitpid(pid, 0);
-    if (!std.os.WIFEXITED(status) or
-        (std.os.WIFEXITED(status) and std.os.WEXITSTATUS(status) != 0))
+    const ret = std.os.waitpid(pid, 0);
+    if (!std.os.WIFEXITED(ret.status) or
+        (std.os.WIFEXITED(ret.status) and std.os.WEXITSTATUS(ret.status) != 0))
     {
         out.* = try std.fmt.allocPrint(allocator, "fork/execve failed", .{});
         return Error.Other;
