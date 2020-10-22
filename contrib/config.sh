@@ -108,6 +108,21 @@ riverctl map normal $mod F11 enter-mode passthrough
 # Mod+F11 to return to normal mode
 riverctl map passthrough $mod F11 enter-mode normal
 
+# Various media key mapping for both normal and locked mode
+for mode in normal locked
+do
+	riverctl map "${mode}" None XF86Eject             spawn eject -T
+	riverctl map "${mode}" None XF86AudioRaiseVolume  spawn pamixer -i 5
+	riverctl map "${mode}" None XF86AudioLowerVolume  spawn pamixer -d 5
+	riverctl map "${mode}" None XF86AudioMute         spawn pamixer --set-volume 0
+	riverctl map "${mode}" None XF86AudioMedia        spawn playerctl play-pause
+	riverctl map "${mode}" None XF86AudioPlay         spawn playerctl play-pause
+	riverctl map "${mode}" None XF86AudioPrev         spawn playerctl previous
+	riverctl map "${mode}" None XF86AudioNext         spawn playerctl next
+	riverctl map "${mode}" None XF86MonBrightnessUp   spawn light -A 5
+	riverctl map "${mode}" None XF86MonBrightnessDown spawn light -U 5
+done
+
 # Set the layout on startup
 riverctl layout rivertile left
 
