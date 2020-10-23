@@ -72,6 +72,12 @@ used to control and configure river.
 	_shell_command_ if you do not want special characters to get
 	interpreted by your shell before the command gets passed to _/bin/sh_.
 
+*swap* *next*|*previous*
+	Swap the focused window with the next/previous visible non-floating window.
+	When the focused view is the first view there is no previous view.
+	In this case *previous* swaps with the last view.
+	*next* behaves analogous.
+
 *toggle-float*
 	If the focused view is floating, make it tiled. If it is tiled, make
 	it floating.
