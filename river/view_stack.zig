@@ -108,6 +108,50 @@ pub fn ViewStack(comptime T: type) type {
             }
         }
 
+        /// Swap the nodes a and b.
+        /// pointers to Node.T will point to the same data as before
+        pub fn swap(self: *Self, a: *Node, b: *Node) void {
+            // Set self.first and self.last
+            const first = self.first;
+            const last = self.last;
+            if (a == first) {
+                self.first = b;
+            } else if (a == last) {
+                self.last = b;
+            }
+
+            if (b == first) {
+                self.first = a;
+            } else if (b == last) {
+                self.last = a;
+            }
+
+            // This is so complicated to make sure everything works when a and b are neighbors
+            const a_next = if (b.next == a) b else b.next;
+            const a_prev = if (b.prev == a) b else b.prev;
+            const b_next = if (a.next == b) a else a.next;
+            const b_prev = if (a.prev == b) a else a.prev;
+
+            a.next = a_next;
+            a.prev = a_prev;
+            b.next = b_next;
+            b.prev = b_prev;
+
+            // Update all neighbors
+            if (a.next) |next| {
+                next.prev = a;
+            }
+            if (a.prev) |prev| {
+                prev.next = a;
+            }
+            if (b.next) |next| {
+                next.prev = b;
+            }
+            if (b.prev) |prev| {
+                prev.next = b;
+            }
+        }
+
         const Direction = enum {
             forward,
             reverse,
