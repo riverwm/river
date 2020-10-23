@@ -43,17 +43,28 @@ pub fn swap(
 
     const focused_node = @fieldParentPtr(ViewStack(View).Node, "view", seat.focused.view);
     const output = seat.focused_output;
-    var it = if (direction == .next) ViewStack(View).iter(focused_node, .forward, output.pending.tags, filter)
-        else ViewStack(View).iter(focused_node, .reverse, output.pending.tags, filter);
-    var it_wrap = if (direction == .next) ViewStack(View).iter(output.views.first, .forward, output.pending.tags, filter)
-        else ViewStack(View).iter(output.views.last, .forward, output.pending.tags, filter);
+    var it = ViewStack(View).iter(
+        focused_node,
+        if (direction == .next) .forward else .reverse,
+        output.pending.tags,
+        filter
+    );
+    var it_wrap = ViewStack(View).iter(
+        if (direction == .next) output.views.first else output.views.last,
+        .forward,
+        output.pending.tags,
+        filter
+    );
 
     // skip the first node which is focused_node
     _ = it.next().?;
 
-    // Wrap around if needed
-    const to_swap = if (it.next()) |next| @fieldParentPtr(ViewStack(View).Node, "view", next)
-        else @fieldParentPtr(ViewStack(View).Node, "view", it_wrap.next().?);
+    const to_swap = @fieldParentPtr(
+        ViewStack(View).Node,
+        "view",
+        // Wrap around if needed
+        if (it.next()) |next| next else it_wrap.next().?
+    );
 
     // Dont swap when only the focused view is part of the layout
     if (focused_node == to_swap) {
