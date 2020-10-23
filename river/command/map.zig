@@ -1,6 +1,7 @@
 // This file is part of river, a dynamic tiling wayland compositor.
 //
 // Copyright 2020 Isaac Freund
+// Copyright 2020 Marten Ringwelski
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -57,31 +58,17 @@ pub fn map(
 
     const mode_id = try modeNameToId(allocator, seat, args[1 + offset], out);
     const modifiers = try parseModifiers(allocator, args[2 + offset], out);
+    const keysym = try parseKeysym(allocator, args[3 + offset], out);
 
-    // Parse the keysym
-    const keysym_name = try std.cstr.addNullByte(allocator, args[3 + offset]);
-    defer allocator.free(keysym_name);
-    const keysym = c.xkb_keysym_from_name(keysym_name, .XKB_KEYSYM_CASE_INSENSITIVE);
-    if (keysym == c.XKB_KEY_NoSymbol) {
+    const mode_mappings = &seat.input_manager.server.config.modes.items[mode_id].mappings;
+
+    if (mappingExists(mode_mappings, modifiers, keysym, optionals.release)) |_| {
         out.* = try std.fmt.allocPrint(
             allocator,
-            "invalid keysym '{}'",
-            .{args[3 + offset]},
+            "a mapping for modifiers '{}' and keysym '{}' already exists",
+            .{ args[2 + offset], args[3 + offset] },
         );
         return Error.Other;
-    }
-
-    // Check if the mapping already exists
-    const mode_mappings = &seat.input_manager.server.config.modes.items[mode_id].mappings;
-    for (mode_mappings.items) |existant_mapping| {
-        if (existant_mapping.modifiers == modifiers and existant_mapping.keysym == keysym and existant_mapping.release == optionals.release) {
-            out.* = try std.fmt.allocPrint(
-                allocator,
-                "a mapping for modifiers '{}' and keysym '{}' already exists",
-                .{ args[2 + offset], args[3 + offset] },
-            );
-            return Error.Other;
-        }
     }
 
     try mode_mappings.append(try Mapping.init(keysym, modifiers, optionals.release, args[4 + offset ..]));
@@ -152,11 +139,50 @@ fn modeNameToId(allocator: *std.mem.Allocator, seat: *Seat, mode_name: []const u
     return config.mode_to_id.get(mode_name) orelse {
         out.* = try std.fmt.allocPrint(
             allocator,
-            "cannot add mapping to non-existant mode '{}p'",
+            "cannot add mapping to non-existant mode '{}'",
             .{mode_name},
         );
         return Error.Other;
     };
+}
+
+/// Returns the index of the Mapping with matching modifiers, keysym and release, if any.
+fn mappingExists(mappings: *std.ArrayList(Mapping), modifiers: u32, keysym: u32, release: bool) ?usize {
+    for (mappings.items) |mapping, i| {
+        if (mapping.modifiers == modifiers and mapping.keysym == keysym and mapping.release == release) {
+            return i;
+        }
+    }
+
+    return null;
+}
+
+fn parseEventCode(allocator: *std.mem.Allocator, event_code_str: []const u8, out: *?[]const u8) !u32 {
+    const event_code_name = try std.cstr.addNullByte(allocator, event_code_str);
+    defer allocator.free(event_code_name);
+    const ret = c.libevdev_event_code_from_name(c.EV_KEY, event_code_name);
+    if (ret < 1) {
+        out.* = try std.fmt.allocPrint(allocator, "unknown button {}", .{event_code_str});
+        return Error.Other;
+    }
+
+    return @intCast(u32, ret);
+}
+
+fn parseKeysym(allocator: *std.mem.Allocator, keysym_str: []const u8, out: *?[]const u8) !u32 {
+    const keysym_name = try std.cstr.addNullByte(allocator, keysym_str);
+    defer allocator.free(keysym_name);
+    const keysym = c.xkb_keysym_from_name(keysym_name, .XKB_KEYSYM_CASE_INSENSITIVE);
+    if (keysym == c.XKB_KEY_NoSymbol) {
+        out.* = try std.fmt.allocPrint(
+            allocator,
+            "invalid keysym '{}'",
+            .{keysym_str},
+        );
+        return Error.Other;
+    }
+
+    return keysym;
 }
 
 fn parseModifiers(allocator: *std.mem.Allocator, modifiers_str: []const u8, out: *?[]const u8) !u32 {
@@ -210,4 +236,37 @@ fn parseOptionalArgs(args: []const []const u8) OptionalArgsContainer {
     }
 
     return parsed;
+}
+
+/// Remove a mapping from a given mode
+///
+/// Example:
+/// unmap normal Mod4+Shift Return
+pub fn unmap(
+    allocator: *std.mem.Allocator,
+    seat: *Seat,
+    args: []const []const u8,
+    out: *?[]const u8,
+) Error!void {
+    const optionals = parseOptionalArgs(args[1..]);
+    // offset caused by optional arguments
+    const offset = optionals.i;
+    if (args.len - offset < 4) return Error.NotEnoughArguments;
+
+    const mode_id = try modeNameToId(allocator, seat, args[1 + offset], out);
+    const modifiers = try parseModifiers(allocator, args[2 + offset], out);
+    const keysym = try parseKeysym(allocator, args[3 + offset], out);
+
+    const mode_mappings = &seat.input_manager.server.config.modes.items[mode_id].mappings;
+    const mapping_idx = mappingExists(mode_mappings, modifiers, keysym, optionals.release) orelse {
+        out.* = try std.fmt.allocPrint(
+            allocator,
+            "there is no mapping for modifiers '{}' and keysym '{}'",
+            .{ args[2 + offset], args[3 + offset] },
+        );
+        return Error.Other;
+    };
+
+    var mapping = mode_mappings.swapRemove(mapping_idx);
+    mapping.deinit();
 }
