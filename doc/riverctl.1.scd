@@ -200,6 +200,10 @@ that tag 1 through 9 are visible.
 	Removes the mapping defined by the arguments *-release*, *modifiers* and *key* from *mode*.
 	See *map* for an explanation of the arguments.
 
+*unmap-pointer* _mode_ _modifiers_ _button_
+	Removes the mapping defined by the arguments *modifiers* and *button* from *mode*.
+	See *map-pointer* for an explanation of the arguments.
+
 *view-padding* _pixels_
 	Set the padding around the edge of each view to _pixels_.
 
