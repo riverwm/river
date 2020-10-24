@@ -89,29 +89,16 @@ pub fn mapPointer(
 
     const mode_id = try modeNameToId(allocator, seat, args[1], out);
     const modifiers = try parseModifiers(allocator, args[2], out);
+    const event_code = try parseEventCode(allocator, args[3], out);
 
-    const event_code = blk: {
-        const event_code_name = try std.cstr.addNullByte(allocator, args[3]);
-        defer allocator.free(event_code_name);
-        const ret = c.libevdev_event_code_from_name(c.EV_KEY, event_code_name);
-        if (ret < 1) {
-            out.* = try std.fmt.allocPrint(allocator, "unknown button {}", .{args[3]});
-            return Error.Other;
-        }
-        break :blk @intCast(u32, ret);
-    };
-
-    // Check if the mapping already exists
     const mode_pointer_mappings = &seat.input_manager.server.config.modes.items[mode_id].pointer_mappings;
-    for (mode_pointer_mappings.items) |existing| {
-        if (existing.event_code == event_code and existing.modifiers == modifiers) {
-            out.* = try std.fmt.allocPrint(
-                allocator,
-                "a pointer mapping for modifiers '{}' and button '{}' already exists",
-                .{ args[2], args[3] },
-            );
-            return Error.Other;
-        }
+    if (pointerMappingExists(mode_pointer_mappings, modifiers, event_code)) |_| {
+        out.* = try std.fmt.allocPrint(
+            allocator,
+            "a pointer mapping for modifiers '{}' and button '{}' already exists",
+            .{ args[2], args[3] },
+        );
+        return Error.Other;
     }
 
     const action = if (std.mem.eql(u8, args[4], "move-view"))
@@ -139,7 +126,7 @@ fn modeNameToId(allocator: *std.mem.Allocator, seat: *Seat, mode_name: []const u
     return config.mode_to_id.get(mode_name) orelse {
         out.* = try std.fmt.allocPrint(
             allocator,
-            "cannot add mapping to non-existant mode '{}'",
+            "cannot add/remove mapping to/from non-existant mode '{}'",
             .{mode_name},
         );
         return Error.Other;
@@ -150,6 +137,17 @@ fn modeNameToId(allocator: *std.mem.Allocator, seat: *Seat, mode_name: []const u
 fn mappingExists(mappings: *std.ArrayList(Mapping), modifiers: u32, keysym: u32, release: bool) ?usize {
     for (mappings.items) |mapping, i| {
         if (mapping.modifiers == modifiers and mapping.keysym == keysym and mapping.release == release) {
+            return i;
+        }
+    }
+
+    return null;
+}
+
+/// Returns the index of the PointerMapping with matching modifiers and event code, if any.
+fn pointerMappingExists(pointer_mappings: *std.ArrayList(PointerMapping), modifiers: u32, event_code: u32) ?usize {
+    for (pointer_mappings.items) |mapping, i| {
+        if (mapping.modifiers == modifiers and mapping.event_code == event_code) {
             return i;
         }
     }
@@ -269,4 +267,34 @@ pub fn unmap(
 
     var mapping = mode_mappings.swapRemove(mapping_idx);
     mapping.deinit();
+}
+
+/// Remove a pointer mapping for a given mode
+///
+/// Example:
+/// unmap-pointer normal Mod4 BTN_LEFT
+pub fn unmapPointer(
+    allocator: *std.mem.Allocator,
+    seat: *Seat,
+    args: []const []const u8,
+    out: *?[]const u8,
+) Error!void {
+    if (args.len < 4) return Error.NotEnoughArguments;
+    if (args.len > 4) return Error.TooManyArguments;
+
+    const mode_id = try modeNameToId(allocator, seat, args[1], out);
+    const modifiers = try parseModifiers(allocator, args[2], out);
+    const event_code = try parseEventCode(allocator, args[3], out);
+
+    const mode_pointer_mappings = &seat.input_manager.server.config.modes.items[mode_id].pointer_mappings;
+    const mapping_idx = pointerMappingExists(mode_pointer_mappings, modifiers, event_code) orelse {
+        out.* = try std.fmt.allocPrint(
+            allocator,
+            "there is no mapping for modifiers '{}' and button '{}'",
+            .{ args[2], args[3] },
+        );
+        return Error.Other;
+    };
+
+    _ = mode_pointer_mappings.swapRemove(mapping_idx);
 }
