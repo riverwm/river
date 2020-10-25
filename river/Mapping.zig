@@ -20,6 +20,7 @@ const Self = @This();
 const std = @import("std");
 
 const c = @import("c.zig");
+const util = @import("util.zig");
 
 keysym: c.xkb_keysym_t,
 modifiers: u32,
@@ -29,12 +30,12 @@ command_args: []const []const u8,
 release: bool,
 
 pub fn init(
-    allocator: *std.mem.Allocator,
     keysym: c.xkb_keysym_t,
     modifiers: u32,
     release: bool,
     command_args: []const []const u8,
 ) !Self {
+    const allocator = util.gpa;
     const owned_args = try allocator.alloc([]u8, command_args.len);
     errdefer allocator.free(owned_args);
     for (command_args) |arg, i| {
@@ -49,7 +50,8 @@ pub fn init(
     };
 }
 
-pub fn deinit(self: Self, allocator: *std.mem.Allocator) void {
+pub fn deinit(self: Self) void {
+    const allocator = util.gpa;
     for (self.command_args) |arg| allocator.free(arg);
     allocator.free(self.command_args);
 }

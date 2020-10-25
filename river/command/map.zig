@@ -84,7 +84,7 @@ pub fn map(
         }
     }
 
-    try mode_mappings.append(try Mapping.init(util.gpa, keysym, modifiers, optionals.release, args[4 + offset ..]));
+    try mode_mappings.append(try Mapping.init(keysym, modifiers, optionals.release, args[4 + offset ..]));
 }
 
 /// Create a new pointer mapping for a given mode
