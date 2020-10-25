@@ -47,13 +47,13 @@ pub fn swap(
         focused_node,
         if (direction == .next) .forward else .reverse,
         output.pending.tags,
-        filter
+        filter,
     );
     var it_wrap = ViewStack(View).iter(
         if (direction == .next) output.views.first else output.views.last,
         .forward,
         output.pending.tags,
-        filter
+        filter,
     );
 
     // skip the first node which is focused_node
@@ -63,7 +63,7 @@ pub fn swap(
         ViewStack(View).Node,
         "view",
         // Wrap around if needed
-        if (it.next()) |next| next else it_wrap.next().?
+        if (it.next()) |next| next else it_wrap.next().?,
     );
 
     // Dont swap when only the focused view is part of the layout
