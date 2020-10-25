@@ -20,6 +20,7 @@ const Self = @This();
 const std = @import("std");
 
 const c = @import("c.zig");
+const util = @import("util.zig");
 
 keysym: c.xkb_keysym_t,
 modifiers: u32,
@@ -29,17 +30,16 @@ command_args: []const []const u8,
 release: bool,
 
 pub fn init(
-    allocator: *std.mem.Allocator,
     keysym: c.xkb_keysym_t,
     modifiers: u32,
     release: bool,
     command_args: []const []const u8,
 ) !Self {
-    const owned_args = try allocator.alloc([]u8, command_args.len);
-    errdefer allocator.free(owned_args);
+    const owned_args = try util.gpa.alloc([]u8, command_args.len);
+    errdefer util.gpa.free(owned_args);
     for (command_args) |arg, i| {
-        errdefer for (owned_args[0..i]) |a| allocator.free(a);
-        owned_args[i] = try std.mem.dupe(allocator, u8, arg);
+        errdefer for (owned_args[0..i]) |a| util.gpa.free(a);
+        owned_args[i] = try std.mem.dupe(util.gpa, u8, arg);
     }
     return Self{
         .keysym = keysym,
@@ -49,7 +49,7 @@ pub fn init(
     };
 }
 
-pub fn deinit(self: Self, allocator: *std.mem.Allocator) void {
-    for (self.command_args) |arg| allocator.free(arg);
-    allocator.free(self.command_args);
+pub fn deinit(self: Self) void {
+    for (self.command_args) |arg| util.gpa.free(arg);
+    util.gpa.free(self.command_args);
 }

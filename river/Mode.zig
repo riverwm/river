@@ -35,7 +35,7 @@ pub fn init() Self {
 }
 
 pub fn deinit(self: Self) void {
-    for (self.mappings.items) |m| m.deinit(util.gpa);
+    for (self.mappings.items) |m| m.deinit();
     self.mappings.deinit();
     self.pointer_mappings.deinit();
 }
