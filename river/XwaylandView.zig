@@ -36,6 +36,7 @@ wlr_xwayland_surface: *c.wlr_xwayland_surface,
 listen_destroy: c.wl_listener = undefined,
 listen_map: c.wl_listener = undefined,
 listen_unmap: c.wl_listener = undefined,
+listen_title: c.wl_listener = undefined,
 
 // Listeners that are only active while the view is mapped
 listen_commit: c.wl_listener = undefined,
@@ -53,6 +54,9 @@ pub fn init(self: *Self, view: *View, wlr_xwayland_surface: *c.wlr_xwayland_surf
 
     self.listen_unmap.notify = handleUnmap;
     c.wl_signal_add(&self.wlr_xwayland_surface.events.unmap, &self.listen_unmap);
+
+    self.listen_title.notify = handleTitle;
+    c.wl_signal_add(&self.wlr_xwayland_surface.events.set_title, &self.listen_title);
 }
 
 pub fn deinit(self: *Self) void {
@@ -61,6 +65,7 @@ pub fn deinit(self: *Self) void {
         c.wl_list_remove(&self.listen_destroy.link);
         c.wl_list_remove(&self.listen_map.link);
         c.wl_list_remove(&self.listen_unmap.link);
+        c.wl_list_remove(&self.listen_title.link);
     }
 }
 
@@ -216,5 +221,21 @@ fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     // See comment in XwaylandView.configure()
     if (view.pending_serial != null) {
         view.notifyConfiguredOrApplyPending();
+    }
+}
+
+/// Called then the window updates its title
+fn handleTitle(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    const self = @fieldParentPtr(Self, "listen_title", listener.?);
+
+    // Send title to all status listeners attached to a seat which focuses this view
+    var seat_it = self.view.output.root.server.input_manager.seats.first;
+    while (seat_it) |seat_node| : (seat_it = seat_node.next) {
+        if (seat_node.data.focused == .view and seat_node.data.focused.view == self.view) {
+            var client_it = seat_node.data.status_trackers.first;
+            while (client_it) |client_node| : (client_it = client_node.next) {
+                client_node.data.sendFocusedView();
+            }
+        }
     }
 }

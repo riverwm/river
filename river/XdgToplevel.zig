@@ -46,6 +46,7 @@ listen_new_popup: c.wl_listener = undefined,
 listen_request_fullscreen: c.wl_listener = undefined,
 listen_request_move: c.wl_listener = undefined,
 listen_request_resize: c.wl_listener = undefined,
+listen_set_title: c.wl_listener = undefined,
 
 pub fn init(self: *Self, view: *View, wlr_xdg_surface: *c.wlr_xdg_surface) void {
     self.* = .{ .view = view, .wlr_xdg_surface = wlr_xdg_surface };
@@ -177,6 +178,9 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     self.listen_request_resize.notify = handleRequestResize;
     c.wl_signal_add(&wlr_xdg_toplevel.events.request_resize, &self.listen_request_resize);
 
+    self.listen_set_title.notify = handleSetTitle;
+    c.wl_signal_add(&wlr_xdg_toplevel.events.set_title, &self.listen_set_title);
+
     view.wlr_surface = self.wlr_xdg_surface.surface;
 
     // Use the view's "natural" size centered on the output as the default
@@ -240,6 +244,7 @@ fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     c.wl_list_remove(&self.listen_request_fullscreen.link);
     c.wl_list_remove(&self.listen_request_move.link);
     c.wl_list_remove(&self.listen_request_resize.link);
+    c.wl_list_remove(&self.listen_set_title.link);
 }
 
 /// Called when the surface is comitted
@@ -310,4 +315,20 @@ fn handleRequestResize(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) v
     const event = util.voidCast(c.wlr_xdg_toplevel_resize_event, data.?);
     const seat = util.voidCast(Seat, event.seat.*.seat.*.data.?);
     seat.cursor.enterMode(.resize, self.view);
+}
+
+/// Called when the client sets / updates its title
+fn handleSetTitle(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    const self = @fieldParentPtr(Self, "listen_set_title", listener.?);
+
+    // Send title to all status listeners attached to a seat which focuses this view
+    var seat_it = self.view.output.root.server.input_manager.seats.first;
+    while (seat_it) |seat_node| : (seat_it = seat_node.next) {
+        if (seat_node.data.focused == .view and seat_node.data.focused.view == self.view) {
+            var client_it = seat_node.data.status_trackers.first;
+            while (client_it) |client_node| : (client_it = client_node.next) {
+                client_node.data.sendFocusedView();
+            }
+        }
+    }
 }
