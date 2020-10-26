@@ -442,4 +442,45 @@ test "iteration (View)" {
         testing.expect(it.next() == &five_b.view);
         testing.expect(it.next() == null);
     }
+
+    // Swap, then iterate
+    {
+        var view_a = views.first orelse unreachable;
+        var view_b = view_a.next orelse unreachable;
+        ViewStack(View).swap(&views, view_a, view_b); // {2, 5, 4, 1, 3} -> {5, 2, 4, 1, 3}
+
+        view_a = views.last orelse unreachable;
+        view_b = view_a.prev orelse unreachable;
+        ViewStack(View).swap(&views, view_a, view_b); // {5, 2, 4, 1, 3} -> {5, 2, 4, 3, 1}
+
+        view_a = views.last orelse unreachable;
+        view_b = views.first orelse unreachable;
+        ViewStack(View).swap(&views, view_a, view_b); // {5, 2, 4, 3, 1} -> {1, 2, 4, 3, 5}
+
+        view_a = views.first orelse unreachable;
+        view_b = views.last orelse unreachable;
+        ViewStack(View).swap(&views, view_a, view_b); // {1, 2, 4, 3, 5} -> {5, 2, 4, 3, 1}
+
+        view_a = views.first orelse unreachable;
+        view_a = view_a.next orelse unreachable;
+        view_b = view_a.next orelse unreachable;
+        view_b = view_b.next orelse unreachable;
+        ViewStack(View).swap(&views, view_a, view_b); // {5, 2, 4, 3, 1} -> {5, 3, 4, 2, 1}
+
+        var it = ViewStack(View).iter(views.first, .forward, {}, filters.all);
+        testing.expect(it.next() == &five_b.view);
+        testing.expect(it.next() == &three_b_pa.view);
+        testing.expect(it.next() == &four_b.view);
+        testing.expect(it.next() == &two_a.view);
+        testing.expect(it.next() == &one_a_pb.view);
+        testing.expect(it.next() == null);
+
+        it = ViewStack(View).iter(views.last, .reverse, {}, filters.all);
+        testing.expect(it.next() == &one_a_pb.view);
+        testing.expect(it.next() == &two_a.view);
+        testing.expect(it.next() == &four_b.view);
+        testing.expect(it.next() == &three_b_pa.view);
+        testing.expect(it.next() == &five_b.view);
+        testing.expect(it.next() == null);
+    }
 }
