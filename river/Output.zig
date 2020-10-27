@@ -2,6 +2,7 @@
 //
 // Copyright 2020 Isaac Freund
 // Copyright 2020 Leon Henrik Plickat
+// Copyright 2020 Marten Ringwelski
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -600,6 +601,11 @@ fn handleFrame(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     // This function is called every time an output is ready to display a frame,
     // generally at the output's refresh rate (e.g. 60Hz).
     const self = @fieldParentPtr(Self, "listen_frame", listener.?);
+
+    // TODO(wlroots) Remove this check when we update wlroots 0.11 to 0.12
+    // wlroots fix: https://github.com/swaywm/wlroots/commit/85757665e6e1393773b36282aa244feb10b7a5fe
+    if (!self.wlr_output.enabled) return;
+
     render.renderOutput(self);
 }
 

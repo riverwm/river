@@ -51,6 +51,9 @@ listen_new_xdg_surface: c.wl_listener,
 wlr_layer_shell: *c.wlr_layer_shell_v1,
 listen_new_layer_surface: c.wl_listener,
 
+wlr_output_power_manager: *c.wlr_output_power_manager_v1,
+listen_output_power_manager_set_mode: c.wl_listener,
+
 wlr_xwayland: if (build_options.xwayland) *c.wlr_xwayland else void,
 listen_new_xwayland_surface: if (build_options.xwayland) c.wl_listener else void,
 
@@ -99,6 +102,11 @@ pub fn init(self: *Self) !void {
 
     const wlr_compositor = c.wlr_compositor_create(self.wl_display, wlr_renderer) orelse
         return error.OutOfMemory;
+
+    // Set up output power manager
+    self.wlr_output_power_manager = c.wlr_output_power_manager_v1_create(self.wl_display);
+    self.listen_output_power_manager_set_mode.notify = handleOutputPowerManagementSetMode;
+    c.wl_signal_add(&self.wlr_output_power_manager.events.set_mode, &self.listen_output_power_manager_set_mode);
 
     // Set up xdg shell
     self.wlr_xdg_shell = c.wlr_xdg_shell_create(self.wl_display) orelse return error.OutOfMemory;
@@ -283,4 +291,29 @@ fn handleNewXwaylandSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(
     const output = self.input_manager.defaultSeat().focused_output;
     const node = util.gpa.create(ViewStack(View).Node) catch return;
     node.view.init(output, output.current.tags, wlr_xwayland_surface);
+}
+
+fn handleOutputPowerManagementSetMode(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    const self = @fieldParentPtr(Self, "listen_output_power_manager_set_mode", listener.?);
+    const mode_event = util.voidCast(c.wlr_output_power_v1_set_mode_event, data.?);
+    const wlr_output: *c.wlr_output = mode_event.output;
+
+    const enable = mode_event.mode == .ZWLR_OUTPUT_POWER_V1_MODE_ON;
+
+    const log_text = if (enable) "Enabling" else "Disabling";
+    log.debug(
+        .server,
+        "{} dpms for output {}",
+        .{log_text, wlr_output.name},
+    );
+
+    c.wlr_output_enable(wlr_output, enable);
+    if (!c.wlr_output_commit(wlr_output)) {
+        log.err(
+            .server,
+            "wlr_output_commit failed for {}",
+            .{wlr_output.name},
+        );
+    }
+
 }
