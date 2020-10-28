@@ -19,6 +19,7 @@ const build_options = @import("build_options");
 const std = @import("std");
 
 const c = @import("c.zig");
+const log = @import("log.zig");
 const util = @import("util.zig");
 
 const Box = @import("Box.zig");
@@ -119,7 +120,9 @@ pub fn renderOutput(output: *Output) void {
     // on-screen.
     c.wlr_renderer_end(wlr_renderer);
     // TODO: handle failure
-    _ = c.wlr_output_commit(output.wlr_output);
+    if (!c.wlr_output_commit(output.wlr_output)) {
+        log.err(.render, "wlr_output_commit failed for {}", .{output.wlr_output.name});
+    }
 }
 
 fn renderFilter(view: *View, filter_tags: u32) bool {
