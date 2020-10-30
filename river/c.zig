@@ -27,7 +27,9 @@ pub usingnamespace @cImport({
     @cInclude("libevdev/libevdev.h");
 
     @cInclude("wayland-server-core.h");
-    //@cInclude("wlr/backend.h");
+    @cInclude("wlr/backend.h");
+    @cInclude("wlr/backend/multi.h");
+    @cInclude("wlr/backend/noop.h");
     //@cInclude("wlr/render/wlr_renderer.h");
     @cInclude("wlr/types/wlr_buffer.h");
     @cInclude("wlr/types/wlr_compositor.h");

@@ -111,7 +111,7 @@ pub fn init(self: *Self, root: *Root, wlr_output: *c.wlr_output) !void {
     self.listen_mode.notify = handleMode;
     c.wl_signal_add(&wlr_output.events.mode, &self.listen_mode);
 
-    if (c.river_wlr_output_is_noop(wlr_output)) {
+    if (c.wlr_output_is_noop(wlr_output)) {
         // A noop output is always 0 x 0
         self.usable_box = .{
             .x = 0,
@@ -146,7 +146,7 @@ pub fn init(self: *Self, root: *Root, wlr_output: *c.wlr_output) !void {
 }
 
 pub fn getRenderer(self: Self) *c.wlr_renderer {
-    return c.river_wlr_backend_get_renderer(self.wlr_output.backend);
+    return c.wlr_backend_get_renderer(self.wlr_output.backend);
 }
 
 pub fn sendViewTags(self: Self) void {

@@ -85,13 +85,13 @@ pub fn init(self: *Self) !void {
 
     // This backend is used to create a noop output for use when no actual
     // outputs are available. This frees itself when the wl_display is destroyed.
-    self.noop_backend = c.river_wlr_noop_backend_create(self.wl_display) orelse
+    self.noop_backend = c.wlr_noop_backend_create(self.wl_display) orelse
         return error.OutOfMemory;
 
     // If we don't provide a renderer, autocreate makes a GLES2 renderer for us.
     // The renderer is responsible for defining the various pixel formats it
     // supports for shared memory, this configures that for clients.
-    const wlr_renderer = c.river_wlr_backend_get_renderer(self.wlr_backend).?;
+    const wlr_renderer = c.wlr_backend_get_renderer(self.wlr_backend).?;
     if (!c.wlr_renderer_init_wl_display(wlr_renderer, self.wl_display)) return error.DisplayInitFailed;
 
     self.listen_new_output.notify = handleNewOutput;
@@ -154,7 +154,7 @@ pub fn deinit(self: *Self) void {
     self.root.deinit();
 
     c.wl_display_destroy(self.wl_display);
-    c.river_wlr_backend_destory(self.noop_backend);
+    c.wlr_backend_destroy(self.noop_backend);
 
     self.input_manager.deinit();
     self.config.deinit();
@@ -163,7 +163,7 @@ pub fn deinit(self: *Self) void {
 /// Create the socket, start the backend, and setup the environment
 pub fn start(self: Self) !void {
     const socket = c.wl_display_add_socket_auto(self.wl_display) orelse return error.AddSocketError;
-    if (!c.river_wlr_backend_start(self.wlr_backend)) return error.StartBackendError;
+    if (!c.wlr_backend_start(self.wlr_backend)) return error.StartBackendError;
     if (c.setenv("WAYLAND_DISPLAY", socket, 1) < 0) return error.SetenvError;
     if (build_options.xwayland) {
         if (c.setenv("DISPLAY", self.wlr_xwayland.display_name, 1) < 0) return error.SetenvError;

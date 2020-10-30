@@ -164,8 +164,8 @@ fn handleBuiltinMapping(self: Self, keysym: c.xkb_keysym_t) bool {
     if (keysym >= c.XKB_KEY_XF86Switch_VT_1 and keysym <= c.XKB_KEY_XF86Switch_VT_12) {
         log.debug(.keyboard, "switch VT keysym received", .{});
         const wlr_backend = self.seat.input_manager.server.wlr_backend;
-        if (c.river_wlr_backend_is_multi(wlr_backend)) {
-            if (c.river_wlr_backend_get_session(wlr_backend)) |session| {
+        if (c.wlr_backend_is_multi(wlr_backend)) {
+            if (c.wlr_backend_get_session(wlr_backend)) |session| {
                 const vt = keysym - c.XKB_KEY_XF86Switch_VT_1 + 1;
                 log.notice(.server, "switching to VT {}", .{vt});
                 _ = c.wlr_session_change_vt(session, vt);
