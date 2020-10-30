@@ -36,6 +36,7 @@ server: *Server,
 wlr_idle: *c.wlr_idle,
 wlr_input_inhibit_manager: *c.wlr_input_inhibit_manager,
 wlr_virtual_pointer_manager: *c.wlr_virtual_pointer_manager_v1,
+wlr_virtual_keyboard_manager: *c.wlr_virtual_keyboard_manager_v1,
 
 seats: std.TailQueue(Seat) = .{},
 
@@ -45,6 +46,7 @@ listen_inhibit_activate: c.wl_listener = undefined,
 listen_inhibit_deactivate: c.wl_listener = undefined,
 listen_new_input: c.wl_listener = undefined,
 listen_new_virtual_pointer: c.wl_listener = undefined,
+listen_new_virtual_keyboard: c.wl_listener = undefined,
 
 pub fn init(self: *Self, server: *Server) !void {
     const seat_node = try util.gpa.create(std.TailQueue(Seat).Node);
@@ -56,6 +58,8 @@ pub fn init(self: *Self, server: *Server) !void {
         .wlr_input_inhibit_manager = c.wlr_input_inhibit_manager_create(server.wl_display) orelse
             return error.OutOfMemory,
         .wlr_virtual_pointer_manager = c.wlr_virtual_pointer_manager_v1_create(server.wl_display) orelse
+            return error.OutOfMemory,
+        .wlr_virtual_keyboard_manager = c.wlr_virtual_keyboard_manager_v1_create(server.wl_display) orelse
             return error.OutOfMemory,
     };
 
@@ -76,6 +80,9 @@ pub fn init(self: *Self, server: *Server) !void {
 
     self.listen_new_virtual_pointer.notify = handleNewVirtualPointer;
     c.wl_signal_add(&self.wlr_virtual_pointer_manager.events.new_virtual_pointer, &self.listen_new_virtual_pointer);
+
+    self.listen_new_virtual_keyboard.notify = handleNewVirtualKeyboard;
+    c.wl_signal_add(&self.wlr_virtual_keyboard_manager.events.new_virtual_keyboard, &self.listen_new_virtual_keyboard);
 }
 
 pub fn deinit(self: *Self) void {
@@ -169,7 +176,7 @@ fn handleNewVirtualPointer(listener: ?*c.wl_listener, data: ?*c_void) callconv(.
     const self = @fieldParentPtr(Self, "listen_new_virtual_pointer", listener.?);
     const event = util.voidCast(c.wlr_virtual_pointer_v1_new_pointer_event, data.?);
 
-    // TODO Support multiple seats and don't ignore 
+    // TODO Support multiple seats and don't ignore
     if (event.suggested_seat != null) {
         log.debug(.input_manager, "Ignoring seat suggestion from virtual pointer", .{});
     }
@@ -180,4 +187,12 @@ fn handleNewVirtualPointer(listener: ?*c.wl_listener, data: ?*c_void) callconv(.
 
     const new_pointer: *c.wlr_virtual_pointer_v1 = event.new_pointer;
     self.defaultSeat().addDevice(&new_pointer.input_device);
+}
+
+fn handleNewVirtualKeyboard(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    const self = @fieldParentPtr(Self, "listen_new_virtual_keyboard", listener.?);
+    const virtual_keyboard = util.voidCast(c.wlr_virtual_keyboard_v1, data.?);
+    const seat = util.voidCast(Seat, @as(*c.wlr_seat, virtual_keyboard.seat).data.?);
+
+    seat.addDevice(&virtual_keyboard.input_device);
 }
