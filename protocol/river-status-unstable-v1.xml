@@ -47,10 +47,13 @@
     </request>
   </interface>
 
-  <interface name="zriver_output_status_v1" version="1">
+  <interface name="zriver_output_status_v1" version="2">
     <description summary="track output tags and focus">
       This interface allows clients to receive information about the current
       windowing state of an output.
+
+      After all river_output_status properties have been sent, wl_output.done
+      is sent to allow atomic changes.
     </description>
 
     <request name="destroy" type="destructor">
