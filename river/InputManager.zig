@@ -1,6 +1,7 @@
 // This file is part of river, a dynamic tiling wayland compositor.
 //
 // Copyright 2020 Isaac Freund
+// Copyright 2020 Marten Ringwelski
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -34,6 +35,7 @@ server: *Server,
 
 wlr_idle: *c.wlr_idle,
 wlr_input_inhibit_manager: *c.wlr_input_inhibit_manager,
+wlr_virtual_keyboard_manager: *c.wlr_virtual_keyboard_manager_v1,
 
 seats: std.TailQueue(Seat) = .{},
 
@@ -42,6 +44,7 @@ exclusive_client: ?*c.wl_client = null,
 listen_inhibit_activate: c.wl_listener = undefined,
 listen_inhibit_deactivate: c.wl_listener = undefined,
 listen_new_input: c.wl_listener = undefined,
+listen_new_virtual_keyboard: c.wl_listener = undefined,
 
 pub fn init(self: *Self, server: *Server) !void {
     const seat_node = try util.gpa.create(std.TailQueue(Seat).Node);
@@ -51,6 +54,8 @@ pub fn init(self: *Self, server: *Server) !void {
         // These are automatically freed when the display is destroyed
         .wlr_idle = c.wlr_idle_create(server.wl_display) orelse return error.OutOfMemory,
         .wlr_input_inhibit_manager = c.wlr_input_inhibit_manager_create(server.wl_display) orelse
+            return error.OutOfMemory,
+        .wlr_virtual_keyboard_manager = c.wlr_virtual_keyboard_manager_v1_create(server.wl_display) orelse
             return error.OutOfMemory,
     };
 
@@ -68,6 +73,9 @@ pub fn init(self: *Self, server: *Server) !void {
 
     self.listen_new_input.notify = handleNewInput;
     c.wl_signal_add(&self.server.wlr_backend.events.new_input, &self.listen_new_input);
+
+    self.listen_new_virtual_keyboard.notify = handleNewVirtualKeyboard;
+    c.wl_signal_add(&self.wlr_virtual_keyboard_manager.events.new_virtual_keyboard, &self.listen_new_virtual_keyboard);
 }
 
 pub fn deinit(self: *Self) void {
@@ -155,4 +163,12 @@ fn handleNewInput(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 
     // TODO: suport multiple seats
     self.defaultSeat().addDevice(device);
+}
+
+fn handleNewVirtualKeyboard(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    const self = @fieldParentPtr(Self, "listen_new_virtual_keyboard", listener.?);
+    const virtual_keyboard = util.voidCast(c.wlr_virtual_keyboard_v1, data.?);
+    const seat = util.voidCast(Seat, @as(*c.wlr_seat, virtual_keyboard.seat).data.?);
+
+    seat.addDevice(&virtual_keyboard.input_device);
 }
