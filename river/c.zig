@@ -53,6 +53,7 @@ pub usingnamespace @cImport({
     @cInclude("wlr/types/wlr_screencopy_v1.h");
     @cInclude("wlr/types/wlr_seat.h");
     @cInclude("wlr/types/wlr_viewporter.h");
+    @cInclude("wlr/types/wlr_virtual_pointer_v1.h");
     @cInclude("wlr/types/wlr_xcursor_manager.h");
     @cInclude("wlr/types/wlr_xdg_decoration_v1.h");
     @cInclude("wlr/types/wlr_xdg_output_v1.h");
