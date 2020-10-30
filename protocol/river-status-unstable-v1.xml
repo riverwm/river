@@ -78,6 +78,13 @@
       </description>
       <arg name="tags" type="array" summary="array of 32-bit bitfields"/>
     </event>
+
+    <event name="layout">
+      <description summary="layout status of an output">
+        Sent when the layout of an output has changed.
+      </description>
+      <arg name="layout_name" type="string" summary="name of the layout"/>
+    </event>
   </interface>
 
   <interface name="zriver_seat_status_v1" version="2">
