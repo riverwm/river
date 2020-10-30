@@ -72,7 +72,7 @@ pub fn init(self: *Self, server: *Server) !void {
         .noop_output = undefined,
     };
 
-    const noop_wlr_output = c.river_wlr_noop_add_output(server.noop_backend) orelse return error.OutOfMemory;
+    const noop_wlr_output = c.wlr_noop_add_output(server.noop_backend) orelse return error.OutOfMemory;
     try self.noop_output.init(self, noop_wlr_output);
 }
 
