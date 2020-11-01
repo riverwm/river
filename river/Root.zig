@@ -102,6 +102,12 @@ pub fn addOutput(self: *Self, wlr_output: *c.wlr_output) void {
     };
     self.outputs.append(node);
 
+    // Add the new output to the layout. The add_auto function arranges outputs
+    // from left-to-right in the order they appear. A more sophisticated
+    // compositor would let the user configure the arrangement of outputs in the
+    // layout. This automatically creates an output global on the wl_display.
+    c.wlr_output_layout_add_auto(self.wlr_output_layout, wlr_output);
+
     // if we previously had no real outputs, move focus from the noop output
     // to the new one.
     if (self.outputs.len == 1) {
