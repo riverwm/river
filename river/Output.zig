@@ -121,12 +121,6 @@ pub fn init(self: *Self, root: *Root, wlr_output: *c.wlr_output) !void {
             .height = 0,
         };
     } else {
-        // Add the new output to the layout. The add_auto function arranges outputs
-        // from left-to-right in the order they appear. A more sophisticated
-        // compositor would let the user configure the arrangement of outputs in the
-        // layout. This automatically creates an output global on the wl_display.
-        c.wlr_output_layout_add_auto(root.wlr_output_layout, wlr_output);
-
         // Ensure that a cursor image at the output's scale factor is loaded
         // for each seat.
         var it = root.server.input_manager.seats.first;
