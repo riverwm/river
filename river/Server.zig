@@ -30,6 +30,7 @@ const DecorationManager = @import("DecorationManager.zig");
 const InputManager = @import("InputManager.zig");
 const LayerSurface = @import("LayerSurface.zig");
 const Output = @import("Output.zig");
+const OutputManager = @import("OutputManager.zig");
 const Root = @import("Root.zig");
 const StatusManager = @import("StatusManager.zig");
 const View = @import("View.zig");
@@ -43,7 +44,6 @@ sigterm_source: *c.wl_event_source,
 
 wlr_backend: *c.wlr_backend,
 noop_backend: *c.wlr_backend,
-listen_new_output: c.wl_listener,
 
 wlr_xdg_shell: *c.wlr_xdg_shell,
 listen_new_xdg_surface: c.wl_listener,
@@ -51,14 +51,12 @@ listen_new_xdg_surface: c.wl_listener,
 wlr_layer_shell: *c.wlr_layer_shell_v1,
 listen_new_layer_surface: c.wl_listener,
 
-wlr_output_power_manager: *c.wlr_output_power_manager_v1,
-listen_output_power_manager_set_mode: c.wl_listener,
-
 wlr_xwayland: if (build_options.xwayland) *c.wlr_xwayland else void,
 listen_new_xwayland_surface: if (build_options.xwayland) c.wl_listener else void,
 
 decoration_manager: DecorationManager,
 input_manager: InputManager,
+output_manager: OutputManager,
 root: Root,
 config: Config,
 control: Control,
@@ -97,16 +95,8 @@ pub fn init(self: *Self) !void {
     const wlr_renderer = c.wlr_backend_get_renderer(self.wlr_backend).?;
     if (!c.wlr_renderer_init_wl_display(wlr_renderer, self.wl_display)) return error.DisplayInitFailed;
 
-    self.listen_new_output.notify = handleNewOutput;
-    c.wl_signal_add(&self.wlr_backend.events.new_output, &self.listen_new_output);
-
     const wlr_compositor = c.wlr_compositor_create(self.wl_display, wlr_renderer) orelse
         return error.OutOfMemory;
-
-    // Set up output power manager
-    self.wlr_output_power_manager = c.wlr_output_power_manager_v1_create(self.wl_display);
-    self.listen_output_power_manager_set_mode.notify = handleOutputPowerManagementSetMode;
-    c.wl_signal_add(&self.wlr_output_power_manager.events.set_mode, &self.listen_output_power_manager_set_mode);
 
     // Set up xdg shell
     self.wlr_xdg_shell = c.wlr_xdg_shell_create(self.wl_display) orelse return error.OutOfMemory;
@@ -136,6 +126,7 @@ pub fn init(self: *Self) !void {
     try self.input_manager.init(self);
     try self.control.init(self);
     try self.status_manager.init(self);
+    try self.output_manager.init(self);
 
     // These all free themselves when the wl_display is destroyed
     _ = c.wlr_data_device_manager_create(self.wl_display) orelse return error.OutOfMemory;
@@ -187,13 +178,6 @@ fn terminate(signal: c_int, data: ?*c_void) callconv(.C) c_int {
     const wl_display = util.voidCast(c.wl_display, data.?);
     c.wl_display_terminate(wl_display);
     return 0;
-}
-
-fn handleNewOutput(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_new_output", listener.?);
-    const wlr_output = util.voidCast(c.wlr_output, data.?);
-    log.debug(.server, "new output {}", .{wlr_output.name});
-    self.root.addOutput(wlr_output);
 }
 
 fn handleNewXdgSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -290,28 +274,4 @@ fn handleNewXwaylandSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(
     const output = self.input_manager.defaultSeat().focused_output;
     const node = util.gpa.create(ViewStack(View).Node) catch return;
     node.view.init(output, output.current.tags, wlr_xwayland_surface);
-}
-
-fn handleOutputPowerManagementSetMode(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_output_power_manager_set_mode", listener.?);
-    const mode_event = util.voidCast(c.wlr_output_power_v1_set_mode_event, data.?);
-    const wlr_output: *c.wlr_output = mode_event.output;
-
-    const enable = mode_event.mode == .ZWLR_OUTPUT_POWER_V1_MODE_ON;
-
-    const log_text = if (enable) "Enabling" else "Disabling";
-    log.debug(
-        .server,
-        "{} dpms for output {}",
-        .{ log_text, wlr_output.name },
-    );
-
-    c.wlr_output_enable(wlr_output, enable);
-    if (!c.wlr_output_commit(wlr_output)) {
-        log.err(
-            .server,
-            "wlr_output_commit failed for {}",
-            .{wlr_output.name},
-        );
-    }
 }
