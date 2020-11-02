@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const ScanProtocolsStep = @import("deps/zig-wayland/build.zig").ScanProtocolsStep;
+
 pub fn build(b: *std.build.Builder) !void {
     // Standard target options allows the person running `zig build` to choose
     // what target to build for. Here we do not override the defaults, which
@@ -35,7 +37,11 @@ pub fn build(b: *std.build.Builder) !void {
         "Set to true to build examples",
     ) orelse false;
 
-    const scan_protocols = ScanProtocolsStep.create(b);
+    // TODO: port all parts of river to zig-wayland and delete this
+    const scan_protocols = OldScanProtocolsStep.create(b);
+
+    const scanner = ScanProtocolsStep.create(b, "deps/zig-wayland/");
+    scanner.addProtocolPath("protocol/river-control-unstable-v1.xml");
 
     {
         const river = b.addExecutable("river", "river/main.zig");
@@ -60,10 +66,12 @@ pub fn build(b: *std.build.Builder) !void {
         riverctl.setTarget(target);
         riverctl.setBuildMode(mode);
 
-        addProtocolDeps(riverctl, &scan_protocols.step);
-
+        riverctl.step.dependOn(&scanner.step);
+        riverctl.addPackage(scanner.getPkg());
         riverctl.linkLibC();
         riverctl.linkSystemLibrary("wayland-client");
+
+        scanner.addCSource(riverctl);
 
         riverctl.install();
     }
@@ -126,25 +134,25 @@ fn addProtocolDeps(exe: *std.build.LibExeObjStep, protocol_step: *std.build.Step
     exe.addCSourceFile("protocol/river-status-unstable-v1-protocol.c", &[_][]const u8{"-std=c99"});
 }
 
-const ScanProtocolsStep = struct {
+const OldScanProtocolsStep = struct {
     builder: *std.build.Builder,
     step: std.build.Step,
 
-    fn create(builder: *std.build.Builder) *ScanProtocolsStep {
-        const self = builder.allocator.create(ScanProtocolsStep) catch @panic("out of memory");
+    fn create(builder: *std.build.Builder) *OldScanProtocolsStep {
+        const self = builder.allocator.create(OldScanProtocolsStep) catch @panic("out of memory");
         self.* = init(builder);
         return self;
     }
 
-    fn init(builder: *std.build.Builder) ScanProtocolsStep {
-        return ScanProtocolsStep{
+    fn init(builder: *std.build.Builder) OldScanProtocolsStep {
+        return OldScanProtocolsStep{
             .builder = builder,
             .step = std.build.Step.init(.Custom, "Scan Protocols", builder.allocator, make),
         };
     }
 
     fn make(step: *std.build.Step) !void {
-        const self = @fieldParentPtr(ScanProtocolsStep, "step", step);
+        const self = @fieldParentPtr(OldScanProtocolsStep, "step", step);
 
         const protocol_dir = std.fmt.trim(try self.builder.exec(
             &[_][]const u8{ "pkg-config", "--variable=pkgdatadir", "wayland-protocols" },

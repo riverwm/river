@@ -20,6 +20,12 @@ separate `riverctl` binary implementing it.
 
 ## Building
 
+On cloning the repository, you must init and update the submodules as well with e.g.
+
+```
+git submodule update --init
+```
+
 To compile river first ensure that you have the following dependencies
 installed:
 
