@@ -154,13 +154,9 @@ const OldScanProtocolsStep = struct {
     fn make(step: *std.build.Step) !void {
         const self = @fieldParentPtr(OldScanProtocolsStep, "step", step);
 
-        const protocol_dir = std.mem.trim(
-            u8,
-            try self.builder.exec(
-                &[_][]const u8{ "pkg-config", "--variable=pkgdatadir", "wayland-protocols" },
-            ),
-            &[_]u8 {' ', '\t', '\n', '\r'},
-        );
+        const protocol_dir = std.mem.trim(u8, try self.builder.exec(
+            &[_][]const u8{ "pkg-config", "--variable=pkgdatadir", "wayland-protocols" },
+        ), &std.ascii.spaces);
 
         const protocol_dir_paths = [_][]const []const u8{
             &[_][]const u8{ protocol_dir, "stable/xdg-shell/xdg-shell.xml" },
