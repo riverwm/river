@@ -18,8 +18,11 @@
 const Self = @This();
 
 const std = @import("std");
+const wlr = @import("wlroots");
+const wayland = @import("wayland");
+const wl = wayland.server.wl;
+const zriver = wayland.server.zriver;
 
-const c = @import("c.zig");
 const log = @import("log.zig");
 const util = @import("util.zig");
 
@@ -29,120 +32,89 @@ const Seat = @import("Seat.zig");
 const SeatStatus = @import("SeatStatus.zig");
 const Server = @import("Server.zig");
 
-const protocol_version = 1;
+global: *wl.Global,
 
-const implementation = c.struct_zriver_status_manager_v1_interface{
-    .destroy = destroy,
-    .get_river_output_status = getRiverOutputStatus,
-    .get_river_seat_status = getRiverSeatStatus,
-};
-
-wl_global: *c.wl_global,
-
-listen_display_destroy: c.wl_listener = undefined,
+server_destroy: wl.Listener(*wl.Server) = undefined,
 
 pub fn init(self: *Self, server: *Server) !void {
     self.* = .{
-        .wl_global = c.wl_global_create(
-            server.wl_display,
-            &c.zriver_status_manager_v1_interface,
-            protocol_version,
-            self,
-            bind,
-        ) orelse return error.OutOfMemory,
+        .global = try wl.Global.create(server.wl_server, zriver.StatusManagerV1, 1, *Self, self, bind),
     };
 
-    self.listen_display_destroy.notify = handleDisplayDestroy;
-    c.wl_display_add_destroy_listener(server.wl_display, &self.listen_display_destroy);
+    self.server_destroy.setNotify(handleServerDestroy);
+    server.wl_server.addDestroyListener(&self.server_destroy);
 }
 
-fn handleDisplayDestroy(wl_listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_display_destroy", wl_listener.?);
-    c.wl_global_destroy(self.wl_global);
+fn handleServerDestroy(listener: *wl.Listener(*wl.Server), wl_server: *wl.Server) void {
+    const self = @fieldParentPtr(Self, "server_destroy", listener);
+    self.global.destroy();
 }
 
-/// Called when a client binds our global
-fn bind(wl_client: ?*c.wl_client, data: ?*c_void, version: u32, id: u32) callconv(.C) void {
-    const self = util.voidCast(Self, data.?);
-    const wl_resource = c.wl_resource_create(
-        wl_client,
-        &c.zriver_status_manager_v1_interface,
-        @intCast(c_int, version),
-        id,
-    ) orelse {
-        c.wl_client_post_no_memory(wl_client);
+fn bind(client: *wl.Client, self: *Self, version: u32, id: u32) callconv(.C) void {
+    const status_manager = zriver.StatusManagerV1.create(client, version, id) catch {
+        client.postNoMemory();
         log.crit(.river_status, "out of memory", .{});
         return;
     };
-    c.wl_resource_set_implementation(wl_resource, &implementation, self, null);
+    status_manager.setHandler(*Self, handleRequest, null, self);
 }
 
-fn destroy(wl_client: ?*c.wl_client, wl_resource: ?*c.wl_resource) callconv(.C) void {
-    c.wl_resource_destroy(wl_resource);
-}
+fn handleRequest(
+    status_manager: *zriver.StatusManagerV1,
+    request: zriver.StatusManagerV1.Request,
+    self: *Self,
+) void {
+    switch (request) {
+        .destroy => status_manager.destroy(),
+        .get_river_output_status => |req| {
+            // ignore if the output is inert
+            const wlr_output = wlr.Output.fromWlOutput(req.output) orelse return;
+            const output = @intToPtr(*Output, wlr_output.data);
 
-fn getRiverOutputStatus(
-    wl_client: ?*c.wl_client,
-    wl_resource: ?*c.wl_resource,
-    new_id: u32,
-    output_wl_resource: ?*c.wl_resource,
-) callconv(.C) void {
-    const self = util.voidCast(Self, c.wl_resource_get_user_data(wl_resource).?);
-    // This can be null if the output is inert, in which case we ignore the request
-    const wlr_output = c.wlr_output_from_resource(output_wl_resource) orelse return;
-    const output = util.voidCast(Output, wlr_output.*.data.?);
+            const node = util.gpa.create(std.SinglyLinkedList(OutputStatus).Node) catch {
+                status_manager.getClient().postNoMemory();
+                log.crit(.river_status, "out of memory", .{});
+                return;
+            };
 
-    const node = util.gpa.create(std.SinglyLinkedList(OutputStatus).Node) catch {
-        c.wl_client_post_no_memory(wl_client);
-        log.crit(.river_status, "out of memory", .{});
-        return;
-    };
+            const output_status = zriver.OutputStatusV1.create(
+                status_manager.getClient(),
+                status_manager.getVersion(),
+                req.id,
+            ) catch {
+                status_manager.getClient().postNoMemory();
+                util.gpa.destroy(node);
+                log.crit(.river_status, "out of memory", .{});
+                return;
+            };
 
-    const output_status_resource = c.wl_resource_create(
-        wl_client,
-        &c.zriver_output_status_v1_interface,
-        protocol_version,
-        new_id,
-    ) orelse {
-        c.wl_client_post_no_memory(wl_client);
-        util.gpa.destroy(node);
-        log.crit(.river_status, "out of memory", .{});
-        return;
-    };
+            node.data.init(output, output_status);
+            output.status_trackers.prepend(node);
+        },
+        .get_river_seat_status => |req| {
+            // ignore if the seat is inert
+            const wlr_seat = wlr.Seat.Client.fromWlSeat(req.seat) orelse return;
+            const seat = @intToPtr(*Seat, wlr_seat.seat.data);
 
-    node.data.init(output, output_status_resource);
-    output.status_trackers.prepend(node);
-}
+            const node = util.gpa.create(std.SinglyLinkedList(SeatStatus).Node) catch {
+                status_manager.getClient().postNoMemory();
+                log.crit(.river_status, "out of memory", .{});
+                return;
+            };
 
-fn getRiverSeatStatus(
-    wl_client: ?*c.wl_client,
-    wl_resource: ?*c.wl_resource,
-    new_id: u32,
-    seat_wl_resource: ?*c.wl_resource,
-) callconv(.C) void {
-    const self = util.voidCast(Self, c.wl_resource_get_user_data(wl_resource).?);
-    // This can be null if the seat is inert, in which case we ignore the request
-    const wlr_seat_client = c.wlr_seat_client_from_resource(seat_wl_resource) orelse return;
-    const seat = util.voidCast(Seat, wlr_seat_client.*.seat.*.data.?);
+            const seat_status = zriver.SeatStatusV1.create(
+                status_manager.getClient(),
+                status_manager.getVersion(),
+                req.id,
+            ) catch {
+                status_manager.getClient().postNoMemory();
+                util.gpa.destroy(node);
+                log.crit(.river_status, "out of memory", .{});
+                return;
+            };
 
-    const node = util.gpa.create(std.SinglyLinkedList(SeatStatus).Node) catch {
-        c.wl_client_post_no_memory(wl_client);
-        log.crit(.river_status, "out of memory", .{});
-        return;
-    };
-
-    const seat_status_resource = c.wl_resource_create(
-        wl_client,
-        &c.zriver_seat_status_v1_interface,
-        protocol_version,
-        new_id,
-    ) orelse {
-        c.wl_client_post_no_memory(wl_client);
-        util.gpa.destroy(node);
-        log.crit(.river_status, "out of memory", .{});
-        return;
-    };
-
-    node.data.init(seat, seat_status_resource);
-    seat.status_trackers.prepend(node);
+            node.data.init(seat, seat_status);
+            seat.status_trackers.prepend(node);
+        },
+    }
 }

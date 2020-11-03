@@ -17,8 +17,6 @@
 
 const std = @import("std");
 
-const c = @import("../c.zig");
-
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
@@ -37,6 +35,6 @@ pub fn setRepeat(
 
     var it = seat.keyboards.first;
     while (it) |node| : (it = node.next) {
-        c.wlr_keyboard_set_repeat_info(node.data.wlr_keyboard, rate, delay);
+        node.data.input_device.device.keyboard.setRepeatInfo(rate, delay);
     }
 }

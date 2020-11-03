@@ -18,8 +18,10 @@
 const Self = @This();
 
 const std = @import("std");
+const wayland = @import("wayland");
+const wl = wayland.server.wl;
+const zriver = wayland.server.zriver;
 
-const c = @import("c.zig");
 const log = @import("log.zig");
 const util = @import("util.zig");
 
@@ -27,29 +29,28 @@ const Output = @import("Output.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 
-const implementation = c.struct_zriver_output_status_v1_interface{ .destroy = destroy };
-
 output: *Output,
-wl_resource: *c.wl_resource,
+output_status: *zriver.OutputStatusV1,
 
-pub fn init(self: *Self, output: *Output, wl_resource: *c.wl_resource) void {
-    self.* = .{ .output = output, .wl_resource = wl_resource };
+pub fn init(self: *Self, output: *Output, output_status: *zriver.OutputStatusV1) void {
+    self.* = .{ .output = output, .output_status = output_status };
 
-    c.wl_resource_set_implementation(wl_resource, &implementation, self, handleResourceDestroy);
+    output_status.setHandler(*Self, handleRequest, handleDestroy, self);
 
     // Send view/focused tags once on bind.
     self.sendViewTags();
     self.sendFocusedTags();
 }
 
-fn handleResourceDestroy(wl_resource: ?*c.wl_resource) callconv(.C) void {
-    const self = util.voidCast(Self, @ptrCast(*c_void, c.wl_resource_get_user_data(wl_resource)));
-    const node = @fieldParentPtr(std.SinglyLinkedList(Self).Node, "data", self);
-    self.output.status_trackers.remove(node);
+fn handleRequest(output_status: *zriver.OutputStatusV1, request: zriver.OutputStatusV1.Request, self: *Self) void {
+    switch (request) {
+        .destroy => output_status.destroy(),
+    }
 }
 
-fn destroy(wl_client: ?*c.wl_client, wl_resource: ?*c.wl_resource) callconv(.C) void {
-    c.wl_resource_destroy(wl_resource);
+fn handleDestroy(output_status: *zriver.OutputStatusV1, self: *Self) void {
+    const node = @fieldParentPtr(std.SinglyLinkedList(Self).Node, "data", self);
+    self.output.status_trackers.remove(node);
 }
 
 /// Send the current tags of each view on the output to the client.
@@ -61,21 +62,17 @@ pub fn sendViewTags(self: Self) void {
     while (it) |node| : (it = node.next) {
         if (node.view.destroying) continue;
         view_tags.append(node.view.current.tags) catch {
-            c.wl_resource_post_no_memory(self.wl_resource);
+            self.output_status.postNoMemory();
             log.crit(.river_status, "out of memory", .{});
             return;
         };
     }
 
-    var wl_array = c.wl_array{
-        .size = view_tags.items.len * @sizeOf(u32),
-        .alloc = view_tags.capacity * @sizeOf(u32),
-        .data = view_tags.items.ptr,
-    };
-    c.zriver_output_status_v1_send_view_tags(self.wl_resource, &wl_array);
+    var wl_array = wl.Array.fromArrayList(u32, view_tags);
+    self.output_status.sendViewTags(&wl_array);
 }
 
 /// Send the currently focused tags of the output to the client.
 pub fn sendFocusedTags(self: Self) void {
-    c.zriver_output_status_v1_send_focused_tags(self.wl_resource, self.output.current.tags);
+    self.output_status.sendFocusedTags(self.output.current.tags);
 }

@@ -17,10 +17,11 @@
 
 const Self = @This();
 
-const std = @import("std");
 const build_options = @import("build_options");
+const std = @import("std");
+const wlr = @import("wlroots");
+const wl = @import("wayland").server.wl;
 
-const c = @import("c.zig");
 const log = @import("log.zig");
 const util = @import("util.zig");
 
@@ -31,10 +32,9 @@ const ViewStack = @import("view_stack.zig").ViewStack;
 const XwaylandUnmanaged = @import("XwaylandUnmanaged.zig");
 const DragIcon = @import("DragIcon.zig");
 
-/// Responsible for all windowing operations
 server: *Server,
 
-wlr_output_layout: *c.wlr_output_layout,
+output_layout: *wlr.OutputLayout,
 
 /// A list of all outputs
 all_outputs: std.TailQueue(*Output) = .{},
@@ -60,24 +60,20 @@ else
 pending_configures: u32 = 0,
 
 /// Handles timeout of transactions
-transaction_timer: *c.wl_event_source,
+transaction_timer: *wl.EventSource,
 
 pub fn init(self: *Self, server: *Server) !void {
-    // Create an output layout, which a wlroots utility for working with an
-    // arrangement of screens in a physical layout.
-    errdefer c.wlr_output_layout_destroy(self.wlr_output_layout);
+    const output_layout = try wlr.OutputLayout.create();
+    errdefer output_layout.destroy();
+
     self.* = .{
         .server = server,
-        .wlr_output_layout = c.wlr_output_layout_create() orelse return error.OutOfMemory,
-        .transaction_timer = c.wl_event_loop_add_timer(
-            c.wl_display_get_event_loop(self.server.wl_display),
-            handleTimeout,
-            self,
-        ) orelse return error.AddTimerError,
+        .output_layout = output_layout,
+        .transaction_timer = try self.server.wl_server.getEventLoop().addTimer(*Self, handleTimeout, self),
         .noop_output = undefined,
     };
 
-    const noop_wlr_output = c.wlr_noop_add_output(server.noop_backend) orelse return error.OutOfMemory;
+    const noop_wlr_output = try server.noop_backend.noopAddOutput();
     try self.noop_output.init(self, noop_wlr_output);
 }
 
@@ -86,14 +82,12 @@ pub fn deinit(self: *Self) void {
     // the noop backend triggering the destroy event. However,
     // Output.handleDestroy is not intended to handle the noop output being
     // destroyed.
-    c.wl_list_remove(&self.noop_output.listen_destroy.link);
-    c.wl_list_remove(&self.noop_output.listen_frame.link);
-    c.wl_list_remove(&self.noop_output.listen_mode.link);
+    self.noop_output.destroy.link.remove();
+    self.noop_output.frame.link.remove();
+    self.noop_output.mode.link.remove();
 
-    c.wlr_output_layout_destroy(self.wlr_output_layout);
-
-    // This literally cannot fail, but for some reason returns 0
-    if (c.wl_event_source_remove(self.transaction_timer) < 0) unreachable;
+    self.output_layout.destroy();
+    self.transaction_timer.remove();
 }
 
 /// Removes the output in node.data from self.outputs
@@ -124,7 +118,7 @@ pub fn removeOutput(self: *Self, node: *std.TailQueue(Output).Node) void {
             // handle them.
             self.noop_output.layers[layer_idx].prepend(layer_node);
             layer_surface.output = &self.noop_output;
-            c.wlr_layer_surface_v1_close(layer_surface.wlr_layer_surface);
+            layer_surface.wlr_layer_surface.close();
         }
     }
 
@@ -153,7 +147,7 @@ pub fn addOutput(self: *Self, node: *std.TailQueue(Output).Node) void {
     // from left-to-right in the order they appear. A more sophisticated
     // compositor would let the user configure the arrangement of outputs in the
     // layout. This automatically creates an output global on the wl_display.
-    c.wlr_output_layout_add_auto(self.wlr_output_layout, node.data.wlr_output);
+    self.output_layout.addAuto(node.data.wlr_output);
 
     // if we previously had no real outputs, move focus from the noop output
     // to the new one.
@@ -222,26 +216,22 @@ pub fn startTransaction(self: *Self) void {
         );
 
         // Set timeout to 200ms
-        if (c.wl_event_source_timer_update(self.transaction_timer, 200) < 0) {
+        self.transaction_timer.timerUpdate(200) catch {
             log.err(.transaction, "failed to update timer", .{});
             self.commitTransaction();
-        }
+        };
     } else {
         // No views need configures, clear the current timer in case we are
         // interrupting another transaction and commit.
-        if (c.wl_event_source_timer_update(self.transaction_timer, 0) < 0)
-            log.err(.transaction, "error disarming timer", .{});
+        self.transaction_timer.timerUpdate(0) catch log.err(.transaction, "error disarming timer", .{});
         self.commitTransaction();
     }
 }
 
-fn handleTimeout(data: ?*c_void) callconv(.C) c_int {
-    const self = util.voidCast(Self, data.?);
-
+fn handleTimeout(self: *Self) callconv(.C) c_int {
     log.err(.transaction, "timeout occurred, some imperfect frames may be shown", .{});
 
     self.pending_configures = 0;
-
     self.commitTransaction();
 
     return 0;
@@ -251,8 +241,7 @@ pub fn notifyConfigured(self: *Self) void {
     self.pending_configures -= 1;
     if (self.pending_configures == 0) {
         // Disarm the timer, as we didn't timeout
-        if (c.wl_event_source_timer_update(self.transaction_timer, 0) == -1)
-            log.err(.transaction, "error disarming timer", .{});
+        self.transaction_timer.timerUpdate(0) catch log.err(.transaction, "error disarming timer", .{});
         self.commitTransaction();
     }
 }

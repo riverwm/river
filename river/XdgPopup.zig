@@ -18,8 +18,10 @@
 const Self = @This();
 
 const std = @import("std");
+const wlr = @import("wlroots");
+const wl = @import("wayland").server.wl;
 
-const c = @import("c.zig");
+const log = @import("log.zig");
 const util = @import("util.zig");
 
 const Box = @import("Box.zig");
@@ -32,12 +34,12 @@ output: *Output,
 parent_box: *const Box,
 
 /// The corresponding wlroots object
-wlr_xdg_popup: *c.wlr_xdg_popup,
+wlr_xdg_popup: *wlr.XdgPopup,
 
-listen_destroy: c.wl_listener = undefined,
-listen_new_popup: c.wl_listener = undefined,
+destroy: wl.Listener(*wlr.XdgSurface) = undefined,
+new_popup: wl.Listener(*wlr.XdgPopup) = undefined,
 
-pub fn init(self: *Self, output: *Output, parent_box: *const Box, wlr_xdg_popup: *c.wlr_xdg_popup) void {
+pub fn init(self: *Self, output: *Output, parent_box: *const Box, wlr_xdg_popup: *wlr.XdgPopup) void {
     self.* = .{
         .output = output,
         .parent_box = parent_box,
@@ -45,36 +47,35 @@ pub fn init(self: *Self, output: *Output, parent_box: *const Box, wlr_xdg_popup:
     };
 
     // The output box relative to the parent of the popup
-    var box = c.wlr_output_layout_get_box(output.root.wlr_output_layout, output.wlr_output).*;
+    var box = output.root.output_layout.getBox(output.wlr_output).?.*;
     box.x -= parent_box.x;
     box.y -= parent_box.y;
-    c.wlr_xdg_popup_unconstrain_from_box(wlr_xdg_popup, &box);
+    wlr_xdg_popup.unconstrainFromBox(&box);
 
-    // Setup listeners
-    self.listen_destroy.notify = handleDestroy;
-    c.wl_signal_add(&wlr_xdg_popup.base.*.events.destroy, &self.listen_destroy);
+    self.destroy.setNotify(handleDestroy);
+    wlr_xdg_popup.base.events.destroy.add(&self.destroy);
 
-    self.listen_new_popup.notify = handleNewPopup;
-    c.wl_signal_add(&wlr_xdg_popup.base.*.events.new_popup, &self.listen_new_popup);
+    self.new_popup.setNotify(handleNewPopup);
+    wlr_xdg_popup.base.events.new_popup.add(&self.new_popup);
 }
 
-fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_destroy", listener.?);
+fn handleDestroy(listener: *wl.Listener(*wlr.XdgSurface), wlr_xdg_surface: *wlr.XdgSurface) void {
+    const self = @fieldParentPtr(Self, "destroy", listener);
 
-    c.wl_list_remove(&self.listen_destroy.link);
-    c.wl_list_remove(&self.listen_new_popup.link);
+    self.destroy.link.remove();
+    self.new_popup.link.remove();
 
     util.gpa.destroy(self);
 }
 
 /// Called when a new xdg popup is requested by the client
-fn handleNewPopup(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_new_popup", listener.?);
-    const wlr_xdg_popup = util.voidCast(c.wlr_xdg_popup, data.?);
+fn handleNewPopup(listener: *wl.Listener(*wlr.XdgPopup), wlr_xdg_popup: *wlr.XdgPopup) void {
+    const self = @fieldParentPtr(Self, "new_popup", listener);
 
     // This will free itself on destroy
-    var xdg_popup = util.gpa.create(Self) catch {
-        c.wl_resource_post_no_memory(wlr_xdg_popup.resource);
+    const xdg_popup = util.gpa.create(Self) catch {
+        wlr_xdg_popup.resource.postNoMemory();
+        log.crit(.server, "out of memory", .{});
         return;
     };
     xdg_popup.init(self.output, self.parent_box, wlr_xdg_popup);

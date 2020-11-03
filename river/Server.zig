@@ -19,6 +19,8 @@ const Self = @This();
 
 const build_options = @import("build_options");
 const std = @import("std");
+const wlr = @import("wlroots");
+const wl = @import("wayland").server.wl;
 
 const c = @import("c.zig");
 const log = @import("log.zig");
@@ -37,22 +39,22 @@ const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const XwaylandUnmanaged = @import("XwaylandUnmanaged.zig");
 
-wl_display: *c.wl_display,
+wl_server: *wl.Server,
 
-sigint_source: *c.wl_event_source,
-sigterm_source: *c.wl_event_source,
+sigint_source: *wl.EventSource,
+sigterm_source: *wl.EventSource,
 
-wlr_backend: *c.wlr_backend,
-noop_backend: *c.wlr_backend,
+backend: *wlr.Backend,
+noop_backend: *wlr.Backend,
 
-wlr_xdg_shell: *c.wlr_xdg_shell,
-listen_new_xdg_surface: c.wl_listener,
+xdg_shell: *wlr.XdgShell,
+new_xdg_surface: wl.Listener(*wlr.XdgSurface),
 
-wlr_layer_shell: *c.wlr_layer_shell_v1,
-listen_new_layer_surface: c.wl_listener,
+layer_shell: *wlr.LayerShellV1,
+new_layer_surface: wl.Listener(*wlr.LayerSurfaceV1),
 
-wlr_xwayland: if (build_options.xwayland) *c.wlr_xwayland else void,
-listen_new_xwayland_surface: if (build_options.xwayland) c.wl_listener else void,
+xwayland: if (build_options.xwayland) *wlr.Xwayland else void,
+new_xwayland_surface: if (build_options.xwayland) wl.Listener(*wlr.XwaylandSurface) else void,
 
 decoration_manager: DecorationManager,
 input_manager: InputManager,
@@ -63,61 +65,46 @@ control: Control,
 status_manager: StatusManager,
 
 pub fn init(self: *Self) !void {
-    // The Wayland display is managed by libwayland. It handles accepting
-    // clients from the Unix socket, managing Wayland globals, and so on.
-    self.wl_display = c.wl_display_create() orelse return error.CreateDisplayError;
-    errdefer c.wl_display_destroy(self.wl_display);
+    self.wl_server = try wl.Server.create();
+    errdefer self.wl_server.destroy();
 
-    // Never returns null if the display was created successfully
-    const wl_event_loop = c.wl_display_get_event_loop(self.wl_display);
-    self.sigint_source = c.wl_event_loop_add_signal(wl_event_loop, std.os.SIGINT, terminate, self.wl_display) orelse
-        return error.AddEventSourceFailed;
-    errdefer _ = c.wl_event_source_remove(self.sigint_source);
-    self.sigterm_source = c.wl_event_loop_add_signal(wl_event_loop, std.os.SIGTERM, terminate, self.wl_display) orelse
-        return error.AddEventSourceFailed;
-    errdefer _ = c.wl_event_source_remove(self.sigterm_source);
+    const loop = self.wl_server.getEventLoop();
+    self.sigint_source = try loop.addSignal(*wl.Server, std.os.SIGINT, terminate, self.wl_server);
+    errdefer self.sigint_source.remove();
+    self.sigterm_source = try loop.addSignal(*wl.Server, std.os.SIGTERM, terminate, self.wl_server);
+    errdefer self.sigterm_source.remove();
 
-    // The wlr_backend abstracts the input/output hardware. Autocreate chooses
-    // the best option based on the environment, for example DRM when run from
-    // a tty or wayland if WAYLAND_DISPLAY is set. This frees itself when the
-    // wl_display is destroyed.
-    self.wlr_backend = c.river_wlr_backend_autocreate(self.wl_display) orelse
-        return error.CreateBackendError;
+    // This frees itself when the wl.Server is destroyed
+    self.backend = try wlr.Backend.autocreate(self.wl_server, null);
 
     // This backend is used to create a noop output for use when no actual
-    // outputs are available. This frees itself when the wl_display is destroyed.
-    self.noop_backend = c.wlr_noop_backend_create(self.wl_display) orelse
-        return error.OutOfMemory;
+    // outputs are available. This frees itself when the wl.Server is destroyed.
+    self.noop_backend = try wlr.Backend.createNoop(self.wl_server);
 
-    // If we don't provide a renderer, autocreate makes a GLES2 renderer for us.
-    // The renderer is responsible for defining the various pixel formats it
-    // supports for shared memory, this configures that for clients.
-    const wlr_renderer = c.wlr_backend_get_renderer(self.wlr_backend).?;
-    if (!c.wlr_renderer_init_wl_display(wlr_renderer, self.wl_display)) return error.DisplayInitFailed;
+    // This will never be null for the non-custom backends in wlroots
+    const renderer = self.backend.getRenderer().?;
+    try renderer.initServer(self.wl_server);
 
-    const wlr_compositor = c.wlr_compositor_create(self.wl_display, wlr_renderer) orelse
-        return error.OutOfMemory;
+    const compositor = try wlr.Compositor.create(self.wl_server, renderer);
 
     // Set up xdg shell
-    self.wlr_xdg_shell = c.wlr_xdg_shell_create(self.wl_display) orelse return error.OutOfMemory;
-    self.listen_new_xdg_surface.notify = handleNewXdgSurface;
-    c.wl_signal_add(&self.wlr_xdg_shell.events.new_surface, &self.listen_new_xdg_surface);
+    self.xdg_shell = try wlr.XdgShell.create(self.wl_server);
+    self.new_xdg_surface.setNotify(handleNewXdgSurface);
+    self.xdg_shell.events.new_surface.add(&self.new_xdg_surface);
 
     // Set up layer shell
-    self.wlr_layer_shell = c.wlr_layer_shell_v1_create(self.wl_display) orelse return error.OutOfMemory;
-    self.listen_new_layer_surface.notify = handleNewLayerSurface;
-    c.wl_signal_add(&self.wlr_layer_shell.events.new_surface, &self.listen_new_layer_surface);
+    self.layer_shell = try wlr.LayerShellV1.create(self.wl_server);
+    self.new_layer_surface.setNotify(handleNewLayerSurface);
+    self.layer_shell.events.new_surface.add(&self.new_layer_surface);
 
     // Set up xwayland if built with support
     if (build_options.xwayland) {
-        self.wlr_xwayland = c.wlr_xwayland_create(self.wl_display, wlr_compositor, false) orelse
-            return error.CreateXwaylandError;
-        self.listen_new_xwayland_surface.notify = handleNewXwaylandSurface;
-        c.wl_signal_add(&self.wlr_xwayland.events.new_surface, &self.listen_new_xwayland_surface);
+        self.xwayland = try wlr.Xwayland.create(self.wl_server, compositor, false);
+        self.new_xwayland_surface.setNotify(handleNewXwaylandSurface);
+        self.xwayland.events.new_surface.add(&self.new_xwayland_surface);
     }
 
-    // Set up primary selection
-    _ = c.wlr_primary_selection_v1_device_manager_create(self.wl_display);
+    _ = try wlr.PrimarySelectionDeviceManagerV1.create(self.wl_server);
 
     self.config = try Config.init();
     try self.decoration_manager.init(self);
@@ -128,31 +115,28 @@ pub fn init(self: *Self) !void {
     try self.status_manager.init(self);
     try self.output_manager.init(self);
 
-    // These all free themselves when the wl_display is destroyed
-    _ = c.wlr_data_device_manager_create(self.wl_display) orelse return error.OutOfMemory;
-    _ = c.wlr_data_control_manager_v1_create(self.wl_display) orelse return error.OutOfMemory;
-    _ = c.wlr_export_dmabuf_manager_v1_create(self.wl_display) orelse return error.OutOfMemory;
-    _ = c.wlr_gamma_control_manager_v1_create(self.wl_display) orelse return error.OutOfMemory;
-    _ = c.wlr_screencopy_manager_v1_create(self.wl_display) orelse return error.OutOfMemory;
-    _ = c.wlr_viewporter_create(self.wl_display) orelse return error.OutOfMemory;
-    _ = c.wlr_xdg_output_manager_v1_create(self.wl_display, self.root.wlr_output_layout) orelse
-        return error.OutOfMemory;
+    // These all free themselves when the wl_server is destroyed
+    _ = try wlr.DataDeviceManager.create(self.wl_server);
+    _ = try wlr.DataControlManagerV1.create(self.wl_server);
+    _ = try wlr.ExportDmabufManagerV1.create(self.wl_server);
+    _ = try wlr.GammaControlManagerV1.create(self.wl_server);
+    _ = try wlr.ScreencopyManagerV1.create(self.wl_server);
+    _ = try wlr.Viewporter.create(self.wl_server);
 }
 
-/// Free allocated memory and clean up
+/// Free allocated memory and clean up. Note: order is important here
 pub fn deinit(self: *Self) void {
-    // Note: order is important here
-    _ = c.wl_event_source_remove(self.sigint_source);
-    _ = c.wl_event_source_remove(self.sigterm_source);
+    self.sigint_source.remove();
+    self.sigterm_source.remove();
 
-    if (build_options.xwayland) c.wlr_xwayland_destroy(self.wlr_xwayland);
+    if (build_options.xwayland) self.xwayland.destroy();
 
-    c.wl_display_destroy_clients(self.wl_display);
+    self.wl_server.destroyClients();
 
     self.root.deinit();
 
-    c.wl_display_destroy(self.wl_display);
-    c.wlr_backend_destroy(self.noop_backend);
+    self.wl_server.destroy();
+    self.noop_backend.destroy();
 
     self.input_manager.deinit();
     self.config.deinit();
@@ -160,33 +144,26 @@ pub fn deinit(self: *Self) void {
 
 /// Create the socket, start the backend, and setup the environment
 pub fn start(self: Self) !void {
-    const socket = c.wl_display_add_socket_auto(self.wl_display) orelse return error.AddSocketError;
-    if (!c.wlr_backend_start(self.wlr_backend)) return error.StartBackendError;
+    var buf: [11]u8 = undefined;
+    const socket = try self.wl_server.addSocketAuto(&buf);
+    try self.backend.start();
+    // TODO: don't use libc's setenv
     if (c.setenv("WAYLAND_DISPLAY", socket, 1) < 0) return error.SetenvError;
     if (build_options.xwayland) {
-        if (c.setenv("DISPLAY", self.wlr_xwayland.display_name, 1) < 0) return error.SetenvError;
+        if (c.setenv("DISPLAY", self.xwayland.display_name, 1) < 0) return error.SetenvError;
     }
 }
 
-/// Enter the wayland event loop and block until the compositor is exited
-pub fn run(self: Self) void {
-    c.wl_display_run(self.wl_display);
-}
-
 /// Handle SIGINT and SIGTERM by gracefully stopping the server
-fn terminate(signal: c_int, data: ?*c_void) callconv(.C) c_int {
-    const wl_display = util.voidCast(c.wl_display, data.?);
-    c.wl_display_terminate(wl_display);
+fn terminate(signal: c_int, wl_server: *wl.Server) callconv(.C) c_int {
+    wl_server.terminate();
     return 0;
 }
 
-fn handleNewXdgSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    // This event is raised when wlr_xdg_shell receives a new xdg surface from a
-    // client, either a toplevel (application window) or popup.
-    const self = @fieldParentPtr(Self, "listen_new_xdg_surface", listener.?);
-    const wlr_xdg_surface = util.voidCast(c.wlr_xdg_surface, data.?);
+fn handleNewXdgSurface(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurface) void {
+    const self = @fieldParentPtr(Self, "new_xdg_surface", listener);
 
-    if (wlr_xdg_surface.role == .WLR_XDG_SURFACE_ROLE_POPUP) {
+    if (xdg_surface.role == .popup) {
         log.debug(.server, "new xdg_popup", .{});
         return;
     }
@@ -196,16 +173,15 @@ fn handleNewXdgSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) v
     // The View will add itself to the output's view stack on map
     const output = self.input_manager.defaultSeat().focused_output;
     const node = util.gpa.create(ViewStack(View).Node) catch {
-        c.wl_resource_post_no_memory(wlr_xdg_surface.resource);
+        xdg_surface.resource.postNoMemory();
         return;
     };
-    node.view.init(output, output.current.tags, wlr_xdg_surface);
+    node.view.init(output, output.current.tags, xdg_surface);
 }
 
 /// This event is raised when the layer_shell recieves a new surface from a client.
-fn handleNewLayerSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_new_layer_surface", listener.?);
-    const wlr_layer_surface = util.voidCast(c.wlr_layer_surface_v1, data.?);
+fn handleNewLayerSurface(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wlr.LayerSurfaceV1) void {
+    const self = @fieldParentPtr(Self, "new_layer_surface", listener);
 
     log.debug(
         .server,
@@ -229,31 +205,28 @@ fn handleNewLayerSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C)
     if (wlr_layer_surface.output == null) {
         const output = self.input_manager.defaultSeat().focused_output;
         if (output == &self.root.noop_output) {
-            log.err(.server, "no output available for layer surface '{s}'", .{wlr_layer_surface.namespace});
-            c.wlr_layer_surface_v1_close(wlr_layer_surface);
+            log.err(.server, "no output available for layer surface '{}'", .{wlr_layer_surface.namespace});
+            wlr_layer_surface.close();
             return;
         }
 
-        log.debug(
-            .server,
-            "new layer surface had null output, assigning it to output '{s}'",
-            .{output.wlr_output.name},
-        );
+        log.debug(.server, "new layer surface had null output, assigning it to output '{}'", .{
+            output.wlr_output.name,
+        });
         wlr_layer_surface.output = output.wlr_output;
     }
 
     // The layer surface will add itself to the proper list of the output on map
-    const output = util.voidCast(Output, wlr_layer_surface.output.*.data.?);
+    const output = @intToPtr(*Output, wlr_layer_surface.output.?.data);
     const node = util.gpa.create(std.TailQueue(LayerSurface).Node) catch {
-        c.wl_resource_post_no_memory(wlr_layer_surface.resource);
+        wlr_layer_surface.resource.postNoMemory();
         return;
     };
     node.data.init(output, wlr_layer_surface);
 }
 
-fn handleNewXwaylandSurface(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_new_xwayland_surface", listener.?);
-    const wlr_xwayland_surface = util.voidCast(c.wlr_xwayland_surface, data.?);
+fn handleNewXwaylandSurface(listener: *wl.Listener(*wlr.XwaylandSurface), wlr_xwayland_surface: *wlr.XwaylandSurface) void {
+    const self = @fieldParentPtr(Self, "new_xwayland_surface", listener);
 
     if (wlr_xwayland_surface.override_redirect) {
         log.debug(.server, "new unmanaged xwayland surface", .{});

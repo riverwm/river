@@ -19,8 +19,9 @@ const Self = @This();
 
 const build_options = @import("build_options");
 const std = @import("std");
+const wlr = @import("wlroots");
+const wl = @import("wayland").server.wl;
 
-const c = @import("c.zig");
 const log = @import("log.zig");
 const util = @import("util.zig");
 
@@ -32,56 +33,53 @@ const default_seat_name = "default";
 
 server: *Server,
 
-wlr_idle: *c.wlr_idle,
-wlr_input_inhibit_manager: *c.wlr_input_inhibit_manager,
-wlr_virtual_pointer_manager: *c.wlr_virtual_pointer_manager_v1,
-wlr_virtual_keyboard_manager: *c.wlr_virtual_keyboard_manager_v1,
+idle: *wlr.Idle,
+input_inhibit_manager: *wlr.InputInhibitManager,
+virtual_pointer_manager: *wlr.VirtualPointerManagerV1,
+virtual_keyboard_manager: *wlr.VirtualKeyboardManagerV1,
 
 seats: std.TailQueue(Seat) = .{},
 
-exclusive_client: ?*c.wl_client = null,
+exclusive_client: ?*wl.Client = null,
 
-listen_inhibit_activate: c.wl_listener = undefined,
-listen_inhibit_deactivate: c.wl_listener = undefined,
-listen_new_input: c.wl_listener = undefined,
-listen_new_virtual_pointer: c.wl_listener = undefined,
-listen_new_virtual_keyboard: c.wl_listener = undefined,
+inhibit_activate: wl.Listener(*wlr.InputInhibitManager) = undefined,
+inhibit_deactivate: wl.Listener(*wlr.InputInhibitManager) = undefined,
+new_input: wl.Listener(*wlr.InputDevice) = undefined,
+new_virtual_pointer: wl.Listener(*wlr.VirtualPointerManagerV1.event.NewPointer) = undefined,
+new_virtual_keyboard: wl.Listener(*wlr.VirtualKeyboardV1) = undefined,
 
 pub fn init(self: *Self, server: *Server) !void {
     const seat_node = try util.gpa.create(std.TailQueue(Seat).Node);
+    errdefer util.gpa.destroy(seat_node);
 
     self.* = .{
         .server = server,
         // These are automatically freed when the display is destroyed
-        .wlr_idle = c.wlr_idle_create(server.wl_display) orelse return error.OutOfMemory,
-        .wlr_input_inhibit_manager = c.wlr_input_inhibit_manager_create(server.wl_display) orelse
-            return error.OutOfMemory,
-        .wlr_virtual_pointer_manager = c.wlr_virtual_pointer_manager_v1_create(server.wl_display) orelse
-            return error.OutOfMemory,
-        .wlr_virtual_keyboard_manager = c.wlr_virtual_keyboard_manager_v1_create(server.wl_display) orelse
-            return error.OutOfMemory,
+        .idle = try wlr.Idle.create(server.wl_server),
+        .input_inhibit_manager = try wlr.InputInhibitManager.create(server.wl_server),
+        .virtual_pointer_manager = try wlr.VirtualPointerManagerV1.create(server.wl_server),
+        .virtual_keyboard_manager = try wlr.VirtualKeyboardManagerV1.create(server.wl_server),
     };
 
     self.seats.prepend(seat_node);
     try seat_node.data.init(self, default_seat_name);
 
-    if (build_options.xwayland) c.wlr_xwayland_set_seat(server.wlr_xwayland, self.defaultSeat().wlr_seat);
+    if (build_options.xwayland) server.xwayland.setSeat(self.defaultSeat().wlr_seat);
 
-    // Set up all listeners
-    self.listen_inhibit_activate.notify = handleInhibitActivate;
-    c.wl_signal_add(&self.wlr_input_inhibit_manager.events.activate, &self.listen_inhibit_activate);
+    self.inhibit_activate.setNotify(handleInhibitActivate);
+    self.input_inhibit_manager.events.activate.add(&self.inhibit_activate);
 
-    self.listen_inhibit_deactivate.notify = handleInhibitDeactivate;
-    c.wl_signal_add(&self.wlr_input_inhibit_manager.events.deactivate, &self.listen_inhibit_deactivate);
+    self.inhibit_deactivate.setNotify(handleInhibitDeactivate);
+    self.input_inhibit_manager.events.deactivate.add(&self.inhibit_deactivate);
 
-    self.listen_new_input.notify = handleNewInput;
-    c.wl_signal_add(&self.server.wlr_backend.events.new_input, &self.listen_new_input);
+    self.new_input.setNotify(handleNewInput);
+    self.server.backend.events.new_input.add(&self.new_input);
 
-    self.listen_new_virtual_pointer.notify = handleNewVirtualPointer;
-    c.wl_signal_add(&self.wlr_virtual_pointer_manager.events.new_virtual_pointer, &self.listen_new_virtual_pointer);
+    self.new_virtual_pointer.setNotify(handleNewVirtualPointer);
+    self.virtual_pointer_manager.events.new_virtual_pointer.add(&self.new_virtual_pointer);
 
-    self.listen_new_virtual_keyboard.notify = handleNewVirtualKeyboard;
-    c.wl_signal_add(&self.wlr_virtual_keyboard_manager.events.new_virtual_keyboard, &self.listen_new_virtual_keyboard);
+    self.new_virtual_keyboard.setNotify(handleNewVirtualKeyboard);
+    self.virtual_keyboard_manager.events.new_virtual_keyboard.add(&self.new_virtual_keyboard);
 }
 
 pub fn deinit(self: *Self) void {
@@ -105,9 +103,9 @@ pub fn handleViewUnmap(self: Self, view: *View) void {
 }
 
 /// Returns true if input is currently allowed on the passed surface.
-pub fn inputAllowed(self: Self, wlr_surface: *c.wlr_surface) bool {
+pub fn inputAllowed(self: Self, wlr_surface: *wlr.Surface) bool {
     return if (self.exclusive_client) |exclusive_client|
-        exclusive_client == c.wl_resource_get_client(wlr_surface.resource)
+        exclusive_client == wlr_surface.resource.getClient()
     else
         true;
 }
@@ -119,8 +117,11 @@ pub fn isCursorActionTarget(self: Self, view: *View) bool {
     } else false;
 }
 
-fn handleInhibitActivate(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_inhibit_activate", listener.?);
+fn handleInhibitActivate(
+    listener: *wl.Listener(*wlr.InputInhibitManager),
+    input_inhibit_manager: *wlr.InputInhibitManager,
+) void {
+    const self = @fieldParentPtr(Self, "inhibit_activate", listener);
 
     log.debug(.input_manager, "input inhibitor activated", .{});
 
@@ -134,11 +135,14 @@ fn handleInhibitActivate(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C)
         seat_node.data.mode_id = 1;
     }
 
-    self.exclusive_client = self.wlr_input_inhibit_manager.active_client;
+    self.exclusive_client = self.input_inhibit_manager.active_client;
 }
 
-fn handleInhibitDeactivate(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_inhibit_deactivate", listener.?);
+fn handleInhibitDeactivate(
+    listener: *wl.Listener(*wlr.InputInhibitManager),
+    input_inhibit_manager: *wlr.InputInhibitManager,
+) void {
+    const self = @fieldParentPtr(Self, "inhibit_deactivate", listener);
 
     log.debug(.input_manager, "input inhibitor deactivated", .{});
 
@@ -163,17 +167,17 @@ fn handleInhibitDeactivate(listener: ?*c.wl_listener, data: ?*c_void) callconv(.
 }
 
 /// This event is raised by the backend when a new input device becomes available.
-fn handleNewInput(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_new_input", listener.?);
-    const device = util.voidCast(c.wlr_input_device, data.?);
-
+fn handleNewInput(listener: *wl.Listener(*wlr.InputDevice), device: *wlr.InputDevice) void {
+    const self = @fieldParentPtr(Self, "new_input", listener);
     // TODO: suport multiple seats
     self.defaultSeat().addDevice(device);
 }
 
-fn handleNewVirtualPointer(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_new_virtual_pointer", listener.?);
-    const event = util.voidCast(c.wlr_virtual_pointer_v1_new_pointer_event, data.?);
+fn handleNewVirtualPointer(
+    listener: *wl.Listener(*wlr.VirtualPointerManagerV1.event.NewPointer),
+    event: *wlr.VirtualPointerManagerV1.event.NewPointer,
+) void {
+    const self = @fieldParentPtr(Self, "new_virtual_pointer", listener);
 
     // TODO Support multiple seats and don't ignore
     if (event.suggested_seat != null) {
@@ -184,14 +188,14 @@ fn handleNewVirtualPointer(listener: ?*c.wl_listener, data: ?*c_void) callconv(.
         log.debug(.input_manager, "Ignoring output suggestion from virtual pointer", .{});
     }
 
-    const new_pointer: *c.wlr_virtual_pointer_v1 = event.new_pointer;
-    self.defaultSeat().addDevice(&new_pointer.input_device);
+    self.defaultSeat().addDevice(&event.new_pointer.input_device);
 }
 
-fn handleNewVirtualKeyboard(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_new_virtual_keyboard", listener.?);
-    const virtual_keyboard = util.voidCast(c.wlr_virtual_keyboard_v1, data.?);
-    const seat = util.voidCast(Seat, @as(*c.wlr_seat, virtual_keyboard.seat).data.?);
-
+fn handleNewVirtualKeyboard(
+    listener: *wl.Listener(*wlr.VirtualKeyboardV1),
+    virtual_keyboard: *wlr.VirtualKeyboardV1,
+) void {
+    const self = @fieldParentPtr(Self, "new_virtual_keyboard", listener);
+    const seat = @intToPtr(*Seat, virtual_keyboard.seat.data);
     seat.addDevice(&virtual_keyboard.input_device);
 }

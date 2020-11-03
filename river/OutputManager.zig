@@ -19,8 +19,9 @@ const Self = @This();
 
 const build_options = @import("build_options");
 const std = @import("std");
+const wlr = @import("wlroots");
+const wl = @import("wayland").server.wl;
 
-const c = @import("c.zig");
 const log = @import("log.zig");
 const util = @import("util.zig");
 
@@ -38,65 +39,60 @@ const min_size = 50;
 
 root: *Root,
 
-listen_new_output: c.wl_listener = undefined,
-listen_output_layout_change: c.wl_listener = undefined,
+new_output: wl.Listener(*wlr.Output) = undefined,
 
-wlr_output_manager: *c.wlr_output_manager_v1,
-listen_output_manager_apply: c.wl_listener = undefined,
-listen_output_manager_test: c.wl_listener = undefined,
+wlr_output_manager: *wlr.OutputManagerV1,
+manager_apply: wl.Listener(*wlr.OutputConfigurationV1) = undefined,
+manager_test: wl.Listener(*wlr.OutputConfigurationV1) = undefined,
+layout_change: wl.Listener(*wlr.OutputLayout) = undefined,
 
-wlr_output_power_manager: *c.wlr_output_power_manager_v1,
-listen_output_power_manager_set_mode: c.wl_listener = undefined,
+power_manager: *wlr.OutputPowerManagerV1,
+power_manager_set_mode: wl.Listener(*wlr.OutputPowerManagerV1.event.SetMode) = undefined,
 
 /// True if and only if we are currently applying an output config
 output_config_pending: bool = false,
 
 pub fn init(self: *Self, server: *Server) !void {
     self.* = .{
-        .wlr_output_manager = c.wlr_output_manager_v1_create(server.wl_display) orelse
-            return error.OutOfMemory,
-        .wlr_output_power_manager = c.wlr_output_power_manager_v1_create(server.wl_display) orelse
-            return error.OutOfMemory,
         .root = &server.root,
+        .wlr_output_manager = try wlr.OutputManagerV1.create(server.wl_server),
+        .power_manager = try wlr.OutputPowerManagerV1.create(server.wl_server),
     };
 
-    self.listen_new_output.notify = handleNewOutput;
-    c.wl_signal_add(&server.wlr_backend.events.new_output, &self.listen_new_output);
+    self.new_output.setNotify(handleNewOutput);
+    server.backend.events.new_output.add(&self.new_output);
 
-    // Set up wlr_output_management
-    self.listen_output_manager_apply.notify = handleOutputManagerApply;
-    c.wl_signal_add(&self.wlr_output_manager.events.apply, &self.listen_output_manager_apply);
-    self.listen_output_manager_test.notify = handleOutputManagerTest;
-    c.wl_signal_add(&self.wlr_output_manager.events.@"test", &self.listen_output_manager_test);
+    self.manager_apply.setNotify(handleOutputManagerApply);
+    self.wlr_output_manager.events.apply.add(&self.manager_apply);
 
-    // Listen for changes in the output layout to send them to the clients of wlr_output_manager
-    self.listen_output_layout_change.notify = handleOutputLayoutChange;
-    c.wl_signal_add(&self.root.wlr_output_layout.events.change, &self.listen_output_layout_change);
+    self.manager_test.setNotify(handleOutputManagerTest);
+    self.wlr_output_manager.events.@"test".add(&self.manager_test);
 
-    // Set up output power manager
-    self.listen_output_power_manager_set_mode.notify = handleOutputPowerManagementSetMode;
-    c.wl_signal_add(&self.wlr_output_power_manager.events.set_mode, &self.listen_output_power_manager_set_mode);
+    self.layout_change.setNotify(handleOutputLayoutChange);
+    self.root.output_layout.events.change.add(&self.layout_change);
 
-    _ = c.wlr_xdg_output_manager_v1_create(server.wl_display, server.root.wlr_output_layout) orelse
-        return error.OutOfMemory;
+    self.power_manager_set_mode.setNotify(handleOutputPowerManagementSetMode);
+    self.power_manager.events.set_mode.add(&self.power_manager_set_mode);
+
+    _ = try wlr.XdgOutputManagerV1.create(server.wl_server, self.root.output_layout);
 }
 
-fn handleNewOutput(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_new_output", listener.?);
-    const wlr_output = util.voidCast(c.wlr_output, data.?);
+fn handleNewOutput(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
+    const self = @fieldParentPtr(Self, "new_output", listener);
     log.debug(.output_manager, "new output {}", .{wlr_output.name});
 
     const node = util.gpa.create(std.TailQueue(Output).Node) catch {
-        c.wlr_output_destroy(wlr_output);
+        wlr_output.destroy();
         return;
     };
     node.data.init(self.root, wlr_output) catch {
-        c.wlr_output_destroy(wlr_output);
+        wlr_output.destroy();
+        util.gpa.destroy(node);
         return;
     };
     const ptr_node = util.gpa.create(std.TailQueue(*Output).Node) catch {
+        wlr_output.destroy();
         util.gpa.destroy(node);
-        c.wlr_output_destroy(wlr_output);
         return;
     };
     ptr_node.data = &node.data;
@@ -105,107 +101,108 @@ fn handleNewOutput(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void 
     self.root.addOutput(node);
 }
 
-/// Sends the new output configuration to all clients of wlr_output_manager
-fn handleOutputLayoutChange(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_output_layout_change", listener.?);
-    // Dont do anything if the layout change is coming from applying a config
+/// Send the new output configuration to all wlr-output-manager clients
+fn handleOutputLayoutChange(
+    listener: *wl.Listener(*wlr.OutputLayout),
+    output_layout: *wlr.OutputLayout,
+) void {
+    const self = @fieldParentPtr(Self, "layout_change", listener);
+    // Ignore if the layout change is from applying a config
     if (self.output_config_pending) return;
 
-    const config = self.createOutputConfigurationFromCurrent() catch {
-        log.err(.output_manager, "Could not create output configuration", .{});
+    const config = self.ouputConfigFromCurrent() catch {
+        log.crit(.output_manager, "out of memory", .{});
         return;
     };
-    c.wlr_output_manager_v1_set_configuration(self.wlr_output_manager, config);
+    self.wlr_output_manager.setConfiguration(config);
 }
 
-fn handleOutputManagerApply(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_output_manager_apply", listener.?);
-    const config = util.voidCast(c.wlr_output_configuration_v1, data.?);
-    defer c.wlr_output_configuration_v1_destroy(config);
+fn handleOutputManagerApply(
+    listener: *wl.Listener(*wlr.OutputConfigurationV1),
+    config: *wlr.OutputConfigurationV1,
+) void {
+    const self = @fieldParentPtr(Self, "manager_apply", listener);
+    defer config.destroy();
 
     if (self.applyOutputConfig(config)) {
-        c.wlr_output_configuration_v1_send_succeeded(config);
+        config.sendSucceeded();
     } else {
-        c.wlr_output_configuration_v1_send_failed(config);
+        config.sendFailed();
     }
 
-    // Now send the config that actually was applied
-    const actualConfig = self.createOutputConfigurationFromCurrent() catch {
-        log.err(.output_manager, "Could not create output configuration", .{});
+    // Send the config that was actually applied
+    const applied_config = self.ouputConfigFromCurrent() catch {
+        log.crit(.output_manager, "out of memory", .{});
         return;
     };
-    c.wlr_output_manager_v1_set_configuration(self.wlr_output_manager, actualConfig);
+    self.wlr_output_manager.setConfiguration(applied_config);
 }
 
-fn handleOutputManagerTest(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_output_manager_test", listener.?);
-    const config = util.voidCast(c.wlr_output_configuration_v1, data.?);
-    defer c.wlr_output_configuration_v1_destroy(config);
+fn handleOutputManagerTest(
+    listener: *wl.Listener(*wlr.OutputConfigurationV1),
+    config: *wlr.OutputConfigurationV1,
+) void {
+    const self = @fieldParentPtr(Self, "manager_test", listener);
+    defer config.destroy();
 
     if (testOutputConfig(config, true)) {
-        c.wlr_output_configuration_v1_send_succeeded(config);
+        config.sendSucceeded();
     } else {
-        c.wlr_output_configuration_v1_send_failed(config);
+        config.sendFailed();
     }
 }
 
-fn handleOutputPowerManagementSetMode(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_output_power_manager_set_mode", listener.?);
-    const mode_event = util.voidCast(c.wlr_output_power_v1_set_mode_event, data.?);
-    const wlr_output: *c.wlr_output = mode_event.output;
+fn handleOutputPowerManagementSetMode(
+    listener: *wl.Listener(*wlr.OutputPowerManagerV1.event.SetMode),
+    event: *wlr.OutputPowerManagerV1.event.SetMode,
+) void {
+    const self = @fieldParentPtr(Self, "power_manager_set_mode", listener);
 
-    const enable = mode_event.mode == .ZWLR_OUTPUT_POWER_V1_MODE_ON;
+    const enable = event.mode == .on;
 
     const log_text = if (enable) "Enabling" else "Disabling";
     log.debug(
         .output_manager,
         "{} dpms for output {}",
-        .{ log_text, wlr_output.name },
+        .{ log_text, event.output.name },
     );
 
-    c.wlr_output_enable(wlr_output, enable);
-    if (!c.wlr_output_commit(wlr_output)) {
-        log.err(
-            .output_manager,
-            "wlr_output_commit failed for {}",
-            .{wlr_output.name},
-        );
-    }
+    event.output.enable(enable);
+    event.output.commit() catch
+        log.err(.server, "output commit failed for {}", .{event.output.name});
 }
 
-/// Applies an output config
-fn applyOutputConfig(self: *Self, config: *c.wlr_output_configuration_v1) bool {
-    // We need to store whether a config is pending because we listen to wlr_output_layout.change
-    // and this event can be triggered by applying the config
+/// Apply the given config, return false on faliure
+fn applyOutputConfig(self: *Self, config: *wlr.OutputConfigurationV1) bool {
+    // Store whether a config is pending so we can tell if the
+    // wlr_output_layout.change event was triggered by applying the config
     self.output_config_pending = true;
     defer self.output_config_pending = false;
 
     // Test if the config should apply cleanly
     if (!testOutputConfig(config, false)) return false;
 
-    const list_head: *c.wl_list = &config.heads;
-    var it: *c.wl_list = list_head.next;
-    while (it != list_head) : (it = it.next) {
-        const head = @fieldParentPtr(c.wlr_output_configuration_head_v1, "link", it);
-        const output = util.voidCast(Output, @as(*c.wlr_output, head.state.output).data.?);
+    var it = config.heads.iterator(.forward);
+    while (it.next()) |head| {
+        const output = @intToPtr(*Output, head.state.output.data);
         const disable = output.wlr_output.enabled and !head.state.enabled;
 
-        // This commit will only fail due to runtime errors.
-        // We choose to ignore this error
-        if (!c.wlr_output_commit(output.wlr_output)) {
-            log.err(.output_manager, "wlr_output_commit failed for {}", .{output.wlr_output.name});
-        }
+        // Since we have done a successful test commit, this will only fail
+        // due to error in the output's backend implementation.
+        output.wlr_output.commit() catch
+            log.err(.output_manager, "output commit failed for {}", .{output.wlr_output.name});
 
         if (output.wlr_output.enabled) {
             // Moves the output if it is already in the layout
-            c.wlr_output_layout_add(self.root.wlr_output_layout, output.wlr_output, head.state.x, head.state.y);
+            self.root.output_layout.add(output.wlr_output, head.state.x, head.state.y);
         }
 
         if (disable) {
             const node = @fieldParentPtr(std.TailQueue(Output).Node, "data", output);
             self.root.removeOutput(node);
-            c.wlr_output_layout_remove(self.root.wlr_output_layout, output.wlr_output);
+            self.root.output_layout.remove(output.wlr_output);
         }
+
         // Arrange layers to adjust the usable_box
         // We dont need to call arrangeViews() since arrangeLayers() will call
         // it for us because the usable_box changed
@@ -218,16 +215,14 @@ fn applyOutputConfig(self: *Self, config: *c.wlr_output_configuration_v1) bool {
 
 /// Tests the output configuration.
 /// If rollback is false all changes are applied to the pending state of the affected outputs.
-fn testOutputConfig(config: *c.wlr_output_configuration_v1, rollback: bool) bool {
+fn testOutputConfig(config: *wlr.OutputConfigurationV1, rollback: bool) bool {
     var ok = true;
-    const list_head: *c.wl_list = &config.heads;
-    var it: *c.wl_list = list_head.next;
-    while (it != list_head) : (it = it.next) {
-        const head = @fieldParentPtr(c.wlr_output_configuration_head_v1, "link", it);
-        const wlr_output = @as(*c.wlr_output, head.state.output);
+    var it = config.heads.iterator(.forward);
+    while (it.next()) |head| {
+        const wlr_output = head.state.output;
 
-        const width = if (@as(?*c.wlr_output_mode, head.state.mode)) |m| m.width else head.state.custom_mode.width;
-        const height = if (@as(?*c.wlr_output_mode, head.state.mode)) |m| m.height else head.state.custom_mode.height;
+        const width = if (head.state.mode) |m| m.width else head.state.custom_mode.width;
+        const height = if (head.state.mode) |m| m.height else head.state.custom_mode.height;
         const scale = head.state.scale;
 
         const too_small = (@intToFloat(f32, width) / scale < min_size) or
@@ -242,24 +237,20 @@ fn testOutputConfig(config: *c.wlr_output_configuration_v1, rollback: bool) bool
         }
 
         applyHeadToOutput(head, wlr_output);
-        ok = ok and !too_small and c.wlr_output_test(wlr_output);
+        ok = ok and !too_small and wlr_output.testCommit();
     }
 
     if (rollback or !ok) {
         // Rollback all changes
-        it = list_head.next;
-        while (it != list_head) : (it = it.next) {
-            const head = @fieldParentPtr(c.wlr_output_configuration_head_v1, "link", it);
-            const wlr_output = @as(*c.wlr_output, head.state.output);
-            c.wlr_output_rollback(wlr_output);
-        }
+        it = config.heads.iterator(.forward);
+        while (it.next()) |head| head.state.output.rollback();
     }
 
     return ok;
 }
 
-fn applyHeadToOutput(head: *c.wlr_output_configuration_head_v1, wlr_output: *c.wlr_output) void {
-    c.wlr_output_enable(wlr_output, head.state.enabled);
+fn applyHeadToOutput(head: *wlr.OutputConfigurationV1.Head, wlr_output: *wlr.Output) void {
+    wlr_output.enable(head.state.enabled);
     // The output must be enabled for the following properties to apply
     if (head.state.enabled) {
         // TODO(wlroots) Somehow on the drm backend setting the mode causes
@@ -268,43 +259,41 @@ fn applyHeadToOutput(head: *c.wlr_output_configuration_head_v1, wlr_output: *c.w
         // We can just ignore this because nothing bad happens but it
         // should be fixed in the future
         // See https://github.com/swaywm/wlroots/issues/2492
-        if (head.state.mode != null) {
-            c.wlr_output_set_mode(wlr_output, head.state.mode);
+        if (head.state.mode) |mode| {
+            wlr_output.setMode(mode);
         } else {
             log.info(.output_manager, "custom modes are not supported until the next wlroots release: ignoring", .{});
             // TODO(wlroots) uncomment the following lines when wlroots 0.13.0 is released
             // See https://github.com/swaywm/wlroots/pull/2517
             //const custom_mode = &head.state.custom_mode;
-            //c.wlr_output_set_custom_mode(wlr_output, custom_mode.width, custom_mode.height, custom_mode.refresh);
+            //wlr_output.setCustomMode(custom_mode.width, custom_mode.height, custom_mode.refresh);
         }
         // TODO(wlroots) Figure out if this conversion is needed or if that is a bug in wlroots
-        c.wlr_output_set_scale(wlr_output, @floatCast(f32, head.state.scale));
-        c.wlr_output_set_transform(wlr_output, head.state.transform);
+        wlr_output.setScale(@floatCast(f32, head.state.scale));
+        wlr_output.setTransform(head.state.transform);
     }
 }
 
-/// Creates an wlr_output_configuration from the current configuration
-fn createOutputConfigurationFromCurrent(self: *Self) !*c.wlr_output_configuration_v1 {
-    var config = c.wlr_output_configuration_v1_create() orelse return error.OutOfMemory;
-    errdefer c.wlr_output_configuration_v1_destroy(config);
+/// Create the config describing the current configuration
+fn ouputConfigFromCurrent(self: *Self) !*wlr.OutputConfigurationV1 {
+    const config = try wlr.OutputConfigurationV1.create();
+    // this destroys all associated config heads as well
+    errdefer config.destroy();
 
     var it = self.root.all_outputs.first;
-    while (it) |node| : (it = node.next) {
-        try self.createHead(node.data, config);
-    }
+    while (it) |node| : (it = node.next) try self.createHead(node.data, config);
 
     return config;
 }
 
-fn createHead(self: *Self, output: *Output, config: *c.wlr_output_configuration_v1) !void {
+fn createHead(self: *Self, output: *Output, config: *wlr.OutputConfigurationV1) !void {
     const wlr_output = output.wlr_output;
-    const head: *c.wlr_output_configuration_head_v1 = c.wlr_output_configuration_head_v1_create(config, wlr_output) orelse
-        return error.OutOfMemory;
+    const head = try wlr.OutputConfigurationV1.Head.create(config, wlr_output);
 
-    // If the output is not part of the layout (and thus disabled) we dont care about the position
-    const box = @as(?*c.wlr_box, c.wlr_output_layout_get_box(self.root.wlr_output_layout, wlr_output));
-    if (box) |b| {
-        head.state.x = b.x;
-        head.state.y = b.y;
+    // If the output is not part of the layout (and thus disabled) we dont care
+    // about the position
+    if (output.root.output_layout.getBox(wlr_output)) |box| {
+        head.state.x = box.x;
+        head.state.y = box.y;
     }
 }

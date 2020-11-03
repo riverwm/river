@@ -18,6 +18,13 @@
 const Self = @This();
 
 const std = @import("std");
+const mem = std.mem;
+
+const wayland = @import("wayland");
+const wl = wayland.server.wl;
+const zriver = wayland.server.zriver;
+
+const wlr = @import("wlroots");
 
 const c = @import("c.zig");
 const command = @import("command.zig");
@@ -26,141 +33,106 @@ const util = @import("util.zig");
 const Seat = @import("Seat.zig");
 const Server = @import("Server.zig");
 
-const protocol_version = 1;
-
-const implementation = c.struct_zriver_control_v1_interface{
-    .destroy = destroy,
-    .add_argument = addArgument,
-    .run_command = runCommand,
-};
-
-wl_global: *c.wl_global,
+global: *wl.Global,
 
 args_map: std.AutoHashMap(u32, std.ArrayList([]const u8)),
 
-listen_display_destroy: c.wl_listener = undefined,
+server_destroy: wl.Listener(*wl.Server) = undefined,
 
 pub fn init(self: *Self, server: *Server) !void {
     self.* = .{
-        .wl_global = c.wl_global_create(
-            server.wl_display,
-            &c.zriver_control_v1_interface,
-            protocol_version,
-            self,
-            bind,
-        ) orelse return error.OutOfMemory,
+        .global = try wl.Global.create(server.wl_server, zriver.ControlV1, 1, *Self, self, bind),
         .args_map = std.AutoHashMap(u32, std.ArrayList([]const u8)).init(util.gpa),
     };
 
-    self.listen_display_destroy.notify = handleDisplayDestroy;
-    c.wl_display_add_destroy_listener(server.wl_display, &self.listen_display_destroy);
+    self.server_destroy.setNotify(handleServerDestroy);
+    server.wl_server.addDestroyListener(&self.server_destroy);
 }
 
-fn handleDisplayDestroy(wl_listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_display_destroy", wl_listener.?);
-    c.wl_global_destroy(self.wl_global);
+fn handleServerDestroy(listener: *wl.Listener(*wl.Server), wl_server: *wl.Server) void {
+    const self = @fieldParentPtr(Self, "server_destroy", listener);
+    self.global.destroy();
     self.args_map.deinit();
 }
 
 /// Called when a client binds our global
-fn bind(wl_client: ?*c.wl_client, data: ?*c_void, version: u32, id: u32) callconv(.C) void {
-    const self = util.voidCast(Self, data.?);
-    const wl_resource = c.wl_resource_create(
-        wl_client,
-        &c.zriver_control_v1_interface,
-        @intCast(c_int, version),
-        id,
-    ) orelse {
-        c.wl_client_post_no_memory(wl_client);
+fn bind(client: *wl.Client, self: *Self, version: u32, id: u32) callconv(.C) void {
+    const control = zriver.ControlV1.create(client, version, id) catch {
+        client.postNoMemory();
         return;
     };
     self.args_map.putNoClobber(id, std.ArrayList([]const u8).init(util.gpa)) catch {
-        c.wl_resource_destroy(wl_resource);
-        c.wl_client_post_no_memory(wl_client);
+        control.destroy();
+        client.postNoMemory();
         return;
     };
-    c.wl_resource_set_implementation(wl_resource, &implementation, self, handleResourceDestroy);
+    control.setHandler(*Self, handleRequest, handleDestroy, self);
+}
+
+fn handleRequest(control: *zriver.ControlV1, request: zriver.ControlV1.Request, self: *Self) void {
+    switch (request) {
+        .destroy => control.destroy(),
+        .add_argument => |add_argument| {
+            const owned_slice = mem.dupe(util.gpa, u8, mem.span(add_argument.argument)) catch {
+                control.getClient().postNoMemory();
+                return;
+            };
+
+            self.args_map.getEntry(control.getId()).?.value.append(owned_slice) catch {
+                control.getClient().postNoMemory();
+                util.gpa.free(owned_slice);
+                return;
+            };
+        },
+        .run_command => |run_command| {
+            const seat = @intToPtr(*Seat, wlr.Seat.Client.fromWlSeat(run_command.seat).?.seat.data);
+
+            const callback = zriver.CommandCallbackV1.create(
+                control.getClient(),
+                control.getVersion(),
+                run_command.callback,
+            ) catch {
+                control.getClient().postNoMemory();
+                return;
+            };
+
+            const args = self.args_map.get(control.getId()).?.items;
+
+            var out: ?[]const u8 = null;
+            defer if (out) |s| util.gpa.free(s);
+            command.run(util.gpa, seat, args, &out) catch |err| {
+                const failure_message = switch (err) {
+                    command.Error.OutOfMemory => {
+                        callback.getClient().postNoMemory();
+                        return;
+                    },
+                    command.Error.Other => std.cstr.addNullByte(util.gpa, out.?) catch {
+                        callback.getClient().postNoMemory();
+                        return;
+                    },
+                    else => command.errToMsg(err),
+                };
+                defer if (err == command.Error.Other) util.gpa.free(failure_message);
+                callback.sendFailure(failure_message);
+                return;
+            };
+
+            const success_message = if (out) |s|
+                std.cstr.addNullByte(util.gpa, s) catch {
+                    callback.getClient().postNoMemory();
+                    return;
+                }
+            else
+                "";
+            defer if (out != null) util.gpa.free(success_message);
+            callback.sendSuccess(success_message);
+        },
+    }
 }
 
 /// Remove the resource from the hash map and free all stored args
-fn handleResourceDestroy(wl_resource: ?*c.wl_resource) callconv(.C) void {
-    const self = util.voidCast(Self, c.wl_resource_get_user_data(wl_resource).?);
-    const id = c.wl_resource_get_id(wl_resource);
-    const list = self.args_map.remove(id).?.value;
+fn handleDestroy(control: *zriver.ControlV1, self: *Self) void {
+    const list = self.args_map.remove(control.getId()).?.value;
     for (list.items) |arg| list.allocator.free(arg);
     list.deinit();
-}
-
-fn destroy(wl_client: ?*c.wl_client, wl_resource: ?*c.wl_resource) callconv(.C) void {
-    c.wl_resource_destroy(wl_resource);
-}
-
-fn addArgument(wl_client: ?*c.wl_client, wl_resource: ?*c.wl_resource, arg: ?[*:0]const u8) callconv(.C) void {
-    const self = util.voidCast(Self, c.wl_resource_get_user_data(wl_resource).?);
-    const id = c.wl_resource_get_id(wl_resource);
-
-    const owned_slice = std.mem.dupe(util.gpa, u8, std.mem.span(arg.?)) catch {
-        c.wl_client_post_no_memory(wl_client);
-        return;
-    };
-
-    self.args_map.getEntry(id).?.value.append(owned_slice) catch {
-        c.wl_client_post_no_memory(wl_client);
-        util.gpa.free(owned_slice);
-        return;
-    };
-}
-
-fn runCommand(
-    wl_client: ?*c.wl_client,
-    wl_resource: ?*c.wl_resource,
-    seat_wl_resource: ?*c.wl_resource,
-    callback_id: u32,
-) callconv(.C) void {
-    const self = util.voidCast(Self, c.wl_resource_get_user_data(wl_resource).?);
-    // This can be null if the seat is inert, in which case we ignore the request
-    const wlr_seat_client = c.wlr_seat_client_from_resource(seat_wl_resource) orelse return;
-    const seat = util.voidCast(Seat, wlr_seat_client.*.seat.*.data.?);
-
-    const callback_resource = c.wl_resource_create(
-        wl_client,
-        &c.zriver_command_callback_v1_interface,
-        protocol_version,
-        callback_id,
-    ) orelse {
-        c.wl_client_post_no_memory(wl_client);
-        return;
-    };
-    c.wl_resource_set_implementation(callback_resource, null, null, null);
-
-    const args = self.args_map.get(c.wl_resource_get_id(wl_resource)).?.items;
-
-    var out: ?[]const u8 = null;
-    defer if (out) |s| util.gpa.free(s);
-    command.run(util.gpa, seat, args, &out) catch |err| {
-        const failure_message = switch (err) {
-            command.Error.OutOfMemory => {
-                c.wl_client_post_no_memory(wl_client);
-                return;
-            },
-            command.Error.Other => std.cstr.addNullByte(util.gpa, out.?) catch {
-                c.wl_client_post_no_memory(wl_client);
-                return;
-            },
-            else => command.errToMsg(err),
-        };
-        defer if (err == command.Error.Other) util.gpa.free(failure_message);
-        c.zriver_command_callback_v1_send_failure(callback_resource, failure_message);
-        return;
-    };
-
-    const success_message = if (out) |s|
-        std.cstr.addNullByte(util.gpa, s) catch {
-            c.wl_client_post_no_memory(wl_client);
-            return;
-        }
-    else
-        "";
-    defer if (out != null) util.gpa.free(success_message);
-    c.zriver_command_callback_v1_send_success(callback_resource, success_message);
 }

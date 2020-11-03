@@ -19,10 +19,10 @@ const std = @import("std");
 
 const wayland = @import("wayland");
 const wl = wayland.client.wl;
-const river = wayland.client.river;
+const zriver = wayland.client.zriver;
 
 const SetupContext = struct {
-    river_control: ?*river.ControlV1 = null,
+    river_control: ?*zriver.ControlV1 = null,
     seat: ?*wl.Seat = null,
 };
 
@@ -54,17 +54,17 @@ pub fn main() !void {
 fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, context: *SetupContext) void {
     switch (event) {
         .global => |global| {
-            if (context.seat == null and std.cstr.cmp(global.interface, wl.Seat.interface().name) == 0) {
+            if (context.seat == null and std.cstr.cmp(global.interface, wl.Seat.getInterface().name) == 0) {
                 context.seat = registry.bind(global.name, wl.Seat, 1) catch return;
-            } else if (std.cstr.cmp(global.interface, river.ControlV1.interface().name) == 0) {
-                context.river_control = registry.bind(global.name, river.ControlV1, 1) catch return;
+            } else if (std.cstr.cmp(global.interface, zriver.ControlV1.getInterface().name) == 0) {
+                context.river_control = registry.bind(global.name, zriver.ControlV1, 1) catch return;
             }
         },
         .global_remove => {},
     }
 }
 
-fn callbackListener(callback: *river.CommandCallbackV1, event: river.CommandCallbackV1.Event, _: ?*c_void) void {
+fn callbackListener(callback: *zriver.CommandCallbackV1, event: zriver.CommandCallbackV1.Event, _: ?*c_void) void {
     switch (event) {
         .success => |success| {
             if (std.mem.len(success.output) > 0) {

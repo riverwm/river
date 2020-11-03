@@ -19,8 +19,10 @@ const Self = @This();
 
 const build_options = @import("build_options");
 const std = @import("std");
+const os = std.os;
+const wlr = @import("wlroots");
+const wl = @import("wayland").server.wl;
 
-const c = @import("c.zig");
 const log = @import("log.zig");
 const util = @import("util.zig");
 
@@ -71,9 +73,9 @@ const State = struct {
 };
 
 const SavedBuffer = struct {
-    wlr_client_buffer: *c.wlr_client_buffer,
+    client_buffer: *wlr.ClientBuffer,
     box: Box,
-    transform: c.wl_output_transform,
+    transform: wl.Output.Transform,
 };
 
 /// The implementation of this view
@@ -84,10 +86,10 @@ output: *Output,
 
 /// This is from the point where the view is mapped until the surface
 /// is destroyed by wlroots.
-wlr_surface: ?*c.wlr_surface = null,
+surface: ?*wlr.Surface = null,
 
 /// This View struct outlasts the wlroots object it wraps. This bool is set to
-/// true when the backing wlr_xdg_toplevel or equivalent has been destroyed.
+/// true when the backing wlr.XdgToplevel or equivalent has been destroyed.
 destroying: bool = false,
 
 /// The double-buffered state of the view
@@ -116,7 +118,7 @@ float_box: Box = undefined,
 opacity: f32,
 
 /// Opacity change timer event source
-opacity_timer: ?*c.wl_event_source = null,
+opacity_timer: ?*wl.EventSource = null,
 
 draw_borders: bool = true,
 
@@ -135,10 +137,10 @@ pub fn init(self: *Self, output: *Output, tags: u32, surface: anytype) void {
         .opacity = output.root.server.config.view_opacity_initial,
     };
 
-    if (@TypeOf(surface) == *c.wlr_xdg_surface) {
+    if (@TypeOf(surface) == *wlr.XdgSurface) {
         self.impl = .{ .xdg_toplevel = undefined };
         self.impl.xdg_toplevel.init(self, surface);
-    } else if (build_options.xwayland and @TypeOf(surface) == *c.wlr_xwayland_surface) {
+    } else if (build_options.xwayland and @TypeOf(surface) == *wlr.XwaylandSurface) {
         self.impl = .{ .xwayland_view = undefined };
         self.impl.xwayland_view.init(self, surface);
     } else unreachable;
@@ -146,7 +148,7 @@ pub fn init(self: *Self, output: *Output, tags: u32, surface: anytype) void {
 
 /// Deinit the view, remove it from the view stack and free the memory.
 pub fn destroy(self: *Self) void {
-    for (self.saved_buffers.items) |buffer| c.wlr_buffer_unlock(&buffer.wlr_client_buffer.*.base);
+    self.dropSavedBuffers();
     self.saved_buffers.deinit();
     switch (self.impl) {
         .xdg_toplevel => |*xdg_toplevel| xdg_toplevel.deinit(),
@@ -183,12 +185,12 @@ pub fn applyPending(self: *Self) void {
     // and turn the view fully opaque
     if (!self.current.fullscreen and self.pending.fullscreen) {
         self.pending.target_opacity = 1.0;
-        const layout_box = c.wlr_output_layout_get_box(self.output.root.wlr_output_layout, self.output.wlr_output);
+        const layout_box = self.output.root.output_layout.getBox(self.output.wlr_output).?;
         self.pending.box = .{
             .x = 0,
             .y = 0,
-            .width = @intCast(u32, layout_box.*.width),
-            .height = @intCast(u32, layout_box.*.height),
+            .width = @intCast(u32, layout_box.width),
+            .height = @intCast(u32, layout_box.height),
         };
     }
 
@@ -225,20 +227,20 @@ pub fn configure(self: Self) void {
 }
 
 pub fn sendFrameDone(self: Self) void {
-    var now: c.timespec = undefined;
-    _ = c.clock_gettime(c.CLOCK_MONOTONIC, &now);
-    c.wlr_surface_send_frame_done(self.wlr_surface.?, &now);
+    var now: os.timespec = undefined;
+    os.clock_gettime(os.CLOCK_MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
+    self.surface.?.sendFrameDone(&now);
 }
 
 pub fn dropSavedBuffers(self: *Self) void {
-    for (self.saved_buffers.items) |buffer| c.wlr_buffer_unlock(&buffer.wlr_client_buffer.*.base);
+    for (self.saved_buffers.items) |buffer| buffer.client_buffer.base.unlock();
     self.saved_buffers.items.len = 0;
 }
 
 pub fn saveBuffers(self: *Self) void {
     std.debug.assert(self.saved_buffers.items.len == 0);
     self.saved_surface_box = self.surface_box;
-    self.forEachSurface(saveBuffersIterator, &self.saved_buffers);
+    self.forEachSurface(*std.ArrayList(SavedBuffer), saveBuffersIterator, &self.saved_buffers);
 }
 
 /// If this commit is in response to our configure and the
@@ -257,26 +259,23 @@ pub fn notifyConfiguredOrApplyPending(self: *Self) void {
 }
 
 fn saveBuffersIterator(
-    wlr_surface: ?*c.wlr_surface,
+    surface: *wlr.Surface,
     surface_x: c_int,
     surface_y: c_int,
-    data: ?*c_void,
+    saved_buffers: *std.ArrayList(SavedBuffer),
 ) callconv(.C) void {
-    const saved_buffers = util.voidCast(std.ArrayList(SavedBuffer), data.?);
-    if (wlr_surface) |surface| {
-        if (c.wlr_surface_has_buffer(surface)) {
-            saved_buffers.append(.{
-                .wlr_client_buffer = surface.buffer,
-                .box = Box{
-                    .x = surface_x,
-                    .y = surface_y,
-                    .width = @intCast(u32, surface.current.width),
-                    .height = @intCast(u32, surface.current.height),
-                },
-                .transform = surface.current.transform,
-            }) catch return;
-            _ = c.wlr_buffer_lock(&surface.buffer.*.base);
-        }
+    if (surface.buffer) |buffer| {
+        saved_buffers.append(.{
+            .client_buffer = buffer,
+            .box = Box{
+                .x = surface_x,
+                .y = surface_y,
+                .width = @intCast(u32, surface.current.width),
+                .height = @intCast(u32, surface.current.height),
+            },
+            .transform = surface.current.transform,
+        }) catch return;
+        _ = buffer.base.lock();
     }
 }
 
@@ -291,8 +290,8 @@ pub fn sendToOutput(self: *Self, destination_output: *Output) void {
     self.output.sendViewTags();
     destination_output.sendViewTags();
 
-    c.wlr_surface_send_leave(self.wlr_surface, self.output.wlr_output);
-    c.wlr_surface_send_enter(self.wlr_surface, destination_output.wlr_output);
+    self.surface.?.sendLeave(self.output.wlr_output);
+    self.surface.?.sendEnter(destination_output.wlr_output);
 
     self.output = destination_output;
 }
@@ -304,20 +303,21 @@ pub fn close(self: Self) void {
     }
 }
 
-pub fn forEachSurface(
+pub inline fn forEachSurface(
     self: Self,
-    iterator: c.wlr_surface_iterator_func_t,
-    user_data: ?*c_void,
+    comptime T: type,
+    iterator: fn (surface: *wlr.Surface, sx: c_int, sy: c_int, data: T) callconv(.C) void,
+    user_data: T,
 ) void {
     switch (self.impl) {
-        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.forEachSurface(iterator, user_data),
-        .xwayland_view => |xwayland_view| xwayland_view.forEachSurface(iterator, user_data),
+        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.forEachSurface(T, iterator, user_data),
+        .xwayland_view => |xwayland_view| xwayland_view.forEachSurface(T, iterator, user_data),
     }
 }
 
 /// Return the surface at output coordinates ox, oy and set sx, sy to the
 /// corresponding surface-relative coordinates, if there is a surface.
-pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*c.wlr_surface {
+pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*wlr.Surface {
     return switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.surfaceAt(ox, oy, sx, sy),
         .xwayland_view => |xwayland_view| xwayland_view.surfaceAt(ox, oy, sx, sy),
@@ -348,18 +348,18 @@ pub fn getConstraints(self: Self) Constraints {
     };
 }
 
-/// Find and return the view corresponding to a given wlr_surface, if any
-pub fn fromWlrSurface(wlr_surface: *c.wlr_surface) ?*Self {
-    if (c.wlr_surface_is_xdg_surface(wlr_surface)) {
-        const wlr_xdg_surface = c.wlr_xdg_surface_from_wlr_surface(wlr_surface);
-        if (wlr_xdg_surface.*.role == .WLR_XDG_SURFACE_ROLE_TOPLEVEL) {
-            return util.voidCast(Self, wlr_xdg_surface.*.data.?);
+/// Find and return the view corresponding to a given surface, if any
+pub fn fromWlrSurface(surface: *wlr.Surface) ?*Self {
+    if (surface.isXdgSurface()) {
+        const xdg_surface = wlr.XdgSurface.fromWlrSurface(surface);
+        if (xdg_surface.role == .toplevel) {
+            return @intToPtr(*Self, xdg_surface.data);
         }
     }
     if (build_options.xwayland) {
-        if (c.wlr_surface_is_xwayland_surface(wlr_surface)) {
-            const wlr_xwayland_surface = c.wlr_xwayland_surface_from_wlr_surface(wlr_surface);
-            return util.voidCast(Self, wlr_xwayland_surface.*.data.?);
+        if (surface.isXWaylandSurface()) {
+            const xwayland_surface = wlr.XwaylandSurface.fromWlrSurface(surface);
+            return @intToPtr(*Self, xwayland_surface.data);
         }
     }
     return null;
@@ -392,7 +392,7 @@ pub fn map(self: *Self) void {
     var it = root.server.input_manager.seats.first;
     while (it) |seat_node| : (it = seat_node.next) seat_node.data.focus(self);
 
-    c.wlr_surface_send_enter(self.wlr_surface.?, self.output.wlr_output);
+    self.surface.?.sendEnter(self.output.wlr_output);
 
     self.output.sendViewTags();
 
@@ -446,22 +446,21 @@ fn incrementOpacity(self: *Self) bool {
 
 /// Destroy a views opacity timer
 fn killOpacityTimer(self: *Self) void {
-    if (c.wl_event_source_remove(self.opacity_timer) < 0) unreachable;
+    self.opacity_timer.?.remove();
     self.opacity_timer = null;
 }
 
 /// Set the timeout on a views opacity timer
 fn armOpacityTimer(self: *Self) void {
     const delta_t = self.output.root.server.config.view_opacity_delta_t;
-    if (c.wl_event_source_timer_update(self.opacity_timer, delta_t) < 0) {
-        log.err(.view, "failed to update opacity timer", .{});
+    self.opacity_timer.?.timerUpdate(delta_t) catch |err| {
+        log.err(.view, "failed to update opacity timer: {}", .{err});
         self.killOpacityTimer();
-    }
+    };
 }
 
 /// Called by the opacity timer
-fn handleOpacityTimer(data: ?*c_void) callconv(.C) c_int {
-    const self = util.voidCast(Self, data.?);
+fn handleOpacityTimer(self: *Self) callconv(.C) c_int {
     if (self.incrementOpacity()) {
         self.killOpacityTimer();
     } else {
@@ -472,12 +471,8 @@ fn handleOpacityTimer(data: ?*c_void) callconv(.C) c_int {
 
 /// Create an opacity timer for a view and arm it
 fn attachOpacityTimer(self: *Self) void {
-    const server = self.output.root.server;
-    self.opacity_timer = c.wl_event_loop_add_timer(
-        c.wl_display_get_event_loop(server.wl_display),
-        handleOpacityTimer,
-        self,
-    ) orelse {
+    const event_loop = self.output.root.server.wl_server.getEventLoop();
+    self.opacity_timer = event_loop.addTimer(*Self, handleOpacityTimer, self) catch {
         log.err(.view, "failed to create opacity timer for view '{}'", .{self.getTitle()});
         return;
     };

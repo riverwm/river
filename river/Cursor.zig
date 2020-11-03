@@ -19,6 +19,10 @@ const Self = @This();
 
 const build_options = @import("build_options");
 const std = @import("std");
+const wlr = @import("wlroots");
+const wayland = @import("wayland");
+const wl = wayland.server.wl;
+const zwlr = wayland.server.zwlr;
 
 const c = @import("c.zig");
 const log = @import("log.zig");
@@ -50,34 +54,34 @@ const default_size = 24;
 mode: Mode = .passthrough,
 
 seat: *Seat,
-wlr_cursor: *c.wlr_cursor,
-wlr_xcursor_manager: *c.wlr_xcursor_manager,
+wlr_cursor: *wlr.Cursor,
+xcursor_manager: *wlr.XcursorManager,
 
 /// Number of distinct buttons currently pressed
 pressed_count: u32 = 0,
 
-listen_axis: c.wl_listener = undefined,
-listen_button: c.wl_listener = undefined,
-listen_frame: c.wl_listener = undefined,
-listen_motion_absolute: c.wl_listener = undefined,
-listen_motion: c.wl_listener = undefined,
-listen_request_set_cursor: c.wl_listener = undefined,
+axis: wl.Listener(*wlr.Pointer.event.Axis) = undefined,
+button: wl.Listener(*wlr.Pointer.event.Button) = undefined,
+frame: wl.Listener(*wlr.Cursor) = undefined,
+motion_absolute: wl.Listener(*wlr.Pointer.event.MotionAbsolute) = undefined,
+motion: wl.Listener(*wlr.Pointer.event.Motion) = undefined,
+request_set_cursor: wl.Listener(*wlr.Seat.event.RequestSetCursor) = undefined,
 
 pub fn init(self: *Self, seat: *Seat) !void {
-    const wlr_cursor = c.wlr_cursor_create() orelse return error.OutOfMemory;
-    errdefer c.wlr_cursor_destroy(wlr_cursor);
-    c.wlr_cursor_attach_output_layout(wlr_cursor, seat.input_manager.server.root.wlr_output_layout);
+    const wlr_cursor = try wlr.Cursor.create();
+    errdefer wlr_cursor.destroy();
+    wlr_cursor.attachOutputLayout(seat.input_manager.server.root.output_layout);
 
-    // This is here so that self.wlr_xcursor_manager doesn't need to be an
+    // This is here so that self.xcursor_manager doesn't need to be an
     // optional pointer. This isn't optimal as it does a needless allocation,
     // but this is not a hot path.
-    const wlr_xcursor_manager = c.wlr_xcursor_manager_create(null, default_size) orelse return error.OutOfMemory;
-    errdefer c.wlr_xcursor_manager_destroy(wlr_xcursor_manager);
+    const xcursor_manager = try wlr.XcursorManager.create(null, default_size);
+    errdefer xcursor_manager.destroy();
 
     self.* = .{
         .seat = seat,
         .wlr_cursor = wlr_cursor,
-        .wlr_xcursor_manager = wlr_xcursor_manager,
+        .xcursor_manager = xcursor_manager,
     };
     try self.setTheme(null, null);
 
@@ -87,28 +91,28 @@ pub fn init(self: *Self, seat: *Seat) !void {
     // can choose how we want to process them, forwarding them to clients and
     // moving the cursor around. See following post for more detail:
     // https://drewdevault.com/2018/07/17/Input-handling-in-wlroots.html
-    self.listen_axis.notify = handleAxis;
-    c.wl_signal_add(&self.wlr_cursor.events.axis, &self.listen_axis);
+    self.axis.setNotify(handleAxis);
+    self.wlr_cursor.events.axis.add(&self.axis);
 
-    self.listen_button.notify = handleButton;
-    c.wl_signal_add(&self.wlr_cursor.events.button, &self.listen_button);
+    self.button.setNotify(handleButton);
+    self.wlr_cursor.events.button.add(&self.button);
 
-    self.listen_frame.notify = handleFrame;
-    c.wl_signal_add(&self.wlr_cursor.events.frame, &self.listen_frame);
+    self.frame.setNotify(handleFrame);
+    self.wlr_cursor.events.frame.add(&self.frame);
 
-    self.listen_motion_absolute.notify = handleMotionAbsolute;
-    c.wl_signal_add(&self.wlr_cursor.events.motion_absolute, &self.listen_motion_absolute);
+    self.motion_absolute.setNotify(handleMotionAbsolute);
+    self.wlr_cursor.events.motion_absolute.add(&self.motion_absolute);
 
-    self.listen_motion.notify = handleMotion;
-    c.wl_signal_add(&self.wlr_cursor.events.motion, &self.listen_motion);
+    self.motion.setNotify(handleMotion);
+    self.wlr_cursor.events.motion.add(&self.motion);
 
-    self.listen_request_set_cursor.notify = handleRequestSetCursor;
-    c.wl_signal_add(&self.seat.wlr_seat.events.request_set_cursor, &self.listen_request_set_cursor);
+    self.request_set_cursor.setNotify(handleRequestSetCursor);
+    self.seat.wlr_seat.events.request_set_cursor.add(&self.request_set_cursor);
 }
 
 pub fn deinit(self: *Self) void {
-    c.wlr_xcursor_manager_destroy(self.wlr_xcursor_manager);
-    c.wlr_cursor_destroy(self.wlr_cursor);
+    self.xcursor_manager.destroy();
+    self.wlr_cursor.destroy();
 }
 
 /// Set the cursor theme for the given seat, as well as the xwayland theme if
@@ -118,15 +122,14 @@ pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
     const server = self.seat.input_manager.server;
     const size = _size orelse default_size;
 
-    c.wlr_xcursor_manager_destroy(self.wlr_xcursor_manager);
-    self.wlr_xcursor_manager = c.wlr_xcursor_manager_create(theme, size) orelse
-        return error.OutOfMemory;
+    self.xcursor_manager.destroy();
+    self.xcursor_manager = try wlr.XcursorManager.create(theme, size);
 
     // For each output, ensure a theme of the proper scale is loaded
     var it = server.root.outputs.first;
     while (it) |node| : (it = node.next) {
         const wlr_output = node.data.wlr_output;
-        if (!c.wlr_xcursor_manager_load(self.wlr_xcursor_manager, wlr_output.scale))
+        self.xcursor_manager.load(wlr_output.scale) catch
             log.err(.cursor, "failed to load xcursor theme '{}' at scale {}", .{ theme, wlr_output.scale });
     }
 
@@ -139,19 +142,20 @@ pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
         if (theme) |t| if (c.setenv("XCURSOR_THEME", t, 1) < 0) return error.OutOfMemory;
 
         if (build_options.xwayland) {
-            if (c.wlr_xcursor_manager_load(self.wlr_xcursor_manager, 1)) {
-                const wlr_xcursor = c.wlr_xcursor_manager_get_xcursor(self.wlr_xcursor_manager, "left_ptr", 1).?;
-                const image: *c.wlr_xcursor_image = wlr_xcursor.*.images[0];
-                c.wlr_xwayland_set_cursor(
-                    server.wlr_xwayland,
-                    image.buffer,
-                    image.width * 4,
-                    image.width,
-                    image.height,
-                    @intCast(i32, image.hotspot_x),
-                    @intCast(i32, image.hotspot_y),
-                );
-            } else log.err(.cursor, "failed to load xcursor theme '{}' at scale 1", .{theme});
+            self.xcursor_manager.load(1) catch {
+                log.err(.cursor, "failed to load xcursor theme '{}' at scale 1", .{theme});
+                return;
+            };
+            const wlr_xcursor = self.xcursor_manager.getXcursor("left_ptr", 1).?;
+            const image = wlr_xcursor.images[0];
+            server.xwayland.setCursor(
+                image.buffer,
+                image.width * 4,
+                image.width,
+                image.height,
+                @intCast(i32, image.hotspot_x),
+                @intCast(i32, image.hotspot_y),
+            );
         }
     }
 }
@@ -173,25 +177,18 @@ pub fn handleViewUnmap(self: *Self, view: *View) void {
 }
 
 fn clearFocus(self: Self) void {
-    c.wlr_xcursor_manager_set_cursor_image(
-        self.wlr_xcursor_manager,
-        "left_ptr",
-        self.wlr_cursor,
-    );
-    c.wlr_seat_pointer_clear_focus(self.seat.wlr_seat);
+    self.xcursor_manager.setCursorImage("left_ptr", self.wlr_cursor);
+    self.seat.wlr_seat.pointerNotifyClearFocus();
 }
 
-fn handleAxis(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    // This event is forwarded by the cursor when a pointer emits an axis event,
-    // for example when you move the scroll wheel.
-    const self = @fieldParentPtr(Self, "listen_axis", listener.?);
-    const event = util.voidCast(c.wlr_event_pointer_axis, data.?);
+/// Axis event is a scroll wheel or similiar
+fn handleAxis(listener: *wl.Listener(*wlr.Pointer.event.Axis), event: *wlr.Pointer.event.Axis) void {
+    const self = @fieldParentPtr(Self, "axis", listener);
 
     self.seat.handleActivity();
 
     // Notify the client with pointer focus of the axis event.
-    c.wlr_seat_pointer_notify_axis(
-        self.seat.wlr_seat,
+    self.seat.wlr_seat.pointerNotifyAxis(
         event.time_msec,
         event.orientation,
         event.delta,
@@ -200,15 +197,12 @@ fn handleAxis(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     );
 }
 
-fn handleButton(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    // This event is forwarded by the cursor when a pointer emits a button
-    // event.
-    const self = @fieldParentPtr(Self, "listen_button", listener.?);
-    const event = util.voidCast(c.wlr_event_pointer_button, data.?);
+fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.Pointer.event.Button) void {
+    const self = @fieldParentPtr(Self, "button", listener);
 
     self.seat.handleActivity();
 
-    if (event.state == .WLR_BUTTON_PRESSED) {
+    if (event.state == .pressed) {
         self.pressed_count += 1;
     } else {
         std.debug.assert(self.pressed_count > 0);
@@ -221,21 +215,21 @@ fn handleButton(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 
     var sx: f64 = undefined;
     var sy: f64 = undefined;
-    if (self.surfaceAt(self.wlr_cursor.x, self.wlr_cursor.y, &sx, &sy)) |wlr_surface| {
+    if (self.surfaceAt(self.wlr_cursor.x, self.wlr_cursor.y, &sx, &sy)) |surface| {
         // If the found surface is a keyboard inteactive layer surface,
         // give it keyboard focus.
-        if (c.wlr_surface_is_layer_surface(wlr_surface)) {
-            const wlr_layer_surface = c.wlr_layer_surface_v1_from_wlr_surface(wlr_surface);
-            if (wlr_layer_surface.*.current.keyboard_interactive) {
-                const layer_surface = util.voidCast(LayerSurface, wlr_layer_surface.*.data.?);
+        if (surface.isLayerSurface()) {
+            const wlr_layer_surface = wlr.LayerSurfaceV1.fromWlrSurface(surface);
+            if (wlr_layer_surface.current.keyboard_interactive) {
+                const layer_surface = @intToPtr(*LayerSurface, wlr_layer_surface.data);
                 self.seat.setFocusRaw(.{ .layer = layer_surface });
             }
         }
 
         // If the target surface has a view, give that view keyboard focus and
         // perhaps enter move/resize mode.
-        if (View.fromWlrSurface(wlr_surface)) |view| {
-            if (event.state == .WLR_BUTTON_PRESSED and self.pressed_count == 1) {
+        if (View.fromWlrSurface(surface)) |view| {
+            if (event.state == .pressed and self.pressed_count == 1) {
                 // If there is an active mapping for this button which is
                 // handled we are done here
                 if (self.handlePointerMapping(event, view)) return;
@@ -244,26 +238,21 @@ fn handleButton(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
             }
         }
 
-        _ = c.wlr_seat_pointer_notify_button(
-            self.seat.wlr_seat,
-            event.time_msec,
-            event.button,
-            event.state,
-        );
+        _ = self.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
     }
 }
 
 /// Handle the mapping for the passed button if any. Returns true if there
 /// was a mapping and the button was handled.
-fn handlePointerMapping(self: *Self, event: *c.wlr_event_pointer_button, view: *View) bool {
-    const wlr_keyboard = c.wlr_seat_get_keyboard(self.seat.wlr_seat);
-    const modifiers = c.wlr_keyboard_get_modifiers(wlr_keyboard);
+fn handlePointerMapping(self: *Self, event: *wlr.Pointer.event.Button, view: *View) bool {
+    const wlr_keyboard = self.seat.wlr_seat.getKeyboard() orelse return false;
+    const modifiers = wlr_keyboard.getModifiers();
 
     const fullscreen = view.current.fullscreen or view.pending.fullscreen;
 
     const config = self.seat.input_manager.server.config;
     return for (config.modes.items[self.seat.mode_id].pointer_mappings.items) |mapping| {
-        if (event.button == mapping.event_code and modifiers == mapping.modifiers) {
+        if (event.button == mapping.event_code and std.meta.eql(modifiers, mapping.modifiers)) {
             switch (mapping.action) {
                 .move => if (!fullscreen) self.enterMode(.move, view),
                 .resize => if (!fullscreen) self.enterMode(.resize, view),
@@ -273,50 +262,54 @@ fn handlePointerMapping(self: *Self, event: *c.wlr_event_pointer_button, view: *
     } else false;
 }
 
-fn handleFrame(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    // This event is forwarded by the cursor when a pointer emits an frame
-    // event. Frame events are sent after regular pointer events to group
-    // multiple events together. For instance, two axis events may happen at the
-    // same time, in which case a frame event won't be sent in between.
-    const self = @fieldParentPtr(Self, "listen_frame", listener.?);
-    // Notify the client with pointer focus of the frame event.
-    c.wlr_seat_pointer_notify_frame(self.seat.wlr_seat);
+/// Frame events are sent after regular pointer events to group multiple
+/// events together. For instance, two axis events may happen at the same
+/// time, in which case a frame event won't be sent in between.
+fn handleFrame(listener: *wl.Listener(*wlr.Cursor), wlr_cursor: *wlr.Cursor) void {
+    const self = @fieldParentPtr(Self, "frame", listener);
+    self.seat.wlr_seat.pointerNotifyFrame();
 }
 
-fn handleMotionAbsolute(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    // This event is forwarded by the cursor when a pointer emits an _absolute_
-    // motion event, from 0..1 on each axis. This happens, for example, when
-    // wlroots is running under a Wayland window rather than KMS+DRM, and you
-    // move the mouse over the window. You could enter the window from any edge,
-    // so we have to warp the mouse there. There is also some hardware which
-    // emits these events.
-    const self = @fieldParentPtr(Self, "listen_motion_absolute", listener.?);
-    const event = util.voidCast(c.wlr_event_pointer_motion_absolute, data.?);
+/// This event is forwarded by the cursor when a pointer emits an _absolute_
+/// motion event, from 0..1 on each axis. This happens, for example, when
+/// wlroots is running under a Wayland window rather than KMS+DRM, and you
+/// move the mouse over the window. You could enter the window from any edge,
+/// so we have to warp the mouse there. There is also some hardware which
+/// emits these events.
+fn handleMotionAbsolute(
+    listener: *wl.Listener(*wlr.Pointer.event.MotionAbsolute),
+    event: *wlr.Pointer.event.MotionAbsolute,
+) void {
+    const self = @fieldParentPtr(Self, "motion_absolute", listener);
 
     self.seat.handleActivity();
 
     var lx: f64 = undefined;
     var ly: f64 = undefined;
-    c.wlr_cursor_absolute_to_layout_coords(self.wlr_cursor, event.device, event.x, event.y, &lx, &ly);
+    self.wlr_cursor.absoluteToLayoutCoords(event.device, event.x, event.y, &lx, &ly);
 
     self.processMotion(event.device, event.time_msec, lx - self.wlr_cursor.x, ly - self.wlr_cursor.y);
 }
 
-fn handleMotion(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    // This event is forwarded by the cursor when a pointer emits a _relative_
-    // pointer motion event (i.e. a delta)
-    const self = @fieldParentPtr(Self, "listen_motion", listener.?);
-    const event = util.voidCast(c.wlr_event_pointer_motion, data.?);
+/// This event is forwarded by the cursor when a pointer emits a _relative_
+/// pointer motion event (i.e. a delta)
+fn handleMotion(
+    listener: *wl.Listener(*wlr.Pointer.event.Motion),
+    event: *wlr.Pointer.event.Motion,
+) void {
+    const self = @fieldParentPtr(Self, "motion", listener);
 
     self.seat.handleActivity();
 
     self.processMotion(event.device, event.time_msec, event.delta_x, event.delta_y);
 }
 
-fn handleRequestSetCursor(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+fn handleRequestSetCursor(
+    listener: *wl.Listener(*wlr.Seat.event.RequestSetCursor),
+    event: *wlr.Seat.event.RequestSetCursor,
+) void {
     // This event is rasied by the seat when a client provides a cursor image
-    const self = @fieldParentPtr(Self, "listen_request_set_cursor", listener.?);
-    const event = util.voidCast(c.wlr_seat_pointer_request_set_cursor_event, data.?);
+    const self = @fieldParentPtr(Self, "request_set_cursor", listener);
     const focused_client = self.seat.wlr_seat.pointer_state.focused_client;
 
     // This can be sent by any client, so we check to make sure this one is
@@ -327,53 +320,40 @@ fn handleRequestSetCursor(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C
         // on the output that it's currently on and continue to do so as the
         // cursor moves between outputs.
         log.debug(.cursor, "focused client set cursor", .{});
-        c.wlr_cursor_set_surface(
-            self.wlr_cursor,
-            event.surface,
-            event.hotspot_x,
-            event.hotspot_y,
-        );
+        self.wlr_cursor.setSurface(event.surface, event.hotspot_x, event.hotspot_y);
     }
 }
 
 /// Find the topmost surface under the output layout coordinates lx/ly
 /// returns the surface if found and sets the sx/sy parametes to the
 /// surface coordinates.
-fn surfaceAt(self: Self, lx: f64, ly: f64, sx: *f64, sy: *f64) ?*c.wlr_surface {
+fn surfaceAt(self: Self, lx: f64, ly: f64, sx: *f64, sy: *f64) ?*wlr.Surface {
     // Find the output to check
     const root = self.seat.input_manager.server.root;
-    const wlr_output = c.wlr_output_layout_output_at(root.wlr_output_layout, lx, ly) orelse return null;
-    const output = util.voidCast(Output, wlr_output.*.data orelse return null);
+    const wlr_output = root.output_layout.outputAt(lx, ly) orelse return null;
+    const output = @intToPtr(*Output, wlr_output.data);
 
     // Get output-local coords from the layout coords
     var ox = lx;
     var oy = ly;
-    c.wlr_output_layout_output_coords(root.wlr_output_layout, wlr_output, &ox, &oy);
-
-    // Check layers and views from top to bottom
-    const layer_idxs = [_]usize{
-        c.ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY,
-        c.ZWLR_LAYER_SHELL_V1_LAYER_TOP,
-        c.ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM,
-        c.ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND,
-    };
+    root.output_layout.outputCoords(wlr_output, &ox, &oy);
 
     // Check overlay layer incl. popups
-    if (layerSurfaceAt(output.*, output.layers[layer_idxs[0]], ox, oy, sx, sy, false)) |s| return s;
+    if (layerSurfaceAt(output.*, output.getLayer(.overlay).*, ox, oy, sx, sy, false)) |s| return s;
 
     // Check top-background popups only
-    for (layer_idxs[1..4]) |idx|
-        if (layerSurfaceAt(output.*, output.layers[idx], ox, oy, sx, sy, true)) |s| return s;
+    for ([_]zwlr.LayerShellV1.Layer{ .top, .bottom, .background }) |layer|
+        if (layerSurfaceAt(output.*, output.getLayer(layer).*, ox, oy, sx, sy, true)) |s| return s;
 
     // Check top layer
-    if (layerSurfaceAt(output.*, output.layers[layer_idxs[1]], ox, oy, sx, sy, false)) |s| return s;
+    if (layerSurfaceAt(output.*, output.getLayer(.top).*, ox, oy, sx, sy, false)) |s| return s;
 
     // Check views
     if (viewSurfaceAt(output.*, ox, oy, sx, sy)) |s| return s;
 
     // Check the bottom-background layers
-    for (layer_idxs[2..4]) |idx|
-        if (layerSurfaceAt(output.*, output.layers[idx], ox, oy, sx, sy, false)) |s| return s;
+    for ([_]zwlr.LayerShellV1.Layer{ .bottom, .background }) |layer|
+        if (layerSurfaceAt(output.*, output.getLayer(layer).*, ox, oy, sx, sy, false)) |s| return s;
 
     return null;
 }
@@ -388,25 +368,20 @@ fn layerSurfaceAt(
     sx: *f64,
     sy: *f64,
     popups_only: bool,
-) ?*c.wlr_surface {
+) ?*wlr.Surface {
     var it = layer.first;
     while (it) |node| : (it = node.next) {
         const layer_surface = &node.data;
-        const surface = c.wlr_layer_surface_v1_surface_at(
-            layer_surface.wlr_layer_surface,
+        if (layer_surface.wlr_layer_surface.surfaceAt(
             ox - @intToFloat(f64, layer_surface.box.x),
             oy - @intToFloat(f64, layer_surface.box.y),
             sx,
             sy,
-        );
-        if (surface) |found| {
+        )) |found| {
             if (!popups_only) {
                 return found;
-            } else if (c.wlr_surface_is_xdg_surface(found)) {
-                const wlr_xdg_surface = c.wlr_xdg_surface_from_wlr_surface(found);
-                if (wlr_xdg_surface.*.role == .WLR_XDG_SURFACE_ROLE_POPUP) {
-                    return found;
-                }
+            } else if (found.isXdgSurface() and wlr.XdgSurface.fromWlrSurface(found).role == .popup) {
+                return found;
             }
         }
     }
@@ -414,7 +389,7 @@ fn layerSurfaceAt(
 }
 
 /// Find the topmost visible view surface (incl. popups) at ox,oy.
-fn viewSurfaceAt(output: Output, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*c.wlr_surface {
+fn viewSurfaceAt(output: Output, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*wlr.Surface {
     // Focused views are rendered on top, so look for them first.
     var it = ViewStack(View).iter(output.views.first, .forward, output.current.tags, surfaceAtFilter);
     while (it.next()) |view| {
@@ -468,10 +443,9 @@ pub fn enterMode(self: *Self, mode: @TagType(Mode), view: *View) void {
             }
 
             // Clear cursor focus, so that the surface does not receive events
-            c.wlr_seat_pointer_clear_focus(self.seat.wlr_seat);
+            self.seat.wlr_seat.pointerNotifyClearFocus();
 
-            c.wlr_xcursor_manager_set_cursor_image(
-                self.wlr_xcursor_manager,
+            self.xcursor_manager.setCursorImage(
                 if (mode == .move) "move" else "se-resize",
                 self.wlr_cursor,
             );
@@ -480,36 +454,30 @@ pub fn enterMode(self: *Self, mode: @TagType(Mode), view: *View) void {
 }
 
 /// Return from down/move/resize to passthrough
-fn leaveMode(self: *Self, event: *c.wlr_event_pointer_button) void {
+fn leaveMode(self: *Self, event: *wlr.Pointer.event.Button) void {
     std.debug.assert(self.mode != .passthrough);
 
     log.debug(.cursor, "leave {} mode", .{@tagName(self.mode)});
 
     // If we were in down mode, we need pass along the release event
     if (self.mode == .down)
-        _ = c.wlr_seat_pointer_notify_button(
-            self.seat.wlr_seat,
-            event.time_msec,
-            event.button,
-            event.state,
-        );
+        _ = self.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
 
     self.mode = .passthrough;
     self.passthrough(event.time_msec);
 }
 
-fn processMotion(self: *Self, device: *c.wlr_input_device, time: u32, delta_x: f64, delta_y: f64) void {
+fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64, delta_y: f64) void {
     const config = self.seat.input_manager.server.config;
 
     switch (self.mode) {
         .passthrough => {
-            c.wlr_cursor_move(self.wlr_cursor, device, delta_x, delta_y);
+            self.wlr_cursor.move(device, delta_x, delta_y);
             self.passthrough(time);
         },
         .down => |view| {
-            c.wlr_cursor_move(self.wlr_cursor, device, delta_x, delta_y);
-            c.wlr_seat_pointer_notify_motion(
-                self.seat.wlr_seat,
+            self.wlr_cursor.move(device, delta_x, delta_y);
+            self.seat.wlr_seat.pointerNotifyMotion(
                 time,
                 self.wlr_cursor.x - @intToFloat(f64, view.current.box.x),
                 self.wlr_cursor.y - @intToFloat(f64, view.current.box.y),
@@ -531,8 +499,7 @@ fn processMotion(self: *Self, device: *c.wlr_input_device, time: u32, delta_x: f
                 @intCast(i32, output_resolution.height - view.pending.box.height - border_width),
             );
 
-            c.wlr_cursor_move(
-                self.wlr_cursor,
+            self.wlr_cursor.move(
                 device,
                 @intToFloat(f64, view.pending.box.x - view.current.box.x),
                 @intToFloat(f64, view.pending.box.y - view.current.box.y),
@@ -557,8 +524,7 @@ fn processMotion(self: *Self, device: *c.wlr_input_device, time: u32, delta_x: f
             data.view.applyPending();
 
             // Keep cursor locked to the original offset from the bottom right corner
-            c.wlr_cursor_warp_closest(
-                self.wlr_cursor,
+            self.wlr_cursor.warpClosest(
                 device,
                 @intToFloat(f64, box.x + @intCast(i32, box.width) - data.offset_x),
                 @intToFloat(f64, box.y + @intCast(i32, box.height) - data.offset_y),
@@ -574,20 +540,20 @@ fn passthrough(self: *Self, time: u32) void {
 
     var sx: f64 = undefined;
     var sy: f64 = undefined;
-    if (self.surfaceAt(self.wlr_cursor.x, self.wlr_cursor.y, &sx, &sy)) |wlr_surface| {
+    if (self.surfaceAt(self.wlr_cursor.x, self.wlr_cursor.y, &sx, &sy)) |surface| {
         // If input is allowed on the surface, send pointer enter and motion
         // events. Note that wlroots won't actually send an enter event if
         // the surface has already been entered.
-        if (self.seat.input_manager.inputAllowed(wlr_surface)) {
+        if (self.seat.input_manager.inputAllowed(surface)) {
             // The focus change must be checked before sending enter events
-            const focus_change = self.seat.wlr_seat.pointer_state.focused_surface != wlr_surface;
+            const focus_change = self.seat.wlr_seat.pointer_state.focused_surface != surface;
 
-            c.wlr_seat_pointer_notify_enter(self.seat.wlr_seat, wlr_surface, sx, sy);
-            c.wlr_seat_pointer_notify_motion(self.seat.wlr_seat, time, sx, sy);
+            self.seat.wlr_seat.pointerNotifyEnter(surface, sx, sy);
+            self.seat.wlr_seat.pointerNotifyMotion(time, sx, sy);
 
             const follow_mode = config.focus_follows_cursor;
             if (follow_mode == .strict or (follow_mode == .normal and focus_change)) {
-                if (View.fromWlrSurface(wlr_surface)) |view| {
+                if (View.fromWlrSurface(surface)) |view| {
                     self.seat.focus(view);
                     self.seat.focusOutput(view.output);
                     root.startTransaction();

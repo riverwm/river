@@ -18,8 +18,7 @@
 const Self = @This();
 
 const std = @import("std");
-
-const c = @import("c.zig");
+const wlr = @import("wlroots");
 
 const Box = @import("Box.zig");
 const View = @import("View.zig");
@@ -42,13 +41,14 @@ pub fn close(self: Self) void {
 
 pub fn forEachSurface(
     self: Self,
-    iterator: c.wlr_surface_iterator_func_t,
-    user_data: ?*c_void,
+    comptime T: type,
+    iterator: fn (surface: *wlr.Surface, sx: c_int, sy: c_int, data: T) callconv(.C) void,
+    user_data: T,
 ) void {
     unreachable;
 }
 
-pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*c.wlr_surface {
+pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*wlr.Surface {
     unreachable;
 }
 

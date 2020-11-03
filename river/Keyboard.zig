@@ -18,122 +18,102 @@
 const Self = @This();
 
 const std = @import("std");
+const wlr = @import("wlroots");
+const wl = @import("wayland").server.wl;
+const xkb = @import("xkbcommon");
 
-const c = @import("c.zig");
 const log = @import("log.zig");
 const util = @import("util.zig");
 
 const Seat = @import("Seat.zig");
 
 seat: *Seat,
-wlr_input_device: *c.wlr_input_device,
-wlr_keyboard: *c.wlr_keyboard,
+input_device: *wlr.InputDevice,
 
-listen_key: c.wl_listener = undefined,
-listen_modifiers: c.wl_listener = undefined,
-listen_destroy: c.wl_listener = undefined,
+key: wl.Listener(*wlr.Keyboard.event.Key) = undefined,
+modifiers: wl.Listener(*wlr.Keyboard) = undefined,
+destroy: wl.Listener(*wlr.Keyboard) = undefined,
 
-pub fn init(self: *Self, seat: *Seat, wlr_input_device: *c.wlr_input_device) !void {
+pub fn init(self: *Self, seat: *Seat, input_device: *wlr.InputDevice) !void {
     self.* = .{
         .seat = seat,
-        .wlr_input_device = wlr_input_device,
-        .wlr_keyboard = @field(wlr_input_device, c.wlr_input_device_union).keyboard,
+        .input_device = input_device,
     };
 
     // We need to prepare an XKB keymap and assign it to the keyboard. This
     // assumes the defaults (e.g. layout = "us").
-    const rules = c.xkb_rule_names{
+    const rules = xkb.RuleNames{
         .rules = null,
         .model = null,
         .layout = null,
         .variant = null,
         .options = null,
     };
-    const context = c.xkb_context_new(.XKB_CONTEXT_NO_FLAGS) orelse return error.XkbContextFailed;
-    defer c.xkb_context_unref(context);
+    const context = xkb.Context.new(.no_flags) orelse return error.XkbContextFailed;
+    defer context.unref();
 
-    const keymap = c.xkb_keymap_new_from_names(
-        context,
-        &rules,
-        .XKB_KEYMAP_COMPILE_NO_FLAGS,
-    ) orelse return error.XkbKeymapFailed;
-    defer c.xkb_keymap_unref(keymap);
+    const keymap = xkb.Keymap.newFromNames(context, &rules, .no_flags) orelse return error.XkbKeymapFailed;
+    defer keymap.unref();
 
-    if (!c.wlr_keyboard_set_keymap(self.wlr_keyboard, keymap)) return error.SetKeymapFailed;
-    c.wlr_keyboard_set_repeat_info(self.wlr_keyboard, 25, 600);
+    const wlr_keyboard = self.input_device.device.keyboard;
 
-    // Setup listeners for keyboard events
-    self.listen_key.notify = handleKey;
-    c.wl_signal_add(&self.wlr_keyboard.events.key, &self.listen_key);
+    if (!wlr_keyboard.setKeymap(keymap)) return error.SetKeymapFailed;
+    wlr_keyboard.setRepeatInfo(25, 600);
 
-    self.listen_modifiers.notify = handleModifiers;
-    c.wl_signal_add(&self.wlr_keyboard.events.modifiers, &self.listen_modifiers);
+    self.key.setNotify(handleKey);
+    wlr_keyboard.events.key.add(&self.key);
 
-    self.listen_destroy.notify = handleDestroy;
-    c.wl_signal_add(&self.wlr_keyboard.events.destroy, &self.listen_destroy);
+    self.modifiers.setNotify(handleModifiers);
+    wlr_keyboard.events.modifiers.add(&self.modifiers);
+
+    self.destroy.setNotify(handleDestroy);
+    wlr_keyboard.events.destroy.add(&self.destroy);
 }
 
 pub fn deinit(self: *Self) void {
-    c.wl_list_remove(&self.listen_key.link);
-    c.wl_list_remove(&self.listen_modifiers.link);
-    c.wl_list_remove(&self.listen_destroy.link);
+    self.key.link.remove();
+    self.modifiers.link.remove();
+    self.destroy.link.remove();
 }
 
-fn handleKey(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboard.event.Key) void {
     // This event is raised when a key is pressed or released.
-    const self = @fieldParentPtr(Self, "listen_key", listener.?);
-    const event = util.voidCast(c.wlr_event_keyboard_key, data.?);
-    const wlr_keyboard = self.wlr_keyboard;
+    const self = @fieldParentPtr(Self, "key", listener);
+    const wlr_keyboard = self.input_device.device.keyboard;
 
     self.seat.handleActivity();
 
     // Translate libinput keycode -> xkbcommon
     const keycode = event.keycode + 8;
 
-    // Get a list of keysyms as xkb reports them
-    var translated_keysyms: ?[*]c.xkb_keysym_t = undefined;
-    const translated_keysyms_len = c.xkb_state_key_get_syms(
-        wlr_keyboard.xkb_state,
-        keycode,
-        &translated_keysyms,
-    );
-
-    // Get a list of keysyms ignoring modifiers (e.g. 1 instead of !)
-    // Important for mappings like Mod+Shift+1
-    var raw_keysyms: ?[*]c.xkb_keysym_t = undefined;
-    const layout_index = c.xkb_state_key_get_layout(wlr_keyboard.xkb_state, keycode);
-    const raw_keysyms_len = c.xkb_keymap_key_get_syms_by_level(
-        wlr_keyboard.keymap,
-        keycode,
-        layout_index,
-        0,
-        &raw_keysyms,
-    );
+    // TODO: These modifiers aren't properly handled, see sway's code
+    const modifiers = wlr_keyboard.getModifiers();
+    const released = event.state == .released;
 
     var handled = false;
-    // TODO: These modifiers aren't properly handled, see sway's code
-    const modifiers = c.wlr_keyboard_get_modifiers(wlr_keyboard);
-    const released = event.state == .WLR_KEY_RELEASED;
 
-    var i: usize = 0;
-    while (i < translated_keysyms_len) : (i += 1) {
+    // First check translated keysyms as xkb reports them
+    for (wlr_keyboard.xkb_state.?.keyGetSyms(keycode)) |sym| {
         // Handle builtin mapping only when keys are pressed
-        if (!released and self.handleBuiltinMapping(translated_keysyms.?[i])) {
+        if (!released and self.handleBuiltinMapping(sym)) {
             handled = true;
             break;
-        } else if (self.seat.handleMapping(translated_keysyms.?[i], modifiers, released)) {
+        } else if (self.seat.handleMapping(sym, modifiers, released)) {
             handled = true;
             break;
         }
     }
+
+    // If not yet handled, check keysyms ignoring modifiers (e.g. 1 instead of !)
+    // Important for mappings like Mod+Shift+1
     if (!handled) {
-        i = 0;
-        while (i < raw_keysyms_len) : (i += 1) {
+        const layout_index = wlr_keyboard.xkb_state.?.keyGetLayout(keycode);
+        for (wlr_keyboard.keymap.?.keyGetSymsByLevel(keycode, layout_index, 0)) |sym| {
             // Handle builtin mapping only when keys are pressed
-            if (!released and self.handleBuiltinMapping(raw_keysyms.?[i])) {
+            if (!released and self.handleBuiltinMapping(sym)) {
                 handled = true;
                 break;
-            } else if (self.seat.handleMapping(raw_keysyms.?[i], modifiers, released)) {
+            } else if (self.seat.handleMapping(sym, modifiers, released)) {
                 handled = true;
                 break;
             }
@@ -143,52 +123,44 @@ fn handleKey(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     if (!handled) {
         // Otherwise, we pass it along to the client.
         const wlr_seat = self.seat.wlr_seat;
-        c.wlr_seat_set_keyboard(wlr_seat, self.wlr_input_device);
-        c.wlr_seat_keyboard_notify_key(
-            wlr_seat,
-            event.time_msec,
-            event.keycode,
-            @intCast(u32, @enumToInt(event.state)),
-        );
+        wlr_seat.setKeyboard(self.input_device);
+        wlr_seat.keyboardNotifyKey(event.time_msec, event.keycode, event.state);
     }
 }
 
-fn handleModifiers(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    // This event is raised when a modifier key, such as shift or alt, is
-    // pressed. We simply communicate this to the client. */
-    const self = @fieldParentPtr(Self, "listen_modifiers", listener.?);
+/// Simply pass modifiers along to the client
+fn handleModifiers(listener: *wl.Listener(*wlr.Keyboard), wlr_keyboard: *wlr.Keyboard) void {
+    const self = @fieldParentPtr(Self, "modifiers", listener);
 
-    // A seat can only have one keyboard, but this is a limitation of the
-    // Wayland protocol - not wlroots. We assign all connected keyboards to the
-    // same seat. You can swap out the underlying wlr_keyboard like this and
-    // wlr_seat handles this transparently.
-    c.wlr_seat_set_keyboard(self.seat.wlr_seat, self.wlr_input_device);
-
-    // Send modifiers to the client.
-    c.wlr_seat_keyboard_notify_modifiers(self.seat.wlr_seat, &self.wlr_keyboard.modifiers);
+    self.seat.wlr_seat.setKeyboard(self.input_device);
+    self.seat.wlr_seat.keyboardNotifyModifiers(&self.input_device.device.keyboard.modifiers);
 }
-fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_destroy", listener.?);
-    self.deinit();
+
+fn handleDestroy(listener: *wl.Listener(*wlr.Keyboard), wlr_keyboard: *wlr.Keyboard) void {
+    const self = @fieldParentPtr(Self, "destroy", listener);
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
+
     self.seat.keyboards.remove(node);
+    self.deinit();
     util.gpa.destroy(node);
 }
 
 /// Handle any builtin, harcoded compsitor mappings such as VT switching.
 /// Returns true if the keysym was handled.
-fn handleBuiltinMapping(self: Self, keysym: c.xkb_keysym_t) bool {
-    if (keysym >= c.XKB_KEY_XF86Switch_VT_1 and keysym <= c.XKB_KEY_XF86Switch_VT_12) {
-        log.debug(.keyboard, "switch VT keysym received", .{});
-        const wlr_backend = self.seat.input_manager.server.wlr_backend;
-        if (c.wlr_backend_is_multi(wlr_backend)) {
-            if (c.wlr_backend_get_session(wlr_backend)) |session| {
-                const vt = keysym - c.XKB_KEY_XF86Switch_VT_1 + 1;
-                log.notice(.server, "switching to VT {}", .{vt});
-                _ = c.wlr_session_change_vt(session, vt);
+fn handleBuiltinMapping(self: Self, keysym: xkb.Keysym) bool {
+    switch (@enumToInt(keysym)) {
+        @enumToInt(xkb.Keysym.XF86Switch_VT_1)...@enumToInt(xkb.Keysym.XF86Switch_VT_12) => {
+            log.debug(.keyboard, "switch VT keysym received", .{});
+            const backend = self.seat.input_manager.server.backend;
+            if (backend.isMulti()) {
+                if (backend.getSession()) |session| {
+                    const vt = @enumToInt(keysym) - @enumToInt(xkb.Keysym.XF86Switch_VT_1) + 1;
+                    log.notice(.server, "switching to VT {}", .{vt});
+                    session.changeVt(vt) catch log.err(.server, "changing VT failed", .{});
+                }
             }
-        }
-        return true;
+            return true;
+        },
+        else => return false,
     }
-    return false;
 }

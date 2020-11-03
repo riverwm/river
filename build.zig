@@ -1,16 +1,10 @@
 const std = @import("std");
+const zbs = std.build;
 
 const ScanProtocolsStep = @import("deps/zig-wayland/build.zig").ScanProtocolsStep;
 
-pub fn build(b: *std.build.Builder) !void {
-    // Standard target options allows the person running `zig build` to choose
-    // what target to build for. Here we do not override the defaults, which
-    // means any target is allowed, and the default is native. Other options
-    // for restricting supported target set are available.
+pub fn build(b: *zbs.Builder) !void {
     const target = b.standardTargetOptions(.{});
-
-    // Standard release options allow the person running `zig build` to select
-    // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
     const mode = b.standardReleaseOptions();
 
     const xwayland = b.option(
@@ -31,17 +25,14 @@ pub fn build(b: *std.build.Builder) !void {
         break :scdoc_found true;
     };
 
-    const examples = b.option(
-        bool,
-        "examples",
-        "Set to true to build examples",
-    ) orelse false;
+    const examples = b.option(bool, "examples", "Set to true to build examples") orelse false;
 
-    // TODO: port all parts of river to zig-wayland and delete this
-    const scan_protocols = OldScanProtocolsStep.create(b);
-
-    const scanner = ScanProtocolsStep.create(b, "deps/zig-wayland/");
+    const scanner = ScanProtocolsStep.create(b);
+    scanner.addSystemProtocol("stable/xdg-shell/xdg-shell.xml");
     scanner.addProtocolPath("protocol/river-control-unstable-v1.xml");
+    scanner.addProtocolPath("protocol/river-status-unstable-v1.xml");
+    scanner.addProtocolPath("protocol/wlr-layer-shell-unstable-v1.xml");
+    scanner.addProtocolPath("protocol/wlr-output-power-management-unstable-v1.xml");
 
     {
         const river = b.addExecutable("river", "river/main.zig");
@@ -49,16 +40,9 @@ pub fn build(b: *std.build.Builder) !void {
         river.setBuildMode(mode);
         river.addBuildOption(bool, "xwayland", xwayland);
 
-        addProtocolDeps(river, &scan_protocols.step);
-        addServerDeps(river);
+        addServerDeps(river, scanner);
 
         river.install();
-
-        const run_cmd = river.run();
-        run_cmd.step.dependOn(b.getInstallStep());
-
-        const run_step = b.step("run", "Run the compositor");
-        run_step.dependOn(&run_cmd.step);
     }
 
     {
@@ -93,10 +77,12 @@ pub fn build(b: *std.build.Builder) !void {
         status.setTarget(target);
         status.setBuildMode(mode);
 
-        addProtocolDeps(status, &scan_protocols.step);
-
+        status.step.dependOn(&scanner.step);
+        status.addPackage(scanner.getPkg());
         status.linkLibC();
         status.linkSystemLibrary("wayland-client");
+
+        scanner.addCSource(status);
 
         status.install();
     }
@@ -107,122 +93,43 @@ pub fn build(b: *std.build.Builder) !void {
         river_test.setBuildMode(mode);
         river_test.addBuildOption(bool, "xwayland", xwayland);
 
-        addProtocolDeps(river_test, &scan_protocols.step);
-        addServerDeps(river_test);
+        addServerDeps(river_test, scanner);
 
         const test_step = b.step("test", "Run the tests");
         test_step.dependOn(&river_test.step);
     }
 }
 
-fn addServerDeps(exe: *std.build.LibExeObjStep) void {
-    exe.addCSourceFile("include/bindings.c", &[_][]const u8{"-std=c99"});
-    exe.addIncludeDir(".");
+fn addServerDeps(exe: *zbs.LibExeObjStep, scanner: *ScanProtocolsStep) void {
+    const wayland = scanner.getPkg();
+    const xkbcommon = zbs.Pkg{ .name = "xkbcommon", .path = "deps/zig-xkbcommon/src/xkbcommon.zig" };
+    const pixman = zbs.Pkg{ .name = "pixman", .path = "deps/zig-pixman/pixman.zig" };
+    const wlroots = zbs.Pkg{
+        .name = "wlroots",
+        .path = "deps/zig-wlroots/src/wlroots.zig",
+        .dependencies = &[_]zbs.Pkg{ wayland, xkbcommon, pixman },
+    };
+
+    exe.step.dependOn(&scanner.step);
 
     exe.linkLibC();
     exe.linkSystemLibrary("libevdev");
+
+    exe.addPackage(wayland);
     exe.linkSystemLibrary("wayland-server");
-    exe.linkSystemLibrary("wlroots");
+
+    exe.addPackage(xkbcommon);
     exe.linkSystemLibrary("xkbcommon");
+
+    exe.addPackage(pixman);
     exe.linkSystemLibrary("pixman-1");
+
+    exe.addPackage(wlroots);
+    exe.linkSystemLibrary("wlroots");
+
+    // TODO: remove when zig issue #131 is implemented
+    scanner.addCSource(exe);
 }
-
-fn addProtocolDeps(exe: *std.build.LibExeObjStep, protocol_step: *std.build.Step) void {
-    exe.step.dependOn(protocol_step);
-    exe.addIncludeDir("protocol");
-    exe.addCSourceFile("protocol/river-control-unstable-v1-protocol.c", &[_][]const u8{"-std=c99"});
-    exe.addCSourceFile("protocol/river-status-unstable-v1-protocol.c", &[_][]const u8{"-std=c99"});
-}
-
-const OldScanProtocolsStep = struct {
-    builder: *std.build.Builder,
-    step: std.build.Step,
-
-    fn create(builder: *std.build.Builder) *OldScanProtocolsStep {
-        const self = builder.allocator.create(OldScanProtocolsStep) catch @panic("out of memory");
-        self.* = init(builder);
-        return self;
-    }
-
-    fn init(builder: *std.build.Builder) OldScanProtocolsStep {
-        return OldScanProtocolsStep{
-            .builder = builder,
-            .step = std.build.Step.init(.Custom, "Scan Protocols", builder.allocator, make),
-        };
-    }
-
-    fn make(step: *std.build.Step) !void {
-        const self = @fieldParentPtr(OldScanProtocolsStep, "step", step);
-
-        const protocol_dir = std.mem.trim(u8, try self.builder.exec(
-            &[_][]const u8{ "pkg-config", "--variable=pkgdatadir", "wayland-protocols" },
-        ), &std.ascii.spaces);
-
-        const protocol_dir_paths = [_][]const []const u8{
-            &[_][]const u8{ protocol_dir, "stable/xdg-shell/xdg-shell.xml" },
-            &[_][]const u8{ "protocol", "wlr-layer-shell-unstable-v1.xml" },
-            &[_][]const u8{ "protocol", "wlr-output-power-management-unstable-v1.xml" },
-            &[_][]const u8{ "protocol", "river-control-unstable-v1.xml" },
-            &[_][]const u8{ "protocol", "river-status-unstable-v1.xml" },
-        };
-
-        const server_protocols = [_][]const u8{
-            "xdg-shell",
-            "wlr-layer-shell-unstable-v1",
-            "wlr-output-power-management-unstable-v1",
-            "river-control-unstable-v1",
-            "river-status-unstable-v1",
-        };
-
-        const client_protocols = [_][]const u8{
-            "river-control-unstable-v1",
-            "river-status-unstable-v1",
-        };
-
-        for (protocol_dir_paths) |dir_path| {
-            const xml_in_path = try std.fs.path.join(self.builder.allocator, dir_path);
-
-            // Extension is .xml, so slice off the last 4 characters
-            const basename = std.fs.path.basename(xml_in_path);
-            const basename_no_ext = basename[0..(basename.len - 4)];
-
-            const code_out_path = try std.mem.concat(
-                self.builder.allocator,
-                u8,
-                &[_][]const u8{ "protocol/", basename_no_ext, "-protocol.c" },
-            );
-            _ = try self.builder.exec(
-                &[_][]const u8{ "wayland-scanner", "private-code", xml_in_path, code_out_path },
-            );
-
-            for (server_protocols) |server_protocol| {
-                if (std.mem.eql(u8, basename_no_ext, server_protocol)) {
-                    const header_out_path = try std.mem.concat(
-                        self.builder.allocator,
-                        u8,
-                        &[_][]const u8{ "protocol/", basename_no_ext, "-protocol.h" },
-                    );
-                    _ = try self.builder.exec(
-                        &[_][]const u8{ "wayland-scanner", "server-header", xml_in_path, header_out_path },
-                    );
-                }
-            }
-
-            for (client_protocols) |client_protocol| {
-                if (std.mem.eql(u8, basename_no_ext, client_protocol)) {
-                    const header_out_path = try std.mem.concat(
-                        self.builder.allocator,
-                        u8,
-                        &[_][]const u8{ "protocol/", basename_no_ext, "-client-protocol.h" },
-                    );
-                    _ = try self.builder.exec(
-                        &[_][]const u8{ "wayland-scanner", "client-header", xml_in_path, header_out_path },
-                    );
-                }
-            }
-        }
-    }
-};
 
 const ScdocStep = struct {
     const scd_paths = [_][]const u8{
@@ -232,23 +139,23 @@ const ScdocStep = struct {
         "doc/river-layouts.7.scd",
     };
 
-    builder: *std.build.Builder,
-    step: std.build.Step,
+    builder: *zbs.Builder,
+    step: zbs.Step,
 
-    fn create(builder: *std.build.Builder) *ScdocStep {
+    fn create(builder: *zbs.Builder) *ScdocStep {
         const self = builder.allocator.create(ScdocStep) catch @panic("out of memory");
         self.* = init(builder);
         return self;
     }
 
-    fn init(builder: *std.build.Builder) ScdocStep {
+    fn init(builder: *zbs.Builder) ScdocStep {
         return ScdocStep{
             .builder = builder,
-            .step = std.build.Step.init(.Custom, "Generate man pages", builder.allocator, make),
+            .step = zbs.Step.init(.Custom, "Generate man pages", builder.allocator, make),
         };
     }
 
-    fn make(step: *std.build.Step) !void {
+    fn make(step: *zbs.Step) !void {
         const self = @fieldParentPtr(ScdocStep, "step", step);
         for (scd_paths) |path| {
             const command = try std.fmt.allocPrint(

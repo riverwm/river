@@ -17,8 +17,11 @@
 
 const build_options = @import("build_options");
 const std = @import("std");
+const os = std.os;
+const wlr = @import("wlroots");
+const wl = @import("wayland").server.wl;
+const pixman = @import("pixman");
 
-const c = @import("c.zig");
 const log = @import("log.zig");
 const util = @import("util.zig");
 
@@ -36,24 +39,21 @@ const SurfaceRenderData = struct {
     output_x: i32,
     output_y: i32,
 
-    when: *c.timespec,
+    when: *os.timespec,
 
     opacity: f32,
 };
 
 pub fn renderOutput(output: *Output) void {
     const config = &output.root.server.config;
-    const wlr_renderer = output.getRenderer();
+    const renderer = output.wlr_output.backend.getRenderer().?;
 
-    var now: c.timespec = undefined;
-    _ = c.clock_gettime(c.CLOCK_MONOTONIC, &now);
+    var now: os.timespec = undefined;
+    os.clock_gettime(os.CLOCK_MONOTONIC, &now) catch unreachable;
 
-    // wlr_output_attach_render makes the OpenGL context current.
-    if (!c.wlr_output_attach_render(output.wlr_output, null)) return;
+    output.wlr_output.attachRender(null) catch return;
 
-    // Begin the renderer (calls glViewport and some other GL sanity checks)
-    // Here we don't want the output_effective_resolution since we want to render the whole output
-    c.wlr_renderer_begin(wlr_renderer, output.wlr_output.width, output.wlr_output.height);
+    renderer.begin(output.wlr_output.width, output.wlr_output.height);
 
     // Find the first visible fullscreen view in the stack if there is one
     var it = ViewStack(View).iter(output.views.first, .forward, output.current.tags, renderFilter);
@@ -64,15 +64,15 @@ pub fn renderOutput(output: *Output) void {
     // If we have a fullscreen view to render, render it.
     if (fullscreen_view) |view| {
         // Always clear with solid black for fullscreen
-        c.wlr_renderer_clear(wlr_renderer, &[_]f32{ 0, 0, 0, 1 });
+        renderer.clear(&[_]f32{ 0, 0, 0, 1 });
         renderView(output.*, view, &now);
         if (build_options.xwayland) renderXwaylandUnmanaged(output.*, &now);
     } else {
         // No fullscreen view, so render normal layers/views
-        c.wlr_renderer_clear(wlr_renderer, &config.background_color);
+        renderer.clear(&config.background_color);
 
-        renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND], &now, .toplevels);
-        renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM], &now, .toplevels);
+        renderLayer(output.*, output.getLayer(.background).*, &now, .toplevels);
+        renderLayer(output.*, output.getLayer(.bottom).*, &now, .toplevels);
 
         // The first view in the list is "on top" so iterate in reverse.
         it = ViewStack(View).iter(output.views.last, .reverse, output.current.tags, renderFilter);
@@ -96,16 +96,16 @@ pub fn renderOutput(output: *Output) void {
 
         if (build_options.xwayland) renderXwaylandUnmanaged(output.*, &now);
 
-        renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_TOP], &now, .toplevels);
+        renderLayer(output.*, output.getLayer(.top).*, &now, .toplevels);
 
-        renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND], &now, .popups);
-        renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM], &now, .popups);
-        renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_TOP], &now, .popups);
+        renderLayer(output.*, output.getLayer(.background).*, &now, .popups);
+        renderLayer(output.*, output.getLayer(.bottom).*, &now, .popups);
+        renderLayer(output.*, output.getLayer(.top).*, &now, .popups);
     }
 
     // The overlay layer is rendered in both fullscreen and normal cases
-    renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY], &now, .toplevels);
-    renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY], &now, .popups);
+    renderLayer(output.*, output.getLayer(.overlay).*, &now, .toplevels);
+    renderLayer(output.*, output.getLayer(.overlay).*, &now, .popups);
 
     renderDragIcons(output.*, &now);
 
@@ -115,28 +115,27 @@ pub fn renderOutput(output: *Output) void {
     // reason, wlroots provides a software fallback, which we ask it to render
     // here. wlr_cursor handles configuring hardware vs software cursors for you,
     // and this function is a no-op when hardware cursors are in use.
-    c.wlr_output_render_software_cursors(output.wlr_output, null);
+    output.wlr_output.renderSoftwareCursors(null);
 
     // Conclude rendering and swap the buffers, showing the final frame
     // on-screen.
-    c.wlr_renderer_end(wlr_renderer);
+    renderer.end();
 
     // TODO(wlroots): remove this with the next release. It is here due to
     // a wlroots bug in the screencopy damage implementation
     {
         var w: c_int = undefined;
         var h: c_int = undefined;
-        c.wlr_output_transformed_resolution(output.wlr_output, &w, &h);
-        var damage: c.pixman_region32_t = undefined;
-        c.pixman_region32_init(&damage);
-        _ = c.pixman_region32_union_rect(&damage, &damage, 0, 0, @intCast(c_uint, w), @intCast(c_uint, h));
-        c.wlr_output_set_damage(output.wlr_output, &damage);
+        output.wlr_output.transformedResolution(&w, &h);
+        var damage: pixman.Region32 = undefined;
+        damage.init();
+        _ = damage.unionRect(&damage, 0, 0, @intCast(c_uint, w), @intCast(c_uint, h));
+        output.wlr_output.setDamage(&damage);
     }
 
     // TODO: handle failure
-    if (!c.wlr_output_commit(output.wlr_output)) {
-        log.err(.render, "wlr_output_commit failed for {}", .{output.wlr_output.name});
-    }
+    output.wlr_output.commit() catch
+        log.err(.render, "output commit failed for {}", .{output.wlr_output.name});
 }
 
 fn renderFilter(view: *View, filter_tags: u32) bool {
@@ -151,7 +150,7 @@ fn renderFilter(view: *View, filter_tags: u32) bool {
 fn renderLayer(
     output: Output,
     layer: std.TailQueue(LayerSurface),
-    now: *c.timespec,
+    now: *os.timespec,
     role: enum { toplevels, popups },
 ) void {
     var it = layer.first;
@@ -165,13 +164,13 @@ fn renderLayer(
             .opacity = 1.0,
         };
         switch (role) {
-            .toplevels => c.wlr_surface_for_each_surface(
-                layer_surface.wlr_layer_surface.surface,
+            .toplevels => layer_surface.wlr_layer_surface.surface.forEachSurface(
+                *SurfaceRenderData,
                 renderSurfaceIterator,
                 &rdata,
             ),
-            .popups => c.wlr_layer_surface_v1_for_each_popup(
-                layer_surface.wlr_layer_surface,
+            .popups => layer_surface.wlr_layer_surface.forEachPopup(
+                *SurfaceRenderData,
                 renderSurfaceIterator,
                 &rdata,
             ),
@@ -179,14 +178,14 @@ fn renderLayer(
     }
 }
 
-fn renderView(output: Output, view: *View, now: *c.timespec) void {
+fn renderView(output: Output, view: *View, now: *os.timespec) void {
     // If we have saved buffers, we are in the middle of a transaction
     // and need to render those buffers until the transaction is complete.
     if (view.saved_buffers.items.len != 0) {
         for (view.saved_buffers.items) |saved_buffer|
             renderTexture(
                 output,
-                saved_buffer.wlr_client_buffer.texture,
+                saved_buffer.client_buffer.texture orelse continue,
                 .{
                     .x = saved_buffer.box.x + view.current.box.x - view.saved_surface_box.x,
                     .y = saved_buffer.box.y + view.current.box.y - view.saved_surface_box.y,
@@ -207,12 +206,12 @@ fn renderView(output: Output, view: *View, now: *c.timespec) void {
             .opacity = view.opacity,
         };
 
-        view.forEachSurface(renderSurfaceIterator, &rdata);
+        view.forEachSurface(*SurfaceRenderData, renderSurfaceIterator, &rdata);
     }
 }
 
-fn renderDragIcons(output: Output, now: *c.timespec) void {
-    const output_box = c.wlr_output_layout_get_box(output.root.wlr_output_layout, output.wlr_output);
+fn renderDragIcons(output: Output, now: *os.timespec) void {
+    const output_box = output.root.output_layout.getBox(output.wlr_output).?;
 
     var it = output.root.drag_icons.first;
     while (it) |node| : (it = node.next) {
@@ -221,70 +220,67 @@ fn renderDragIcons(output: Output, now: *c.timespec) void {
         var rdata = SurfaceRenderData{
             .output = &output,
             .output_x = @floatToInt(i32, drag_icon.seat.cursor.wlr_cursor.x) +
-                drag_icon.wlr_drag_icon.surface.*.sx - output_box.*.x,
+                drag_icon.wlr_drag_icon.surface.sx - output_box.x,
             .output_y = @floatToInt(i32, drag_icon.seat.cursor.wlr_cursor.y) +
-                drag_icon.wlr_drag_icon.surface.*.sy - output_box.*.y,
+                drag_icon.wlr_drag_icon.surface.sy - output_box.y,
             .when = now,
             .opacity = 1.0,
         };
-        c.wlr_surface_for_each_surface(drag_icon.wlr_drag_icon.surface, renderSurfaceIterator, &rdata);
+        drag_icon.wlr_drag_icon.surface.forEachSurface(*SurfaceRenderData, renderSurfaceIterator, &rdata);
     }
 }
 
 /// Render all xwayland unmanaged windows that appear on the output
-fn renderXwaylandUnmanaged(output: Output, now: *c.timespec) void {
-    const output_box = c.wlr_output_layout_get_box(output.root.wlr_output_layout, output.wlr_output);
+fn renderXwaylandUnmanaged(output: Output, now: *os.timespec) void {
+    const output_box = output.root.output_layout.getBox(output.wlr_output).?;
 
     var it = output.root.xwayland_unmanaged_views.first;
     while (it) |node| : (it = node.next) {
-        const wlr_xwayland_surface = node.data.wlr_xwayland_surface;
+        const xwayland_surface = node.data.xwayland_surface;
 
         var rdata = SurfaceRenderData{
             .output = &output,
-            .output_x = wlr_xwayland_surface.x - output_box.*.x,
-            .output_y = wlr_xwayland_surface.y - output_box.*.y,
+            .output_x = xwayland_surface.x - output_box.x,
+            .output_y = xwayland_surface.y - output_box.y,
             .when = now,
             .opacity = 1.0,
         };
-        c.wlr_surface_for_each_surface(wlr_xwayland_surface.surface, renderSurfaceIterator, &rdata);
+        xwayland_surface.surface.?.forEachSurface(*SurfaceRenderData, renderSurfaceIterator, &rdata);
     }
 }
 
 /// This function is passed to wlroots to render each surface during iteration
 fn renderSurfaceIterator(
-    surface: ?*c.wlr_surface,
+    surface: *wlr.Surface,
     surface_x: c_int,
     surface_y: c_int,
-    data: ?*c_void,
+    rdata: *SurfaceRenderData,
 ) callconv(.C) void {
-    const rdata = util.voidCast(SurfaceRenderData, data.?);
-
     renderTexture(
         rdata.output.*,
-        c.wlr_surface_get_texture(surface),
+        surface.getTexture() orelse return,
         .{
             .x = rdata.output_x + surface_x,
             .y = rdata.output_y + surface_y,
-            .width = surface.?.current.width,
-            .height = surface.?.current.height,
+            .width = surface.current.width,
+            .height = surface.current.height,
         },
-        surface.?.current.transform,
+        surface.current.transform,
         rdata.opacity,
     );
 
-    c.wlr_surface_send_frame_done(surface, rdata.when);
+    surface.sendFrameDone(rdata.when);
 }
 
 /// Render the given texture at the given box, taking the scale and transform
 /// of the output into account.
 fn renderTexture(
     output: Output,
-    wlr_texture: ?*c.wlr_texture,
-    wlr_box: c.wlr_box,
-    transform: c.wl_output_transform,
+    texture: *wlr.Texture,
+    wlr_box: wlr.Box,
+    transform: wl.Output.Transform,
     opacity: f32,
 ) void {
-    const texture = wlr_texture orelse return;
     var box = wlr_box;
 
     // Scale the box to the output's current scaling factor
@@ -295,15 +291,16 @@ fn renderTexture(
     // prepares an orthographic projection and multiplies the necessary
     // transforms to produce a model-view-projection matrix.
     var matrix: [9]f32 = undefined;
-    const inverted = c.wlr_output_transform_invert(transform);
-    c.wlr_matrix_project_box(&matrix, &box, inverted, 0.0, &output.wlr_output.transform_matrix);
+    const inverted = wlr.Output.transformInvert(transform);
+    wlr.matrix.projectBox(&matrix, &box, inverted, 0.0, &output.wlr_output.transform_matrix);
 
     // This takes our matrix, the texture, and an alpha, and performs the actual
     // rendering on the GPU.
-    _ = c.wlr_render_texture_with_matrix(output.getRenderer(), texture, &matrix, opacity);
+    const renderer = output.wlr_output.backend.getRenderer().?;
+    renderer.renderTextureWithMatrix(texture, &matrix, opacity) catch return;
 }
 
-fn renderBorders(output: Output, view: *View, now: *c.timespec) void {
+fn renderBorders(output: Output, view: *View, now: *os.timespec) void {
     const config = &output.root.server.config;
     const color = if (view.current.focus != 0) &config.border_color_focused else &config.border_color_unfocused;
     const border_width = config.border_width;
@@ -341,8 +338,7 @@ fn renderBorders(output: Output, view: *View, now: *c.timespec) void {
 fn renderRect(output: Output, box: Box, color: *const [4]f32) void {
     var wlr_box = box.toWlrBox();
     scaleBox(&wlr_box, output.wlr_output.scale);
-    c.wlr_render_rect(
-        output.getRenderer(),
+    output.wlr_output.backend.getRenderer().?.renderRect(
         &wlr_box,
         color,
         &output.wlr_output.transform_matrix,
@@ -350,7 +346,7 @@ fn renderRect(output: Output, box: Box, color: *const [4]f32) void {
 }
 
 /// Scale a wlr_box, taking the possibility of fractional scaling into account.
-fn scaleBox(box: *c.wlr_box, scale: f64) void {
+fn scaleBox(box: *wlr.Box, scale: f64) void {
     box.x = @floatToInt(c_int, @round(@intToFloat(f64, box.x) * scale));
     box.y = @floatToInt(c_int, @round(@intToFloat(f64, box.y) * scale));
     box.width = scaleLength(box.width, box.x, scale);
