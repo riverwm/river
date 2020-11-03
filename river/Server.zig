@@ -128,7 +128,6 @@ pub fn init(self: *Self) !void {
 
     // Set up primary selection
     _ = c.wlr_primary_selection_v1_device_manager_create(self.wl_display);
-    _ = c.wlr_gtk_primary_selection_device_manager_create(self.wl_display);
 
     self.config = try Config.init();
     try self.decoration_manager.init(self);
@@ -304,7 +303,7 @@ fn handleOutputPowerManagementSetMode(listener: ?*c.wl_listener, data: ?*c_void)
     log.debug(
         .server,
         "{} dpms for output {}",
-        .{log_text, wlr_output.name},
+        .{ log_text, wlr_output.name },
     );
 
     c.wlr_output_enable(wlr_output, enable);
@@ -315,5 +314,4 @@ fn handleOutputPowerManagementSetMode(listener: ?*c.wl_listener, data: ?*c_void)
             .{wlr_output.name},
         );
     }
-
 }
