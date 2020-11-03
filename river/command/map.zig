@@ -16,6 +16,9 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
+const mem = std.mem;
+const wlr = @import("wlroots");
+const xkb = @import("xkbcommon");
 
 const c = @import("../c.zig");
 const util = @import("../util.zig");
@@ -24,21 +27,6 @@ const Error = @import("../command.zig").Error;
 const Mapping = @import("../Mapping.zig");
 const PointerMapping = @import("../PointerMapping.zig");
 const Seat = @import("../Seat.zig");
-
-const modifier_names = [_]struct {
-    name: []const u8,
-    modifier: u32,
-}{
-    .{ .name = "None", .modifier = 0 },
-    .{ .name = "Shift", .modifier = c.WLR_MODIFIER_SHIFT },
-    .{ .name = "Lock", .modifier = c.WLR_MODIFIER_CAPS },
-    .{ .name = "Control", .modifier = c.WLR_MODIFIER_CTRL },
-    .{ .name = "Mod1", .modifier = c.WLR_MODIFIER_ALT },
-    .{ .name = "Mod2", .modifier = c.WLR_MODIFIER_MOD2 },
-    .{ .name = "Mod3", .modifier = c.WLR_MODIFIER_MOD3 },
-    .{ .name = "Mod4", .modifier = c.WLR_MODIFIER_LOGO },
-    .{ .name = "Mod5", .modifier = c.WLR_MODIFIER_MOD5 },
-};
 
 /// Create a new mapping for a given mode
 ///
@@ -133,9 +121,14 @@ fn modeNameToId(allocator: *std.mem.Allocator, seat: *Seat, mode_name: []const u
 }
 
 /// Returns the index of the Mapping with matching modifiers, keysym and release, if any.
-fn mappingExists(mappings: *std.ArrayList(Mapping), modifiers: u32, keysym: u32, release: bool) ?usize {
+fn mappingExists(
+    mappings: *std.ArrayList(Mapping),
+    modifiers: wlr.Keyboard.ModifierMask,
+    keysym: xkb.Keysym,
+    release: bool,
+) ?usize {
     for (mappings.items) |mapping, i| {
-        if (mapping.modifiers == modifiers and mapping.keysym == keysym and mapping.release == release) {
+        if (std.meta.eql(mapping.modifiers, modifiers) and mapping.keysym == keysym and mapping.release == release) {
             return i;
         }
     }
@@ -144,9 +137,13 @@ fn mappingExists(mappings: *std.ArrayList(Mapping), modifiers: u32, keysym: u32,
 }
 
 /// Returns the index of the PointerMapping with matching modifiers and event code, if any.
-fn pointerMappingExists(pointer_mappings: *std.ArrayList(PointerMapping), modifiers: u32, event_code: u32) ?usize {
+fn pointerMappingExists(
+    pointer_mappings: *std.ArrayList(PointerMapping),
+    modifiers: wlr.Keyboard.ModifierMask,
+    event_code: u32,
+) ?usize {
     for (pointer_mappings.items) |mapping, i| {
-        if (mapping.modifiers == modifiers and mapping.event_code == event_code) {
+        if (std.meta.eql(mapping.modifiers, modifiers) and mapping.event_code == event_code) {
             return i;
         }
     }
@@ -166,39 +163,47 @@ fn parseEventCode(allocator: *std.mem.Allocator, event_code_str: []const u8, out
     return @intCast(u32, ret);
 }
 
-fn parseKeysym(allocator: *std.mem.Allocator, keysym_str: []const u8, out: *?[]const u8) !u32 {
+fn parseKeysym(allocator: *std.mem.Allocator, keysym_str: []const u8, out: *?[]const u8) !xkb.Keysym {
     const keysym_name = try std.cstr.addNullByte(allocator, keysym_str);
     defer allocator.free(keysym_name);
-    const keysym = c.xkb_keysym_from_name(keysym_name, .XKB_KEYSYM_CASE_INSENSITIVE);
-    if (keysym == c.XKB_KEY_NoSymbol) {
-        out.* = try std.fmt.allocPrint(
-            allocator,
-            "invalid keysym '{}'",
-            .{keysym_str},
-        );
+    const keysym = xkb.Keysym.fromName(keysym_name, .case_insensitive);
+    if (keysym == .NoSymbol) {
+        out.* = try std.fmt.allocPrint(allocator, "invalid keysym '{}'", .{keysym_str});
         return Error.Other;
     }
-
     return keysym;
 }
 
-fn parseModifiers(allocator: *std.mem.Allocator, modifiers_str: []const u8, out: *?[]const u8) !u32 {
+fn parseModifiers(
+    allocator: *std.mem.Allocator,
+    modifiers_str: []const u8,
+    out: *?[]const u8,
+) !wlr.Keyboard.ModifierMask {
     var it = std.mem.split(modifiers_str, "+");
-    var modifiers: u32 = 0;
-    while (it.next()) |mod_name| {
-        for (modifier_names) |def| {
+    var modifiers = wlr.Keyboard.ModifierMask{};
+    outer: while (it.next()) |mod_name| {
+        if (mem.eql(u8, mod_name, "None")) continue;
+        inline for ([_]struct { name: []const u8, field_name: []const u8 }{
+            .{ .name = "Shift", .field_name = "shift" },
+            .{ .name = "Lock", .field_name = "caps" },
+            .{ .name = "Control", .field_name = "ctrl" },
+            .{ .name = "Mod1", .field_name = "alt" },
+            .{ .name = "Mod2", .field_name = "mod2" },
+            .{ .name = "Mod3", .field_name = "mod3" },
+            .{ .name = "Mod4", .field_name = "logo" },
+            .{ .name = "Mod5", .field_name = "mod5" },
+        }) |def| {
             if (std.mem.eql(u8, def.name, mod_name)) {
-                modifiers |= def.modifier;
-                break;
+                @field(modifiers, def.field_name) = true;
+                continue :outer;
             }
-        } else {
-            out.* = try std.fmt.allocPrint(
-                allocator,
-                "invalid modifier '{}'",
-                .{mod_name},
-            );
-            return Error.Other;
         }
+        out.* = try std.fmt.allocPrint(
+            allocator,
+            "invalid modifier '{}'",
+            .{mod_name},
+        );
+        return Error.Other;
     }
     return modifiers;
 }

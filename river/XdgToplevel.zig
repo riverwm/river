@@ -18,8 +18,9 @@
 const Self = @This();
 
 const std = @import("std");
+const wlr = @import("wlroots");
+const wl = @import("wayland").server.wl;
 
-const c = @import("c.zig");
 const log = @import("log.zig");
 const util = @import("util.zig");
 
@@ -33,52 +34,49 @@ const XdgPopup = @import("XdgPopup.zig");
 view: *View,
 
 /// The corresponding wlroots object
-wlr_xdg_surface: *c.wlr_xdg_surface,
+xdg_surface: *wlr.XdgSurface,
 
 // Listeners that are always active over the view's lifetime
-listen_destroy: c.wl_listener = undefined,
-listen_map: c.wl_listener = undefined,
-listen_unmap: c.wl_listener = undefined,
+destroy: wl.Listener(*wlr.XdgSurface) = undefined,
+map: wl.Listener(*wlr.XdgSurface) = undefined,
+unmap: wl.Listener(*wlr.XdgSurface) = undefined,
 
 // Listeners that are only active while the view is mapped
-listen_commit: c.wl_listener = undefined,
-listen_new_popup: c.wl_listener = undefined,
-listen_request_fullscreen: c.wl_listener = undefined,
-listen_request_move: c.wl_listener = undefined,
-listen_request_resize: c.wl_listener = undefined,
-listen_set_title: c.wl_listener = undefined,
+commit: wl.Listener(*wlr.Surface) = undefined,
+new_popup: wl.Listener(*wlr.XdgPopup) = undefined,
+request_fullscreen: wl.Listener(*wlr.XdgToplevel.event.SetFullscreen) = undefined,
+request_move: wl.Listener(*wlr.XdgToplevel.event.Move) = undefined,
+request_resize: wl.Listener(*wlr.XdgToplevel.event.Resize) = undefined,
+set_title: wl.Listener(*wlr.XdgSurface) = undefined,
 
-pub fn init(self: *Self, view: *View, wlr_xdg_surface: *c.wlr_xdg_surface) void {
-    self.* = .{ .view = view, .wlr_xdg_surface = wlr_xdg_surface };
-    wlr_xdg_surface.data = self;
+pub fn init(self: *Self, view: *View, xdg_surface: *wlr.XdgSurface) void {
+    self.* = .{ .view = view, .xdg_surface = xdg_surface };
+    xdg_surface.data = @ptrToInt(self);
 
     // Add listeners that are active over the view's entire lifetime
-    self.listen_destroy.notify = handleDestroy;
-    c.wl_signal_add(&self.wlr_xdg_surface.events.destroy, &self.listen_destroy);
+    self.destroy.setNotify(handleDestroy);
+    self.xdg_surface.events.destroy.add(&self.destroy);
 
-    self.listen_map.notify = handleMap;
-    c.wl_signal_add(&self.wlr_xdg_surface.events.map, &self.listen_map);
+    self.map.setNotify(handleMap);
+    self.xdg_surface.events.map.add(&self.map);
 
-    self.listen_unmap.notify = handleUnmap;
-    c.wl_signal_add(&self.wlr_xdg_surface.events.unmap, &self.listen_unmap);
+    self.unmap.setNotify(handleUnmap);
+    self.xdg_surface.events.unmap.add(&self.unmap);
 }
 
 pub fn deinit(self: *Self) void {
-    if (self.view.wlr_surface != null) {
+    if (self.view.surface != null) {
         // Remove listeners that are active for the entire lifetime of the view
-        c.wl_list_remove(&self.listen_destroy.link);
-        c.wl_list_remove(&self.listen_map.link);
-        c.wl_list_remove(&self.listen_unmap.link);
+        self.destroy.link.remove();
+        self.map.link.remove();
+        self.unmap.link.remove();
     }
 }
 
 /// Returns true if a configure must be sent to ensure the dimensions of the
 /// pending_box are applied.
 pub fn needsConfigure(self: Self) bool {
-    const server_pending = &@field(
-        self.wlr_xdg_surface,
-        c.wlr_xdg_surface_union,
-    ).toplevel.*.server_pending;
+    const server_pending = &self.xdg_surface.role_data.toplevel.server_pending;
     const state = &self.view.pending;
 
     // Checking server_pending is sufficient here since it will be either in
@@ -92,35 +90,32 @@ pub fn needsConfigure(self: Self) bool {
 
 /// Send a configure event, applying the pending state of the view.
 pub fn configure(self: Self) void {
+    const toplevel = self.xdg_surface.role_data.toplevel;
     const state = &self.view.pending;
-    _ = c.wlr_xdg_toplevel_set_activated(self.wlr_xdg_surface, state.focus != 0);
-    _ = c.wlr_xdg_toplevel_set_fullscreen(self.wlr_xdg_surface, state.fullscreen);
-    self.view.pending_serial = c.wlr_xdg_toplevel_set_size(
-        self.wlr_xdg_surface,
-        state.box.width,
-        state.box.height,
-    );
+    _ = toplevel.setActivated(state.focus != 0);
+    _ = toplevel.setFullscreen(state.fullscreen);
+    self.view.pending_serial = toplevel.setSize(state.box.width, state.box.height);
 }
 
 /// Close the view. This will lead to the unmap and destroy events being sent
 pub fn close(self: Self) void {
-    c.wlr_xdg_toplevel_send_close(self.wlr_xdg_surface);
+    self.xdg_surface.role_data.toplevel.sendClose();
 }
 
-pub fn forEachSurface(
+pub inline fn forEachSurface(
     self: Self,
-    iterator: c.wlr_surface_iterator_func_t,
-    user_data: ?*c_void,
+    comptime T: type,
+    iterator: fn (surface: *wlr.Surface, sx: c_int, sy: c_int, data: T) callconv(.C) void,
+    user_data: T,
 ) void {
-    c.wlr_xdg_surface_for_each_surface(self.wlr_xdg_surface, iterator, user_data);
+    self.xdg_surface.forEachSurface(T, iterator, user_data);
 }
 
 /// Return the surface at output coordinates ox, oy and set sx, sy to the
 /// corresponding surface-relative coordinates, if there is a surface.
-pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*c.wlr_surface {
+pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*wlr.Surface {
     const view = self.view;
-    return c.wlr_xdg_surface_surface_at(
-        self.wlr_xdg_surface,
+    return self.xdg_surface.surfaceAt(
         ox - @intToFloat(f64, view.current.box.x - view.surface_box.x),
         oy - @intToFloat(f64, view.current.box.y - view.surface_box.y),
         sx,
@@ -130,16 +125,12 @@ pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*c.wlr_surfa
 
 /// Return the current title of the toplevel. May be an empty string.
 pub fn getTitle(self: Self) [*:0]const u8 {
-    const wlr_xdg_toplevel: *c.wlr_xdg_toplevel = @field(
-        self.wlr_xdg_surface,
-        c.wlr_xdg_surface_union,
-    ).toplevel;
-    return wlr_xdg_toplevel.title orelse "NULL";
+    return self.xdg_surface.role_data.toplevel.title orelse "NULL";
 }
 
 /// Return bounds on the dimensions of the toplevel.
 pub fn getConstraints(self: Self) View.Constraints {
-    const state = @field(self.wlr_xdg_surface, c.wlr_xdg_surface_union).toplevel.*.current;
+    const state = &self.xdg_surface.role_data.toplevel.current;
     return .{
         .min_width = std.math.max(state.min_width, View.min_size),
         .max_width = if (state.max_width > 0) state.max_width else std.math.maxInt(u32),
@@ -149,55 +140,55 @@ pub fn getConstraints(self: Self) View.Constraints {
 }
 
 /// Called when the xdg surface is destroyed
-fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_destroy", listener.?);
+fn handleDestroy(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurface) void {
+    const self = @fieldParentPtr(Self, "destroy", listener);
     self.deinit();
-    self.view.wlr_surface = null;
+    self.view.surface = null;
 }
 
 /// Called when the xdg surface is mapped, or ready to display on-screen.
-fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_map", listener.?);
+fn handleMap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurface) void {
+    const self = @fieldParentPtr(Self, "map", listener);
     const view = self.view;
     const root = view.output.root;
-    const wlr_xdg_toplevel: *c.wlr_xdg_toplevel = @field(self.wlr_xdg_surface, c.wlr_xdg_surface_union).toplevel;
+    const toplevel = self.xdg_surface.role_data.toplevel;
 
     // Add listeners that are only active while mapped
-    self.listen_commit.notify = handleCommit;
-    c.wl_signal_add(&self.wlr_xdg_surface.surface.*.events.commit, &self.listen_commit);
+    self.commit.setNotify(handleCommit);
+    self.xdg_surface.surface.events.commit.add(&self.commit);
 
-    self.listen_new_popup.notify = handleNewPopup;
-    c.wl_signal_add(&self.wlr_xdg_surface.events.new_popup, &self.listen_new_popup);
+    self.new_popup.setNotify(handleNewPopup);
+    self.xdg_surface.events.new_popup.add(&self.new_popup);
 
-    self.listen_request_fullscreen.notify = handleRequestFullscreen;
-    c.wl_signal_add(&wlr_xdg_toplevel.events.request_fullscreen, &self.listen_request_fullscreen);
+    self.request_fullscreen.setNotify(handleRequestFullscreen);
+    toplevel.events.request_fullscreen.add(&self.request_fullscreen);
 
-    self.listen_request_move.notify = handleRequestMove;
-    c.wl_signal_add(&wlr_xdg_toplevel.events.request_move, &self.listen_request_move);
+    self.request_move.setNotify(handleRequestMove);
+    toplevel.events.request_move.add(&self.request_move);
 
-    self.listen_request_resize.notify = handleRequestResize;
-    c.wl_signal_add(&wlr_xdg_toplevel.events.request_resize, &self.listen_request_resize);
+    self.request_resize.setNotify(handleRequestResize);
+    toplevel.events.request_resize.add(&self.request_resize);
 
-    self.listen_set_title.notify = handleSetTitle;
-    c.wl_signal_add(&wlr_xdg_toplevel.events.set_title, &self.listen_set_title);
+    self.set_title.setNotify(handleSetTitle);
+    toplevel.events.set_title.add(&self.set_title);
 
-    view.wlr_surface = self.wlr_xdg_surface.surface;
+    view.surface = self.xdg_surface.surface;
 
     // Use the view's "natural" size centered on the output as the default
     // floating dimensions
-    view.float_box.width = @intCast(u32, self.wlr_xdg_surface.geometry.width);
-    view.float_box.height = @intCast(u32, self.wlr_xdg_surface.geometry.height);
+    view.float_box.width = @intCast(u32, self.xdg_surface.geometry.width);
+    view.float_box.height = @intCast(u32, self.xdg_surface.geometry.height);
     view.float_box.x = std.math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.width) -
         @intCast(i32, view.float_box.width), 2));
     view.float_box.y = std.math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.height) -
         @intCast(i32, view.float_box.height), 2));
 
-    const state = &wlr_xdg_toplevel.current;
+    const state = &toplevel.current;
     const has_fixed_size = state.min_width != 0 and state.min_height != 0 and
         (state.min_width == state.max_width or state.min_height == state.max_height);
-    const app_id: [*:0]const u8 = if (wlr_xdg_toplevel.app_id) |id| id else "NULL";
+    const app_id: [*:0]const u8 = if (toplevel.app_id) |id| id else "NULL";
 
-    if (wlr_xdg_toplevel.parent != null or has_fixed_size) {
+    if (toplevel.parent != null or has_fixed_size) {
         // If the toplevel has a parent or has a fixed size make it float
         view.current.float = true;
         view.pending.float = true;
@@ -222,38 +213,35 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
             break;
         }
     } else {
-        _ = c.wlr_xdg_toplevel_set_tiled(
-            self.wlr_xdg_surface,
-            c.WLR_EDGE_LEFT | c.WLR_EDGE_RIGHT | c.WLR_EDGE_TOP | c.WLR_EDGE_BOTTOM,
-        );
+        _ = toplevel.setTiled(.{ .top = true, .bottom = true, .left = true, .right = true });
     }
 
     view.map();
 }
 
 /// Called when the surface is unmapped and will no longer be displayed.
-fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_unmap", listener.?);
+fn handleUnmap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurface) void {
+    const self = @fieldParentPtr(Self, "unmap", listener);
     const root = self.view.output.root;
 
     self.view.unmap();
 
     // Remove listeners that are only active while mapped
-    c.wl_list_remove(&self.listen_commit.link);
-    c.wl_list_remove(&self.listen_new_popup.link);
-    c.wl_list_remove(&self.listen_request_fullscreen.link);
-    c.wl_list_remove(&self.listen_request_move.link);
-    c.wl_list_remove(&self.listen_request_resize.link);
-    c.wl_list_remove(&self.listen_set_title.link);
+    self.commit.link.remove();
+    self.new_popup.link.remove();
+    self.request_fullscreen.link.remove();
+    self.request_move.link.remove();
+    self.request_resize.link.remove();
+    self.set_title.link.remove();
 }
 
 /// Called when the surface is comitted
-fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_commit", listener.?);
+fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) void {
+    const self = @fieldParentPtr(Self, "commit", listener);
     const view = self.view;
 
-    var wlr_box: c.wlr_box = undefined;
-    c.wlr_xdg_surface_get_geometry(self.wlr_xdg_surface, &wlr_box);
+    var wlr_box: wlr.Box = undefined;
+    self.xdg_surface.getGeometry(&wlr_box);
     const new_box = Box.fromWlrBox(wlr_box);
 
     // If we have sent a configure changing the size
@@ -261,7 +249,7 @@ fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         // Update the stored dimensions of the surface
         view.surface_box = new_box;
 
-        if (s == self.wlr_xdg_surface.configure_serial) {
+        if (s == self.xdg_surface.configure_serial) {
             view.notifyConfiguredOrApplyPending();
         } else {
             // If the client has not yet acked our configure, we need to send a
@@ -279,13 +267,12 @@ fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 }
 
 /// Called when a new xdg popup is requested by the client
-fn handleNewPopup(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_new_popup", listener.?);
-    const wlr_xdg_popup = util.voidCast(c.wlr_xdg_popup, data.?);
+fn handleNewPopup(listener: *wl.Listener(*wlr.XdgPopup), wlr_xdg_popup: *wlr.XdgPopup) void {
+    const self = @fieldParentPtr(Self, "new_popup", listener);
 
     // This will free itself on destroy
-    var xdg_popup = util.gpa.create(XdgPopup) catch {
-        c.wl_resource_post_no_memory(wlr_xdg_popup.resource);
+    const xdg_popup = util.gpa.create(XdgPopup) catch {
+        wlr_xdg_popup.resource.postNoMemory();
         return;
     };
     xdg_popup.init(self.view.output, &self.view.current.box, wlr_xdg_popup);
@@ -293,33 +280,36 @@ fn handleNewPopup(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 
 /// Called when the client asks to be fullscreened. We always honor the request
 /// for now, perhaps it should be denied in some cases in the future.
-fn handleRequestFullscreen(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_request_fullscreen", listener.?);
-    const event = util.voidCast(c.wlr_xdg_toplevel_set_fullscreen_event, data.?);
+fn handleRequestFullscreen(
+    listener: *wl.Listener(*wlr.XdgToplevel.event.SetFullscreen),
+    event: *wlr.XdgToplevel.event.SetFullscreen,
+) void {
+    const self = @fieldParentPtr(Self, "request_fullscreen", listener);
     self.view.pending.fullscreen = event.fullscreen;
     self.view.applyPending();
 }
 
 /// Called when the client asks to be moved via the cursor, for example when the
 /// user drags CSD titlebars.
-fn handleRequestMove(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_request_move", listener.?);
-    const event = util.voidCast(c.wlr_xdg_toplevel_move_event, data.?);
-    const seat = util.voidCast(Seat, event.seat.*.seat.*.data.?);
+fn handleRequestMove(
+    listener: *wl.Listener(*wlr.XdgToplevel.event.Move),
+    event: *wlr.XdgToplevel.event.Move,
+) void {
+    const self = @fieldParentPtr(Self, "request_move", listener);
+    const seat = @intToPtr(*Seat, event.seat.seat.data);
     seat.cursor.enterMode(.move, self.view);
 }
 
 /// Called when the client asks to be resized via the cursor.
-fn handleRequestResize(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_request_resize", listener.?);
-    const event = util.voidCast(c.wlr_xdg_toplevel_resize_event, data.?);
-    const seat = util.voidCast(Seat, event.seat.*.seat.*.data.?);
+fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), event: *wlr.XdgToplevel.event.Resize) void {
+    const self = @fieldParentPtr(Self, "request_resize", listener);
+    const seat = @intToPtr(*Seat, event.seat.seat.data);
     seat.cursor.enterMode(.resize, self.view);
 }
 
 /// Called when the client sets / updates its title
-fn handleSetTitle(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_set_title", listener.?);
+fn handleSetTitle(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurface) void {
+    const self = @fieldParentPtr(Self, "set_title", listener);
 
     // Send title to all status listeners attached to a seat which focuses this view
     var seat_it = self.view.output.root.server.input_manager.seats.first;

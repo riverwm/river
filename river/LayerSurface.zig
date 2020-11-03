@@ -18,8 +18,9 @@
 const Self = @This();
 
 const std = @import("std");
+const wlr = @import("wlroots");
+const wl = @import("wayland").server.wl;
 
-const c = @import("c.zig");
 const log = @import("log.zig");
 const util = @import("util.zig");
 
@@ -28,27 +29,27 @@ const Output = @import("Output.zig");
 const XdgPopup = @import("XdgPopup.zig");
 
 output: *Output,
-wlr_layer_surface: *c.wlr_layer_surface_v1,
+wlr_layer_surface: *wlr.LayerSurfaceV1,
 
 box: Box = undefined,
-state: c.wlr_layer_surface_v1_state,
+state: wlr.LayerSurfaceV1.State,
 
 // Listeners active the entire lifetime of the layser surface
-listen_destroy: c.wl_listener = undefined,
-listen_map: c.wl_listener = undefined,
-listen_unmap: c.wl_listener = undefined,
+destroy: wl.Listener(*wlr.LayerSurfaceV1) = undefined,
+map: wl.Listener(*wlr.LayerSurfaceV1) = undefined,
+unmap: wl.Listener(*wlr.LayerSurfaceV1) = undefined,
 
 // Listeners only active while the layer surface is mapped
-listen_commit: c.wl_listener = undefined,
-listen_new_popup: c.wl_listener = undefined,
+commit: wl.Listener(*wlr.Surface) = undefined,
+new_popup: wl.Listener(*wlr.XdgPopup) = undefined,
 
-pub fn init(self: *Self, output: *Output, wlr_layer_surface: *c.wlr_layer_surface_v1) void {
+pub fn init(self: *Self, output: *Output, wlr_layer_surface: *wlr.LayerSurfaceV1) void {
     self.* = .{
         .output = output,
         .wlr_layer_surface = wlr_layer_surface,
         .state = wlr_layer_surface.current,
     };
-    wlr_layer_surface.data = self;
+    wlr_layer_surface.data = @ptrToInt(self);
 
     // Temporarily add to the output's list to allow for inital arrangement
     // which sends the first configure.
@@ -59,61 +60,56 @@ pub fn init(self: *Self, output: *Output, wlr_layer_surface: *c.wlr_layer_surfac
     list.remove(node);
 
     // Set up listeners that are active for the entire lifetime of the layer surface
-    self.listen_destroy.notify = handleDestroy;
-    c.wl_signal_add(&self.wlr_layer_surface.events.destroy, &self.listen_destroy);
+    self.destroy.setNotify(handleDestroy);
+    self.wlr_layer_surface.events.destroy.add(&self.destroy);
 
-    self.listen_map.notify = handleMap;
-    c.wl_signal_add(&self.wlr_layer_surface.events.map, &self.listen_map);
+    self.map.setNotify(handleMap);
+    self.wlr_layer_surface.events.map.add(&self.map);
 
-    self.listen_unmap.notify = handleUnmap;
-    c.wl_signal_add(&self.wlr_layer_surface.events.unmap, &self.listen_unmap);
+    self.unmap.setNotify(handleUnmap);
+    self.wlr_layer_surface.events.unmap.add(&self.unmap);
 }
 
-fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_destroy", listener.?);
-    const output = self.output;
+fn handleDestroy(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wlr.LayerSurfaceV1) void {
+    const self = @fieldParentPtr(Self, "destroy", listener);
 
     log.debug(.layer_shell, "layer surface '{}' destroyed", .{self.wlr_layer_surface.namespace});
 
     // Remove listeners active the entire lifetime of the layer surface
-    c.wl_list_remove(&self.listen_destroy.link);
-    c.wl_list_remove(&self.listen_map.link);
-    c.wl_list_remove(&self.listen_unmap.link);
+    self.destroy.link.remove();
+    self.map.link.remove();
+    self.unmap.link.remove();
 
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
     util.gpa.destroy(node);
 }
 
-fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_map", listener.?);
-    const wlr_layer_surface = self.wlr_layer_surface;
+fn handleMap(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wlr.LayerSurfaceV1) void {
+    const self = @fieldParentPtr(Self, "map", listener);
 
     log.debug(.layer_shell, "layer surface '{}' mapped", .{wlr_layer_surface.namespace});
 
     // Add listeners that are only active while mapped
-    self.listen_commit.notify = handleCommit;
-    c.wl_signal_add(&wlr_layer_surface.surface.*.events.commit, &self.listen_commit);
+    self.commit.setNotify(handleCommit);
+    wlr_layer_surface.surface.events.commit.add(&self.commit);
 
-    self.listen_new_popup.notify = handleNewPopup;
-    c.wl_signal_add(&wlr_layer_surface.events.new_popup, &self.listen_new_popup);
+    self.new_popup.setNotify(handleNewPopup);
+    wlr_layer_surface.events.new_popup.add(&self.new_popup);
 
-    c.wlr_surface_send_enter(
-        wlr_layer_surface.surface,
-        wlr_layer_surface.output,
-    );
+    wlr_layer_surface.surface.sendEnter(wlr_layer_surface.output.?);
 
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
     self.output.layers[@intCast(usize, @enumToInt(self.state.layer))].append(node);
 }
 
-fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_unmap", listener.?);
+fn handleUnmap(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wlr.LayerSurfaceV1) void {
+    const self = @fieldParentPtr(Self, "unmap", listener);
 
     log.debug(.layer_shell, "layer surface '{}' unmapped", .{self.wlr_layer_surface.namespace});
 
     // remove listeners only active while the layer surface is mapped
-    c.wl_list_remove(&self.listen_commit.link);
-    c.wl_list_remove(&self.listen_new_popup.link);
+    self.commit.link.remove();
+    self.new_popup.link.remove();
 
     // Remove from the output's list of layer surfaces
     const self_node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
@@ -142,8 +138,8 @@ fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     self.output.root.startTransaction();
 }
 
-fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_commit", listener.?);
+fn handleCommit(listener: *wl.Listener(*wlr.Surface), wlr_surface: *wlr.Surface) void {
+    const self = @fieldParentPtr(Self, "commit", listener);
 
     if (self.wlr_layer_surface.output == null) {
         log.err(.layer_shell, "layer surface committed with null output", .{});
@@ -166,13 +162,12 @@ fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     }
 }
 
-fn handleNewPopup(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_new_popup", listener.?);
-    const wlr_xdg_popup = util.voidCast(c.wlr_xdg_popup, data.?);
+fn handleNewPopup(listener: *wl.Listener(*wlr.XdgPopup), wlr_xdg_popup: *wlr.XdgPopup) void {
+    const self = @fieldParentPtr(Self, "new_popup", listener);
 
     // This will free itself on destroy
-    var xdg_popup = util.gpa.create(XdgPopup) catch {
-        c.wl_resource_post_no_memory(wlr_xdg_popup.resource);
+    const xdg_popup = util.gpa.create(XdgPopup) catch {
+        wlr_xdg_popup.resource.postNoMemory();
         return;
     };
     xdg_popup.init(self.output, &self.box, wlr_xdg_popup);

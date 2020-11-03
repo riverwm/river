@@ -18,8 +18,8 @@
 const Self = @This();
 
 const std = @import("std");
-
-const c = @import("c.zig");
+const wlr = @import("wlroots");
+const wl = @import("wayland").server.wl;
 
 const Box = @import("Box.zig");
 const View = @import("View.zig");
@@ -30,58 +30,57 @@ const XdgPopup = @import("XdgPopup.zig");
 view: *View,
 
 /// The corresponding wlroots object
-wlr_xwayland_surface: *c.wlr_xwayland_surface,
+xwayland_surface: *wlr.XwaylandSurface,
 
 // Listeners that are always active over the view's lifetime
-listen_destroy: c.wl_listener = undefined,
-listen_map: c.wl_listener = undefined,
-listen_unmap: c.wl_listener = undefined,
-listen_title: c.wl_listener = undefined,
+destroy: wl.Listener(*wlr.XwaylandSurface) = undefined,
+map: wl.Listener(*wlr.XwaylandSurface) = undefined,
+unmap: wl.Listener(*wlr.XwaylandSurface) = undefined,
+title: wl.Listener(*wlr.XwaylandSurface) = undefined,
 
 // Listeners that are only active while the view is mapped
-listen_commit: c.wl_listener = undefined,
+commit: wl.Listener(*wlr.Surface) = undefined,
 
-pub fn init(self: *Self, view: *View, wlr_xwayland_surface: *c.wlr_xwayland_surface) void {
-    self.* = .{ .view = view, .wlr_xwayland_surface = wlr_xwayland_surface };
-    wlr_xwayland_surface.data = self;
+pub fn init(self: *Self, view: *View, xwayland_surface: *wlr.XwaylandSurface) void {
+    self.* = .{ .view = view, .xwayland_surface = xwayland_surface };
+    xwayland_surface.data = @ptrToInt(self);
 
     // Add listeners that are active over the view's entire lifetime
-    self.listen_destroy.notify = handleDestroy;
-    c.wl_signal_add(&self.wlr_xwayland_surface.events.destroy, &self.listen_destroy);
+    self.destroy.setNotify(handleDestroy);
+    self.xwayland_surface.events.destroy.add(&self.destroy);
 
-    self.listen_map.notify = handleMap;
-    c.wl_signal_add(&self.wlr_xwayland_surface.events.map, &self.listen_map);
+    self.map.setNotify(handleMap);
+    self.xwayland_surface.events.map.add(&self.map);
 
-    self.listen_unmap.notify = handleUnmap;
-    c.wl_signal_add(&self.wlr_xwayland_surface.events.unmap, &self.listen_unmap);
+    self.unmap.setNotify(handleUnmap);
+    self.xwayland_surface.events.unmap.add(&self.unmap);
 
-    self.listen_title.notify = handleTitle;
-    c.wl_signal_add(&self.wlr_xwayland_surface.events.set_title, &self.listen_title);
+    self.title.setNotify(handleTitle);
+    self.xwayland_surface.events.set_title.add(&self.title);
 }
 
 pub fn deinit(self: *Self) void {
-    if (self.view.wlr_surface != null) {
+    if (self.view.surface != null) {
         // Remove listeners that are active for the entire lifetime of the view
-        c.wl_list_remove(&self.listen_destroy.link);
-        c.wl_list_remove(&self.listen_map.link);
-        c.wl_list_remove(&self.listen_unmap.link);
-        c.wl_list_remove(&self.listen_title.link);
+        self.destroy.link.remove();
+        self.map.link.remove();
+        self.unmap.link.remove();
+        self.title.link.remove();
     }
 }
 
 pub fn needsConfigure(self: Self) bool {
-    return self.wlr_xwayland_surface.x != self.view.pending.box.x or
-        self.wlr_xwayland_surface.y != self.view.pending.box.y or
-        self.wlr_xwayland_surface.width != self.view.pending.box.width or
-        self.wlr_xwayland_surface.height != self.view.pending.box.height;
+    return self.xwayland_surface.x != self.view.pending.box.x or
+        self.xwayland_surface.y != self.view.pending.box.y or
+        self.xwayland_surface.width != self.view.pending.box.width or
+        self.xwayland_surface.height != self.view.pending.box.height;
 }
 
 /// Apply pending state
 pub fn configure(self: Self) void {
     const state = &self.view.pending;
-    c.wlr_xwayland_surface_set_fullscreen(self.wlr_xwayland_surface, state.fullscreen);
-    c.wlr_xwayland_surface_configure(
-        self.wlr_xwayland_surface,
+    self.xwayland_surface.setFullscreen(state.fullscreen);
+    self.xwayland_surface.configure(
         @intCast(i16, state.box.x),
         @intCast(i16, state.box.y),
         @intCast(u16, state.box.width),
@@ -97,23 +96,23 @@ pub fn configure(self: Self) void {
 
 /// Close the view. This will lead to the unmap and destroy events being sent
 pub fn close(self: Self) void {
-    c.wlr_xwayland_surface_close(self.wlr_xwayland_surface);
+    self.xwayland_surface.close();
 }
 
 /// Iterate over all surfaces of the xwayland view.
 pub fn forEachSurface(
     self: Self,
-    iterator: c.wlr_surface_iterator_func_t,
-    user_data: ?*c_void,
+    comptime T: type,
+    iterator: fn (surface: *wlr.Surface, sx: c_int, sy: c_int, data: T) callconv(.C) void,
+    data: T,
 ) void {
-    c.wlr_surface_for_each_surface(self.wlr_xwayland_surface.surface, iterator, user_data);
+    self.xwayland_surface.surface.?.forEachSurface(T, iterator, data);
 }
 
 /// Return the surface at output coordinates ox, oy and set sx, sy to the
 /// corresponding surface-relative coordinates, if there is a surface.
-pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*c.wlr_surface {
-    return c.wlr_surface_surface_at(
-        self.wlr_xwayland_surface.surface,
+pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*wlr.Surface {
+    return self.xwayland_surface.surface.?.surfaceAt(
         ox - @intToFloat(f64, self.view.current.box.x),
         oy - @intToFloat(f64, self.view.current.box.y),
         sx,
@@ -123,12 +122,12 @@ pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*c.wlr_surfa
 
 /// Get the current title of the xwayland surface. May be an empty string
 pub fn getTitle(self: Self) [*:0]const u8 {
-    return self.wlr_xwayland_surface.title orelse "";
+    return self.xwayland_surface.title orelse "";
 }
 
 /// Return bounds on the dimensions of the view
 pub fn getConstraints(self: Self) View.Constraints {
-    const hints: *c.wlr_xwayland_surface_size_hints = self.wlr_xwayland_surface.size_hints orelse return .{
+    const hints = self.xwayland_surface.size_hints orelse return .{
         .min_width = View.min_size,
         .max_width = std.math.maxInt(u32),
         .min_height = View.min_size,
@@ -143,39 +142,42 @@ pub fn getConstraints(self: Self) View.Constraints {
 }
 
 /// Called when the xwayland surface is destroyed
-fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_destroy", listener.?);
+fn handleDestroy(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
+    const self = @fieldParentPtr(Self, "destroy", listener);
     self.deinit();
-    self.view.wlr_surface = null;
+    self.view.surface = null;
 }
 
 /// Called when the xwayland surface is mapped, or ready to display on-screen.
-fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_map", listener.?);
+fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
+    const self = @fieldParentPtr(Self, "map", listener);
     const view = self.view;
     const root = view.output.root;
 
     // Add listeners that are only active while mapped
-    self.listen_commit.notify = handleCommit;
-    c.wl_signal_add(&self.wlr_xwayland_surface.surface.*.events.commit, &self.listen_commit);
+    self.commit.setNotify(handleCommit);
+    self.xwayland_surface.surface.?.events.commit.add(&self.commit);
 
-    view.wlr_surface = self.wlr_xwayland_surface.surface;
+    view.surface = self.xwayland_surface.surface;
 
     // Use the view's "natural" size centered on the output as the default
     // floating dimensions
-    view.float_box.width = self.wlr_xwayland_surface.width;
-    view.float_box.height = self.wlr_xwayland_surface.height;
+    view.float_box.width = self.xwayland_surface.width;
+    view.float_box.height = self.xwayland_surface.height;
     view.float_box.x = std.math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.width) -
         @intCast(i32, view.float_box.width), 2));
     view.float_box.y = std.math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.height) -
         @intCast(i32, view.float_box.height), 2));
 
-    const size_hints = self.wlr_xwayland_surface.size_hints;
-    const has_fixed_size = size_hints.*.min_width != 0 and size_hints.*.min_height != 0 and
-        (size_hints.*.min_width == size_hints.*.max_width or size_hints.*.min_height == size_hints.*.max_height);
-    const app_id: [*:0]const u8 = if (self.wlr_xwayland_surface.class) |id| id else "NULL";
+    const has_fixed_size = if (self.xwayland_surface.size_hints) |size_hints|
+        size_hints.min_width != 0 and size_hints.min_height != 0 and
+            (size_hints.min_width == size_hints.max_width or size_hints.min_height == size_hints.max_height)
+    else
+        false;
 
-    if (self.wlr_xwayland_surface.parent != null or has_fixed_size) {
+    const app_id: [*:0]const u8 = if (self.xwayland_surface.class) |id| id else "NULL";
+
+    if (self.xwayland_surface.parent != null or has_fixed_size) {
         // If the toplevel has a parent or has a fixed size make it float
         view.current.float = true;
         view.pending.float = true;
@@ -196,26 +198,26 @@ fn handleMap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 }
 
 /// Called when the surface is unmapped and will no longer be displayed.
-fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_unmap", listener.?);
+fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
+    const self = @fieldParentPtr(Self, "unmap", listener);
 
     self.view.unmap();
 
     // Remove listeners that are only active while mapped
-    c.wl_list_remove(&self.listen_commit.link);
+    self.commit.link.remove();
 }
 
 /// Called when the surface is comitted
 /// TODO: check for unexpected change in size and react as needed
-fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_commit", listener.?);
+fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) void {
+    const self = @fieldParentPtr(Self, "commit", listener);
     const view = self.view;
 
     view.surface_box = Box{
         .x = 0,
         .y = 0,
-        .width = @intCast(u32, self.wlr_xwayland_surface.surface.*.current.width),
-        .height = @intCast(u32, self.wlr_xwayland_surface.surface.*.current.height),
+        .width = @intCast(u32, surface.current.width),
+        .height = @intCast(u32, surface.current.height),
     };
 
     // See comment in XwaylandView.configure()
@@ -225,8 +227,8 @@ fn handleCommit(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 }
 
 /// Called then the window updates its title
-fn handleTitle(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_title", listener.?);
+fn handleTitle(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
+    const self = @fieldParentPtr(Self, "title", listener);
 
     // Send title to all status listeners attached to a seat which focuses this view
     var seat_it = self.view.output.root.server.input_manager.seats.first;

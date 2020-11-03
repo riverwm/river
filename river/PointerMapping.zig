@@ -15,11 +15,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+const wlr = @import("wlroots");
+
 pub const Action = enum {
     move,
     resize,
 };
 
 event_code: u32,
-modifiers: u32,
+modifiers: wlr.Keyboard.ModifierMask,
 action: Action,

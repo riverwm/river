@@ -17,145 +17,77 @@
 
 const std = @import("std");
 
-const c = @cImport({
-    @cInclude("wayland-client.h");
-    @cInclude("river-status-unstable-v1-client-protocol.h");
-});
+const wayland = @import("wayland");
+const wl = wayland.client.wl;
+const zriver = wayland.client.zriver;
 
-const wl_registry_listener = c.wl_registry_listener{
-    .global = handleGlobal,
-    .global_remove = handleGlobalRemove,
+const SetupContext = struct {
+    status_manager: ?*zriver.StatusManagerV1 = null,
+    outputs: std.ArrayList(*wl.Output) = std.ArrayList(*wl.Output).init(std.heap.c_allocator),
+    seats: std.ArrayList(*wl.Seat) = std.ArrayList(*wl.Seat).init(std.heap.c_allocator),
 };
-
-const river_output_status_listener = c.zriver_output_status_v1_listener{
-    .focused_tags = handleFocusedTags,
-    .view_tags = handleViewTags,
-};
-
-const river_seat_status_listener = c.zriver_seat_status_v1_listener{
-    .focused_output = handleFocusedOutput,
-    .unfocused_output = handleUnfocusedOutput,
-    .focused_view = handleFocusedView,
-};
-
-var river_status_manager: ?*c.zriver_status_manager_v1 = null;
-
-var outputs = std.ArrayList(*c.wl_output).init(std.heap.c_allocator);
-var seats = std.ArrayList(*c.wl_seat).init(std.heap.c_allocator);
 
 pub fn main() !void {
-    const wl_display = c.wl_display_connect(null) orelse return error.CantConnectToDisplay;
-    const wl_registry = c.wl_display_get_registry(wl_display);
+    const display = try wl.Display.connect(null);
+    const registry = try display.getRegistry();
 
-    if (c.wl_registry_add_listener(wl_registry, &wl_registry_listener, null) < 0)
-        return error.FailedToAddListener;
-    if (c.wl_display_roundtrip(wl_display) < 0) return error.RoundtripFailed;
+    var context = SetupContext{};
 
-    if (river_status_manager == null) return error.RiverStatusManagerNotAdvertised;
+    registry.setListener(*SetupContext, registryListener, &context) catch unreachable;
+    _ = try display.roundtrip();
 
-    for (outputs.items) |wl_output| createOutputStatus(wl_output);
-    for (seats.items) |wl_seat| createSeatStatus(wl_seat);
-    outputs.deinit();
-    seats.deinit();
+    const status_manager = context.status_manager orelse return error.RiverStatusManagerNotAdvertised;
+
+    for (context.outputs.items) |output| {
+        const output_status = try status_manager.getRiverOutputStatus(output);
+        output_status.setListener(?*c_void, outputStatusListener, null) catch unreachable;
+    }
+    for (context.seats.items) |seat| {
+        const seat_status = try status_manager.getRiverSeatStatus(seat);
+        seat_status.setListener(?*c_void, seatStatusListener, null) catch unreachable;
+    }
+    context.outputs.deinit();
+    context.seats.deinit();
 
     // Loop forever, listening for new events.
-    while (true) if (c.wl_display_dispatch(wl_display) < 0) return error.DispatchFailed;
+    while (true) _ = try display.dispatch();
 }
 
-fn handleGlobal(
-    data: ?*c_void,
-    wl_registry: ?*c.wl_registry,
-    name: u32,
-    interface: ?[*:0]const u8,
-    version: u32,
-) callconv(.C) void {
-    // Global advertisement order is not defined, so save any outputs or seats
-    // advertised before the river_status_manager.
-    if (std.cstr.cmp(interface.?, @ptrCast([*:0]const u8, c.zriver_status_manager_v1_interface.name.?)) == 0) {
-        river_status_manager = @ptrCast(
-            *c.zriver_status_manager_v1,
-            c.wl_registry_bind(wl_registry, name, &c.zriver_status_manager_v1_interface, version),
-        );
-    } else if (std.cstr.cmp(interface.?, @ptrCast([*:0]const u8, c.wl_output_interface.name.?)) == 0) {
-        const wl_output = @ptrCast(
-            *c.wl_output,
-            c.wl_registry_bind(wl_registry, name, &c.wl_output_interface, version),
-        );
-        outputs.append(wl_output) catch @panic("out of memory");
-    } else if (std.cstr.cmp(interface.?, @ptrCast([*:0]const u8, c.wl_seat_interface.name.?)) == 0) {
-        const wl_seat = @ptrCast(
-            *c.wl_seat,
-            c.wl_registry_bind(wl_registry, name, &c.wl_seat_interface, version),
-        );
-        seats.append(wl_seat) catch @panic("out of memory");
+fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, context: *SetupContext) void {
+    switch (event) {
+        .global => |global| {
+            if (std.cstr.cmp(global.interface, zriver.StatusManagerV1.getInterface().name) == 0) {
+                context.status_manager = registry.bind(global.name, zriver.StatusManagerV1, 1) catch return;
+            } else if (std.cstr.cmp(global.interface, wl.Seat.getInterface().name) == 0) {
+                const seat = registry.bind(global.name, wl.Seat, 1) catch return;
+                context.seats.append(seat) catch @panic("out of memory");
+            } else if (std.cstr.cmp(global.interface, wl.Output.getInterface().name) == 0) {
+                const output = registry.bind(global.name, wl.Output, 1) catch return;
+                context.outputs.append(output) catch @panic("out of memory");
+            }
+        },
+        .global_remove => {},
     }
 }
 
-fn createOutputStatus(wl_output: *c.wl_output) void {
-    const river_output_status = c.zriver_status_manager_v1_get_river_output_status(
-        river_status_manager.?,
-        wl_output,
-    );
-    _ = c.zriver_output_status_v1_add_listener(
-        river_output_status,
-        &river_output_status_listener,
-        null,
-    );
-}
-
-fn createSeatStatus(wl_seat: *c.wl_seat) void {
-    const river_seat_status = c.zriver_status_manager_v1_get_river_seat_status(
-        river_status_manager.?,
-        wl_seat,
-    );
-    _ = c.zriver_seat_status_v1_add_listener(river_seat_status, &river_seat_status_listener, null);
-}
-
-fn handleGlobalRemove(data: ?*c_void, wl_registry: ?*c.wl_registry, name: u32) callconv(.C) void {
-    // Ignore the event
-}
-
-fn handleFocusedTags(
-    data: ?*c_void,
-    output_status: ?*c.zriver_output_status_v1,
-    tags: u32,
-) callconv(.C) void {
-    std.debug.warn("Focused tags: {b:0>10}\n", .{tags});
-}
-
-fn handleViewTags(
-    data: ?*c_void,
-    output_status: ?*c.zriver_output_status_v1,
-    tags: ?*c.wl_array,
-) callconv(.C) void {
-    std.debug.warn("View tags:\n", .{});
-    var offset: usize = 0;
-    while (offset < tags.?.size) : (offset += @sizeOf(u32)) {
-        const ptr = @ptrCast([*]u8, tags.?.data) + offset;
-        std.debug.warn("{b:0>10}\n", .{std.mem.bytesToValue(u32, ptr[0..4])});
+fn outputStatusListener(output_status: *zriver.OutputStatusV1, event: zriver.OutputStatusV1.Event, data: ?*c_void) void {
+    switch (event) {
+        .focused_tags => |focused_tags| std.debug.warn("Focused tags: {b:0>10}\n", .{focused_tags.tags}),
+        .view_tags => |view_tags| {
+            std.debug.warn("View tags:\n", .{});
+            for (view_tags.tags.slice(u32)) |t| std.debug.warn("{b:0>10}\n", .{t});
+        },
     }
 }
 
-fn handleFocusedOutput(
-    data: ?*c_void,
-    seat_status: ?*c.zriver_seat_status_v1,
-    wl_output: ?*c.wl_output,
-) callconv(.C) void {
-    std.debug.warn("Output id {} focused\n", .{c.wl_proxy_get_id(@ptrCast(*c.wl_proxy, wl_output))});
-}
-
-fn handleUnfocusedOutput(
-    data: ?*c_void,
-    seat_status: ?*c.zriver_seat_status_v1,
-    wl_output: ?*c.wl_output,
-) callconv(.C) void {
-    std.debug.warn("Output id {} unfocused\n", .{c.wl_proxy_get_id(@ptrCast(*c.wl_proxy, wl_output))});
-}
-
-fn handleFocusedView(
-    data: ?*c_void,
-    seat_status: ?*c.zriver_seat_status_v1,
-    title: ?[*:0]const u8,
-) callconv(.C) void {
-    std.debug.warn("Focused view title: {}\n", .{title.?});
+fn seatStatusListener(seat_status: *zriver.SeatStatusV1, event: zriver.SeatStatusV1.Event, data: ?*c_void) void {
+    switch (event) {
+        .focused_output => |focused_output| std.debug.warn("Output id {} focused\n", .{
+            @ptrCast(*wl.Proxy, focused_output.output orelse return).getId(),
+        }),
+        .unfocused_output => |unfocused_output| std.debug.warn("Output id {} focused\n", .{
+            @ptrCast(*wl.Proxy, unfocused_output.output orelse return).getId(),
+        }),
+        .focused_view => |focused_view| std.debug.warn("Focused view title: {}\n", .{focused_view.title}),
+    }
 }

@@ -17,14 +17,14 @@
 
 const Self = @This();
 
-const c = @import("c.zig");
+const wlr = @import("wlroots");
 
 x: i32,
 y: i32,
 width: u32,
 height: u32,
 
-pub fn fromWlrBox(wlr_box: c.wlr_box) Self {
+pub fn fromWlrBox(wlr_box: wlr.Box) Self {
     return Self{
         .x = @intCast(i32, wlr_box.x),
         .y = @intCast(i32, wlr_box.y),
@@ -33,8 +33,8 @@ pub fn fromWlrBox(wlr_box: c.wlr_box) Self {
     };
 }
 
-pub fn toWlrBox(self: Self) c.wlr_box {
-    return c.wlr_box{
+pub fn toWlrBox(self: Self) wlr.Box {
+    return wlr.Box{
         .x = @intCast(c_int, self.x),
         .y = @intCast(c_int, self.y),
         .width = @intCast(c_int, self.width),

@@ -18,20 +18,21 @@
 const Self = @This();
 
 const std = @import("std");
+const wlr = @import("wlroots");
+const xkb = @import("xkbcommon");
 
-const c = @import("c.zig");
 const util = @import("util.zig");
 
-keysym: c.xkb_keysym_t,
-modifiers: u32,
+keysym: xkb.Keysym,
+modifiers: wlr.Keyboard.ModifierMask,
 command_args: []const []const u8,
 
 /// When set to true the mapping will be executed on key release rather than on press
 release: bool,
 
 pub fn init(
-    keysym: c.xkb_keysym_t,
-    modifiers: u32,
+    keysym: xkb.Keysym,
+    modifiers: wlr.Keyboard.ModifierMask,
     release: bool,
     command_args: []const []const u8,
 ) !Self {

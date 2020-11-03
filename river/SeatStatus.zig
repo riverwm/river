@@ -18,55 +18,53 @@
 const Self = @This();
 
 const std = @import("std");
+const wayland = @import("wayland");
+const wl = wayland.server.wl;
+const zriver = wayland.server.zriver;
 
-const c = @import("c.zig");
 const util = @import("util.zig");
 
 const Seat = @import("Seat.zig");
 const Output = @import("Output.zig");
 const View = @import("View.zig");
 
-const implementation = c.struct_zriver_seat_status_v1_interface{ .destroy = destroy };
-
 seat: *Seat,
-wl_resource: *c.wl_resource,
+seat_status: *zriver.SeatStatusV1,
 
-pub fn init(self: *Self, seat: *Seat, wl_resource: *c.wl_resource) void {
-    self.* = .{ .seat = seat, .wl_resource = wl_resource };
+pub fn init(self: *Self, seat: *Seat, seat_status: *zriver.SeatStatusV1) void {
+    self.* = .{ .seat = seat, .seat_status = seat_status };
 
-    c.wl_resource_set_implementation(wl_resource, &implementation, self, handleResourceDestroy);
+    seat_status.setHandler(*Self, handleRequest, handleDestroy, self);
 
     // Send focused output/view once on bind
     self.sendOutput(.focused);
     self.sendFocusedView();
 }
 
-fn handleResourceDestroy(wl_resource: ?*c.wl_resource) callconv(.C) void {
-    const self = util.voidCast(Self, c.wl_resource_get_user_data(wl_resource).?);
+fn handleRequest(seat_status: *zriver.SeatStatusV1, request: zriver.SeatStatusV1.Request, self: *Self) void {
+    switch (request) {
+        .destroy => seat_status.destroy(),
+    }
+}
+
+fn handleDestroy(seat_status: *zriver.SeatStatusV1, self: *Self) void {
     const node = @fieldParentPtr(std.SinglyLinkedList(Self).Node, "data", self);
     self.seat.status_trackers.remove(node);
     util.gpa.destroy(node);
 }
 
-fn destroy(wl_client: ?*c.wl_client, wl_resource: ?*c.wl_resource) callconv(.C) void {
-    c.wl_resource_destroy(wl_resource);
-}
-
 pub fn sendOutput(self: Self, state: enum { focused, unfocused }) void {
-    const wl_client = c.wl_resource_get_client(self.wl_resource);
-    const output_resources = &self.seat.focused_output.wlr_output.resources;
-    var output_resource = c.wl_resource_from_link(output_resources.next);
-    while (c.wl_resource_get_link(output_resource) != output_resources) : (output_resource =
-        c.wl_resource_from_link(c.wl_resource_get_link(output_resource).*.next))
-    {
-        if (c.wl_resource_get_client(output_resource) == wl_client) switch (state) {
-            .focused => c.zriver_seat_status_v1_send_focused_output(self.wl_resource, output_resource),
-            .unfocused => c.zriver_seat_status_v1_send_unfocused_output(self.wl_resource, output_resource),
+    const client = self.seat_status.getClient();
+    var it = self.seat.focused_output.wlr_output.resources.iterator(.forward);
+    while (it.next()) |wl_output| {
+        if (wl_output.getClient() == client) switch (state) {
+            .focused => self.seat_status.sendFocusedOutput(wl_output),
+            .unfocused => self.seat_status.sendUnfocusedOutput(wl_output),
         };
     }
 }
 
 pub fn sendFocusedView(self: Self) void {
     const title: [*:0]const u8 = if (self.seat.focused == .view) self.seat.focused.view.getTitle() else "";
-    c.zriver_seat_status_v1_send_focused_view(self.wl_resource, title);
+    self.seat_status.sendFocusedView(title);
 }

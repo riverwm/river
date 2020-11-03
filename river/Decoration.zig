@@ -18,53 +18,56 @@
 const Self = @This();
 
 const std = @import("std");
+const wlr = @import("wlroots");
+const wl = @import("wayland").server.wl;
 
-const c = @import("c.zig");
 const util = @import("util.zig");
 
 const Server = @import("Server.zig");
 
 server: *Server,
 
-wlr_xdg_toplevel_decoration: *c.wlr_xdg_toplevel_decoration_v1,
+xdg_toplevel_decoration: *wlr.XdgToplevelDecorationV1,
 
-listen_destroy: c.wl_listener = undefined,
-listen_request_mode: c.wl_listener = undefined,
+destroy: wl.Listener(*wlr.XdgToplevelDecorationV1) = undefined,
+request_mode: wl.Listener(*wlr.XdgToplevelDecorationV1) = undefined,
 
 pub fn init(
     self: *Self,
     server: *Server,
-    wlr_xdg_toplevel_decoration: *c.wlr_xdg_toplevel_decoration_v1,
+    xdg_toplevel_decoration: *wlr.XdgToplevelDecorationV1,
 ) void {
-    self.* = .{ .server = server, .wlr_xdg_toplevel_decoration = wlr_xdg_toplevel_decoration };
+    self.* = .{ .server = server, .xdg_toplevel_decoration = xdg_toplevel_decoration };
 
-    self.listen_destroy.notify = handleDestroy;
-    c.wl_signal_add(&self.wlr_xdg_toplevel_decoration.events.destroy, &self.listen_destroy);
+    self.destroy.setNotify(handleDestroy);
+    self.xdg_toplevel_decoration.events.destroy.add(&self.destroy);
 
-    self.listen_request_mode.notify = handleRequestMode;
-    c.wl_signal_add(&self.wlr_xdg_toplevel_decoration.events.request_mode, &self.listen_request_mode);
+    self.request_mode.setNotify(handleRequestMode);
+    self.xdg_toplevel_decoration.events.request_mode.add(&self.request_mode);
 
-    handleRequestMode(&self.listen_request_mode, self.wlr_xdg_toplevel_decoration);
+    handleRequestMode(&self.request_mode, self.xdg_toplevel_decoration);
 }
 
-fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_destroy", listener.?);
+fn handleDestroy(
+    listener: *wl.Listener(*wlr.XdgToplevelDecorationV1),
+    xdg_toplevel_decoration: *wlr.XdgToplevelDecorationV1,
+) void {
+    const self = @fieldParentPtr(Self, "destroy", listener);
     util.gpa.destroy(self);
 }
 
-fn handleRequestMode(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_request_mode", listener.?);
+fn handleRequestMode(
+    listener: *wl.Listener(*wlr.XdgToplevelDecorationV1),
+    xdg_toplevel_decoration: *wlr.XdgToplevelDecorationV1,
+) void {
+    const self = @fieldParentPtr(Self, "request_mode", listener);
 
-    const wlr_xdg_surface: *c.wlr_xdg_surface = self.wlr_xdg_toplevel_decoration.surface;
-    const wlr_xdg_toplevel: *c.wlr_xdg_toplevel = @field(wlr_xdg_surface, c.wlr_xdg_surface_union).toplevel;
-    const app_id: [*:0]const u8 = if (wlr_xdg_toplevel.app_id) |id| id else "NULL";
+    const toplevel = self.xdg_toplevel_decoration.surface.role_data.toplevel;
+    const app_id: [*:0]const u8 = if (toplevel.app_id) |id| id else "NULL";
 
-    _ = c.wlr_xdg_toplevel_decoration_v1_set_mode(
-        self.wlr_xdg_toplevel_decoration,
+    _ = self.xdg_toplevel_decoration.setMode(
         for (self.server.config.csd_filter.items) |filter_app_id| {
-            if (std.mem.eql(u8, std.mem.span(app_id), filter_app_id)) {
-                break .WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE;
-            }
-        } else .WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE,
+            if (std.mem.eql(u8, std.mem.span(app_id), filter_app_id)) break .client_side;
+        } else .server_side,
     );
 }

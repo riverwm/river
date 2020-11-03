@@ -18,6 +18,10 @@
 const Self = @This();
 
 const std = @import("std");
+const wlr = @import("wlroots");
+const wayland = @import("wayland");
+const wl = wayland.server.wl;
+const zwlr = wayland.server.zwlr;
 
 const c = @import("c.zig");
 const log = @import("log.zig");
@@ -38,7 +42,7 @@ const State = struct {
 };
 
 root: *Root,
-wlr_output: *c.wlr_output,
+wlr_output: *wlr.Output,
 
 /// All layer surfaces on the output, indexed by the layer enum.
 layers: [4]std.TailQueue(LayerSurface) = [1]std.TailQueue(LayerSurface){.{}} ** 4,
@@ -76,22 +80,21 @@ status_trackers: std.SinglyLinkedList(OutputStatus) = .{},
 /// An active output can have focus (e.g. an output turned off by dpms is active)
 active: bool = false,
 
-// All listeners for this output, in alphabetical order
-listen_destroy: c.wl_listener = undefined,
-listen_enable: c.wl_listener = undefined,
-listen_frame: c.wl_listener = undefined,
-listen_mode: c.wl_listener = undefined,
+destroy: wl.Listener(*wlr.Output) = undefined,
+enable: wl.Listener(*wlr.Output) = undefined,
+frame: wl.Listener(*wlr.Output) = undefined,
+mode: wl.Listener(*wlr.Output) = undefined,
 
-pub fn init(self: *Self, root: *Root, wlr_output: *c.wlr_output) !void {
+pub fn init(self: *Self, root: *Root, wlr_output: *wlr.Output) !void {
     // Some backends don't have modes. DRM+KMS does, and we need to set a mode
     // before we can use the output. The mode is a tuple of (width, height,
     // refresh rate), and each monitor supports only a specific set of modes. We
     // just pick the monitor's preferred mode, a more sophisticated compositor
     // would let the user configure it.
-    if (c.wlr_output_preferred_mode(wlr_output)) |mode| {
-        c.wlr_output_set_mode(wlr_output, mode);
-        c.wlr_output_enable(wlr_output, true);
-        if (!c.wlr_output_commit(wlr_output)) return error.OutputCommitFailed;
+    if (wlr_output.preferredMode()) |mode| {
+        wlr_output.setMode(mode);
+        wlr_output.enable(true);
+        try wlr_output.commit();
     }
 
     const layout = try std.mem.dupe(util.gpa, u8, "full");
@@ -103,22 +106,21 @@ pub fn init(self: *Self, root: *Root, wlr_output: *c.wlr_output) !void {
         .layout = layout,
         .usable_box = undefined,
     };
-    wlr_output.data = self;
+    wlr_output.data = @ptrToInt(self);
 
-    // Set up listeners
-    self.listen_destroy.notify = handleDestroy;
-    c.wl_signal_add(&wlr_output.events.destroy, &self.listen_destroy);
+    self.destroy.setNotify(handleDestroy);
+    wlr_output.events.destroy.add(&self.destroy);
 
-    self.listen_enable.notify = handleEnable;
-    c.wl_signal_add(&wlr_output.events.enable, &self.listen_enable);
+    self.enable.setNotify(handleEnable);
+    wlr_output.events.enable.add(&self.enable);
 
-    self.listen_frame.notify = handleFrame;
-    c.wl_signal_add(&wlr_output.events.frame, &self.listen_frame);
+    self.frame.setNotify(handleFrame);
+    wlr_output.events.frame.add(&self.frame);
 
-    self.listen_mode.notify = handleMode;
-    c.wl_signal_add(&wlr_output.events.mode, &self.listen_mode);
+    self.mode.setNotify(handleMode);
+    wlr_output.events.mode.add(&self.mode);
 
-    if (c.wlr_output_is_noop(wlr_output)) {
+    if (wlr_output.isNoop()) {
         // A noop output is always 0 x 0
         self.usable_box = .{
             .x = 0,
@@ -132,7 +134,7 @@ pub fn init(self: *Self, root: *Root, wlr_output: *c.wlr_output) !void {
         var it = root.server.input_manager.seats.first;
         while (it) |node| : (it = node.next) {
             const seat = &node.data;
-            if (!c.wlr_xcursor_manager_load(seat.cursor.wlr_xcursor_manager, wlr_output.scale))
+            seat.cursor.xcursor_manager.load(wlr_output.scale) catch
                 log.err(.cursor, "failed to load xcursor theme at scale {}", .{wlr_output.scale});
         }
 
@@ -146,8 +148,8 @@ pub fn init(self: *Self, root: *Root, wlr_output: *c.wlr_output) !void {
     }
 }
 
-pub fn getRenderer(self: Self) *c.wlr_renderer {
-    return c.wlr_backend_get_renderer(self.wlr_output.backend);
+pub fn getLayer(self: *Self, layer: zwlr.LayerShellV1.Layer) *std.TailQueue(LayerSurface) {
+    return &self.layers[@intCast(usize, @enumToInt(layer))];
 }
 
 pub fn sendViewTags(self: Self) void {
@@ -321,16 +323,11 @@ pub fn arrangeLayers(self: *Self) void {
     // This box is modified as exclusive zones are applied
     var usable_box = full_box;
 
-    const layer_idxs = [_]usize{
-        c.ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY,
-        c.ZWLR_LAYER_SHELL_V1_LAYER_TOP,
-        c.ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM,
-        c.ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND,
-    };
+    const layers = [_]zwlr.LayerShellV1.Layer{ .overlay, .top, .bottom, .background };
 
     // Arrange all layer surfaces with exclusive zones, applying them to the
     // usable box along the way.
-    for (layer_idxs) |layer| self.arrangeLayer(self.layers[layer], full_box, &usable_box, true);
+    for (layers) |layer| self.arrangeLayer(self.getLayer(layer).*, full_box, &usable_box, true);
 
     // If the the usable_box has changed, we need to rearrange the output
     if (!std.meta.eql(self.usable_box, usable_box)) {
@@ -339,13 +336,13 @@ pub fn arrangeLayers(self: *Self) void {
     }
 
     // Arrange the layers without exclusive zones
-    for (layer_idxs) |layer| self.arrangeLayer(self.layers[layer], full_box, &usable_box, false);
+    for (layers) |layer| self.arrangeLayer(self.getLayer(layer).*, full_box, &usable_box, false);
 
     // Find the topmost layer surface in the top or overlay layers which
     // requests keyboard interactivity if any.
-    const topmost_surface = outer: for (layer_idxs[0..2]) |layer| {
+    const topmost_surface = outer: for (layers[0..2]) |layer| {
         // Iterate in reverse order since the last layer is rendered on top
-        var it = self.layers[layer].last;
+        var it = self.getLayer(layer).last;
         while (it) |node| : (it = node.prev) {
             const layer_surface = &node.data;
             if (layer_surface.wlr_layer_surface.current.keyboard_interactive) {
@@ -400,19 +397,14 @@ fn arrangeLayer(
         var new_box: Box = undefined;
 
         // Horizontal alignment
-        const anchor_left = @as(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT);
-        const anchor_right = @as(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT);
         if (current_state.desired_width == 0) {
-            const anchor_left_right = anchor_left | anchor_right;
-            if (current_state.anchor & anchor_left_right == anchor_left_right) {
-                new_box.x = bounds.x + @intCast(i32, current_state.margin.left);
-                new_box.width = bounds.width -
-                    (current_state.margin.left + current_state.margin.right);
-            }
-        } else if (current_state.anchor & anchor_left != 0) {
+            std.debug.assert(current_state.anchor.right and current_state.anchor.left);
+            new_box.x = bounds.x + @intCast(i32, current_state.margin.left);
+            new_box.width = bounds.width - (current_state.margin.left + current_state.margin.right);
+        } else if (current_state.anchor.left) {
             new_box.x = bounds.x + @intCast(i32, current_state.margin.left);
             new_box.width = current_state.desired_width;
-        } else if (current_state.anchor & anchor_right != 0) {
+        } else if (current_state.anchor.right) {
             new_box.x = bounds.x + @intCast(i32, bounds.width - current_state.desired_width -
                 current_state.margin.right);
             new_box.width = current_state.desired_width;
@@ -422,19 +414,14 @@ fn arrangeLayer(
         }
 
         // Vertical alignment
-        const anchor_top = @as(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP);
-        const anchor_bottom = @as(u32, c.ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM);
         if (current_state.desired_height == 0) {
-            const anchor_top_bottom = anchor_top | anchor_bottom;
-            if (current_state.anchor & anchor_top_bottom == anchor_top_bottom) {
-                new_box.y = bounds.y + @intCast(i32, current_state.margin.top);
-                new_box.height = bounds.height -
-                    (current_state.margin.top + current_state.margin.bottom);
-            }
-        } else if (current_state.anchor & anchor_top != 0) {
+            std.debug.assert(current_state.anchor.top and current_state.anchor.bottom);
+            new_box.y = bounds.y + @intCast(i32, current_state.margin.top);
+            new_box.height = bounds.height - (current_state.margin.top + current_state.margin.bottom);
+        } else if (current_state.anchor.top) {
             new_box.y = bounds.y + @intCast(i32, current_state.margin.top);
             new_box.height = current_state.desired_height;
-        } else if (current_state.anchor & anchor_bottom != 0) {
+        } else if (current_state.anchor.bottom) {
             new_box.y = bounds.y + @intCast(i32, bounds.height - current_state.desired_height -
                 current_state.margin.bottom);
             new_box.height = current_state.desired_height;
@@ -447,36 +434,36 @@ fn arrangeLayer(
 
         // Apply the exclusive zone to the current bounds
         const edges = [4]struct {
-            single: u32,
-            triple: u32,
+            single: zwlr.LayerSurfaceV1.Anchor,
+            triple: zwlr.LayerSurfaceV1.Anchor,
             to_increase: ?*i32,
             to_decrease: *u32,
             margin: u32,
         }{
             .{
-                .single = anchor_top,
-                .triple = anchor_top | anchor_left | anchor_right,
+                .single = .{ .top = true },
+                .triple = .{ .top = true, .left = true, .right = true },
                 .to_increase = &usable_box.y,
                 .to_decrease = &usable_box.height,
                 .margin = current_state.margin.top,
             },
             .{
-                .single = anchor_bottom,
-                .triple = anchor_bottom | anchor_left | anchor_right,
+                .single = .{ .bottom = true },
+                .triple = .{ .bottom = true, .left = true, .right = true },
                 .to_increase = null,
                 .to_decrease = &usable_box.height,
                 .margin = current_state.margin.bottom,
             },
             .{
-                .single = anchor_left,
-                .triple = anchor_left | anchor_top | anchor_bottom,
+                .single = .{ .left = true },
+                .triple = .{ .left = true, .top = true, .bottom = true },
                 .to_increase = &usable_box.x,
                 .to_decrease = &usable_box.width,
                 .margin = current_state.margin.left,
             },
             .{
-                .single = anchor_right,
-                .triple = anchor_right | anchor_top | anchor_bottom,
+                .single = .{ .right = true },
+                .triple = .{ .right = true, .top = true, .bottom = true },
                 .to_increase = null,
                 .to_decrease = &usable_box.width,
                 .margin = current_state.margin.right,
@@ -484,7 +471,7 @@ fn arrangeLayer(
         };
 
         for (edges) |edge| {
-            if ((current_state.anchor == edge.single or current_state.anchor == edge.triple) and
+            if ((std.meta.eql(current_state.anchor, edge.single) or std.meta.eql(current_state.anchor, edge.triple)) and
                 current_state.exclusive_zone + @intCast(i32, edge.margin) > 0)
             {
                 const delta = current_state.exclusive_zone + @intCast(i32, edge.margin);
@@ -496,21 +483,18 @@ fn arrangeLayer(
 
         // Tell the client to assume the new size
         log.debug(.layer_shell, "send configure, {} x {}", .{ layer_surface.box.width, layer_surface.box.height });
-        c.wlr_layer_surface_v1_configure(
-            layer_surface.wlr_layer_surface,
-            layer_surface.box.width,
-            layer_surface.box.height,
-        );
+        layer_surface.wlr_layer_surface.configure(layer_surface.box.width, layer_surface.box.height);
     }
 }
 
 /// Called when the output is destroyed. Evacuate all views from the output
 /// and then remove it from the list of outputs.
-fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_destroy", listener.?);
+fn handleDestroy(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
+    const self = @fieldParentPtr(Self, "destroy", listener);
     const root = self.root;
 
     log.debug(.server, "output '{}' destroyed", .{self.wlr_output.name});
+
     // Remove the destroyed output from root if it wasn't already removed
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
     if (self.active) {
@@ -526,37 +510,35 @@ fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     }
 
     // Remove all listeners
-    c.wl_list_remove(&self.listen_destroy.link);
-    c.wl_list_remove(&self.listen_enable.link);
-    c.wl_list_remove(&self.listen_frame.link);
-    c.wl_list_remove(&self.listen_mode.link);
+    self.destroy.link.remove();
+    self.enable.link.remove();
+    self.frame.link.remove();
+    self.mode.link.remove();
 
-    // Free the layout command
+    // Free all memory and clean up the wlr.Output
+    self.wlr_output.data = undefined;
     util.gpa.free(self.layout);
-
-    // Clean up the wlr_output
-    self.wlr_output.data = null;
     util.gpa.destroy(node);
 }
 
-fn handleEnable(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_enable", listener.?);
+fn handleEnable(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
+    const self = @fieldParentPtr(Self, "enable", listener);
 
-    if (self.wlr_output.enabled and !self.active) {
+    if (wlr_output.enabled and !self.active) {
         const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
         self.root.addOutput(node);
     }
 }
 
-fn handleFrame(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+fn handleFrame(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
     // This function is called every time an output is ready to display a frame,
     // generally at the output's refresh rate (e.g. 60Hz).
-    const self = @fieldParentPtr(Self, "listen_frame", listener.?);
+    const self = @fieldParentPtr(Self, "frame", listener);
     render.renderOutput(self);
 }
 
-fn handleMode(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_mode", listener.?);
+fn handleMode(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
+    const self = @fieldParentPtr(Self, "mode", listener);
     self.arrangeLayers();
     self.arrangeViews();
     self.root.startTransaction();
@@ -565,7 +547,7 @@ fn handleMode(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 pub fn getEffectiveResolution(self: *Self) struct { width: u32, height: u32 } {
     var width: c_int = undefined;
     var height: c_int = undefined;
-    c.wlr_output_effective_resolution(self.wlr_output, &width, &height);
+    self.wlr_output.effectiveResolution(&width, &height);
     return .{
         .width = @intCast(u32, width),
         .height = @intCast(u32, height),

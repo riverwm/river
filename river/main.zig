@@ -16,6 +16,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
+const wlr = @import("wlroots");
 
 const c = @import("c.zig");
 const log = @import("log.zig");
@@ -93,14 +94,11 @@ pub fn main() anyerror!void {
         }
     }
 
-    c.wlr_log_init(
-        switch (log.level) {
-            .debug => .WLR_DEBUG,
-            .notice, .info => .WLR_INFO,
-            .warn, .err, .crit, .alert, .emerg => .WLR_ERROR,
-        },
-        null,
-    );
+    wlr.log.init(switch (log.level) {
+        .debug => .debug,
+        .notice, .info => .info,
+        .warn, .err, .crit, .alert, .emerg => .err,
+    });
 
     log.info(.server, "initializing", .{});
 
@@ -136,7 +134,7 @@ pub fn main() anyerror!void {
 
     log.info(.server, "running...", .{});
 
-    server.run();
+    server.wl_server.run();
 
     log.info(.server, "shutting down", .{});
 }

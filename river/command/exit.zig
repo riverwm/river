@@ -17,8 +17,6 @@
 
 const std = @import("std");
 
-const c = @import("../c.zig");
-
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
@@ -30,5 +28,5 @@ pub fn exit(
     out: *?[]const u8,
 ) Error!void {
     if (args.len > 1) return Error.TooManyArguments;
-    c.wl_display_terminate(seat.input_manager.server.wl_display);
+    seat.input_manager.server.wl_server.terminate();
 }

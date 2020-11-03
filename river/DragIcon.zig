@@ -18,29 +18,27 @@
 const Self = @This();
 
 const std = @import("std");
+const wlr = @import("wlroots");
+const wl = @import("wayland").server.wl;
 
-const c = @import("c.zig");
 const util = @import("util.zig");
 
 const Seat = @import("Seat.zig");
 
 seat: *Seat,
-wlr_drag_icon: *c.wlr_drag_icon,
+wlr_drag_icon: *wlr.Drag.Icon,
 
-listen_destroy: c.wl_listener = undefined,
+destroy: wl.Listener(*wlr.Drag.Icon) = undefined,
 
-pub fn init(self: *Self, seat: *Seat, wlr_drag_icon: *c.wlr_drag_icon) void {
-    self.* = .{
-        .seat = seat,
-        .wlr_drag_icon = wlr_drag_icon,
-    };
+pub fn init(self: *Self, seat: *Seat, wlr_drag_icon: *wlr.Drag.Icon) void {
+    self.* = .{ .seat = seat, .wlr_drag_icon = wlr_drag_icon };
 
-    self.listen_destroy.notify = handleDestroy;
-    c.wl_signal_add(&wlr_drag_icon.events.destroy, &self.listen_destroy);
+    self.destroy.setNotify(handleDestroy);
+    wlr_drag_icon.events.destroy.add(&self.destroy);
 }
 
-fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_destroy", listener.?);
+fn handleDestroy(listener: *wl.Listener(*wlr.Drag.Icon), wlr_drag_icon: *wlr.Drag.Icon) void {
+    const self = @fieldParentPtr(Self, "destroy", listener);
     const root = &self.seat.input_manager.server.root;
     const node = @fieldParentPtr(std.SinglyLinkedList(Self).Node, "data", self);
     root.drag_icons.remove(node);

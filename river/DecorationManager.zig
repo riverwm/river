@@ -18,8 +18,9 @@
 const Self = @This();
 
 const std = @import("std");
+const wlr = @import("wlroots");
+const wl = @import("wayland").server.wl;
 
-const c = @import("c.zig");
 const util = @import("util.zig");
 
 const Decoration = @import("Decoration.zig");
@@ -27,31 +28,28 @@ const Server = @import("Server.zig");
 
 server: *Server,
 
-wlr_xdg_decoration_manager: *c.wlr_xdg_decoration_manager_v1,
+xdg_decoration_manager: *wlr.XdgDecorationManagerV1,
 
-listen_new_toplevel_decoration: c.wl_listener = undefined,
+new_toplevel_decoration: wl.Listener(*wlr.XdgToplevelDecorationV1) = undefined,
 
 pub fn init(self: *Self, server: *Server) !void {
     self.* = .{
         .server = server,
-        .wlr_xdg_decoration_manager = c.wlr_xdg_decoration_manager_v1_create(server.wl_display) orelse
-            return error.OutOfMemory,
+        .xdg_decoration_manager = try wlr.XdgDecorationManagerV1.create(server.wl_server),
     };
 
-    self.listen_new_toplevel_decoration.notify = handleNewToplevelDecoration;
-    c.wl_signal_add(
-        &self.wlr_xdg_decoration_manager.events.new_toplevel_decoration,
-        &self.listen_new_toplevel_decoration,
-    );
+    self.new_toplevel_decoration.setNotify(handleNewToplevelDecoration);
+    self.xdg_decoration_manager.events.new_toplevel_decoration.add(&self.new_toplevel_decoration);
 }
 
-fn handleNewToplevelDecoration(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_new_toplevel_decoration", listener.?);
-    const wlr_xdg_toplevel_decoration = util.voidCast(c.wlr_xdg_toplevel_decoration_v1, data.?);
-
+fn handleNewToplevelDecoration(
+    listener: *wl.Listener(*wlr.XdgToplevelDecorationV1),
+    xdg_toplevel_decoration: *wlr.XdgToplevelDecorationV1,
+) void {
+    const self = @fieldParentPtr(Self, "new_toplevel_decoration", listener);
     const decoration = util.gpa.create(Decoration) catch {
-        c.wl_resource_post_no_memory(wlr_xdg_toplevel_decoration.resource);
+        xdg_toplevel_decoration.resource.postNoMemory();
         return;
     };
-    decoration.init(self.server, wlr_xdg_toplevel_decoration);
+    decoration.init(self.server, xdg_toplevel_decoration);
 }

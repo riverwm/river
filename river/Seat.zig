@@ -19,8 +19,10 @@ const Self = @This();
 
 const build_options = @import("build_options");
 const std = @import("std");
+const wlr = @import("wlroots");
+const wl = @import("wayland").server.wl;
+const xkb = @import("xkbcommon");
 
-const c = @import("c.zig");
 const command = @import("command.zig");
 const log = @import("log.zig");
 const util = @import("util.zig");
@@ -42,7 +44,7 @@ const FocusTarget = union(enum) {
 };
 
 input_manager: *InputManager,
-wlr_seat: *c.wlr_seat,
+wlr_seat: *wlr.Seat,
 
 /// Multiple mice are handled by the same Cursor
 cursor: Cursor = undefined,
@@ -56,7 +58,8 @@ mode_id: usize = 0,
 /// ID of previous keymap mode, used when returning from "locked" mode
 prev_mode_id: usize = 0,
 
-/// Currently focused output, may be the noop output if no
+/// Currently focused output, may be the noop output if no real output
+/// is currently available for focus.
 focused_output: *Output,
 
 /// Currently focused view/layer surface if any
@@ -69,33 +72,33 @@ focus_stack: ViewStack(*View) = .{},
 /// List of status tracking objects relaying changes to this seat to clients.
 status_trackers: std.SinglyLinkedList(SeatStatus) = .{},
 
-listen_request_set_selection: c.wl_listener = undefined,
-listen_request_start_drag: c.wl_listener = undefined,
-listen_start_drag: c.wl_listener = undefined,
-listen_request_set_primary_selection: c.wl_listener = undefined,
+request_set_selection: wl.Listener(*wlr.Seat.event.RequestSetSelection) = undefined,
+request_start_drag: wl.Listener(*wlr.Seat.event.RequestStartDrag) = undefined,
+start_drag: wl.Listener(*wlr.Drag) = undefined,
+request_set_primary_selection: wl.Listener(*wlr.Seat.event.RequestSetPrimarySelection) = undefined,
 
 pub fn init(self: *Self, input_manager: *InputManager, name: [*:0]const u8) !void {
     self.* = .{
         .input_manager = input_manager,
         // This will be automatically destroyed when the display is destroyed
-        .wlr_seat = c.wlr_seat_create(input_manager.server.wl_display, name) orelse return error.OutOfMemory,
+        .wlr_seat = try wlr.Seat.create(input_manager.server.wl_server, name),
         .focused_output = &self.input_manager.server.root.noop_output,
     };
-    self.wlr_seat.data = self;
+    self.wlr_seat.data = @ptrToInt(self);
 
     try self.cursor.init(self);
 
-    self.listen_request_set_selection.notify = handleRequestSetSelection;
-    c.wl_signal_add(&self.wlr_seat.events.request_set_selection, &self.listen_request_set_selection);
+    self.request_set_selection.setNotify(handleRequestSetSelection);
+    self.wlr_seat.events.request_set_selection.add(&self.request_set_selection);
 
-    self.listen_request_start_drag.notify = handleRequestStartDrag;
-    c.wl_signal_add(&self.wlr_seat.events.request_start_drag, &self.listen_request_start_drag);
+    self.request_start_drag.setNotify(handleRequestStartDrag);
+    self.wlr_seat.events.request_start_drag.add(&self.request_start_drag);
 
-    self.listen_start_drag.notify = handleStartDrag;
-    c.wl_signal_add(&self.wlr_seat.events.start_drag, &self.listen_start_drag);
+    self.start_drag.setNotify(handleStartDrag);
+    self.wlr_seat.events.start_drag.add(&self.start_drag);
 
-    self.listen_request_set_primary_selection.notify = handleRequestPrimarySelection;
-    c.wl_signal_add(&self.wlr_seat.events.request_set_primary_selection, &self.listen_request_set_primary_selection);
+    self.request_set_primary_selection.setNotify(handleRequestPrimarySelection);
+    self.wlr_seat.events.request_set_primary_selection.add(&self.request_set_primary_selection);
 }
 
 pub fn deinit(self: *Self) void {
@@ -180,29 +183,28 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
     // If the target is already focused, do nothing
     if (std.meta.eql(new_focus, self.focused)) return;
 
-    // Obtain the target wlr_surface
-    const target_wlr_surface = switch (new_focus) {
-        .view => |target_view| target_view.wlr_surface.?,
-        .layer => |target_layer| target_layer.wlr_layer_surface.surface.?,
+    // Obtain the target surface
+    const target_surface = switch (new_focus) {
+        .view => |target_view| target_view.surface.?,
+        .layer => |target_layer| target_layer.wlr_layer_surface.surface,
         .none => null,
     };
 
     // If input is not allowed on the target surface (e.g. due to an active
     // input inhibitor) do not set focus. If there is no target surface we
     // still clear the focus.
-    if (if (target_wlr_surface) |wlr_surface| self.input_manager.inputAllowed(wlr_surface) else true) {
+    if (if (target_surface) |wlr_surface| self.input_manager.inputAllowed(wlr_surface) else true) {
         // First clear the current focus
         if (self.focused == .view) {
             self.focused.view.pending.focus -= 1;
             // This is needed because xwayland views don't double buffer
             // activated state.
             if (build_options.xwayland and self.focused.view.impl == .xwayland_view)
-                c.wlr_xwayland_surface_activate(self.focused.view.impl.xwayland_view.wlr_xwayland_surface, false);
+                self.focused.view.impl.xwayland_view.xwayland_surface.activate(false);
             if (self.focused.view.pending.focus == 0 and !self.focused.view.pending.fullscreen) {
                 self.focused.view.pending.target_opacity = self.input_manager.server.config.view_opacity_unfocused;
             }
         }
-        c.wlr_seat_keyboard_clear_focus(self.wlr_seat);
 
         // Set the new focus
         switch (new_focus) {
@@ -212,7 +214,7 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
                 // This is needed because xwayland views don't double buffer
                 // activated state.
                 if (build_options.xwayland and target_view.impl == .xwayland_view)
-                    c.wlr_xwayland_surface_activate(target_view.impl.xwayland_view.wlr_xwayland_surface, true);
+                    target_view.impl.xwayland_view.xwayland_surface.activate(true);
                 if (!target_view.pending.fullscreen) {
                     target_view.pending.target_opacity = self.input_manager.server.config.view_opacity_focused;
                 }
@@ -222,16 +224,20 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
         }
         self.focused = new_focus;
 
-        // Tell wlroots to send the new keyboard focus if we have a target
-        if (target_wlr_surface) |wlr_surface| {
-            const keyboard: *c.wlr_keyboard = c.wlr_seat_get_keyboard(self.wlr_seat);
-            c.wlr_seat_keyboard_notify_enter(
-                self.wlr_seat,
-                wlr_surface,
-                &keyboard.keycodes,
-                keyboard.num_keycodes,
-                &keyboard.modifiers,
-            );
+        // Send surface enter/leave events
+        if (target_surface) |wlr_surface| {
+            if (self.wlr_seat.getKeyboard()) |keyboard| {
+                self.wlr_seat.keyboardNotifyEnter(
+                    wlr_surface,
+                    &keyboard.keycodes,
+                    keyboard.num_keycodes,
+                    &keyboard.modifiers,
+                );
+            } else {
+                self.wlr_seat.keyboardNotifyEnter(wlr_surface, null, 0, null);
+            }
+        } else {
+            self.wlr_seat.keyboardClearFocus();
         }
     }
 
@@ -256,7 +262,7 @@ pub fn focusOutput(self: *Self, output: *Output) void {
 }
 
 pub fn handleActivity(self: Self) void {
-    c.wlr_idle_notify_activity(self.input_manager.wlr_idle, self.wlr_seat);
+    self.input_manager.idle.notifyActivity(self.wlr_seat);
 }
 
 /// Handle the unmapping of a view, removing it from the focus stack and
@@ -280,10 +286,15 @@ pub fn handleViewUnmap(self: *Self, view: *View) void {
 
 /// Handle any user-defined mapping for the passed keysym and modifiers
 /// Returns true if the key was handled
-pub fn handleMapping(self: *Self, keysym: c.xkb_keysym_t, modifiers: u32, released: bool) bool {
+pub fn handleMapping(
+    self: *Self,
+    keysym: xkb.Keysym,
+    modifiers: wlr.Keyboard.ModifierMask,
+    released: bool,
+) bool {
     const modes = &self.input_manager.server.config.modes;
     for (modes.items[self.mode_id].mappings.items) |mapping| {
-        if (modifiers == mapping.modifiers and keysym == mapping.keysym and released == mapping.release) {
+        if (std.meta.eql(modifiers, mapping.modifiers) and keysym == mapping.keysym and released == mapping.release) {
             // Execute the bound command
             const args = mapping.command_args;
             var out: ?[]const u8 = null;
@@ -309,22 +320,23 @@ pub fn handleMapping(self: *Self, keysym: c.xkb_keysym_t, modifiers: u32, releas
 
 /// Add a newly created input device to the seat and update the reported
 /// capabilities.
-pub fn addDevice(self: *Self, device: *c.wlr_input_device) void {
+pub fn addDevice(self: *Self, device: *wlr.InputDevice) void {
     switch (device.type) {
-        .WLR_INPUT_DEVICE_KEYBOARD => self.addKeyboard(device) catch return,
-        .WLR_INPUT_DEVICE_POINTER => self.addPointer(device),
+        .keyboard => self.addKeyboard(device) catch return,
+        .pointer => self.addPointer(device),
         else => return,
     }
 
     // We need to let the wlr_seat know what our capabilities are, which is
     // communiciated to the client. We always have a cursor, even if
     // there are no pointer devices, so we always include that capability.
-    var caps = @intCast(u32, c.WL_SEAT_CAPABILITY_POINTER);
-    if (self.keyboards.len > 0) caps |= @intCast(u32, c.WL_SEAT_CAPABILITY_KEYBOARD);
-    c.wlr_seat_set_capabilities(self.wlr_seat, caps);
+    self.wlr_seat.setCapabilities(.{
+        .pointer = true,
+        .keyboard = self.keyboards.len > 0,
+    });
 }
 
-fn addKeyboard(self: *Self, device: *c.wlr_input_device) !void {
+fn addKeyboard(self: *Self, device: *wlr.InputDevice) !void {
     const node = try util.gpa.create(std.TailQueue(Keyboard).Node);
     node.data.init(self, device) catch |err| {
         switch (err) {
@@ -335,40 +347,46 @@ fn addKeyboard(self: *Self, device: *c.wlr_input_device) !void {
         return;
     };
     self.keyboards.append(node);
-    c.wlr_seat_set_keyboard(self.wlr_seat, device);
+    self.wlr_seat.setKeyboard(device);
 }
 
-fn addPointer(self: Self, device: *c.struct_wlr_input_device) void {
+fn addPointer(self: Self, device: *wlr.InputDevice) void {
     // We don't do anything special with pointers. All of our pointer handling
     // is proxied through wlr_cursor. On another compositor, you might take this
     // opportunity to do libinput configuration on the device to set
     // acceleration, etc.
-    c.wlr_cursor_attach_input_device(self.cursor.wlr_cursor, device);
+    self.cursor.wlr_cursor.attachInputDevice(device);
 }
 
-fn handleRequestSetSelection(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_request_set_selection", listener.?);
-    const event = util.voidCast(c.wlr_seat_request_set_selection_event, data.?);
-    c.wlr_seat_set_selection(self.wlr_seat, event.source, event.serial);
+fn handleRequestSetSelection(
+    listener: *wl.Listener(*wlr.Seat.event.RequestSetSelection),
+    event: *wlr.Seat.event.RequestSetSelection,
+) void {
+    const self = @fieldParentPtr(Self, "request_set_selection", listener);
+    self.wlr_seat.setSelection(event.source, event.serial);
 }
 
-fn handleRequestStartDrag(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_request_start_drag", listener.?);
-    const event = util.voidCast(c.wlr_seat_request_start_drag_event, data.?);
+fn handleRequestStartDrag(
+    listener: *wl.Listener(*wlr.Seat.event.RequestStartDrag),
+    event: *wlr.Seat.event.RequestStartDrag,
+) void {
+    const self = @fieldParentPtr(Self, "request_start_drag", listener);
 
-    if (c.wlr_seat_validate_pointer_grab_serial(self.wlr_seat, event.origin, event.serial)) {
-        log.debug(.seat, "starting pointer drag", .{});
-        c.wlr_seat_start_pointer_drag(self.wlr_seat, event.drag, event.serial);
+    if (!self.wlr_seat.validatePointerGrabSerial(event.origin, event.serial)) {
+        log.debug(.seat, "ignoring request to start drag, failed to validate serial {}", .{event.serial});
+        if (event.drag.source) |source| source.destroy();
         return;
     }
 
-    log.debug(.seat, "ignoring request to start drag, failed to validate serial {}", .{event.serial});
-    c.wlr_data_source_destroy(event.drag.*.source);
+    log.debug(.seat, "starting pointer drag", .{});
+    self.wlr_seat.startPointerDrag(event.drag, event.serial);
 }
 
-fn handleStartDrag(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_start_drag", listener.?);
-    const wlr_drag = util.voidCast(c.wlr_drag, data.?);
+fn handleStartDrag(
+    listener: *wl.Listener(*wlr.Drag),
+    wlr_drag: *wlr.Drag,
+) void {
+    const self = @fieldParentPtr(Self, "start_drag", listener);
 
     if (wlr_drag.icon) |wlr_drag_icon| {
         const node = util.gpa.create(std.SinglyLinkedList(DragIcon).Node) catch {
@@ -381,8 +399,10 @@ fn handleStartDrag(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void 
     self.cursor.mode = .passthrough;
 }
 
-fn handleRequestPrimarySelection(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
-    const self = @fieldParentPtr(Self, "listen_request_set_primary_selection", listener.?);
-    const event = util.voidCast(c.wlr_seat_request_set_primary_selection_event, data.?);
-    c.wlr_seat_set_primary_selection(self.wlr_seat, event.source, event.serial);
+fn handleRequestPrimarySelection(
+    listener: *wl.Listener(*wlr.Seat.event.RequestSetPrimarySelection),
+    event: *wlr.Seat.event.RequestSetPrimarySelection,
+) void {
+    const self = @fieldParentPtr(Self, "request_set_primary_selection", listener);
+    self.wlr_seat.setPrimarySelection(event.source, event.serial);
 }
