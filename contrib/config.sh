@@ -119,7 +119,7 @@ do
 	riverctl map "${mode}" None XF86Eject             spawn eject -T
 	riverctl map "${mode}" None XF86AudioRaiseVolume  spawn pamixer -i 5
 	riverctl map "${mode}" None XF86AudioLowerVolume  spawn pamixer -d 5
-	riverctl map "${mode}" None XF86AudioMute         spawn pamixer --set-volume 0
+	riverctl map "${mode}" None XF86AudioMute         spawn pamixer --toggle-mute
 	riverctl map "${mode}" None XF86AudioMedia        spawn playerctl play-pause
 	riverctl map "${mode}" None XF86AudioPlay         spawn playerctl play-pause
 	riverctl map "${mode}" None XF86AudioPrev         spawn playerctl previous
