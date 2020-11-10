@@ -67,6 +67,7 @@ const str_to_impl_fn = [_]struct {
     .{ .name = "resize",                 .impl = @import("command/move.zig").resize },
     .{ .name = "send-to-output",         .impl = @import("command/send_to_output.zig").sendToOutput },
     .{ .name = "set-focused-tags",       .impl = @import("command/tags.zig").setFocusedTags },
+    .{ .name = "set-repeat",             .impl = @import("command/set_repeat.zig").setRepeat },
     .{ .name = "set-view-tags",          .impl = @import("command/tags.zig").setViewTags },
     .{ .name = "snap",                   .impl = @import("command/move.zig").snap },
     .{ .name = "spawn",                  .impl = @import("command/spawn.zig").spawn },
