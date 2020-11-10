@@ -75,8 +75,8 @@ pub fn renderOutput(output: *Output) void {
         // No fullscreen view, so render normal layers/views
         c.wlr_renderer_clear(wlr_renderer, &config.background_color);
 
-        renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND], &now);
-        renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM], &now);
+        renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND], &now, .toplevels);
+        renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM], &now, .toplevels);
 
         // The first view in the list is "on top" so iterate in reverse.
         it = ViewStack(View).iter(output.views.last, .reverse, output.current.tags, renderFilter);
@@ -100,11 +100,16 @@ pub fn renderOutput(output: *Output) void {
 
         if (build_options.xwayland) renderXwaylandUnmanaged(output.*, &now);
 
-        renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_TOP], &now);
+        renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_TOP], &now, .toplevels);
+
+        renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND], &now, .popups);
+        renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM], &now, .popups);
+        renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_TOP], &now, .popups);
     }
 
     // The overlay layer is rendered in both fullscreen and normal cases
-    renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY], &now);
+    renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY], &now, .toplevels);
+    renderLayer(output.*, output.layers[c.ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY], &now, .popups);
 
     renderDragIcons(output.*, &now);
 
@@ -134,7 +139,12 @@ fn renderFilter(view: *View, filter_tags: u32) bool {
 }
 
 /// Render all surfaces on the passed layer
-fn renderLayer(output: Output, layer: std.TailQueue(LayerSurface), now: *c.timespec) void {
+fn renderLayer(
+    output: Output,
+    layer: std.TailQueue(LayerSurface),
+    now: *c.timespec,
+    role: enum { toplevels, popups },
+) void {
     var it = layer.first;
     while (it) |node| : (it = node.next) {
         const layer_surface = &node.data;
@@ -145,11 +155,18 @@ fn renderLayer(output: Output, layer: std.TailQueue(LayerSurface), now: *c.times
             .when = now,
             .opacity = 1.0,
         };
-        c.wlr_layer_surface_v1_for_each_surface(
-            layer_surface.wlr_layer_surface,
-            renderSurfaceIterator,
-            &rdata,
-        );
+        switch (role) {
+            .toplevels => c.wlr_surface_for_each_surface(
+                layer_surface.wlr_layer_surface.surface,
+                renderSurfaceIterator,
+                &rdata,
+            ),
+            .popups => c.wlr_layer_surface_v1_for_each_popup(
+                layer_surface.wlr_layer_surface,
+                renderSurfaceIterator,
+                &rdata,
+            ),
+        }
     }
 }
 
