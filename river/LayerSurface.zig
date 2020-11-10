@@ -111,19 +111,9 @@ fn handleUnmap(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 
     log.debug(.layer_shell, "layer surface '{}' unmapped", .{self.wlr_layer_surface.namespace});
 
-    // This is a bit ugly: we need to use the wlr bool here since surfaces
-    // may be closed during the inital configure which we preform
-    // while unmapped. wlroots currently calls unmap unconditionally on close
-    // even if the surface is not mapped. I sent a patch which was merged, but
-    // we need to wait for a release to use it.
-    //
-    // TODO(wlroots): Remove this check on updating
-    // https://github.com/swaywm/wlroots/commit/11e94c406bb75c9a8990ce99489798411deb110c
-    if (self.wlr_layer_surface.mapped) {
-        // remove listeners only active while the layer surface is mapped
-        c.wl_list_remove(&self.listen_commit.link);
-        c.wl_list_remove(&self.listen_new_popup.link);
-    }
+    // remove listeners only active while the layer surface is mapped
+    c.wl_list_remove(&self.listen_commit.link);
+    c.wl_list_remove(&self.listen_new_popup.link);
 
     // Remove from the output's list of layer surfaces
     const self_node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);

@@ -402,18 +402,6 @@ fn arrangeLayer(
                 new_box.x = bounds.x + @intCast(i32, current_state.margin.left);
                 new_box.width = bounds.width -
                     (current_state.margin.left + current_state.margin.right);
-            } else {
-                log.err(
-                    .layer_shell,
-                    "layer surface '{s}' requested width 0 without setting left and right anchors",
-                    .{layer_surface.wlr_layer_surface.namespace},
-                );
-                c.wl_resource_post_error(
-                    layer_surface.wlr_layer_surface.resource,
-                    c.ZWLR_LAYER_SURFACE_V1_ERROR_INVALID_SIZE,
-                    "width 0 requested without setting left and right anchors",
-                );
-                continue;
             }
         } else if (current_state.anchor & anchor_left != 0) {
             new_box.x = bounds.x + @intCast(i32, current_state.margin.left);
@@ -436,18 +424,6 @@ fn arrangeLayer(
                 new_box.y = bounds.y + @intCast(i32, current_state.margin.top);
                 new_box.height = bounds.height -
                     (current_state.margin.top + current_state.margin.bottom);
-            } else {
-                log.err(
-                    .layer_shell,
-                    "layer surface '{s}' requested height 0 without setting top and bottom anchors",
-                    .{layer_surface.wlr_layer_surface.namespace},
-                );
-                c.wl_resource_post_error(
-                    layer_surface.wlr_layer_surface.resource,
-                    c.ZWLR_LAYER_SURFACE_V1_ERROR_INVALID_SIZE,
-                    "height 0 requested without setting top and bottom anchors",
-                );
-                continue;
             }
         } else if (current_state.anchor & anchor_top != 0) {
             new_box.y = bounds.y + @intCast(i32, current_state.margin.top);
@@ -595,11 +571,6 @@ fn handleFrame(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     // This function is called every time an output is ready to display a frame,
     // generally at the output's refresh rate (e.g. 60Hz).
     const self = @fieldParentPtr(Self, "listen_frame", listener.?);
-
-    // TODO(wlroots) Remove this check when we update wlroots 0.11 to 0.12
-    // wlroots fix: https://github.com/swaywm/wlroots/commit/85757665e6e1393773b36282aa244feb10b7a5fe
-    if (!self.wlr_output.enabled) return;
-
     render.renderOutput(self);
 }
 
