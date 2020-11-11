@@ -47,6 +47,12 @@ The following environment variables are used to configure the keyboard. See
 - XKB_DEFAULT_OPTIONS
 - XKB_DEFAULT_RULES
 
+# AUTHORS
+
+Maintained by Isaac Freund <ifreund@ifreund.xyz> who is assisted by open
+source contributors. For more information about river's development, see
+<https://github.com/ifreund/river>.
+
 # SEE ALSO
 
 *riverctl*(1), *river-layouts*(7), *rivertile*(1)

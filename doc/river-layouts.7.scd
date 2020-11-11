@@ -69,5 +69,11 @@ in a grid.
 500 500 500 500
 ```
 
+# AUTHORS
+
+Maintained by Isaac Freund <ifreund@ifreund.xyz> who is assisted by open
+source contributors. For more information about river's development, see
+<https://github.com/ifreund/river>.
+
 # SEE ALSO
 *river*(1), *riverctl*(1), *rivertile*(1)

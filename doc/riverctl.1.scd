@@ -221,6 +221,12 @@ Bind bemenu-run to Super+P:
 
 See _contrib/config.sh_ for some basic keybindings.
 
+# AUTHORS
+
+Maintained by Isaac Freund <ifreund@ifreund.xyz> who is assisted by open
+source contributors. For more information about river's development, see
+<https://github.com/ifreund/river>.
+
 # SEE ALSO
 
 *river*(1), *river-layouts*(7), *rivertile*(1)

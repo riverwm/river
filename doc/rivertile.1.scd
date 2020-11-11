@@ -33,6 +33,12 @@ Set river's layout to *rivertile*'s *left* layout using riverctl
 
 	riverctl layout rivertile left
 
+# AUTHORS
+
+Maintained by Isaac Freund <ifreund@ifreund.xyz> who is assisted by open
+source contributors. For more information about river's development, see
+<https://github.com/ifreund/river>.
+
 # SEE ALSO
 
 *river-layouts*(7), *river*(1), *riverctl*(1)
