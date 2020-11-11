@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <protocol name="river_status_unstable_v1">
   <copyright>
-    Copyright 2020 Isaac Freund
+    Copyright 2020 The River Developers
 
     Permission to use, copy, modify, and/or distribute this software for any
     purpose with or without fee is hereby granted, provided that the above

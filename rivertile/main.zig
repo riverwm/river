@@ -1,6 +1,6 @@
 // This file is part of river, a dynamic tiling wayland compositor.
 //
-// Copyright 2020 Isaac Freund
+// Copyright 2020 The River Developers
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
