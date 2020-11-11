@@ -1,6 +1,6 @@
 // This file is part of river, a dynamic tiling wayland compositor.
 //
-// Copyright 2020 Isaac Freund
+// Copyright 2020 Bonicgamer
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -22,7 +22,7 @@ const c = @import("../c.zig");
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
-/// Close the focused view, if any.
+/// Set the repeat rate and delay for all keyboards.
 pub fn setRepeat(
     allocator: *std.mem.Allocator,
     seat: *Seat,
@@ -35,6 +35,8 @@ pub fn setRepeat(
     const rate = try std.fmt.parseInt(i32, args[1], 10);
     const delay = try std.fmt.parseInt(i32, args[2], 10);
 
-    const keyboard: *c.wlr_keyboard = c.wlr_seat_get_keyboard(seat.wlr_seat);
-    c.wlr_keyboard_set_repeat_info(keyboard, rate, delay);
+    var it = seat.keyboards.first;
+    while (it) |node| : (it = node.next) {
+        c.wlr_keyboard_set_repeat_info(node.data.wlr_keyboard, rate, delay);
+    }
 }
