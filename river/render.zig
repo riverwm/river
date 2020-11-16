@@ -57,7 +57,8 @@ pub fn renderOutput(output: *Output) void {
     c.wlr_output_effective_resolution(output.wlr_output, &width, &height);
 
     // Begin the renderer (calls glViewport and some other GL sanity checks)
-    c.wlr_renderer_begin(wlr_renderer, width, height);
+    // Here we don't want the output_effective_resolution since we want to render the whole output
+    c.wlr_renderer_begin(wlr_renderer, output.wlr_output.width, output.wlr_output.height);
 
     // Find the first visible fullscreen view in the stack if there is one
     var it = ViewStack(View).iter(output.views.first, .forward, output.current.tags, renderFilter);
