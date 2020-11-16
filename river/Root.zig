@@ -91,22 +91,16 @@ pub fn deinit(self: *Self) void {
     if (c.wl_event_source_remove(self.transaction_timer) < 0) unreachable;
 }
 
-pub fn addOutput(self: *Self, wlr_output: *c.wlr_output) void {
-    const node = util.gpa.create(std.TailQueue(Output).Node) catch {
-        c.wlr_output_destroy(wlr_output);
-        return;
-    };
-    node.data.init(self, wlr_output) catch {
-        c.wlr_output_destroy(wlr_output);
-        return;
-    };
+/// Adds the output in node.data to self.outputs
+/// The Output in node.data must be initalized
+pub fn addOutput(self: *Self, node: *std.TailQueue(Output).Node) void {
     self.outputs.append(node);
 
     // Add the new output to the layout. The add_auto function arranges outputs
     // from left-to-right in the order they appear. A more sophisticated
     // compositor would let the user configure the arrangement of outputs in the
     // layout. This automatically creates an output global on the wl_display.
-    c.wlr_output_layout_add_auto(self.wlr_output_layout, wlr_output);
+    c.wlr_output_layout_add_auto(self.wlr_output_layout, node.data.wlr_output);
 
     // if we previously had no real outputs, move focus from the noop output
     // to the new one.

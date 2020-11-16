@@ -24,6 +24,7 @@ const c = @import("c.zig");
 const log = @import("log.zig");
 const util = @import("util.zig");
 
+const Output = @import("Output.zig");
 const Root = @import("Root.zig");
 const Server = @import("Server.zig");
 
@@ -56,7 +57,17 @@ fn handleNewOutput(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void 
     const self = @fieldParentPtr(Self, "listen_new_output", listener.?);
     const wlr_output = util.voidCast(c.wlr_output, data.?);
     log.debug(.output_manager, "new output {}", .{wlr_output.name});
-    self.root.addOutput(wlr_output);
+
+    const node = util.gpa.create(std.TailQueue(Output).Node) catch {
+        c.wlr_output_destroy(wlr_output);
+        return;
+    };
+    node.data.init(self.root, wlr_output) catch {
+        c.wlr_output_destroy(wlr_output);
+        return;
+    };
+
+    self.root.addOutput(node);
 }
 
 fn handleOutputPowerManagementSetMode(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
