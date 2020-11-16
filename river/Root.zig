@@ -35,6 +35,11 @@ const DragIcon = @import("DragIcon.zig");
 server: *Server,
 
 wlr_output_layout: *c.wlr_output_layout,
+
+/// A list of all outputs
+all_outputs: std.TailQueue(*Output) = .{},
+
+/// A list of all active outputs. See Output.active
 outputs: std.TailQueue(Output) = .{},
 
 /// This output is used internally when no real outputs are available.
@@ -91,10 +96,58 @@ pub fn deinit(self: *Self) void {
     if (c.wl_event_source_remove(self.transaction_timer) < 0) unreachable;
 }
 
+/// Removes the output in node.data from self.outputs
+/// The node is not freed
+pub fn removeOutput(self: *Self, node: *std.TailQueue(Output).Node) void {
+    const output = &node.data;
+    self.outputs.remove(node);
+    output.active = false;
+
+    // Use the first output in the list as fallback.
+    // If there is no other real output, use the noop output.
+    const fallback_output = if (self.outputs.first) |output_node| &output_node.data else &self.noop_output;
+
+    // Move all views from the destroyed output to the fallback one
+    while (output.views.last) |view_node| {
+        const view = &view_node.view;
+        view.sendToOutput(fallback_output);
+    }
+
+    // Close all layer surfaces on the removed output
+    for (output.layers) |*layer, layer_idx| {
+        while (layer.pop()) |layer_node| {
+            const layer_surface = &layer_node.data;
+            // We need to move the closing layer surface to the noop output
+            // since it may not be immediately destoryed. This just a request
+            // to close which will trigger unmap and destroy events in
+            // response, and the LayerSurface needs a valid output to
+            // handle them.
+            self.noop_output.layers[layer_idx].prepend(layer_node);
+            layer_surface.output = &self.noop_output;
+            c.wlr_layer_surface_v1_close(layer_surface.wlr_layer_surface);
+        }
+    }
+
+    // If any seat has the removed output focused, focus the fallback one
+    var seat_it = self.server.input_manager.seats.first;
+    while (seat_it) |seat_node| : (seat_it = seat_node.next) {
+        const seat = &seat_node.data;
+        if (seat.focused_output == output) {
+            seat.focusOutput(fallback_output);
+            seat.focus(null);
+        }
+    }
+
+    // Arrange the root in case evacuated views affect the layout
+    fallback_output.arrangeViews();
+    self.startTransaction();
+}
+
 /// Adds the output in node.data to self.outputs
 /// The Output in node.data must be initalized
 pub fn addOutput(self: *Self, node: *std.TailQueue(Output).Node) void {
     self.outputs.append(node);
+    node.data.active = true;
 
     // Add the new output to the layout. The add_auto function arranges outputs
     // from left-to-right in the order they appear. A more sophisticated

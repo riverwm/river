@@ -72,6 +72,10 @@ attach_mode: AttachMode = .top,
 /// List of status tracking objects relaying changes to this output to clients.
 status_trackers: std.SinglyLinkedList(OutputStatus) = .{},
 
+/// Whether or not the output is active
+/// An active output can have focus (e.g. an output turned off by dpms is active)
+active: bool = false,
+
 // All listeners for this output, in alphabetical order
 listen_destroy: c.wl_listener = undefined,
 listen_frame: c.wl_listener = undefined,
@@ -503,45 +507,10 @@ fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     const root = self.root;
 
     log.debug(.server, "output '{}' destroyed", .{self.wlr_output.name});
-
-    // Use the first output in the list that is not the one being destroyed.
-    // If there is no other real output, use the noop output.
-    var output_it = root.outputs.first;
-    const fallback_output = while (output_it) |output_node| : (output_it = output_node.next) {
-        if (&output_node.data != self) {
-            break &output_node.data;
-        }
-    } else &root.noop_output;
-
-    // Move all views from the destroyed output to the fallback one
-    while (self.views.last) |node| {
-        const view = &node.view;
-        view.sendToOutput(fallback_output);
-    }
-
-    // Close all layer surfaces on the destroyed output
-    for (self.layers) |*layer, layer_idx| {
-        while (layer.pop()) |node| {
-            const layer_surface = &node.data;
-            // We need to move the closing layer surface to the noop output
-            // since it may not be immediately destoryed. This just a request
-            // to close which will trigger unmap and destroy events in
-            // response, and the LayerSurface needs a valid output to
-            // handle them.
-            root.noop_output.layers[layer_idx].prepend(node);
-            layer_surface.output = &root.noop_output;
-            c.wlr_layer_surface_v1_close(layer_surface.wlr_layer_surface);
-        }
-    }
-
-    // If any seat has the destroyed output focused, focus the fallback one
-    var seat_it = root.server.input_manager.seats.first;
-    while (seat_it) |seat_node| : (seat_it = seat_node.next) {
-        const seat = &seat_node.data;
-        if (seat.focused_output == self) {
-            seat.focusOutput(fallback_output);
-            seat.focus(null);
-        }
+    // Remove the destroyed output from root if it wasn't already removed
+    const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
+    if (self.active) {
+        root.removeOutput(node);
     }
 
     // Remove all listeners
@@ -549,20 +518,12 @@ fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     c.wl_list_remove(&self.listen_frame.link);
     c.wl_list_remove(&self.listen_mode.link);
 
-    // Clean up the wlr_output
-    self.wlr_output.data = null;
-
     // Free the layout command
     util.gpa.free(self.layout);
 
-    // Remove the destroyed output from the list
-    const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-    root.outputs.remove(node);
+    // Clean up the wlr_output
+    self.wlr_output.data = null;
     util.gpa.destroy(node);
-
-    // Arrange the root in case evacuated views affect the layout
-    fallback_output.arrangeViews();
-    root.startTransaction();
 }
 
 fn handleFrame(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
