@@ -513,6 +513,14 @@ fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
         root.removeOutput(node);
     }
 
+    var it = root.all_outputs.first;
+    while (it) |all_node| : (it = all_node.next) {
+        if (all_node.data == self) {
+            root.all_outputs.remove(all_node);
+            break;
+        }
+    }
+
     // Remove all listeners
     c.wl_list_remove(&self.listen_destroy.link);
     c.wl_list_remove(&self.listen_frame.link);

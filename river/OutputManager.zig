@@ -66,7 +66,14 @@ fn handleNewOutput(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void 
         c.wlr_output_destroy(wlr_output);
         return;
     };
+    const ptr_node = util.gpa.create(std.TailQueue(*Output).Node) catch {
+        util.gpa.destroy(node);
+        c.wlr_output_destroy(wlr_output);
+        return;
+    };
+    ptr_node.data = &node.data;
 
+    self.root.all_outputs.append(ptr_node);
     self.root.addOutput(node);
 }
 
