@@ -32,8 +32,33 @@ const usage: []const u8 =
     \\
 ;
 
+fn testConfigPath(comptime fmt: []const u8, args: anytype) std.fmt.AllocPrintError!?[:0]const u8 {
+    const path = try std.fmt.allocPrintZ(util.gpa, fmt, args);
+    std.os.access(path, std.os.X_OK) catch {
+        util.gpa.free(path);
+        return null;
+    };
+    return path;
+}
+
+fn getStartupCommand() std.fmt.AllocPrintError!?[:0]const u8 {
+    if (std.os.getenv("XDG_CONFIG_HOME")) |xdg_config_home| {
+        if (try testConfigPath("{}/river/init", .{xdg_config_home})) |path| {
+            return path;
+        }
+    } else if (std.os.getenv("HOME")) |home| {
+        if (try testConfigPath("{}/.config/river/init", .{home})) |path| {
+            return path;
+        }
+    }
+    if (try testConfigPath("/etc/river/init", .{})) |path| {
+        return path;
+    }
+    return null;
+}
+
 pub fn main() anyerror!void {
-    var startup_command: ?[*:0]const u8 = null;
+    var startup_command: ?[:0]const u8 = null;
     {
         var it = std.process.args();
         // Skip our name
@@ -45,7 +70,10 @@ pub fn main() anyerror!void {
                 std.os.exit(0);
             } else if (std.mem.eql(u8, arg, "-c")) {
                 if (it.nextPosix()) |command| {
-                    startup_command = @ptrCast([*:0]const u8, command.ptr);
+                    // If the user used '-c' multiple times the variable
+                    // already holds a path and needs to be freed.
+                    if (startup_command) |ptr| util.gpa.free(ptr);
+                    startup_command = try util.gpa.dupeZ(u8, std.mem.spanZ(command.ptr));
                 } else {
                     printErrorExit("Error: flag '-c' requires exactly one argument", .{});
                 }
@@ -69,6 +97,17 @@ pub fn main() anyerror!void {
 
     log.info(.server, "initializing", .{});
 
+    if (startup_command == null) {
+        if (try getStartupCommand()) |path| {
+            startup_command = path;
+            log.info(.server, "Using default startup command path: {}", .{path});
+        } else {
+            log.info(.server, "Starting without startup command", .{});
+        }
+    } else {
+        log.info(.server, "Using custom startup command path: {}", .{startup_command});
+    }
+
     var server: Server = undefined;
     try server.init();
     defer server.deinit();
@@ -82,6 +121,7 @@ pub fn main() anyerror!void {
             if (std.os.system.sigprocmask(std.os.SIG_SETMASK, &std.os.empty_sigset, null) < 0) unreachable;
             std.os.execveZ("/bin/sh", &child_args, std.c.environ) catch c._exit(1);
         }
+        util.gpa.free(cmd);
         break :blk pid;
     } else null;
     defer if (child_pid) |pid|
