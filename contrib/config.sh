@@ -128,6 +128,9 @@ do
 	riverctl map "${mode}" None XF86MonBrightnessDown spawn light -U 5
 done
 
+# Set repeat rate
+riverctl set-repeat 50 300
+
 # Set the layout on startup
 riverctl layout rivertile left
 

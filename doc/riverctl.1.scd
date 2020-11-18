@@ -196,6 +196,10 @@ that tag 1 through 9 are visible.
 *outer-padding* _pixels_
 	Set the padding around the edge of the screen to _pixels_.
 
+*set-repeat* _rate_ _delay_
+	Set the keyboard repeat rate to _rate_ key repeats per second and
+	repeat delay to _delay_ milliseconds.
+
 *unmap* [-release] _mode_ _modifiers_ _key_
 	Removes the mapping defined by the arguments *-release*, *modifiers* and *key* from *mode*.
 	See *map* for an explanation of the arguments.
