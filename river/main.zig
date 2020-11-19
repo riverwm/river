@@ -93,7 +93,14 @@ pub fn main() anyerror!void {
         }
     }
 
-    c.wlr_log_init(.WLR_ERROR, null);
+    c.wlr_log_init(
+        switch (log.level) {
+            .debug => .WLR_DEBUG,
+            .notice, .info, => .WLR_INFO,
+            .warn, .err, .crit, .alert, .emerg => .WLR_ERROR,
+        },
+        null,
+    );
 
     log.info(.server, "initializing", .{});
 
