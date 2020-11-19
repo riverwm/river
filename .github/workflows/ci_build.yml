@@ -18,16 +18,17 @@ jobs:
     container: voidlinux/voidlinux:latest
 
     steps:
-      - name: Install Dependencies
+      - name: install deps
         run: |
           xbps-install -S
           xbps-install -uy xbps
-          xbps-install -uy
           xbps-install -uy zig wayland-devel wayland-protocols wlroots-devel \
-          	libxkbcommon-devel pixman-devel pkgconf scdoc
+          	libxkbcommon-devel pixman-devel pkgconf scdoc git
 
-      - name: Checkout Code
-        uses: actions/checkout@master
+      - name: checkout
+        uses: actions/checkout@v2
+        with:
+          submodules: true
 
       - name: build
         run: |
@@ -49,10 +50,12 @@ jobs:
           xbps-install -uy xbps
           xbps-install -uy
           xbps-install -uy zig wayland-devel wayland-protocols wlroots-devel \
-          	libxkbcommon-devel pixman-devel pkgconf scdoc
+          	libxkbcommon-devel pixman-devel pkgconf scdoc git
 
       - name: checkout
-        uses: actions/checkout@master
+        uses: actions/checkout@v2
+        with:
+          submodules: true
 
       - name: build
         run: |
@@ -73,11 +76,16 @@ jobs:
           xbps-install -S
           xbps-install -uy xbps
           xbps-install -uy
-          xbps-install -uy zig
+          xbps-install -uy zig git
 
       - name: checkout
-        uses: actions/checkout@master
+        uses: actions/checkout@v2
+        with:
+          submodules: true
 
       - name: fmt
         run: |
-          find . -path ./zig-cache -prune -o -name "*.zig" -exec zig fmt --check {} ";"
+          zig fmt --check river/
+          zig fmt --check riverctl/
+          zig fmt --check rivertile/
+          zig fmt --check example/
