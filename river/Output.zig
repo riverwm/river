@@ -78,6 +78,7 @@ active: bool = false,
 
 // All listeners for this output, in alphabetical order
 listen_destroy: c.wl_listener = undefined,
+listen_enable: c.wl_listener = undefined,
 listen_frame: c.wl_listener = undefined,
 listen_mode: c.wl_listener = undefined,
 
@@ -107,6 +108,9 @@ pub fn init(self: *Self, root: *Root, wlr_output: *c.wlr_output) !void {
     // Set up listeners
     self.listen_destroy.notify = handleDestroy;
     c.wl_signal_add(&wlr_output.events.destroy, &self.listen_destroy);
+
+    self.listen_enable.notify = handleEnable;
+    c.wl_signal_add(&wlr_output.events.enable, &self.listen_enable);
 
     self.listen_frame.notify = handleFrame;
     c.wl_signal_add(&wlr_output.events.frame, &self.listen_frame);
@@ -523,6 +527,7 @@ fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
 
     // Remove all listeners
     c.wl_list_remove(&self.listen_destroy.link);
+    c.wl_list_remove(&self.listen_enable.link);
     c.wl_list_remove(&self.listen_frame.link);
     c.wl_list_remove(&self.listen_mode.link);
 
@@ -532,6 +537,15 @@ fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
     // Clean up the wlr_output
     self.wlr_output.data = null;
     util.gpa.destroy(node);
+}
+
+fn handleEnable(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    const self = @fieldParentPtr(Self, "listen_enable", listener.?);
+
+    if (self.wlr_output.enabled and !self.active) {
+        const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
+        self.root.addOutput(node);
+    }
 }
 
 fn handleFrame(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {

@@ -46,6 +46,7 @@ pub usingnamespace @cImport({
     @cInclude("wlr/types/wlr_matrix.h");
     @cInclude("wlr/types/wlr_output.h");
     @cInclude("wlr/types/wlr_output_layout.h");
+    @cInclude("wlr/types/wlr_output_management_v1.h");
     @cInclude("wlr/types/wlr_output_power_management_v1.h");
     @cInclude("wlr/types/wlr_pointer.h");
     @cInclude("wlr/types/wlr_primary_selection.h");

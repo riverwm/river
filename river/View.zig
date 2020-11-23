@@ -52,7 +52,7 @@ const Impl = union(enum) {
 };
 
 const State = struct {
-    /// The output-relative coordinates and dimensions of the view. The
+    /// The output-relative effective coordinates and effective dimensions of the view. The
     /// surface itself may have other dimensions which are stored in the
     /// surface_box member.
     box: Box = Box{ .x = 0, .y = 0, .width = 0, .height = 0 },
