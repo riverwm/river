@@ -31,6 +31,7 @@ wlr_keyboard: *c.wlr_keyboard,
 
 listen_key: c.wl_listener = undefined,
 listen_modifiers: c.wl_listener = undefined,
+listen_destroy: c.wl_listener = undefined,
 
 pub fn init(self: *Self, seat: *Seat, wlr_input_device: *c.wlr_input_device) !void {
     self.* = .{
@@ -67,6 +68,15 @@ pub fn init(self: *Self, seat: *Seat, wlr_input_device: *c.wlr_input_device) !vo
 
     self.listen_modifiers.notify = handleModifiers;
     c.wl_signal_add(&self.wlr_keyboard.events.modifiers, &self.listen_modifiers);
+
+    self.listen_destroy.notify = handleDestroy;
+    c.wl_signal_add(&self.wlr_keyboard.events.destroy, &self.listen_destroy);
+}
+
+pub fn deinit(self: *Self) void {
+    c.wl_list_remove(&self.listen_key.link);
+    c.wl_list_remove(&self.listen_modifiers.link);
+    c.wl_list_remove(&self.listen_destroy.link);
 }
 
 fn handleKey(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
@@ -156,6 +166,13 @@ fn handleModifiers(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void 
 
     // Send modifiers to the client.
     c.wlr_seat_keyboard_notify_modifiers(self.seat.wlr_seat, &self.wlr_keyboard.modifiers);
+}
+fn handleDestroy(listener: ?*c.wl_listener, data: ?*c_void) callconv(.C) void {
+    const self = @fieldParentPtr(Self, "listen_destroy", listener.?);
+    self.deinit();
+    const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
+    self.seat.keyboards.remove(node);
+    util.gpa.destroy(node);
 }
 
 /// Handle any builtin, harcoded compsitor mappings such as VT switching.

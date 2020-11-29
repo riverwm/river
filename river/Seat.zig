@@ -101,7 +101,10 @@ pub fn init(self: *Self, input_manager: *InputManager, name: [*:0]const u8) !voi
 pub fn deinit(self: *Self) void {
     self.cursor.deinit();
 
-    while (self.keyboards.pop()) |node| util.gpa.destroy(node);
+    while (self.keyboards.pop()) |node| {
+        node.data.deinit();
+        util.gpa.destroy(node);
+    }
 
     while (self.focus_stack.first) |node| {
         self.focus_stack.remove(node);
