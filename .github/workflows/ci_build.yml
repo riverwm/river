@@ -89,3 +89,4 @@ jobs:
           zig fmt --check riverctl/
           zig fmt --check rivertile/
           zig fmt --check example/
+          zig fmt --check build.zig
