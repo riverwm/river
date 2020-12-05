@@ -124,6 +124,19 @@ pub fn renderOutput(output: *Output) void {
     // Conclude rendering and swap the buffers, showing the final frame
     // on-screen.
     c.wlr_renderer_end(wlr_renderer);
+
+    // TODO(wlroots): remove this with the next release. It is here due to
+    // a wlroots bug in the screencopy damage implementation
+    {
+        var w: c_int = undefined;
+        var h: c_int = undefined;
+        c.wlr_output_transformed_resolution(output.wlr_output, &w, &h);
+        var damage: c.pixman_region32_t = undefined;
+        c.pixman_region32_init(&damage);
+        _ = c.pixman_region32_union_rect(&damage, &damage, 0, 0, @intCast(c_uint, w), @intCast(c_uint, h));
+        c.wlr_output_set_damage(output.wlr_output, &damage);
+    }
+
     // TODO: handle failure
     if (!c.wlr_output_commit(output.wlr_output)) {
         log.err(.render, "wlr_output_commit failed for {}", .{output.wlr_output.name});

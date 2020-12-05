@@ -124,6 +124,7 @@ fn addServerDeps(exe: *std.build.LibExeObjStep) void {
     exe.linkSystemLibrary("wayland-server");
     exe.linkSystemLibrary("wlroots");
     exe.linkSystemLibrary("xkbcommon");
+    exe.linkSystemLibrary("pixman-1");
 }
 
 fn addProtocolDeps(exe: *std.build.LibExeObjStep, protocol_step: *std.build.Step) void {
