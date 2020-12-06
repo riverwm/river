@@ -584,25 +584,15 @@ fn passthrough(self: *Self, time: u32) void {
 
             c.wlr_seat_pointer_notify_enter(self.seat.wlr_seat, wlr_surface, sx, sy);
             c.wlr_seat_pointer_notify_motion(self.seat.wlr_seat, time, sx, sy);
-            if (View.fromWlrSurface(wlr_surface)) |view| {
-                // Change focus according to config
-                switch (config.focus_follows_cursor) {
-                    .disabled => {},
-                    .normal => {
-                        // Only refocus when the cursor entered a new surface
-                        if (focus_change) {
-                            self.seat.focus(view);
-                            root.startTransaction();
-                        }
-                    },
-                    .strict => {
-                        self.seat.focus(view);
-                        root.startTransaction();
-                    },
+
+            const follow_mode = config.focus_follows_cursor;
+            if (follow_mode == .strict or (follow_mode == .normal and focus_change)) {
+                if (View.fromWlrSurface(wlr_surface)) |view| {
+                    self.seat.focus(view);
+                    self.seat.focusOutput(view.output);
+                    root.startTransaction();
                 }
             }
-
-            return;
         }
     } else {
         // There is either no surface under the cursor or input is disallowed
