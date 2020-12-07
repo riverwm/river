@@ -242,6 +242,8 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
 
 /// Focus the given output, notifying any listening clients of the change.
 pub fn focusOutput(self: *Self, output: *Output) void {
+    if (self.focused_output == output) return;
+
     const root = &self.input_manager.server.root;
 
     var it = self.status_trackers.first;

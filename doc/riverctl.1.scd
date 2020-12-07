@@ -136,9 +136,12 @@ that tag 1 through 9 are visible.
 *focus-follows-cursor* *disabled*|*normal*|*strict*
 	When _disabled_ moving the cursor will not influence the focus. This is the default setting.
 	If set to _normal_ moving the cursor over a window will focus that window.
-	The focus still can be changed and moving the cursor within the (now unfocused) window will not change the focus to that window
-	but let the currently focused window in focus.
+	The focus still can be changed and moving the cursor within the (now unfocused) window will
+	not change the focus to that window but let the currently focused window in focus.
 	When set to _strict_ this is not the case. The focus will be updated on every cursor movement.
+
+	When the to be focused view is on another output than the currently focused output the view's
+	output is focused.
 
 *map* [-release] _mode_ _modifiers_ _key_ _command_
 	_mode_ is either "normal" (the default mode), "locked" (the mode entered when
