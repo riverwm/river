@@ -117,6 +117,9 @@ pub fn deinit(self: *Self) void {
     for (self.modes.items) |mode| mode.deinit();
     self.modes.deinit();
 
+    for (self.float_filter.items) |s| util.gpa.free(s);
     self.float_filter.deinit();
+
+    for (self.csd_filter.items) |s| util.gpa.free(s);
     self.csd_filter.deinit();
 }
