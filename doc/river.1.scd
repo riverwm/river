@@ -1,7 +1,8 @@
 RIVER(1) "github.com/ifreund/river" "General Commands Manual"
+
 # NAME
 
-river - dynamic tiling Wayland compositor
+river - Dynamic tiling Wayland compositor
 
 # SYNOPSIS
 
@@ -9,19 +10,19 @@ river - dynamic tiling Wayland compositor
 
 # DESCRIPTION
 
-*river* is a dynamic tiling Wayland compositor inspired by dwm and
-bspwm based on wlroots and written in Zig.
+*river* is a dynamic tiling Wayland compositor inspired by dwm and bspwm based
+on wlroots and written in Zig.
 
 # OPTIONS
 
 *-c* _shell_command_
-	Run a shell command or give the path to a script that will be run
-	after river's wayland server is initialized but before entering the
-	main loop. You may use this to configure river and define keymaps
-	using *riverctl*(1), start programs such as a status bar, or perhaps
-	run a service manager. If the process started by this flag is still
-	running when river exits, river will send SIGTERM and and wait for it
-	to terminate.
+	Run a shell command or give the path to a script that will be run after
+	river's wayland server is initialized but before entering the main
+	loop. You may use this to configure river and define keymaps using
+	*riverctl*(1), start programs such as a status bar, or perhaps run a
+	service manager. If the process started by this flag is still running
+	when river exits, river will send SIGTERM and and wait for it to
+	terminate.
 
 *-l* _log_level_
 	Set the log level of river to a value from 0 to 7 with 0 being the
@@ -30,8 +31,8 @@ bspwm based on wlroots and written in Zig.
 
 # CONFIGURATION
 
-You can define the list of programs which should float in _Config.zig_.
-Make your changes and recompile.
+You can define the list of programs which should float in _Config.zig_. Make
+your changes and recompile.
 
 Experimental XWayland support can be enabled on compile-time with the
 _-Dxwayland=true_ flag.
