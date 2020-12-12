@@ -51,11 +51,6 @@ pub fn renderOutput(output: *Output) void {
     // wlr_output_attach_render makes the OpenGL context current.
     if (!c.wlr_output_attach_render(output.wlr_output, null)) return;
 
-    // The "effective" resolution can change if you rotate your outputs.
-    var width: c_int = undefined;
-    var height: c_int = undefined;
-    c.wlr_output_effective_resolution(output.wlr_output, &width, &height);
-
     // Begin the renderer (calls glViewport and some other GL sanity checks)
     // Here we don't want the output_effective_resolution since we want to render the whole output
     c.wlr_renderer_begin(wlr_renderer, output.wlr_output.width, output.wlr_output.height);
