@@ -49,9 +49,6 @@ layout_change: wl.Listener(*wlr.OutputLayout) = undefined,
 power_manager: *wlr.OutputPowerManagerV1,
 power_manager_set_mode: wl.Listener(*wlr.OutputPowerManagerV1.event.SetMode) = undefined,
 
-/// True if and only if we are currently applying an output config
-output_config_pending: bool = false,
-
 pub fn init(self: *Self, server: *Server) !void {
     self.* = .{
         .root = &server.root,
@@ -107,8 +104,6 @@ fn handleOutputLayoutChange(
     output_layout: *wlr.OutputLayout,
 ) void {
     const self = @fieldParentPtr(Self, "layout_change", listener);
-    // Ignore if the layout change is from applying a config
-    if (self.output_config_pending) return;
 
     const config = self.ouputConfigFromCurrent() catch {
         log.crit(.output_manager, "out of memory", .{});
@@ -174,10 +169,9 @@ fn handleOutputPowerManagementSetMode(
 
 /// Apply the given config, return false on faliure
 fn applyOutputConfig(self: *Self, config: *wlr.OutputConfigurationV1) bool {
-    // Store whether a config is pending so we can tell if the
-    // wlr_output_layout.change event was triggered by applying the config
-    self.output_config_pending = true;
-    defer self.output_config_pending = false;
+    // Ignore layout change events while applying the config
+    self.layout_change.link.remove();
+    defer self.root.output_layout.events.change.add(&self.layout_change);
 
     // Test if the config should apply cleanly
     if (!testOutputConfig(config, false)) return false;
