@@ -31,9 +31,6 @@ on wlroots and written in Zig.
 
 # CONFIGURATION
 
-You can define the list of programs which should float in _Config.zig_. Make
-your changes and recompile.
-
 Experimental XWayland support can be enabled on compile-time with the
 _-Dxwayland=true_ flag.
 
