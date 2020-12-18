@@ -18,6 +18,7 @@
 const Self = @This();
 
 const std = @import("std");
+const math = std.math;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
@@ -129,15 +130,23 @@ pub fn getTitle(self: Self) [*:0]const u8 {
 pub fn getConstraints(self: Self) View.Constraints {
     const hints = self.xwayland_surface.size_hints orelse return .{
         .min_width = View.min_size,
-        .max_width = std.math.maxInt(u32),
         .min_height = View.min_size,
-        .max_height = std.math.maxInt(u32),
+        .max_width = math.maxInt(u32),
+        .max_height = math.maxInt(u32),
     };
     return .{
-        .min_width = @intCast(u32, std.math.max(hints.min_width, View.min_size)),
-        .max_width = if (hints.max_width > 0) @intCast(u32, hints.max_width) else std.math.maxInt(u32),
-        .min_height = @intCast(u32, std.math.max(hints.min_height, View.min_size)),
-        .max_height = if (hints.max_height > 0) @intCast(u32, hints.max_height) else std.math.maxInt(u32),
+        .min_width = @intCast(u32, math.max(hints.min_width, View.min_size)),
+        .min_height = @intCast(u32, math.max(hints.min_height, View.min_size)),
+
+        .max_width = if (hints.max_width > 0)
+            math.max(@intCast(u32, hints.max_width), View.min_size)
+        else
+            math.maxInt(u32),
+
+        .max_height = if (hints.max_height > 0)
+            math.max(@intCast(u32, hints.max_height), View.min_size)
+        else
+            math.maxInt(u32),
     };
 }
 
@@ -164,9 +173,9 @@ fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wl
     // floating dimensions
     view.float_box.width = self.xwayland_surface.width;
     view.float_box.height = self.xwayland_surface.height;
-    view.float_box.x = std.math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.width) -
+    view.float_box.x = math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.width) -
         @intCast(i32, view.float_box.width), 2));
-    view.float_box.y = std.math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.height) -
+    view.float_box.y = math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.height) -
         @intCast(i32, view.float_box.height), 2));
 
     const has_fixed_size = if (self.xwayland_surface.size_hints) |size_hints|
