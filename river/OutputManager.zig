@@ -95,7 +95,7 @@ fn handleNewOutput(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output)
     ptr_node.data = &node.data;
 
     self.root.all_outputs.append(ptr_node);
-    self.root.addOutput(node);
+    self.root.addOutput(&node.data);
 }
 
 /// Send the new output configuration to all wlr-output-manager clients
@@ -192,8 +192,7 @@ fn applyOutputConfig(self: *Self, config: *wlr.OutputConfigurationV1) bool {
         }
 
         if (disable) {
-            const node = @fieldParentPtr(std.TailQueue(Output).Node, "data", output);
-            self.root.removeOutput(node);
+            self.root.removeOutput(output);
             self.root.output_layout.remove(output.wlr_output);
         }
 

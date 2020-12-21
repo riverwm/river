@@ -90,12 +90,18 @@ pub fn deinit(self: *Self) void {
     self.transaction_timer.remove();
 }
 
-/// Removes the output in node.data from self.outputs
-/// The node is not freed
-pub fn removeOutput(self: *Self, node: *std.TailQueue(Output).Node) void {
-    const output = &node.data;
+/// Remove the output from self.outputs and evacuate views if it is a member of
+/// the list. The node is not freed
+pub fn removeOutput(self: *Self, output: *Output) void {
+    const node = @fieldParentPtr(std.TailQueue(Output).Node, "data", output);
+
+    // If the node has already been removed, do nothing
+    var output_it = self.outputs.first;
+    while (output_it) |n| : (output_it = n.next) {
+        if (n == node) break;
+    } else return;
+
     self.outputs.remove(node);
-    output.active = false;
 
     // Use the first output in the list as fallback.
     // If there is no other real output, use the noop output.
@@ -137,11 +143,16 @@ pub fn removeOutput(self: *Self, node: *std.TailQueue(Output).Node) void {
     self.startTransaction();
 }
 
-/// Adds the output in node.data to self.outputs
-/// The Output in node.data must be initalized
-pub fn addOutput(self: *Self, node: *std.TailQueue(Output).Node) void {
+/// Add the output to self.outputs and the output layout if it has not
+/// already been added.
+pub fn addOutput(self: *Self, output: *Output) void {
+    const node = @fieldParentPtr(std.TailQueue(Output).Node, "data", output);
+
+    // If we have already added the output, do nothing and return
+    var output_it = self.outputs.first;
+    while (output_it) |n| : (output_it = n.next) if (n == node) return;
+
     self.outputs.append(node);
-    node.data.active = true;
 
     // Add the new output to the layout. The add_auto function arranges outputs
     // from left-to-right in the order they appear. A more sophisticated

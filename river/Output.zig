@@ -76,10 +76,6 @@ attach_mode: AttachMode = .top,
 /// List of status tracking objects relaying changes to this output to clients.
 status_trackers: std.SinglyLinkedList(OutputStatus) = .{},
 
-/// Whether or not the output is active
-/// An active output can have focus (e.g. an output turned off by dpms is active)
-active: bool = false,
-
 destroy: wl.Listener(*wlr.Output) = undefined,
 enable: wl.Listener(*wlr.Output) = undefined,
 frame: wl.Listener(*wlr.Output) = undefined,
@@ -496,10 +492,7 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) v
     log.debug(.server, "output '{}' destroyed", .{self.wlr_output.name});
 
     // Remove the destroyed output from root if it wasn't already removed
-    const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-    if (self.active) {
-        root.removeOutput(node);
-    }
+    root.removeOutput(self);
 
     var it = root.all_outputs.first;
     while (it) |all_node| : (it = all_node.next) {
@@ -518,16 +511,17 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) v
     // Free all memory and clean up the wlr.Output
     self.wlr_output.data = undefined;
     util.gpa.free(self.layout);
+
+    const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
     util.gpa.destroy(node);
 }
 
 fn handleEnable(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
     const self = @fieldParentPtr(Self, "enable", listener);
 
-    if (wlr_output.enabled and !self.active) {
-        const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-        self.root.addOutput(node);
-    }
+    // Add the output to root.outputs and the output layout if it has not
+    // already been added.
+    if (wlr_output.enabled) self.root.addOutput(self);
 }
 
 fn handleFrame(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
