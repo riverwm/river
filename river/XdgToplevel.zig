@@ -123,9 +123,14 @@ pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*wlr.Surface
     );
 }
 
-/// Return the current title of the toplevel. May be an empty string.
-pub fn getTitle(self: Self) [*:0]const u8 {
-    return self.xdg_surface.role_data.toplevel.title orelse "NULL";
+/// Return the current title of the toplevel if any.
+pub fn getTitle(self: Self) ?[*:0]const u8 {
+    return self.xdg_surface.role_data.toplevel.title;
+}
+
+/// Return the current app_id of the toplevel if any .
+pub fn getAppId(self: Self) ?[*:0]const u8 {
+    return self.xdg_surface.role_data.toplevel.app_id;
 }
 
 /// Return bounds on the dimensions of the toplevel.
@@ -310,15 +315,4 @@ fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), ev
 /// Called when the client sets / updates its title
 fn handleSetTitle(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurface) void {
     const self = @fieldParentPtr(Self, "set_title", listener);
-
-    // Send title to all status listeners attached to a seat which focuses this view
-    var seat_it = self.view.output.root.server.input_manager.seats.first;
-    while (seat_it) |seat_node| : (seat_it = seat_node.next) {
-        if (seat_node.data.focused == .view and seat_node.data.focused.view == self.view) {
-            var client_it = seat_node.data.status_trackers.first;
-            while (client_it) |client_node| : (client_it = client_node.next) {
-                client_node.data.sendFocusedView();
-            }
-        }
-    }
 }

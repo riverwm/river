@@ -121,9 +121,14 @@ pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*wlr.Surface
     );
 }
 
-/// Get the current title of the xwayland surface. May be an empty string
-pub fn getTitle(self: Self) [*:0]const u8 {
-    return self.xwayland_surface.title orelse "";
+/// Get the current title of the xwayland surface if any.
+pub fn getTitle(self: Self) ?[*:0]const u8 {
+    return self.xwayland_surface.title;
+}
+
+/// Get the current class of the xwayland surface if any.
+pub fn getClass(self: Self) ?[*:0]const u8 {
+    return self.xwayland_surface.class;
 }
 
 /// Return bounds on the dimensions of the view

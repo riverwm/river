@@ -52,7 +52,11 @@ pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*wlr.Surface
     unreachable;
 }
 
-pub fn getTitle(self: Self) [*:0]const u8 {
+pub fn getTitle(self: Self) ?[*:0]const u8 {
+    unreachable;
+}
+
+pub fn getClass(self: Self) ?[*:0]const u8 {
     unreachable;
 }
 

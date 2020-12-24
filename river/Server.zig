@@ -56,6 +56,8 @@ new_layer_surface: wl.Listener(*wlr.LayerSurfaceV1),
 xwayland: if (build_options.xwayland) *wlr.Xwayland else void,
 new_xwayland_surface: if (build_options.xwayland) wl.Listener(*wlr.XwaylandSurface) else void,
 
+foreign_toplevel_manager: *wlr.ForeignToplevelManagerV1,
+
 decoration_manager: DecorationManager,
 input_manager: InputManager,
 output_manager: OutputManager,
@@ -104,6 +106,8 @@ pub fn init(self: *Self) !void {
         self.xwayland.events.new_surface.add(&self.new_xwayland_surface);
     }
 
+    self.foreign_toplevel_manager = try wlr.ForeignToplevelManagerV1.create(self.wl_server);
+
     _ = try wlr.PrimarySelectionDeviceManagerV1.create(self.wl_server);
 
     self.config = try Config.init();
@@ -135,8 +139,8 @@ pub fn deinit(self: *Self) void {
 
     self.root.deinit();
 
-    self.wl_server.destroy();
     self.noop_backend.destroy();
+    self.wl_server.destroy();
 
     self.input_manager.deinit();
     self.config.deinit();

@@ -29,6 +29,7 @@ const util = @import("util.zig");
 const Box = @import("Box.zig");
 const Output = @import("Output.zig");
 const Root = @import("Root.zig");
+const Seat = @import("Seat.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const XdgToplevel = @import("XdgToplevel.zig");
 const XwaylandView = if (build_options.xwayland) @import("XwaylandView.zig") else @import("VoidView.zig");
@@ -84,8 +85,8 @@ impl: Impl = undefined,
 /// The output this view is currently associated with
 output: *Output,
 
-/// This is from the point where the view is mapped until the surface
-/// is destroyed by wlroots.
+/// This is non-null from the point where the view is mapped until the
+/// surface is destroyed by wlroots.
 surface: ?*wlr.Surface = null,
 
 /// This View struct outlasts the wlroots object it wraps. This bool is set to
@@ -122,6 +123,12 @@ opacity_timer: ?*wl.EventSource = null,
 
 draw_borders: bool = true,
 
+/// This is created when the view is mapped and destroyed with the view
+foreign_toplevel_handle: ?*wlr.ForeignToplevelHandleV1 = null,
+foreign_activate: wl.Listener(*wlr.ForeignToplevelHandleV1.event.Activated) = undefined,
+foreign_fullscreen: wl.Listener(*wlr.ForeignToplevelHandleV1.event.Fullscreen) = undefined,
+foreign_close: wl.Listener(*wlr.ForeignToplevelHandleV1) = undefined,
+
 pub fn init(self: *Self, output: *Output, tags: u32, surface: anytype) void {
     self.* = .{
         .output = output,
@@ -150,10 +157,19 @@ pub fn init(self: *Self, output: *Output, tags: u32, surface: anytype) void {
 pub fn destroy(self: *Self) void {
     self.dropSavedBuffers();
     self.saved_buffers.deinit();
+
+    if (self.foreign_toplevel_handle) |handle| {
+        self.foreign_activate.link.remove();
+        self.foreign_fullscreen.link.remove();
+        self.foreign_close.link.remove();
+        handle.destroy();
+    }
+
     switch (self.impl) {
         .xdg_toplevel => |*xdg_toplevel| xdg_toplevel.deinit(),
         .xwayland_view => |*xwayland_view| xwayland_view.deinit(),
     }
+
     const node = @fieldParentPtr(ViewStack(Self).Node, "view", self);
     self.output.views.remove(node);
     util.gpa.destroy(node);
@@ -220,6 +236,10 @@ pub fn needsConfigure(self: Self) bool {
 }
 
 pub fn configure(self: Self) void {
+    if (self.foreign_toplevel_handle) |handle| {
+        handle.setActivated(self.pending.focus != 0);
+        handle.setFullscreen(self.pending.fullscreen);
+    }
     switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.configure(),
         .xwayland_view => |xwayland_view| xwayland_view.configure(),
@@ -293,6 +313,9 @@ pub fn sendToOutput(self: *Self, destination_output: *Output) void {
     self.surface.?.sendLeave(self.output.wlr_output);
     self.surface.?.sendEnter(destination_output.wlr_output);
 
+    self.foreign_toplevel_handle.?.outputLeave(self.output.wlr_output);
+    self.foreign_toplevel_handle.?.outputEnter(destination_output.wlr_output);
+
     self.output = destination_output;
 }
 
@@ -324,11 +347,20 @@ pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*wlr.Surface
     };
 }
 
-/// Return the current title of the view. May be an empty string.
-pub fn getTitle(self: Self) [*:0]const u8 {
+/// Return the current title of the view if any.
+pub fn getTitle(self: Self) ?[*:0]const u8 {
     return switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.getTitle(),
         .xwayland_view => |xwayland_view| xwayland_view.getTitle(),
+    };
+}
+
+/// Return the current app_id of the view if any.
+pub fn getAppId(self: Self) ?[*:0]const u8 {
+    return switch (self.impl) {
+        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.getAppId(),
+        // X11 clients don't have an app_id but the class serves a similar role
+        .xwayland_view => |xwayland_view| xwayland_view.getClass(),
     };
 }
 
@@ -383,6 +415,28 @@ pub fn map(self: *Self) void {
 
     log.debug(.server, "view '{}' mapped", .{self.getTitle()});
 
+    if (self.foreign_toplevel_handle == null) {
+        self.foreign_toplevel_handle = wlr.ForeignToplevelHandleV1.create(
+            root.server.foreign_toplevel_manager,
+        ) catch {
+            log.crit(.server, "out of memory", .{});
+            self.surface.?.resource.getClient().postNoMemory();
+            return;
+        };
+
+        self.foreign_activate.setNotify(handleForeignActivate);
+        self.foreign_toplevel_handle.?.events.request_activate.add(&self.foreign_activate);
+
+        self.foreign_fullscreen.setNotify(handleForeignFullscreen);
+        self.foreign_toplevel_handle.?.events.request_fullscreen.add(&self.foreign_fullscreen);
+
+        self.foreign_close.setNotify(handleForeignClose);
+        self.foreign_toplevel_handle.?.events.request_close.add(&self.foreign_close);
+
+        if (self.getTitle()) |s| self.foreign_toplevel_handle.?.setTitle(s);
+        if (self.getAppId()) |s| self.foreign_toplevel_handle.?.setAppId(s);
+    }
+
     // Add the view to the stack of its output
     const node = @fieldParentPtr(ViewStack(Self).Node, "view", self);
     self.output.views.attach(node, self.output.attach_mode);
@@ -426,6 +480,28 @@ pub fn unmap(self: *Self) void {
     if (!self.current.float) self.output.arrangeViews();
 
     root.startTransaction();
+}
+
+pub fn notifyTitle(self: Self) void {
+    if (self.foreign_toplevel_handle) |handle| {
+        if (self.getTitle()) |s| handle.setTitle(s);
+    }
+    // Send title to all status listeners attached to a seat which focuses this view
+    var seat_it = self.output.root.server.input_manager.seats.first;
+    while (seat_it) |seat_node| : (seat_it = seat_node.next) {
+        if (seat_node.data.focused == .view and seat_node.data.focused.view == self) {
+            var client_it = seat_node.data.status_trackers.first;
+            while (client_it) |client_node| : (client_it = client_node.next) {
+                client_node.data.sendFocusedView();
+            }
+        }
+    }
+}
+
+pub fn notifyAppId(self: Self) void {
+    if (self.foreign_toplevel_handle) |handle| {
+        if (self.getAppId()) |s| handle.setAppId(s);
+    }
 }
 
 /// Change the opacity of a view by config.view_opacity_delta.
@@ -490,4 +566,34 @@ pub fn commitOpacityTransition(self: *Self) void {
     if (!self.incrementOpacity()) {
         self.attachOpacityTimer();
     }
+}
+
+/// Only honors the request if the view is already visible on the seat's
+/// currently focused output. TODO: consider allowing this request to switch
+/// output/tag focus.
+fn handleForeignActivate(
+    listener: *wl.Listener(*wlr.ForeignToplevelHandleV1.event.Activated),
+    event: *wlr.ForeignToplevelHandleV1.event.Activated,
+) void {
+    const self = @fieldParentPtr(Self, "foreign_activate", listener);
+    const seat = @intToPtr(*Seat, event.seat.data);
+    seat.focus(self);
+    self.output.root.startTransaction();
+}
+
+fn handleForeignFullscreen(
+    listener: *wl.Listener(*wlr.ForeignToplevelHandleV1.event.Fullscreen),
+    event: *wlr.ForeignToplevelHandleV1.event.Fullscreen,
+) void {
+    const self = @fieldParentPtr(Self, "foreign_fullscreen", listener);
+    self.pending.fullscreen = event.fullscreen;
+    self.applyPending();
+}
+
+fn handleForeignClose(
+    listener: *wl.Listener(*wlr.ForeignToplevelHandleV1),
+    event: *wlr.ForeignToplevelHandleV1,
+) void {
+    const self = @fieldParentPtr(Self, "foreign_close", listener);
+    self.close();
 }

@@ -65,6 +65,9 @@ pub fn sendOutput(self: Self, state: enum { focused, unfocused }) void {
 }
 
 pub fn sendFocusedView(self: Self) void {
-    const title: [*:0]const u8 = if (self.seat.focused == .view) self.seat.focused.view.getTitle() else "";
+    const title: [*:0]const u8 = if (self.seat.focused == .view)
+        self.seat.focused.view.getTitle() orelse ""
+    else
+        "";
     self.seat_status.sendFocusedView(title);
 }
