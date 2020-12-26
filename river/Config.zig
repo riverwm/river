@@ -81,6 +81,12 @@ view_opacity_delta: f32 = 1.0,
 /// Time between view opacity transition steps in msec
 view_opacity_delta_t: u31 = 20,
 
+/// Keyboard repeat rate in characters per second
+repeat_rate: u31 = 25,
+
+/// Keyboard repeat delay in milliseconds
+repeat_delay: u31 = 600,
+
 pub fn init() !Self {
     var self = Self{
         .mode_to_id = std.StringHashMap(usize).init(util.gpa),

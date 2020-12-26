@@ -58,7 +58,9 @@ pub fn init(self: *Self, seat: *Seat, input_device: *wlr.InputDevice) !void {
     const wlr_keyboard = self.input_device.device.keyboard;
 
     if (!wlr_keyboard.setKeymap(keymap)) return error.SetKeymapFailed;
-    wlr_keyboard.setRepeatInfo(25, 600);
+
+    const config = &seat.input_manager.server.config;
+    wlr_keyboard.setRepeatInfo(config.repeat_rate, config.repeat_delay);
 
     self.key.setNotify(handleKey);
     wlr_keyboard.events.key.add(&self.key);

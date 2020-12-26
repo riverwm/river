@@ -30,8 +30,12 @@ pub fn setRepeat(
     if (args.len < 3) return Error.NotEnoughArguments;
     if (args.len > 3) return Error.TooManyArguments;
 
-    const rate = try std.fmt.parseInt(i32, args[1], 10);
-    const delay = try std.fmt.parseInt(i32, args[2], 10);
+    const rate = try std.fmt.parseInt(u31, args[1], 10);
+    const delay = try std.fmt.parseInt(u31, args[2], 10);
+
+    const config = &seat.input_manager.server.config;
+    config.repeat_rate = rate;
+    config.repeat_delay = delay;
 
     var it = seat.keyboards.first;
     while (it) |node| : (it = node.next) {
