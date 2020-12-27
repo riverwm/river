@@ -19,6 +19,7 @@ const Self = @This();
 
 const build_options = @import("build_options");
 const std = @import("std");
+const math = std.math;
 const wlr = @import("wlroots");
 const wayland = @import("wayland");
 const wl = wayland.server.wl;
@@ -468,8 +469,6 @@ fn leaveMode(self: *Self, event: *wlr.Pointer.event.Button) void {
 }
 
 fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64, delta_y: f64) void {
-    const config = self.seat.input_manager.server.config;
-
     switch (self.mode) {
         .passthrough => {
             self.wlr_cursor.move(device, delta_x, delta_y);
@@ -484,42 +483,28 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
             );
         },
         .move => |view| {
-            const border_width = if (view.draw_borders) config.border_width else 0;
-
-            // Set x/y of cursor and view, clamp to output dimensions
-            const output_resolution = view.output.getEffectiveResolution();
-            view.pending.box.x = std.math.clamp(
-                view.pending.box.x + @floatToInt(i32, delta_x),
-                @intCast(i32, border_width),
-                @intCast(i32, output_resolution.width - view.pending.box.width - border_width),
-            );
-            view.pending.box.y = std.math.clamp(
-                view.pending.box.y + @floatToInt(i32, delta_y),
-                @intCast(i32, border_width),
-                @intCast(i32, output_resolution.height - view.pending.box.height - border_width),
-            );
-
+            view.move(@floatToInt(i32, delta_x), @floatToInt(i32, delta_y));
             self.wlr_cursor.move(
                 device,
                 @intToFloat(f64, view.pending.box.x - view.current.box.x),
                 @intToFloat(f64, view.pending.box.y - view.current.box.y),
             );
-
             view.applyPending();
         },
         .resize => |data| {
+            const config = &self.seat.input_manager.server.config;
             const border_width = if (data.view.draw_borders) config.border_width else 0;
 
             // Set width/height of view, clamp to view size constraints and output dimensions
             const box = &data.view.pending.box;
-            box.width = @intCast(u32, std.math.max(0, @intCast(i32, box.width) + @floatToInt(i32, delta_x)));
-            box.height = @intCast(u32, std.math.max(0, @intCast(i32, box.height) + @floatToInt(i32, delta_y)));
+            box.width = @intCast(u32, math.max(0, @intCast(i32, box.width) + @floatToInt(i32, delta_x)));
+            box.height = @intCast(u32, math.max(0, @intCast(i32, box.height) + @floatToInt(i32, delta_y)));
 
             data.view.applyConstraints();
 
             const output_resolution = data.view.output.getEffectiveResolution();
-            box.width = std.math.min(box.width, output_resolution.width - border_width - @intCast(u32, box.x));
-            box.height = std.math.min(box.height, output_resolution.height - border_width - @intCast(u32, box.y));
+            box.width = math.min(box.width, output_resolution.width - border_width - @intCast(u32, box.x));
+            box.height = math.min(box.height, output_resolution.height - border_width - @intCast(u32, box.y));
 
             data.view.applyPending();
 

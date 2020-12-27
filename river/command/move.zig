@@ -41,10 +41,10 @@ pub fn move(
 
     const view = getView(seat) orelse return;
     switch (direction) {
-        .up => moveVertical(view, -1 * delta),
-        .down => moveVertical(view, delta),
-        .left => moveHorizontal(view, -1 * delta),
-        .right => moveHorizontal(view, delta),
+        .up => view.move(0, -delta),
+        .down => view.move(0, delta),
+        .left => view.move(-delta, 0),
+        .right => view.move(delta, 0),
     }
 
     apply(view);
@@ -110,7 +110,7 @@ pub fn resize(
                 output_box.width - @intCast(u32, 2 * border_width),
             );
             real_delta -= @intCast(i32, view.pending.box.width);
-            moveHorizontal(view, @divFloor(real_delta, 2));
+            view.move(@divFloor(real_delta, 2), 0);
         },
         .vertical => {
             var real_delta: i32 = @intCast(i32, view.pending.box.height);
@@ -128,7 +128,7 @@ pub fn resize(
                 output_box.height - @intCast(u32, 2 * border_width),
             );
             real_delta -= @intCast(i32, view.pending.box.height);
-            moveVertical(view, @divFloor(real_delta, 2));
+            view.move(0, @divFloor(real_delta, 2));
         },
     }
 
@@ -154,24 +154,4 @@ fn getView(seat: *Seat) ?*View {
     if (seat.input_manager.isCursorActionTarget(view)) return null;
 
     return view;
-}
-
-fn moveVertical(view: *View, delta: i32) void {
-    const output_box = view.output.getEffectiveResolution();
-    const border_width = @intCast(i32, view.output.root.server.config.border_width);
-    view.pending.box.y = std.math.clamp(
-        view.pending.box.y + delta,
-        border_width,
-        @intCast(i32, output_box.height - view.pending.box.height) - border_width,
-    );
-}
-
-fn moveHorizontal(view: *View, delta: i32) void {
-    const output_box = view.output.getEffectiveResolution();
-    const border_width = @intCast(i32, view.output.root.server.config.border_width);
-    view.pending.box.x = std.math.clamp(
-        view.pending.box.x + delta,
-        border_width,
-        @intCast(i32, output_box.width - view.pending.box.width) - border_width,
-    );
 }

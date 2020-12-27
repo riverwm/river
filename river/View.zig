@@ -19,6 +19,7 @@ const Self = @This();
 
 const build_options = @import("build_options");
 const std = @import("std");
+const math = std.math;
 const os = std.os;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
@@ -378,6 +379,26 @@ pub fn getConstraints(self: Self) Constraints {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.getConstraints(),
         .xwayland_view => |xwayland_view| xwayland_view.getConstraints(),
     };
+}
+
+/// Modify the pending x/y of the view by the given deltas, clamping to the
+/// bounds of the output.
+pub fn move(self: *Self, delta_x: i32, delta_y: i32) void {
+    const config = &self.output.root.server.config;
+    const border_width = if (self.draw_borders) @intCast(i32, config.border_width) else 0;
+    const output_resolution = self.output.getEffectiveResolution();
+
+    const max_x = @intCast(i32, output_resolution.width) - @intCast(i32, self.pending.box.width) - border_width;
+    self.pending.box.x += delta_x;
+    self.pending.box.x = math.max(self.pending.box.x, border_width);
+    self.pending.box.x = math.min(self.pending.box.x, max_x);
+    self.pending.box.x = math.max(self.pending.box.x, 0);
+
+    const max_y = @intCast(i32, output_resolution.height) - @intCast(i32, self.pending.box.height) - border_width;
+    self.pending.box.y += delta_y;
+    self.pending.box.y = math.max(self.pending.box.y, border_width);
+    self.pending.box.y = math.min(self.pending.box.y, max_y);
+    self.pending.box.y = math.max(self.pending.box.y, 0);
 }
 
 /// Find and return the view corresponding to a given surface, if any
