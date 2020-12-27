@@ -478,8 +478,8 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
             self.wlr_cursor.move(device, delta_x, delta_y);
             self.seat.wlr_seat.pointerNotifyMotion(
                 time,
-                self.wlr_cursor.x - @intToFloat(f64, view.current.box.x),
-                self.wlr_cursor.y - @intToFloat(f64, view.current.box.y),
+                self.wlr_cursor.x - @intToFloat(f64, view.current.box.x - view.surface_box.x),
+                self.wlr_cursor.y - @intToFloat(f64, view.current.box.y - view.surface_box.y),
             );
         },
         .move => |view| {
