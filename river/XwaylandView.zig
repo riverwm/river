@@ -77,7 +77,8 @@ pub fn needsConfigure(self: Self) bool {
         self.xwayland_surface.height != self.view.pending.box.height;
 }
 
-/// Apply pending state
+/// Apply pending state. Note: we don't set View.serial as
+/// shouldTrackConfigure() is always false for xwayland views.
 pub fn configure(self: Self) void {
     const state = &self.view.pending;
     self.xwayland_surface.setFullscreen(state.fullscreen);
@@ -87,12 +88,6 @@ pub fn configure(self: Self) void {
         @intCast(u16, state.box.width),
         @intCast(u16, state.box.height),
     );
-    // Xwayland surfaces don't use serials, so we will just assume they have
-    // configured the next time they commit. Set pending serial to a dummy
-    // value to indicate that a transaction has started. Note: we can't just
-    // call notifyConfigured() here as the transaction has not yet been fully
-    // initiated.
-    self.view.pending_serial = 0x66666666;
 }
 
 /// Close the view. This will lead to the unmap and destroy events being sent
@@ -225,19 +220,12 @@ fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *
 /// TODO: check for unexpected change in size and react as needed
 fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) void {
     const self = @fieldParentPtr(Self, "commit", listener);
-    const view = self.view;
-
-    view.surface_box = Box{
+    self.view.surface_box = Box{
         .x = 0,
         .y = 0,
         .width = @intCast(u32, surface.current.width),
         .height = @intCast(u32, surface.current.height),
     };
-
-    // See comment in XwaylandView.configure()
-    if (view.pending_serial != null) {
-        view.notifyConfiguredOrApplyPending();
-    }
 }
 
 /// Called then the window updates its title

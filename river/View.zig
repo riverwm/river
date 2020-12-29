@@ -419,6 +419,9 @@ pub fn fromWlrSurface(surface: *wlr.Surface) ?*Self {
 }
 
 pub fn shouldTrackConfigure(self: Self) bool {
+    // We don't give a damn about frame perfection for xwayland views
+    if (build_options.xwayland and self.impl == .xwayland_view) return false;
+
     // There are exactly three cases in which we do not track configures
     // 1. the view was and remains floating
     // 2. the view is changing from float/layout to fullscreen

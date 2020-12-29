@@ -355,7 +355,7 @@ fn commitTransaction(self: *Self) void {
             }
             defer view_it = view_node.next;
 
-            if (!view.shouldTrackConfigure() and view.pending_serial != null) continue;
+            if (view.pending_serial != null and !view.shouldTrackConfigure()) continue;
 
             // Apply pending state of the view
             view.pending_serial = null;
