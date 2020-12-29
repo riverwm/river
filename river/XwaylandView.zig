@@ -63,8 +63,10 @@ pub fn deinit(self: *Self) void {
 }
 
 pub fn needsConfigure(self: Self) bool {
-    return self.xwayland_surface.x != self.view.pending.box.x or
-        self.xwayland_surface.y != self.view.pending.box.y or
+    const output = self.view.output;
+    const output_box = output.root.output_layout.getBox(output.wlr_output).?;
+    return self.xwayland_surface.x != self.view.pending.box.x + output_box.x or
+        self.xwayland_surface.y != self.view.pending.box.y + output_box.y or
         self.xwayland_surface.width != self.view.pending.box.width or
         self.xwayland_surface.height != self.view.pending.box.height;
 }
@@ -72,11 +74,14 @@ pub fn needsConfigure(self: Self) bool {
 /// Apply pending state. Note: we don't set View.serial as
 /// shouldTrackConfigure() is always false for xwayland views.
 pub fn configure(self: Self) void {
+    const output = self.view.output;
+    const output_box = output.root.output_layout.getBox(output.wlr_output).?;
+
     const state = &self.view.pending;
     self.xwayland_surface.setFullscreen(state.fullscreen);
     self.xwayland_surface.configure(
-        @intCast(i16, state.box.x),
-        @intCast(i16, state.box.y),
+        @intCast(i16, state.box.x + output_box.x),
+        @intCast(i16, state.box.y + output_box.y),
         @intCast(u16, state.box.width),
         @intCast(u16, state.box.height),
     );
