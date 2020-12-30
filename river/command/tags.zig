@@ -100,7 +100,7 @@ fn parseTags(
     const tags = try std.fmt.parseInt(u32, args[1], 10);
 
     if (tags == 0) {
-        out.* = try std.fmt.allocPrint(allocator, "tagmask may not be 0", .{});
+        out.* = try std.fmt.allocPrint(allocator, "tags may not be 0", .{});
         return Error.Other;
     }
 

@@ -68,26 +68,26 @@ riverctl map-pointer normal $mod BTN_RIGHT resize-view
 
 for i in $(seq 1 9)
 do
-    tagmask=$((1 << ($i - 1)))
+    tags=$((1 << ($i - 1)))
 
     # Mod+[1-9] to focus tag [0-8]
-    riverctl map normal $mod $i set-focused-tags $tagmask
+    riverctl map normal $mod $i set-focused-tags $tags
 
     # Mod+Shift+[1-9] to tag focused view with tag [0-8]
-    riverctl map normal $mod+Shift $i set-view-tags $tagmask
+    riverctl map normal $mod+Shift $i set-view-tags $tags
 
     # Mod+Ctrl+[1-9] to toggle focus of tag [0-8]
-    riverctl map normal $mod+Control $i toggle-focused-tags $tagmask
+    riverctl map normal $mod+Control $i toggle-focused-tags $tags
 
     # Mod+Shift+Ctrl+[1-9] to toggle tag [0-8] of focused view
-    riverctl map normal $mod+Shift+Control $i toggle-view-tags $tagmask
+    riverctl map normal $mod+Shift+Control $i toggle-view-tags $tags
 done
 
 # Mod+0 to focus all tags
 # Mod+Shift+0 to tag focused view with all tags
-all_tags_mask=$(((1 << 32) - 1))
-riverctl map normal $mod 0 set-focused-tags $all_tags_mask
-riverctl map normal $mod+Shift 0 set-view-tags $all_tags_mask
+all_tags=$(((1 << 32) - 1))
+riverctl map normal $mod 0 set-focused-tags $all_tags
+riverctl map normal $mod+Shift 0 set-view-tags $all_tags
 
 # Mod+Space to toggle float
 riverctl map normal $mod Space toggle-float

@@ -92,25 +92,34 @@ control and configure river.
 	Bump the focused view to the top of the layout stack to make it the new
 	master.
 
-## ACTIONS ON TAGS
+## TAG MANAGEMENT
 
-Tags are like workspaces but more flexible: You can assign views to multiple
-tags and look at multiple tags at once. A _tagmask_ is used to represent which
-tags are visible. The following commands take a _tagmask_ in base 10 as
-argument but _tagmasks_ are best understood in binary: 000000001 means that the
-first tag is visible; 111111111 means that tag 1 through 9 are visible.
+Tags are similar to workspaces but more flexible. You can assign views multiple
+tags and focus multiple tags simultaneously. Bitfields are used to describe
+sets of tags when interfacing with river. As such, the following commands
+take a normal base 10 number as their argument but the semantics are best
+understood in binary. The binary number 000000001 represents a set containing
+only tag 1 while 100001101 represents a set containing tags 1, 3, 4, and 9.
 
-*set-focused-tags* _tagmask_
-	Show the tags specified with _tagmask_.
+At least one tag must always be focused and each view must be assigned at
+least one tag. Operations that would violate either of these requirements
+are ignored by river.
 
-*set-view-tags* _tagmask_
-	Assign focused view to tags specified with _tagmask_.
+*set-focused-tags* _tags_
+	Show views with tags corresponding to the set bits of _tags_ on the
+	currently focused output.
 
-*toggle-focused-tags* _tagmask_
-	Toggle visibility of tags specified with _tagmask_.
+*set-view-tags* _tags_
+	Assign the currently focused view the tags corresponding to the set
+	bits of _tags_.
 
-*toggle-view-tags* _tagmask_
-	Toggle tags of focused view as specified with _tagmask_.
+*toggle-focused-tags* _tags_
+	Toggle visibility of views with tags corresponding to the set bits
+	of _tags_ on the currently focused output.
+
+*toggle-view-tags* _tags_
+	Toggle the tags of the currently focused view corresponding to the
+	set bits of _tags_.
 
 ## CONFIGURATION COMMANDS
 
