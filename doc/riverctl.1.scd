@@ -234,7 +234,7 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 	If the view to be focused is on an output that does not have focus,
 	focus is switched to that output.
 
-*opacity* _focused_ _unfocused_ _initial_ _step_size_ _delta-t_
+*opacity* _focused_ _unfocused_ _initial_ _step-size_ _delta-t_
 	Configure server-side opacity of views, including transition
 	animations. A value of 0.0 is fully transparent while 1.0 is fully
 	opaque. By default all views are fully opaque and there are no
@@ -244,14 +244,14 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 	- _unfocused_: opacity of unfocused views [0.0, 1.0]
 	- _initial_: opacity of views when they are created before immediately
 	  transitioning to either _focused_ or _unfocused_ [0.0, 1.0]
-	- _step_size_: opacity change per step [0.05, 1.0]
+	- _step-size_: opacity change per step [0.05, 1.0]
 	- _delta-t_: step time in milliseconds
 
 	A transition animation may occur when changing between states with
 	different opacity values configured. Instead of setting the view's
 	opacity to the value for the new state immediately, it is changed
-	incrementally in steps of _step_size_ every _delta-t_ milliseconds.
-	Setting _step_size_ to 1.0 disables transitions fully regardless of
+	incrementally in steps of _step-size_ every _delta-t_ milliseconds.
+	Setting _step-size_ to 1.0 disables transitions fully regardless of
 	the value of _delta-t_.
 
 *outer-padding* _pixels_
