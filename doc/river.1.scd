@@ -16,13 +16,9 @@ on wlroots and written in Zig.
 # OPTIONS
 
 *-c* _shell_command_
-	Run a shell command or give the path to a script that will be run after
-	river's wayland server is initialized but before entering the main
-	loop. You may use this to configure river and define keymaps using
-	*riverctl*(1), start programs such as a status bar, or perhaps run a
-	service manager. If the process started by this flag is still running
-	when river exits, river will send SIGTERM and and wait for it to
-	terminate.
+	Override the default search paths for an init executable: instead
+	_shell_command_ will be run with `/bin/sh -c`. See the *CONFIGURATION*
+	section for more details.
 
 *-l* _log_level_
 	Set the log level of river to a value from 0 to 7 with 0 being the
@@ -31,8 +27,20 @@ on wlroots and written in Zig.
 
 # CONFIGURATION
 
-Experimental XWayland support can be enabled on compile-time with the
-_-Dxwayland=true_ flag.
+On startup river will look for and run an executable file at one of the
+following locations, checked in the order listed:
+
+- $XDG_CONFIG_HOME/river/init
+- $HOME/.config/river/init
+- /etc/river/init
+
+This executable init file will be run after river's wayland server is
+initialized but before entering the main loop. If the process started by
+this flag is still running when river exits, river will send SIGTERM and
+and wait for it to terminate.
+
+Usually this will be a shell script invoking *riverctl*(1) to create mappings,
+start programs such as a status bar, and preform other configuration.
 
 # ENVIRONMENT
 
@@ -44,6 +52,12 @@ The following environment variables are used to configure the keyboard. See
 - XKB_DEFAULT_VARIANT
 - XKB_DEFAULT_OPTIONS
 - XKB_DEFAULT_RULES
+
+# EXAMPLES
+
+Set the keyboard layout to colemak:
+
+	XKB_DEFAULT_LAYOUT="us(colemak)" river
 
 # AUTHORS
 

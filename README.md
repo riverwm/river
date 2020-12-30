@@ -42,48 +42,33 @@ installed:
 *Note: NixOS users may refer to the
 [Building on NixOS wiki page](https://github.com/ifreund/river/wiki/Building-on-NixOS)*
 
-Then run, for example,
+Then run, for example:
 ```
-zig build -Drelease-safe=true --prefix /usr/local install
+zig build -Drelease-safe=true --prefix /usr install
 ```
-to build and install the binaries and man pages to `/usr/local/bin` and
-`/usr/local/share/man`. To enable experimental Xwayland support pass the
-`-Dxwayland=true` option as well.
+To enable experimental Xwayland support pass the `-Dxwayland=true` option as well.
 
 ## Usage
 
 River can either be run nested in an X11/wayland session or directly
 from a tty using KMS/DRM.
 
-River has no keybindings by default; mappings can be created using the `map`
-command of `riverctl`. Generally, creating mappings and other configuration is
-done with a shell script. River will execute any arbitrary shell command passed
-with the `-c` flag during startup. For example:
+On startup river will look for and run an executable file at one of the
+following locations, checked in the order listed:
 
-```
-river -c /path/to/config.sh
-```
+- `$XDG_CONFIG_HOME/river/init`
+- `$HOME/.config/river/init`
+- `/etc/river/init`
 
-An example script with sane defaults is provided [here](contrib/config.sh) in
-the contrib directory.
+Usually this executable init file will be a shell script invoking riverctl
+to create mappings and preform other configuration.  The init file path may
+be overridden with the `-c` flag.
 
-For a complete list of commands see the `riverctl(1)` man page.
+An example init script with sane defaults is provided [here](example/init)
+in the example directory and installed to `/etc/river/init`.
 
-Keyboard configuration is not yet implemented in river, but since river uses
-libxkbcommon you may use the following environment variables to set defaults:
-
-- `XKB_DEFAULT_RULES`
-- `XKB_DEFAULT_MODEL`
-- `XKB_DEFAULT_LAYOUT`
-- `XKB_DEFAULT_VARIANT`
-- `XKB_DEFAULT_OPTIONS`
-
-Possible values for these variables can be found in the `xkeyboard-config(7)`
-man page. For example, to use a dvorak layout one could start river with
-
-```
-XKB_DEFAULT_LAYOUT="us(dvorak)" river
-```
+For a complete list of commands and documentation see the `riverctl(1)`
+man page.
 
 ## Development
 
