@@ -2,7 +2,7 @@ RIVERCTL(1) "github.com/ifreund/river" "General Commands Manual"
 
 # NAME
 
-riverctl - Command-line interface for controlling river
+riverctl - command-line interface for controlling river
 
 # SYNOPSIS
 
@@ -10,8 +10,8 @@ riverctl - Command-line interface for controlling river
 
 # DESCRIPTION
 
-*riverctl* is a command-line interface inspired by bspc from bspwm used to
-control and configure river.
+*riverctl* is a command-line utility used to control and configure river
+over the Wayland protocol.
 
 # COMMANDS
 
@@ -21,35 +21,35 @@ control and configure river.
 	Close the focused view.
 
 *csd-filter-add* _app-id_
-	Add an app-id to the CSD filter list. Windows with this app-id are
-	allowed to use client side decoration instead of the default server
+	Add _app_id_ to the CSD filter list. Views with this _app_id are
+	told to use client side decoration instead of the default server
 	side decoration.
 
 *exit*
 	Exit the compositor, terminating the Wayland session.
 
 *float-filter-add* _app-id_
-	Add an app-id to the float filter list. Windows with this app-id will
-	start floating.
+	Add _app-id_ to the float filter list. Views with this _app-id_
+	will start floating.
 
 *focus-output* *next*|*previous*
-	Focus next or previous output.
+	Focus the next or previous output.
 
 *focus-view* *next*|*previous*
-	Focus next or previous view in the stack.
+	Focus the next or previous view in the stack.
 
 *layout* *full*|_command_
-	Provide a command which river will use for generating the layout of
-	non-floating windows on the currently focused output. See
-	*river-layouts*(7) for details on the expected formatting of the output
-	of layout commands. Alternatively, “full” can be given instead of a
-	command to cause river to use its single internal layout, in which
-	windows span the entire width and height of the output.
+	Provide a command which river will use for generating the layout
+	of non-floating windows on the currently focused output. See
+	*river-layouts*(7) for details on the expected formatting of the
+	output of layout commands. Alternatively, “full” can be given
+	instead of a command to cause river to use its single internal layout,
+	in which windows span the entire width and height of the output.
 
 *mod-main-count* _integer_
-	Increase or decrease the number of "main" views which is relayed to
-	the layout generator. _integer_ can be positive or negative. Exactly
-	how "main" views are display, or if they are even displayed differently
+	Increase or decrease the number of "main" views which is relayed to the
+	layout generator. _integer_ can be positive or negative. Exactly how
+	"main" views are display, or if they are even displayed differently
 	from other views, is left to the layout generator.
 
 *mod-main-factor* _float_
@@ -62,16 +62,16 @@ control and configure river.
 	the "main" area will occupy.
 
 *move* *up*|*down*|*left*|*right* _delta_
-	Move the focused view in the specified direction by _delta_. The view
-	will be set to floating.
+	Move the focused view in the specified direction by _delta_ logical
+	pixels. The view will be set to floating.
 
 *resize* *horizontal*|*vertical* _delta_
-	Resize the view in the given orientation by _delta_. The view will be
-	set to floating.
+	Resize the focused view along the given axis by _delta_ logical
+	pixels. The view will be set to floating.
 
 *snap* *up*|*down*|*left*|*right*
-	Snap the view to the specified screen edge. The view will be set to
-	floating.
+	Snap the focused view to the specified screen edge. The view will
+	be set to floating.
 
 *send-to-output* *next*|*previous*
 	Send the focused view to the next or the previous output.
@@ -82,21 +82,18 @@ control and configure river.
 	interpreted by your shell before the command gets passed to _/bin/sh_.
 
 *swap* *next*|*previous*
-	Swap the focused window with the next/previous visible non-floating
-	window. When the focused view is the first view there is no previous
-	view. In this case *previous* swaps with the last view. *next* behaves
-	analogous.
+	Swap the focused view with the next/previous visible non-floating
+	view. If the first/last view in the stack is focused, wrap.
 
 *toggle-float*
-	If the focused view is floating, make it tiled. If it is tiled, make it
-	floating.
+	Toggle the floating state of the focused view.
 
 *toggle-fullscreen*
 	Toggle the fullscreen state of the focused view.
 
 *zoom*
-	Bump the focused view to the top of the layout stack. If the top view
-	in the stack is already focused, bump the second view.
+	Bump the focused view to the top of the layout stack. If the top
+	view in the stack is already focused, bump the second view.
 
 ## TAG MANAGEMENT
 
@@ -127,10 +124,88 @@ are ignored by river.
 	Toggle the tags of the currently focused view corresponding to the
 	set bits of _tags_.
 
-## CONFIGURATION COMMANDS
+## MAPPINGS
+
+Mappings are modal in river. Each mapping is associated with a mode and is
+only active while in that mode. There are two special modes: "default" and
+"locked". The default mode is the initial mode for every seat. The locked
+mode is automatically entered while an input inhibitor (such as a lockscreen)
+is active. It cannot be left or entered manually.
+
+The following modifiers are available for use in mappings:
+
+	- Shift
+	- Lock (Caps lock)
+	- Control (Ctrl)
+	- Mod1 (Alt)
+	- Mod2
+	- Mod3
+	- Mod4 (Super, Logo, Windows)
+	- Mod5
+	- None (Create a mapping without modifiers)
+
+Keys are specified by their XKB keysym name. See
+_/usr/include/xkbcommon/xkbcommon-keysyms.h_ for the complete list.
+
+Mouse buttons are specified by linux input event code names. The most commonly
+used values are:
+
+	- BTN_LEFT - left mouse button
+	- BTN_RIGHT - right mouse button
+	- BTN_MIDDLE - middle mouse button
+
+A complete list may be found in _/usr/include/linux/input-event-codes.h_
+
+*declare-mode* _name_
+	Create a new mode called _name_.
+
+*enter-mode* _name_
+	Switch to given mode if it exits.
+
+*map* [_-release_] _mode_ _modifiers_ _key_ _command_
+	Run _command_ when _key_ is pressed while _modifiers_ are held down
+	and in the specified _mode_.
+
+	- _-release_: if passed activate on key release instead of key press
+	- _mode_: name of the mode for which to create the mapping
+	- _modifiers_: one or more of the modifiers listed above, separated
+	  by a plus sign (+).
+	- _key_: an XKB keysym name as described above
+	- _command_: any command that may be run with riverctl
+
+*map-pointer* _mode_ _modifiers_ _button_ _action_
+	Move or resize views when _button_ and _modifiers_ are held down
+	while in the specified _mode_.
+
+	- _mode_: name of the mode for which to create the mapping
+	- _modifiers_: one or more of the modifiers listed above, separated
+	  by a plus sign (+).
+	- _button_: the name of a linux input event code as described above
+	- _action_: one of the following values:
+		- move-view
+		- resize-view
+
+*unmap* [_-release_] _mode_ _modifiers_ _key_
+	Remove the mapping defined by the arguments:
+
+	- _-release_: if passed unmap the key release instead of the key press
+	- _mode_: name of the mode for which to remove the mapping
+	- _modifiers_: one or more of the modifiers listed above, separated
+	  by a plus sign (+).
+	- _key_: an XKB keysym name as described above
+
+*unmap-pointer* _mode_ _modifiers_ _button_
+	Remove the pointer mapping defined by the arguments:
+
+	- _mode_: name of the mode for which to remove the mapping
+	- _modifiers_: one or more of the modifiers listed above, separated
+	  by a plus sign (+).
+	- _button_: the name of a linux input event code as described above
+
+## CONFIGURATION
 
 *attach-mode* *top*|*bottom*
-	Configure where new views should attach in the view stack for the
+	Configure where new views should attach to the view stack for the
 	currently focused output.
 
 *background-color* _#RRGGBB_|_#RRGGBBAA_
@@ -145,80 +220,39 @@ are ignored by river.
 *border-width* _pixels_
 	Set the border width to _pixels_.
 
-*declare-mode* _name_
-	Create a new mode called _name_ for use in mappings.
-
-*enter-mode* _name_
-	Switch to given mode if it exits.
-
 *focus-follows-cursor* *disabled*|*normal*|*strict*
-	When _disabled_ moving the cursor will not influence the focus. This is
-	the default setting. If set to _normal_ moving the cursor over a window
-	will focus that window. The focus still can be changed and moving the
-	cursor within the (now unfocused) window will not change the focus to
-	that window but let the currently focused window in focus. When set to
-	_strict_ this is not the case. The focus will be updated on every
-	cursor movement.
+	There are three available modes:
 
-	When the to be focused view is on another output than the currently
-	focused output the view's output is focused.
+	- _disabled_: Moving the cursor does not affect focus. This is
+	  the default
+	- _normal_: Moving the cursor over a view will focus that view.
+	  Moving the cursor within a view will not re-focus that view if
+	  focus has moved elsewhere.
+	- _strict_: Moving the cursor over a view or within a view will
+	  focus that view.
 
-*map* [-release] _mode_ _modifiers_ _key_ _command_
-	_mode_ is either "normal" (the default mode), "locked" (the mode
-	entered when an input inhibitor such as a lock screen is active) or a
-	mode created with *declare-mode*. If _-release_ is specified the
-	mapping is executed on key release rather than key press. _modifiers_
-	is a list of one or more of the following modifiers separated with a
-	plus sign:
+	If the view to be focused is on an output that does not have focus,
+	focus is switched to that output.
 
-	- Shift
-	- Lock (Caps lock)
-	- Control (Ctrl)
-	- Mod1 (Alt)
-	- Mod2
-	- Mod3
-	- Mod4 (Super, Logo, Windows)
-	- Mod5
+*opacity* _focused_ _unfocused_ _initial_ _step_size_ _delta-t_
+	Configure server-side opacity of views, including transition
+	animations. A value of 0.0 is fully transparent while 1.0 is fully
+	opaque. By default all views are fully opaque and there are no
+	animations.
 
-	_key_ is an XKB key name. See
-	_/usr/include/xkbcommon/xkbcommon-keysyms.h_ for a list of special key
-	names. _command_ can be any of the above commands.
+	- _focused_: opacity of focused views [0.0, 1.0]
+	- _unfocused_: opacity of unfocused views [0.0, 1.0]
+	- _initial_: opacity of views when they are created before immediately
+	  transitioning to either _focused_ or _unfocused_ [0.0, 1.0]
+	- _step_size_: opacity change per step [0.05, 1.0]
+	- _delta-t_: step time in milliseconds
 
-	A mapping without modifiers can be created by using "None" as sole
-	modifier.
-
-*map-pointer* _mode_ _modifiers_ _button_ _action_
-	_mode_ and _modifiers_ are the same as for *map*.
-
-	_button_ is the name of a linux input event code. The most commonly
-	used values are:
-
-	- BTN_LEFT - left mouse button
-	- BTN_RIGHT - right mouse button
-	- BTN_MIDDLE - middle mouse button
-
-	A complete list may be found in _/usr/include/linux/input-event-codes.h_
-
-	_action_ is one of the following values:
-
-	- move-view
-	- resize-view
-
-*opacity* _focused-opacity_ _unfocused-opacity_ _starting-opacity_ _opacity-step_ _opacity-delta-t_
-	Set the server side opacity of views.
-
-	_focused-opacity_ sets the opacity of the focused window,
-	_unfocused-opacity_ the opacity of every unfocused window while
-	_starting-opacity_ sets the opacity a window will have at startup
-	before immediately transitioning to either the focused or unfocused
-	opacity. These settings require a floating point number from 0.0 (fully
-	transparent) to 1.0 (fully opaque).
-
-	Opacity transitions can be animated. _opacity-step_ sets the amount the
-	opacity should be increased or decreased per step of the transition. It
-	requires a floating point number from 0.05 to 1.0. If set to 1.0,
-	animations are disabled. _opacity-delta-t_ sets the time between the
-	transition steps in milliseconds.
+	A transition animation may occur when changing between states with
+	different opacity values configured. Instead of setting the view's
+	opacity to the value for the new state immediately, it is changed
+	incrementally in steps of _step_size_ every _delta-t_ milliseconds.
+	Setting _step_size_ to 1.0 disables transitions fully regardless of
+	the value of _delta-t_.
 
 *outer-padding* _pixels_
 	Set the padding around the edge of the screen to _pixels_.
@@ -227,30 +261,22 @@ are ignored by river.
 	Set the keyboard repeat rate to _rate_ key repeats per second and
 	repeat delay to _delay_ milliseconds.
 
-*unmap* [-release] _mode_ _modifiers_ _key_
-	Removes the mapping defined by the arguments *-release*, *modifiers*
-	and *key* from *mode*. See *map* for an explanation of the arguments.
-
-*unmap-pointer* _mode_ _modifiers_ _button_
-	Removes the mapping defined by the arguments *modifiers* and *button*
-	from *mode*. See *map-pointer* for an explanation of the arguments.
-
 *view-padding* _pixels_
 	Set the padding around the edge of each view to _pixels_.
 
 *xcursor-theme* _theme_name_ [_size_]
 	Set the xcursor theme to _theme_name_ and optionally set the _size_.
-	The theme of the default seat determines the default for XWayland and
-	made available through the _XCURSOR_THEME_ and _XCURSOR_SIZE_
+	The theme of the default seat determines the default for Xwayland
+	and is made available through the _XCURSOR_THEME_ and _XCURSOR_SIZE_
 	environment variables.
 
 # EXAMPLES
 
-Bind bemenu-run to Super+P:
+Bind bemenu-run to Super+P in normal mode:
 
 	riverctl map normal Mod4 P spawn bemenu-run
 
-See _contrib/config.sh_ for some basic keybindings.
+See also the example init script at /etc/river/init.
 
 # AUTHORS
 

@@ -2,7 +2,7 @@ RIVER(1) "github.com/ifreund/river" "General Commands Manual"
 
 # NAME
 
-river - Dynamic tiling Wayland compositor
+river - dynamic tiling Wayland compositor
 
 # SYNOPSIS
 
@@ -10,14 +10,19 @@ river - Dynamic tiling Wayland compositor
 
 # DESCRIPTION
 
-*river* is a dynamic tiling Wayland compositor inspired by dwm and bspwm based
-on wlroots and written in Zig.
+*river* is a dynamic tiling Wayland compositor. Window management is based on
+a stack of views laid out dynamically by an external layout generator. Tags
+are used instead of workspaces allowing for increased flexibility.
+
+All runtime configuration and control happens through wayland protocols,
+including several river-specific protocol extensions. The *riverctl*(1)
+utility may be used to communicate with river over these protocols.
 
 # OPTIONS
 
 *-c* _shell_command_
 	Override the default search paths for an init executable: instead
-	_shell_command_ will be run with `/bin/sh -c`. See the *CONFIGURATION*
+	_shell_command_ will be run with _/bin/sh -c_. See the *CONFIGURATION*
 	section for more details.
 
 *-l* _log_level_

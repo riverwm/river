@@ -20,7 +20,8 @@ separate `riverctl` binary implementing it.
 
 ## Building
 
-On cloning the repository, you must init and update the submodules as well with e.g.
+On cloning the repository, you must init and update the submodules as well
+with e.g.
 
 ```
 git submodule update --init
@@ -61,19 +62,15 @@ following locations, checked in the order listed:
 - `/etc/river/init`
 
 Usually this executable init file will be a shell script invoking riverctl
-to create mappings and preform other configuration.  The init file path may
-be overridden with the `-c` flag.
+to create mappings and preform other configuration.
 
 An example init script with sane defaults is provided [here](example/init)
 in the example directory and installed to `/etc/river/init`.
 
-For a complete list of commands and documentation see the `riverctl(1)`
-man page.
+For complete documentation see the `river(1)`, `riverctl(1)`, and
+`rivertile(1)` man pages.
 
 ## Development
-
-Check out the [roadmap](https://github.com/ifreund/river/issues/1)
-if you'd like to see what has been done and what is left to do.
 
 If you are interested in the development of river, please join us at
 [#river](https://webchat.freenode.net/#river) on freenode. You should also
