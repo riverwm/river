@@ -27,6 +27,14 @@ pub fn build(b: *zbs.Builder) !void {
 
     const examples = b.option(bool, "examples", "Set to true to build examples") orelse false;
 
+    // Sigh, why are the conventions inconsistent like this.
+    const resolved_prefix = try std.fs.path.resolve(b.allocator, &[_][]const u8{b.install_prefix.?});
+    if (std.mem.eql(u8, resolved_prefix, "/usr")) {
+        b.installFile("example/init", "../etc/river/init");
+    } else {
+        b.installFile("example/init", "etc/river/init");
+    }
+
     const scanner = ScanProtocolsStep.create(b);
     scanner.addSystemProtocol("stable/xdg-shell/xdg-shell.xml");
     scanner.addProtocolPath("protocol/river-control-unstable-v1.xml");

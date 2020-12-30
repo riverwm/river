@@ -1,5 +1,12 @@
 #!/bin/sh
 
+# This is the example configuration file for river(1).
+#
+# If you wish to edit this, you will probably want to copy it to
+# $XDG_CONFIG_HOME/river/init or $HOME/.config/river/init first.
+#
+# See the riverctl(1) man page for complete documentation
+
 # Use the "logo" key as the primary modifier
 mod="Mod4"
 
