@@ -21,7 +21,7 @@ over the Wayland protocol.
 	Close the focused view.
 
 *csd-filter-add* _app-id_
-	Add _app_id_ to the CSD filter list. Views with this _app_id are
+	Add _app-id_ to the CSD filter list. Views with this _app-id_ are
 	told to use client side decoration instead of the default server
 	side decoration.
 
