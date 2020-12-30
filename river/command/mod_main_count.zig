@@ -20,8 +20,8 @@ const std = @import("std");
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
-/// Modify the number of master views
-pub fn modMasterCount(
+/// Modify the number of main views
+pub fn modMainCount(
     allocator: *std.mem.Allocator,
     seat: *Seat,
     args: []const []const u8,
@@ -32,7 +32,7 @@ pub fn modMasterCount(
 
     const delta = try std.fmt.parseInt(i32, args[1], 10);
     const output = seat.focused_output;
-    output.master_count = @intCast(u32, std.math.max(0, @intCast(i32, output.master_count) + delta));
+    output.main_count = @intCast(u32, std.math.max(0, @intCast(i32, output.main_count) + delta));
     output.arrangeViews();
     output.root.startTransaction();
 }

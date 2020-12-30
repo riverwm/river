@@ -46,14 +46,20 @@ control and configure river.
 	command to cause river to use its single internal layout, in which
 	windows span the entire width and height of the output.
 
-*mod-master-count* _integer_
-	Increase or decrease the number of master views. _integer_ can be
-	positive or negative.
+*mod-main-count* _integer_
+	Increase or decrease the number of "main" views which is relayed to
+	the layout generator. _integer_ can be positive or negative. Exactly
+	how "main" views are display, or if they are even displayed differently
+	from other views, is left to the layout generator.
 
-*mod-master-factor* _float_
-	Make the master area bigger or smaller. _float_ is a positive or
-	negative floating point number (such as 0.05) where 1 corresponds to
-	the whole screen.
+*mod-main-factor* _float_
+	Increase or decrease the "main factor" relayed to layout
+	generators. _float_ is a positive or negative floating point number
+	(such as 0.05). This value is added to the current main factor which
+	is then clamped to the range [0.0, 1.0]. The layout generator is
+	free to interpret this value as it sees fit, or ignore it entirely.
+	*rivertile*(1) uses this to determine what percentage of the screen
+	the "main" area will occupy.
 
 *move* *up*|*down*|*left*|*right* _delta_
 	Move the focused view in the specified direction by _delta_. The view
@@ -89,8 +95,8 @@ control and configure river.
 	Toggle the fullscreen state of the focused view.
 
 *zoom*
-	Bump the focused view to the top of the layout stack to make it the new
-	master.
+	Bump the focused view to the top of the layout stack. If the top view
+	in the stack is already focused, bump the second view.
 
 ## TAG MANAGEMENT
 

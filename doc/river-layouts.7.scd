@@ -16,8 +16,8 @@ When running the executable, river will provide it with five parameters which
 are appended to the end of the command in the following order:
 
 . The amount of visible clients (integer)
-. The amount of views dedicated as master (integer)
-. The screen size multiplier for the master area (float between 0.0 and 1.0)
+. The amount of views dedicated as main (integer)
+. The screen size multiplier for the main area (float between 0.0 and 1.0)
 . The useable width of the output (integer)
 . The useable height of the output (integer)
 

@@ -20,8 +20,8 @@ const std = @import("std");
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
-/// Modify the percent of the width of the screen that the master views occupy.
-pub fn modMasterFactor(
+/// Modify the percent of the width of the screen that the main views occupy.
+pub fn modMainFactor(
     allocator: *std.mem.Allocator,
     seat: *Seat,
     args: []const []const u8,
@@ -32,9 +32,9 @@ pub fn modMasterFactor(
 
     const delta = try std.fmt.parseFloat(f64, args[1]);
     const output = seat.focused_output;
-    const new_master_factor = std.math.min(std.math.max(output.master_factor + delta, 0.05), 0.95);
-    if (new_master_factor != output.master_factor) {
-        output.master_factor = new_master_factor;
+    const new_main_factor = std.math.min(std.math.max(output.main_factor + delta, 0.05), 0.95);
+    if (new_main_factor != output.main_factor) {
+        output.main_factor = new_main_factor;
         output.arrangeViews();
         output.root.startTransaction();
     }

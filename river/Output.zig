@@ -59,11 +59,11 @@ views: ViewStack(View) = .{},
 current: State = State{ .tags = 1 << 0 },
 pending: State = State{ .tags = 1 << 0 },
 
-/// Number of views in "master" section of the screen.
-master_count: u32 = 1,
+/// Number of views in "main" section of the screen.
+main_count: u32 = 1,
 
-/// Percentage of the total screen that the master section takes up.
-master_factor: f64 = 0.6,
+/// Percentage of the total screen that the "main" section takes up.
+main_factor: f64 = 0.6,
 
 /// Current layout of the output. If it is "full", river will use the full
 /// layout. Otherwise river assumes it contains a string which, when executed
@@ -221,8 +221,8 @@ fn layoutExternal(self: *Self, visible_count: u32) !void {
     const layout_command = try std.fmt.allocPrint0(&arena.allocator, "{} {} {} {d} {} {}", .{
         self.layout,
         visible_count,
-        self.master_count,
-        self.master_factor,
+        self.main_count,
+        self.main_factor,
         layout_width,
         layout_height,
     });

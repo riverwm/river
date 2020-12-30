@@ -11,21 +11,21 @@ rivertile - Tiled layout generator for river
 # DESCRIPTION
 
 *rivertile* is a layout generator for river. It produces tiled layouts with
-split master/secondary stacks in four configurable orientations.
+split main/secondary stacks in four configurable orientations.
 
 # OPTIONS
 
 *left*
-	Place the master stack on the left side of the output.
+	Place the main stack on the left side of the output.
 
 *right*
-	Place the master stack on the right side of the output.
+	Place the main stack on the right side of the output.
 
 *top*
-	Place the master stack at the top of the output.
+	Place the main stack at the top of the output.
 
 *bottom*
-	Place the master stack at the bottom of the output.
+	Place the main stack at the bottom of the output.
 
 # EXAMPLE
 

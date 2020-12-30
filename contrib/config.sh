@@ -29,18 +29,18 @@ riverctl map normal $mod Comma focus-output previous
 riverctl map normal $mod+Shift Period send-to-output next
 riverctl map normal $mod+Shift Comma send-to-output previous
 
-# Mod+Return to bump the focused view to the top of the layout stack, making
-# it the new master
+# Mod+Return to bump the focused view to the top of the layout stack
 riverctl map normal $mod Return zoom
 
-# Mod+H and Mod+L to decrease/increase the width of the master column by 5%
-riverctl map normal $mod H mod-master-factor -0.05
-riverctl map normal $mod L mod-master-factor +0.05
+# Mod+H and Mod+L to decrease/increase the main factor by 5%
+# If using rivertile(1) this determines the width of the main stack.
+riverctl map normal $mod H mod-main-factor -0.05
+riverctl map normal $mod L mod-main-factor +0.05
 
 # Mod+Shift+H and Mod+Shift+L to increment/decrement the number of
-# master views in the layout
-riverctl map normal $mod+Shift H mod-master-count +1
-riverctl map normal $mod+Shift L mod-master-count -1
+# main views in the layout
+riverctl map normal $mod+Shift H mod-main-count +1
+riverctl map normal $mod+Shift L mod-main-count -1
 
 # Mod+Alt+{H,J,K,L} to move views
 riverctl map normal $mod+Mod1 H move left 100
@@ -95,7 +95,7 @@ riverctl map normal $mod Space toggle-float
 # Mod+F to toggle fullscreen
 riverctl map normal $mod F toggle-fullscreen
 
-# Mod+{Up,Right,Down,Left} to change master orientation
+# Mod+{Up,Right,Down,Left} to change layout orientation
 riverctl map normal $mod Up layout rivertile top
 riverctl map normal $mod Right layout rivertile right
 riverctl map normal $mod Down layout rivertile down
