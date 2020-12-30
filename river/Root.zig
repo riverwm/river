@@ -163,9 +163,18 @@ pub fn removeOutput(self: *Self, output: *Output) void {
 
     self.outputs.remove(node);
 
-    // Use the first output in the list as fallback.
-    // If there is no other real output, use the noop output.
-    const fallback_output = if (self.outputs.first) |output_node| &output_node.data else &self.noop_output;
+    // Use the first output in the list as fallback. If the last real output
+    // is being removed, use the noop output.
+    const fallback_output = blk: {
+        if (self.outputs.first) |output_node| {
+            break :blk &output_node.data;
+        } else {
+            // Store the focused output tags if we are hotplugged down to
+            // 0 real outputs so they can be restored on gaining a new output.
+            self.noop_output.current.tags = output.current.tags;
+            break :blk &self.noop_output;
+        }
+    };
 
     // Move all views from the destroyed output to the fallback one
     while (output.views.last) |view_node| {
@@ -214,19 +223,27 @@ pub fn addOutput(self: *Self, output: *Output) void {
 
     self.outputs.append(node);
 
-    // Add the new output to the layout. The add_auto function arranges outputs
-    // from left-to-right in the order they appear. A more sophisticated
-    // compositor would let the user configure the arrangement of outputs in the
-    // layout. This automatically creates an output global on the wl_display.
+    // This aarranges outputs from left-to-right in the order they appear. The
+    // wlr-output-management protocol may be used to modify this arrangement.
+    // This also creates a wl_output global which is advertised to clients.
     self.output_layout.addAuto(node.data.wlr_output);
 
-    // if we previously had no real outputs, move focus from the noop output
+    // If we previously had no real outputs, move focus from the noop output
     // to the new one.
     if (self.outputs.len == 1) {
-        // TODO: move views from the noop output to the new one and focus(null)
+        // Restore the focused tags of the last output to be removed
+        output.pending.tags = self.noop_output.current.tags;
+        output.current.tags = self.noop_output.current.tags;
+
+        // Move all views from noop output to the new output
+        while (self.noop_output.views.last) |n| n.view.sendToOutput(output);
+
+        // Focus the new output with all seats
         var it = self.server.input_manager.seats.first;
         while (it) |seat_node| : (it = seat_node.next) {
-            seat_node.data.focusOutput(&self.outputs.first.?.data);
+            const seat = &seat_node.data;
+            seat.focusOutput(output);
+            seat.focus(null);
         }
     }
 }
