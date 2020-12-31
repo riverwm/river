@@ -28,12 +28,10 @@ const Seat = @import("Seat.zig");
 seat: *Seat,
 wlr_drag_icon: *wlr.Drag.Icon,
 
-destroy: wl.Listener(*wlr.Drag.Icon) = undefined,
+destroy: wl.Listener(*wlr.Drag.Icon) = wl.Listener(*wlr.Drag.Icon).init(handleDestroy),
 
 pub fn init(self: *Self, seat: *Seat, wlr_drag_icon: *wlr.Drag.Icon) void {
     self.* = .{ .seat = seat, .wlr_drag_icon = wlr_drag_icon };
-
-    self.destroy.setNotify(handleDestroy);
     wlr_drag_icon.events.destroy.add(&self.destroy);
 }
 

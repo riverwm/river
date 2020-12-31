@@ -37,30 +37,30 @@ view: *View,
 xdg_surface: *wlr.XdgSurface,
 
 // Listeners that are always active over the view's lifetime
-destroy: wl.Listener(*wlr.XdgSurface) = undefined,
-map: wl.Listener(*wlr.XdgSurface) = undefined,
-unmap: wl.Listener(*wlr.XdgSurface) = undefined,
+destroy: wl.Listener(*wlr.XdgSurface) = wl.Listener(*wlr.XdgSurface).init(handleDestroy),
+map: wl.Listener(*wlr.XdgSurface) = wl.Listener(*wlr.XdgSurface).init(handleMap),
+unmap: wl.Listener(*wlr.XdgSurface) = wl.Listener(*wlr.XdgSurface).init(handleUnmap),
 
 // Listeners that are only active while the view is mapped
-commit: wl.Listener(*wlr.Surface) = undefined,
-new_popup: wl.Listener(*wlr.XdgPopup) = undefined,
-request_fullscreen: wl.Listener(*wlr.XdgToplevel.event.SetFullscreen) = undefined,
-request_move: wl.Listener(*wlr.XdgToplevel.event.Move) = undefined,
-request_resize: wl.Listener(*wlr.XdgToplevel.event.Resize) = undefined,
-set_title: wl.Listener(*wlr.XdgSurface) = undefined,
+commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
+new_popup: wl.Listener(*wlr.XdgPopup) = wl.Listener(*wlr.XdgPopup).init(handleNewPopup),
+// zig fmt: off
+request_fullscreen: wl.Listener(*wlr.XdgToplevel.event.SetFullscreen) =
+    wl.Listener(*wlr.XdgToplevel.event.SetFullscreen).init(handleRequestFullscreen),
+request_move: wl.Listener(*wlr.XdgToplevel.event.Move) =
+    wl.Listener(*wlr.XdgToplevel.event.Move).init(handleRequestMove),
+request_resize: wl.Listener(*wlr.XdgToplevel.event.Resize) =
+    wl.Listener(*wlr.XdgToplevel.event.Resize).init(handleRequestResize),
+// zig fmt: on
+set_title: wl.Listener(*wlr.XdgSurface) = wl.Listener(*wlr.XdgSurface).init(handleSetTitle),
 
 pub fn init(self: *Self, view: *View, xdg_surface: *wlr.XdgSurface) void {
     self.* = .{ .view = view, .xdg_surface = xdg_surface };
     xdg_surface.data = @ptrToInt(self);
 
     // Add listeners that are active over the view's entire lifetime
-    self.destroy.setNotify(handleDestroy);
     self.xdg_surface.events.destroy.add(&self.destroy);
-
-    self.map.setNotify(handleMap);
     self.xdg_surface.events.map.add(&self.map);
-
-    self.unmap.setNotify(handleUnmap);
     self.xdg_surface.events.unmap.add(&self.unmap);
 }
 
@@ -159,22 +159,11 @@ fn handleMap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurfa
     const toplevel = self.xdg_surface.role_data.toplevel;
 
     // Add listeners that are only active while mapped
-    self.commit.setNotify(handleCommit);
     self.xdg_surface.surface.events.commit.add(&self.commit);
-
-    self.new_popup.setNotify(handleNewPopup);
     self.xdg_surface.events.new_popup.add(&self.new_popup);
-
-    self.request_fullscreen.setNotify(handleRequestFullscreen);
     toplevel.events.request_fullscreen.add(&self.request_fullscreen);
-
-    self.request_move.setNotify(handleRequestMove);
     toplevel.events.request_move.add(&self.request_move);
-
-    self.request_resize.setNotify(handleRequestResize);
     toplevel.events.request_resize.add(&self.request_resize);
-
-    self.set_title.setNotify(handleSetTitle);
     toplevel.events.set_title.add(&self.set_title);
 
     view.surface = self.xdg_surface.surface;

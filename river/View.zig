@@ -126,9 +126,14 @@ draw_borders: bool = true,
 
 /// This is created when the view is mapped and destroyed with the view
 foreign_toplevel_handle: ?*wlr.ForeignToplevelHandleV1 = null,
-foreign_activate: wl.Listener(*wlr.ForeignToplevelHandleV1.event.Activated) = undefined,
-foreign_fullscreen: wl.Listener(*wlr.ForeignToplevelHandleV1.event.Fullscreen) = undefined,
-foreign_close: wl.Listener(*wlr.ForeignToplevelHandleV1) = undefined,
+// zig fmt: off
+foreign_activate: wl.Listener(*wlr.ForeignToplevelHandleV1.event.Activated) =
+    wl.Listener(*wlr.ForeignToplevelHandleV1.event.Activated).init(handleForeignActivate),
+foreign_fullscreen: wl.Listener(*wlr.ForeignToplevelHandleV1.event.Fullscreen) =
+    wl.Listener(*wlr.ForeignToplevelHandleV1.event.Fullscreen).init(handleForeignFullscreen),
+foreign_close: wl.Listener(*wlr.ForeignToplevelHandleV1) =
+    wl.Listener(*wlr.ForeignToplevelHandleV1).init(handleForeignClose),
+// zig fmt: on
 
 pub fn init(self: *Self, output: *Output, tags: u32, surface: anytype) void {
     self.* = .{
@@ -369,8 +374,8 @@ pub fn getAppId(self: Self) ?[*:0]const u8 {
 pub fn applyConstraints(self: *Self) void {
     const constraints = self.getConstraints();
     const box = &self.pending.box;
-    box.width = std.math.clamp(box.width, constraints.min_width, constraints.max_width);
-    box.height = std.math.clamp(box.height, constraints.min_height, constraints.max_height);
+    box.width = math.clamp(box.width, constraints.min_width, constraints.max_width);
+    box.height = math.clamp(box.height, constraints.min_height, constraints.max_height);
 }
 
 /// Return bounds on the dimensions of the view
@@ -448,13 +453,8 @@ pub fn map(self: *Self) void {
             return;
         };
 
-        self.foreign_activate.setNotify(handleForeignActivate);
         self.foreign_toplevel_handle.?.events.request_activate.add(&self.foreign_activate);
-
-        self.foreign_fullscreen.setNotify(handleForeignFullscreen);
         self.foreign_toplevel_handle.?.events.request_fullscreen.add(&self.foreign_fullscreen);
-
-        self.foreign_close.setNotify(handleForeignClose);
         self.foreign_toplevel_handle.?.events.request_close.add(&self.foreign_close);
 
         if (self.getTitle()) |s| self.foreign_toplevel_handle.?.setTitle(s);

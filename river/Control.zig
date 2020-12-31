@@ -37,7 +37,7 @@ global: *wl.Global,
 
 args_map: std.AutoHashMap(u32, std.ArrayList([]const u8)),
 
-server_destroy: wl.Listener(*wl.Server) = undefined,
+server_destroy: wl.Listener(*wl.Server) = wl.Listener(*wl.Server).init(handleServerDestroy),
 
 pub fn init(self: *Self, server: *Server) !void {
     self.* = .{
@@ -45,7 +45,6 @@ pub fn init(self: *Self, server: *Server) !void {
         .args_map = std.AutoHashMap(u32, std.ArrayList([]const u8)).init(util.gpa),
     };
 
-    self.server_destroy.setNotify(handleServerDestroy);
     server.wl_server.addDestroyListener(&self.server_destroy);
 }
 

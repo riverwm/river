@@ -36,8 +36,8 @@ parent_box: *const Box,
 /// The corresponding wlroots object
 wlr_xdg_popup: *wlr.XdgPopup,
 
-destroy: wl.Listener(*wlr.XdgSurface) = undefined,
-new_popup: wl.Listener(*wlr.XdgPopup) = undefined,
+destroy: wl.Listener(*wlr.XdgSurface) = wl.Listener(*wlr.XdgSurface).init(handleDestroy),
+new_popup: wl.Listener(*wlr.XdgPopup) = wl.Listener(*wlr.XdgPopup).init(handleNewPopup),
 
 pub fn init(self: *Self, output: *Output, parent_box: *const Box, wlr_xdg_popup: *wlr.XdgPopup) void {
     self.* = .{
@@ -52,10 +52,7 @@ pub fn init(self: *Self, output: *Output, parent_box: *const Box, wlr_xdg_popup:
     box.y -= parent_box.y;
     wlr_xdg_popup.unconstrainFromBox(&box);
 
-    self.destroy.setNotify(handleDestroy);
     wlr_xdg_popup.base.events.destroy.add(&self.destroy);
-
-    self.new_popup.setNotify(handleNewPopup);
     wlr_xdg_popup.base.events.new_popup.add(&self.new_popup);
 }
 

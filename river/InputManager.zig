@@ -32,6 +32,7 @@ const View = @import("View.zig");
 const default_seat_name = "default";
 
 server: *Server,
+new_input: wl.Listener(*wlr.InputDevice) = wl.Listener(*wlr.InputDevice).init(handleNewInput),
 
 idle: *wlr.Idle,
 input_inhibit_manager: *wlr.InputInhibitManager,
@@ -42,11 +43,16 @@ seats: std.TailQueue(Seat) = .{},
 
 exclusive_client: ?*wl.Client = null,
 
-inhibit_activate: wl.Listener(*wlr.InputInhibitManager) = undefined,
-inhibit_deactivate: wl.Listener(*wlr.InputInhibitManager) = undefined,
-new_input: wl.Listener(*wlr.InputDevice) = undefined,
-new_virtual_pointer: wl.Listener(*wlr.VirtualPointerManagerV1.event.NewPointer) = undefined,
-new_virtual_keyboard: wl.Listener(*wlr.VirtualKeyboardV1) = undefined,
+// zig fmt: off
+inhibit_activate: wl.Listener(*wlr.InputInhibitManager) =
+    wl.Listener(*wlr.InputInhibitManager).init(handleInhibitActivate),
+inhibit_deactivate: wl.Listener(*wlr.InputInhibitManager) =
+    wl.Listener(*wlr.InputInhibitManager).init(handleInhibitDeactivate),
+new_virtual_pointer: wl.Listener(*wlr.VirtualPointerManagerV1.event.NewPointer) =
+    wl.Listener(*wlr.VirtualPointerManagerV1.event.NewPointer).init(handleNewVirtualPointer),
+new_virtual_keyboard: wl.Listener(*wlr.VirtualKeyboardV1) =
+    wl.Listener(*wlr.VirtualKeyboardV1).init(handleNewVirtualKeyboard),
+// zig fmt: on
 
 pub fn init(self: *Self, server: *Server) !void {
     const seat_node = try util.gpa.create(std.TailQueue(Seat).Node);
@@ -66,19 +72,10 @@ pub fn init(self: *Self, server: *Server) !void {
 
     if (build_options.xwayland) server.xwayland.setSeat(self.defaultSeat().wlr_seat);
 
-    self.inhibit_activate.setNotify(handleInhibitActivate);
+    server.backend.events.new_input.add(&self.new_input);
     self.input_inhibit_manager.events.activate.add(&self.inhibit_activate);
-
-    self.inhibit_deactivate.setNotify(handleInhibitDeactivate);
     self.input_inhibit_manager.events.deactivate.add(&self.inhibit_deactivate);
-
-    self.new_input.setNotify(handleNewInput);
-    self.server.backend.events.new_input.add(&self.new_input);
-
-    self.new_virtual_pointer.setNotify(handleNewVirtualPointer);
     self.virtual_pointer_manager.events.new_virtual_pointer.add(&self.new_virtual_pointer);
-
-    self.new_virtual_keyboard.setNotify(handleNewVirtualKeyboard);
     self.virtual_keyboard_manager.events.new_virtual_keyboard.add(&self.new_virtual_keyboard);
 }
 

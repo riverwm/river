@@ -72,10 +72,15 @@ focus_stack: ViewStack(*View) = .{},
 /// List of status tracking objects relaying changes to this seat to clients.
 status_trackers: std.SinglyLinkedList(SeatStatus) = .{},
 
-request_set_selection: wl.Listener(*wlr.Seat.event.RequestSetSelection) = undefined,
-request_start_drag: wl.Listener(*wlr.Seat.event.RequestStartDrag) = undefined,
-start_drag: wl.Listener(*wlr.Drag) = undefined,
-request_set_primary_selection: wl.Listener(*wlr.Seat.event.RequestSetPrimarySelection) = undefined,
+// zig fmt: off
+request_set_selection: wl.Listener(*wlr.Seat.event.RequestSetSelection) =
+    wl.Listener(*wlr.Seat.event.RequestSetSelection).init(handleRequestSetSelection),
+request_start_drag: wl.Listener(*wlr.Seat.event.RequestStartDrag) =
+    wl.Listener(*wlr.Seat.event.RequestStartDrag).init(handleRequestStartDrag),
+start_drag: wl.Listener(*wlr.Drag) = wl.Listener(*wlr.Drag).init(handleStartDrag),
+request_set_primary_selection: wl.Listener(*wlr.Seat.event.RequestSetPrimarySelection) =
+    wl.Listener(*wlr.Seat.event.RequestSetPrimarySelection).init(handleRequestSetPrimarySelection),
+// zig fmt: on
 
 pub fn init(self: *Self, input_manager: *InputManager, name: [*:0]const u8) !void {
     self.* = .{
@@ -88,16 +93,9 @@ pub fn init(self: *Self, input_manager: *InputManager, name: [*:0]const u8) !voi
 
     try self.cursor.init(self);
 
-    self.request_set_selection.setNotify(handleRequestSetSelection);
     self.wlr_seat.events.request_set_selection.add(&self.request_set_selection);
-
-    self.request_start_drag.setNotify(handleRequestStartDrag);
     self.wlr_seat.events.request_start_drag.add(&self.request_start_drag);
-
-    self.start_drag.setNotify(handleStartDrag);
     self.wlr_seat.events.start_drag.add(&self.start_drag);
-
-    self.request_set_primary_selection.setNotify(handleRequestPrimarySelection);
     self.wlr_seat.events.request_set_primary_selection.add(&self.request_set_primary_selection);
 }
 
@@ -399,7 +397,7 @@ fn handleStartDrag(
     self.cursor.mode = .passthrough;
 }
 
-fn handleRequestPrimarySelection(
+fn handleRequestSetPrimarySelection(
     listener: *wl.Listener(*wlr.Seat.event.RequestSetPrimarySelection),
     event: *wlr.Seat.event.RequestSetPrimarySelection,
 ) void {

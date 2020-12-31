@@ -76,10 +76,10 @@ attach_mode: AttachMode = .top,
 /// List of status tracking objects relaying changes to this output to clients.
 status_trackers: std.SinglyLinkedList(OutputStatus) = .{},
 
-destroy: wl.Listener(*wlr.Output) = undefined,
-enable: wl.Listener(*wlr.Output) = undefined,
-frame: wl.Listener(*wlr.Output) = undefined,
-mode: wl.Listener(*wlr.Output) = undefined,
+destroy: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleDestroy),
+enable: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleEnable),
+frame: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleFrame),
+mode: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleMode),
 
 pub fn init(self: *Self, root: *Root, wlr_output: *wlr.Output) !void {
     // Some backends don't have modes. DRM+KMS does, and we need to set a mode
@@ -104,16 +104,9 @@ pub fn init(self: *Self, root: *Root, wlr_output: *wlr.Output) !void {
     };
     wlr_output.data = @ptrToInt(self);
 
-    self.destroy.setNotify(handleDestroy);
     wlr_output.events.destroy.add(&self.destroy);
-
-    self.enable.setNotify(handleEnable);
     wlr_output.events.enable.add(&self.enable);
-
-    self.frame.setNotify(handleFrame);
     wlr_output.events.frame.add(&self.frame);
-
-    self.mode.setNotify(handleMode);
     wlr_output.events.mode.add(&self.mode);
 
     if (wlr_output.isNoop()) {

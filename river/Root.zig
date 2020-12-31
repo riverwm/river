@@ -41,17 +41,22 @@ const DragIcon = @import("DragIcon.zig");
 const min_size = 50;
 
 server: *Server,
-new_output: wl.Listener(*wlr.Output) = undefined,
+new_output: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleNewOutput),
 
 output_layout: *wlr.OutputLayout,
-layout_change: wl.Listener(*wlr.OutputLayout) = undefined,
+layout_change: wl.Listener(*wlr.OutputLayout) = wl.Listener(*wlr.OutputLayout).init(handleLayoutChange),
 
+// zig fmt: off
 output_manager: *wlr.OutputManagerV1,
-manager_apply: wl.Listener(*wlr.OutputConfigurationV1) = undefined,
-manager_test: wl.Listener(*wlr.OutputConfigurationV1) = undefined,
+manager_apply: wl.Listener(*wlr.OutputConfigurationV1) =
+    wl.Listener(*wlr.OutputConfigurationV1).init(handleManagerApply),
+manager_test: wl.Listener(*wlr.OutputConfigurationV1) =
+    wl.Listener(*wlr.OutputConfigurationV1).init(handleManagerTest),
 
 power_manager: *wlr.OutputPowerManagerV1,
-power_manager_set_mode: wl.Listener(*wlr.OutputPowerManagerV1.event.SetMode) = undefined,
+power_manager_set_mode: wl.Listener(*wlr.OutputPowerManagerV1.event.SetMode) =
+    wl.Listener(*wlr.OutputPowerManagerV1.event.SetMode).init(handlePowerManagerSetMode),
+// zig fmt: on
 
 /// A list of all outputs
 all_outputs: std.TailQueue(*Output) = .{},
@@ -97,19 +102,10 @@ pub fn init(self: *Self, server: *Server) !void {
     const noop_wlr_output = try server.noop_backend.noopAddOutput();
     try self.noop_output.init(self, noop_wlr_output);
 
-    self.new_output.setNotify(handleNewOutput);
     server.backend.events.new_output.add(&self.new_output);
-
-    self.manager_apply.setNotify(handleOutputManagerApply);
     self.output_manager.events.apply.add(&self.manager_apply);
-
-    self.manager_test.setNotify(handleOutputManagerTest);
     self.output_manager.events.@"test".add(&self.manager_test);
-
-    self.layout_change.setNotify(handleOutputLayoutChange);
     self.output_layout.events.change.add(&self.layout_change);
-
-    self.power_manager_set_mode.setNotify(handleOutputPowerManagementSetMode);
     self.power_manager.events.set_mode.add(&self.power_manager_set_mode);
 }
 
@@ -389,7 +385,7 @@ fn commitTransaction(self: *Self) void {
 }
 
 /// Send the new output configuration to all wlr-output-manager clients
-fn handleOutputLayoutChange(
+fn handleLayoutChange(
     listener: *wl.Listener(*wlr.OutputLayout),
     output_layout: *wlr.OutputLayout,
 ) void {
@@ -402,7 +398,7 @@ fn handleOutputLayoutChange(
     self.output_manager.setConfiguration(config);
 }
 
-fn handleOutputManagerApply(
+fn handleManagerApply(
     listener: *wl.Listener(*wlr.OutputConfigurationV1),
     config: *wlr.OutputConfigurationV1,
 ) void {
@@ -423,7 +419,7 @@ fn handleOutputManagerApply(
     self.output_manager.setConfiguration(applied_config);
 }
 
-fn handleOutputManagerTest(
+fn handleManagerTest(
     listener: *wl.Listener(*wlr.OutputConfigurationV1),
     config: *wlr.OutputConfigurationV1,
 ) void {
@@ -560,7 +556,7 @@ fn createHead(self: *Self, output: *Output, config: *wlr.OutputConfigurationV1) 
     }
 }
 
-fn handleOutputPowerManagementSetMode(
+fn handlePowerManagerSetMode(
     listener: *wl.Listener(*wlr.OutputPowerManagerV1.event.SetMode),
     event: *wlr.OutputPowerManagerV1.event.SetMode,
 ) void {

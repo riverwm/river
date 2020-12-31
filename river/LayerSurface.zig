@@ -35,13 +35,13 @@ box: Box = undefined,
 state: wlr.LayerSurfaceV1.State,
 
 // Listeners active the entire lifetime of the layser surface
-destroy: wl.Listener(*wlr.LayerSurfaceV1) = undefined,
-map: wl.Listener(*wlr.LayerSurfaceV1) = undefined,
-unmap: wl.Listener(*wlr.LayerSurfaceV1) = undefined,
+destroy: wl.Listener(*wlr.LayerSurfaceV1) = wl.Listener(*wlr.LayerSurfaceV1).init(handleDestroy),
+map: wl.Listener(*wlr.LayerSurfaceV1) = wl.Listener(*wlr.LayerSurfaceV1).init(handleMap),
+unmap: wl.Listener(*wlr.LayerSurfaceV1) = wl.Listener(*wlr.LayerSurfaceV1).init(handleUnmap),
 
 // Listeners only active while the layer surface is mapped
-commit: wl.Listener(*wlr.Surface) = undefined,
-new_popup: wl.Listener(*wlr.XdgPopup) = undefined,
+commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
+new_popup: wl.Listener(*wlr.XdgPopup) = wl.Listener(*wlr.XdgPopup).init(handleNewPopup),
 
 pub fn init(self: *Self, output: *Output, wlr_layer_surface: *wlr.LayerSurfaceV1) void {
     self.* = .{
@@ -60,13 +60,8 @@ pub fn init(self: *Self, output: *Output, wlr_layer_surface: *wlr.LayerSurfaceV1
     list.remove(node);
 
     // Set up listeners that are active for the entire lifetime of the layer surface
-    self.destroy.setNotify(handleDestroy);
     self.wlr_layer_surface.events.destroy.add(&self.destroy);
-
-    self.map.setNotify(handleMap);
     self.wlr_layer_surface.events.map.add(&self.map);
-
-    self.unmap.setNotify(handleUnmap);
     self.wlr_layer_surface.events.unmap.add(&self.unmap);
 }
 
@@ -90,10 +85,7 @@ fn handleMap(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wl
     log.debug(.layer_shell, "layer surface '{}' mapped", .{wlr_layer_surface.namespace});
 
     // Add listeners that are only active while mapped
-    self.commit.setNotify(handleCommit);
     wlr_layer_surface.surface.events.commit.add(&self.commit);
-
-    self.new_popup.setNotify(handleNewPopup);
     wlr_layer_surface.events.new_popup.add(&self.new_popup);
 
     wlr_layer_surface.surface.sendEnter(wlr_layer_surface.output.?);

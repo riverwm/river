@@ -30,7 +30,10 @@ server: *Server,
 
 xdg_decoration_manager: *wlr.XdgDecorationManagerV1,
 
-new_toplevel_decoration: wl.Listener(*wlr.XdgToplevelDecorationV1) = undefined,
+// zig fmt: off
+new_toplevel_decoration: wl.Listener(*wlr.XdgToplevelDecorationV1) =
+    wl.Listener(*wlr.XdgToplevelDecorationV1).init(handleNewToplevelDecoration),
+// zig fmt: on
 
 pub fn init(self: *Self, server: *Server) !void {
     self.* = .{
@@ -38,7 +41,6 @@ pub fn init(self: *Self, server: *Server) !void {
         .xdg_decoration_manager = try wlr.XdgDecorationManagerV1.create(server.wl_server),
     };
 
-    self.new_toplevel_decoration.setNotify(handleNewToplevelDecoration);
     self.xdg_decoration_manager.events.new_toplevel_decoration.add(&self.new_toplevel_decoration);
 }
 

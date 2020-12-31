@@ -34,30 +34,23 @@ view: *View,
 xwayland_surface: *wlr.XwaylandSurface,
 
 // Listeners that are always active over the view's lifetime
-destroy: wl.Listener(*wlr.XwaylandSurface) = undefined,
-map: wl.Listener(*wlr.XwaylandSurface) = undefined,
-unmap: wl.Listener(*wlr.XwaylandSurface) = undefined,
-title: wl.Listener(*wlr.XwaylandSurface) = undefined,
+destroy: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleDestroy),
+map: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleMap),
+unmap: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleUnmap),
+title: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleTitle),
 
 // Listeners that are only active while the view is mapped
-commit: wl.Listener(*wlr.Surface) = undefined,
+commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
 
 pub fn init(self: *Self, view: *View, xwayland_surface: *wlr.XwaylandSurface) void {
     self.* = .{ .view = view, .xwayland_surface = xwayland_surface };
     xwayland_surface.data = @ptrToInt(self);
 
     // Add listeners that are active over the view's entire lifetime
-    self.destroy.setNotify(handleDestroy);
-    self.xwayland_surface.events.destroy.add(&self.destroy);
-
-    self.map.setNotify(handleMap);
-    self.xwayland_surface.events.map.add(&self.map);
-
-    self.unmap.setNotify(handleUnmap);
-    self.xwayland_surface.events.unmap.add(&self.unmap);
-
-    self.title.setNotify(handleTitle);
-    self.xwayland_surface.events.set_title.add(&self.title);
+    xwayland_surface.events.destroy.add(&self.destroy);
+    xwayland_surface.events.map.add(&self.map);
+    xwayland_surface.events.unmap.add(&self.unmap);
+    xwayland_surface.events.set_title.add(&self.title);
 }
 
 pub fn deinit(self: *Self) void {
@@ -164,8 +157,7 @@ fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wl
     const root = view.output.root;
 
     // Add listeners that are only active while mapped
-    self.commit.setNotify(handleCommit);
-    self.xwayland_surface.surface.?.events.commit.add(&self.commit);
+    xwayland_surface.surface.?.events.commit.add(&self.commit);
 
     view.surface = self.xwayland_surface.surface;
 

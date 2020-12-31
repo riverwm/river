@@ -29,8 +29,12 @@ server: *Server,
 
 xdg_toplevel_decoration: *wlr.XdgToplevelDecorationV1,
 
-destroy: wl.Listener(*wlr.XdgToplevelDecorationV1) = undefined,
-request_mode: wl.Listener(*wlr.XdgToplevelDecorationV1) = undefined,
+// zig fmt: off
+destroy: wl.Listener(*wlr.XdgToplevelDecorationV1) =
+    wl.Listener(*wlr.XdgToplevelDecorationV1).init(handleDestroy),
+request_mode: wl.Listener(*wlr.XdgToplevelDecorationV1) =
+    wl.Listener(*wlr.XdgToplevelDecorationV1).init(handleRequestMode),
+// zig fmt: on
 
 pub fn init(
     self: *Self,
@@ -39,11 +43,8 @@ pub fn init(
 ) void {
     self.* = .{ .server = server, .xdg_toplevel_decoration = xdg_toplevel_decoration };
 
-    self.destroy.setNotify(handleDestroy);
-    self.xdg_toplevel_decoration.events.destroy.add(&self.destroy);
-
-    self.request_mode.setNotify(handleRequestMode);
-    self.xdg_toplevel_decoration.events.request_mode.add(&self.request_mode);
+    xdg_toplevel_decoration.events.destroy.add(&self.destroy);
+    xdg_toplevel_decoration.events.request_mode.add(&self.request_mode);
 
     handleRequestMode(&self.request_mode, self.xdg_toplevel_decoration);
 }

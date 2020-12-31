@@ -30,9 +30,9 @@ const Seat = @import("Seat.zig");
 seat: *Seat,
 input_device: *wlr.InputDevice,
 
-key: wl.Listener(*wlr.Keyboard.event.Key) = undefined,
-modifiers: wl.Listener(*wlr.Keyboard) = undefined,
-destroy: wl.Listener(*wlr.Keyboard) = undefined,
+key: wl.Listener(*wlr.Keyboard.event.Key) = wl.Listener(*wlr.Keyboard.event.Key).init(handleKey),
+modifiers: wl.Listener(*wlr.Keyboard) = wl.Listener(*wlr.Keyboard).init(handleModifiers),
+destroy: wl.Listener(*wlr.Keyboard) = wl.Listener(*wlr.Keyboard).init(handleDestroy),
 
 pub fn init(self: *Self, seat: *Seat, input_device: *wlr.InputDevice) !void {
     self.* = .{
@@ -62,13 +62,8 @@ pub fn init(self: *Self, seat: *Seat, input_device: *wlr.InputDevice) !void {
     const config = &seat.input_manager.server.config;
     wlr_keyboard.setRepeatInfo(config.repeat_rate, config.repeat_delay);
 
-    self.key.setNotify(handleKey);
     wlr_keyboard.events.key.add(&self.key);
-
-    self.modifiers.setNotify(handleModifiers);
     wlr_keyboard.events.modifiers.add(&self.modifiers);
-
-    self.destroy.setNotify(handleDestroy);
     wlr_keyboard.events.destroy.add(&self.destroy);
 }
 

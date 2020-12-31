@@ -34,14 +34,13 @@ const Server = @import("Server.zig");
 
 global: *wl.Global,
 
-server_destroy: wl.Listener(*wl.Server) = undefined,
+server_destroy: wl.Listener(*wl.Server) = wl.Listener(*wl.Server).init(handleServerDestroy),
 
 pub fn init(self: *Self, server: *Server) !void {
     self.* = .{
         .global = try wl.Global.create(server.wl_server, zriver.StatusManagerV1, 1, *Self, self, bind),
     };
 
-    self.server_destroy.setNotify(handleServerDestroy);
     server.wl_server.addDestroyListener(&self.server_destroy);
 }
 

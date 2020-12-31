@@ -32,28 +32,24 @@ root: *Root,
 xwayland_surface: *wlr.XwaylandSurface,
 
 // Listeners that are always active over the view's lifetime
-request_configure: wl.Listener(*wlr.XwaylandSurface.event.Configure) = undefined,
-destroy: wl.Listener(*wlr.XwaylandSurface) = undefined,
-map: wl.Listener(*wlr.XwaylandSurface) = undefined,
-unmap: wl.Listener(*wlr.XwaylandSurface) = undefined,
+// zig fmt: off
+request_configure: wl.Listener(*wlr.XwaylandSurface.event.Configure) =
+    wl.Listener(*wlr.XwaylandSurface.event.Configure).init(handleRequestConfigure),
+// zig fmt: on
+destroy: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleDestroy),
+map: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleMap),
+unmap: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleUnmap),
 
 // Listeners that are only active while the view is mapped
-commit: wl.Listener(*wlr.Surface) = undefined,
+commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
 
 pub fn init(self: *Self, root: *Root, xwayland_surface: *wlr.XwaylandSurface) void {
     self.* = .{ .root = root, .xwayland_surface = xwayland_surface };
 
     // Add listeners that are active over the view's entire lifetime
-    self.request_configure.setNotify(handleRequestConfigure);
     xwayland_surface.events.request_configure.add(&self.request_configure);
-
-    self.destroy.setNotify(handleDestroy);
     xwayland_surface.events.destroy.add(&self.destroy);
-
-    self.map.setNotify(handleMap);
     xwayland_surface.events.map.add(&self.map);
-
-    self.unmap.setNotify(handleUnmap);
     xwayland_surface.events.unmap.add(&self.unmap);
 }
 
@@ -100,7 +96,6 @@ fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wl
     root.xwayland_unmanaged_views.prepend(node);
 
     // Add listeners that are only active while mapped
-    self.commit.setNotify(handleCommit);
     xwayland_surface.surface.?.events.commit.add(&self.commit);
 
     // TODO: handle keyboard focus

@@ -61,12 +61,18 @@ xcursor_manager: *wlr.XcursorManager,
 /// Number of distinct buttons currently pressed
 pressed_count: u32 = 0,
 
-axis: wl.Listener(*wlr.Pointer.event.Axis) = undefined,
-button: wl.Listener(*wlr.Pointer.event.Button) = undefined,
-frame: wl.Listener(*wlr.Cursor) = undefined,
-motion_absolute: wl.Listener(*wlr.Pointer.event.MotionAbsolute) = undefined,
-motion: wl.Listener(*wlr.Pointer.event.Motion) = undefined,
-request_set_cursor: wl.Listener(*wlr.Seat.event.RequestSetCursor) = undefined,
+axis: wl.Listener(*wlr.Pointer.event.Axis) = wl.Listener(*wlr.Pointer.event.Axis).init(handleAxis),
+frame: wl.Listener(*wlr.Cursor) = wl.Listener(*wlr.Cursor).init(handleFrame),
+// zig fmt: off
+button: wl.Listener(*wlr.Pointer.event.Button) =
+    wl.Listener(*wlr.Pointer.event.Button).init(handleButton),
+motion_absolute: wl.Listener(*wlr.Pointer.event.MotionAbsolute) =
+    wl.Listener(*wlr.Pointer.event.MotionAbsolute).init(handleMotionAbsolute),
+motion: wl.Listener(*wlr.Pointer.event.Motion) =
+    wl.Listener(*wlr.Pointer.event.Motion).init(handleMotion),
+request_set_cursor: wl.Listener(*wlr.Seat.event.RequestSetCursor) =
+    wl.Listener(*wlr.Seat.event.RequestSetCursor).init(handleRequestSetCursor),
+// zig fmt: on
 
 pub fn init(self: *Self, seat: *Seat) !void {
     const wlr_cursor = try wlr.Cursor.create();
@@ -92,23 +98,12 @@ pub fn init(self: *Self, seat: *Seat) !void {
     // can choose how we want to process them, forwarding them to clients and
     // moving the cursor around. See following post for more detail:
     // https://drewdevault.com/2018/07/17/Input-handling-in-wlroots.html
-    self.axis.setNotify(handleAxis);
-    self.wlr_cursor.events.axis.add(&self.axis);
-
-    self.button.setNotify(handleButton);
-    self.wlr_cursor.events.button.add(&self.button);
-
-    self.frame.setNotify(handleFrame);
-    self.wlr_cursor.events.frame.add(&self.frame);
-
-    self.motion_absolute.setNotify(handleMotionAbsolute);
-    self.wlr_cursor.events.motion_absolute.add(&self.motion_absolute);
-
-    self.motion.setNotify(handleMotion);
-    self.wlr_cursor.events.motion.add(&self.motion);
-
-    self.request_set_cursor.setNotify(handleRequestSetCursor);
-    self.seat.wlr_seat.events.request_set_cursor.add(&self.request_set_cursor);
+    wlr_cursor.events.axis.add(&self.axis);
+    wlr_cursor.events.button.add(&self.button);
+    wlr_cursor.events.frame.add(&self.frame);
+    wlr_cursor.events.motion_absolute.add(&self.motion_absolute);
+    wlr_cursor.events.motion.add(&self.motion);
+    seat.wlr_seat.events.request_set_cursor.add(&self.request_set_cursor);
 }
 
 pub fn deinit(self: *Self) void {
