@@ -45,9 +45,9 @@ installed:
 
 Then run, for example:
 ```
-zig build -Drelease-safe=true --prefix /usr install
+zig build -Drelease-safe --prefix /usr install
 ```
-To enable experimental Xwayland support pass the `-Dxwayland=true` option as well.
+To enable experimental Xwayland support pass the `-Dxwayland` option as well.
 
 ## Usage
 
