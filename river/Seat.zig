@@ -200,7 +200,7 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
             if (build_options.xwayland and self.focused.view.impl == .xwayland_view)
                 self.focused.view.impl.xwayland_view.xwayland_surface.activate(false);
             if (self.focused.view.pending.focus == 0 and !self.focused.view.pending.fullscreen) {
-                self.focused.view.pending.target_opacity = self.input_manager.server.config.view_opacity_unfocused;
+                self.focused.view.pending.target_opacity = self.input_manager.server.config.opacity.unfocused;
             }
         }
 
@@ -214,7 +214,7 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
                 if (build_options.xwayland and target_view.impl == .xwayland_view)
                     target_view.impl.xwayland_view.xwayland_surface.activate(true);
                 if (!target_view.pending.fullscreen) {
-                    target_view.pending.target_opacity = self.input_manager.server.config.view_opacity_focused;
+                    target_view.pending.target_opacity = self.input_manager.server.config.opacity.focused;
                 }
             },
             .layer => |target_layer| std.debug.assert(self.focused_output == target_layer.output),

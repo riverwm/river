@@ -39,28 +39,28 @@ pub fn opacity(
     const server = seat.input_manager.server;
 
     // Focused opacity
-    server.config.view_opacity_focused = try std.fmt.parseFloat(f32, args[1]);
-    if (server.config.view_opacity_focused < 0.0 or server.config.view_opacity_focused > 1.0)
+    server.config.opacity.focused = try std.fmt.parseFloat(f32, args[1]);
+    if (server.config.opacity.focused < 0.0 or server.config.opacity.focused > 1.0)
         return Error.InvalidValue;
 
     // Unfocused opacity
-    server.config.view_opacity_unfocused = try std.fmt.parseFloat(f32, args[2]);
-    if (server.config.view_opacity_unfocused < 0.0 or server.config.view_opacity_unfocused > 1.0)
+    server.config.opacity.unfocused = try std.fmt.parseFloat(f32, args[2]);
+    if (server.config.opacity.unfocused < 0.0 or server.config.opacity.unfocused > 1.0)
         return Error.InvalidValue;
 
     // Starting opacity for new views
-    server.config.view_opacity_initial = try std.fmt.parseFloat(f32, args[3]);
-    if (server.config.view_opacity_initial < 0.0 or server.config.view_opacity_initial > 1.0)
+    server.config.opacity.initial = try std.fmt.parseFloat(f32, args[3]);
+    if (server.config.opacity.initial < 0.0 or server.config.opacity.initial > 1.0)
         return Error.InvalidValue;
 
     // Opacity transition step
-    server.config.view_opacity_delta = try std.fmt.parseFloat(f32, args[4]);
-    if (server.config.view_opacity_delta < 0.0 or server.config.view_opacity_delta > 1.0)
+    server.config.opacity.delta = try std.fmt.parseFloat(f32, args[4]);
+    if (server.config.opacity.delta < 0.0 or server.config.opacity.delta > 1.0)
         return Error.InvalidValue;
 
     // Time between step
-    server.config.view_opacity_delta_t = try std.fmt.parseInt(u31, args[5], 10);
-    if (server.config.view_opacity_delta_t < 1) return Error.InvalidValue;
+    server.config.opacity.delta_t = try std.fmt.parseInt(u31, args[5], 10);
+    if (server.config.opacity.delta_t < 1) return Error.InvalidValue;
 
     // Update opacity of all views
     // Unmapped views will be skipped, however their opacity gets updated on map anyway
@@ -69,9 +69,9 @@ pub fn opacity(
         var vit = ViewStack(View).iter(onode.data.views.first, .forward, {}, opacityUpdateFilter);
         while (vit.next()) |vnode| {
             if (vnode.current.focus > 0) {
-                vnode.pending.target_opacity = server.config.view_opacity_focused;
+                vnode.pending.target_opacity = server.config.opacity.focused;
             } else {
-                vnode.pending.target_opacity = server.config.view_opacity_unfocused;
+                vnode.pending.target_opacity = server.config.opacity.unfocused;
             }
         }
     }

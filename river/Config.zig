@@ -66,20 +66,18 @@ csd_filter: std.ArrayList([]const u8),
 /// The selected focus_follows_cursor mode
 focus_follows_cursor: FocusFollowsCursorMode = .disabled,
 
-/// The opacity of the focused view
-view_opacity_focused: f32 = 1.0,
-
-/// The opacity of unfocused views
-view_opacity_unfocused: f32 = 1.0,
-
-/// The starting opacity of new views
-view_opacity_initial: f32 = 1.0,
-
-/// View opacity transition step
-view_opacity_delta: f32 = 1.0,
-
-/// Time between view opacity transition steps in msec
-view_opacity_delta_t: u31 = 20,
+opacity: struct {
+    /// The opacity of focused views
+    focused: f32 = 1.0,
+    /// The opacity of unfocused views
+    unfocused: f32 = 1.0,
+    /// The initial opacity of new views
+    initial: f32 = 1.0,
+    /// View opacity transition step
+    delta: f32 = 1.0,
+    /// Time between view opacity transition steps in milliseconds
+    delta_t: u31 = 20,
+} = .{},
 
 /// Keyboard repeat rate in characters per second
 repeat_rate: u31 = 25,

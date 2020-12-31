@@ -140,14 +140,14 @@ pub fn init(self: *Self, output: *Output, tags: u32, surface: anytype) void {
         .output = output,
         .current = .{
             .tags = tags,
-            .target_opacity = output.root.server.config.view_opacity_initial,
+            .target_opacity = output.root.server.config.opacity.initial,
         },
         .pending = .{
             .tags = tags,
-            .target_opacity = output.root.server.config.view_opacity_initial,
+            .target_opacity = output.root.server.config.opacity.initial,
         },
         .saved_buffers = std.ArrayList(SavedBuffer).init(util.gpa),
-        .opacity = output.root.server.config.view_opacity_initial,
+        .opacity = output.root.server.config.opacity.initial,
     };
 
     if (@TypeOf(surface) == *wlr.XdgSurface) {
@@ -224,9 +224,9 @@ pub fn applyPending(self: *Self) void {
 
         // Restore configured opacity
         self.pending.target_opacity = if (self.pending.focus > 0)
-            self.output.root.server.config.view_opacity_focused
+            self.output.root.server.config.opacity.focused
         else
-            self.output.root.server.config.view_opacity_unfocused;
+            self.output.root.server.config.opacity.unfocused;
     }
 
     if (arrange_output) self.output.arrangeViews();
@@ -440,7 +440,7 @@ pub fn shouldTrackConfigure(self: Self) bool {
 pub fn map(self: *Self) void {
     const root = self.output.root;
 
-    self.pending.target_opacity = self.output.root.server.config.view_opacity_unfocused;
+    self.pending.target_opacity = self.output.root.server.config.opacity.unfocused;
 
     log.debug(.server, "view '{}' mapped", .{self.getTitle()});
 
@@ -528,16 +528,16 @@ pub fn notifyAppId(self: Self) void {
     }
 }
 
-/// Change the opacity of a view by config.view_opacity_delta.
+/// Change the opacity of a view by config.opacity.delta.
 /// If the target opacity was reached, return true.
 fn incrementOpacity(self: *Self) bool {
     // TODO damage view when implementing damage based rendering
     const config = &self.output.root.server.config;
     if (self.opacity < self.current.target_opacity) {
-        self.opacity += config.view_opacity_delta;
+        self.opacity += config.opacity.delta;
         if (self.opacity < self.current.target_opacity) return false;
     } else {
-        self.opacity -= config.view_opacity_delta;
+        self.opacity -= config.opacity.delta;
         if (self.opacity > self.current.target_opacity) return false;
     }
     self.opacity = self.current.target_opacity;
@@ -552,7 +552,7 @@ fn killOpacityTimer(self: *Self) void {
 
 /// Set the timeout on a views opacity timer
 fn armOpacityTimer(self: *Self) void {
-    const delta_t = self.output.root.server.config.view_opacity_delta_t;
+    const delta_t = self.output.root.server.config.opacity.delta_t;
     self.opacity_timer.?.timerUpdate(delta_t) catch |err| {
         log.err(.view, "failed to update opacity timer: {}", .{err});
         self.killOpacityTimer();
