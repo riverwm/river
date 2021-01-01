@@ -365,8 +365,7 @@ pub fn getTitle(self: Self) ?[*:0]const u8 {
 pub fn getAppId(self: Self) ?[*:0]const u8 {
     return switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.getAppId(),
-        // X11 clients don't have an app_id but the class serves a similar role
-        .xwayland_view => |xwayland_view| xwayland_view.getClass(),
+        .xwayland_view => |xwayland_view| xwayland_view.getAppId(),
     };
 }
 
@@ -513,7 +512,7 @@ pub fn notifyTitle(self: Self) void {
     // Send title to all status listeners attached to a seat which focuses this view
     var seat_it = self.output.root.server.input_manager.seats.first;
     while (seat_it) |seat_node| : (seat_it = seat_node.next) {
-        if (seat_node.data.focused == .view and seat_node.data.focused.view == self) {
+        if (seat_node.data.focused == .view and seat_node.data.focused.view == &self) {
             var client_it = seat_node.data.status_trackers.first;
             while (client_it) |client_node| : (client_it = client_node.next) {
                 client_node.data.sendFocusedView();

@@ -37,7 +37,8 @@ xwayland_surface: *wlr.XwaylandSurface,
 destroy: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleDestroy),
 map: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleMap),
 unmap: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleUnmap),
-title: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleTitle),
+set_title: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleSetTitle),
+set_class: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleSetClass),
 
 // Listeners that are only active while the view is mapped
 commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
@@ -50,7 +51,6 @@ pub fn init(self: *Self, view: *View, xwayland_surface: *wlr.XwaylandSurface) vo
     xwayland_surface.events.destroy.add(&self.destroy);
     xwayland_surface.events.map.add(&self.map);
     xwayland_surface.events.unmap.add(&self.unmap);
-    xwayland_surface.events.set_title.add(&self.title);
 }
 
 pub fn deinit(self: *Self) void {
@@ -59,7 +59,6 @@ pub fn deinit(self: *Self) void {
         self.destroy.link.remove();
         self.map.link.remove();
         self.unmap.link.remove();
-        self.title.link.remove();
     }
 }
 
@@ -113,9 +112,9 @@ pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*wlr.Surface
 pub fn getTitle(self: Self) ?[*:0]const u8 {
     return self.xwayland_surface.title;
 }
-
+/// X11 clients don't have an app_id but the class serves a similar role.
 /// Get the current class of the xwayland surface if any.
-pub fn getClass(self: Self) ?[*:0]const u8 {
+pub fn getAppId(self: Self) ?[*:0]const u8 {
     return self.xwayland_surface.class;
 }
 
@@ -158,6 +157,8 @@ fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wl
 
     // Add listeners that are only active while mapped
     xwayland_surface.surface.?.events.commit.add(&self.commit);
+    xwayland_surface.events.set_title.add(&self.set_title);
+    xwayland_surface.events.set_class.add(&self.set_class);
 
     view.surface = self.xwayland_surface.surface;
 
@@ -206,6 +207,8 @@ fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *
 
     // Remove listeners that are only active while mapped
     self.commit.link.remove();
+    self.set_title.link.remove();
+    self.set_class.link.remove();
 }
 
 /// Called when the surface is comitted
@@ -221,17 +224,13 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) voi
 }
 
 /// Called then the window updates its title
-fn handleTitle(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
-    const self = @fieldParentPtr(Self, "title", listener);
+fn handleSetTitle(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
+    const self = @fieldParentPtr(Self, "set_title", listener);
+    self.view.notifyTitle();
+}
 
-    // Send title to all status listeners attached to a seat which focuses this view
-    var seat_it = self.view.output.root.server.input_manager.seats.first;
-    while (seat_it) |seat_node| : (seat_it = seat_node.next) {
-        if (seat_node.data.focused == .view and seat_node.data.focused.view == self.view) {
-            var client_it = seat_node.data.status_trackers.first;
-            while (client_it) |client_node| : (client_it = client_node.next) {
-                client_node.data.sendFocusedView();
-            }
-        }
-    }
+/// Called then the window updates its class
+fn handleSetClass(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
+    const self = @fieldParentPtr(Self, "set_class", listener);
+    self.view.notifyAppId();
 }

@@ -53,6 +53,7 @@ request_resize: wl.Listener(*wlr.XdgToplevel.event.Resize) =
     wl.Listener(*wlr.XdgToplevel.event.Resize).init(handleRequestResize),
 // zig fmt: on
 set_title: wl.Listener(*wlr.XdgSurface) = wl.Listener(*wlr.XdgSurface).init(handleSetTitle),
+set_app_id: wl.Listener(*wlr.XdgSurface) = wl.Listener(*wlr.XdgSurface).init(handleSetAppId),
 
 pub fn init(self: *Self, view: *View, xdg_surface: *wlr.XdgSurface) void {
     self.* = .{ .view = view, .xdg_surface = xdg_surface };
@@ -165,6 +166,7 @@ fn handleMap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurfa
     toplevel.events.request_move.add(&self.request_move);
     toplevel.events.request_resize.add(&self.request_resize);
     toplevel.events.set_title.add(&self.set_title);
+    toplevel.events.set_app_id.add(&self.set_app_id);
 
     view.surface = self.xdg_surface.surface;
 
@@ -304,4 +306,11 @@ fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), ev
 /// Called when the client sets / updates its title
 fn handleSetTitle(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurface) void {
     const self = @fieldParentPtr(Self, "set_title", listener);
+    self.view.notifyTitle();
+}
+
+/// Called when the client sets / updates its app_id
+fn handleSetAppId(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurface) void {
+    const self = @fieldParentPtr(Self, "set_app_id", listener);
+    self.view.notifyAppId();
 }
