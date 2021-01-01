@@ -18,6 +18,8 @@
 const std = @import("std");
 const wlr = @import("wlroots");
 
+const build_options = @import("build_options");
+
 const c = @import("c.zig");
 const log = @import("log.zig");
 const util = @import("util.zig");
@@ -52,7 +54,7 @@ fn getStartupCommand() std.fmt.AllocPrintError!?[:0]const u8 {
             return path;
         }
     }
-    if (try testConfigPath("/etc/river/init", .{})) |path| {
+    if (try testConfigPath(build_options.default_config_path, .{})) |path| {
         return path;
     }
     return null;

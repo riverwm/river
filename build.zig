@@ -27,13 +27,16 @@ pub fn build(b: *zbs.Builder) !void {
 
     const examples = b.option(bool, "examples", "Set to true to build examples") orelse false;
 
-    // Sigh, why are the conventions inconsistent like this.
     const resolved_prefix = try std.fs.path.resolve(b.allocator, &[_][]const u8{b.install_prefix.?});
-    if (std.mem.eql(u8, resolved_prefix, "/usr")) {
-        b.installFile("example/init", "../etc/river/init");
-    } else {
-        b.installFile("example/init", "etc/river/init");
-    }
+    const rel_config_path = if (std.mem.eql(u8, resolved_prefix, "/usr"))
+        "../etc/river/init"
+    else
+        "etc/river/init";
+    b.installFile("example/init", rel_config_path);
+    const default_config_path = try std.fs.path.resolve(
+        b.allocator,
+        &[_][]const u8{ resolved_prefix, rel_config_path },
+    );
 
     const scanner = ScanProtocolsStep.create(b);
     scanner.addSystemProtocol("stable/xdg-shell/xdg-shell.xml");
@@ -47,6 +50,7 @@ pub fn build(b: *zbs.Builder) !void {
         river.setTarget(target);
         river.setBuildMode(mode);
         river.addBuildOption(bool, "xwayland", xwayland);
+        river.addBuildOption([]const u8, "default_config_path", default_config_path);
 
         addServerDeps(river, scanner);
 
