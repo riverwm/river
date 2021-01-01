@@ -56,7 +56,7 @@ pub fn getTitle(self: Self) ?[*:0]const u8 {
     unreachable;
 }
 
-pub fn getClass(self: Self) ?[*:0]const u8 {
+pub fn getAppId(self: Self) ?[*:0]const u8 {
     unreachable;
 }
 
