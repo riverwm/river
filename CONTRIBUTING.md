@@ -35,11 +35,11 @@ For further details regarding commit style and git history see
 
 Please follow the
 [Zig Style Guide](https://ziglang.org/documentation/master/#Style-Guide)
-and run `zig fmt` before every commit. With regards to line length, consider 100
-characters to be a hard upper limit and 80 or less to be the goal. Note that
-inserting a trailing comma after the last parameter in function calls, struct
-declarations, etc. will cause `zig fmt` to wrap those lines. I highly recommend
-configuring your editor to run `zig fmt` on write.
+and run `zig fmt` before every commit. With regards to line length, keep it
+under 100 columns in general but prioritize readability over adhering to a
+strict limit. Note that inserting a trailing comma after the last parameter in
+function calls, struct declarations, etc. will cause `zig fmt` to wrap those
+lines. I highly recommend configuring your editor to run `zig fmt` on write.
 
 On a higher level, prioritize simplicity of code over nearly everything else.
 Performance is only a valid reason for code complexity if there are profiling
