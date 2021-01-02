@@ -71,6 +71,7 @@ const str_to_impl_fn = [_]struct {
     .{ .name = "set-view-tags",          .impl = @import("command/tags.zig").setViewTags },
     .{ .name = "snap",                   .impl = @import("command/move.zig").snap },
     .{ .name = "spawn",                  .impl = @import("command/spawn.zig").spawn },
+    .{ .name = "spawn-tagmask",          .impl = @import("command/tags.zig").spawnTagmask },
     .{ .name = "swap",                   .impl = @import("command/swap.zig").swap},
     .{ .name = "toggle-float",           .impl = @import("command/toggle_float.zig").toggleFloat },
     .{ .name = "toggle-focused-tags",    .impl = @import("command/tags.zig").toggleFocusedTags },

@@ -104,6 +104,8 @@ take a normal base 10 number as their argument but the semantics are best
 understood in binary. The binary number 000000001 represents a set containing
 only tag 1 while 100001101 represents a set containing tags 1, 3, 4, and 9.
 
+When a view spawns it is assigned the currently focused tags of the output.
+
 At least one tag must always be focused and each view must be assigned at
 least one tag. Operations that would violate either of these requirements
 are ignored by river.
@@ -123,6 +125,14 @@ are ignored by river.
 *toggle-view-tags* _tags_
 	Toggle the tags of the currently focused view corresponding to the
 	set bits of _tags_.
+
+*spawn-tagmask* _tagmask_
+	Set a _tagmask_ to filter the tags assigned to newly spawned views
+	on the focused output. This mask will be applied to the tags of
+	new views with a bitwise and. If, for example, the tags 000011111
+	are focused on an output with a _tagmask_ of 111110001, a new view
+	will be assigned the tags 000010001. If no tags would remain after
+	filtering, the _tagmask_ is ignored.
 
 ## MAPPINGS
 

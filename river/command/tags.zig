@@ -36,6 +36,17 @@ pub fn setFocusedTags(
     }
 }
 
+/// Set the spawn tagmask
+pub fn spawnTagmask(
+    allocator: *std.mem.Allocator,
+    seat: *Seat,
+    args: []const []const u8,
+    out: *?[]const u8,
+) Error!void {
+    const tags = try parseTags(allocator, args, out);
+    seat.focused_output.spawn_tagmask = tags;
+}
+
 /// Set the tags of the focused view.
 pub fn setViewTags(
     allocator: *std.mem.Allocator,

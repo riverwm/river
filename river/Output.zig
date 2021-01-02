@@ -73,6 +73,9 @@ layout: []const u8,
 /// Determines where new views will be attached to the view stack.
 attach_mode: AttachMode = .top,
 
+/// Bitmask that whitelists tags for newly spawned views
+spawn_tagmask: u32 = std.math.maxInt(u32),
+
 /// List of status tracking objects relaying changes to this output to clients.
 status_trackers: std.SinglyLinkedList(OutputStatus) = .{},
 
