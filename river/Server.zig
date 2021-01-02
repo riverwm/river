@@ -177,7 +177,7 @@ fn handleNewXdgSurface(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wl
         xdg_surface.resource.postNoMemory();
         return;
     };
-    node.view.init(output, output.current.tags, xdg_surface);
+    node.view.init(output, getNewViewTags(output), xdg_surface);
 }
 
 /// This event is raised when the layer_shell recieves a new surface from a client.
@@ -247,5 +247,10 @@ fn handleNewXwaylandSurface(listener: *wl.Listener(*wlr.XwaylandSurface), wlr_xw
     // The View will add itself to the output's view stack on map
     const output = self.input_manager.defaultSeat().focused_output;
     const node = util.gpa.create(ViewStack(View).Node) catch return;
-    node.view.init(output, output.current.tags, wlr_xwayland_surface);
+    node.view.init(output, getNewViewTags(output), wlr_xwayland_surface);
+}
+
+fn getNewViewTags(output: *Output) u32 {
+    const tags = output.current.tags & output.spawn_tagmask;
+    return if (tags != 0) tags else output.current.tags;
 }
