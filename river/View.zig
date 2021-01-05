@@ -266,7 +266,7 @@ pub fn dropSavedBuffers(self: *Self) void {
 pub fn saveBuffers(self: *Self) void {
     std.debug.assert(self.saved_buffers.items.len == 0);
     self.saved_surface_box = self.surface_box;
-    self.forEachSurface(*std.ArrayList(SavedBuffer), saveBuffersIterator, &self.saved_buffers);
+    self.surface.?.forEachSurface(*std.ArrayList(SavedBuffer), saveBuffersIterator, &self.saved_buffers);
 }
 
 /// If this commit is in response to our configure and the
@@ -332,15 +332,15 @@ pub fn close(self: Self) void {
     }
 }
 
-pub inline fn forEachSurface(
+pub inline fn forEachPopup(
     self: Self,
     comptime T: type,
     iterator: fn (surface: *wlr.Surface, sx: c_int, sy: c_int, data: T) callconv(.C) void,
     user_data: T,
 ) void {
     switch (self.impl) {
-        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.forEachSurface(T, iterator, user_data),
-        .xwayland_view => |xwayland_view| xwayland_view.forEachSurface(T, iterator, user_data),
+        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.forEachPopup(T, iterator, user_data),
+        .xwayland_view => {},
     }
 }
 

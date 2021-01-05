@@ -39,15 +39,6 @@ pub fn close(self: Self) void {
     unreachable;
 }
 
-pub fn forEachSurface(
-    self: Self,
-    comptime T: type,
-    iterator: fn (surface: *wlr.Surface, sx: c_int, sy: c_int, data: T) callconv(.C) void,
-    user_data: T,
-) void {
-    unreachable;
-}
-
 pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*wlr.Surface {
     unreachable;
 }

@@ -92,6 +92,7 @@ pub fn renderOutput(output: *Output) void {
 
             renderView(output.*, view, &now);
             if (view.draw_borders) renderBorders(output.*, view, &now);
+            renderViewPopups(output.*, view, &now);
         }
 
         if (build_options.xwayland) renderXwaylandUnmanaged(output.*, &now);
@@ -206,8 +207,19 @@ fn renderView(output: Output, view: *View, now: *os.timespec) void {
             .opacity = view.opacity,
         };
 
-        view.forEachSurface(*SurfaceRenderData, renderSurfaceIterator, &rdata);
+        view.surface.?.forEachSurface(*SurfaceRenderData, renderSurfaceIterator, &rdata);
     }
+}
+
+fn renderViewPopups(output: Output, view: *View, now: *os.timespec) void {
+    var rdata = SurfaceRenderData{
+        .output = &output,
+        .output_x = view.current.box.x - view.surface_box.x,
+        .output_y = view.current.box.y - view.surface_box.y,
+        .when = now,
+        .opacity = view.opacity,
+    };
+    view.forEachPopup(*SurfaceRenderData, renderSurfaceIterator, &rdata);
 }
 
 fn renderDragIcons(output: Output, now: *os.timespec) void {

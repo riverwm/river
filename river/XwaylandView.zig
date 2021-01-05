@@ -87,16 +87,6 @@ pub fn close(self: Self) void {
     self.xwayland_surface.close();
 }
 
-/// Iterate over all surfaces of the xwayland view.
-pub fn forEachSurface(
-    self: Self,
-    comptime T: type,
-    iterator: fn (surface: *wlr.Surface, sx: c_int, sy: c_int, data: T) callconv(.C) void,
-    data: T,
-) void {
-    self.xwayland_surface.surface.?.forEachSurface(T, iterator, data);
-}
-
 /// Return the surface at output coordinates ox, oy and set sx, sy to the
 /// corresponding surface-relative coordinates, if there is a surface.
 pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*wlr.Surface {
