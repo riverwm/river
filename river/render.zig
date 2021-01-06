@@ -65,14 +65,15 @@ pub fn renderOutput(output: *Output) void {
     if (fullscreen_view) |view| {
         // Always clear with solid black for fullscreen
         renderer.clear(&[_]f32{ 0, 0, 0, 1 });
-        renderView(output.*, view, &now);
-        if (build_options.xwayland) renderXwaylandUnmanaged(output.*, &now);
+        renderView(output, view, &now);
+        if (build_options.xwayland) renderXwaylandUnmanaged(output, &now);
+        if (!view.destroying) renderViewPopups(output, view, &now);
     } else {
         // No fullscreen view, so render normal layers/views
         renderer.clear(&config.background_color);
 
-        renderLayer(output.*, output.getLayer(.background).*, &now, .toplevels);
-        renderLayer(output.*, output.getLayer(.bottom).*, &now, .toplevels);
+        renderLayer(output, output.getLayer(.background).*, &now, .toplevels);
+        renderLayer(output, output.getLayer(.bottom).*, &now, .toplevels);
 
         // The first view in the list is "on top" so iterate in reverse.
         it = ViewStack(View).iter(output.views.last, .reverse, output.current.tags, renderFilter);
@@ -80,8 +81,8 @@ pub fn renderOutput(output: *Output) void {
             // Focused views are rendered on top of normal views, skip them for now
             if (view.current.focus != 0) continue;
 
-            renderView(output.*, view, &now);
-            if (view.draw_borders) renderBorders(output.*, view, &now);
+            renderView(output, view, &now);
+            if (view.draw_borders) renderBorders(output, view, &now);
         }
 
         // Render focused views
@@ -90,25 +91,31 @@ pub fn renderOutput(output: *Output) void {
             // Skip unfocused views since we already rendered them
             if (view.current.focus == 0) continue;
 
-            renderView(output.*, view, &now);
-            if (view.draw_borders) renderBorders(output.*, view, &now);
-            renderViewPopups(output.*, view, &now);
+            renderView(output, view, &now);
+            if (view.draw_borders) renderBorders(output, view, &now);
         }
 
-        if (build_options.xwayland) renderXwaylandUnmanaged(output.*, &now);
+        if (build_options.xwayland) renderXwaylandUnmanaged(output, &now);
 
-        renderLayer(output.*, output.getLayer(.top).*, &now, .toplevels);
+        renderLayer(output, output.getLayer(.top).*, &now, .toplevels);
 
-        renderLayer(output.*, output.getLayer(.background).*, &now, .popups);
-        renderLayer(output.*, output.getLayer(.bottom).*, &now, .popups);
-        renderLayer(output.*, output.getLayer(.top).*, &now, .popups);
+        // Render popups of focused views
+        it = ViewStack(View).iter(output.views.last, .reverse, output.current.tags, renderFilter);
+        while (it.next()) |view| {
+            if (view.current.focus == 0 or view.destroying) continue;
+            renderViewPopups(output, view, &now);
+        }
+
+        renderLayer(output, output.getLayer(.background).*, &now, .popups);
+        renderLayer(output, output.getLayer(.bottom).*, &now, .popups);
+        renderLayer(output, output.getLayer(.top).*, &now, .popups);
     }
 
     // The overlay layer is rendered in both fullscreen and normal cases
-    renderLayer(output.*, output.getLayer(.overlay).*, &now, .toplevels);
-    renderLayer(output.*, output.getLayer(.overlay).*, &now, .popups);
+    renderLayer(output, output.getLayer(.overlay).*, &now, .toplevels);
+    renderLayer(output, output.getLayer(.overlay).*, &now, .popups);
 
-    renderDragIcons(output.*, &now);
+    renderDragIcons(output, &now);
 
     // Hardware cursors are rendered by the GPU on a separate plane, and can be
     // moved around without re-rendering what's beneath them - which is more
@@ -149,7 +156,7 @@ fn renderFilter(view: *View, filter_tags: u32) bool {
 
 /// Render all surfaces on the passed layer
 fn renderLayer(
-    output: Output,
+    output: *const Output,
     layer: std.TailQueue(LayerSurface),
     now: *os.timespec,
     role: enum { toplevels, popups },
@@ -158,7 +165,7 @@ fn renderLayer(
     while (it) |node| : (it = node.next) {
         const layer_surface = &node.data;
         var rdata = SurfaceRenderData{
-            .output = &output,
+            .output = output,
             .output_x = layer_surface.box.x,
             .output_y = layer_surface.box.y,
             .when = now,
@@ -179,7 +186,7 @@ fn renderLayer(
     }
 }
 
-fn renderView(output: Output, view: *View, now: *os.timespec) void {
+fn renderView(output: *const Output, view: *View, now: *os.timespec) void {
     // If we have saved buffers, we are in the middle of a transaction
     // and need to render those buffers until the transaction is complete.
     if (view.saved_buffers.items.len != 0) {
@@ -200,7 +207,7 @@ fn renderView(output: Output, view: *View, now: *os.timespec) void {
         // Since there is no stashed buffer, we are not in the middle of
         // a transaction and may simply render each toplevel surface.
         var rdata = SurfaceRenderData{
-            .output = &output,
+            .output = output,
             .output_x = view.current.box.x - view.surface_box.x,
             .output_y = view.current.box.y - view.surface_box.y,
             .when = now,
@@ -211,9 +218,9 @@ fn renderView(output: Output, view: *View, now: *os.timespec) void {
     }
 }
 
-fn renderViewPopups(output: Output, view: *View, now: *os.timespec) void {
+fn renderViewPopups(output: *const Output, view: *View, now: *os.timespec) void {
     var rdata = SurfaceRenderData{
-        .output = &output,
+        .output = output,
         .output_x = view.current.box.x - view.surface_box.x,
         .output_y = view.current.box.y - view.surface_box.y,
         .when = now,
@@ -222,7 +229,7 @@ fn renderViewPopups(output: Output, view: *View, now: *os.timespec) void {
     view.forEachPopup(*SurfaceRenderData, renderSurfaceIterator, &rdata);
 }
 
-fn renderDragIcons(output: Output, now: *os.timespec) void {
+fn renderDragIcons(output: *const Output, now: *os.timespec) void {
     const output_box = output.root.output_layout.getBox(output.wlr_output).?;
 
     var it = output.root.drag_icons.first;
@@ -230,7 +237,7 @@ fn renderDragIcons(output: Output, now: *os.timespec) void {
         const drag_icon = &node.data;
 
         var rdata = SurfaceRenderData{
-            .output = &output,
+            .output = output,
             .output_x = @floatToInt(i32, drag_icon.seat.cursor.wlr_cursor.x) +
                 drag_icon.wlr_drag_icon.surface.sx - output_box.x,
             .output_y = @floatToInt(i32, drag_icon.seat.cursor.wlr_cursor.y) +
@@ -243,7 +250,7 @@ fn renderDragIcons(output: Output, now: *os.timespec) void {
 }
 
 /// Render all xwayland unmanaged windows that appear on the output
-fn renderXwaylandUnmanaged(output: Output, now: *os.timespec) void {
+fn renderXwaylandUnmanaged(output: *const Output, now: *os.timespec) void {
     const output_box = output.root.output_layout.getBox(output.wlr_output).?;
 
     var it = output.root.xwayland_unmanaged_views.first;
@@ -251,7 +258,7 @@ fn renderXwaylandUnmanaged(output: Output, now: *os.timespec) void {
         const xwayland_surface = node.data.xwayland_surface;
 
         var rdata = SurfaceRenderData{
-            .output = &output,
+            .output = output,
             .output_x = xwayland_surface.x - output_box.x,
             .output_y = xwayland_surface.y - output_box.y,
             .when = now,
@@ -269,7 +276,7 @@ fn renderSurfaceIterator(
     rdata: *SurfaceRenderData,
 ) callconv(.C) void {
     renderTexture(
-        rdata.output.*,
+        rdata.output,
         surface.getTexture() orelse return,
         .{
             .x = rdata.output_x + surface_x,
@@ -287,7 +294,7 @@ fn renderSurfaceIterator(
 /// Render the given texture at the given box, taking the scale and transform
 /// of the output into account.
 fn renderTexture(
-    output: Output,
+    output: *const Output,
     texture: *wlr.Texture,
     wlr_box: wlr.Box,
     transform: wl.Output.Transform,
@@ -312,7 +319,7 @@ fn renderTexture(
     renderer.renderTextureWithMatrix(texture, &matrix, opacity) catch return;
 }
 
-fn renderBorders(output: Output, view: *View, now: *os.timespec) void {
+fn renderBorders(output: *const Output, view: *View, now: *os.timespec) void {
     const config = &output.root.server.config;
     const color = if (view.current.focus != 0) &config.border_color_focused else &config.border_color_unfocused;
     const border_width = config.border_width;
@@ -347,7 +354,7 @@ fn renderBorders(output: Output, view: *View, now: *os.timespec) void {
     renderRect(output, border, color);
 }
 
-fn renderRect(output: Output, box: Box, color: *const [4]f32) void {
+fn renderRect(output: *const Output, box: Box, color: *const [4]f32) void {
     var wlr_box = box.toWlrBox();
     scaleBox(&wlr_box, output.wlr_output.scale);
     output.wlr_output.backend.getRenderer().?.renderRect(
