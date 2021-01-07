@@ -536,8 +536,8 @@ fn passthrough(self: *Self, time: u32) void {
             const follow_mode = config.focus_follows_cursor;
             if (follow_mode == .strict or (follow_mode == .normal and focus_change)) {
                 if (View.fromWlrSurface(surface)) |view| {
-                    self.seat.focus(view);
                     self.seat.focusOutput(view.output);
+                    self.seat.focus(view);
                     root.startTransaction();
                 }
             }
