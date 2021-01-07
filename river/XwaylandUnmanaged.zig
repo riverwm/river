@@ -40,43 +40,29 @@ destroy: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).i
 map: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleMap),
 unmap: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleUnmap),
 
-// Listeners that are only active while the view is mapped
-commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
-
 pub fn init(self: *Self, root: *Root, xwayland_surface: *wlr.XwaylandSurface) void {
     self.* = .{ .root = root, .xwayland_surface = xwayland_surface };
 
-    // Add listeners that are active over the view's entire lifetime
+    // Add listeners that are active over the the entire lifetime
     xwayland_surface.events.request_configure.add(&self.request_configure);
     xwayland_surface.events.destroy.add(&self.destroy);
     xwayland_surface.events.map.add(&self.map);
     xwayland_surface.events.unmap.add(&self.unmap);
 }
 
-/// Return the surface at output coordinates ox, oy and set sx, sy to the
-/// corresponding surface-relative coordinates, if there is a surface.
-pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*wlr.Surface {
-    return self.xwayland_surface.surface.?.surfaceAt(
-        ox - @intToFloat(f64, self.view.current_box.x),
-        oy - @intToFloat(f64, self.view.current_box.y),
-        sx,
-        sy,
-    );
-}
-
 fn handleRequestConfigure(
     listener: *wl.Listener(*wlr.XwaylandSurface.event.Configure),
     event: *wlr.XwaylandSurface.event.Configure,
 ) void {
-    const self = @fieldParentPtr(Self, "request_configure", listener);
-    self.xwayland_surface.configure(event.x, event.y, event.width, event.height);
+    event.surface.configure(event.x, event.y, event.width, event.height);
 }
 
 /// Called when the xwayland surface is destroyed
 fn handleDestroy(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
 
-    // Remove listeners that are active for the entire lifetime of the view
+    // Remove listeners that are active for the entire lifetime
+    self.request_configure.link.remove();
     self.destroy.link.remove();
     self.map.link.remove();
     self.unmap.link.remove();
@@ -95,9 +81,6 @@ fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wl
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
     root.xwayland_unmanaged_views.prepend(node);
 
-    // Add listeners that are only active while mapped
-    xwayland_surface.surface.?.events.commit.add(&self.commit);
-
     // TODO: handle keyboard focus
     // if (wlr_xwayland_or_surface_wants_focus(self.xwayland_surface)) { ...
 }
@@ -109,15 +92,4 @@ fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *
     // Remove self from the list of unmanged views in the root
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
     self.root.xwayland_unmanaged_views.remove(node);
-
-    // Remove listeners that are only active while mapped
-    self.commit.link.remove();
-
-    // TODO: return focus
-}
-
-/// Called when the surface is comitted
-fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) void {
-    const self = @fieldParentPtr(Self, "commit", listener);
-    // TODO: check if the surface has moved for damage tracking
 }
