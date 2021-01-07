@@ -226,7 +226,24 @@ fn renderViewPopups(output: *const Output, view: *View, now: *os.timespec) void 
         .when = now,
         .opacity = view.opacity,
     };
-    view.forEachPopup(*SurfaceRenderData, renderSurfaceIterator, &rdata);
+    view.forEachPopup(*SurfaceRenderData, renderPopupSurfaceIterator, &rdata);
+}
+
+// TODO(wlroots): replace with wlr_xdg_surface_for_each_popup_surface()
+fn renderPopupSurfaceIterator(
+    surface: *wlr.Surface,
+    surface_x: c_int,
+    surface_y: c_int,
+    rdata: *SurfaceRenderData,
+) callconv(.C) void {
+    var new_rdata = SurfaceRenderData{
+        .output = rdata.output,
+        .output_x = rdata.output_x + surface_x,
+        .output_y = rdata.output_y + surface_y,
+        .when = rdata.when,
+        .opacity = rdata.opacity,
+    };
+    surface.forEachSurface(*SurfaceRenderData, renderSurfaceIterator, &new_rdata);
 }
 
 fn renderDragIcons(output: *const Output, now: *os.timespec) void {
