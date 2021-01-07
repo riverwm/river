@@ -47,9 +47,13 @@ pub fn init(self: *Self, output: *Output, parent_box: *const Box, wlr_xdg_popup:
     };
 
     // The output box relative to the parent of the popup
-    var box = output.root.output_layout.getBox(output.wlr_output).?.*;
-    box.x -= parent_box.x;
-    box.y -= parent_box.y;
+    const output_dimensions = output.getEffectiveResolution();
+    var box = wlr.Box{
+        .x = -parent_box.x,
+        .y = -parent_box.y,
+        .width = @intCast(c_int, output_dimensions.width),
+        .height = @intCast(c_int, output_dimensions.height),
+    };
     wlr_xdg_popup.unconstrainFromBox(&box);
 
     wlr_xdg_popup.base.events.destroy.add(&self.destroy);
