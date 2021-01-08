@@ -218,6 +218,7 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
             const wlr_layer_surface = wlr.LayerSurfaceV1.fromWlrSurface(surface);
             if (wlr_layer_surface.current.keyboard_interactive) {
                 const layer_surface = @intToPtr(*LayerSurface, wlr_layer_surface.data);
+                self.seat.focusOutput(layer_surface.output);
                 self.seat.setFocusRaw(.{ .layer = layer_surface });
             }
         }
