@@ -17,8 +17,6 @@
 
 const std = @import("std");
 
-const c = @import("../c.zig");
-
 const Error = @import("../command.zig").Error;
 const PhysicalDirection = @import("../command.zig").PhysicalDirection;
 const Orientation = @import("../command.zig").Orientation;

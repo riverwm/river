@@ -26,7 +26,6 @@ const zriver = wayland.server.zriver;
 
 const wlr = @import("wlroots");
 
-const c = @import("c.zig");
 const command = @import("command.zig");
 const util = @import("util.zig");
 

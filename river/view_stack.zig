@@ -322,7 +322,6 @@ test "push/remove (*View)" {
 }
 
 test "iteration (View)" {
-    const c = @import("c.zig");
     const std = @import("std");
     const testing = std.testing;
 

@@ -17,8 +17,6 @@
 
 const std = @import("std");
 
-const c = @import("../c.zig");
-
 const Box = @import("../Box.zig");
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");

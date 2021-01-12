@@ -19,7 +19,6 @@ const Self = @This();
 
 const std = @import("std");
 
-const c = @import("c.zig");
 const util = @import("util.zig");
 
 const Server = @import("Server.zig");
