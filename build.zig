@@ -41,6 +41,7 @@ pub fn build(b: *zbs.Builder) !void {
     const scanner = ScanProtocolsStep.create(b);
     scanner.addSystemProtocol("stable/xdg-shell/xdg-shell.xml");
     scanner.addProtocolPath("protocol/river-control-unstable-v1.xml");
+    scanner.addProtocolPath("protocol/river-options-unstable-v1.xml");
     scanner.addProtocolPath("protocol/river-status-unstable-v1.xml");
     scanner.addProtocolPath("protocol/wlr-layer-shell-unstable-v1.xml");
     scanner.addProtocolPath("protocol/wlr-output-power-management-unstable-v1.xml");
@@ -85,18 +86,20 @@ pub fn build(b: *zbs.Builder) !void {
     }
 
     if (examples) {
-        const status = b.addExecutable("status", "example/status.zig");
-        status.setTarget(target);
-        status.setBuildMode(mode);
+        inline for (.{ "status", "options" }) |example_name| {
+            const example = b.addExecutable(example_name, "example/" ++ example_name ++ ".zig");
+            example.setTarget(target);
+            example.setBuildMode(mode);
 
-        status.step.dependOn(&scanner.step);
-        status.addPackage(scanner.getPkg());
-        status.linkLibC();
-        status.linkSystemLibrary("wayland-client");
+            example.step.dependOn(&scanner.step);
+            example.addPackage(scanner.getPkg());
+            example.linkLibC();
+            example.linkSystemLibrary("wayland-client");
 
-        scanner.addCSource(status);
+            scanner.addCSource(example);
 
-        status.install();
+            example.install();
+        }
     }
 
     {
