@@ -280,6 +280,25 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 	and is made available through the _XCURSOR_THEME_ and _XCURSOR_SIZE_
 	environment variables.
 
+# OPTIONS
+
+River has various options that are saved in a typed key-value store. It also
+allows users to store arbitrary custom options in the store. Options are
+scoped either globally or per-output if the -output flag is passed with the
+name of the output as obtained from the xdg-output protocol.
+
+*declare-option* [-output _output_name_] _name_ _type_ _value_
+	Declare a new option with the given _type_ and inital _value_. If
+	the option already exists with the given _type_, it is still set
+	to _value_. If the option already exists with a different type,
+	nothing happens.
+
+*get-option* [-output _output_name_] _name_
+	Print the current value of the given option to stdout.
+
+*set-option* [-output _output_name_] _name_ _value_
+	Set the value of the specified option to _value_.
+
 # EXAMPLES
 
 Bind bemenu-run to Super+P in normal mode:
