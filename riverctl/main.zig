@@ -1,6 +1,6 @@
 // This file is part of river, a dynamic tiling wayland compositor.
 //
-// Copyright 2020 The River Developers
+// Copyright 2020-2021 The River Developers
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -16,48 +16,78 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
+const mem = std.mem;
+const os = std.os;
 
 const wayland = @import("wayland");
 const wl = wayland.client.wl;
 const zriver = wayland.client.zriver;
+const zxdg = wayland.client.zxdg;
 
-const SetupContext = struct {
-    river_control: ?*zriver.ControlV1 = null,
+const gpa = std.heap.c_allocator;
+
+const options = @import("options.zig");
+
+pub const Output = struct {
+    wl_output: *wl.Output,
+    name: []const u8,
+};
+
+pub const Globals = struct {
+    control: ?*zriver.ControlV1 = null,
+    options_manager: ?*zriver.OptionsManagerV1 = null,
     seat: ?*wl.Seat = null,
+    output_manager: ?*zxdg.OutputManagerV1 = null,
+    outputs: std.ArrayList(Output) = std.ArrayList(Output).init(gpa),
 };
 
 pub fn main() !void {
     const display = try wl.Display.connect(null);
     const registry = try display.getRegistry();
 
-    var context = SetupContext{};
+    var globals = Globals{};
 
-    registry.setListener(*SetupContext, registryListener, &context) catch unreachable;
+    registry.setListener(*Globals, registryListener, &globals) catch unreachable;
     _ = try display.roundtrip();
 
-    const river_control = context.river_control orelse return error.RiverControlNotAdvertised;
-    const seat = context.seat orelse return error.SeatNotAdverstised;
+    if (os.argv.len > 2 and mem.eql(u8, "declare-option", mem.span(os.argv[1]))) {
+        try options.declareOption(display, &globals);
+    } else if (os.argv.len > 2 and mem.eql(u8, "get-option", mem.span(os.argv[1]))) {
+        try options.getOption(display, &globals);
+    } else if (os.argv.len > 2 and mem.eql(u8, "set-option", mem.span(os.argv[1]))) {
+        try options.setOption(display, &globals);
+    } else {
+        const control = globals.control orelse return error.RiverControlNotAdvertised;
+        const seat = globals.seat orelse return error.SeatNotAdverstised;
 
-    // Skip our name, send all other args
-    // This next line is needed cause of https://github.com/ziglang/zig/issues/2622
-    const args = std.os.argv;
-    for (args[1..]) |arg| river_control.addArgument(arg);
+        // Skip our name, send all other args
+        // This next line is needed cause of https://github.com/ziglang/zig/issues/2622
+        const args = os.argv;
+        for (args[1..]) |arg| control.addArgument(arg);
 
-    const callback = try river_control.runCommand(seat);
+        const callback = try control.runCommand(seat);
 
-    callback.setListener(?*c_void, callbackListener, null) catch unreachable;
+        callback.setListener(?*c_void, callbackListener, null) catch unreachable;
 
-    // Loop until our callback is called and we exit.
-    while (true) _ = try display.dispatch();
+        // Loop until our callback is called and we exit.
+        while (true) _ = try display.dispatch();
+    }
 }
 
-fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, context: *SetupContext) void {
+fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, globals: *Globals) void {
     switch (event) {
         .global => |global| {
-            if (context.seat == null and std.cstr.cmp(global.interface, wl.Seat.getInterface().name) == 0) {
-                context.seat = registry.bind(global.name, wl.Seat, 1) catch return;
+            if (globals.seat == null and std.cstr.cmp(global.interface, wl.Seat.getInterface().name) == 0) {
+                globals.seat = registry.bind(global.name, wl.Seat, 1) catch @panic("out of memory");
             } else if (std.cstr.cmp(global.interface, zriver.ControlV1.getInterface().name) == 0) {
-                context.river_control = registry.bind(global.name, zriver.ControlV1, 1) catch return;
+                globals.control = registry.bind(global.name, zriver.ControlV1, 1) catch @panic("out of memory");
+            } else if (std.cstr.cmp(global.interface, zriver.OptionsManagerV1.getInterface().name) == 0) {
+                globals.options_manager = registry.bind(global.name, zriver.OptionsManagerV1, 1) catch @panic("out of memory");
+            } else if (std.cstr.cmp(global.interface, zxdg.OutputManagerV1.getInterface().name) == 0 and global.version >= 2) {
+                globals.output_manager = registry.bind(global.name, zxdg.OutputManagerV1, 2) catch @panic("out of memory");
+            } else if (std.cstr.cmp(global.interface, wl.Output.getInterface().name) == 0) {
+                const output = registry.bind(global.name, wl.Output, 1) catch @panic("out of memory");
+                globals.outputs.append(.{ .wl_output = output, .name = undefined }) catch @panic("out of memory");
             }
         },
         .global_remove => {},
@@ -67,15 +97,20 @@ fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, context: *
 fn callbackListener(callback: *zriver.CommandCallbackV1, event: zriver.CommandCallbackV1.Event, _: ?*c_void) void {
     switch (event) {
         .success => |success| {
-            if (std.mem.len(success.output) > 0) {
+            if (mem.len(success.output) > 0) {
                 const stdout = std.io.getStdOut().outStream();
                 stdout.print("{}\n", .{success.output}) catch @panic("failed to write to stdout");
             }
-            std.os.exit(0);
+            os.exit(0);
         },
         .failure => |failure| {
             std.debug.print("Error: {}\n", .{failure.failure_message});
-            std.os.exit(1);
+            os.exit(1);
         },
     }
+}
+
+pub fn printErrorExit(comptime format: []const u8, args: anytype) noreturn {
+    std.debug.print("err: " ++ format ++ "\n", args);
+    os.exit(1);
 }
