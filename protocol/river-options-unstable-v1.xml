@@ -110,27 +110,38 @@
 
     <request name="set_int_value">
       <description summary="set the value of the option">
-        If the option is either unset or set to a value of type int,
-        this request sets the value of the option as well as the type if
-        previously unset. Otherwise the request is ignored.
+        If the option is either unset or set to a value of type int, this
+        request asks the compositor to set the value of the option as well
+        as the type if previously unset. The compositor is not required to
+        honor this request.
+
+        If the option is already set and is not of type int, this request does nothing.
       </description>
       <arg name="value" type="int"/>
     </request>
 
     <request name="set_uint_value">
       <description summary="set the value of the option">
-        If the option is either unset or set to a value of type uint,
-        this request sets the value of the option as well as the type if
-        previously unset. Otherwise the request is ignored.
+        If the option is either unset or set to a value of type uint, this
+        request asks the compositor to set the value of the option as well
+        as the type if previously unset. The compositor is not required to
+        honor this request.
+
+        If the option is already set and is not of type uint, this request
+        does nothing.
       </description>
       <arg name="value" type="uint"/>
     </request>
 
     <request name="set_fixed_value">
       <description summary="set the value of the option">
-        If the option is either unset or set to a value of type fixed,
-        this request sets the value of the option as well as the type if
-        previously unset. Otherwise the request is ignored.
+        If the option is either unset or set to a value of type fixed, this
+        request asks the compositor to set the value of the option as well
+        as the type if previously unset. The compositor is not required to
+        honor this request.
+
+        If the option is already set and is not of type fixed, this request
+        does nothing.
       </description>
       <arg name="value" type="fixed"/>
     </request>
@@ -138,8 +149,12 @@
     <request name="set_string_value">
       <description summary="set the value of the option">
         If the option is either unset or set to a value of type string,
-        this request sets the value of the option as well as the type if
-        previously unset. Otherwise the request is ignored.
+        this request asks the compositor to set the value of the option as
+        well as the type if previously unset. The compositor is not required
+        to honor this request.
+
+        If the option is already set and is not of type string, this request
+        does nothing.
       </description>
       <arg name="value" type="string" allow-null="true"/>
     </request>
