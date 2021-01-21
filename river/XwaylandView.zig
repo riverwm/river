@@ -157,10 +157,19 @@ fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wl
 
     view.surface = self.xwayland_surface.surface;
 
-    // Use the view's "natural" size centered on the output as the default
-    // floating dimensions
+    // Use the view's "natural" size as the default floating dimensions
     view.float_box.width = self.xwayland_surface.width;
     view.float_box.height = self.xwayland_surface.height;
+    if (self.xwayland_surface.size_hints) |size_hints| {
+        // If existing, use size hints for the default floating dimensions
+        if (size_hints.min_width > 0 and size_hints.min_height > 0 and
+            (size_hints.min_width == size_hints.max_width or size_hints.min_height == size_hints.max_height))
+        {
+            view.float_box.width = @intCast(u32, size_hints.max_width);
+            view.float_box.height = @intCast(u32, size_hints.max_height);
+        }
+    }
+    // Floating Position
     view.float_box.x = math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.width) -
         @intCast(i32, view.float_box.width), 2));
     view.float_box.y = math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.height) -
