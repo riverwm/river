@@ -67,6 +67,7 @@ pub fn destroy(self: *Self) void {
     var it = self.handles.safeIterator(.forward);
     while (it.next()) |handle| handle.destroy();
     if (self.value == .string) if (self.value.string) |s| util.gpa.free(mem.span(s));
+    self.link.remove();
     util.gpa.destroy(self);
 }
 

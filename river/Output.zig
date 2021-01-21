@@ -487,6 +487,8 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) v
 
     log.debug(.server, "output '{}' destroyed", .{self.wlr_output.name});
 
+    root.server.options_manager.handleOutputDestroy(self);
+
     // Remove the destroyed output from root if it wasn't already removed
     root.removeOutput(self);
 

@@ -44,6 +44,13 @@ pub fn init(self: *Self, server: *Server) !void {
     server.wl_server.addDestroyListener(&self.server_destroy);
 }
 
+pub fn handleOutputDestroy(self: *Self, output: *Output) void {
+    var it = self.options.safeIterator(.forward);
+    while (it.next()) |option| {
+        if (option.output == output) option.destroy();
+    }
+}
+
 fn handleServerDestroy(listener: *wl.Listener(*wl.Server), wl_server: *wl.Server) void {
     const self = @fieldParentPtr(Self, "server_destroy", listener);
     self.global.destroy();
