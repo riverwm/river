@@ -37,11 +37,15 @@ xwayland_surface: *wlr.XwaylandSurface,
 destroy: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleDestroy),
 map: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleMap),
 unmap: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleUnmap),
-set_title: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleSetTitle),
-set_class: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleSetClass),
+// zig fmt: off
+request_configure: wl.Listener(*wlr.XwaylandSurface.event.Configure) =
+    wl.Listener(*wlr.XwaylandSurface.event.Configure).init(handleRequestConfigure),
+// zig fmt: on
 
 // Listeners that are only active while the view is mapped
 commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
+set_title: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleSetTitle),
+set_class: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleSetClass),
 
 pub fn init(self: *Self, view: *View, xwayland_surface: *wlr.XwaylandSurface) void {
     self.* = .{ .view = view, .xwayland_surface = xwayland_surface };
@@ -51,6 +55,7 @@ pub fn init(self: *Self, view: *View, xwayland_surface: *wlr.XwaylandSurface) vo
     xwayland_surface.events.destroy.add(&self.destroy);
     xwayland_surface.events.map.add(&self.map);
     xwayland_surface.events.unmap.add(&self.unmap);
+    xwayland_surface.events.request_configure.add(&self.request_configure);
 }
 
 pub fn deinit(self: *Self) void {
@@ -59,6 +64,7 @@ pub fn deinit(self: *Self) void {
         self.destroy.link.remove();
         self.map.link.remove();
         self.unmap.link.remove();
+        self.request_configure.link.remove();
     }
 }
 
@@ -204,6 +210,21 @@ fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *
     self.commit.link.remove();
     self.set_title.link.remove();
     self.set_class.link.remove();
+}
+
+fn handleRequestConfigure(
+    listener: *wl.Listener(*wlr.XwaylandSurface.event.Configure),
+    event: *wlr.XwaylandSurface.event.Configure,
+) void {
+    const self = @fieldParentPtr(Self, "request_configure", listener);
+
+    // Allow xwayland views to set their own dimensions (but not position)
+    // if floating or unmapped
+    if (self.view.surface == null or self.view.pending.float) {
+        self.view.pending.box.width = event.width;
+        self.view.pending.box.height = event.height;
+        self.configure();
+    }
 }
 
 /// Called when the surface is comitted
