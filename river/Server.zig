@@ -112,12 +112,12 @@ pub fn init(self: *Self) !void {
 
     self.config = try Config.init();
     try self.decoration_manager.init(self);
+    try self.options_manager.init(self);
     try self.root.init(self);
     // Must be called after root is initialized
     try self.input_manager.init(self);
     try self.control.init(self);
     try self.status_manager.init(self);
-    try self.options_manager.init(self);
 
     // These all free themselves when the wl_server is destroyed
     _ = try wlr.DataDeviceManager.create(self.wl_server);

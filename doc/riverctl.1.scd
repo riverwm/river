@@ -299,6 +299,12 @@ name of the output as obtained from the xdg-output protocol.
 *set-option* [-output _output_name_] _name_ _value_
 	Set the value of the specified option to _value_.
 
+River declares certain default options for all outputs.
+
+*output-title* (string)
+	Changing this option changes the title of the wayland and X11 backend
+	outputs.
+
 # EXAMPLES
 
 Bind bemenu-run to Super+P in normal mode:

@@ -35,6 +35,7 @@ const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const AttachMode = @import("view_stack.zig").AttachMode;
 const OutputStatus = @import("OutputStatus.zig");
+const Option = @import("Option.zig");
 
 const State = struct {
     /// A bit field of focused tags
@@ -83,6 +84,9 @@ destroy: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleDestroy)
 enable: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleEnable),
 frame: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleFrame),
 mode: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleMode),
+
+/// Listeners for options
+title_change: wl.Listener(*Option) = wl.Listener(*Option).init(handleTitleChange),
 
 pub fn init(self: *Self, root: *Root, wlr_output: *wlr.Output) !void {
     // Some backends don't have modes. DRM+KMS does, and we need to set a mode
@@ -138,6 +142,9 @@ pub fn init(self: *Self, root: *Root, wlr_output: *wlr.Output) !void {
             .height = effective_resolution.height,
         };
     }
+
+    // Create some default options for this output
+    try self.defaultOption("output-title", .{ .string = "river" }, &self.title_change);
 }
 
 pub fn getLayer(self: *Self, layer: zwlr.LayerShellV1.Layer) *std.TailQueue(LayerSurface) {
@@ -544,4 +551,30 @@ pub fn getEffectiveResolution(self: *Self) struct { width: u32, height: u32 } {
         .width = @intCast(u32, width),
         .height = @intCast(u32, height),
     };
+}
+
+pub fn setTitle(self: *Self, title: [*:0]const u8) void {
+    if (self.wlr_output.isWl()) {
+        self.wlr_output.wlSetTitle(title);
+    } else if (self.wlr_output.isX11()) {
+        self.wlr_output.x11SetTitle(title);
+    }
+}
+
+/// Create an option for this output, attach a listener which is called when
+/// the option changed and initialize with a default value. Note that the
+/// listener is called once through this function.
+fn defaultOption(
+    self: *Self,
+    key: [*:0]const u8,
+    value: Option.Value,
+    listener: *wl.Listener(*Option),
+) !void {
+    const option = try Option.create(&self.root.server.options_manager, self, key);
+    option.update.add(listener);
+    try option.set(value);
+}
+
+fn handleTitleChange(listener: *wl.Listener(*Option), option: *Option) void {
+    if (option.value.string) |title| option.output.?.setTitle(title);
 }
