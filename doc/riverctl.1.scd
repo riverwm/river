@@ -280,7 +280,7 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 	and is made available through the _XCURSOR_THEME_ and _XCURSOR_SIZE_
 	environment variables.
 
-# OPTIONS
+## OPTIONS
 
 River has various options that are saved in a typed key-value store. It also
 allows users to store arbitrary custom options in the store. Options are
@@ -298,6 +298,12 @@ name of the output as obtained from the xdg-output protocol.
 
 *set-option* [-output _output_name_] _name_ _value_
 	Set the value of the specified option to _value_.
+
+River declares certain default options for all outputs.
+
+*output_title* (string)
+	Changing this option changes the title of the wayland and X11 backend
+	outputs.
 
 # EXAMPLES
 

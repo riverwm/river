@@ -45,6 +45,9 @@ output: ?*Output,
 key: [*:0]const u8,
 value: Value = .unset,
 
+/// Emitted whenever the value of the option changes.
+update: wl.Signal(*Self) = undefined,
+
 handles: wl.list.Head(zriver.OptionHandleV1, null) = undefined,
 
 pub fn create(options_manager: *OptionsManager, output: ?*Output, key: [*:0]const u8) !*Self {
@@ -57,6 +60,7 @@ pub fn create(options_manager: *OptionsManager, output: ?*Output, key: [*:0]cons
         .key = try util.gpa.dupeZ(u8, mem.span(key)),
     };
     self.handles.init();
+    self.update.init();
 
     options_manager.options.append(self);
 
@@ -101,6 +105,9 @@ pub fn set(self: *Self, value: Value) !void {
 
     var it = self.handles.iterator(.forward);
     while (it.next()) |handle| self.sendValue(handle);
+
+    // Call listeners, if any.
+    self.update.emit(self);
 }
 
 fn sendValue(self: Self, handle: *zriver.OptionHandleV1) void {
