@@ -89,7 +89,7 @@ pub fn set(self: *Self, value: Value) !void {
         };
     } else if (self.value == .string and
         // TODO: std.mem needs a good way to compare optional sentinel pointers
-        ((self.value.string == null and value.string == null) or
+        (((self.value.string == null) != (value.string == null)) or
         (self.value.string != null and value.string != null and
         std.cstr.cmp(self.value.string.?, value.string.?) != 0)))
     {
