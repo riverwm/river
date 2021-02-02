@@ -63,7 +63,7 @@ pub fn declareOption(display: *wl.Display, globals: *Globals) !void {
         .int => setIntValueRaw(handle, raw_value),
         .uint => setUintValueRaw(handle, raw_value),
         .fixed => setFixedValueRaw(handle, raw_value),
-        .string => handle.setStringValue(raw_value),
+        .string => handle.setStringValue(if (raw_value[0] == 0) null else raw_value),
     }
     _ = display.flush() catch os.exit(1);
 }
@@ -156,7 +156,7 @@ fn getOptionListener(
         .int_value => |ev| printOutputExit("{}", .{ev.value}),
         .uint_value => |ev| printOutputExit("{}", .{ev.value}),
         .fixed_value => |ev| printOutputExit("{d}", .{ev.value.toDouble()}),
-        .string_value => |ev| printOutputExit("{}", .{ev.value}),
+        .string_value => |ev| if (ev.value) |s| printOutputExit("{}", .{s}) else os.exit(0),
     }
 }
 
@@ -180,7 +180,7 @@ fn setOptionListener(
         .int_value => |ev| setIntValueRaw(handle, ctx.raw_value),
         .uint_value => |ev| setUintValueRaw(handle, ctx.raw_value),
         .fixed_value => |ev| setFixedValueRaw(handle, ctx.raw_value),
-        .string_value => |ev| handle.setStringValue(ctx.raw_value),
+        .string_value => |ev| handle.setStringValue(if (ctx.raw_value[0] == 0) null else ctx.raw_value),
     }
     _ = ctx.display.flush() catch os.exit(1);
     os.exit(0);
