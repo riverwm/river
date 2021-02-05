@@ -24,7 +24,6 @@ const os = std.os;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
-const log = @import("log.zig");
 const util = @import("util.zig");
 
 const Box = @import("Box.zig");
@@ -34,6 +33,8 @@ const Seat = @import("Seat.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const XdgToplevel = @import("XdgToplevel.zig");
 const XwaylandView = if (build_options.xwayland) @import("XwaylandView.zig") else @import("VoidView.zig");
+
+const log = std.log.scoped(.view);
 
 pub const Constraints = struct {
     min_width: u32,
@@ -441,13 +442,13 @@ pub fn map(self: *Self) void {
 
     self.pending.target_opacity = self.output.root.server.config.opacity.unfocused;
 
-    log.debug(.server, "view '{}' mapped", .{self.getTitle()});
+    log.debug("view '{}' mapped", .{self.getTitle()});
 
     if (self.foreign_toplevel_handle == null) {
         self.foreign_toplevel_handle = wlr.ForeignToplevelHandleV1.create(
             root.server.foreign_toplevel_manager,
         ) catch {
-            log.crit(.server, "out of memory", .{});
+            log.crit("out of memory", .{});
             self.surface.?.resource.getClient().postNoMemory();
             return;
         };
@@ -482,7 +483,7 @@ pub fn map(self: *Self) void {
 pub fn unmap(self: *Self) void {
     const root = self.output.root;
 
-    log.debug(.server, "view '{}' unmapped", .{self.getTitle()});
+    log.debug("view '{}' unmapped", .{self.getTitle()});
 
     self.destroying = true;
 
@@ -553,7 +554,7 @@ fn killOpacityTimer(self: *Self) void {
 fn armOpacityTimer(self: *Self) void {
     const delta_t = self.output.root.server.config.opacity.delta_t;
     self.opacity_timer.?.timerUpdate(delta_t) catch |err| {
-        log.err(.view, "failed to update opacity timer: {}", .{err});
+        log.err("failed to update opacity timer: {}", .{err});
         self.killOpacityTimer();
     };
 }
@@ -572,7 +573,7 @@ fn handleOpacityTimer(self: *Self) callconv(.C) c_int {
 fn attachOpacityTimer(self: *Self) void {
     const event_loop = self.output.root.server.wl_server.getEventLoop();
     self.opacity_timer = event_loop.addTimer(*Self, handleOpacityTimer, self) catch {
-        log.err(.view, "failed to create opacity timer for view '{}'", .{self.getTitle()});
+        log.err("failed to create opacity timer for view '{}'", .{self.getTitle()});
         return;
     };
     self.armOpacityTimer();

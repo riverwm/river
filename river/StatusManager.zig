@@ -23,7 +23,6 @@ const wayland = @import("wayland");
 const wl = wayland.server.wl;
 const zriver = wayland.server.zriver;
 
-const log = @import("log.zig");
 const util = @import("util.zig");
 
 const Output = @import("Output.zig");
@@ -31,6 +30,8 @@ const OutputStatus = @import("OutputStatus.zig");
 const Seat = @import("Seat.zig");
 const SeatStatus = @import("SeatStatus.zig");
 const Server = @import("Server.zig");
+
+const log = std.log.scoped(.river_status);
 
 global: *wl.Global,
 
@@ -52,7 +53,7 @@ fn handleServerDestroy(listener: *wl.Listener(*wl.Server), wl_server: *wl.Server
 fn bind(client: *wl.Client, self: *Self, version: u32, id: u32) callconv(.C) void {
     const status_manager = zriver.StatusManagerV1.create(client, version, id) catch {
         client.postNoMemory();
-        log.crit(.river_status, "out of memory", .{});
+        log.crit("out of memory", .{});
         return;
     };
     status_manager.setHandler(*Self, handleRequest, null, self);
@@ -72,7 +73,7 @@ fn handleRequest(
 
             const node = util.gpa.create(std.SinglyLinkedList(OutputStatus).Node) catch {
                 status_manager.getClient().postNoMemory();
-                log.crit(.river_status, "out of memory", .{});
+                log.crit("out of memory", .{});
                 return;
             };
 
@@ -83,7 +84,7 @@ fn handleRequest(
             ) catch {
                 status_manager.getClient().postNoMemory();
                 util.gpa.destroy(node);
-                log.crit(.river_status, "out of memory", .{});
+                log.crit("out of memory", .{});
                 return;
             };
 
@@ -97,7 +98,7 @@ fn handleRequest(
 
             const node = util.gpa.create(std.SinglyLinkedList(SeatStatus).Node) catch {
                 status_manager.getClient().postNoMemory();
-                log.crit(.river_status, "out of memory", .{});
+                log.crit("out of memory", .{});
                 return;
             };
 
@@ -108,7 +109,7 @@ fn handleRequest(
             ) catch {
                 status_manager.getClient().postNoMemory();
                 util.gpa.destroy(node);
-                log.crit(.river_status, "out of memory", .{});
+                log.crit("out of memory", .{});
                 return;
             };
 

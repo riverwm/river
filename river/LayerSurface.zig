@@ -21,12 +21,13 @@ const std = @import("std");
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
-const log = @import("log.zig");
 const util = @import("util.zig");
 
 const Box = @import("Box.zig");
 const Output = @import("Output.zig");
 const XdgPopup = @import("XdgPopup.zig");
+
+const log = std.log.scoped(.layer_shell);
 
 output: *Output,
 wlr_layer_surface: *wlr.LayerSurfaceV1,
@@ -68,7 +69,7 @@ pub fn init(self: *Self, output: *Output, wlr_layer_surface: *wlr.LayerSurfaceV1
 fn handleDestroy(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wlr.LayerSurfaceV1) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
 
-    log.debug(.layer_shell, "layer surface '{}' destroyed", .{self.wlr_layer_surface.namespace});
+    log.debug("layer surface '{}' destroyed", .{self.wlr_layer_surface.namespace});
 
     // Remove listeners active the entire lifetime of the layer surface
     self.destroy.link.remove();
@@ -82,7 +83,7 @@ fn handleDestroy(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface:
 fn handleMap(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wlr.LayerSurfaceV1) void {
     const self = @fieldParentPtr(Self, "map", listener);
 
-    log.debug(.layer_shell, "layer surface '{}' mapped", .{wlr_layer_surface.namespace});
+    log.debug("layer surface '{}' mapped", .{wlr_layer_surface.namespace});
 
     // Add listeners that are only active while mapped
     wlr_layer_surface.surface.events.commit.add(&self.commit);
@@ -97,7 +98,7 @@ fn handleMap(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wl
 fn handleUnmap(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wlr.LayerSurfaceV1) void {
     const self = @fieldParentPtr(Self, "unmap", listener);
 
-    log.debug(.layer_shell, "layer surface '{}' unmapped", .{self.wlr_layer_surface.namespace});
+    log.debug("layer surface '{}' unmapped", .{self.wlr_layer_surface.namespace});
 
     // remove listeners only active while the layer surface is mapped
     self.commit.link.remove();
@@ -134,7 +135,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), wlr_surface: *wlr.Surface)
     const self = @fieldParentPtr(Self, "commit", listener);
 
     if (self.wlr_layer_surface.output == null) {
-        log.err(.layer_shell, "layer surface committed with null output", .{});
+        log.err("layer surface committed with null output", .{});
         return;
     }
 

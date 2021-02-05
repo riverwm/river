@@ -21,10 +21,18 @@ const wlr = @import("wlroots");
 const build_options = @import("build_options");
 
 const c = @import("c.zig");
-const log = @import("log.zig");
 const util = @import("util.zig");
 
 const Server = @import("Server.zig");
+
+const log_server = std.log.scoped(.server);
+
+pub var level: std.log.Level = switch (std.builtin.mode) {
+    .Debug => .debug,
+    .ReleaseSafe => .notice,
+    .ReleaseFast => .err,
+    .ReleaseSmall => .emerg,
+};
 
 const usage: []const u8 =
     \\Usage: river [options]
@@ -60,6 +68,22 @@ fn getStartupCommand() std.fmt.AllocPrintError!?[:0]const u8 {
     return null;
 }
 
+pub fn log(
+    comptime message_level: std.log.Level,
+    comptime scope: @TypeOf(.foobar),
+    comptime format: []const u8,
+    args: anytype,
+) void {
+    if (@enumToInt(message_level) <= @enumToInt(level)) {
+        // Don't store/log messages in release small mode to save space
+        if (std.builtin.mode != .ReleaseSmall) {
+            const stderr = std.io.getStdErr().writer();
+            stderr.print(@tagName(message_level) ++ ": (" ++ @tagName(scope) ++ ") " ++
+                format ++ "\n", args) catch return;
+        }
+    }
+}
+
 pub fn main() anyerror!void {
     var startup_command: ?[:0]const u8 = null;
     {
@@ -82,9 +106,9 @@ pub fn main() anyerror!void {
                 }
             } else if (std.mem.eql(u8, arg, "-l")) {
                 if (it.nextPosix()) |level_str| {
-                    const level = std.fmt.parseInt(u3, level_str, 10) catch
+                    const log_level = std.fmt.parseInt(u3, level_str, 10) catch
                         printErrorExit("Error: invalid log level '{}'", .{level_str});
-                    log.level = @intToEnum(log.Level, level);
+                    level = @intToEnum(std.log.Level, log_level);
                 } else {
                     printErrorExit("Error: flag '-l' requires exactly one argument", .{});
                 }
@@ -96,23 +120,23 @@ pub fn main() anyerror!void {
         }
     }
 
-    wlr.log.init(switch (log.level) {
+    wlr.log.init(switch (level) {
         .debug => .debug,
         .notice, .info => .info,
         .warn, .err, .crit, .alert, .emerg => .err,
     });
 
-    log.info(.server, "initializing", .{});
+    log_server.info("initializing", .{});
 
     if (startup_command == null) {
         if (try getStartupCommand()) |path| {
             startup_command = path;
-            log.info(.server, "Using default startup command path: {}", .{path});
+            log_server.info("Using default startup command path: {}", .{path});
         } else {
-            log.info(.server, "Starting without startup command", .{});
+            log_server.info("Starting without startup command", .{});
         }
     } else {
-        log.info(.server, "Using custom startup command path: {}", .{startup_command});
+        log_server.info("Using custom startup command path: {}", .{startup_command});
     }
 
     var server: Server = undefined;
@@ -132,13 +156,13 @@ pub fn main() anyerror!void {
         break :blk pid;
     } else null;
     defer if (child_pid) |pid|
-        std.os.kill(pid, std.os.SIGTERM) catch |e| log.err(.server, "failed to kill startup process: {}", .{e});
+        std.os.kill(pid, std.os.SIGTERM) catch |e| log_server.err("failed to kill startup process: {}", .{e});
 
-    log.info(.server, "running...", .{});
+    log_server.info("running...", .{});
 
     server.wl_server.run();
 
-    log.info(.server, "shutting down", .{});
+    log_server.info("shutting down", .{});
 }
 
 fn printErrorExit(comptime format: []const u8, args: anytype) noreturn {

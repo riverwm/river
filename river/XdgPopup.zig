@@ -21,11 +21,12 @@ const std = @import("std");
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
-const log = @import("log.zig");
 const util = @import("util.zig");
 
 const Box = @import("Box.zig");
 const Output = @import("Output.zig");
+
+const log = std.log.scoped(.server);
 
 /// The output this popup is displayed on.
 output: *Output,
@@ -76,7 +77,7 @@ fn handleNewPopup(listener: *wl.Listener(*wlr.XdgPopup), wlr_xdg_popup: *wlr.Xdg
     // This will free itself on destroy
     const xdg_popup = util.gpa.create(Self) catch {
         wlr_xdg_popup.resource.postNoMemory();
-        log.crit(.server, "out of memory", .{});
+        log.crit("out of memory", .{});
         return;
     };
     xdg_popup.init(self.output, self.parent_box, wlr_xdg_popup);

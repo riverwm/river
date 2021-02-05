@@ -22,10 +22,11 @@ const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 const xkb = @import("xkbcommon");
 
-const log = @import("log.zig");
 const util = @import("util.zig");
 
 const Seat = @import("Seat.zig");
+
+const log = std.log.scoped(.keyboard);
 
 seat: *Seat,
 input_device: *wlr.InputDevice,
@@ -147,13 +148,14 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Keyboard), wlr_keyboard: *wlr.Keybo
 fn handleBuiltinMapping(self: Self, keysym: xkb.Keysym) bool {
     switch (@enumToInt(keysym)) {
         @enumToInt(xkb.Keysym.XF86Switch_VT_1)...@enumToInt(xkb.Keysym.XF86Switch_VT_12) => {
-            log.debug(.keyboard, "switch VT keysym received", .{});
+            log.debug("switch VT keysym received", .{});
             const backend = self.seat.input_manager.server.backend;
             if (backend.isMulti()) {
                 if (backend.getSession()) |session| {
                     const vt = @enumToInt(keysym) - @enumToInt(xkb.Keysym.XF86Switch_VT_1) + 1;
-                    log.notice(.server, "switching to VT {}", .{vt});
-                    session.changeVt(vt) catch log.err(.server, "changing VT failed", .{});
+                    const log_server = std.log.scoped(.server);
+                    log_server.notice("switching to VT {}", .{vt});
+                    session.changeVt(vt) catch log_server.err("changing VT failed", .{});
                 }
             }
             return true;
