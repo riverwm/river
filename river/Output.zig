@@ -26,7 +26,6 @@ const wl = wayland.server.wl;
 const zwlr = wayland.server.zwlr;
 
 const c = @import("c.zig");
-const log = @import("log.zig");
 const render = @import("render.zig");
 const util = @import("util.zig");
 
@@ -43,6 +42,8 @@ const State = struct {
     /// A bit field of focused tags
     tags: u32,
 };
+
+const log = std.log.scoped(.layout);
 
 root: *Root,
 wlr_output: *wlr.Output,
@@ -133,7 +134,7 @@ pub fn init(self: *Self, root: *Root, wlr_output: *wlr.Output) !void {
         while (it) |node| : (it = node.next) {
             const seat = &node.data;
             seat.cursor.xcursor_manager.load(wlr_output.scale) catch
-                log.err(.cursor, "failed to load xcursor theme at scale {}", .{wlr_output.scale});
+                std.log.scoped(.cursor).err("failed to load xcursor theme at scale {}", .{wlr_output.scale});
         }
 
         const effective_resolution = self.getEffectiveResolution();
@@ -303,11 +304,11 @@ pub fn arrangeViews(self: *Self) void {
 
     self.layoutExternal(layout_count) catch |err| {
         switch (err) {
-            LayoutError.BadExitCode => log.err(.layout, "layout command exited with non-zero return code", .{}),
-            LayoutError.WrongViewCount => log.err(.layout, "mismatch between window configuration and visible window counts", .{}),
-            else => log.err(.layout, "failed to use external layout: {}", .{err}),
+            LayoutError.BadExitCode => log.err("layout command exited with non-zero return code", .{}),
+            LayoutError.WrongViewCount => log.err("mismatch between window configuration and visible window counts", .{}),
+            else => log.err("failed to use external layout: {}", .{err}),
         }
-        log.err(.layout, "falling back to internal layout", .{});
+        log.err("falling back to internal layout", .{});
         self.layoutFull(layout_count);
     };
 }
@@ -484,7 +485,7 @@ fn arrangeLayer(
         }
 
         // Tell the client to assume the new size
-        log.debug(.layer_shell, "send configure, {} x {}", .{ layer_surface.box.width, layer_surface.box.height });
+        std.log.scoped(.layer_shell).debug("send configure, {} x {}", .{ layer_surface.box.width, layer_surface.box.height });
         layer_surface.wlr_layer_surface.configure(layer_surface.box.width, layer_surface.box.height);
     }
 }
@@ -495,7 +496,7 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) v
     const self = @fieldParentPtr(Self, "destroy", listener);
     const root = self.root;
 
-    log.debug(.server, "output '{}' destroyed", .{self.wlr_output.name});
+    std.log.scoped(.server).debug("output '{}' destroyed", .{self.wlr_output.name});
 
     root.server.options_manager.handleOutputDestroy(self);
 

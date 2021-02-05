@@ -21,7 +21,6 @@ const std = @import("std");
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
-const log = @import("log.zig");
 const util = @import("util.zig");
 
 const Box = @import("Box.zig");
@@ -29,6 +28,8 @@ const Seat = @import("Seat.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const XdgPopup = @import("XdgPopup.zig");
+
+const log = std.log.scoped(.xdg_shell);
 
 /// The view this xdg toplevel implements
 view: *View,
@@ -257,7 +258,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) voi
     } else {
         // TODO: handle unexpected change in dimensions
         if (!std.meta.eql(view.surface_box, new_box))
-            log.err(.xdg_shell, "view changed size unexpectedly", .{});
+            log.err("view changed size unexpectedly", .{});
         view.surface_box = new_box;
     }
 }

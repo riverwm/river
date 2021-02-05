@@ -22,7 +22,6 @@ const std = @import("std");
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
-const log = @import("log.zig");
 const util = @import("util.zig");
 
 const Seat = @import("Seat.zig");
@@ -30,6 +29,8 @@ const Server = @import("Server.zig");
 const View = @import("View.zig");
 
 const default_seat_name = "default";
+
+const log = std.log.scoped(.input_manager);
 
 server: *Server,
 new_input: wl.Listener(*wlr.InputDevice) = wl.Listener(*wlr.InputDevice).init(handleNewInput),
@@ -120,7 +121,7 @@ fn handleInhibitActivate(
 ) void {
     const self = @fieldParentPtr(Self, "inhibit_activate", listener);
 
-    log.debug(.input_manager, "input inhibitor activated", .{});
+    log.debug("input inhibitor activated", .{});
 
     var seat_it = self.seats.first;
     while (seat_it) |seat_node| : (seat_it = seat_node.next) {
@@ -141,7 +142,7 @@ fn handleInhibitDeactivate(
 ) void {
     const self = @fieldParentPtr(Self, "inhibit_deactivate", listener);
 
-    log.debug(.input_manager, "input inhibitor deactivated", .{});
+    log.debug("input inhibitor deactivated", .{});
 
     self.exclusive_client = null;
 
@@ -178,11 +179,11 @@ fn handleNewVirtualPointer(
 
     // TODO Support multiple seats and don't ignore
     if (event.suggested_seat != null) {
-        log.debug(.input_manager, "Ignoring seat suggestion from virtual pointer", .{});
+        log.debug("Ignoring seat suggestion from virtual pointer", .{});
     }
     // TODO dont ignore output suggestion
     if (event.suggested_output != null) {
-        log.debug(.input_manager, "Ignoring output suggestion from virtual pointer", .{});
+        log.debug("Ignoring output suggestion from virtual pointer", .{});
     }
 
     self.defaultSeat().addDevice(&event.new_pointer.input_device);

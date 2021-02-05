@@ -22,7 +22,6 @@ const std = @import("std");
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
-const log = @import("log.zig");
 const util = @import("util.zig");
 
 const Output = @import("Output.zig");
@@ -124,7 +123,7 @@ pub fn deinit(self: *Self) void {
 
 fn handleNewOutput(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
     const self = @fieldParentPtr(Self, "new_output", listener);
-    log.debug(.output_manager, "new output {}", .{wlr_output.name});
+    std.log.scoped(.output_manager).debug("new output {}", .{wlr_output.name});
 
     const node = util.gpa.create(std.TailQueue(Output).Node) catch {
         wlr_output.destroy();
@@ -293,27 +292,26 @@ pub fn startTransaction(self: *Self) void {
     }
 
     if (self.pending_configures > 0) {
-        log.debug(
-            .transaction,
+        std.log.scoped(.transaction).debug(
             "started transaction with {} pending configure(s)",
             .{self.pending_configures},
         );
 
         // Set timeout to 200ms
         self.transaction_timer.timerUpdate(200) catch {
-            log.err(.transaction, "failed to update timer", .{});
+            std.log.scoped(.transaction).err("failed to update timer", .{});
             self.commitTransaction();
         };
     } else {
         // No views need configures, clear the current timer in case we are
         // interrupting another transaction and commit.
-        self.transaction_timer.timerUpdate(0) catch log.err(.transaction, "error disarming timer", .{});
+        self.transaction_timer.timerUpdate(0) catch std.log.scoped(.transaction).err("error disarming timer", .{});
         self.commitTransaction();
     }
 }
 
 fn handleTimeout(self: *Self) callconv(.C) c_int {
-    log.err(.transaction, "timeout occurred, some imperfect frames may be shown", .{});
+    std.log.scoped(.transaction).err("timeout occurred, some imperfect frames may be shown", .{});
 
     self.pending_configures = 0;
     self.commitTransaction();
@@ -325,7 +323,7 @@ pub fn notifyConfigured(self: *Self) void {
     self.pending_configures -= 1;
     if (self.pending_configures == 0) {
         // Disarm the timer, as we didn't timeout
-        self.transaction_timer.timerUpdate(0) catch log.err(.transaction, "error disarming timer", .{});
+        self.transaction_timer.timerUpdate(0) catch std.log.scoped(.transaction).err("error disarming timer", .{});
         self.commitTransaction();
     }
 }
@@ -346,8 +344,7 @@ fn commitTransaction(self: *Self) void {
         const output_tags_changed = output.pending.tags != output.current.tags;
         output.current = output.pending;
         if (output_tags_changed) {
-            log.debug(
-                .output,
+            std.log.scoped(.output).debug(
                 "changing current focus: {b:0>10} to {b:0>10}",
                 .{ output.current.tags, output.pending.tags },
             );
@@ -392,7 +389,7 @@ fn handleLayoutChange(
     const self = @fieldParentPtr(Self, "layout_change", listener);
 
     const config = self.ouputConfigFromCurrent() catch {
-        log.crit(.output_manager, "out of memory", .{});
+        std.log.scoped(.output_manager).crit("out of memory", .{});
         return;
     };
     self.output_manager.setConfiguration(config);
@@ -413,7 +410,7 @@ fn handleManagerApply(
 
     // Send the config that was actually applied
     const applied_config = self.ouputConfigFromCurrent() catch {
-        log.crit(.output_manager, "out of memory", .{});
+        std.log.scoped(.output_manager).crit("out of memory", .{});
         return;
     };
     self.output_manager.setConfiguration(applied_config);
@@ -450,7 +447,7 @@ fn applyOutputConfig(self: *Self, config: *wlr.OutputConfigurationV1) bool {
         // Since we have done a successful test commit, this will only fail
         // due to error in the output's backend implementation.
         output.wlr_output.commit() catch
-            log.err(.output_manager, "output commit failed for {}", .{output.wlr_output.name});
+            std.log.scoped(.output_manager).err("output commit failed for {}", .{output.wlr_output.name});
 
         if (output.wlr_output.enabled) {
             // Moves the output if it is already in the layout
@@ -488,8 +485,7 @@ fn testOutputConfig(config: *wlr.OutputConfigurationV1, rollback: bool) bool {
             (@intToFloat(f32, height) / scale < min_size);
 
         if (too_small) {
-            log.info(
-                .output_manager,
+            std.log.scoped(.output_manager).info(
                 "The requested output resolution {}x{} scaled with {} for {} would be too small.",
                 .{ width, height, scale, wlr_output.name },
             );
@@ -521,7 +517,7 @@ fn applyHeadToOutput(head: *wlr.OutputConfigurationV1.Head, wlr_output: *wlr.Out
         if (head.state.mode) |mode| {
             wlr_output.setMode(mode);
         } else {
-            log.info(.output_manager, "custom modes are not supported until the next wlroots release: ignoring", .{});
+            std.log.scoped(.output_manager).info("custom modes are not supported until the next wlroots release: ignoring", .{});
             // TODO(wlroots) uncomment the following lines when wlroots 0.13.0 is released
             // See https://github.com/swaywm/wlroots/pull/2517
             //const custom_mode = &head.state.custom_mode;
@@ -565,13 +561,12 @@ fn handlePowerManagerSetMode(
     const enable = event.mode == .on;
 
     const log_text = if (enable) "Enabling" else "Disabling";
-    log.debug(
-        .output_manager,
+    std.log.scoped(.output_manager).debug(
         "{} dpms for output {}",
         .{ log_text, event.output.name },
     );
 
     event.output.enable(enable);
     event.output.commit() catch
-        log.err(.server, "output commit failed for {}", .{event.output.name});
+        std.log.scoped(.server).err("output commit failed for {}", .{event.output.name});
 }

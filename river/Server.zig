@@ -23,7 +23,6 @@ const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
 const c = @import("c.zig");
-const log = @import("log.zig");
 const util = @import("util.zig");
 
 const Config = @import("Config.zig");
@@ -38,6 +37,8 @@ const StatusManager = @import("StatusManager.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const XwaylandUnmanaged = @import("XwaylandUnmanaged.zig");
+
+const log = std.log.scoped(.server);
 
 wl_server: *wl.Server,
 
@@ -168,11 +169,11 @@ fn handleNewXdgSurface(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wl
     const self = @fieldParentPtr(Self, "new_xdg_surface", listener);
 
     if (xdg_surface.role == .popup) {
-        log.debug(.server, "new xdg_popup", .{});
+        log.debug("new xdg_popup", .{});
         return;
     }
 
-    log.debug(.server, "new xdg_toplevel", .{});
+    log.debug("new xdg_toplevel", .{});
 
     // The View will add itself to the output's view stack on map
     const output = self.input_manager.defaultSeat().focused_output;
@@ -188,7 +189,6 @@ fn handleNewLayerSurface(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_
     const self = @fieldParentPtr(Self, "new_layer_surface", listener);
 
     log.debug(
-        .server,
         "New layer surface: namespace {}, layer {}, anchor {}, size {}x{}, margin ({},{},{},{}), exclusive_zone {}",
         .{
             wlr_layer_surface.namespace,
@@ -209,12 +209,12 @@ fn handleNewLayerSurface(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_
     if (wlr_layer_surface.output == null) {
         const output = self.input_manager.defaultSeat().focused_output;
         if (output == &self.root.noop_output) {
-            log.err(.server, "no output available for layer surface '{}'", .{wlr_layer_surface.namespace});
+            log.err("no output available for layer surface '{}'", .{wlr_layer_surface.namespace});
             wlr_layer_surface.close();
             return;
         }
 
-        log.debug(.server, "new layer surface had null output, assigning it to output '{}'", .{
+        log.debug("new layer surface had null output, assigning it to output '{}'", .{
             output.wlr_output.name,
         });
         wlr_layer_surface.output = output.wlr_output;
@@ -233,7 +233,7 @@ fn handleNewXwaylandSurface(listener: *wl.Listener(*wlr.XwaylandSurface), wlr_xw
     const self = @fieldParentPtr(Self, "new_xwayland_surface", listener);
 
     if (wlr_xwayland_surface.override_redirect) {
-        log.debug(.server, "new unmanaged xwayland surface", .{});
+        log.debug("new unmanaged xwayland surface", .{});
         // The unmanged surface will add itself to the list of unmanaged views
         // in Root when it is mapped.
         const node = util.gpa.create(std.TailQueue(XwaylandUnmanaged).Node) catch return;
@@ -242,7 +242,6 @@ fn handleNewXwaylandSurface(listener: *wl.Listener(*wlr.XwaylandSurface), wlr_xw
     }
 
     log.debug(
-        .server,
         "new xwayland surface: title '{}', class '{}'",
         .{ wlr_xwayland_surface.title, wlr_xwayland_surface.class },
     );

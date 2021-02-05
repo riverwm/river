@@ -22,7 +22,6 @@ const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 const pixman = @import("pixman");
 
-const log = @import("log.zig");
 const util = @import("util.zig");
 
 const Box = @import("Box.zig");
@@ -31,6 +30,8 @@ const Output = @import("Output.zig");
 const Server = @import("Server.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
+
+const log = std.log.scoped(.render);
 
 const SurfaceRenderData = struct {
     output: *const Output,
@@ -143,7 +144,7 @@ pub fn renderOutput(output: *Output) void {
 
     // TODO: handle failure
     output.wlr_output.commit() catch
-        log.err(.render, "output commit failed for {}", .{output.wlr_output.name});
+        log.err("output commit failed for {}", .{output.wlr_output.name});
 }
 
 fn renderFilter(view: *View, filter_tags: u32) bool {

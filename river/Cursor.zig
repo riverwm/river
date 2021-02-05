@@ -26,7 +26,6 @@ const wl = wayland.server.wl;
 const zwlr = wayland.server.zwlr;
 
 const c = @import("c.zig");
-const log = @import("log.zig");
 const util = @import("util.zig");
 
 const Box = @import("Box.zig");
@@ -50,6 +49,8 @@ const Mode = union(enum) {
 };
 
 const default_size = 24;
+
+const log = std.log.scoped(.cursor);
 
 /// Current cursor mode as well as any state needed to implement that mode
 mode: Mode = .passthrough,
@@ -126,7 +127,7 @@ pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
     while (it) |node| : (it = node.next) {
         const wlr_output = node.data.wlr_output;
         self.xcursor_manager.load(wlr_output.scale) catch
-            log.err(.cursor, "failed to load xcursor theme '{}' at scale {}", .{ theme, wlr_output.scale });
+            log.err("failed to load xcursor theme '{}' at scale {}", .{ theme, wlr_output.scale });
     }
 
     // If this cursor belongs to the default seat, set the xcursor environment
@@ -139,7 +140,7 @@ pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
 
         if (build_options.xwayland) {
             self.xcursor_manager.load(1) catch {
-                log.err(.cursor, "failed to load xcursor theme '{}' at scale 1", .{theme});
+                log.err("failed to load xcursor theme '{}' at scale 1", .{theme});
                 return;
             };
             const wlr_xcursor = self.xcursor_manager.getXcursor("left_ptr", 1).?;
@@ -316,7 +317,7 @@ fn handleRequestSetCursor(
         // provided surface as the cursor image. It will set the hardware cursor
         // on the output that it's currently on and continue to do so as the
         // cursor moves between outputs.
-        log.debug(.cursor, "focused client set cursor", .{});
+        log.debug("focused client set cursor", .{});
         self.wlr_cursor.setSurface(event.surface, event.hotspot_x, event.hotspot_y);
     }
 }
@@ -408,7 +409,7 @@ fn surfaceAtFilter(view: *View, filter_tags: u32) bool {
 
 /// Enter move or resize mode
 pub fn enterMode(self: *Self, mode: @TagType(Mode), view: *View) void {
-    log.debug(.cursor, "enter {} mode", .{@tagName(mode)});
+    log.debug("enter {} mode", .{@tagName(mode)});
 
     self.seat.focus(view);
 
@@ -454,7 +455,7 @@ pub fn enterMode(self: *Self, mode: @TagType(Mode), view: *View) void {
 fn leaveMode(self: *Self, event: *wlr.Pointer.event.Button) void {
     std.debug.assert(self.mode != .passthrough);
 
-    log.debug(.cursor, "leave {} mode", .{@tagName(self.mode)});
+    log.debug("leave {} mode", .{@tagName(self.mode)});
 
     // If we were in down mode, we need pass along the release event
     if (self.mode == .down)

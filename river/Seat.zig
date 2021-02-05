@@ -24,7 +24,6 @@ const wl = @import("wayland").server.wl;
 const xkb = @import("xkbcommon");
 
 const command = @import("command.zig");
-const log = @import("log.zig");
 const util = @import("util.zig");
 
 const DragIcon = @import("DragIcon.zig");
@@ -36,6 +35,8 @@ const Output = @import("Output.zig");
 const SeatStatus = @import("SeatStatus.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
+
+const log = std.log.scoped(.seat);
 
 const FocusTarget = union(enum) {
     view: *View,
@@ -302,13 +303,13 @@ pub fn handleMapping(
                     command.Error.Other => out.?,
                     else => command.errToMsg(err),
                 };
-                log.err(.command, "{}: {}", .{ args[0], failure_message });
+                std.log.scoped(.command).err("{}: {}", .{ args[0], failure_message });
                 return true;
             };
             if (out) |s| {
                 const stdout = std.io.getStdOut().outStream();
                 stdout.print("{}", .{s}) catch
-                |err| log.err(.command, "{}: write to stdout failed {}", .{ args[0], err });
+                |err| std.log.scoped(.command).err("{}: write to stdout failed {}", .{ args[0], err });
             }
             return true;
         }
@@ -337,10 +338,11 @@ pub fn addDevice(self: *Self, device: *wlr.InputDevice) void {
 fn addKeyboard(self: *Self, device: *wlr.InputDevice) !void {
     const node = try util.gpa.create(std.TailQueue(Keyboard).Node);
     node.data.init(self, device) catch |err| {
+        const log_keyboard = std.log.scoped(.keyboard);
         switch (err) {
-            error.XkbContextFailed => log.err(.keyboard, "Failed to create XKB context", .{}),
-            error.XkbKeymapFailed => log.err(.keyboard, "Failed to create XKB keymap", .{}),
-            error.SetKeymapFailed => log.err(.keyboard, "Failed to set wlr keyboard keymap", .{}),
+            error.XkbContextFailed => log_keyboard.err("Failed to create XKB context", .{}),
+            error.XkbKeymapFailed => log_keyboard.err("Failed to create XKB keymap", .{}),
+            error.SetKeymapFailed => log_keyboard.err("Failed to set wlr keyboard keymap", .{}),
         }
         return;
     };
@@ -371,12 +373,12 @@ fn handleRequestStartDrag(
     const self = @fieldParentPtr(Self, "request_start_drag", listener);
 
     if (!self.wlr_seat.validatePointerGrabSerial(event.origin, event.serial)) {
-        log.debug(.seat, "ignoring request to start drag, failed to validate serial {}", .{event.serial});
+        log.debug("ignoring request to start drag, failed to validate serial {}", .{event.serial});
         if (event.drag.source) |source| source.destroy();
         return;
     }
 
-    log.debug(.seat, "starting pointer drag", .{});
+    log.debug("starting pointer drag", .{});
     self.wlr_seat.startPointerDrag(event.drag, event.serial);
 }
 
@@ -388,7 +390,7 @@ fn handleStartDrag(
 
     if (wlr_drag.icon) |wlr_drag_icon| {
         const node = util.gpa.create(std.SinglyLinkedList(DragIcon).Node) catch {
-            log.crit(.seat, "out of memory", .{});
+            log.crit("out of memory", .{});
             return;
         };
         node.data.init(self, wlr_drag_icon);

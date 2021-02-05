@@ -22,12 +22,13 @@ const wayland = @import("wayland");
 const wl = wayland.server.wl;
 const zriver = wayland.server.zriver;
 
-const log = @import("log.zig");
 const util = @import("util.zig");
 
 const Output = @import("Output.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
+
+const log = std.log.scoped(.river_status);
 
 output: *Output,
 output_status: *zriver.OutputStatusV1,
@@ -63,7 +64,7 @@ pub fn sendViewTags(self: Self) void {
         if (node.view.destroying) continue;
         view_tags.append(node.view.current.tags) catch {
             self.output_status.postNoMemory();
-            log.crit(.river_status, "out of memory", .{});
+            log.crit("out of memory", .{});
             return;
         };
     }
