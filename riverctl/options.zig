@@ -49,12 +49,22 @@ const Context = struct {
 pub fn declareOption(display: *wl.Display, globals: *Globals) !void {
     // https://github.com/ziglang/zig/issues/7807
     const argv: [][*:0]const u8 = os.argv;
-    const args = Args(3, &[_]FlagDef{.{ .name = "-output", .kind = .arg }}).parse(argv[2..]);
+    const args = Args(3, &[_]FlagDef{
+        .{ .name = "-output", .kind = .arg },
+        .{ .name = "-focused-output", .kind = .boolean },
+    }).parse(argv[2..]);
+
     const key = args.positionals[0];
     const value_type = std.meta.stringToEnum(ValueType, mem.span(args.positionals[1])) orelse
         root.printErrorExit("'{}' is not a valid type, must be int, uint, fixed, or string", .{args.positionals[1]});
     const raw_value = args.positionals[2];
-    const output = if (args.argFlag("-output")) |o| try parseOutputName(display, globals, o) else null;
+
+    const output = if (args.argFlag("-output")) |o|
+        try parseOutputName(display, globals, o)
+    else if (args.boolFlag("-focused-output"))
+        try getFocusedOutput(display, globals)
+    else
+        null;
 
     const options_manager = globals.options_manager orelse return error.RiverOptionsManagerNotAdvertised;
     const handle = try options_manager.getOptionHandle(key, if (output) |o| o.wl_output else null);
@@ -86,12 +96,23 @@ fn setFixedValueRaw(handle: *zriver.OptionHandleV1, raw_value: [*:0]const u8) vo
 pub fn getOption(display: *wl.Display, globals: *Globals) !void {
     // https://github.com/ziglang/zig/issues/7807
     const argv: [][*:0]const u8 = os.argv;
-    const args = Args(1, &[_]FlagDef{.{ .name = "-output", .kind = .arg }}).parse(argv[2..]);
+    const args = Args(1, &[_]FlagDef{
+        .{ .name = "-output", .kind = .arg },
+        .{ .name = "-focused-output", .kind = .boolean },
+    }).parse(argv[2..]);
+
+    const output = if (args.argFlag("-output")) |o|
+        try parseOutputName(display, globals, o)
+    else if (args.boolFlag("-focused-output"))
+        try getFocusedOutput(display, globals)
+    else
+        null;
+
     const ctx = Context{
         .display = display,
         .key = args.positionals[0],
         .raw_value = undefined,
-        .output = if (args.argFlag("-output")) |o| try parseOutputName(display, globals, o) else null,
+        .output = output,
     };
 
     const options_manager = globals.options_manager orelse return error.RiverOptionsManagerNotAdvertised;
@@ -105,12 +126,23 @@ pub fn getOption(display: *wl.Display, globals: *Globals) !void {
 pub fn setOption(display: *wl.Display, globals: *Globals) !void {
     // https://github.com/ziglang/zig/issues/7807
     const argv: [][*:0]const u8 = os.argv;
-    const args = Args(2, &[_]FlagDef{.{ .name = "-output", .kind = .arg }}).parse(argv[2..]);
+    const args = Args(2, &[_]FlagDef{
+        .{ .name = "-output", .kind = .arg },
+        .{ .name = "-focused-output", .kind = .boolean },
+    }).parse(argv[2..]);
+
+    const output = if (args.argFlag("-output")) |o|
+        try parseOutputName(display, globals, o)
+    else if (args.boolFlag("-focused-output"))
+        try getFocusedOutput(display, globals)
+    else
+        null;
+
     const ctx = Context{
         .display = display,
         .key = args.positionals[0],
         .raw_value = args.positionals[1],
-        .output = if (args.argFlag("-output")) |o| try parseOutputName(display, globals, o) else null,
+        .output = output,
     };
 
     const options_manager = globals.options_manager orelse return error.RiverOptionsManagerNotAdvertised;
@@ -139,6 +171,26 @@ fn xdgOutputListener(xdg_output: *zxdg.OutputV1, event: zxdg.OutputV1.Event, out
     switch (event) {
         .name => |ev| output.name = std.heap.c_allocator.dupe(u8, mem.span(ev.name)) catch @panic("out of memory"),
         else => {},
+    }
+}
+
+fn getFocusedOutput(display: *wl.Display, globals: *Globals) !*Output {
+    const status_manager = globals.status_manager orelse return error.RiverStatusManagerNotAdvertised;
+    const seat = globals.seat orelse return error.SeatNotAdverstised;
+    const seat_status = try status_manager.getRiverSeatStatus(seat);
+    var result: ?*wl.Output = null;
+    seat_status.setListener(*?*wl.Output, seatStatusListener, &result) catch unreachable;
+    _ = try display.roundtrip();
+    const wl_output = if (result) |output| output else return error.NoOutputFocused;
+    for (globals.outputs.items) |*output| {
+        if (output.wl_output == wl_output) return output;
+    } else unreachable;
+}
+
+fn seatStatusListener(seat_status: *zriver.SeatStatusV1, event: zriver.SeatStatusV1.Event, result: *?*wl.Output) void {
+    switch (event) {
+        .focused_output => |ev| result.* = ev.output,
+        .unfocused_output, .focused_view => {},
     }
 }
 

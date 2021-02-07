@@ -18,6 +18,7 @@
 const std = @import("std");
 const mem = std.mem;
 const os = std.os;
+const assert = std.debug.assert;
 
 const wayland = @import("wayland");
 const wl = wayland.client.wl;
@@ -36,6 +37,7 @@ pub const Output = struct {
 pub const Globals = struct {
     control: ?*zriver.ControlV1 = null,
     options_manager: ?*zriver.OptionsManagerV1 = null,
+    status_manager: ?*zriver.StatusManagerV1 = null,
     seat: ?*wl.Seat = null,
     output_manager: ?*zxdg.OutputManagerV1 = null,
     outputs: std.ArrayList(Output) = std.ArrayList(Output).init(gpa),
@@ -77,12 +79,15 @@ pub fn main() !void {
 fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, globals: *Globals) void {
     switch (event) {
         .global => |global| {
-            if (globals.seat == null and std.cstr.cmp(global.interface, wl.Seat.getInterface().name) == 0) {
+            if (std.cstr.cmp(global.interface, wl.Seat.getInterface().name) == 0) {
+                assert(globals.seat == null); // TODO: support multiple seats
                 globals.seat = registry.bind(global.name, wl.Seat, 1) catch @panic("out of memory");
             } else if (std.cstr.cmp(global.interface, zriver.ControlV1.getInterface().name) == 0) {
                 globals.control = registry.bind(global.name, zriver.ControlV1, 1) catch @panic("out of memory");
             } else if (std.cstr.cmp(global.interface, zriver.OptionsManagerV1.getInterface().name) == 0) {
                 globals.options_manager = registry.bind(global.name, zriver.OptionsManagerV1, 1) catch @panic("out of memory");
+            } else if (std.cstr.cmp(global.interface, zriver.StatusManagerV1.getInterface().name) == 0) {
+                globals.status_manager = registry.bind(global.name, zriver.StatusManagerV1, 1) catch @panic("out of memory");
             } else if (std.cstr.cmp(global.interface, zxdg.OutputManagerV1.getInterface().name) == 0 and global.version >= 2) {
                 globals.output_manager = registry.bind(global.name, zxdg.OutputManagerV1, 2) catch @panic("out of memory");
             } else if (std.cstr.cmp(global.interface, wl.Output.getInterface().name) == 0) {

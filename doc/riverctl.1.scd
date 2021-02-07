@@ -284,19 +284,20 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 
 River has various options that are saved in a typed key-value store. It also
 allows users to store arbitrary custom options in the store. Options are
-scoped either globally or per-output if the -output flag is passed with the
-name of the output as obtained from the xdg-output protocol.
+scoped either globally or per-output if the *-output* flag is passed with the
+name of the output as obtained from the xdg-output protocol. Alternatively,
+the currently focused output may be targeted with the *-focused-output* flag.
 
-*declare-option* [-output _output_name_] _name_ _type_ _value_
+*declare-option* [*-output* _output_name_|*-focused-output*] _name_ _type_ _value_
 	Declare a new option with the given _type_ and inital _value_. If
 	the option already exists with the given _type_, it is still set
 	to _value_. If the option already exists with a different type,
 	nothing happens.
 
-*get-option* [-output _output_name_] _name_
+*get-option* [*-output* _output_name_|*-focused-output*] _name_
 	Print the current value of the given option to stdout.
 
-*set-option* [-output _output_name_] _name_ _value_
+*set-option* [*-output* _output_name_|*-focused-output*] _name_ _value_
 	Set the value of the specified option to _value_.
 
 River declares certain default options for all outputs.

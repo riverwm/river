@@ -60,6 +60,7 @@ pub fn Args(comptime num_positionals: comptime_int, comptime flag_defs: []const 
             var arg_idx: usize = 0;
             var positional_idx: usize = 0;
             outer: while (arg_idx < argv.len) : (arg_idx += 1) {
+                var should_continue = false;
                 inline for (flag_defs) |flag_def, flag_idx| {
                     if (cstr.cmp(flag_def.name, argv[arg_idx]) == 0) {
                         switch (flag_def.kind) {
@@ -73,9 +74,12 @@ pub fn Args(comptime num_positionals: comptime_int, comptime flag_defs: []const 
                                         "' requires an argument but none was provided!", .{});
                             },
                         }
-                        continue :outer;
+                        // TODO: this variable exists as a workaround for the fact that
+                        // using continue :outer here crashes the stage1 compiler.
+                        should_continue = true;
                     }
                 }
+                if (should_continue) continue;
 
                 if (positional_idx == num_positionals) {
                     root.printErrorExit(
