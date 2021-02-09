@@ -58,6 +58,8 @@ pub fn main() !void {
         try options.getOption(display, &globals);
     } else if (os.argv.len > 2 and mem.eql(u8, "set-option", mem.span(os.argv[1]))) {
         try options.setOption(display, &globals);
+    } else if (os.argv.len > 2 and mem.eql(u8, "mod-option", mem.span(os.argv[1]))) {
+        try options.modOption(display, &globals);
     } else {
         const control = globals.control orelse return error.RiverControlNotAdvertised;
         const seat = globals.seat orelse return error.SeatNotAdverstised;
