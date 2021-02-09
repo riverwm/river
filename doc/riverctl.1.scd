@@ -300,6 +300,9 @@ the currently focused output may be targeted with the *-focused-output* flag.
 *set-option* [*-output* _output_name_|*-focused-output*] _name_ _value_
 	Set the value of the specified option to _value_.
 
+*mod-option* [*-output* _output_name_|*-focused-output*] _name_ _value_
+	Add _value_ to the value of the specified option. _value_ can be negative.
+
 River declares certain default options for all outputs.
 
 *output_title* (string)

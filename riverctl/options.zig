@@ -93,6 +93,27 @@ fn setFixedValueRaw(handle: *zriver.OptionHandleV1, raw_value: [*:0]const u8) vo
         root.printErrorExit("{} is not a valid fixed", .{raw_value})));
 }
 
+fn modIntValueRaw(handle: *zriver.OptionHandleV1, current: i32, raw_value: [*:0]const u8) void {
+    const mod = fmt.parseInt(i32, mem.span(raw_value), 10) catch
+        root.printErrorExit("{} is not a valid int modificator", .{raw_value});
+    handle.setIntValue(current + mod);
+}
+
+fn modUintValueRaw(handle: *zriver.OptionHandleV1, current: u32, raw_value: [*:0]const u8) void {
+    // We need to allow negative mod values, but the value of the option may
+    // never be below zero.
+    const mod = fmt.parseInt(i32, mem.span(raw_value), 10) catch
+        root.printErrorExit("{} is not a valid uint modificator", .{raw_value});
+    const new = @intCast(i32, current) + mod;
+    handle.setUintValue(if (new < 0) 0 else @intCast(u32, new));
+}
+
+fn modFixedValueRaw(handle: *zriver.OptionHandleV1, current: wl.Fixed, raw_value: [*:0]const u8) void {
+    const mod = fmt.parseFloat(f64, mem.span(raw_value)) catch
+        root.printErrorExit("{} is not a valid fixed modificator", .{raw_value});
+    handle.setFixedValue(wl.Fixed.fromDouble(current.toDouble() + mod));
+}
+
 pub fn getOption(display: *wl.Display, globals: *Globals) !void {
     // https://github.com/ziglang/zig/issues/7807
     const argv: [][*:0]const u8 = os.argv;
@@ -148,6 +169,36 @@ pub fn setOption(display: *wl.Display, globals: *Globals) !void {
     const options_manager = globals.options_manager orelse return error.RiverOptionsManagerNotAdvertised;
     const handle = try options_manager.getOptionHandle(ctx.key, if (ctx.output) |o| o.wl_output else null);
     handle.setListener(*const Context, setOptionListener, &ctx) catch unreachable;
+
+    // We always exit when our listener is called
+    while (true) _ = try display.dispatch();
+}
+
+pub fn modOption(display: *wl.Display, globals: *Globals) !void {
+    // https://github.com/ziglang/zig/issues/7807
+    const argv: [][*:0]const u8 = os.argv;
+    const args = Args(2, &[_]FlagDef{
+        .{ .name = "-output", .kind = .arg },
+        .{ .name = "-focused-output", .kind = .boolean },
+    }).parse(argv[2..]);
+
+    const output = if (args.argFlag("-output")) |o|
+        try parseOutputName(display, globals, o)
+    else if (args.boolFlag("-focused-output"))
+        try getFocusedOutput(display, globals)
+    else
+        null;
+
+    const ctx = Context{
+        .display = display,
+        .key = args.positionals[0],
+        .raw_value = args.positionals[1],
+        .output = output,
+    };
+
+    const options_manager = globals.options_manager orelse return error.RiverOptionsManagerNotAdvertised;
+    const handle = try options_manager.getOptionHandle(ctx.key, if (ctx.output) |o| o.wl_output else null);
+    handle.setListener(*const Context, modOptionListener, &ctx) catch unreachable;
 
     // We always exit when our listener is called
     while (true) _ = try display.dispatch();
@@ -233,6 +284,26 @@ fn setOptionListener(
         .uint_value => |ev| setUintValueRaw(handle, ctx.raw_value),
         .fixed_value => |ev| setFixedValueRaw(handle, ctx.raw_value),
         .string_value => |ev| handle.setStringValue(if (ctx.raw_value[0] == 0) null else ctx.raw_value),
+    }
+    _ = ctx.display.flush() catch os.exit(1);
+    os.exit(0);
+}
+
+fn modOptionListener(
+    handle: *zriver.OptionHandleV1,
+    event: zriver.OptionHandleV1.Event,
+    ctx: *const Context,
+) void {
+    switch (event) {
+        .unset => if (ctx.output) |output| {
+            root.printErrorExit("option '{}' has not been declared on output '{}'", .{ ctx.key, output.name });
+        } else {
+            root.printErrorExit("option '{}' has not been declared globally", .{ctx.key});
+        },
+        .int_value => |ev| modIntValueRaw(handle, ev.value, ctx.raw_value),
+        .uint_value => |ev| modUintValueRaw(handle, ev.value, ctx.raw_value),
+        .fixed_value => |ev| modFixedValueRaw(handle, ev.value, ctx.raw_value),
+        .string_value => root.printErrorExit("can not modify string options, use set-option to overwrite them", .{}),
     }
     _ = ctx.display.flush() catch os.exit(1);
     os.exit(0);
