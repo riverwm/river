@@ -51,7 +51,7 @@ pub fn swap(
     );
     var it_wrap = ViewStack(View).iter(
         if (direction == .next) output.views.first else output.views.last,
-        .forward,
+        if (direction == .next) .forward else .reverse,
         output.pending.tags,
         filter,
     );
