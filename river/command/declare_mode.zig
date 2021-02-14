@@ -37,14 +37,7 @@ pub fn declareMode(
     const config = &seat.input_manager.server.config;
     const new_mode_name = args[1];
 
-    if (config.mode_to_id.get(new_mode_name) != null) {
-        out.* = try std.fmt.allocPrint(
-            allocator,
-            "mode '{}' already exists and cannot be re-declared",
-            .{new_mode_name},
-        );
-        return Error.Other;
-    }
+    if (config.mode_to_id.get(new_mode_name) != null) return;
 
     try config.modes.ensureCapacity(config.modes.items.len + 1);
     const owned_name = try std.mem.dupe(util.gpa, u8, new_mode_name);
