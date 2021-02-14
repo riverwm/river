@@ -171,10 +171,12 @@ fn handleMap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurfa
 
     view.surface = self.xdg_surface.surface;
 
-    // Use the view's "natural" size centered on the output as the default
+    // Use the view's initial size centered on the output as the default
     // floating dimensions
-    view.float_box.width = @intCast(u32, self.xdg_surface.geometry.width);
-    view.float_box.height = @intCast(u32, self.xdg_surface.geometry.height);
+    var initial_box: wlr.Box = undefined;
+    self.xdg_surface.getGeometry(&initial_box);
+    view.float_box.width = @intCast(u32, initial_box.width);
+    view.float_box.height = @intCast(u32, initial_box.height);
     view.float_box.x = std.math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.width) -
         @intCast(i32, view.float_box.width), 2));
     view.float_box.y = std.math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.height) -
