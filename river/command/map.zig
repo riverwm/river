@@ -49,16 +49,15 @@ pub fn map(
 
     const mode_mappings = &seat.input_manager.server.config.modes.items[mode_id].mappings;
 
-    if (mappingExists(mode_mappings, modifiers, keysym, optionals.release)) |_| {
-        out.* = try std.fmt.allocPrint(
-            allocator,
-            "a mapping for modifiers '{}' and keysym '{}' already exists",
-            .{ args[2 + offset], args[3 + offset] },
-        );
-        return Error.Other;
-    }
+    const new = try Mapping.init(keysym, modifiers, optionals.release, args[4 + offset ..]);
+    errdefer new.deinit();
 
-    try mode_mappings.append(try Mapping.init(keysym, modifiers, optionals.release, args[4 + offset ..]));
+    if (mappingExists(mode_mappings, modifiers, keysym, optionals.release)) |current| {
+        mode_mappings.items[current].deinit();
+        mode_mappings.items[current] = new;
+    } else {
+        try mode_mappings.append(new);
+    }
 }
 
 /// Create a new pointer mapping for a given mode
@@ -78,16 +77,6 @@ pub fn mapPointer(
     const modifiers = try parseModifiers(allocator, args[2], out);
     const event_code = try parseEventCode(allocator, args[3], out);
 
-    const mode_pointer_mappings = &seat.input_manager.server.config.modes.items[mode_id].pointer_mappings;
-    if (pointerMappingExists(mode_pointer_mappings, modifiers, event_code)) |_| {
-        out.* = try std.fmt.allocPrint(
-            allocator,
-            "a pointer mapping for modifiers '{}' and button '{}' already exists",
-            .{ args[2], args[3] },
-        );
-        return Error.Other;
-    }
-
     const action = if (std.mem.eql(u8, args[4], "move-view"))
         PointerMapping.Action.move
     else if (std.mem.eql(u8, args[4], "resize-view"))
@@ -101,11 +90,18 @@ pub fn mapPointer(
         return Error.Other;
     };
 
-    try mode_pointer_mappings.append(.{
+    const new = PointerMapping{
         .event_code = event_code,
         .modifiers = modifiers,
         .action = action,
-    });
+    };
+
+    const mode_pointer_mappings = &seat.input_manager.server.config.modes.items[mode_id].pointer_mappings;
+    if (pointerMappingExists(mode_pointer_mappings, modifiers, event_code)) |current| {
+        mode_pointer_mappings.items[current] = new;
+    } else {
+        try mode_pointer_mappings.append(new);
+    }
 }
 
 fn modeNameToId(allocator: *std.mem.Allocator, seat: *Seat, mode_name: []const u8, out: *?[]const u8) !usize {
@@ -260,14 +256,7 @@ pub fn unmap(
     const keysym = try parseKeysym(allocator, args[3 + offset], out);
 
     const mode_mappings = &seat.input_manager.server.config.modes.items[mode_id].mappings;
-    const mapping_idx = mappingExists(mode_mappings, modifiers, keysym, optionals.release) orelse {
-        out.* = try std.fmt.allocPrint(
-            allocator,
-            "there is no mapping for modifiers '{}' and keysym '{}'",
-            .{ args[2 + offset], args[3 + offset] },
-        );
-        return Error.Other;
-    };
+    const mapping_idx = mappingExists(mode_mappings, modifiers, keysym, optionals.release) orelse return;
 
     var mapping = mode_mappings.swapRemove(mapping_idx);
     mapping.deinit();
@@ -291,14 +280,7 @@ pub fn unmapPointer(
     const event_code = try parseEventCode(allocator, args[3], out);
 
     const mode_pointer_mappings = &seat.input_manager.server.config.modes.items[mode_id].pointer_mappings;
-    const mapping_idx = pointerMappingExists(mode_pointer_mappings, modifiers, event_code) orelse {
-        out.* = try std.fmt.allocPrint(
-            allocator,
-            "there is no mapping for modifiers '{}' and button '{}'",
-            .{ args[2], args[3] },
-        );
-        return Error.Other;
-    };
+    const mapping_idx = pointerMappingExists(mode_pointer_mappings, modifiers, event_code) orelse return;
 
     _ = mode_pointer_mappings.swapRemove(mapping_idx);
 }
