@@ -57,6 +57,7 @@ mode: Mode = .passthrough,
 
 seat: *Seat,
 wlr_cursor: *wlr.Cursor,
+pointer_gestures: *wlr.PointerGesturesV1,
 xcursor_manager: *wlr.XcursorManager,
 
 /// Number of distinct buttons currently pressed
@@ -71,8 +72,20 @@ motion_absolute: wl.Listener(*wlr.Pointer.event.MotionAbsolute) =
     wl.Listener(*wlr.Pointer.event.MotionAbsolute).init(handleMotionAbsolute),
 motion: wl.Listener(*wlr.Pointer.event.Motion) =
     wl.Listener(*wlr.Pointer.event.Motion).init(handleMotion),
+pinch_begin: wl.Listener(*wlr.Pointer.event.PinchBegin) =
+    wl.Listener(*wlr.Pointer.event.PinchBegin).init(handlePinchBegin),
+pinch_update: wl.Listener(*wlr.Pointer.event.PinchUpdate) =
+    wl.Listener(*wlr.Pointer.event.PinchUpdate).init(handlePinchUpdate),
+pinch_end: wl.Listener(*wlr.Pointer.event.PinchEnd) =
+    wl.Listener(*wlr.Pointer.event.PinchEnd).init(handlePinchEnd),
 request_set_cursor: wl.Listener(*wlr.Seat.event.RequestSetCursor) =
     wl.Listener(*wlr.Seat.event.RequestSetCursor).init(handleRequestSetCursor),
+swipe_begin: wl.Listener(*wlr.Pointer.event.SwipeBegin) =
+    wl.Listener(*wlr.Pointer.event.SwipeBegin).init(handleSwipeBegin),
+swipe_update: wl.Listener(*wlr.Pointer.event.SwipeUpdate) =
+    wl.Listener(*wlr.Pointer.event.SwipeUpdate).init(handleSwipeUpdate),
+swipe_end: wl.Listener(*wlr.Pointer.event.SwipeEnd) =
+    wl.Listener(*wlr.Pointer.event.SwipeEnd).init(handleSwipeEnd),
 // zig fmt: on
 
 pub fn init(self: *Self, seat: *Seat) !void {
@@ -89,6 +102,7 @@ pub fn init(self: *Self, seat: *Seat) !void {
     self.* = .{
         .seat = seat,
         .wlr_cursor = wlr_cursor,
+        .pointer_gestures = try wlr.PointerGesturesV1.create(seat.input_manager.server.wl_server),
         .xcursor_manager = xcursor_manager,
     };
     try self.setTheme(null, null);
@@ -104,6 +118,12 @@ pub fn init(self: *Self, seat: *Seat) !void {
     wlr_cursor.events.frame.add(&self.frame);
     wlr_cursor.events.motion_absolute.add(&self.motion_absolute);
     wlr_cursor.events.motion.add(&self.motion);
+    wlr_cursor.events.swipe_begin.add(&self.swipe_begin);
+    wlr_cursor.events.swipe_update.add(&self.swipe_update);
+    wlr_cursor.events.swipe_end.add(&self.swipe_end);
+    wlr_cursor.events.pinch_begin.add(&self.pinch_begin);
+    wlr_cursor.events.pinch_update.add(&self.pinch_update);
+    wlr_cursor.events.pinch_end.add(&self.pinch_end);
     seat.wlr_seat.events.request_set_cursor.add(&self.request_set_cursor);
 }
 
@@ -238,6 +258,82 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
 
         _ = self.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
     }
+}
+
+fn handlePinchBegin(
+    listener: *wl.Listener(*wlr.Pointer.event.PinchBegin),
+    event: *wlr.Pointer.event.PinchBegin,
+) void {
+    const self = @fieldParentPtr(Self, "pinch_begin", listener);
+    self.pointer_gestures.sendPinchBegin(
+        self.seat.wlr_seat,
+        event.time_msec,
+        event.fingers,
+    );
+}
+
+fn handlePinchUpdate(
+    listener: *wl.Listener(*wlr.Pointer.event.PinchUpdate),
+    event: *wlr.Pointer.event.PinchUpdate,
+) void {
+    const self = @fieldParentPtr(Self, "pinch_update", listener);
+    self.pointer_gestures.sendPinchUpdate(
+        self.seat.wlr_seat,
+        event.time_msec,
+        event.dx,
+        event.dy,
+        event.scale,
+        event.rotation,
+    );
+}
+
+fn handlePinchEnd(
+    listener: *wl.Listener(*wlr.Pointer.event.PinchEnd),
+    event: *wlr.Pointer.event.PinchEnd,
+) void {
+    const self = @fieldParentPtr(Self, "pinch_end", listener);
+    self.pointer_gestures.sendPinchEnd(
+        self.seat.wlr_seat,
+        event.time_msec,
+        event.cancelled,
+    );
+}
+
+fn handleSwipeBegin(
+    listener: *wl.Listener(*wlr.Pointer.event.SwipeBegin),
+    event: *wlr.Pointer.event.SwipeBegin,
+) void {
+    const self = @fieldParentPtr(Self, "swipe_begin", listener);
+    self.pointer_gestures.sendSwipeBegin(
+        self.seat.wlr_seat,
+        event.time_msec,
+        event.fingers,
+    );
+}
+
+fn handleSwipeUpdate(
+    listener: *wl.Listener(*wlr.Pointer.event.SwipeUpdate),
+    event: *wlr.Pointer.event.SwipeUpdate,
+) void {
+    const self = @fieldParentPtr(Self, "swipe_update", listener);
+    self.pointer_gestures.sendSwipeUpdate(
+        self.seat.wlr_seat,
+        event.time_msec,
+        event.dx,
+        event.dy,
+    );
+}
+
+fn handleSwipeEnd(
+    listener: *wl.Listener(*wlr.Pointer.event.SwipeEnd),
+    event: *wlr.Pointer.event.SwipeEnd,
+) void {
+    const self = @fieldParentPtr(Self, "swipe_end", listener);
+    self.pointer_gestures.sendSwipeEnd(
+        self.seat.wlr_seat,
+        event.time_msec,
+        event.cancelled,
+    );
 }
 
 /// Handle the mapping for the passed button if any. Returns true if there
