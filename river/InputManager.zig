@@ -27,6 +27,7 @@ const util = @import("util.zig");
 const Seat = @import("Seat.zig");
 const Server = @import("Server.zig");
 const View = @import("View.zig");
+const PointerConstraint = @import("PointerConstraint.zig");
 
 const default_seat_name = "default";
 
@@ -37,6 +38,8 @@ new_input: wl.Listener(*wlr.InputDevice) = wl.Listener(*wlr.InputDevice).init(ha
 
 idle: *wlr.Idle,
 input_inhibit_manager: *wlr.InputInhibitManager,
+pointer_constraints: *wlr.PointerConstraintsV1,
+relative_pointer_manager: *wlr.RelativePointerManagerV1,
 virtual_pointer_manager: *wlr.VirtualPointerManagerV1,
 virtual_keyboard_manager: *wlr.VirtualKeyboardManagerV1,
 
@@ -49,6 +52,8 @@ inhibit_activate: wl.Listener(*wlr.InputInhibitManager) =
     wl.Listener(*wlr.InputInhibitManager).init(handleInhibitActivate),
 inhibit_deactivate: wl.Listener(*wlr.InputInhibitManager) =
     wl.Listener(*wlr.InputInhibitManager).init(handleInhibitDeactivate),
+new_pointer_constraint: wl.Listener(*wlr.PointerConstraintV1) =
+    wl.Listener(*wlr.PointerConstraintV1).init(handleNewPointerConstraint),
 new_virtual_pointer: wl.Listener(*wlr.VirtualPointerManagerV1.event.NewPointer) =
     wl.Listener(*wlr.VirtualPointerManagerV1.event.NewPointer).init(handleNewVirtualPointer),
 new_virtual_keyboard: wl.Listener(*wlr.VirtualKeyboardV1) =
@@ -64,6 +69,8 @@ pub fn init(self: *Self, server: *Server) !void {
         // These are automatically freed when the display is destroyed
         .idle = try wlr.Idle.create(server.wl_server),
         .input_inhibit_manager = try wlr.InputInhibitManager.create(server.wl_server),
+        .pointer_constraints = try wlr.PointerConstraintsV1.create(server.wl_server),
+        .relative_pointer_manager = try wlr.RelativePointerManagerV1.create(server.wl_server),
         .virtual_pointer_manager = try wlr.VirtualPointerManagerV1.create(server.wl_server),
         .virtual_keyboard_manager = try wlr.VirtualKeyboardManagerV1.create(server.wl_server),
     };
@@ -76,6 +83,7 @@ pub fn init(self: *Self, server: *Server) !void {
     server.backend.events.new_input.add(&self.new_input);
     self.input_inhibit_manager.events.activate.add(&self.inhibit_activate);
     self.input_inhibit_manager.events.deactivate.add(&self.inhibit_deactivate);
+    self.pointer_constraints.events.new_constraint.add(&self.new_pointer_constraint);
     self.virtual_pointer_manager.events.new_virtual_pointer.add(&self.new_virtual_pointer);
     self.virtual_keyboard_manager.events.new_virtual_keyboard.add(&self.new_virtual_keyboard);
 }
@@ -169,6 +177,15 @@ fn handleNewInput(listener: *wl.Listener(*wlr.InputDevice), device: *wlr.InputDe
     const self = @fieldParentPtr(Self, "new_input", listener);
     // TODO: suport multiple seats
     self.defaultSeat().addDevice(device);
+}
+
+fn handleNewPointerConstraint(listener: *wl.Listener(*wlr.PointerConstraintV1), constraint: *wlr.PointerConstraintV1) void {
+    const pointer_constraint = util.gpa.create(PointerConstraint) catch {
+        log.crit("out of memory", .{});
+        return;
+    };
+
+    pointer_constraint.init(constraint);
 }
 
 fn handleNewVirtualPointer(

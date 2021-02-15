@@ -42,6 +42,7 @@ pub fn build(b: *zbs.Builder) !void {
     scanner.addSystemProtocol("stable/xdg-shell/xdg-shell.xml");
     scanner.addSystemProtocol("unstable/pointer-gestures/pointer-gestures-unstable-v1.xml");
     scanner.addSystemProtocol("unstable/xdg-output/xdg-output-unstable-v1.xml");
+    scanner.addSystemProtocol("unstable/pointer-constraints/pointer-constraints-unstable-v1.xml");
     scanner.addProtocolPath("protocol/river-control-unstable-v1.xml");
     scanner.addProtocolPath("protocol/river-options-unstable-v1.xml");
     scanner.addProtocolPath("protocol/river-status-unstable-v1.xml");
