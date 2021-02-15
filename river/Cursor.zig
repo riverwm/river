@@ -60,6 +60,8 @@ wlr_cursor: *wlr.Cursor,
 pointer_gestures: *wlr.PointerGesturesV1,
 xcursor_manager: *wlr.XcursorManager,
 
+constraint: ?*wlr.PointerConstraintV1 = null,
+
 /// Number of distinct buttons currently pressed
 pressed_count: u32 = 0,
 
@@ -382,7 +384,9 @@ fn handleMotionAbsolute(
     var ly: f64 = undefined;
     self.wlr_cursor.absoluteToLayoutCoords(event.device, event.x, event.y, &lx, &ly);
 
-    self.processMotion(event.device, event.time_msec, lx - self.wlr_cursor.x, ly - self.wlr_cursor.y);
+    const dx = lx - self.wlr_cursor.x;
+    const dy = ly - self.wlr_cursor.y;
+    self.processMotion(event.device, event.time_msec, dx, dy, dx, dy);
 }
 
 /// This event is forwarded by the cursor when a pointer emits a _relative_
@@ -395,7 +399,7 @@ fn handleMotion(
 
     self.seat.handleActivity();
 
-    self.processMotion(event.device, event.time_msec, event.delta_x, event.delta_y);
+    self.processMotion(event.device, event.time_msec, event.delta_x, event.delta_y, event.unaccel_dx, event.unaccel_dy);
 }
 
 fn handleRequestSetCursor(
@@ -561,14 +565,44 @@ fn leaveMode(self: *Self, event: *wlr.Pointer.event.Button) void {
     self.passthrough(event.time_msec);
 }
 
-fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64, delta_y: f64) void {
+fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64, delta_y: f64, unaccel_dx: f64, unaccel_dy: f64) void {
+    self.seat.input_manager.relative_pointer_manager.sendRelativeMotion(
+        self.seat.wlr_seat,
+        @as(u64, time) * 1000,
+        delta_x,
+        delta_y,
+        unaccel_dx,
+        unaccel_dy,
+    );
+    var dx: f64 = delta_x;
+    var dy: f64 = delta_y;
+    if (self.constraint) |constraint| {
+        if (self.mode == .passthrough or self.mode == .down) {
+            if (constraint.type == .locked) return;
+
+            var sx: f64 = undefined;
+            var sy: f64 = undefined;
+            const surface = self.surfaceAt(self.wlr_cursor.x, self.wlr_cursor.y, &sx, &sy);
+
+            if (surface != constraint.surface) return;
+
+            var sx_con: f64 = undefined;
+            var sy_con: f64 = undefined;
+            if (!wlr.region.confine(&constraint.region, sx, sy, sx + dx, sy + dy, &sx_con, &sy_con)) {
+                return;
+            }
+
+            dx = sx_con - sx;
+            dy = sy_con - sy;
+        }
+    }
     switch (self.mode) {
         .passthrough => {
-            self.wlr_cursor.move(device, delta_x, delta_y);
+            self.wlr_cursor.move(device, dx, dy);
             self.passthrough(time);
         },
         .down => |view| {
-            self.wlr_cursor.move(device, delta_x, delta_y);
+            self.wlr_cursor.move(device, dx, dy);
             // This takes surface-local coordinates
             const output_box = view.output.root.output_layout.getBox(view.output.wlr_output).?;
             self.seat.wlr_seat.pointerNotifyMotion(

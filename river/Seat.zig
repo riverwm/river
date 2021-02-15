@@ -37,6 +37,7 @@ const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 
 const log = std.log.scoped(.seat);
+const PointerConstraint = @import("PointerConstraint.zig");
 
 const FocusTarget = union(enum) {
     view: *View,
@@ -223,7 +224,7 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
         }
         self.focused = new_focus;
 
-        // Send surface enter/leave events
+        // Send keyboard enter/leave events and handle pointer constraints
         if (target_surface) |wlr_surface| {
             if (self.wlr_seat.getKeyboard()) |keyboard| {
                 self.wlr_seat.keyboardNotifyEnter(
@@ -235,8 +236,22 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
             } else {
                 self.wlr_seat.keyboardNotifyEnter(wlr_surface, null, 0, null);
             }
+
+            if (self.input_manager.pointer_constraints.constraintForSurface(wlr_surface, self.wlr_seat)) |constraint| {
+                @intToPtr(*PointerConstraint, constraint.data).setAsActive();
+            } else if (self.cursor.constraint) |constraint| {
+                PointerConstraint.warpToHint(&self.cursor);
+                constraint.sendDeactivated();
+                self.cursor.constraint = null;
+            }
         } else {
             self.wlr_seat.keyboardClearFocus();
+
+            if (self.cursor.constraint) |constraint| {
+                PointerConstraint.warpToHint(&self.cursor);
+                constraint.sendDeactivated();
+                self.cursor.constraint = null;
+            }
         }
     }
 
