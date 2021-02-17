@@ -459,6 +459,8 @@ pub fn map(self: *Self) void {
 
         if (self.getTitle()) |s| self.foreign_toplevel_handle.?.setTitle(s);
         if (self.getAppId()) |s| self.foreign_toplevel_handle.?.setAppId(s);
+
+        self.foreign_toplevel_handle.?.outputEnter(self.output.wlr_output);
     }
 
     // Add the view to the stack of its output
