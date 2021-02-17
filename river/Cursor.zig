@@ -46,9 +46,25 @@ const Mode = union(enum) {
         offset_x: i32,
         offset_y: i32,
     },
+    moveThreshold: struct {
+        view: *View,
+        start_x: f64,
+        start_y: f64,
+        current_x: f64,
+        current_y: f64,
+    },
+    resizeThreshold: struct {
+        view: *View,
+        start_x: f64,
+        start_y: f64,
+        current_x: f64,
+        current_y: f64,
+    },
 };
 
 const default_size = 24;
+
+const threshold: f64 = 50.0;
 
 const log = std.log.scoped(.cursor);
 
@@ -183,6 +199,8 @@ pub fn isCursorActionTarget(self: Self, view: *const View) bool {
         .down => |target_view| target_view == view,
         .move => |target_view| target_view == view,
         .resize => |data| data.view == view,
+        .moveThreshold => |data| data.view == view,
+        .resizeThreshold => |data| data.view == view,
     };
 }
 
@@ -518,7 +536,6 @@ pub fn enterMode(self: *Self, mode: @TagType(Mode), view: *View) void {
         .move, .resize => {
             const cur_box = &view.current.box;
             self.mode = switch (mode) {
-                .passthrough, .down => unreachable,
                 .move => .{ .move = view },
                 .resize => .{
                     .resize = .{
@@ -527,6 +544,7 @@ pub fn enterMode(self: *Self, mode: @TagType(Mode), view: *View) void {
                         .offset_y = cur_box.y + @intCast(i32, cur_box.height) - @floatToInt(i32, self.wlr_cursor.y),
                     },
                 },
+                else => unreachable,
             };
 
             // Automatically float all views being moved by the pointer
@@ -543,6 +561,24 @@ pub fn enterMode(self: *Self, mode: @TagType(Mode), view: *View) void {
                 if (mode == .move) "move" else "se-resize",
                 self.wlr_cursor,
             );
+        },
+        .moveThreshold => self.mode = .{
+            .moveThreshold = .{
+                .view = view,
+                .start_x = self.wlr_cursor.x,
+                .start_y = self.wlr_cursor.y,
+                .current_x = self.wlr_cursor.x,
+                .current_y = self.wlr_cursor.y,
+            },
+        },
+        .resizeThreshold => self.mode = .{
+            .resizeThreshold = .{
+                .view = view,
+                .start_x = self.wlr_cursor.x,
+                .start_y = self.wlr_cursor.y,
+                .current_x = self.wlr_cursor.x,
+                .current_y = self.wlr_cursor.y,
+            },
         },
     }
 }
@@ -610,7 +646,36 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
                 @intToFloat(f64, box.y + @intCast(i32, box.height) - data.offset_y),
             );
         },
+        .moveThreshold => {
+            self.mode.moveThreshold.current_x += delta_x;
+            self.mode.moveThreshold.current_y += delta_y;
+            if (distance(
+                self.mode.moveThreshold.start_x,
+                self.mode.moveThreshold.start_y,
+                self.mode.moveThreshold.current_x,
+                self.mode.moveThreshold.current_y,
+            ) >= threshold) {
+                self.enterMode(.move, self.mode.moveThreshold.view);
+            }
+        },
+        .resizeThreshold => {
+            self.mode.resizeThreshold.current_x += delta_x;
+            self.mode.resizeThreshold.current_y += delta_y;
+            if (distance(
+                self.mode.resizeThreshold.start_x,
+                self.mode.resizeThreshold.start_y,
+                self.mode.resizeThreshold.current_x,
+                self.mode.resizeThreshold.current_y,
+            ) >= threshold) {
+                self.enterMode(.resize, self.mode.resizeThreshold.view);
+            }
+        },
     }
+}
+
+/// Distance between two cursor positions
+fn distance(ax: f64, ay: f64, bx: f64, by: f64) f64 {
+    return @sqrt(std.math.pow(f64, ax - bx, 2) + std.math.pow(f64, ay - by, 2));
 }
 
 /// Pass an event on to the surface under the cursor, if any.
