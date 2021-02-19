@@ -32,16 +32,18 @@ const util = @import("util.zig");
 const Seat = @import("Seat.zig");
 const Server = @import("Server.zig");
 
+const ArgMap = std.AutoHashMap(struct { client: *wl.Client, id: u32 }, std.ArrayListUnmanaged([]const u8));
+
 global: *wl.Global,
 
-args_map: std.AutoHashMap(u32, std.ArrayList([]const u8)),
+args_map: ArgMap,
 
 server_destroy: wl.Listener(*wl.Server) = wl.Listener(*wl.Server).init(handleServerDestroy),
 
 pub fn init(self: *Self, server: *Server) !void {
     self.* = .{
         .global = try wl.Global.create(server.wl_server, zriver.ControlV1, 1, *Self, self, bind),
-        .args_map = std.AutoHashMap(u32, std.ArrayList([]const u8)).init(util.gpa),
+        .args_map = ArgMap.init(util.gpa),
     };
 
     server.wl_server.addDestroyListener(&self.server_destroy);
@@ -59,7 +61,7 @@ fn bind(client: *wl.Client, self: *Self, version: u32, id: u32) callconv(.C) voi
         client.postNoMemory();
         return;
     };
-    self.args_map.putNoClobber(id, std.ArrayList([]const u8).init(util.gpa)) catch {
+    self.args_map.putNoClobber(.{ .client = client, .id = id }, .{}) catch {
         control.destroy();
         client.postNoMemory();
         return;
@@ -76,7 +78,8 @@ fn handleRequest(control: *zriver.ControlV1, request: zriver.ControlV1.Request, 
                 return;
             };
 
-            self.args_map.getEntry(control.getId()).?.value.append(owned_slice) catch {
+            const entry = self.args_map.getEntry(.{ .client = control.getClient(), .id = control.getId() }).?;
+            entry.value.append(util.gpa, owned_slice) catch {
                 control.getClient().postNoMemory();
                 util.gpa.free(owned_slice);
                 return;
@@ -94,7 +97,12 @@ fn handleRequest(control: *zriver.ControlV1, request: zriver.ControlV1.Request, 
                 return;
             };
 
-            const args = self.args_map.get(control.getId()).?.items;
+            const entry = self.args_map.getEntry(.{ .client = control.getClient(), .id = control.getId() }).?;
+            defer {
+                for (entry.value.items) |arg| util.gpa.free(arg);
+                entry.value.items.len = 0;
+            }
+            const args = entry.value.items;
 
             var out: ?[]const u8 = null;
             defer if (out) |s| util.gpa.free(s);
@@ -116,7 +124,7 @@ fn handleRequest(control: *zriver.ControlV1, request: zriver.ControlV1.Request, 
             };
 
             const success_message = if (out) |s|
-                std.cstr.addNullByte(util.gpa, s) catch {
+                util.gpa.dupeZ(u8, s) catch {
                     callback.getClient().postNoMemory();
                     return;
                 }
@@ -130,7 +138,9 @@ fn handleRequest(control: *zriver.ControlV1, request: zriver.ControlV1.Request, 
 
 /// Remove the resource from the hash map and free all stored args
 fn handleDestroy(control: *zriver.ControlV1, self: *Self) void {
-    const list = self.args_map.remove(control.getId()).?.value;
-    for (list.items) |arg| list.allocator.free(arg);
-    list.deinit();
+    var list = self.args_map.remove(
+        .{ .client = control.getClient(), .id = control.getId() },
+    ).?.value;
+    for (list.items) |arg| util.gpa.free(arg);
+    list.deinit(util.gpa);
 }
