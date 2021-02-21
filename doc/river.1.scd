@@ -39,10 +39,9 @@ following locations, checked in the order listed:
 - $HOME/.config/river/init
 - /etc/river/init
 
-This executable init file will be run after river's wayland server is
-initialized but before entering the main loop. If the process started by
-this flag is still running when river exits, river will send SIGTERM and
-and wait for it to terminate.
+The executable init file will be run as a process group leader after river's
+wayland server is initialized but before entering the main loop. On exit,
+river will send SIGTERM to this process group.
 
 Usually this will be a shell script invoking *riverctl*(1) to create mappings,
 start programs such as a status bar, and preform other configuration.
