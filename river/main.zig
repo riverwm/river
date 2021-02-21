@@ -16,6 +16,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
+const os = std.os;
 const wlr = @import("wlroots");
 
 const build_options = @import("build_options");
@@ -45,7 +46,7 @@ const usage: []const u8 =
 
 fn testConfigPath(comptime fmt: []const u8, args: anytype) std.fmt.AllocPrintError!?[:0]const u8 {
     const path = try std.fmt.allocPrintZ(util.gpa, fmt, args);
-    std.os.access(path, std.os.X_OK) catch {
+    os.access(path, os.X_OK) catch {
         util.gpa.free(path);
         return null;
     };
@@ -53,11 +54,11 @@ fn testConfigPath(comptime fmt: []const u8, args: anytype) std.fmt.AllocPrintErr
 }
 
 fn getStartupCommand() std.fmt.AllocPrintError!?[:0]const u8 {
-    if (std.os.getenv("XDG_CONFIG_HOME")) |xdg_config_home| {
+    if (os.getenv("XDG_CONFIG_HOME")) |xdg_config_home| {
         if (try testConfigPath("{}/river/init", .{xdg_config_home})) |path| {
             return path;
         }
-    } else if (std.os.getenv("HOME")) |home| {
+    } else if (os.getenv("HOME")) |home| {
         if (try testConfigPath("{}/.config/river/init", .{home})) |path| {
             return path;
         }
@@ -94,13 +95,13 @@ pub fn main() anyerror!void {
             if (std.mem.eql(u8, arg, "-h")) {
                 const stdout = std.io.getStdOut().outStream();
                 try stdout.print(usage, .{});
-                std.os.exit(0);
+                os.exit(0);
             } else if (std.mem.eql(u8, arg, "-c")) {
                 if (it.nextPosix()) |command| {
                     // If the user used '-c' multiple times the variable
                     // already holds a path and needs to be freed.
-                    if (startup_command) |ptr| util.gpa.free(ptr);
-                    startup_command = try util.gpa.dupeZ(u8, std.mem.spanZ(command.ptr));
+                    if (startup_command) |cmd| util.gpa.free(cmd);
+                    startup_command = try util.gpa.dupeZ(u8, command);
                 } else {
                     printErrorExit("Error: flag '-c' requires exactly one argument", .{});
                 }
@@ -115,7 +116,7 @@ pub fn main() anyerror!void {
             } else {
                 const stderr = std.io.getStdErr().outStream();
                 try stderr.print(usage, .{});
-                std.os.exit(1);
+                os.exit(1);
             }
         }
     }
@@ -126,39 +127,36 @@ pub fn main() anyerror!void {
         .warn, .err, .crit, .alert, .emerg => .err,
     });
 
-    log_server.info("initializing", .{});
-
     if (startup_command == null) {
-        if (try getStartupCommand()) |path| {
-            startup_command = path;
-            log_server.info("Using default startup command path: {}", .{path});
-        } else {
-            log_server.info("Starting without startup command", .{});
-        }
-    } else {
-        log_server.info("Using custom startup command path: {}", .{startup_command});
+        if (try getStartupCommand()) |path| startup_command = path;
     }
 
+    log_server.info("initializing server", .{});
     var server: Server = undefined;
     try server.init();
     defer server.deinit();
 
     try server.start();
 
-    const child_pid = if (startup_command) |cmd| blk: {
+    // Run the child in a new process group so that we can send SIGTERM to all
+    // descendants on exit.
+    const child_pgid = if (startup_command) |cmd| blk: {
+        log_server.info("running startup command '{}'", .{cmd});
         const child_args = [_:null]?[*:0]const u8{ "/bin/sh", "-c", cmd, null };
-        const pid = try std.os.fork();
+        const pid = try os.fork();
         if (pid == 0) {
-            if (std.os.system.sigprocmask(std.os.SIG_SETMASK, &std.os.empty_sigset, null) < 0) unreachable;
-            std.os.execveZ("/bin/sh", &child_args, std.c.environ) catch c._exit(1);
+            if (c.setsid() < 0) unreachable;
+            if (os.system.sigprocmask(os.SIG_SETMASK, &os.empty_sigset, null) < 0) unreachable;
+            os.execveZ("/bin/sh", &child_args, std.c.environ) catch c._exit(1);
         }
         util.gpa.free(cmd);
+        // Since the child has called setsid, the pid is the pgid
         break :blk pid;
     } else null;
-    defer if (child_pid) |pid|
-        std.os.kill(pid, std.os.SIGTERM) catch |e| log_server.err("failed to kill startup process: {}", .{e});
+    defer if (child_pgid) |pgid|
+        os.kill(-pgid, os.SIGTERM) catch |e| log_server.err("failed to kill startup process: {}", .{e});
 
-    log_server.info("running...", .{});
+    log_server.info("running server", .{});
 
     server.wl_server.run();
 
@@ -167,6 +165,6 @@ pub fn main() anyerror!void {
 
 fn printErrorExit(comptime format: []const u8, args: anytype) noreturn {
     const stderr = std.io.getStdErr().outStream();
-    stderr.print(format ++ "\n", args) catch std.os.exit(1);
-    std.os.exit(1);
+    stderr.print(format ++ "\n", args) catch os.exit(1);
+    os.exit(1);
 }
