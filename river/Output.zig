@@ -560,7 +560,7 @@ pub fn getEffectiveResolution(self: *Self) struct { width: u32, height: u32 } {
 pub fn setTitle(self: *Self, title: [*:0]const u8) void {
     if (self.wlr_output.isWl()) {
         self.wlr_output.wlSetTitle(title);
-    } else if (self.wlr_output.isX11()) {
+    } else if (wlr.config.has_x11_backend and self.wlr_output.isX11()) {
         self.wlr_output.x11SetTitle(title);
     }
 }
