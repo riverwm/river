@@ -1,0 +1,99 @@
+#compdef riverctl
+
+
+_riverctl() {
+
+  _next_prev() { _alternative 'arguments:args:(next previous)' }
+  _orientations() { _alternative 'arguments:args:(up down left right)' }
+  _hor_ver() { _alternative 'arguments:args:(horizontal vertcial)' }
+  _attach() { _alternative 'arguments:args:(top bottom)' }
+  _focus_cursor() { _alternative 'arguments:args:(disabled normal strict)' }
+  _river_opts() { _alternative 'arguments:args:(-output -focused-output)' }
+
+  local -a _cmds
+
+  _cmds=(
+    # Actions
+    'close:Close the focused view'
+    'csd-filter-add:Add app-id to the CSD filter list'
+    'exit:Exit the compositor, terminating the Wayland session'
+    'float-filter-add:Add app-id to the float filter list'
+    'focus-output:Focus the next or previous output'
+    'focus-view:Focus the next or previous view in the stack'
+    'layout:Provide a command which river will use for generating the layout of non-floating windows'
+    'mod-main-count:Increase or decrease the number of "main" views'
+    'mod-main-factor:Increase or decrease the "main factor"'
+    'move:Move the focused view in the specified direction'
+    'resize:Resize the focused view along the given axis'
+    'snap:Snap the focused view to the specified screen edge'
+    'send-to-output:Send the focused view to the next or the previous output'
+    'spawn:Run shell_command using /bin/sh -c'
+    'swap:Swap the focused view with the next/previous visible non-floating view'
+    'toggle-float:Toggle the floating state of the focused view'
+    'toggle-fullscreen:Toggle the fullscreen state of the focused view'
+    'zoom:Bump the focused view to the top of the layout stack'
+    # Tag management
+    'set-focused-tags:Show views with tags corresponding to the set bits of tags'
+    'set-view-tags:Assign the currently focused view the tags corresponding to the set bits of tags'
+    'toggle-focused-tags:Toggle visibility of views with tags corresponding to the set bits of tags'
+    'toggle-view-tags:Toggle the tags of the currently focused view'
+    'spawn-tagmask:Set a tagmask to filter the tags assigned to newly spawned views on the focused output'
+    # Mappings
+    'declare-mode:Create a new mode'
+    'enter-mode:Switch to given mode if it exits'
+    'map:Run command when key is pressed while modifiers are held down and in the specified mode'
+    'map-pointer:Move or resize views when button and modifiers are held down while in the specified mode'
+    'unmap:Remove the mapping defined by the arguments'
+    'unmap-pointer:Remove the pointer mapping defined by the arguments'
+    # Configuration
+    'attach-mode:Configure where new views should attach to the view stack for the currently focused output'
+    'background-color:Set the background color'
+    'border-color-focused:Set the border color of focused views'
+    'border-color-unfocused:Set the border color of unfocused views'
+    'border-width:Set the border width to pixels'
+    'focus-follows-cursor:There are three available modes'
+    'opacity:Configure server-side opacity of views'
+    'outer-padding:Set the padding around the edge of the screen to pixels'
+    'set-repeat:Set the keyboard repeat rate to rate key repeats and repeat delay'
+    'view-padding:Set the padding around the edge of each view to pixels'
+    'xcursor-theme:Set the xcursor theme'
+    # Options
+    'declare-option:Declare a new option with the given type and inital value'
+    'get-option:Print the current value of the given option to stdout'
+    'set-option:Set the value of the specified option to value'
+    'mod-option:Add value to the value of the specified option'
+    'output_title:Changing this option changes the title of the wayland and X11 backend outputs'
+  )
+
+  local -A opt_args
+
+  _arguments -C '*:: :->_cmds'
+
+  if (( CURRENT == 1 )); then
+    _describe -t commands "commands" _cmds
+    return
+  fi
+
+  case "$words[1]" in
+    focus-output) _next_prev ;;
+    focus-view) _next_prev ;;
+    layout) _alternative 'arguments:optional:(full)' ;;
+    move) _orientations ;;
+    resize) _hor_ver ;;
+    snap) _orientations ;;
+    send-to-output) _next_prev ;;
+    swap) _next_prev ;;
+    map) _alternative 'arguments:optional:(-release)' ;;
+    unmap) _alternative 'arguments:optional:(-release)' ;;
+    attach-mode) _attach ;;
+    focus-follows-cursor) _focus_cursor ;;
+    declare-option) _river_opts ;;
+    get-option) _river_opts ;;
+    set-option) _river_opts ;;
+    mod-option) _river_opts ;;
+    *) return 0 ;;
+  esac
+
+  return 1
+}
+
