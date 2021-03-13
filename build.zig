@@ -25,6 +25,12 @@ pub fn build(b: *zbs.Builder) !void {
         break :scdoc_found true;
     };
 
+    const bash_completion = b.option(
+        bool,
+        "bash-completion",
+        "Set to true to install bash completion for riverctl. Defaults to true.",
+    ) orelse true;
+
     const examples = b.option(bool, "examples", "Set to true to build examples") orelse false;
 
     const resolved_prefix = try std.fs.path.resolve(b.allocator, &[_][]const u8{b.install_prefix.?});
@@ -86,6 +92,13 @@ pub fn build(b: *zbs.Builder) !void {
     if (man_pages) {
         const scdoc_step = ScdocStep.create(b);
         try scdoc_step.install();
+    }
+
+    if (bash_completion) {
+        b.installFile(
+            "completions/bash/riverctl",
+            "share/bash-completion/completions/riverctl",
+        );
     }
 
     if (examples) {
