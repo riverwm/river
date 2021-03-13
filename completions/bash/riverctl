@@ -1,0 +1,69 @@
+function __riverctl_completion ()
+{
+	if [ "${COMP_CWORD}" -eq 1 ]
+	then
+		OPTS=" \
+			csd-filter-add \
+			exit \
+			float-filter-add \
+			focus-output \
+			focus-view \
+			layout \
+			mod-main-count \
+			mod-main-factor \
+			move \
+			resize \
+			snap \
+			send-to-output \
+			spawn \
+			swap \
+			toggle-float \
+			toggle-fullscreen \
+			zoom \
+			set-focused-tags \
+			set-view-tags \
+			toggle-focused-tags \
+			toggle-view-tags \
+			spawn-tagmask \
+			declare-mode \
+			enter-mode \
+			map \
+			map-pointer \
+			unmap \
+			unmap-pointer \
+			attach-mode \
+			background-color \
+			border-color-focused \
+			border-color-unfocused \
+			border-width \
+			focus-follow-cursor \
+			opacity \
+			outer-padding \
+			set-repeat \
+			view-padding \
+			xcursor-theme \
+			declare-option \
+			get-option \
+			set-option \
+			mod-option"
+		COMPREPLY=($(compgen -W "${OPTS}" -- "${COMP_WORDS[1]}"))
+	elif [ "${COMP_CWORD}" -eq 2 ]
+	then
+		case "${COMP_WORDS[1]}" in
+			"focus-output"|"focus-view"|"send-to-output"|"swap") OPTS="next previous" ;;
+			"move"|"snap") OPTS="up down left right" ;;
+			"resize") OPTS="horizontal vertical" ;;
+			"map"|"unmap") OPTS="-release" ;;
+			"attach-mode") OPTS="top bottom" ;;
+			"focus-follows-cursor") OPTS="disabled normal strict" ;;
+			"declare-option"|"get-option"|"set-option"|"mod-option") OPTS="-output -focused-output" ;;
+			*) return ;;
+		esac
+		COMPREPLY=($(compgen -W "${OPTS}" -- "${COMP_WORDS[2]}"))
+	else
+		return
+	fi
+}
+
+complete -F __riverctl_completion riverctl
+
