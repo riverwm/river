@@ -37,6 +37,12 @@ pub fn build(b: *zbs.Builder) !void {
         "Set to true to install zsh completion for riverctl. Defaults to true.",
     ) orelse true;
 
+    const fish_completion = b.option(
+        bool,
+        "fish-completion",
+        "Set to true to install fish completion for riverctl. Defaults to true.",
+    ) orelse true;
+
     const examples = b.option(bool, "examples", "Set to true to build examples") orelse false;
 
     const resolved_prefix = try std.fs.path.resolve(b.allocator, &[_][]const u8{b.install_prefix.?});
@@ -111,6 +117,13 @@ pub fn build(b: *zbs.Builder) !void {
         b.installFile(
             "completions/zsh/_riverctl",
             "share/zsh/site-functions/_riverctl",
+        );
+    }
+
+    if (fish_completion) {
+        b.installFile(
+            "completions/fish/riverctl.fish",
+            "share/fish/vendor_completions.d/riverctl.fish",
         );
     }
 
