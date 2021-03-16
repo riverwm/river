@@ -170,7 +170,7 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 	Create a new mode called _name_.
 
 *enter-mode* _name_
-	Switch to given mode if it exits.
+	Switch to given mode if it exists.
 
 *map* [_-release_] _mode_ _modifiers_ _key_ _command_
 	Run _command_ when _key_ is pressed while _modifiers_ are held down
@@ -289,7 +289,7 @@ name of the output as obtained from the xdg-output protocol. Alternatively,
 the currently focused output may be targeted with the *-focused-output* flag.
 
 *declare-option* [*-output* _output_name_|*-focused-output*] _name_ _type_ _value_
-	Declare a new option with the given _type_ and inital _value_. If
+	Declare a new option with the given _type_ and initial _value_. If
 	the option already exists with the given _type_, it is still set
 	to _value_. If the option already exists with a different type,
 	nothing happens.
