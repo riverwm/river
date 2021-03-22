@@ -56,7 +56,8 @@ pub fn build(b: *zbs.Builder) !void {
     };
     b.installFile("example/init", rel_config_path);
     const abs_config_path = try fs.path.resolve(b.allocator, &[_][]const u8{
-        b.install_prefix orelse b.cache_root,
+        // This logic must match std.build.resolveInstallPrefix()
+        b.install_prefix orelse if (b.dest_dir) |_| "/usr" else b.cache_root,
         rel_config_path,
     });
 
