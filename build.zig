@@ -1,5 +1,7 @@
 const std = @import("std");
+const assert = std.debug.assert;
 const fs = std.fs;
+const mem = std.mem;
 const zbs = std.build;
 
 const ScanProtocolsStep = @import("deps/zig-wayland/build.zig").ScanProtocolsStep;
@@ -46,20 +48,15 @@ pub fn build(b: *zbs.Builder) !void {
 
     const examples = b.option(bool, "examples", "Set to true to build examples") orelse false;
 
-    const rel_config_path = blk: {
-        if (b.install_prefix) |prefix| {
-            if (std.mem.eql(u8, try fs.path.resolve(b.allocator, &[_][]const u8{prefix}), "/usr")) {
-                break :blk "../etc/river/init";
-            }
-        }
-        break :blk "etc/river/init";
-    };
+    // This logic must match std.build.resolveInstallPrefix()
+    const prefix = b.install_prefix orelse if (b.dest_dir) |_| "/usr" else b.cache_root;
+    const rel_config_path = if (mem.eql(u8, try fs.path.resolve(b.allocator, &[_][]const u8{prefix}), "/usr"))
+        "../etc/river/init"
+    else
+        "etc/river/init";
     b.installFile("example/init", rel_config_path);
-    const abs_config_path = try fs.path.resolve(b.allocator, &[_][]const u8{
-        // This logic must match std.build.resolveInstallPrefix()
-        b.install_prefix orelse if (b.dest_dir) |_| "/usr" else b.cache_root,
-        rel_config_path,
-    });
+    const abs_config_path = try fs.path.resolve(b.allocator, &[_][]const u8{ prefix, rel_config_path });
+    assert(fs.path.isAbsolute(abs_config_path));
 
     const scanner = ScanProtocolsStep.create(b);
     scanner.addSystemProtocol("stable/xdg-shell/xdg-shell.xml");
