@@ -1,4 +1,5 @@
 const std = @import("std");
+const fs = std.fs;
 const zbs = std.build;
 
 const ScanProtocolsStep = @import("deps/zig-wayland/build.zig").ScanProtocolsStep;
@@ -45,16 +46,19 @@ pub fn build(b: *zbs.Builder) !void {
 
     const examples = b.option(bool, "examples", "Set to true to build examples") orelse false;
 
-    const resolved_prefix = try std.fs.path.resolve(b.allocator, &[_][]const u8{b.install_prefix.?});
-    const rel_config_path = if (std.mem.eql(u8, resolved_prefix, "/usr"))
-        "../etc/river/init"
-    else
-        "etc/river/init";
+    const rel_config_path = blk: {
+        if (b.install_prefix) |prefix| {
+            if (std.mem.eql(u8, try fs.path.resolve(b.allocator, &[_][]const u8{prefix}), "/usr")) {
+                break :blk "../etc/river/init";
+            }
+        }
+        break :blk "etc/river/init";
+    };
     b.installFile("example/init", rel_config_path);
-    const default_config_path = try std.fs.path.resolve(
-        b.allocator,
-        &[_][]const u8{ resolved_prefix, rel_config_path },
-    );
+    const abs_config_path = try fs.path.resolve(b.allocator, &[_][]const u8{
+        b.install_prefix orelse b.cache_root,
+        rel_config_path,
+    });
 
     const scanner = ScanProtocolsStep.create(b);
     scanner.addSystemProtocol("stable/xdg-shell/xdg-shell.xml");
@@ -72,7 +76,7 @@ pub fn build(b: *zbs.Builder) !void {
         river.setTarget(target);
         river.setBuildMode(mode);
         river.addBuildOption(bool, "xwayland", xwayland);
-        river.addBuildOption([]const u8, "default_config_path", default_config_path);
+        river.addBuildOption([]const u8, "default_config_path", abs_config_path);
 
         addServerDeps(river, scanner);
 
@@ -229,7 +233,7 @@ const ScdocStep = struct {
 
         for (scd_paths) |path| {
             const path_no_ext = path[0..(path.len - 4)];
-            const basename_no_ext = std.fs.path.basename(path_no_ext);
+            const basename_no_ext = fs.path.basename(path_no_ext);
             const section = path_no_ext[(path_no_ext.len - 1)..];
 
             const output = try std.fmt.allocPrint(
