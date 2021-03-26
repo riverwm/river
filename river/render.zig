@@ -143,8 +143,12 @@ pub fn renderOutput(output: *Output) void {
     }
 
     // TODO: handle failure
-    output.wlr_output.commit() catch
+    if (output.wlr_output.commit()) |_| {
+        return;
+    } else |_| {
+        renderOutput(output);
         log.err("output commit failed for {}", .{output.wlr_output.name});
+    }
 }
 
 fn renderFilter(view: *View, filter_tags: u32) bool {
