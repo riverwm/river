@@ -143,7 +143,7 @@ pub fn renderOutput(output: *Output) void {
     }
 
     output.wlr_output.commit() catch {
-        log.err("output commit failed for {}, retrying", .{output.wlr_output.name});
+        log.err("output commit failed for {}, retrying", .{std.mem.spanZ(&output.wlr_output.name)});
         output.wlr_output.scheduleFrame();
     };
 }
