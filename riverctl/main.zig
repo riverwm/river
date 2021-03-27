@@ -44,6 +44,35 @@ pub const Globals = struct {
 };
 
 pub fn main() !void {
+    _main() catch |err| {
+        if (std.builtin.mode == .Debug)
+            return err;
+
+        switch (err) {
+            error.RiverControlNotAdvertised => printErrorExit(
+                \\The Wayland server does not support river-control-unstable-v1.
+                \\Do your versions of river and riverctl match?
+            , .{}),
+            error.RiverStatusManagerNotAdvertised => printErrorExit(
+                \\The Wayland server does not support river-status-unstable-v1.
+                \\Do your versions of river and riverctl match?
+            , .{}),
+            error.RiverOptionsManagerNotAdvertised => printErrorExit(
+                \\The Wayland server does not support river-options-unstable-v1.
+                \\Do your versions of river and riverctl match?
+            , .{}),
+            error.SeatNotAdverstised => printErrorExit(
+                \\The Wayland server did not advertise any seat.
+            , .{}),
+            error.XdgOutputNotAdvertised => printErrorExit(
+                \\The Wayland server does not support xdg-output-unstable-v1.
+            , .{}),
+            else => return err,
+        }
+    };
+}
+
+fn _main() !void {
     const display = try wl.Display.connect(null);
     const registry = try display.getRegistry();
 
