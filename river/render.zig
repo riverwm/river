@@ -142,7 +142,6 @@ pub fn renderOutput(output: *Output) void {
         output.wlr_output.setDamage(&damage);
     }
 
-    // TODO: handle failure
     output.wlr_output.commit() catch {
         log.err("output commit failed for {}, retrying", .{output.wlr_output.name});
         output.wlr_output.scheduleFrame();
