@@ -147,6 +147,7 @@ fn callbackListener(callback: *zriver.CommandCallbackV1, event: zriver.CommandCa
 }
 
 pub fn printErrorExit(comptime format: []const u8, args: anytype) noreturn {
-    std.debug.print("err: " ++ format ++ "\n", args);
-    os.exit(1);
+    const stderr = std.io.getStdErr().outStream();
+    stderr.print("err: " ++ format ++ "\n", args) catch std.os.exit(1);
+    std.os.exit(1);
 }
