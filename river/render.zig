@@ -142,10 +142,9 @@ pub fn renderOutput(output: *Output) void {
         output.wlr_output.setDamage(&damage);
     }
 
-    output.wlr_output.commit() catch {
-        log.err("output commit failed for {}, retrying", .{std.mem.spanZ(&output.wlr_output.name)});
-        output.wlr_output.scheduleFrame();
-    };
+    // TODO: handle failure
+    output.wlr_output.commit() catch
+        log.err("output commit failed for {}", .{output.wlr_output.name});
 }
 
 fn renderFilter(view: *View, filter_tags: u32) bool {
