@@ -333,14 +333,14 @@ pub fn close(self: Self) void {
     }
 }
 
-pub inline fn forEachPopup(
+pub inline fn forEachPopupSurface(
     self: Self,
     comptime T: type,
     iterator: fn (surface: *wlr.Surface, sx: c_int, sy: c_int, data: T) callconv(.C) void,
     user_data: T,
 ) void {
     switch (self.impl) {
-        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.forEachPopup(T, iterator, user_data),
+        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.forEachPopupSurface(T, iterator, user_data),
         .xwayland_view => {},
     }
 }

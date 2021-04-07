@@ -348,7 +348,7 @@ pub fn arrangeLayers(self: *Self) void {
         var it = self.getLayer(layer).last;
         while (it) |node| : (it = node.prev) {
             const layer_surface = &node.data;
-            if (layer_surface.wlr_layer_surface.current.keyboard_interactive) {
+            if (layer_surface.wlr_layer_surface.current.keyboard_interactive == .exclusive) {
                 break :outer layer_surface;
             }
         }
@@ -368,7 +368,7 @@ pub fn arrangeLayers(self: *Self) void {
         } else if (seat.focused == .layer) {
             // If the seat is currently focusing a layer without keyboard
             // interactivity, stop focusing that layer.
-            if (!seat.focused.layer.wlr_layer_surface.current.keyboard_interactive) {
+            if (seat.focused.layer.wlr_layer_surface.current.keyboard_interactive != .exclusive) {
                 seat.setFocusRaw(.{ .none = {} });
                 seat.focus(null);
             }

@@ -54,7 +54,7 @@ pub fn renderOutput(output: *Output) void {
 
     output.wlr_output.attachRender(null) catch return;
 
-    renderer.begin(output.wlr_output.width, output.wlr_output.height);
+    renderer.begin(@intCast(u32, output.wlr_output.width), @intCast(u32, output.wlr_output.height));
 
     // Find the first visible fullscreen view in the stack if there is one
     var it = ViewStack(View).iter(output.views.first, .forward, output.current.tags, renderFilter);
@@ -130,18 +130,6 @@ pub fn renderOutput(output: *Output) void {
     // on-screen.
     renderer.end();
 
-    // TODO(wlroots): remove this with the next release. It is here due to
-    // a wlroots bug in the screencopy damage implementation
-    {
-        var w: c_int = undefined;
-        var h: c_int = undefined;
-        output.wlr_output.transformedResolution(&w, &h);
-        var damage: pixman.Region32 = undefined;
-        damage.init();
-        _ = damage.unionRect(&damage, 0, 0, @intCast(c_uint, w), @intCast(c_uint, h));
-        output.wlr_output.setDamage(&damage);
-    }
-
     // TODO: handle failure
     output.wlr_output.commit() catch
         log.err("output commit failed for {}", .{output.wlr_output.name});
@@ -178,7 +166,7 @@ fn renderLayer(
                 renderSurfaceIterator,
                 &rdata,
             ),
-            .popups => layer_surface.wlr_layer_surface.forEachPopup(
+            .popups => layer_surface.wlr_layer_surface.forEachPopupSurface(
                 *SurfaceRenderData,
                 renderSurfaceIterator,
                 &rdata,
@@ -227,24 +215,7 @@ fn renderViewPopups(output: *const Output, view: *View, now: *os.timespec) void 
         .when = now,
         .opacity = view.opacity,
     };
-    view.forEachPopup(*SurfaceRenderData, renderPopupSurfaceIterator, &rdata);
-}
-
-// TODO(wlroots): replace with wlr_xdg_surface_for_each_popup_surface()
-fn renderPopupSurfaceIterator(
-    surface: *wlr.Surface,
-    surface_x: c_int,
-    surface_y: c_int,
-    rdata: *SurfaceRenderData,
-) callconv(.C) void {
-    var new_rdata = SurfaceRenderData{
-        .output = rdata.output,
-        .output_x = rdata.output_x + surface_x,
-        .output_y = rdata.output_y + surface_y,
-        .when = rdata.when,
-        .opacity = rdata.opacity,
-    };
-    surface.forEachSurface(*SurfaceRenderData, renderSurfaceIterator, &new_rdata);
+    view.forEachPopupSurface(*SurfaceRenderData, renderSurfaceIterator, &rdata);
 }
 
 fn renderDragIcons(output: *const Output, now: *os.timespec) void {

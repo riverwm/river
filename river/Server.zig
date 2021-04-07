@@ -78,7 +78,7 @@ pub fn init(self: *Self) !void {
     errdefer self.sigterm_source.remove();
 
     // This frees itself when the wl.Server is destroyed
-    self.backend = try wlr.Backend.autocreate(self.wl_server, null);
+    self.backend = try wlr.Backend.autocreate(self.wl_server);
 
     // This backend is used to create a noop output for use when no actual
     // outputs are available. This frees itself when the wl.Server is destroyed.
@@ -140,7 +140,6 @@ pub fn deinit(self: *Self) void {
 
     self.root.deinit();
 
-    self.noop_backend.destroy();
     self.wl_server.destroy();
 
     self.input_manager.deinit();

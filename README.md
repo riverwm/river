@@ -33,7 +33,7 @@ installed:
 - [zig](https://ziglang.org/download/) 0.7.1
 - wayland
 - wayland-protocols
-- [wlroots](https://github.com/swaywm/wlroots) 0.12.0
+- [wlroots](https://github.com/swaywm/wlroots) 0.13.0
 - xkbcommon
 - libevdev
 - pixman

@@ -517,14 +517,10 @@ fn applyHeadToOutput(head: *wlr.OutputConfigurationV1.Head, wlr_output: *wlr.Out
         if (head.state.mode) |mode| {
             wlr_output.setMode(mode);
         } else {
-            std.log.scoped(.output_manager).info("custom modes are not supported until the next wlroots release: ignoring", .{});
-            // TODO(wlroots) uncomment the following lines when wlroots 0.13.0 is released
-            // See https://github.com/swaywm/wlroots/pull/2517
-            //const custom_mode = &head.state.custom_mode;
-            //wlr_output.setCustomMode(custom_mode.width, custom_mode.height, custom_mode.refresh);
+            const custom_mode = &head.state.custom_mode;
+            wlr_output.setCustomMode(custom_mode.width, custom_mode.height, custom_mode.refresh);
         }
-        // TODO(wlroots) Figure out if this conversion is needed or if that is a bug in wlroots
-        wlr_output.setScale(@floatCast(f32, head.state.scale));
+        wlr_output.setScale(head.state.scale);
         wlr_output.setTransform(head.state.transform);
     }
 }

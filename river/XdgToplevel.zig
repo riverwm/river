@@ -104,13 +104,13 @@ pub fn close(self: Self) void {
     self.xdg_surface.role_data.toplevel.sendClose();
 }
 
-pub inline fn forEachPopup(
+pub inline fn forEachPopupSurface(
     self: Self,
     comptime T: type,
     iterator: fn (surface: *wlr.Surface, sx: c_int, sy: c_int, data: T) callconv(.C) void,
     user_data: T,
 ) void {
-    self.xdg_surface.forEachPopup(T, iterator, user_data);
+    self.xdg_surface.forEachPopupSurface(T, iterator, user_data);
 }
 
 /// Return the surface at output coordinates ox, oy and set sx, sy to the
