@@ -49,6 +49,14 @@ zig build -Drelease-safe --prefix /usr install
 ```
 To enable experimental Xwayland support pass the `-Dxwayland` option as well.
 
+## Install from package manager
+Currently river is available in [nixpkgs](https://github.com/NixOS/nixpkgs) for Nix package manager users which follow **nixpkgs-master** channel.
+
+*Note: river in nixpkgs is prebuild with manpages and xwayland support*
+```
+nix-env -iA nixpkgs.river
+```
+
 ## Usage
 
 River can either be run nested in an X11/wayland session or directly
