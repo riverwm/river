@@ -39,6 +39,7 @@ const ViewStack = @import("view_stack.zig").ViewStack;
 const AttachMode = @import("view_stack.zig").AttachMode;
 const OutputStatus = @import("OutputStatus.zig");
 const Option = @import("Option.zig");
+const OutputOption = @import("OutputOption.zig");
 
 const State = struct {
     /// A bit field of focused tags
@@ -94,11 +95,10 @@ enable: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleEnable),
 frame: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleFrame),
 mode: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleMode),
 
-layout_option: *Option,
+layout_option: *OutputOption,
 
-/// Listeners for options
-output_title: wl.Listener(*Option) = wl.Listener(*Option).init(handleTitleChange),
-layout_change: wl.Listener(*Option) = wl.Listener(*Option).init(handleLayoutChange),
+output_title: wl.Listener(*Option.Value) = wl.Listener(*Option.Value).init(handleTitleChange),
+layout_change: wl.Listener(*Option.Value) = wl.Listener(*Option.Value).init(handleLayoutChange),
 
 pub fn init(self: *Self, root: *Root, wlr_output: *wlr.Output) !void {
     // Some backends don't have modes. DRM+KMS does, and we need to set a mode
@@ -150,24 +150,29 @@ pub fn init(self: *Self, root: *Root, wlr_output: *wlr.Output) !void {
             .width = effective_resolution.width,
             .height = effective_resolution.height,
         };
+
+        const options_manager = &root.server.options_manager;
+        try options_manager.createOutputOptions(self);
+        errdefer options_manager.destroyOutputOptions(self);
+
+        // Set the default title of this output
+        var buf: ["river - ".len + wlr_output.name.len + 1]u8 = undefined;
+        const default_title = fmt.bufPrintZ(&buf, "river - {}", .{mem.spanZ(&wlr_output.name)}) catch unreachable;
+        self.setTitle(default_title);
+
+        const global_title_option = options_manager.getOption("output_title") orelse unreachable;
+        const title_option = global_title_option.getOutputOption(self).?;
+        title_option.set(.{ .string = default_title }) catch |err| switch (err) {
+            error.TypeMismatch => unreachable,
+            error.OutOfMemory => return err,
+        };
+
+        const global_layout_option = options_manager.getOption("layout") orelse unreachable;
+        self.layout_option = global_layout_option.getOutputOption(self).?;
+
+        self.layout_option.event.update.add(&self.layout_change);
+        title_option.event.update.add(&self.output_title);
     }
-
-    // Set the default title of this output
-    var buf: ["river - ".len + wlr_output.name.len + 1]u8 = undefined;
-    const default_title = fmt.bufPrintZ(&buf, "river - {}", .{mem.spanZ(&wlr_output.name)}) catch unreachable;
-    self.setTitle(default_title);
-
-    // Create all default output options
-    const options_manager = &root.server.options_manager;
-    self.layout_option = try Option.create(options_manager, self, "layout", .{ .string = null });
-    const title_option = try Option.create(options_manager, self, "output_title", .{ .string = default_title.ptr });
-    _ = try Option.create(options_manager, self, "main_amount", .{ .uint = 1 });
-    _ = try Option.create(options_manager, self, "main_factor", .{ .fixed = wl.Fixed.fromDouble(0.6) });
-    _ = try Option.create(options_manager, self, "view_padding", .{ .uint = 10 });
-    _ = try Option.create(options_manager, self, "outer_padding", .{ .uint = 10 });
-
-    self.layout_option.event.update.add(&self.layout_change);
-    title_option.event.update.add(&self.output_title);
 }
 
 pub fn getLayer(self: *Self, layer: zwlr.LayerShellV1.Layer) *std.TailQueue(LayerSurface) {
@@ -440,7 +445,7 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) v
 
     std.log.scoped(.server).debug("output '{}' destroyed", .{self.wlr_output.name});
 
-    root.server.options_manager.handleOutputDestroy(self);
+    root.server.options_manager.destroyOutputOptions(self);
 
     // Remove the destroyed output from root if it wasn't already removed
     root.removeOutput(self);
@@ -509,20 +514,21 @@ pub fn setTitle(self: *Self, title: [*:0]const u8) void {
     }
 }
 
-fn handleTitleChange(listener: *wl.Listener(*Option), option: *Option) void {
-    if (option.value.string) |title| option.output.?.setTitle(title);
+fn handleTitleChange(listener: *wl.Listener(*Option.Value), value: *Option.Value) void {
+    const self = @fieldParentPtr(Self, "output_title", listener);
+    if (value.string) |title| self.setTitle(title);
 }
 
-fn handleLayoutChange(listener: *wl.Listener(*Option), option: *Option) void {
+fn handleLayoutChange(listener: *wl.Listener(*Option.Value), value: *Option.Value) void {
+    const self = @fieldParentPtr(Self, "layout_change", listener);
     // The user changed the layout namespace of this output. Try to find a
     // matching layout.
-    const output = option.output.?;
-    output.pending.layout = if (option.value.string) |namespace| blk: {
-        var layout_it = output.layouts.first;
+    self.pending.layout = if (value.string) |namespace| blk: {
+        var layout_it = self.layouts.first;
         break :blk while (layout_it) |node| : (layout_it = node.next) {
             if (mem.eql(u8, mem.span(namespace), node.data.namespace)) break &node.data;
         } else null;
     } else null;
-    output.arrangeViews();
-    output.root.startTransaction();
+    self.arrangeViews();
+    self.root.startTransaction();
 }

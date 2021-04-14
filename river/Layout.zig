@@ -61,7 +61,7 @@ pub fn create(client: *wl.Client, version: u32, id: u32, output: *Output, namesp
 
     // If the namespace matches that of the output, set the layout as
     // the active one of the output and arrange it.
-    if (output.layout_option.value.string) |current_layout| {
+    if (output.layout_option.get().string) |current_layout| {
         if (mem.eql(u8, namespace, mem.span(current_layout))) {
             output.pending.layout = &node.data;
             output.arrangeViews();

@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="river_options_v2">
+  <copyright>
+    Copyright 2020-2021 The River Developers
+
+    Permission to use, copy, modify, and/or distribute this software for any
+    purpose with or without fee is hereby granted, provided that the above
+    copyright notice and this permission notice appear in all copies.
+
+    THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+    WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+    MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+    ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+    ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  </copyright>
+
+  <description summary="set and retrieve options">
+    This protocol allows clients to access a typed key-value store of
+    options. These options are global but may be overridden using a handle
+    scoped to a wl_output. If no output scoped value has been set, then the
+    global value is provided to this handle.
+
+    This protocol does not define any semantic meaning of the options,
+    that is left up to compositors.
+
+    Compositors are free to set or declare options themselves at any time,
+    though the type of any given option is immutable once set.
+
+    Options are never removed once declared.
+
+    Warning! The protocol described in this file is currently in the
+    testing phase. Backward compatible changes may be added together with
+    the corresponding interface version bump. Backward incompatible changes
+    can only be done by creating a new major version of the extension.
+  </description>
+
+  <interface name="river_options_manager_v2" version="1">
+    <description summary="declare options and get handles">
+      This interface allows clients to declare new options and create
+      river_option_v2 handle objects in order to retrieve the current
+      value or set a new one.
+    </description>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the river_options_manager_v2 object">
+        This request indicates that the client will not use the manager object
+        any more. Objects that have been created through this instance are
+        not affected.
+      </description>
+    </request>
+
+    <request name="declare_int_option">
+      <description summary="declare a new option">
+        The option is created in the global scope and is initialized with the
+        provided value. This request is ignored if the option already exists.
+      </description>
+      <arg name="key" type="string"/>
+      <arg name="value" type="int"/>
+    </request>
+
+    <request name="declare_uint_option">
+      <description summary="declare a new option">
+        The option is created in the global scope and is initialized with the
+        provided value. This request is ignored if the option already exists.
+      </description>
+      <arg name="key" type="string"/>
+      <arg name="value" type="uint"/>
+   </request>
+
+    <request name="declare_string_option">
+      <description summary="declare a new option">
+        The option is created in the global scope and is initialized with the
+        provided value. This request is ignored if the option already exists.
+      </description>
+      <arg name="key" type="string"/>
+      <arg name="value" type="string" allow-null="true"/>
+   </request>
+
+    <request name="declare_fixed_option">
+      <description summary="declare a new option">
+        The option is created in the global scope and is initialized with the
+        provided value. This request is ignored if the option already exists.
+      </description>
+      <arg name="key" type="string"/>
+      <arg name="value" type="fixed"/>
+   </request>
+
+   <request name="get_option_handle">
+      <description summary="get an option handle for the given key">
+        If the output argument is non-null, the option is local to the given
+        output. Otherwise it is considered global.
+      </description>
+      <arg name="key" type="string"/>
+      <arg name="output" type="object" interface="wl_output" allow-null="true"/>
+      <arg name="handle" type="new_id" interface="river_option_handle_v2"/>
+   </request>
+
+    <request name="unset_option">
+      <description summary="unset an output-local value if any">
+        This causes the value of the option for the given output to fall
+        back to the global value.
+      </description>
+      <arg name="key" type="string"/>
+      <arg name="output" type="object" interface="wl_output"/>
+   </request>
+  </interface>
+
+  <interface name="river_option_handle_v2" version="1">
+    <description summary="handle to an option">
+      On binding this object, one of the events will immediately be sent by
+      the server to inform the client of the current state of the option,
+      including its type. Making one of the 4 set requests before receiving
+      this first event would be a bug as the client would not yet know the
+      type of the option.  New events will be sent as the state changes.
+    </description>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the handle">
+        This request indicates that the client will not use the
+        river_option_handle_v2 any more and that it may be safely destroyed.
+      </description>
+    </request>
+
+    <enum name="error">
+      <entry name="request_while_undeclared" value="0" summary="a request other
+        than destroy was made after receiving the undeclared event"/>
+      <entry name="type_mismatch" value="1"
+        summary="a set request of the wrong type was made"/>
+    </enum>
+
+    <event name="undeclared">
+      <description summary="the option has never been declared">
+        No option with the the given name has ever been declared. All requests
+        on this object aside from the destroy request are a protocol error and
+        no further events will be sent.
+      </description>
+    </event>
+
+    <event name="int_value">
+      <description summary="the current value of the int option">
+        This indicates to the client that the option is of type int as well
+        as the current value of the option. Once set the type of the option
+        can never change.
+      </description>
+      <arg name="value" type="int"/>
+    </event>
+
+    <event name="uint_value">
+      <description summary="the current value of the uint option">
+        This indicates to the client that the option is of type uint as well
+        as the current value of the option. Once set the type of the option
+        can never change.
+      </description>
+      <arg name="value" type="uint"/>
+    </event>
+
+    <event name="string_value">
+      <description summary="the current value of the string option">
+        This indicates to the client that the option is of type string as well
+        as the current value of the option. Once set the type of the option
+        can never change.
+      </description>
+      <arg name="value" type="string" allow-null="true"/>
+    </event>
+
+    <event name="fixed_value">
+      <description summary="the current value of the fixed option">
+        This indicates to the client that the option is of type fixed as well
+        as the current value of the option. Once set the type of the option
+        can never change.
+      </description>
+      <arg name="value" type="fixed"/>
+    </event>
+
+    <request name="set_int_value">
+      <description summary="set the value of the option">
+        If the option is of type int, set the value of the option.
+        Otherwise, this request is a protocol error.
+      </description>
+      <arg name="value" type="int"/>
+    </request>
+
+    <request name="set_uint_value">
+      <description summary="set the value of the option">
+        If the option is of type uint, set the value of the option.
+        Otherwise, this request is a protocol error.
+      </description>
+      <arg name="value" type="uint"/>
+    </request>
+
+    <request name="set_string_value">
+      <description summary="set the value of the option">
+        If the option is of type string, set the value of the option.
+        Otherwise, this request is a protocol error.
+      </description>
+      <arg name="value" type="string" allow-null="true"/>
+    </request>
+
+    <request name="set_fixed_value">
+      <description summary="set the value of the option">
+        If the option is of type fixed, set the value of the option.
+        Otherwise, this request is a protocol error.
+      </description>
+      <arg name="value" type="fixed"/>
+    </request>
+  </interface>
+</protocol>

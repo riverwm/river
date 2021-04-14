@@ -22,6 +22,7 @@ const assert = std.debug.assert;
 
 const wayland = @import("wayland");
 const wl = wayland.client.wl;
+const river = wayland.client.river;
 const zriver = wayland.client.zriver;
 const zxdg = wayland.client.zxdg;
 
@@ -36,7 +37,7 @@ pub const Output = struct {
 
 pub const Globals = struct {
     control: ?*zriver.ControlV1 = null,
-    options_manager: ?*zriver.OptionsManagerV1 = null,
+    options_manager: ?*river.OptionsManagerV2 = null,
     status_manager: ?*zriver.StatusManagerV1 = null,
     seat: ?*wl.Seat = null,
     output_manager: ?*zxdg.OutputManagerV1 = null,
@@ -87,6 +88,8 @@ fn _main() !void {
         try options.getOption(display, &globals);
     } else if (os.argv.len > 2 and mem.eql(u8, "set-option", mem.span(os.argv[1]))) {
         try options.setOption(display, &globals);
+    } else if (os.argv.len > 2 and mem.eql(u8, "unset-option", mem.span(os.argv[1]))) {
+        try options.unsetOption(display, &globals);
     } else if (os.argv.len > 2 and mem.eql(u8, "mod-option", mem.span(os.argv[1]))) {
         try options.modOption(display, &globals);
     } else {
@@ -115,8 +118,8 @@ fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, globals: *
                 globals.seat = registry.bind(global.name, wl.Seat, 1) catch @panic("out of memory");
             } else if (std.cstr.cmp(global.interface, zriver.ControlV1.getInterface().name) == 0) {
                 globals.control = registry.bind(global.name, zriver.ControlV1, 1) catch @panic("out of memory");
-            } else if (std.cstr.cmp(global.interface, zriver.OptionsManagerV1.getInterface().name) == 0) {
-                globals.options_manager = registry.bind(global.name, zriver.OptionsManagerV1, 1) catch @panic("out of memory");
+            } else if (std.cstr.cmp(global.interface, river.OptionsManagerV2.getInterface().name) == 0) {
+                globals.options_manager = registry.bind(global.name, river.OptionsManagerV2, 1) catch @panic("out of memory");
             } else if (std.cstr.cmp(global.interface, zriver.StatusManagerV1.getInterface().name) == 0) {
                 globals.status_manager = registry.bind(global.name, zriver.StatusManagerV1, 1) catch @panic("out of memory");
             } else if (std.cstr.cmp(global.interface, zxdg.OutputManagerV1.getInterface().name) == 0 and global.version >= 2) {
