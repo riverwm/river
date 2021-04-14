@@ -1,6 +1,6 @@
 // This file is part of river, a dynamic tiling wayland compositor.
 //
-// Copyright 2020 The River Developers
+// Copyright 2020-2021 The River Developers
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -23,28 +23,30 @@ const meta = std.meta;
 
 const wayland = @import("wayland");
 const wl = wayland.server.wl;
-const zriver = wayland.server.zriver;
+const river = wayland.server.river;
 
 const util = @import("util.zig");
 
 const Output = @import("Output.zig");
 const OptionsManager = @import("OptionsManager.zig");
+const OutputOption = @import("OutputOption.zig");
+
+const log = std.log.scoped(.river_options);
 
 pub const Value = union(enum) {
-    unset: void,
     int: i32,
     uint: u32,
     fixed: wl.Fixed,
     string: ?[*:0]const u8,
 
-    fn dupe(value: Value) !Value {
+    pub fn dupe(value: Value) !Value {
         return switch (value) {
             .string => |v| Value{ .string = if (v) |s| try util.gpa.dupeZ(u8, mem.span(s)) else null },
             else => value,
         };
     }
 
-    fn deinit(value: *Value) void {
+    pub fn deinit(value: *Value) void {
         if (value.* == .string) if (value.string) |s| util.gpa.free(mem.span(s));
     }
 };
@@ -52,19 +54,20 @@ pub const Value = union(enum) {
 options_manager: *OptionsManager,
 link: wl.list.Link = undefined,
 
-output: ?*Output,
-key: [*:0]const u8,
+key: [:0]const u8,
 value: Value,
+
+output_options: wl.list.Head(OutputOption, "link") = undefined,
 
 event: struct {
     /// Emitted whenever the value of the option changes.
-    update: wl.Signal(*Self),
+    update: wl.Signal(*Value),
 } = undefined,
 
-handles: wl.list.Head(zriver.OptionHandleV1, null) = undefined,
+handles: wl.list.Head(river.OptionHandleV2, null) = undefined,
 
 /// Allocate a new option, duping the provided key and value
-pub fn create(options_manager: *OptionsManager, output: ?*Output, key: [*:0]const u8, value: Value) !*Self {
+pub fn create(options_manager: *OptionsManager, key: [*:0]const u8, value: Value) !void {
     const self = try util.gpa.create(Self);
     errdefer util.gpa.destroy(self);
 
@@ -73,56 +76,70 @@ pub fn create(options_manager: *OptionsManager, output: ?*Output, key: [*:0]cons
 
     self.* = .{
         .options_manager = options_manager,
-        .output = output,
         .key = try util.gpa.dupeZ(u8, mem.span(key)),
         .value = owned_value,
     };
-    self.handles.init();
+    errdefer util.gpa.free(self.key);
+
+    self.output_options.init();
+    errdefer {
+        var it = self.output_options.safeIterator(.forward);
+        while (it.next()) |output_option| output_option.destroy();
+    }
+    var it = options_manager.server.root.all_outputs.first;
+    while (it) |node| : (it = node.next) try OutputOption.create(self, node.data);
+
     self.event.update.init();
+    self.handles.init();
 
     options_manager.options.append(self);
-
-    return self;
 }
 
 pub fn destroy(self: *Self) void {
-    var it = self.handles.safeIterator(.forward);
-    while (it.next()) |handle| handle.destroy();
-    if (self.value == .string) if (self.value.string) |s| util.gpa.free(mem.span(s));
+    {
+        var it = self.handles.safeIterator(.forward);
+        while (it.next()) |handle| handle.destroy();
+    }
+    {
+        var it = self.output_options.safeIterator(.forward);
+        while (it.next()) |output_option| output_option.destroy();
+    }
+    self.value.deinit();
     self.link.remove();
     util.gpa.destroy(self);
 }
 
-/// Asserts that the new value is not .unset.
-/// Ignores the new value if the value is currently set and the type does not match.
+pub fn getOutputOption(self: *Self, output: *Output) ?*OutputOption {
+    var it = self.output_options.iterator(.forward);
+    while (it.next()) |output_option| {
+        if (output_option.output == output) return output_option;
+    } else return null;
+}
+
 /// If the value is a string, the string is cloned.
 /// If the value is changed, send the proper event to all clients
 pub fn set(self: *Self, value: Value) !void {
-    std.debug.assert(value != .unset);
-    if (self.value != .unset and meta.activeTag(value) != meta.activeTag(self.value)) return;
+    if (meta.activeTag(value) != meta.activeTag(self.value)) return error.TypeMismatch;
 
-    if (switch (self.value) {
-        .unset => true,
-        // TODO: std.mem needs a good way to compare optional sentinel pointers
-        .string => ((self.value.string == null) != (value.string == null)) or
-            (self.value.string != null and value.string != null and
-            std.cstr.cmp(self.value.string.?, value.string.?) != 0),
-        else => !std.meta.eql(self.value, value),
-    }) {
-        self.value.deinit();
-        self.value = try value.dupe();
+    self.value.deinit();
+    self.value = try value.dupe();
 
+    {
         var it = self.handles.iterator(.forward);
         while (it.next()) |handle| self.sendValue(handle);
-
-        // Call listeners, if any.
-        self.event.update.emit(self);
     }
+    {
+        var it = self.output_options.iterator(.forward);
+        while (it.next()) |output_option| {
+            if (output_option.value == null) output_option.notifyChanged();
+        }
+    }
+
+    self.event.update.emit(&self.value);
 }
 
-fn sendValue(self: Self, handle: *zriver.OptionHandleV1) void {
+pub fn sendValue(self: Self, handle: *river.OptionHandleV2) void {
     switch (self.value) {
-        .unset => handle.sendUnset(),
         .int => |v| handle.sendIntValue(v),
         .uint => |v| handle.sendUintValue(v),
         .fixed => |v| handle.sendFixedValue(v),
@@ -130,24 +147,38 @@ fn sendValue(self: Self, handle: *zriver.OptionHandleV1) void {
     }
 }
 
-pub fn addHandle(self: *Self, handle: *zriver.OptionHandleV1) void {
-    self.handles.append(handle);
-    self.sendValue(handle);
-    handle.setHandler(*Self, handleRequest, handleDestroy, self);
+pub fn addHandle(self: *Self, output: ?*Output, handle: *river.OptionHandleV2) void {
+    if (output) |o| {
+        self.getOutputOption(o).?.addHandle(handle);
+    } else {
+        self.handles.append(handle);
+        self.sendValue(handle);
+        handle.setHandler(*Self, handleRequest, handleDestroy, self);
+    }
 }
 
-fn handleRequest(handle: *zriver.OptionHandleV1, request: zriver.OptionHandleV1.Request, self: *Self) void {
+fn handleRequest(handle: *river.OptionHandleV2, request: river.OptionHandleV2.Request, self: *Self) void {
     switch (request) {
         .destroy => handle.destroy(),
-        .set_int_value => |req| self.set(.{ .int = req.value }) catch unreachable,
-        .set_uint_value => |req| self.set(.{ .uint = req.value }) catch unreachable,
-        .set_fixed_value => |req| self.set(.{ .fixed = req.value }) catch unreachable,
-        .set_string_value => |req| self.set(.{ .string = req.value }) catch {
-            handle.getClient().postNoMemory();
+        .set_int_value => |req| self.set(.{ .int = req.value }) catch |err| switch (err) {
+            error.TypeMismatch => handle.postError(.type_mismatch, "option is not of type int"),
+            error.OutOfMemory => unreachable,
+        },
+        .set_uint_value => |req| self.set(.{ .uint = req.value }) catch |err| switch (err) {
+            error.TypeMismatch => handle.postError(.type_mismatch, "option is not of type uint"),
+            error.OutOfMemory => unreachable,
+        },
+        .set_fixed_value => |req| self.set(.{ .fixed = req.value }) catch |err| switch (err) {
+            error.TypeMismatch => handle.postError(.type_mismatch, "option is not of type fixed"),
+            error.OutOfMemory => unreachable,
+        },
+        .set_string_value => |req| self.set(.{ .string = req.value }) catch |err| switch (err) {
+            error.TypeMismatch => handle.postError(.type_mismatch, "option is not of type string"),
+            error.OutOfMemory => handle.getClient().postNoMemory(),
         },
     }
 }
 
-fn handleDestroy(handle: *zriver.OptionHandleV1, self: *Self) void {
+fn handleDestroy(handle: *river.OptionHandleV2, self: *Self) void {
     handle.getLink().remove();
 }

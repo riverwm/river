@@ -45,6 +45,7 @@ function __riverctl_completion ()
 			declare-option \
 			get-option \
 			set-option \
+			unset-option \
 			mod-option"
 		COMPREPLY=($(compgen -W "${OPTS}" -- "${COMP_WORDS[1]}"))
 	elif [ "${COMP_CWORD}" -eq 2 ]
@@ -56,7 +57,7 @@ function __riverctl_completion ()
 			"map"|"unmap") OPTS="-release" ;;
 			"attach-mode") OPTS="top bottom" ;;
 			"focus-follows-cursor") OPTS="disabled normal strict" ;;
-			"declare-option"|"get-option"|"set-option"|"mod-option") OPTS="-output -focused-output" ;;
+			"get-option"|"set-option"|"unset-option"|"mod-option") OPTS="-output -focused-output" ;;
 			*) return ;;
 		esac
 		COMPREPLY=($(compgen -W "${OPTS}" -- "${COMP_WORDS[2]}"))
@@ -66,4 +67,3 @@ function __riverctl_completion ()
 }
 
 complete -F __riverctl_completion riverctl
-

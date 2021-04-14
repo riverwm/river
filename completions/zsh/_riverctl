@@ -61,6 +61,7 @@ _riverctl() {
     'declare-option:Declare a new option with the given type and initial value'
     'get-option:Print the current value of the given option to stdout'
     'set-option:Set the value of the specified option'
+    'unset-option:Unset the value of the specified option for the given output'
     'mod-option:Add value to the value of the specified option'
     'output_title:Changing this option changes the title of the Wayland and X11 backend outputs'
   )
@@ -87,13 +88,12 @@ _riverctl() {
     unmap) _alternative 'arguments:optional:(-release)' ;;
     attach-mode) _attach ;;
     focus-follows-cursor) _focus_cursor ;;
-    declare-option) _river_opts ;;
     get-option) _river_opts ;;
     set-option) _river_opts ;;
+    unset-option) _river_opts ;;
     mod-option) _river_opts ;;
     *) return 0 ;;
   esac
 
   return 1
 }
-

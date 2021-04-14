@@ -1,6 +1,6 @@
 function __fish_riverctl_complete_no_subcommand
     for i in (commandline -opc)
-        if contains -- $i close csd-filter-add exit float-filter-add focus-output focus-view layout mod-main-count mod-main-factor move resize snap send-to-output spawn swap toggle-float toggle-fullscreen zoom set-focused-tags set-view-tags toggle-focused-tags toggle-view-tags spawn-tagmask declare-mode enter-mode map map-pointer unmap unmap-pointer attach-mode background-color border-color-focused border-color-unfocused border-width focus-follows-cursor opacity outer-padding set-repeat view-padding xcursor-theme declare-option get-option set-option mod-option output_title
+        if contains -- $i close csd-filter-add exit float-filter-add focus-output focus-view layout mod-main-count mod-main-factor move resize snap send-to-output spawn swap toggle-float toggle-fullscreen zoom set-focused-tags set-view-tags toggle-focused-tags toggle-view-tags spawn-tagmask declare-mode enter-mode map map-pointer unmap unmap-pointer attach-mode background-color border-color-focused border-color-unfocused border-width focus-follows-cursor opacity outer-padding set-repeat view-padding xcursor-theme declare-option get-option set-option unset-option mod-option output_title
             return 1
         end
     end
@@ -55,6 +55,7 @@ complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a xcursor-t
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a declare-option         -d 'Declare a new option with the given type and initial value'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a get-option             -d 'Print the current value of the given option to stdout'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a set-option             -d 'Set the value of the specified option'
+complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a unset-option           -d 'Unset the value of the specified option for the given output'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a mod-option             -d 'Add value to the value of the specified option'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a output_title           -d 'Changing this option changes the title of the Wayland and X11 backend outputs'
 
@@ -71,8 +72,7 @@ complete -c riverctl -x -n '__fish_seen_subcommand_from map'                  -a
 complete -c riverctl -x -n '__fish_seen_subcommand_from unmap'                -a '-release'
 complete -c riverctl -x -n '__fish_seen_subcommand_from attach-mode'          -a 'top bottom'
 complete -c riverctl -x -n '__fish_seen_subcommand_from focus-follows-cursor' -a 'disabled normal strict'
-complete -c riverctl -x -n '__fish_seen_subcommand_from declare-option'       -a '-output -focused-output'
 complete -c riverctl -x -n '__fish_seen_subcommand_from get-option'           -a '-output -focused-output'
 complete -c riverctl -x -n '__fish_seen_subcommand_from set-option'           -a '-output -focused-output'
+complete -c riverctl -x -n '__fish_seen_subcommand_from unset-option'         -a '-output -focused-output'
 complete -c riverctl -x -n '__fish_seen_subcommand_from mod-option'           -a '-output -focused-output'
-

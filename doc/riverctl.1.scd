@@ -259,11 +259,15 @@ scoped either globally or per-output if the *-output* flag is passed with the
 name of the output as obtained from the xdg-output protocol. Alternatively,
 the currently focused output may be targeted with the *-focused-output* flag.
 
-*declare-option* [*-output* _output_name_|*-focused-output*] _name_ _type_ _value_
+*declare-option* _name_ _type_ _value_
 	Declare a new option with the given _type_ and initial _value_. If
-	the option already exists with the given _type_, it is still set
-	to _value_. If the option already exists with a different type,
-	nothing happens.
+	the option already exists, this command does nothing. The following
+	types are available:
+
+	- _int_: a signed 32-bit integer
+	- _uint_: an unsigned 32-bit integer
+	- _fixed_: a signed 24.8 bit fixed point number
+	- _string_: a string of bytes, may be null
 
 *get-option* [*-output* _output_name_|*-focused-output*] _name_
 	Print the current value of the given option to stdout.
@@ -271,36 +275,24 @@ the currently focused output may be targeted with the *-focused-output* flag.
 *set-option* [*-output* _output_name_|*-focused-output*] _name_ _value_
 	Set the value of the specified option to _value_.
 
+*unset-option* (*-output* _output_name_|*-focused-output*) _name_
+	Unset the value of the specified option for the given output and
+	cause it to fall back to the global value. Either the *-output* or
+	*-focused-output* flag is required.
+
 *mod-option* [*-output* _output_name_|*-focused-output*] _name_ _value_
 	Add _value_ to the value of the specified option. _value_ can be negative.
 
-River declares certain default options for all outputs.
-
-*output_title* (string)
-	Changing this option changes the title of the wayland and X11 backend
-	outputs.
+River declares certain default options which will always be available:
 
 *layout* (string)
 	The layout namespace used to determine which layout should arrange this
 	output. If set to null or no layout with this namespace exists for this
 	output, the output will enter floating mode. Defaults to null.
 
-*main_amount* (uint, optional hint for layouts)
-	An arbitrary positive integer indicating the amount of main views. Defaults
-	to 1.
-
-*main_factor* (float, optional hint for layouts)
-	A floating point numger indicating the relative size of the area reserved
-	for main views. Note that layouts commonly expect values between 0.1 and 0.9.
-	Defaults to 0.6.
-
-*view_padding* (uint, optional hint for layouts)
-	A positive integer indicating the padding in of pixels between / around
-	views. Defaults to 10.
-
-*outer_padding* (uint, optional hint for layouts)
-	A positive integer indicating the padding in of pixels around the layut.
-	Defaults to 10.
+*output_title* (string)
+	Changing this option changes the title of the wayland and X11 backend
+	outputs.
 
 # EXAMPLES
 

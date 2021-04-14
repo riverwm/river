@@ -17,11 +17,13 @@
 
 const std = @import("std");
 const os = std.os;
+const math = std.math;
 const mem = std.mem;
 const fmt = std.fmt;
 
 const wayland = @import("wayland");
 const wl = wayland.client.wl;
+const river = wayland.client.river;
 const zriver = wayland.client.zriver;
 const zxdg = wayland.client.zxdg;
 
@@ -49,69 +51,42 @@ const Context = struct {
 pub fn declareOption(display: *wl.Display, globals: *Globals) !void {
     // https://github.com/ziglang/zig/issues/7807
     const argv: [][*:0]const u8 = os.argv;
-    const args = Args(3, &[_]FlagDef{
-        .{ .name = "-output", .kind = .arg },
-        .{ .name = "-focused-output", .kind = .boolean },
-    }).parse(argv[2..]);
+    const args = Args(3, &[_]FlagDef{}).parse(argv[2..]);
 
     const key = args.positionals[0];
-    const value_type = std.meta.stringToEnum(ValueType, mem.span(args.positionals[1])) orelse
-        root.printErrorExit("'{}' is not a valid type, must be int, uint, fixed, or string", .{args.positionals[1]});
+    const value_type = std.meta.stringToEnum(ValueType, mem.span(args.positionals[1])) orelse {
+        root.printErrorExit(
+            "'{}' is not a valid type, must be int, uint, fixed, or string",
+            .{args.positionals[1]},
+        );
+    };
     const raw_value = args.positionals[2];
 
-    const output = if (args.argFlag("-output")) |o|
-        try parseOutputName(display, globals, o)
-    else if (args.boolFlag("-focused-output"))
-        try getFocusedOutput(display, globals)
-    else
-        null;
-
     const options_manager = globals.options_manager orelse return error.RiverOptionsManagerNotAdvertised;
-    const handle = try options_manager.getOptionHandle(key, if (output) |o| o.wl_output else null);
 
     switch (value_type) {
-        .int => setIntValueRaw(handle, raw_value),
-        .uint => setUintValueRaw(handle, raw_value),
-        .fixed => setFixedValueRaw(handle, raw_value),
-        .string => handle.setStringValue(if (raw_value[0] == 0) null else raw_value),
+        .int => options_manager.declareIntOption(key, parseInt(raw_value)),
+        .uint => options_manager.declareUintOption(key, parseUint(raw_value)),
+        .fixed => options_manager.declareFixedOption(key, parseFixed(raw_value)),
+        .string => options_manager.declareStringOption(key, raw_value),
     }
-    _ = display.flush() catch os.exit(1);
+
+    _ = try display.flush();
 }
 
-fn setIntValueRaw(handle: *zriver.OptionHandleV1, raw_value: [*:0]const u8) void {
-    handle.setIntValue(fmt.parseInt(i32, mem.span(raw_value), 10) catch
-        root.printErrorExit("{} is not a valid int", .{raw_value}));
+fn parseInt(raw_value: [*:0]const u8) i32 {
+    return fmt.parseInt(i32, mem.span(raw_value), 10) catch
+        root.printErrorExit("{} is not a valid int", .{raw_value});
 }
 
-fn setUintValueRaw(handle: *zriver.OptionHandleV1, raw_value: [*:0]const u8) void {
-    handle.setUintValue(fmt.parseInt(u32, mem.span(raw_value), 10) catch
-        root.printErrorExit("{} is not a valid uint", .{raw_value}));
+fn parseUint(raw_value: [*:0]const u8) u32 {
+    return fmt.parseInt(u32, mem.span(raw_value), 10) catch
+        root.printErrorExit("{} is not a valid uint", .{raw_value});
 }
 
-fn setFixedValueRaw(handle: *zriver.OptionHandleV1, raw_value: [*:0]const u8) void {
-    handle.setFixedValue(wl.Fixed.fromDouble(fmt.parseFloat(f64, mem.span(raw_value)) catch
-        root.printErrorExit("{} is not a valid fixed", .{raw_value})));
-}
-
-fn modIntValueRaw(handle: *zriver.OptionHandleV1, current: i32, raw_value: [*:0]const u8) void {
-    const mod = fmt.parseInt(i32, mem.span(raw_value), 10) catch
-        root.printErrorExit("{} is not a valid int modificator", .{raw_value});
-    handle.setIntValue(current + mod);
-}
-
-fn modUintValueRaw(handle: *zriver.OptionHandleV1, current: u32, raw_value: [*:0]const u8) void {
-    // We need to allow negative mod values, but the value of the option may
-    // never be below zero.
-    const mod = fmt.parseInt(i32, mem.span(raw_value), 10) catch
-        root.printErrorExit("{} is not a valid uint modificator", .{raw_value});
-    const new = @intCast(i32, current) + mod;
-    handle.setUintValue(if (new < 0) 0 else @intCast(u32, new));
-}
-
-fn modFixedValueRaw(handle: *zriver.OptionHandleV1, current: wl.Fixed, raw_value: [*:0]const u8) void {
-    const mod = fmt.parseFloat(f64, mem.span(raw_value)) catch
-        root.printErrorExit("{} is not a valid fixed modificator", .{raw_value});
-    handle.setFixedValue(wl.Fixed.fromDouble(current.toDouble() + mod));
+fn parseFixed(raw_value: [*:0]const u8) wl.Fixed {
+    return wl.Fixed.fromDouble(fmt.parseFloat(f64, mem.span(raw_value)) catch
+        root.printErrorExit("{} is not a valid fixed", .{raw_value}));
 }
 
 pub fn getOption(display: *wl.Display, globals: *Globals) !void {
@@ -172,6 +147,30 @@ pub fn setOption(display: *wl.Display, globals: *Globals) !void {
 
     // We always exit when our listener is called
     while (true) _ = try display.dispatch();
+}
+
+pub fn unsetOption(display: *wl.Display, globals: *Globals) !void {
+    // https://github.com/ziglang/zig/issues/7807
+    const argv: [][*:0]const u8 = os.argv;
+    const args = Args(1, &[_]FlagDef{
+        .{ .name = "-output", .kind = .arg },
+        .{ .name = "-focused-output", .kind = .boolean },
+    }).parse(argv[2..]);
+
+    const output = if (args.argFlag("-output")) |o|
+        try parseOutputName(display, globals, o)
+    else if (args.boolFlag("-focused-output"))
+        try getFocusedOutput(display, globals)
+    else
+        root.printErrorExit("unset requires either -output or -focused-output", .{});
+
+    const key = args.positionals[0];
+
+    const options_manager = globals.options_manager orelse return error.RiverOptionsManagerNotAdvertised;
+
+    options_manager.unsetOption(key, output.wl_output);
+
+    _ = try display.flush();
 }
 
 pub fn modOption(display: *wl.Display, globals: *Globals) !void {
@@ -246,16 +245,12 @@ fn seatStatusListener(seat_status: *zriver.SeatStatusV1, event: zriver.SeatStatu
 }
 
 fn getOptionListener(
-    handle: *zriver.OptionHandleV1,
-    event: zriver.OptionHandleV1.Event,
+    handle: *river.OptionHandleV2,
+    event: river.OptionHandleV2.Event,
     ctx: *const Context,
 ) void {
     switch (event) {
-        .unset => if (ctx.output) |output| {
-            root.printErrorExit("option '{}' has not been declared on output '{}'", .{ ctx.key, output.name });
-        } else {
-            root.printErrorExit("option '{}' has not been declared globally", .{ctx.key});
-        },
+        .undeclared => root.printErrorExit("option '{}' has not been declared", .{ctx.key}),
         .int_value => |ev| printOutputExit("{}", .{ev.value}),
         .uint_value => |ev| printOutputExit("{}", .{ev.value}),
         .fixed_value => |ev| printOutputExit("{d}", .{ev.value.toDouble()}),
@@ -270,19 +265,15 @@ fn printOutputExit(comptime format: []const u8, args: anytype) noreturn {
 }
 
 fn setOptionListener(
-    handle: *zriver.OptionHandleV1,
-    event: zriver.OptionHandleV1.Event,
+    handle: *river.OptionHandleV2,
+    event: river.OptionHandleV2.Event,
     ctx: *const Context,
 ) void {
     switch (event) {
-        .unset => if (ctx.output) |output| {
-            root.printErrorExit("option '{}' has not been declared on output '{}'", .{ ctx.key, output.name });
-        } else {
-            root.printErrorExit("option '{}' has not been declared globally", .{ctx.key});
-        },
-        .int_value => |ev| setIntValueRaw(handle, ctx.raw_value),
-        .uint_value => |ev| setUintValueRaw(handle, ctx.raw_value),
-        .fixed_value => |ev| setFixedValueRaw(handle, ctx.raw_value),
+        .undeclared => root.printErrorExit("option '{}' has not been declared", .{ctx.key}),
+        .int_value => |ev| handle.setIntValue(parseInt(ctx.raw_value)),
+        .uint_value => |ev| handle.setUintValue(parseUint(ctx.raw_value)),
+        .fixed_value => |ev| handle.setFixedValue(parseFixed(ctx.raw_value)),
         .string_value => |ev| handle.setStringValue(if (ctx.raw_value[0] == 0) null else ctx.raw_value),
     }
     _ = ctx.display.flush() catch os.exit(1);
@@ -290,16 +281,12 @@ fn setOptionListener(
 }
 
 fn modOptionListener(
-    handle: *zriver.OptionHandleV1,
-    event: zriver.OptionHandleV1.Event,
+    handle: *river.OptionHandleV2,
+    event: river.OptionHandleV2.Event,
     ctx: *const Context,
 ) void {
     switch (event) {
-        .unset => if (ctx.output) |output| {
-            root.printErrorExit("option '{}' has not been declared on output '{}'", .{ ctx.key, output.name });
-        } else {
-            root.printErrorExit("option '{}' has not been declared globally", .{ctx.key});
-        },
+        .undeclared => root.printErrorExit("option '{}' has not been declared", .{ctx.key}),
         .int_value => |ev| modIntValueRaw(handle, ev.value, ctx.raw_value),
         .uint_value => |ev| modUintValueRaw(handle, ev.value, ctx.raw_value),
         .fixed_value => |ev| modFixedValueRaw(handle, ev.value, ctx.raw_value),
@@ -307,4 +294,27 @@ fn modOptionListener(
     }
     _ = ctx.display.flush() catch os.exit(1);
     os.exit(0);
+}
+
+fn modIntValueRaw(handle: *river.OptionHandleV2, current: i32, raw_value: [*:0]const u8) void {
+    const mod = fmt.parseInt(i32, mem.span(raw_value), 10) catch
+        root.printErrorExit("{} is not a valid int modifier", .{raw_value});
+    const new_value = math.add(i32, current, mod) catch
+        root.printErrorExit("provided value of {d} would overflow option if added", .{mod});
+    handle.setIntValue(new_value);
+}
+
+fn modUintValueRaw(handle: *river.OptionHandleV2, current: u32, raw_value: [*:0]const u8) void {
+    // We need to allow negative mod values, but the value of the option may
+    // never be below zero.
+    const mod = fmt.parseInt(i32, mem.span(raw_value), 10) catch
+        root.printErrorExit("{} is not a valid uint modifier", .{raw_value});
+    const new = @intCast(i32, current) + mod;
+    handle.setUintValue(if (new < 0) 0 else @intCast(u32, new));
+}
+
+fn modFixedValueRaw(handle: *river.OptionHandleV2, current: wl.Fixed, raw_value: [*:0]const u8) void {
+    const mod = fmt.parseFloat(f64, mem.span(raw_value)) catch
+        root.printErrorExit("{} is not a valid fixed modifier", .{raw_value});
+    handle.setFixedValue(wl.Fixed.fromDouble(current.toDouble() + mod));
 }
