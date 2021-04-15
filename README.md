@@ -20,6 +20,10 @@ separate `riverctl` binary implementing it.
 
 ## Building
 
+<a href="https://repology.org/project/river/versions">
+    <img src="https://repology.org/badge/vertical-allrepos/river.svg" alt="Packaging status" align="right">
+</a>
+
 On cloning the repository, you must init and update the submodules as well
 with e.g.
 
