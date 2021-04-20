@@ -20,7 +20,6 @@ _riverctl() {
     'float-filter-add:Add app-id to the float filter list'
     'focus-output:Focus the next or previous output'
     'focus-view:Focus the next or previous view in the stack'
-    'layout:Provide a command which river will use for generating the layout of non-floating windows'
     'mod-main-count:Increase or decrease the number of "main" views'
     'mod-main-factor:Increase or decrease the "main factor"'
     'move:Move the focused view in the specified direction'
@@ -78,7 +77,6 @@ _riverctl() {
   case "$words[1]" in
     focus-output) _next_prev ;;
     focus-view) _next_prev ;;
-    layout) _alternative 'arguments:optional:(full)' ;;
     move) _orientations ;;
     resize) _hor_ver ;;
     snap) _orientations ;;
