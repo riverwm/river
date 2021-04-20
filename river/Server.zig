@@ -113,11 +113,11 @@ pub fn init(self: *Self) !void {
 
     _ = try wlr.PrimarySelectionDeviceManagerV1.create(self.wl_server);
 
-    self.config = try Config.init();
     try self.decoration_manager.init(self);
     try self.root.init(self);
     // Must be called after root is initialized
     try self.options_manager.init(self);
+    try self.config.init(self);
     try self.input_manager.init(self);
     try self.control.init(self);
     try self.status_manager.init(self);
