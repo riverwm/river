@@ -66,7 +66,7 @@ pub fn setAsActive(self: *Self) void {
 
     self.cursor.constraint = self.constraint;
 
-    if (self.constraint.current.region.notEmpty() != 0) {
+    if (self.constraint.current.region.notEmpty()) {
         _ = self.constraint.region.intersect(&self.constraint.surface.input_region, &self.constraint.current.region);
     } else {
         _ = self.constraint.region.copy(&self.constraint.surface.input_region);
@@ -84,7 +84,7 @@ fn constrainToRegion(self: *Self) void {
 
         var box: pixman.Box32 = undefined;
 
-        if (self.constraint.region.containsPoint(cx, cy, &box) == 0) {
+        if (!self.constraint.region.containsPoint(cx, cy, &box)) {
             var nRects: c_int = undefined;
             const rects = self.constraint.region.rectangles(&nRects);
 
