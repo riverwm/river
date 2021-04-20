@@ -8,7 +8,6 @@ function __riverctl_completion ()
 			float-filter-add \
 			focus-output \
 			focus-view \
-			layout \
 			mod-main-count \
 			mod-main-factor \
 			move \

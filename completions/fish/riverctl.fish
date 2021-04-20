@@ -1,6 +1,6 @@
 function __fish_riverctl_complete_no_subcommand
     for i in (commandline -opc)
-        if contains -- $i close csd-filter-add exit float-filter-add focus-output focus-view layout mod-main-count mod-main-factor move resize snap send-to-output spawn swap toggle-float toggle-fullscreen zoom set-focused-tags set-view-tags toggle-focused-tags toggle-view-tags spawn-tagmask declare-mode enter-mode map map-pointer unmap unmap-pointer attach-mode background-color border-color-focused border-color-unfocused border-width focus-follows-cursor opacity outer-padding set-repeat view-padding xcursor-theme declare-option get-option set-option unset-option mod-option output_title
+        if contains -- $i close csd-filter-add exit float-filter-add focus-output focus-view mod-main-count mod-main-factor move resize snap send-to-output spawn swap toggle-float toggle-fullscreen zoom set-focused-tags set-view-tags toggle-focused-tags toggle-view-tags spawn-tagmask declare-mode enter-mode map map-pointer unmap unmap-pointer attach-mode background-color border-color-focused border-color-unfocused border-width focus-follows-cursor opacity outer-padding set-repeat view-padding xcursor-theme declare-option get-option set-option unset-option mod-option output_title
             return 1
         end
     end
@@ -14,7 +14,6 @@ complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a exit     
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a float-filter-add       -d 'Add app-id to the float filter list'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a focus-output           -d 'Focus the next or previous output'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a focus-view             -d 'Focus the next or previous view in the stack'
-complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a layout                 -d 'Provide a command which river will use for generating the layour of non-floating windows'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a mod-main-count         -d 'Increase or decrease the number of "main" views'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a mod-main-factor        -d 'Increase or decrease the "main factor"'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a move                   -d 'Move the focused view in the specified direction'
@@ -62,7 +61,6 @@ complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a output_ti
 # Subcommands
 complete -c riverctl -x -n '__fish_seen_subcommand_from focus-output'         -a 'next previous'
 complete -c riverctl -x -n '__fish_seen_subcommand_from focus-view'           -a 'next previous'
-complete -c riverctl -x -n '__fish_seen_subcommand_from layout'               -a 'full'
 complete -c riverctl -x -n '__fish_seen_subcommand_from move'                 -a 'up down left right'
 complete -c riverctl -x -n '__fish_seen_subcommand_from resize'               -a 'horizontal vertical'
 complete -c riverctl -x -n '__fish_seen_subcommand_from snap'                 -a 'up down left right'
