@@ -38,12 +38,15 @@ pub const FocusFollowsCursorMode = enum {
     strict,
 };
 
+server: *Server,
+
 /// Color of background in RGBA (alpha should only affect nested sessions)
 background_color: [4]f32 = [_]f32{ 0.0, 0.16862745, 0.21176471, 1.0 }, // Solarized base03
 background_color_change: wl.Listener(*Option.Value) = wl.Listener(*Option.Value).init(handleBackgroundColorChange),
 
 /// Width of borders in pixels
 border_width: u32 = 2,
+border_width_change: wl.Listener(*Option.Value) = wl.Listener(*Option.Value).init(handleBorderWidthChange),
 
 /// Color of border of focused window in RGBA
 border_color_focused: [4]f32 = [_]f32{ 0.57647059, 0.63137255, 0.63137255, 1.0 }, // Solarized base1
@@ -88,7 +91,9 @@ repeat_rate: u31 = 25,
 repeat_delay: u31 = 600,
 
 pub fn init(self: *Self, server: *Server) !void {
-    self.* = .{};
+    self.* = .{
+        .server = server,
+    };
 
     errdefer self.deinit();
 
@@ -121,6 +126,10 @@ pub fn init(self: *Self, server: *Server) !void {
     try Option.create(options_manager, "background_color", .{ .string = "#002b36" }); // Solarized base3
     const background_color_option = options_manager.getOption("background_color").?;
     background_color_option.event.update.add(&self.background_color_change);
+
+    try Option.create(options_manager, "border_width", .{ .uint = 2 });
+    const border_width_option = options_manager.getOption("border_width").?;
+    border_width_option.event.update.add(&self.border_width_change);
 }
 
 pub fn deinit(self: *Self) void {
@@ -136,6 +145,13 @@ pub fn deinit(self: *Self) void {
 
     for (self.csd_filter.items) |s| util.gpa.free(s);
     self.csd_filter.deinit();
+}
+
+fn handleBorderWidthChange(listener: *wl.Listener(*Option.Value), value: *Option.Value) void {
+    const self = @fieldParentPtr(Self, "border_width_change", listener);
+    self.border_width = value.uint;
+    self.server.root.arrangeAll();
+    self.server.root.startTransaction();
 }
 
 fn handleBorderColorFocusedChange(listener: *wl.Listener(*Option.Value), value: *Option.Value) void {

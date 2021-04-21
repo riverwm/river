@@ -43,7 +43,6 @@ const str_to_impl_fn = [_]struct {
     impl: fn (*std.mem.Allocator, *Seat, []const []const u8, *?[]const u8) Error!void,
 }{
     .{ .name = "attach-mode",            .impl = @import("command/attach_mode.zig").attachMode },
-    .{ .name = "border-width",           .impl = @import("command/config.zig").borderWidth },
     .{ .name = "close",                  .impl = @import("command/close.zig").close },
     .{ .name = "csd-filter-add",         .impl = @import("command/filter.zig").csdFilterAdd },
     .{ .name = "declare-mode",           .impl = @import("command/declare_mode.zig").declareMode },
