@@ -20,8 +20,6 @@ _riverctl() {
     'float-filter-add:Add app-id to the float filter list'
     'focus-output:Focus the next or previous output'
     'focus-view:Focus the next or previous view in the stack'
-    'mod-main-count:Increase or decrease the number of "main" views'
-    'mod-main-factor:Increase or decrease the "main factor"'
     'move:Move the focused view in the specified direction'
     'resize:Resize the focused view along the given axis'
     'snap:Snap the focused view to the specified screen edge'
@@ -52,9 +50,7 @@ _riverctl() {
     'border-width:Set the border width to pixels'
     'focus-follows-cursor:Configure the focus behavior when moving cursor'
     'opacity:Configure server-side opacity of views'
-    'outer-padding:Set the padding around the edge of the screen to pixels'
     'set-repeat:Set the keyboard repeat rate and repeat delay'
-    'view-padding:Set the padding around the edge of each view to pixels'
     'xcursor-theme:Set the xcursor theme'
     # Options
     'declare-option:Declare a new option with the given type and initial value'

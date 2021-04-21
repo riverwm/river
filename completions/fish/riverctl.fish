@@ -1,6 +1,6 @@
 function __fish_riverctl_complete_no_subcommand
     for i in (commandline -opc)
-        if contains -- $i close csd-filter-add exit float-filter-add focus-output focus-view mod-main-count mod-main-factor move resize snap send-to-output spawn swap toggle-float toggle-fullscreen zoom set-focused-tags set-view-tags toggle-focused-tags toggle-view-tags spawn-tagmask declare-mode enter-mode map map-pointer unmap unmap-pointer attach-mode background-color border-color-focused border-color-unfocused border-width focus-follows-cursor opacity outer-padding set-repeat view-padding xcursor-theme declare-option get-option set-option unset-option mod-option output_title
+        if contains -- $i close csd-filter-add exit float-filter-add focus-output focus-view move resize snap send-to-output spawn swap toggle-float toggle-fullscreen zoom set-focused-tags set-view-tags toggle-focused-tags toggle-view-tags spawn-tagmask declare-mode enter-mode map map-pointer unmap unmap-pointer attach-mode background-color border-color-focused border-color-unfocused border-width focus-follows-cursor opacity set-repeat xcursor-theme declare-option get-option set-option unset-option mod-option output_title
             return 1
         end
     end
@@ -14,8 +14,6 @@ complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a exit     
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a float-filter-add       -d 'Add app-id to the float filter list'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a focus-output           -d 'Focus the next or previous output'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a focus-view             -d 'Focus the next or previous view in the stack'
-complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a mod-main-count         -d 'Increase or decrease the number of "main" views'
-complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a mod-main-factor        -d 'Increase or decrease the "main factor"'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a move                   -d 'Move the focused view in the specified direction'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a resize                 -d 'Resize the focused view along the given axis'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a snap                   -d 'Snap the focused view to the specified screen edge'
@@ -46,9 +44,7 @@ complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a border-co
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a border-width           -d 'Set the border width to pixels'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a focus-follows-cursor   -d 'Configure the focus behavior when moving cursor'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a opacity                -d 'Configure server-side opacity of views'
-complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a outer-padding          -d 'Set the padding around the edge of the screen to pixels'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a set-repeat             -d 'Set the keyboard repeat rate and repeat delay'
-complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a view-padding           -d 'Set the padding around the edge of each view to pixels'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a xcursor-theme          -d 'Set the xcursor theme'
 # Options
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a declare-option         -d 'Declare a new option with the given type and initial value'

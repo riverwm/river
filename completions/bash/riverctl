@@ -8,8 +8,6 @@ function __riverctl_completion ()
 			float-filter-add \
 			focus-output \
 			focus-view \
-			mod-main-count \
-			mod-main-factor \
 			move \
 			resize \
 			snap \
@@ -37,9 +35,7 @@ function __riverctl_completion ()
 			border-width \
 			focus-follow-cursor \
 			opacity \
-			outer-padding \
 			set-repeat \
-			view-padding \
 			xcursor-theme \
 			declare-option \
 			get-option \
