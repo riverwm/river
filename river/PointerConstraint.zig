@@ -85,12 +85,11 @@ fn constrainToRegion(self: *Self) void {
         var box: pixman.Box32 = undefined;
 
         if (!self.constraint.region.containsPoint(cx, cy, &box)) {
-            var nRects: c_int = undefined;
-            const rects = self.constraint.region.rectangles(&nRects);
+            const rects = self.constraint.region.rectangles();
 
-            if (nRects > 0) {
-                const new_cx = @intToFloat(f64, view.current.box.x + rects.x1 + @divFloor(rects.x2, 2));
-                const new_cy = @intToFloat(f64, view.current.box.y + rects.y1 + @divFloor(rects.y2, 2));
+            if (rects.len > 0) {
+                const new_cx = @intToFloat(f64, view.current.box.x + rects[0].x1 + @divFloor(rects[0].x2, 2));
+                const new_cy = @intToFloat(f64, view.current.box.y + rects[0].y1 + @divFloor(rects[0].y2, 2));
 
                 self.cursor.wlr_cursor.warpClosest(null, new_cx, new_cy);
             }
