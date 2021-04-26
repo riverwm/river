@@ -81,6 +81,11 @@ layout_demand: ?LayoutDemand = null,
 /// List of all layouts
 layouts: std.TailQueue(Layout) = .{},
 
+/// The current layout namespace of the output. If null,
+/// config.default_layout_namespace should be used instead.
+/// Call handleLayoutNamespaceChange() after setting this.
+layout_namespace: ?[]const u8 = null,
+
 /// Determines where new views will be attached to the view stack.
 attach_mode: AttachMode = .top,
 
@@ -94,11 +99,6 @@ destroy: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleDestroy)
 enable: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleEnable),
 frame: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleFrame),
 mode: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleMode),
-
-layout_option: *OutputOption,
-
-output_title: wl.Listener(*Option.Value) = wl.Listener(*Option.Value).init(handleTitleChange),
-layout_change: wl.Listener(*Option.Value) = wl.Listener(*Option.Value).init(handleLayoutChange),
 
 pub fn init(self: *Self, root: *Root, wlr_output: *wlr.Output) !void {
     // Some backends don't have modes. DRM+KMS does, and we need to set a mode
@@ -116,7 +116,6 @@ pub fn init(self: *Self, root: *Root, wlr_output: *wlr.Output) !void {
         .root = root,
         .wlr_output = wlr_output,
         .usable_box = undefined,
-        .layout_option = undefined,
     };
     wlr_output.data = @ptrToInt(self);
 
@@ -155,23 +154,7 @@ pub fn init(self: *Self, root: *Root, wlr_output: *wlr.Output) !void {
         try options_manager.createOutputOptions(self);
         errdefer options_manager.destroyOutputOptions(self);
 
-        // Set the default title of this output
-        var buf: ["river - ".len + wlr_output.name.len + 1]u8 = undefined;
-        const default_title = fmt.bufPrintZ(&buf, "river - {}", .{mem.spanZ(&wlr_output.name)}) catch unreachable;
-        self.setTitle(default_title);
-
-        const global_title_option = options_manager.getOption("output_title") orelse unreachable;
-        const title_option = global_title_option.getOutputOption(self).?;
-        title_option.set(.{ .string = default_title }) catch |err| switch (err) {
-            error.TypeMismatch => unreachable,
-            error.OutOfMemory => return err,
-        };
-
-        const global_layout_option = options_manager.getOption("layout") orelse unreachable;
-        self.layout_option = global_layout_option.getOutputOption(self).?;
-
-        self.layout_option.event.update.add(&self.layout_change);
-        title_option.event.update.add(&self.output_title);
+        self.setTitle();
     }
 }
 
@@ -464,10 +447,10 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) v
     self.frame.link.remove();
     self.mode.link.remove();
 
-    // Cleanup the layout demand, if any
-    if (self.layout_demand) |demand| demand.deinit();
-
     // Free all memory and clean up the wlr.Output
+    if (self.layout_demand) |demand| demand.deinit();
+    if (self.layout_namespace) |namespace| util.gpa.free(namespace);
+
     self.wlr_output.data = undefined;
 
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
@@ -506,7 +489,9 @@ pub fn getEffectiveResolution(self: *Self) struct { width: u32, height: u32 } {
     };
 }
 
-pub fn setTitle(self: *Self, title: [*:0]const u8) void {
+fn setTitle(self: Self) void {
+    var buf: ["river - ".len + self.wlr_output.name.len + 1]u8 = undefined;
+    const title = fmt.bufPrintZ(&buf, "river - {}", .{mem.spanZ(&self.wlr_output.name)}) catch unreachable;
     if (self.wlr_output.isWl()) {
         self.wlr_output.wlSetTitle(title);
     } else if (wlr.config.has_x11_backend and self.wlr_output.isX11()) {
@@ -514,21 +499,17 @@ pub fn setTitle(self: *Self, title: [*:0]const u8) void {
     }
 }
 
-fn handleTitleChange(listener: *wl.Listener(*Option.Value), value: *Option.Value) void {
-    const self = @fieldParentPtr(Self, "output_title", listener);
-    if (value.string) |title| self.setTitle(title);
-}
-
-fn handleLayoutChange(listener: *wl.Listener(*Option.Value), value: *Option.Value) void {
-    const self = @fieldParentPtr(Self, "layout_change", listener);
+pub fn handleLayoutNamespaceChange(self: *Self) void {
     // The user changed the layout namespace of this output. Try to find a
     // matching layout.
-    self.pending.layout = if (value.string) |namespace| blk: {
-        var layout_it = self.layouts.first;
-        break :blk while (layout_it) |node| : (layout_it = node.next) {
-            if (mem.eql(u8, mem.span(namespace), node.data.namespace)) break &node.data;
-        } else null;
+    var it = self.layouts.first;
+    self.pending.layout = while (it) |node| : (it = node.next) {
+        if (mem.eql(u8, self.layoutNamespace(), node.data.namespace)) break &node.data;
     } else null;
     self.arrangeViews();
     self.root.startTransaction();
+}
+
+pub fn layoutNamespace(self: Self) []const u8 {
+    return self.layout_namespace orelse self.root.server.config.default_layout_namespace;
 }

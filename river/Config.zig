@@ -59,6 +59,11 @@ csd_filter: std.ArrayList([]const u8),
 /// The selected focus_follows_cursor mode
 focus_follows_cursor: FocusFollowsCursorMode = .disabled,
 
+/// The default layout namespace for outputs which have never had a per-output
+/// value set. Call Output.handleLayoutNamespaceChange() on setting this if
+/// Output.layout_namespace is null.
+default_layout_namespace: []const u8 = &[0]u8{},
+
 opacity: struct {
     /// The opacity of focused views
     focused: f32 = 1.0,
@@ -119,4 +124,6 @@ pub fn deinit(self: *Self) void {
 
     for (self.csd_filter.items) |s| util.gpa.free(s);
     self.csd_filter.deinit();
+
+    util.gpa.free(self.default_layout_namespace);
 }

@@ -72,6 +72,13 @@ over the Wayland protocol.
 	Bump the focused view to the top of the layout stack. If the top
 	view in the stack is already focused, bump the second view.
 
+*default-layout* _namespace_
+	Set the layout namespace to be used by all outputs by default.
+
+*output-layout* _namespace_
+	Set the layout namespace of currently focused output, overriding
+	the value set with *default-layout* if any.
+
 ## TAG MANAGEMENT
 
 Tags are similar to workspaces but more flexible. You can assign views multiple
@@ -282,17 +289,6 @@ the currently focused output may be targeted with the *-focused-output* flag.
 
 *mod-option* [*-output* _output_name_|*-focused-output*] _name_ _value_
 	Add _value_ to the value of the specified option. _value_ can be negative.
-
-River declares certain default options which will always be available:
-
-*layout* (string)
-	The layout namespace used to determine which layout should arrange this
-	output. If set to null or no layout with this namespace exists for this
-	output, the output will enter floating mode. Defaults to null.
-
-*output_title* (string)
-	Changing this option changes the title of the wayland and X11 backend
-	outputs.
 
 # EXAMPLES
 
