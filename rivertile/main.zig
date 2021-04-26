@@ -63,7 +63,6 @@ const gpa = std.heap.c_allocator;
 const Context = struct {
     initialized: bool = false,
     layout_manager: ?*river.LayoutManagerV1 = null,
-    options_manager: ?*river.OptionsManagerV2 = null,
     outputs: std.TailQueue(Output) = .{},
 
     fn addOutput(context: *Context, registry: *wl.Registry, name: u32) !void {
@@ -76,102 +75,25 @@ const Context = struct {
     }
 };
 
-fn Option(comptime key: [:0]const u8, comptime T: type, comptime default: T) type {
-    return struct {
-        const Self = @This();
-        output: *Output,
-        handle: *river.OptionHandleV2,
-        value: T = default,
-
-        fn init(option: *Self, context: *Context, output: *Output) !void {
-            option.* = .{
-                .output = output,
-                .handle = try context.options_manager.?.getOptionHandle(key, output.wl_output),
-            };
-            option.handle.setListener(*Self, optionListener, option) catch unreachable;
-        }
-
-        fn deinit(option: *Self) void {
-            option.handle.destroy();
-            option.* = undefined;
-        }
-
-        fn optionListener(handle: *river.OptionHandleV2, event: river.OptionHandleV2.Event, option: *Self) void {
-            const prev_value = option.value;
-            assert(event != .undeclared); // We declare all options used in main()
-            switch (T) {
-                u32 => switch (event) {
-                    .uint_value => |ev| option.value = ev.value,
-                    else => std.log.err("expected value of uint type for " ++ key ++
-                        " option, falling back to default", .{}),
-                },
-                f64 => switch (event) {
-                    .fixed_value => |ev| option.value = ev.value.toDouble(),
-                    else => std.log.err("expected value of fixed type for " ++ key ++
-                        " option, falling back to default", .{}),
-                },
-                Location => switch (event) {
-                    .string_value => |ev| if (ev.value) |value| {
-                        if (std.meta.stringToEnum(Location, mem.span(value))) |location| {
-                            option.value = location;
-                        } else {
-                            std.log.err(
-                                \\invalid main_location "{s}", must be "top", "bottom", "left", or "right"
-                            , .{value});
-                        }
-                    },
-                    else => std.log.err("expected value of string type for " ++ key ++
-                        " option, falling back to default", .{}),
-                },
-                else => unreachable,
-            }
-            if (option.value != prev_value) option.output.layout.parametersChanged();
-        }
-    };
-}
-
 const Output = struct {
     wl_output: *wl.Output,
     name: u32,
-
-    main_location: Option("main_location", Location, default_main_location) = undefined,
-    main_count: Option("main_count", u32, default_main_count) = undefined,
-    main_factor: Option("main_factor", f64, default_main_factor) = undefined,
-    view_padding: Option("view_padding", u32, default_view_padding) = undefined,
-    outer_padding: Option("outer_padding", u32, default_outer_padding) = undefined,
 
     layout: *river.LayoutV1 = undefined,
 
     fn init(output: *Output, context: *Context, wl_output: *wl.Output, name: u32) !void {
         output.* = .{ .wl_output = wl_output, .name = name };
-        if (context.initialized) try output.initOptionsAndLayout(context);
+        if (context.initialized) try output.getLayout(context);
     }
 
-    fn initOptionsAndLayout(output: *Output, context: *Context) !void {
+    fn getLayout(output: *Output, context: *Context) !void {
         assert(context.initialized);
-        try output.main_location.init(context, output);
-        errdefer output.main_location.deinit();
-        try output.main_count.init(context, output);
-        errdefer output.main_count.deinit();
-        try output.main_factor.init(context, output);
-        errdefer output.main_factor.deinit();
-        try output.view_padding.init(context, output);
-        errdefer output.view_padding.deinit();
-        try output.outer_padding.init(context, output);
-        errdefer output.outer_padding.deinit();
-
         output.layout = try context.layout_manager.?.getLayout(output.wl_output, "rivertile");
         output.layout.setListener(*Output, layoutListener, output) catch unreachable;
     }
 
     fn deinit(output: *Output) void {
         output.wl_output.release();
-
-        output.main_count.deinit();
-        output.main_factor.deinit();
-        output.view_padding.deinit();
-        output.outer_padding.deinit();
-
         output.layout.destroy();
     }
 
@@ -180,18 +102,18 @@ const Output = struct {
             .namespace_in_use => fatal("namespace 'rivertile' already in use.", .{}),
 
             .layout_demand => |ev| {
-                const secondary_count = if (ev.view_count > output.main_count.value)
-                    ev.view_count - output.main_count.value
+                const secondary_count = if (ev.view_count > default_main_count)
+                    ev.view_count - default_main_count
                 else
                     0;
 
-                const usable_width = switch (output.main_location.value) {
-                    .left, .right => ev.usable_width - (2 * output.outer_padding.value),
-                    .top, .bottom => ev.usable_height - (2 * output.outer_padding.value),
+                const usable_width = switch (default_main_location) {
+                    .left, .right => ev.usable_width - 2 * default_outer_padding,
+                    .top, .bottom => ev.usable_height - 2 * default_outer_padding,
                 };
-                const usable_height = switch (output.main_location.value) {
-                    .left, .right => ev.usable_height - (2 * output.outer_padding.value),
-                    .top, .bottom => ev.usable_width - (2 * output.outer_padding.value),
+                const usable_height = switch (default_main_location) {
+                    .left, .right => ev.usable_height - 2 * default_outer_padding,
+                    .top, .bottom => ev.usable_width - 2 * default_outer_padding,
                 };
 
                 // to make things pixel-perfect, we make the first main and first secondary
@@ -204,18 +126,18 @@ const Output = struct {
                 var secondary_height: u32 = undefined;
                 var secondary_height_rem: u32 = undefined;
 
-                if (output.main_count.value > 0 and secondary_count > 0) {
-                    main_width = @floatToInt(u32, output.main_factor.value * @intToFloat(f64, usable_width));
-                    main_height = usable_height / output.main_count.value;
-                    main_height_rem = usable_height % output.main_count.value;
+                if (default_main_count > 0 and secondary_count > 0) {
+                    main_width = @floatToInt(u32, default_main_factor * @intToFloat(f64, usable_width));
+                    main_height = usable_height / default_main_count;
+                    main_height_rem = usable_height % default_main_count;
 
                     secondary_width = usable_width - main_width;
                     secondary_height = usable_height / secondary_count;
                     secondary_height_rem = usable_height % secondary_count;
-                } else if (output.main_count.value > 0) {
+                } else if (default_main_count > 0) {
                     main_width = usable_width;
-                    main_height = usable_height / output.main_count.value;
-                    main_height_rem = usable_height % output.main_count.value;
+                    main_height = usable_height / default_main_count;
+                    main_height_rem = usable_height % default_main_count;
                 } else if (secondary_width > 0) {
                     main_width = 0;
                     secondary_width = usable_width;
@@ -230,50 +152,50 @@ const Output = struct {
                     var width: u32 = undefined;
                     var height: u32 = undefined;
 
-                    if (i < output.main_count.value) {
+                    if (i < default_main_count) {
                         x = 0;
                         y = @intCast(i32, (i * main_height) + if (i > 0) main_height_rem else 0);
                         width = main_width;
                         height = main_height + if (i == 0) main_height_rem else 0;
                     } else {
                         x = @intCast(i32, main_width);
-                        y = @intCast(i32, (i - output.main_count.value) * secondary_height +
-                            if (i > output.main_count.value) secondary_height_rem else 0);
+                        y = @intCast(i32, (i - default_main_count) * secondary_height +
+                            if (i > default_main_count) secondary_height_rem else 0);
                         width = secondary_width;
-                        height = secondary_height + if (i == output.main_count.value) secondary_height_rem else 0;
+                        height = secondary_height + if (i == default_main_count) secondary_height_rem else 0;
                     }
 
-                    x += @intCast(i32, output.view_padding.value);
-                    y += @intCast(i32, output.view_padding.value);
-                    width -= 2 * output.view_padding.value;
-                    height -= 2 * output.view_padding.value;
+                    x += @intCast(i32, default_view_padding);
+                    y += @intCast(i32, default_view_padding);
+                    width -= 2 * default_view_padding;
+                    height -= 2 * default_view_padding;
 
-                    switch (output.main_location.value) {
+                    switch (default_main_location) {
                         .left => layout.pushViewDimensions(
                             ev.serial,
-                            x + @intCast(i32, output.outer_padding.value),
-                            y + @intCast(i32, output.outer_padding.value),
+                            x + @intCast(i32, default_outer_padding),
+                            y + @intCast(i32, default_outer_padding),
                             width,
                             height,
                         ),
                         .right => layout.pushViewDimensions(
                             ev.serial,
-                            @intCast(i32, usable_width - width) - x + @intCast(i32, output.outer_padding.value),
-                            y + @intCast(i32, output.outer_padding.value),
+                            @intCast(i32, usable_width - width) - x + @intCast(i32, default_outer_padding),
+                            y + @intCast(i32, default_outer_padding),
                             width,
                             height,
                         ),
                         .top => layout.pushViewDimensions(
                             ev.serial,
-                            y + @intCast(i32, output.outer_padding.value),
-                            x + @intCast(i32, output.outer_padding.value),
+                            y + @intCast(i32, default_outer_padding),
+                            x + @intCast(i32, default_outer_padding),
                             height,
                             width,
                         ),
                         .bottom => layout.pushViewDimensions(
                             ev.serial,
-                            y + @intCast(i32, output.outer_padding.value),
-                            @intCast(i32, usable_width - width) - x + @intCast(i32, output.outer_padding.value),
+                            y + @intCast(i32, default_outer_padding),
+                            @intCast(i32, usable_width - width) - x + @intCast(i32, default_outer_padding),
                             height,
                             width,
                         ),
@@ -305,23 +227,13 @@ pub fn main() !void {
     if (context.layout_manager == null) {
         fatal("wayland compositor does not support river_layout_v1.\n", .{});
     }
-    if (context.options_manager == null) {
-        fatal("wayland compositor does not support river_options_v2.\n", .{});
-    }
-
-    // TODO: should be @tagName(default_main_location), https://github.com/ziglang/zig/issues/3779
-    context.options_manager.?.declareStringOption("main_location", "left");
-    context.options_manager.?.declareUintOption("main_count", default_main_count);
-    context.options_manager.?.declareFixedOption("main_factor", wl.Fixed.fromDouble(default_main_factor));
-    context.options_manager.?.declareUintOption("view_padding", default_view_padding);
-    context.options_manager.?.declareUintOption("outer_padding", default_outer_padding);
 
     context.initialized = true;
 
     var it = context.outputs.first;
     while (it) |node| : (it = node.next) {
         const output = &node.data;
-        try output.initOptionsAndLayout(&context);
+        try output.getLayout(&context);
     }
 
     while (true) _ = try display.dispatch();
@@ -332,8 +244,6 @@ fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, context: *
         .global => |global| {
             if (std.cstr.cmp(global.interface, river.LayoutManagerV1.getInterface().name) == 0) {
                 context.layout_manager = registry.bind(global.name, river.LayoutManagerV1, 1) catch return;
-            } else if (std.cstr.cmp(global.interface, river.OptionsManagerV2.getInterface().name) == 0) {
-                context.options_manager = registry.bind(global.name, river.OptionsManagerV2, 1) catch return;
             } else if (std.cstr.cmp(global.interface, wl.Output.getInterface().name) == 0) {
                 context.addOutput(registry, global.name) catch |err| fatal("failed to bind output: {}", .{err});
             }

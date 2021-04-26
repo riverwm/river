@@ -26,7 +26,6 @@ const c = @import("c.zig");
 const util = @import("util.zig");
 
 const Config = @import("Config.zig");
-const OptionsManager = @import("OptionsManager.zig");
 const Control = @import("Control.zig");
 const DecorationManager = @import("DecorationManager.zig");
 const InputManager = @import("InputManager.zig");
@@ -66,7 +65,6 @@ root: Root,
 config: Config,
 control: Control,
 status_manager: StatusManager,
-options_manager: OptionsManager,
 layout_manager: LayoutManager,
 
 pub fn init(self: *Self) !void {
@@ -117,7 +115,6 @@ pub fn init(self: *Self) !void {
     try self.decoration_manager.init(self);
     try self.root.init(self);
     // Must be called after root is initialized
-    try self.options_manager.init(self);
     try self.input_manager.init(self);
     try self.control.init(self);
     try self.status_manager.init(self);

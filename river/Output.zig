@@ -38,8 +38,6 @@ const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const AttachMode = @import("view_stack.zig").AttachMode;
 const OutputStatus = @import("OutputStatus.zig");
-const Option = @import("Option.zig");
-const OutputOption = @import("OutputOption.zig");
 
 const State = struct {
     /// A bit field of focused tags
@@ -149,10 +147,6 @@ pub fn init(self: *Self, root: *Root, wlr_output: *wlr.Output) !void {
             .width = effective_resolution.width,
             .height = effective_resolution.height,
         };
-
-        const options_manager = &root.server.options_manager;
-        try options_manager.createOutputOptions(self);
-        errdefer options_manager.destroyOutputOptions(self);
 
         self.setTitle();
     }
@@ -427,8 +421,6 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) v
     const root = self.root;
 
     std.log.scoped(.server).debug("output '{}' destroyed", .{self.wlr_output.name});
-
-    root.server.options_manager.destroyOutputOptions(self);
 
     // Remove the destroyed output from root if it wasn't already removed
     root.removeOutput(self);

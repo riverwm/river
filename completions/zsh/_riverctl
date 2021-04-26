@@ -29,6 +29,8 @@ _riverctl() {
     'toggle-float:Toggle the floating state of the focused view'
     'toggle-fullscreen:Toggle the fullscreen state of the focused view'
     'zoom:Bump the focused view to the top of the layout stack'
+    'default-layout:Set the layout namespace to be used by all outputs by default.'
+    'output-layout:Set the layout namespace of currently focused output.'
     # Tag management
     'set-focused-tags:Show views with tags corresponding to the set bits of tags'
     'set-view-tags:Assign the currently focused view the tags corresponding to the set bits of tags'
@@ -52,13 +54,6 @@ _riverctl() {
     'opacity:Configure server-side opacity of views'
     'set-repeat:Set the keyboard repeat rate and repeat delay'
     'xcursor-theme:Set the xcursor theme'
-    # Options
-    'declare-option:Declare a new option with the given type and initial value'
-    'get-option:Print the current value of the given option to stdout'
-    'set-option:Set the value of the specified option'
-    'unset-option:Unset the value of the specified option for the given output'
-    'mod-option:Add value to the value of the specified option'
-    'output_title:Changing this option changes the title of the Wayland and X11 backend outputs'
   )
 
   local -A opt_args

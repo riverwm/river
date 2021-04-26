@@ -17,6 +17,8 @@ function __riverctl_completion ()
 			toggle-float \
 			toggle-fullscreen \
 			zoom \
+			default-layout \
+			output-layout \
 			set-focused-tags \
 			set-view-tags \
 			toggle-focused-tags \
@@ -36,12 +38,7 @@ function __riverctl_completion ()
 			focus-follow-cursor \
 			opacity \
 			set-repeat \
-			xcursor-theme \
-			declare-option \
-			get-option \
-			set-option \
-			unset-option \
-			mod-option"
+			xcursor-theme
 		COMPREPLY=($(compgen -W "${OPTS}" -- "${COMP_WORDS[1]}"))
 	elif [ "${COMP_CWORD}" -eq 2 ]
 	then
@@ -52,7 +49,6 @@ function __riverctl_completion ()
 			"map"|"unmap") OPTS="-release" ;;
 			"attach-mode") OPTS="top bottom" ;;
 			"focus-follows-cursor") OPTS="disabled normal strict" ;;
-			"get-option"|"set-option"|"unset-option"|"mod-option") OPTS="-output -focused-output" ;;
 			*) return ;;
 		esac
 		COMPREPLY=($(compgen -W "${OPTS}" -- "${COMP_WORDS[2]}"))
