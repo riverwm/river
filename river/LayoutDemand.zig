@@ -21,7 +21,6 @@ const std = @import("std");
 const wlr = @import("wlroots");
 const wayland = @import("wayland");
 const wl = wayland.server.wl;
-const zriver = wayland.server.zriver;
 
 const util = @import("util.zig");
 

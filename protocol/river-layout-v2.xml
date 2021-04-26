@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<protocol name="river_layout_v1">
+<protocol name="river_layout_v2">
   <copyright>
     Copyright 2020-2021 The River Developers
 
@@ -19,7 +19,7 @@
   <description summary="let clients propose view positions and dimensions">
     This protocol specifies a way for clients to propose arbitrary positions and
     dimensions for a set of views on a specific output of a compositor through
-    the river_layout_v1 object.
+    the river_layout_v2 object.
 
     This set of views is logically structured as a simple list. Views
     in this list cannot be individually addressed, instead the order of
@@ -32,7 +32,7 @@
     intentional limitation.
 
     Note that the client may need to handle multiple layout demands per
-    river_layout_v1 object simultaneously.
+    river_layout_v2 object simultaneously.
 
     Warning! The protocol described in this file is currently in the testing
     phase. Backward compatible changes may be added together with the
@@ -40,9 +40,9 @@
     only be done by creating a new major version of the extension.
   </description>
 
-  <interface name="river_layout_manager_v1" version="1">
+  <interface name="river_layout_manager_v2" version="1">
     <description summary="manage river layout objects">
-      A global factory for river_layout_v1 objects.
+      A global factory for river_layout_v2 objects.
     </description>
 
     <request name="destroy" type="destructor">
@@ -54,26 +54,26 @@
     </request>
 
     <request name="get_layout">
-      <description summary="create a river_layout_v1 object">
-        This creates a new river_layout_v1 object for the given wl_output.
+      <description summary="create a river_layout_v2 object">
+        This creates a new river_layout_v2 object for the given wl_output.
 
         All layout related communication is done through this interface.
 
-        The namespace is used by the compositor to decide which river_layout_v1
+        The namespace is used by the compositor to decide which river_layout_v2
         object will receive layout demands for the output.
 
         The namespace is required to be be unique per-output. Furthermore,
         two separate clients may not share a namespace on separate outputs. If
         these conditions are not upheld, the the namespace_in_use event will
-        be sent directly after creation of the river_layout_v1 object.
+        be sent directly after creation of the river_layout_v2 object.
       </description>
-      <arg name="id" type="new_id" interface="river_layout_v1"/>
+      <arg name="id" type="new_id" interface="river_layout_v2"/>
       <arg name="output" type="object" interface="wl_output"/>
       <arg name="namespace" type="string" summary="namespace of the layout object"/>
     </request>
   </interface>
 
-  <interface name="river_layout_v1" version="1">
+  <interface name="river_layout_v2" version="1">
     <description summary="receive and respond to layout demands">
       This interface allows clients to receive layout demands from the
       compositor for a specific output and subsequently propose positions and
@@ -88,8 +88,8 @@
     </enum>
 
     <request name="destroy" type="destructor">
-      <description summary="destroy the river_layout_v1 object">
-        This request indicates that the client will not use the river_layout_v1
+      <description summary="destroy the river_layout_v2 object">
+        This request indicates that the client will not use the river_layout_v2
         object any more.
       </description>
     </request>
@@ -98,7 +98,7 @@
       <description summary="the requested namespace is already in use">
         After this event is sent, all requests aside from the destroy event
         will be ignored by the server. If the client wishes to try again with
-        a different namespace they must create a new river_layout_v1 object.
+        a different namespace they must create a new river_layout_v2 object.
       </description>
     </event>
 
@@ -188,14 +188,69 @@
       <arg name="serial" type="uint" summary="serial of layout demand"/>
     </request>
 
-    <request name="parameters_changed">
-      <description summary="parameters of layout have changed">
-        The client may use this request to inform the compositor that one or
-        muliple of the parameters it uses to generate layouts have changed.
+    <event name="set_int_value">
+      <description summary="an int value has been set">
+        This event indicates that the value of this river_layout_v2 object
+        with the given name has been set to the given value.
 
-        If the client is responsible for the current view layout, the compositor
-        may decide to send a new layout demand to update the layout.
+        This event will be followed by a layout_demand if necessary (i.e. if
+        this layout object is currently being used by the compositor to
+        layout an output)
       </description>
-    </request>
+      <arg name="name" type="string"/>
+      <arg name="value" type="int"/>
+    </event>
+
+    <event name="mod_int_value">
+      <description summary="an int value has been modified">
+        This event indicates that the value of this river_layout_v2 object
+        with the given name has been modifed by the given delta.
+
+        This event will be followed by a layout_demand if necessary (i.e. if
+        this layout object is currently being used by the compositor to
+        layout an output)
+      </description>
+      <arg name="name" type="string"/>
+      <arg name="delta" type="int"/>
+    </event>
+
+    <event name="set_fixed_value">
+      <description summary="a fixed value has been set">
+        This event indicates that the value of this river_layout_v2 object
+        with the given name has been set to the given value.
+
+        This event will be followed by a layout_demand if necessary (i.e. if
+        this layout object is currently being used by the compositor to
+        layout an output)
+      </description>
+      <arg name="name" type="string"/>
+      <arg name="value" type="fixed"/>
+    </event>
+
+    <event name="mod_fixed_value">
+      <description summary="a fixed value has been modified">
+        This event indicates that the value of this river_layout_v2 object
+        with the given name has been modifed by the given delta.
+
+        This event will be followed by a layout_demand if necessary (i.e. if
+        this layout object is currently being used by the compositor to
+        layout an output)
+      </description>
+      <arg name="name" type="string"/>
+      <arg name="delta" type="fixed"/>
+    </event>
+
+    <event name="set_string_value">
+      <description summary="a string value has been set">
+        This event indicates that the value of this river_layout_v2 object
+        with the given name has been set to the given value.
+
+        This event will be followed by a layout_demand if necessary (i.e. if
+        this layout object is currently being used by the compositor to
+        layout an output)
+      </description>
+      <arg name="name" type="string"/>
+      <arg name="value" type="string"/>
+    </event>
   </interface>
 </protocol>

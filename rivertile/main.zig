@@ -38,6 +38,7 @@
 
 const std = @import("std");
 const mem = std.mem;
+const math = std.math;
 const assert = std.debug.assert;
 
 const wayland = @import("wayland");
@@ -51,9 +52,7 @@ const Location = enum {
     left,
 };
 
-const default_main_location: Location = .left;
-const default_main_count = 1;
-const default_main_factor = 0.6;
+// TODO: expose these as command line options
 const default_view_padding = 6;
 const default_outer_padding = 6;
 
@@ -62,7 +61,7 @@ const gpa = std.heap.c_allocator;
 
 const Context = struct {
     initialized: bool = false,
-    layout_manager: ?*river.LayoutManagerV1 = null,
+    layout_manager: ?*river.LayoutManagerV2 = null,
     outputs: std.TailQueue(Output) = .{},
 
     fn addOutput(context: *Context, registry: *wl.Registry, name: u32) !void {
@@ -79,7 +78,11 @@ const Output = struct {
     wl_output: *wl.Output,
     name: u32,
 
-    layout: *river.LayoutV1 = undefined,
+    main_location: Location = .left,
+    main_count: u32 = 1,
+    main_factor: f64 = 0.6,
+
+    layout: *river.LayoutV2 = undefined,
 
     fn init(output: *Output, context: *Context, wl_output: *wl.Output, name: u32) !void {
         output.* = .{ .wl_output = wl_output, .name = name };
@@ -97,21 +100,53 @@ const Output = struct {
         output.layout.destroy();
     }
 
-    fn layoutListener(layout: *river.LayoutV1, event: river.LayoutV1.Event, output: *Output) void {
+    fn layoutListener(layout: *river.LayoutV2, event: river.LayoutV2.Event, output: *Output) void {
         switch (event) {
             .namespace_in_use => fatal("namespace 'rivertile' already in use.", .{}),
 
+            .set_int_value => |ev| {
+                if (mem.eql(u8, mem.span(ev.name), "main_count")) {
+                    if (ev.value > 0) output.main_count = @intCast(u32, ev.value);
+                }
+            },
+            .mod_int_value => |ev| {
+                if (mem.eql(u8, mem.span(ev.name), "main_count")) {
+                    const result = @as(i33, output.main_count) + ev.delta;
+                    if (result > 0) output.main_count = @intCast(u32, result);
+                }
+            },
+
+            .set_fixed_value => |ev| {
+                if (mem.eql(u8, mem.span(ev.name), "main_factor")) {
+                    output.main_factor = math.clamp(ev.value.toDouble(), 0.1, 0.9);
+                }
+            },
+            .mod_fixed_value => |ev| {
+                if (mem.eql(u8, mem.span(ev.name), "main_factor")) {
+                    const new_value = ev.delta.toDouble() + output.main_factor;
+                    output.main_factor = math.clamp(new_value, 0.1, 0.9);
+                }
+            },
+
+            .set_string_value => |ev| {
+                if (mem.eql(u8, mem.span(ev.name), "main_location")) {
+                    if (std.meta.stringToEnum(Location, mem.span(ev.value))) |new_location| {
+                        output.main_location = new_location;
+                    }
+                }
+            },
+
             .layout_demand => |ev| {
-                const secondary_count = if (ev.view_count > default_main_count)
-                    ev.view_count - default_main_count
+                const secondary_count = if (ev.view_count > output.main_count)
+                    ev.view_count - output.main_count
                 else
                     0;
 
-                const usable_width = switch (default_main_location) {
+                const usable_width = switch (output.main_location) {
                     .left, .right => ev.usable_width - 2 * default_outer_padding,
                     .top, .bottom => ev.usable_height - 2 * default_outer_padding,
                 };
-                const usable_height = switch (default_main_location) {
+                const usable_height = switch (output.main_location) {
                     .left, .right => ev.usable_height - 2 * default_outer_padding,
                     .top, .bottom => ev.usable_width - 2 * default_outer_padding,
                 };
@@ -126,18 +161,18 @@ const Output = struct {
                 var secondary_height: u32 = undefined;
                 var secondary_height_rem: u32 = undefined;
 
-                if (default_main_count > 0 and secondary_count > 0) {
-                    main_width = @floatToInt(u32, default_main_factor * @intToFloat(f64, usable_width));
-                    main_height = usable_height / default_main_count;
-                    main_height_rem = usable_height % default_main_count;
+                if (output.main_count > 0 and secondary_count > 0) {
+                    main_width = @floatToInt(u32, output.main_factor * @intToFloat(f64, usable_width));
+                    main_height = usable_height / output.main_count;
+                    main_height_rem = usable_height % output.main_count;
 
                     secondary_width = usable_width - main_width;
                     secondary_height = usable_height / secondary_count;
                     secondary_height_rem = usable_height % secondary_count;
-                } else if (default_main_count > 0) {
+                } else if (output.main_count > 0) {
                     main_width = usable_width;
-                    main_height = usable_height / default_main_count;
-                    main_height_rem = usable_height % default_main_count;
+                    main_height = usable_height / output.main_count;
+                    main_height_rem = usable_height % output.main_count;
                 } else if (secondary_width > 0) {
                     main_width = 0;
                     secondary_width = usable_width;
@@ -152,17 +187,17 @@ const Output = struct {
                     var width: u32 = undefined;
                     var height: u32 = undefined;
 
-                    if (i < default_main_count) {
+                    if (i < output.main_count) {
                         x = 0;
                         y = @intCast(i32, (i * main_height) + if (i > 0) main_height_rem else 0);
                         width = main_width;
                         height = main_height + if (i == 0) main_height_rem else 0;
                     } else {
                         x = @intCast(i32, main_width);
-                        y = @intCast(i32, (i - default_main_count) * secondary_height +
-                            if (i > default_main_count) secondary_height_rem else 0);
+                        y = @intCast(i32, (i - output.main_count) * secondary_height +
+                            if (i > output.main_count) secondary_height_rem else 0);
                         width = secondary_width;
-                        height = secondary_height + if (i == default_main_count) secondary_height_rem else 0;
+                        height = secondary_height + if (i == output.main_count) secondary_height_rem else 0;
                     }
 
                     x += @intCast(i32, default_view_padding);
@@ -170,7 +205,7 @@ const Output = struct {
                     width -= 2 * default_view_padding;
                     height -= 2 * default_view_padding;
 
-                    switch (default_main_location) {
+                    switch (output.main_location) {
                         .left => layout.pushViewDimensions(
                             ev.serial,
                             x + @intCast(i32, default_outer_padding),
@@ -242,8 +277,8 @@ pub fn main() !void {
 fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, context: *Context) void {
     switch (event) {
         .global => |global| {
-            if (std.cstr.cmp(global.interface, river.LayoutManagerV1.getInterface().name) == 0) {
-                context.layout_manager = registry.bind(global.name, river.LayoutManagerV1, 1) catch return;
+            if (std.cstr.cmp(global.interface, river.LayoutManagerV2.getInterface().name) == 0) {
+                context.layout_manager = registry.bind(global.name, river.LayoutManagerV2, 1) catch return;
             } else if (std.cstr.cmp(global.interface, wl.Output.getInterface().name) == 0) {
                 context.addOutput(registry, global.name) catch |err| fatal("failed to bind output: {}", .{err});
             }
