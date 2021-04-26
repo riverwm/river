@@ -37,7 +37,7 @@ server_destroy: wl.Listener(*wl.Server) = wl.Listener(*wl.Server).init(handleSer
 
 pub fn init(self: *Self, server: *Server) !void {
     self.* = .{
-        .global = try wl.Global.create(server.wl_server, river.LayoutManagerV1, 1, *Self, self, bind),
+        .global = try wl.Global.create(server.wl_server, river.LayoutManagerV2, 1, *Self, self, bind),
     };
 
     server.wl_server.addDestroyListener(&self.server_destroy);
@@ -49,7 +49,7 @@ fn handleServerDestroy(listener: *wl.Listener(*wl.Server), wl_server: *wl.Server
 }
 
 fn bind(client: *wl.Client, self: *Self, version: u32, id: u32) callconv(.C) void {
-    const layout_manager = river.LayoutManagerV1.create(client, 1, id) catch {
+    const layout_manager = river.LayoutManagerV2.create(client, 1, id) catch {
         client.postNoMemory();
         log.crit("out of memory", .{});
         return;
@@ -57,7 +57,7 @@ fn bind(client: *wl.Client, self: *Self, version: u32, id: u32) callconv(.C) voi
     layout_manager.setHandler(*Self, handleRequest, null, self);
 }
 
-fn handleRequest(layout_manager: *river.LayoutManagerV1, request: river.LayoutManagerV1.Request, self: *Self) void {
+fn handleRequest(layout_manager: *river.LayoutManagerV2, request: river.LayoutManagerV2.Request, self: *Self) void {
     switch (request) {
         .destroy => layout_manager.destroy(),
 

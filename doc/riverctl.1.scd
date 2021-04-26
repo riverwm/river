@@ -79,6 +79,16 @@ over the Wayland protocol.
 	Set the layout namespace of currently focused output, overriding
 	the value set with *default-layout* if any.
 
+*set-layout-value* _namespace_ _type_ _name_ _value_
+	Set the value with name _name_ of the layout on the focused output
+	with matching namespace. If there is no matching layout, this command
+	does nothing.
+
+*mod-layout-value* _namespace_ _type_ _name_ _value_
+	Modify the value with name _name_ of the layout on the focused
+	output with matching namespace. If there is no matching layout,
+	this command does nothing.
+
 ## TAG MANAGEMENT
 
 Tags are similar to workspaces but more flexible. You can assign views multiple

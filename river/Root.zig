@@ -75,7 +75,8 @@ drag_icons: std.SinglyLinkedList(DragIcon) = .{},
 xwayland_unmanaged_views: if (build_options.xwayland)
     std.TailQueue(XwaylandUnmanaged)
 else
-    void = if (build_options.xwayland) .{},
+    void = if (build_options.xwayland)
+    .{},
 
 /// Number of layout demands pending before the transaction may be started.
 pending_layout_demands: u32 = 0,

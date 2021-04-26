@@ -65,7 +65,7 @@ pub fn build(b: *zbs.Builder) !void {
     scanner.addSystemProtocol("unstable/pointer-constraints/pointer-constraints-unstable-v1.xml");
     scanner.addProtocolPath("protocol/river-control-unstable-v1.xml");
     scanner.addProtocolPath("protocol/river-status-unstable-v1.xml");
-    scanner.addProtocolPath("protocol/river-layout-v1.xml");
+    scanner.addProtocolPath("protocol/river-layout-v2.xml");
     scanner.addProtocolPath("protocol/wlr-layer-shell-unstable-v1.xml");
     scanner.addProtocolPath("protocol/wlr-output-power-management-unstable-v1.xml");
 
