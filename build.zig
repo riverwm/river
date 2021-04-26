@@ -6,6 +6,9 @@ const zbs = std.build;
 
 const ScanProtocolsStep = @import("deps/zig-wayland/build.zig").ScanProtocolsStep;
 
+const SimpleCompletionStep = @import("deps/zig-shellcomplete/SimpleCompletionStep.zig");
+const river_completion = @import("completions.zig").river_completion;
+
 pub fn build(b: *zbs.Builder) !void {
     const target = b.standardTargetOptions(.{});
     const mode = b.standardReleaseOptions();
@@ -78,6 +81,8 @@ pub fn build(b: *zbs.Builder) !void {
         river.addBuildOption([]const u8, "default_config_path", abs_config_path);
 
         addServerDeps(river, scanner);
+
+        try SimpleCompletionStep.create(b, &river.step, "river", river_completion);
 
         river.install();
     }

@@ -10,3 +10,6 @@
 [submodule "deps/zig-wlroots"]
 	path = deps/zig-wlroots
 	url = https://github.com/swaywm/zig-wlroots
+[submodule "deps/zig-shellcomplete"]
+	path = deps/zig-shellcomplete
+	url = https://git.sr.ht/~leon_plickat/zig-shellcomplete
