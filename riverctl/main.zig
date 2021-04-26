@@ -22,26 +22,13 @@ const assert = std.debug.assert;
 
 const wayland = @import("wayland");
 const wl = wayland.client.wl;
-const river = wayland.client.river;
 const zriver = wayland.client.zriver;
-const zxdg = wayland.client.zxdg;
 
 const gpa = std.heap.c_allocator;
 
-const options = @import("options.zig");
-
-pub const Output = struct {
-    wl_output: *wl.Output,
-    name: []const u8,
-};
-
 pub const Globals = struct {
     control: ?*zriver.ControlV1 = null,
-    options_manager: ?*river.OptionsManagerV2 = null,
-    status_manager: ?*zriver.StatusManagerV1 = null,
     seat: ?*wl.Seat = null,
-    output_manager: ?*zxdg.OutputManagerV1 = null,
-    outputs: std.ArrayList(Output) = std.ArrayList(Output).init(gpa),
 };
 
 pub fn main() !void {
@@ -54,19 +41,8 @@ pub fn main() !void {
                 \\The Wayland server does not support river-control-unstable-v1.
                 \\Do your versions of river and riverctl match?
             , .{}),
-            error.RiverStatusManagerNotAdvertised => printErrorExit(
-                \\The Wayland server does not support river-status-unstable-v1.
-                \\Do your versions of river and riverctl match?
-            , .{}),
-            error.RiverOptionsManagerNotAdvertised => printErrorExit(
-                \\The Wayland server does not support river-options-unstable-v1.
-                \\Do your versions of river and riverctl match?
-            , .{}),
             error.SeatNotAdverstised => printErrorExit(
                 \\The Wayland server did not advertise any seat.
-            , .{}),
-            error.XdgOutputNotAdvertised => printErrorExit(
-                \\The Wayland server does not support xdg-output-unstable-v1.
             , .{}),
             else => return err,
         }
@@ -82,32 +58,20 @@ fn _main() !void {
     registry.setListener(*Globals, registryListener, &globals) catch unreachable;
     _ = try display.roundtrip();
 
-    if (os.argv.len > 2 and mem.eql(u8, "declare-option", mem.span(os.argv[1]))) {
-        try options.declareOption(display, &globals);
-    } else if (os.argv.len > 2 and mem.eql(u8, "get-option", mem.span(os.argv[1]))) {
-        try options.getOption(display, &globals);
-    } else if (os.argv.len > 2 and mem.eql(u8, "set-option", mem.span(os.argv[1]))) {
-        try options.setOption(display, &globals);
-    } else if (os.argv.len > 2 and mem.eql(u8, "unset-option", mem.span(os.argv[1]))) {
-        try options.unsetOption(display, &globals);
-    } else if (os.argv.len > 2 and mem.eql(u8, "mod-option", mem.span(os.argv[1]))) {
-        try options.modOption(display, &globals);
-    } else {
-        const control = globals.control orelse return error.RiverControlNotAdvertised;
-        const seat = globals.seat orelse return error.SeatNotAdverstised;
+    const control = globals.control orelse return error.RiverControlNotAdvertised;
+    const seat = globals.seat orelse return error.SeatNotAdverstised;
 
-        // Skip our name, send all other args
-        // This next line is needed cause of https://github.com/ziglang/zig/issues/2622
-        const args = os.argv;
-        for (args[1..]) |arg| control.addArgument(arg);
+    // Skip our name, send all other args
+    // This next line is needed cause of https://github.com/ziglang/zig/issues/2622
+    const args = os.argv;
+    for (args[1..]) |arg| control.addArgument(arg);
 
-        const callback = try control.runCommand(seat);
+    const callback = try control.runCommand(seat);
 
-        callback.setListener(?*c_void, callbackListener, null) catch unreachable;
+    callback.setListener(?*c_void, callbackListener, null) catch unreachable;
 
-        // Loop until our callback is called and we exit.
-        while (true) _ = try display.dispatch();
-    }
+    // Loop until our callback is called and we exit.
+    while (true) _ = try display.dispatch();
 }
 
 fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, globals: *Globals) void {
@@ -118,15 +82,6 @@ fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, globals: *
                 globals.seat = registry.bind(global.name, wl.Seat, 1) catch @panic("out of memory");
             } else if (std.cstr.cmp(global.interface, zriver.ControlV1.getInterface().name) == 0) {
                 globals.control = registry.bind(global.name, zriver.ControlV1, 1) catch @panic("out of memory");
-            } else if (std.cstr.cmp(global.interface, river.OptionsManagerV2.getInterface().name) == 0) {
-                globals.options_manager = registry.bind(global.name, river.OptionsManagerV2, 1) catch @panic("out of memory");
-            } else if (std.cstr.cmp(global.interface, zriver.StatusManagerV1.getInterface().name) == 0) {
-                globals.status_manager = registry.bind(global.name, zriver.StatusManagerV1, 1) catch @panic("out of memory");
-            } else if (std.cstr.cmp(global.interface, zxdg.OutputManagerV1.getInterface().name) == 0 and global.version >= 2) {
-                globals.output_manager = registry.bind(global.name, zxdg.OutputManagerV1, 2) catch @panic("out of memory");
-            } else if (std.cstr.cmp(global.interface, wl.Output.getInterface().name) == 0) {
-                const output = registry.bind(global.name, wl.Output, 1) catch @panic("out of memory");
-                globals.outputs.append(.{ .wl_output = output, .name = undefined }) catch @panic("out of memory");
             }
         },
         .global_remove => {},
@@ -142,10 +97,7 @@ fn callbackListener(callback: *zriver.CommandCallbackV1, event: zriver.CommandCa
             }
             os.exit(0);
         },
-        .failure => |failure| {
-            std.debug.print("Error: {}\n", .{failure.failure_message});
-            os.exit(1);
-        },
+        .failure => |failure| printErrorExit("Error: {}\n", .{failure.failure_message}),
     }
 }
 
