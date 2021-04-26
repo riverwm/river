@@ -6,12 +6,29 @@ rivertile - Tiled layout generator for river
 
 # SYNOPSIS
 
-*rivertile*
+*rivertile* [_options_]
 
 # DESCRIPTION
 
 *rivertile* is a layout client for river. It provides a simple tiled layout
 split main/secondary stacks.
+
+# OPTIONS
+
+*-view-padding* _pixels_
+	Set the padding around views in pixels.
+
+*-outer-padding* _pixels_
+	Set the padding around the edge of the layout area in pixels.
+
+*-main-location* [*top*|*bottom*|*left*|*right*]
+	Set the default location of the main area in the layout.
+
+*-main-count* _count_
+	Set the default number of views in the main area of the layout.
+
+*-main-factor* _ratio_
+	Set the default ratio of main area to total layout area.
 
 # VALUES
 

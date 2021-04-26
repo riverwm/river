@@ -45,6 +45,9 @@ const wayland = @import("wayland");
 const wl = wayland.client.wl;
 const river = wayland.client.river;
 
+const Args = @import("args.zig").Args;
+const FlagDef = @import("args.zig").FlagDef;
+
 const Location = enum {
     top,
     right,
@@ -52,9 +55,12 @@ const Location = enum {
     left,
 };
 
-// TODO: expose these as command line options
-const default_view_padding = 6;
-const default_outer_padding = 6;
+// Configured through command line options
+var view_padding: u32 = 6;
+var outer_padding: u32 = 6;
+var default_main_location: Location = .left;
+var default_main_count: u32 = 1;
+var default_main_factor: f64 = 0.6;
 
 /// We don't free resources on exit, only when output globals are removed.
 const gpa = std.heap.c_allocator;
@@ -78,14 +84,20 @@ const Output = struct {
     wl_output: *wl.Output,
     name: u32,
 
-    main_location: Location = .left,
-    main_count: u32 = 1,
-    main_factor: f64 = 0.6,
+    main_location: Location,
+    main_count: u32,
+    main_factor: f64,
 
     layout: *river.LayoutV2 = undefined,
 
     fn init(output: *Output, context: *Context, wl_output: *wl.Output, name: u32) !void {
-        output.* = .{ .wl_output = wl_output, .name = name };
+        output.* = .{
+            .wl_output = wl_output,
+            .name = name,
+            .main_location = default_main_location,
+            .main_count = default_main_count,
+            .main_factor = default_main_factor,
+        };
         if (context.initialized) try output.getLayout(context);
     }
 
@@ -143,12 +155,12 @@ const Output = struct {
                     0;
 
                 const usable_width = switch (output.main_location) {
-                    .left, .right => ev.usable_width - 2 * default_outer_padding,
-                    .top, .bottom => ev.usable_height - 2 * default_outer_padding,
+                    .left, .right => ev.usable_width - 2 * outer_padding,
+                    .top, .bottom => ev.usable_height - 2 * outer_padding,
                 };
                 const usable_height = switch (output.main_location) {
-                    .left, .right => ev.usable_height - 2 * default_outer_padding,
-                    .top, .bottom => ev.usable_width - 2 * default_outer_padding,
+                    .left, .right => ev.usable_height - 2 * outer_padding,
+                    .top, .bottom => ev.usable_width - 2 * outer_padding,
                 };
 
                 // to make things pixel-perfect, we make the first main and first secondary
@@ -200,37 +212,37 @@ const Output = struct {
                         height = secondary_height + if (i == output.main_count) secondary_height_rem else 0;
                     }
 
-                    x += @intCast(i32, default_view_padding);
-                    y += @intCast(i32, default_view_padding);
-                    width -= 2 * default_view_padding;
-                    height -= 2 * default_view_padding;
+                    x += @intCast(i32, view_padding);
+                    y += @intCast(i32, view_padding);
+                    width -= 2 * view_padding;
+                    height -= 2 * view_padding;
 
                     switch (output.main_location) {
                         .left => layout.pushViewDimensions(
                             ev.serial,
-                            x + @intCast(i32, default_outer_padding),
-                            y + @intCast(i32, default_outer_padding),
+                            x + @intCast(i32, outer_padding),
+                            y + @intCast(i32, outer_padding),
                             width,
                             height,
                         ),
                         .right => layout.pushViewDimensions(
                             ev.serial,
-                            @intCast(i32, usable_width - width) - x + @intCast(i32, default_outer_padding),
-                            y + @intCast(i32, default_outer_padding),
+                            @intCast(i32, usable_width - width) - x + @intCast(i32, outer_padding),
+                            y + @intCast(i32, outer_padding),
                             width,
                             height,
                         ),
                         .top => layout.pushViewDimensions(
                             ev.serial,
-                            y + @intCast(i32, default_outer_padding),
-                            x + @intCast(i32, default_outer_padding),
+                            y + @intCast(i32, outer_padding),
+                            x + @intCast(i32, outer_padding),
                             height,
                             width,
                         ),
                         .bottom => layout.pushViewDimensions(
                             ev.serial,
-                            y + @intCast(i32, default_outer_padding),
-                            @intCast(i32, usable_width - width) - x + @intCast(i32, default_outer_padding),
+                            y + @intCast(i32, outer_padding),
+                            @intCast(i32, usable_width - width) - x + @intCast(i32, outer_padding),
                             height,
                             width,
                         ),
@@ -247,6 +259,37 @@ const Output = struct {
 };
 
 pub fn main() !void {
+    // https://github.com/ziglang/zig/issues/7807
+    const argv: [][*:0]const u8 = std.os.argv;
+    const args = Args(0, &[_]FlagDef{
+        .{ .name = "-view-padding", .kind = .arg },
+        .{ .name = "-outer-padding", .kind = .arg },
+        .{ .name = "-main-location", .kind = .arg },
+        .{ .name = "-main-count", .kind = .arg },
+        .{ .name = "-main-factor", .kind = .arg },
+    }).parse(argv[1..]);
+
+    if (args.argFlag("-view-padding")) |raw| {
+        view_padding = std.fmt.parseUnsigned(u32, mem.span(raw), 10) catch
+            fatal("invalid value '{s}' provided to -view-padding", .{raw});
+    }
+    if (args.argFlag("-outer-padding")) |raw| {
+        outer_padding = std.fmt.parseUnsigned(u32, mem.span(raw), 10) catch
+            fatal("invalid value '{s}' provided to -outer-padding", .{raw});
+    }
+    if (args.argFlag("-main-location")) |raw| {
+        default_main_location = std.meta.stringToEnum(Location, mem.span(raw)) orelse
+            fatal("invalid value '{s}' provided to -main-location", .{raw});
+    }
+    if (args.argFlag("-main-count")) |raw| {
+        default_main_count = std.fmt.parseUnsigned(u32, mem.span(raw), 10) catch
+            fatal("invalid value '{s}' provided to -main-count", .{raw});
+    }
+    if (args.argFlag("-main-factor")) |raw| {
+        default_main_factor = std.fmt.parseFloat(f64, mem.span(raw)) catch
+            fatal("invalid value '{s}' provided to -main-factor", .{raw});
+    }
+
     const display = wl.Display.connect(null) catch {
         std.debug.warn("Unable to connect to Wayland server.\n", .{});
         std.os.exit(1);
@@ -298,7 +341,8 @@ fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, context: *
     }
 }
 
-fn fatal(comptime format: []const u8, args: anytype) noreturn {
-    std.log.err(format, args);
+pub fn fatal(comptime format: []const u8, args: anytype) noreturn {
+    const stderr = std.io.getStdErr().writer();
+    stderr.print("err: " ++ format ++ "\n", args) catch {};
     std.os.exit(1);
 }
