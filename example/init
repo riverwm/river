@@ -40,15 +40,13 @@ riverctl map normal $mod+Shift Comma send-to-output previous
 # Mod+Return to bump the focused view to the top of the layout stack
 riverctl map normal $mod Return zoom
 
-# Mod+H and Mod+L to decrease/increase the main_factor option by 0.05
-# rivertile(1) uses this option to determine the width of the main stack.
-#riverctl map normal $mod H spawn riverctl mod-option -focused-output main_factor -0.05
-#riverctl map normal $mod L spawn riverctl mod-option -focused-output main_factor +0.05
+# Mod+H and Mod+L to decrease/increase the main_factor value of rivertile by 0.05
+riverctl map normal $mod H mod-layout-value rivertile fixed main_factor -0.05
+riverctl map normal $mod I mod-layout-value rivertile fixed main_factor +0.05
 
-# Mod+Shift+H and Mod+Shift+L to increment/decrement the main_count option.
-# rivertile(1) uses this option to determine the number of "main" views in the layout.
-#riverctl map normal $mod+Shift H spawn riverctl mod-option -focused-output main_count +1
-#riverctl map normal $mod+Shift L spawn riverctl mod-option -focused-output main_count -1
+# Mod+Shift+H and Mod+Shift+L to increment/decrement the main_count value of rivertile.
+riverctl map normal $mod+Shift H mod-layout-value rivertile int main_count +1
+riverctl map normal $mod+Shift I mod-layout-value rivertile int main_count -1
 
 # Mod+Alt+{H,J,K,L} to move views
 riverctl map normal $mod+Mod1 H move left 100
@@ -104,10 +102,10 @@ riverctl map normal $mod Space toggle-float
 riverctl map normal $mod F toggle-fullscreen
 
 # Mod+{Up,Right,Down,Left} to change layout orientation
-#riverctl map normal $mod Up    spawn riverctl set-option -focused-output main_location top
-#riverctl map normal $mod Right spawn riverctl set-option -focused-output main_location right
-#riverctl map normal $mod Down  spawn riverctl set-option -focused-output main_location bottom
-#riverctl map normal $mod Left  spawn riverctl set-option -focused-output main_location left
+riverctl map normal $mod Up    set-layout-value rivertile string main_location top
+riverctl map normal $mod Right set-layout-value rivertile string main_location right
+riverctl map normal $mod Down  set-layout-value rivertile string main_location bottom
+riverctl map normal $mod Left  set-layout-value rivertile string main_location left
 
 # Declare a passthrough mode. This mode has only a single mapping to return to
 # normal mode. This makes it useful for testing a nested wayland compositor
