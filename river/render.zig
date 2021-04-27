@@ -45,6 +45,7 @@ const SurfaceRenderData = struct {
     opacity: f32,
 };
 
+/// The rendering order in this function must be kept in sync with Cursor.surfaceAt()
 pub fn renderOutput(output: *Output) void {
     const config = &output.root.server.config;
     const renderer = output.wlr_output.backend.getRenderer().?;
@@ -76,22 +77,36 @@ pub fn renderOutput(output: *Output) void {
         renderLayer(output, output.getLayer(.background).*, &now, .toplevels);
         renderLayer(output, output.getLayer(.bottom).*, &now, .toplevels);
 
-        // The first view in the list is "on top" so iterate in reverse.
+        // The first view in the list is "on top" so always iterate in reverse.
+
+        // non-focused, non-floating views
         it = ViewStack(View).iter(output.views.last, .reverse, output.current.tags, renderFilter);
         while (it.next()) |view| {
-            // Focused views are rendered on top of normal views, skip them for now
-            if (view.current.focus != 0) continue;
-
+            if (view.current.focus != 0 or view.current.float) continue;
             renderView(output, view, &now);
             if (view.draw_borders) renderBorders(output, view, &now);
         }
 
-        // Render focused views
+        // focused, non-floating views
         it = ViewStack(View).iter(output.views.last, .reverse, output.current.tags, renderFilter);
         while (it.next()) |view| {
-            // Skip unfocused views since we already rendered them
-            if (view.current.focus == 0) continue;
+            if (view.current.focus == 0 or view.current.float) continue;
+            renderView(output, view, &now);
+            if (view.draw_borders) renderBorders(output, view, &now);
+        }
 
+        // non-focused, floating views
+        it = ViewStack(View).iter(output.views.last, .reverse, output.current.tags, renderFilter);
+        while (it.next()) |view| {
+            if (view.current.focus != 0 or !view.current.float) continue;
+            renderView(output, view, &now);
+            if (view.draw_borders) renderBorders(output, view, &now);
+        }
+
+        // focused, floating views
+        it = ViewStack(View).iter(output.views.last, .reverse, output.current.tags, renderFilter);
+        while (it.next()) |view| {
+            if (view.current.focus == 0 or !view.current.float) continue;
             renderView(output, view, &now);
             if (view.draw_borders) renderBorders(output, view, &now);
         }
