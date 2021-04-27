@@ -423,8 +423,9 @@ fn handleRequestSetCursor(
 }
 
 /// Find the topmost surface under the output layout coordinates lx/ly
-/// returns the surface if found and sets the sx/sy parametes to the
+/// returns the surface if found and sets the sx/sy parameters to the
 /// surface coordinates.
+/// This function must be kept in sync with the rendering order in render.zig.
 fn surfaceAt(self: Self, lx: f64, ly: f64, sx: *f64, sy: *f64) ?*wlr.Surface {
     const root = self.seat.input_manager.server.root;
     const wlr_output = root.output_layout.outputAt(lx, ly) orelse return null;
@@ -490,15 +491,31 @@ fn layerSurfaceAt(layer: std.TailQueue(LayerSurface), ox: f64, oy: f64, sx: *f64
 
 /// Find the topmost visible view surface (incl. popups) at ox,oy.
 fn viewSurfaceAt(output: Output, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*wlr.Surface {
-    // Focused views are rendered on top, so look for them first.
+    // focused, floating views
     var it = ViewStack(View).iter(output.views.first, .forward, output.current.tags, surfaceAtFilter);
     while (it.next()) |view| {
-        if (view.current.focus == 0) continue;
+        if (view.current.focus == 0 or !view.current.float) continue;
         if (view.surfaceAt(ox, oy, sx, sy)) |found| return found;
     }
 
+    // non-focused, floating views
     it = ViewStack(View).iter(output.views.first, .forward, output.current.tags, surfaceAtFilter);
     while (it.next()) |view| {
+        if (view.current.focus != 0 or !view.current.float) continue;
+        if (view.surfaceAt(ox, oy, sx, sy)) |found| return found;
+    }
+
+    // focused, non-floating views
+    it = ViewStack(View).iter(output.views.first, .forward, output.current.tags, surfaceAtFilter);
+    while (it.next()) |view| {
+        if (view.current.focus == 0 or view.current.float) continue;
+        if (view.surfaceAt(ox, oy, sx, sy)) |found| return found;
+    }
+
+    // non-focused, non-floating views
+    it = ViewStack(View).iter(output.views.first, .forward, output.current.tags, surfaceAtFilter);
+    while (it.next()) |view| {
+        if (view.current.focus != 0 or view.current.float) continue;
         if (view.surfaceAt(ox, oy, sx, sy)) |found| return found;
     }
 
