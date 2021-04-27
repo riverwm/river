@@ -426,7 +426,6 @@ fn handleRequestSetCursor(
 /// returns the surface if found and sets the sx/sy parametes to the
 /// surface coordinates.
 fn surfaceAt(self: Self, lx: f64, ly: f64, sx: *f64, sy: *f64) ?*wlr.Surface {
-    // Find the output to check
     const root = self.seat.input_manager.server.root;
     const wlr_output = root.output_layout.outputAt(lx, ly) orelse return null;
     const output = @intToPtr(*Output, wlr_output.data);
@@ -436,37 +435,46 @@ fn surfaceAt(self: Self, lx: f64, ly: f64, sx: *f64, sy: *f64) ?*wlr.Surface {
     var oy = ly;
     root.output_layout.outputCoords(wlr_output, &ox, &oy);
 
-    // Check overlay layer incl. popups
-    if (layerSurfaceAt(output.*, output.getLayer(.overlay).*, ox, oy, sx, sy, false)) |s| return s;
+    // Check surfaces in the reverse order they are rendered in:
+    // 1. overlay layer (+ popups)
+    // 2. top, bottom, background popups
+    // 3. top layer
+    // 4. views
+    // 5. bottom, background layers
+    if (layerSurfaceAt(output.getLayer(.overlay).*, ox, oy, sx, sy)) |s| return s;
 
-    // Check top-background popups only
-    for ([_]zwlr.LayerShellV1.Layer{ .top, .bottom, .background }) |layer|
-        if (layerSurfaceAt(output.*, output.getLayer(layer).*, ox, oy, sx, sy, true)) |s| return s;
+    for ([_]zwlr.LayerShellV1.Layer{ .top, .bottom, .background }) |layer| {
+        if (layerPopupSurfaceAt(output.getLayer(layer).*, ox, oy, sx, sy)) |s| return s;
+    }
 
-    // Check top layer
-    if (layerSurfaceAt(output.*, output.getLayer(.top).*, ox, oy, sx, sy, false)) |s| return s;
+    if (layerSurfaceAt(output.getLayer(.top).*, ox, oy, sx, sy)) |s| return s;
 
-    // Check views
     if (viewSurfaceAt(output.*, ox, oy, sx, sy)) |s| return s;
 
-    // Check the bottom-background layers
-    for ([_]zwlr.LayerShellV1.Layer{ .bottom, .background }) |layer|
-        if (layerSurfaceAt(output.*, output.getLayer(layer).*, ox, oy, sx, sy, false)) |s| return s;
+    for ([_]zwlr.LayerShellV1.Layer{ .bottom, .background }) |layer| {
+        if (layerSurfaceAt(output.getLayer(layer).*, ox, oy, sx, sy)) |s| return s;
+    }
 
     return null;
 }
 
-/// Find the topmost surface on the given layer at ox,oy. Will only check
-/// popups if popups_only is true.
-fn layerSurfaceAt(
-    output: Output,
-    layer: std.TailQueue(LayerSurface),
-    ox: f64,
-    oy: f64,
-    sx: *f64,
-    sy: *f64,
-    popups_only: bool,
-) ?*wlr.Surface {
+/// Find the topmost popup surface on the given layer at ox,oy.
+fn layerPopupSurfaceAt(layer: std.TailQueue(LayerSurface), ox: f64, oy: f64, sx: *f64, sy: *f64) ?*wlr.Surface {
+    var it = layer.first;
+    while (it) |node| : (it = node.next) {
+        const layer_surface = &node.data;
+        if (layer_surface.wlr_layer_surface.popupSurfaceAt(
+            ox - @intToFloat(f64, layer_surface.box.x),
+            oy - @intToFloat(f64, layer_surface.box.y),
+            sx,
+            sy,
+        )) |found| return found;
+    }
+    return null;
+}
+
+/// Find the topmost surface (or popup surface) on the given layer at ox,oy.
+fn layerSurfaceAt(layer: std.TailQueue(LayerSurface), ox: f64, oy: f64, sx: *f64, sy: *f64) ?*wlr.Surface {
     var it = layer.first;
     while (it) |node| : (it = node.next) {
         const layer_surface = &node.data;
@@ -475,13 +483,7 @@ fn layerSurfaceAt(
             oy - @intToFloat(f64, layer_surface.box.y),
             sx,
             sy,
-        )) |found| {
-            if (!popups_only) {
-                return found;
-            } else if (found.isXdgSurface() and wlr.XdgSurface.fromWlrSurface(found).role == .popup) {
-                return found;
-            }
-        }
+        )) |found| return found;
     }
     return null;
 }
