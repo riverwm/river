@@ -55,7 +55,7 @@ fn _main() !void {
 
     var globals = Globals{};
 
-    registry.setListener(*Globals, registryListener, &globals) catch unreachable;
+    registry.setListener(*Globals, registryListener, &globals);
     _ = try display.roundtrip();
 
     const control = globals.control orelse return error.RiverControlNotAdvertised;
@@ -68,7 +68,7 @@ fn _main() !void {
 
     const callback = try control.runCommand(seat);
 
-    callback.setListener(?*c_void, callbackListener, null) catch unreachable;
+    callback.setListener(?*c_void, callbackListener, null);
 
     // Loop until our callback is called and we exit.
     while (true) _ = try display.dispatch();

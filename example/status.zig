@@ -33,18 +33,18 @@ pub fn main() !void {
 
     var context = SetupContext{};
 
-    registry.setListener(*SetupContext, registryListener, &context) catch unreachable;
+    registry.setListener(*SetupContext, registryListener, &context);
     _ = try display.roundtrip();
 
     const status_manager = context.status_manager orelse return error.RiverStatusManagerNotAdvertised;
 
     for (context.outputs.items) |output| {
         const output_status = try status_manager.getRiverOutputStatus(output);
-        output_status.setListener(?*c_void, outputStatusListener, null) catch unreachable;
+        output_status.setListener(?*c_void, outputStatusListener, null);
     }
     for (context.seats.items) |seat| {
         const seat_status = try status_manager.getRiverSeatStatus(seat);
-        seat_status.setListener(?*c_void, seatStatusListener, null) catch unreachable;
+        seat_status.setListener(?*c_void, seatStatusListener, null);
     }
     context.outputs.deinit();
     context.seats.deinit();

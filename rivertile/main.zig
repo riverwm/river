@@ -104,7 +104,7 @@ const Output = struct {
     fn getLayout(output: *Output, context: *Context) !void {
         assert(context.initialized);
         output.layout = try context.layout_manager.?.getLayout(output.wl_output, "rivertile");
-        output.layout.setListener(*Output, layoutListener, output) catch unreachable;
+        output.layout.setListener(*Output, layoutListener, output);
     }
 
     fn deinit(output: *Output) void {
@@ -299,7 +299,7 @@ pub fn main() !void {
     var context: Context = .{};
 
     const registry = try display.getRegistry();
-    registry.setListener(*Context, registryListener, &context) catch unreachable;
+    registry.setListener(*Context, registryListener, &context);
     _ = try display.roundtrip();
 
     if (context.layout_manager == null) {
