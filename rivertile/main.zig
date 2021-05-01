@@ -288,7 +288,7 @@ pub fn main() !void {
     }).parse(argv[1..]);
 
     if (args.boolFlag("-h") or args.boolFlag("--help")) {
-        std.io.getStdOut().writeAll(usage);
+        try std.io.getStdOut().writeAll(usage);
         std.os.exit(0);
     }
     if (args.argFlag("-view-padding")) |raw| {
