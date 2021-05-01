@@ -48,6 +48,22 @@ const river = wayland.client.river;
 const Args = @import("args.zig").Args;
 const FlagDef = @import("args.zig").FlagDef;
 
+const usage =
+    \\Usage: rivertile [options]
+    \\
+    \\  -h, --help      Print this help message and exit.
+    \\  -view-padding   Set the padding around views in pixels. (Default 6)
+    \\  -outer-padding  Set the padding around the edge of the layout area in
+    \\                  pixels. (Default 6)
+    \\  -main-location  Set the initial location of the main area in the
+    \\                  layout. (Default left)
+    \\  -main-count     Set the initial number of views in the main area of the
+    \\                  layout. (Default 1)
+    \\  -main-factor    Set the initial ratio of main area to total layout
+    \\                  area. (Default: 0.6)
+    \\
+;
+
 const Location = enum {
     top,
     right,
@@ -262,6 +278,8 @@ pub fn main() !void {
     // https://github.com/ziglang/zig/issues/7807
     const argv: [][*:0]const u8 = std.os.argv;
     const args = Args(0, &[_]FlagDef{
+        .{ .name = "-h", .kind = .boolean },
+        .{ .name = "--help", .kind = .boolean },
         .{ .name = "-view-padding", .kind = .arg },
         .{ .name = "-outer-padding", .kind = .arg },
         .{ .name = "-main-location", .kind = .arg },
@@ -269,6 +287,10 @@ pub fn main() !void {
         .{ .name = "-main-factor", .kind = .arg },
     }).parse(argv[1..]);
 
+    if (args.boolFlag("-h") or args.boolFlag("--help")) {
+        std.io.getStdOut().writeAll(usage);
+        std.os.exit(0);
+    }
     if (args.argFlag("-view-padding")) |raw| {
         view_padding = std.fmt.parseUnsigned(u32, mem.span(raw), 10) catch
             fatal("invalid value '{s}' provided to -view-padding", .{raw});
