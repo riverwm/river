@@ -30,6 +30,22 @@ split main/secondary stacks.
 *-main-factor* _ratio_
 	Set the default ratio of main area to total layout area.
 
+Note that _padding_ options needs to be set at *rivertile* launch.
+
+Example:
+
+```
+rivertile -view-padding 4 -outer-padding 3
+```
+
+_main_ options can be set after *rivertile* launch with the help of *riverctl*.
+
+Example:
+
+```
+riverctl set-layout-value rivertile string main_location top
+```
+
 # VALUES
 
 _main_location_ (string: top, bottom, left, or right)
