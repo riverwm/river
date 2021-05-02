@@ -42,11 +42,11 @@ riverctl map normal $mod Return zoom
 
 # Mod+H and Mod+L to decrease/increase the main_factor value of rivertile by 0.05
 riverctl map normal $mod H mod-layout-value rivertile fixed main_factor -0.05
-riverctl map normal $mod I mod-layout-value rivertile fixed main_factor +0.05
+riverctl map normal $mod L mod-layout-value rivertile fixed main_factor +0.05
 
 # Mod+Shift+H and Mod+Shift+L to increment/decrement the main_count value of rivertile.
 riverctl map normal $mod+Shift H mod-layout-value rivertile int main_count +1
-riverctl map normal $mod+Shift I mod-layout-value rivertile int main_count -1
+riverctl map normal $mod+Shift L mod-layout-value rivertile int main_count -1
 
 # Mod+Alt+{H,J,K,L} to move views
 riverctl map normal $mod+Mod1 H move left 100
