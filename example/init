@@ -5,7 +5,7 @@
 # If you wish to edit this, you will probably want to copy it to
 # $XDG_CONFIG_HOME/river/init or $HOME/.config/river/init first.
 #
-# See the river(1), riverctl(1), and river(1) man pages for complete
+# See the river(1), riverctl(1), and rivertile(1) man pages for complete
 # documentation.
 
 # Use the "logo" key as the primary modifier
