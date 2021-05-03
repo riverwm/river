@@ -71,4 +71,4 @@ source contributors. For more information about river's development, see
 
 # SEE ALSO
 
-*riverctl*(1), *river-layouts*(7), *rivertile*(1)
+*riverctl*(1), *rivertile*(1)
