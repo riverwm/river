@@ -49,7 +49,7 @@ installed:
 
 Then run, for example:
 ```
-zig build -Drelease-safe --prefix /usr install
+zig build -Drelease-safe --prefix ~/.local install
 ```
 To enable experimental Xwayland support pass the `-Dxwayland` option as well.
 
