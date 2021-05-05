@@ -325,7 +325,7 @@ pub fn main() !void {
     _ = try display.roundtrip();
 
     if (context.layout_manager == null) {
-        fatal("wayland compositor does not support river_layout_v1.\n", .{});
+        fatal("wayland compositor does not support river-layout-v2.\n", .{});
     }
 
     context.initialized = true;
