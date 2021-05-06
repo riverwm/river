@@ -1,8 +1,7 @@
 /*
  * Tiled layout for river, implemented in understandable, simple, commented code.
  * Reading this code should help you get a basic understanding of how to use
- * river-layout to create a basic layout generator and how your layouts can
- * depend on values of river-options.
+ * river-layout to create a basic layout generator.
  *
  * Q: Wow, this is a lot of code just for a layout!
  * A: No, it really is not. Most of the code here is just generic Wayland client
@@ -25,18 +24,16 @@
  *    extension and link against them. This is achieved with the following
  *    commands (You may want to setup a build system).
  *
- *        wayland-scanner private-code < river-layout-v1.xml > river-layout-v1.c
- *        wayland-scanner client-header < river-layout-v1.xml > river-layout-v1.h
- *        wayland-scanner private-code < river-options-v2.xml > river-options-v2.c
- *        wayland-scanner client-header < river-options-v2.xml > river-options-v2.h
+ *        wayland-scanner private-code < river-layout-v2.xml > river-layout-v2.c
+ *        wayland-scanner client-header < river-layout-v2.xml > river-layout-v2.h
  *        gcc -Wall -Wextra -Wpedantic -Wno-unused-parameter -c -o layout.o layout.c
- *        gcc -Wall -Wextra -Wpedantic -Wno-unused-parameter -c -o river-layout-v1.o river-layout-v1.c
- *        gcc -Wall -Wextra -Wpedantic -Wno-unused-parameter -c -o river-options-v2.o river-options-v2.c
- *        gcc -o layout layout.o river-layout-v1.o river-options-v2.o -lwayland-client
+ *        gcc -Wall -Wextra -Wpedantic -Wno-unused-parameter -c -o river-layout-v2.o river-layout-v2.c
+ *        gcc -o layout layout.o river-layout-v2.o -lwayland-client
  */
 
 #include<assert.h>
 #include<stdbool.h>
+#include<stdint.h>
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
@@ -44,43 +41,24 @@
 #include<wayland-client.h>
 #include<wayland-client-protocol.h>
 
-#include"river-layout-v1.h"
-#include"river-options-v2.h"
+#include"river-layout-v2.h"
 
 /* A few macros to indulge the inner glibc user. */
 #define MIN(a, b) ( a < b ? a : b )
 #define MAX(a, b) ( a > b ? a : b )
 #define CLAMP(a, b, c) ( MIN(MAX(b, c), MAX(MIN(b, c), a)) )
 
-enum Option_type
-{
-	UINT_OPTION,
-	DOUBLE_OPTION
-};
-
-struct Option
-{
-	struct Output *output;
-	struct river_option_handle_v2 *handle;
-	enum Option_type type;
-	union
-	{
-		uint32_t u;
-		double   d;
-	} value;
-};
-
 struct Output
 {
 	struct wl_list link;
 
 	struct wl_output       *output;
-	struct river_layout_v1 *layout;
+	struct river_layout_v2 *layout;
 
-	struct Option main_count;
-	struct Option main_factor;
-	struct Option view_padding;
-	struct Option outer_padding;
+	uint32_t main_count;
+	double main_factor;
+	uint32_t view_padding;
+	uint32_t outer_padding;
 
 	bool configured;
 };
@@ -91,13 +69,12 @@ struct Output
 struct wl_display  *wl_display;
 struct wl_registry *wl_registry;
 struct wl_callback *sync_callback;
-struct river_layout_manager_v1 *layout_manager;
-struct river_options_manager_v2 *options_manager;
+struct river_layout_manager_v2 *layout_manager;
 struct wl_list outputs;
 bool loop = true;
 int ret = EXIT_FAILURE;
 
-static void layout_handle_layout_demand (void *data, struct river_layout_v1 *river_layout_v1,
+static void layout_handle_layout_demand (void *data, struct river_layout_v2 *river_layout_v2,
 		uint32_t view_count, uint32_t width, uint32_t height, uint32_t tags, uint32_t serial)
 {
 	struct Output *output = (struct Output *)data;
@@ -112,52 +89,51 @@ static void layout_handle_layout_demand (void *data, struct river_layout_v1 *riv
 	 * you have to create handlers for the advertise_view and advertise_done
 	 * events. Happy hacking!
 	 */
-	width -= 2 * output->outer_padding.value.u, height -= 2 * output->outer_padding.value.u;
-	const double main_factor = CLAMP(output->main_factor.value.d, 0.1, 0.9);
+	width -= 2 * output->outer_padding, height -= 2 * output->outer_padding;
 	unsigned int main_size, stack_size, view_x, view_y, view_width, view_height;
-	if ( output->main_count.value.u == 0 )
+	if ( output->main_count == 0 )
 	{
 		main_size  = 0;
 		stack_size = width;
 	}
-	else if ( view_count <= output->main_count.value.u )
+	else if ( view_count <= output->main_count )
 	{
 		main_size  = width;
 		stack_size = 0;
 	}
 	else
 	{
-		main_size  = width * main_factor;
+		main_size  = width * output->main_factor;
 		stack_size = width - main_size;
 	}
 	for (unsigned int i = 0; i < view_count; i++)
 	{
-		if ( i < output->main_count.value.u ) /* main area. */
+		if ( i < output->main_count ) /* main area. */
 		{
 			view_x      = 0;
 			view_width  = main_size;
-			view_height = height / MIN(output->main_count.value.u, view_count);
+			view_height = height / MIN(output->main_count, view_count);
 			view_y      = i * view_height;
 		}
 		else /* Stack area. */
 		{
 			view_x      = main_size;
 			view_width  = stack_size;
-			view_height = height / ( view_count - output->main_count.value.u);
-			view_y      = (i - output->main_count.value.u) * view_height;
+			view_height = height / ( view_count - output->main_count);
+			view_y      = (i - output->main_count) * view_height;
 		}
 
-		river_layout_v1_push_view_dimensions(output->layout, serial,
-				view_x + output->view_padding.value.u + output->outer_padding.value.u,
-				view_y + output->view_padding.value.u + output->outer_padding.value.u,
-				view_width - (2 * output->view_padding.value.u),
-				view_height - (2 * output->view_padding.value.u));
+		river_layout_v2_push_view_dimensions(output->layout, serial,
+				view_x + output->view_padding + output->outer_padding,
+				view_y + output->view_padding + output->outer_padding,
+				view_width - (2 * output->view_padding),
+				view_height - (2 * output->view_padding));
 	}
 
-	river_layout_v1_commit(output->layout, serial);
+	river_layout_v2_commit(output->layout, serial);
 }
 
-static void layout_handle_namespace_in_use (void *data, struct river_layout_v1 *river_layout_v1)
+static void layout_handle_namespace_in_use (void *data, struct river_layout_v2 *river_layout_v2)
 {
 	/* Oh no, the namespace we choose is already used by another client!
 	 * All we can do now is destroy the river_layout object. Because we are
@@ -170,60 +146,81 @@ static void layout_handle_namespace_in_use (void *data, struct river_layout_v1 *
 	loop = false;
 }
 
+static void layout_handle_set_int_value (void *data, struct river_layout_v2 *river_layout_v2,
+		const char *name, int32_t value)
+{
+	/* This event is used by the server to tell us to change the value of
+	 * one of our layout parameters, identified by name. A layout_demand
+	 * event will be send immediately afterwards.
+	 */
+	struct Output *output = (struct Output *)data;
+
+	/* All integer parameters of this layout only accept positive values. */
+	if ( value < 0 )
+		return;
+
+	if ( strcmp(name, "main_count") == 0 )
+		output->main_count = (uint32_t)value;
+	else if ( strcmp(name, "view_padding") == 0 )
+		output->view_padding = (uint32_t)value;
+	else if ( strcmp(name, "outer_padding") == 0 )
+		output->outer_padding = (uint32_t)value;
+}
+
+static void layout_handle_mod_int_value (void *data, struct river_layout_v2 *river_layout_v2,
+		const char *name, int32_t delta)
+{
+	/* This event is used by the server to tell us to modify the value of
+	 * one of our layout parameters by a delta, identified by name. A
+	 * layout_demand event will be send immediately afterwards.
+	 */
+	struct Output *output = (struct Output *)data;
+	if ( strcmp(name, "main_count") == 0 )
+	{
+		if ( (int32_t)output->main_count + delta >= 0 )
+			output->main_count = output->main_count + delta;
+	}
+	else if ( strcmp(name, "view_padding") == 0 )
+	{
+		if ( (int32_t)output->view_padding + delta >= 0 )
+			output->view_padding = output->view_padding + delta;
+	}
+	else if ( strcmp(name, "outer_padding") == 0 )
+	{
+		if ( (int32_t)output->outer_padding + delta >= 0 )
+			output->outer_padding = output->outer_padding + delta;
+	}
+}
+
+static void layout_handle_set_fixed_value (void *data, struct river_layout_v2 *river_layout_v2,
+		const char *name, wl_fixed_t value)
+{
+	struct Output *output = (struct Output *)data;
+	if ( strcmp(name, "main_factor") == 0 )
+		output->main_factor = CLAMP(wl_fixed_to_double(value), 0.1, 0.9);
+}
+
+static void layout_handle_mod_fixed_value (void *data, struct river_layout_v2 *river_layout_v2,
+		const char *name, wl_fixed_t delta)
+{
+	struct Output *output = (struct Output *)data;
+	if ( strcmp(name, "main_factor") == 0 )
+		output->main_factor = CLAMP(output->main_factor + wl_fixed_to_double(delta), 0.1, 0.9);
+}
+
 /* A no-op function we plug into listeners when we don't want to handle an event. */
 static void noop () {}
 
-static const struct river_layout_v1_listener layout_listener = {
+static const struct river_layout_v2_listener layout_listener = {
 	.namespace_in_use = layout_handle_namespace_in_use,
 	.layout_demand    = layout_handle_layout_demand,
+	.set_int_value    = layout_handle_set_int_value,
+	.mod_int_value    = layout_handle_mod_int_value,
+	.set_fixed_value  = layout_handle_set_fixed_value,
+	.mod_fixed_value  = layout_handle_mod_fixed_value,
+	.set_string_value = noop,
 	.advertise_view   = noop,
 	.advertise_done   = noop,
-};
-
-static void option_handle_uint (void *data, struct river_option_handle_v2 *handle,
-		uint32_t value)
-{
-	struct Option *option = (struct Option *)data;
-
-	/* We have received an event with the value of this option. But we
-	 * can only use it if it matches the type we want.
-	 */
-	if ( option->type == UINT_OPTION )
-	{
-		option->value.u = value;
-
-		/* Our layout depends on the value of this option. We need to
-		 * signal the compositor that one of the parameters we use to
-		 * generate the layout has changed. It may then decide to start
-		 * a new layout demand process.
-		 */
-		river_layout_v1_parameters_changed(option->output->layout);
-	}
-}
-
-static void option_handle_fixed (void *data, struct river_option_handle_v2 *handle,
-		wl_fixed_t value)
-{
-	struct Option *option = (struct Option *)data;
-
-	if ( option->type == DOUBLE_OPTION )
-	{
-		option->value.d = wl_fixed_to_double(value);
-		river_layout_v1_parameters_changed(option->output->layout);
-	}
-}
-
-static const struct river_option_handle_v2_listener option_listener = {
-	.int_value    = noop,
-	.uint_value   = option_handle_uint,
-	.fixed_value  = option_handle_fixed,
-	.string_value = noop,
-
-	/* This event will be sent by the compositor when the requested option does
-	 * not exist. Since we declared all options we plan on using at startup, we
-	 * can safely ignore this event.
-	 */
-	.undeclared   = noop,
 };
 
 static void configure_output (struct Output *output)
@@ -234,39 +231,9 @@ static void configure_output (struct Output *output)
 	 * to use. It can be any arbitrary string. It should describe roughly
 	 * what kind of layout your client will create, so here we use "tile".
 	 */
-	output->layout = river_layout_manager_v1_get_layout(layout_manager,
+	output->layout = river_layout_manager_v2_get_layout(layout_manager,
 			output->output, "tile");
-	river_layout_v1_add_listener(output->layout, &layout_listener, output);
-
-	/* The amount of main views and other such values are communicated using
-	 * river-options. You can have an arbitrary amount of options which hold
-	 * arbitrary values. Here we are boring and just use the ones you'd
-	 * typically expect for typical tiled layouts.
-	 *
-	 * Careful: Options can have a wrong type (set by other clients) which
-	 * is a special case we have to handle. In case of this example layout
-	 * generator it is handled by simply ignoring the wrong events and falling
-	 * back to defaults.
-	 */
-	output->main_count.handle = river_options_manager_v2_get_option_handle(
-		options_manager, "main_count", output->output);
-	river_option_handle_v2_add_listener(output->main_count.handle,
-		&option_listener, &output->main_count);
-
-	output->main_factor.handle = river_options_manager_v2_get_option_handle(
-		options_manager, "main_factor", output->output);
-	river_option_handle_v2_add_listener(output->main_factor.handle,
-		&option_listener, &output->main_factor);
-
-	output->view_padding.handle = river_options_manager_v2_get_option_handle(
-		options_manager, "view_padding", output->output);
-	river_option_handle_v2_add_listener(output->view_padding.handle,
-		&option_listener, &output->view_padding);
-
-	output->outer_padding.handle = river_options_manager_v2_get_option_handle(
-		options_manager, "outer_padding", output->output);
-	river_option_handle_v2_add_listener(output->outer_padding.handle,
-		&option_listener, &output->outer_padding);
+	river_layout_v2_add_listener(output->layout, &layout_listener, output);
 }
 
 static bool create_output (struct wl_output *wl_output)
@@ -282,30 +249,22 @@ static bool create_output (struct wl_output *wl_output)
 	output->layout     = NULL;
 	output->configured = false;
 
-	output->main_count.value.u = 1;
-	output->main_count.handle  = NULL;
-	output->main_count.type    = UINT_OPTION;
-	output->main_count.output  = output;
-
-	output->main_factor.value.d = 0.6;
-	output->main_factor.handle  = NULL;
-	output->main_factor.type    = DOUBLE_OPTION;
-	output->main_factor.output  = output;
-
-	output->view_padding.value.u = 5;
-	output->view_padding.handle  = NULL;
-	output->view_padding.type    = UINT_OPTION;
-	output->view_padding.output  = output;
-
-	output->outer_padding.value.u = 5;
-	output->outer_padding.handle  = NULL;
-	output->outer_padding.type    = UINT_OPTION;
-	output->outer_padding.output  = output;
-
-	/* If we already have the river_layout_manager and the river_options_manager,
-	 * we can get a river_layout for this output.
+	/* These are the parameters of our layout. In this case, they are the
+	 * ones you'd typically expect from a dynamic tiling layout, but if you
+	 * are creative, you can do more. You can use any arbitrary amount of
+	 * integer, fixed and string values in your layout. If the user wants to
+	 * change a value, the server lets us know using events of the
+	 * river_layout object. They need to be initialiued with defaults though.
 	 */
-	if ( layout_manager != NULL && options_manager != NULL )
+	output->main_count    = 1;
+	output->main_factor   = 0.6;
+	output->view_padding  = 5;
+	output->outer_padding = 5;
+
+	/* If we already have the river_layout_manager, we can get a
+	 * river_layout for this output.
+	 */
+	if ( layout_manager != NULL )
 		configure_output(output);
 
 	wl_list_insert(&outputs, &output->link);
@@ -315,15 +274,7 @@ static bool create_output (struct wl_output *wl_output)
 static void destroy_output (struct Output *output)
 {
 	if ( output->layout != NULL )
-		river_layout_v1_destroy(output->layout);
-	if ( output->main_count.handle != NULL )
-		river_option_handle_v2_destroy(output->main_count.handle);
-	if ( output->main_factor.handle != NULL )
-		river_option_handle_v2_destroy(output->main_factor.handle);
-	if ( output->view_padding.handle != NULL )
-		river_option_handle_v2_destroy(output->view_padding.handle);
-	if ( output->outer_padding.handle != NULL )
-		river_option_handle_v2_destroy(output->outer_padding.handle);
+		river_layout_v2_destroy(output->layout);
 	wl_output_destroy(output->output);
 	wl_list_remove(&output->link);
 	free(output);
@@ -339,12 +290,9 @@ static void destroy_all_outputs ()
 static void registry_handle_global (void *data, struct wl_registry *registry,
 		uint32_t name, const char *interface, uint32_t version)
 {
-	if (! strcmp(interface, river_layout_manager_v1_interface.name))
+	if (! strcmp(interface, river_layout_manager_v2_interface.name))
 		layout_manager = wl_registry_bind(registry, name,
-				&river_layout_manager_v1_interface, 1);
-	else if (! strcmp(interface, river_options_manager_v2_interface.name))
-		options_manager = wl_registry_bind(registry, name,
-				&river_options_manager_v2_interface, 1);
+				&river_layout_manager_v2_interface, 1);
 	else if (! strcmp(interface, wl_output_interface.name))
 	{
 		struct wl_output *wl_output = wl_registry_bind(registry, name,
@@ -373,33 +321,15 @@ static void sync_handle_done (void *data, struct wl_callback *wl_callback,
 	 */
 	if ( layout_manager == NULL )
 	{
-		fputs("Wayland compositor does not support river-layout-v1.\n", stderr);
+		fputs("Wayland compositor does not support river-layout-v2.\n", stderr);
 		ret = EXIT_FAILURE;
 		loop = false;
 		return;
 	}
 
-	if ( options_manager == NULL )
-	{
-		fputs("Wayland compositor does not support river-options-v2.\n", stderr);
-		ret = EXIT_FAILURE;
-		loop = false;
-		return;
-	}
-
-	/* The options we want to use may not exist yet, so let's declare them with
-	 * some sensible defaults. If they do already exists, river will ignore this.
-	 * How these options are named and what you end up doing with them is totally
-	 * up to your creativity.
-	 */
-	 river_options_manager_v2_declare_uint_option(options_manager, "main_count", 1);
-	 river_options_manager_v2_declare_fixed_option(options_manager, "main_factor", wl_fixed_from_double(0.6));
-	 river_options_manager_v2_declare_uint_option(options_manager, "view_padding", 5);
-	 river_options_manager_v2_declare_uint_option(options_manager, "outer_padding", 5);
-
-	/* If outputs were registered before both river_layout_manager and
-	 * river_options_manager where available, they won't have a river_layout
-	 * nor the option handles, so we need to create those here.
+	/* If outputs were registered before the river_layout_manager is
+	 * available, they won't have a river_layout, so we need to create those
+	 * here.
 	 */
 	struct Output *output;
 	wl_list_for_each(output, &outputs, link)
@@ -456,9 +386,7 @@ static void finish_wayland (void)
 	if ( sync_callback != NULL )
 		wl_callback_destroy(sync_callback);
 	if ( layout_manager != NULL )
-		river_layout_manager_v1_destroy(layout_manager);
-	if ( options_manager != NULL )
-		river_options_manager_v2_destroy(options_manager);
+		river_layout_manager_v2_destroy(layout_manager);
 
 	wl_registry_destroy(wl_registry);
 	wl_display_disconnect(wl_display);
