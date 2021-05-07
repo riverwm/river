@@ -21,6 +21,7 @@ const server = &@import("../main.zig").server;
 
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
+const Config = @import("../Config.zig");
 
 pub fn borderWidth(
     allocator: *std.mem.Allocator,
@@ -79,6 +80,18 @@ pub fn borderColorUnfocused(
 
     var it = server.root.outputs.first;
     while (it) |node| : (it = node.next) node.data.damage.addWhole();
+}
+
+pub fn setCursorWarp(
+    allocator: *std.mem.Allocator,
+    seat: *Seat,
+    args: []const []const u8,
+    out: *?[]const u8,
+) Error!void {
+    if (args.len < 2) return Error.NotEnoughArguments;
+    if (args.len > 2) return Error.TooManyArguments;
+    server.config.warp_cursor = std.meta.stringToEnum(Config.WarpCursorMode, args[1]) orelse
+        return Error.UnknownOption;
 }
 
 /// Parse a color in the format #RRGGBB or #RRGGBBAA

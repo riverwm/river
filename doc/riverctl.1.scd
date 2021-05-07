@@ -228,7 +228,7 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 	There are three available modes:
 
 	- _disabled_: Moving the cursor does not affect focus. This is
-	  the default
+	  the default.
 	- _normal_: Moving the cursor over a view will focus that view.
 	  Moving the cursor within a view will not re-focus that view if
 	  focus has moved elsewhere.
@@ -237,6 +237,13 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 
 	If the view to be focused is on an output that does not have focus,
 	focus is switched to that output.
+
+*set-cursor-warp* *disabled*|*on-output-change*
+	Set the cursor warp mode. There are two available modes:
+
+	- _disabled_: Cursor will not be warped. This is the default.
+	- _on-output-change_: When a different output is focused, the cursor will be
+	  warped to its center.
 
 *opacity* _focused_ _unfocused_ _initial_ _step-size_ _delta-t_
 	Configure server-side opacity of views, including transition
