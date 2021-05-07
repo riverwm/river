@@ -33,6 +33,11 @@ pub const FocusFollowsCursorMode = enum {
     strict,
 };
 
+pub const WarpCursorMode = enum {
+    disabled,
+    @"on-output-change",
+};
+
 /// Color of background in RGBA (alpha should only affect nested sessions)
 background_color: [4]f32 = [_]f32{ 0.0, 0.16862745, 0.21176471, 1.0 }, // Solarized base03
 
@@ -59,6 +64,9 @@ csd_filter: std.ArrayList([]const u8),
 
 /// The selected focus_follows_cursor mode
 focus_follows_cursor: FocusFollowsCursorMode = .disabled,
+
+/// If true, the cursor warps to the center of the focused output
+warp_cursor: WarpCursorMode = .disabled,
 
 /// The default layout namespace for outputs which have never had a per-output
 /// value set. Call Output.handleLayoutNamespaceChange() on setting this if

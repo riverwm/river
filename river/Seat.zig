@@ -266,6 +266,23 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
 pub fn focusOutput(self: *Self, output: *Output) void {
     if (self.focused_output == output) return;
 
+    // Warp pointer to center of newly focused output (In layout coordinates),
+    // but only if cursor is not already on the output and this feature is enabled.
+    switch (server.config.warp_cursor) {
+        .disabled => {},
+        .@"on-output-change" => {
+            const layout_box = server.root.output_layout.getBox(output.wlr_output).?;
+            if (!layout_box.containsPoint(self.cursor.wlr_cursor.x, self.cursor.wlr_cursor.y)) {
+                const eff_res = output.getEffectiveResolution();
+                const lx = @intToFloat(f32, layout_box.x + @intCast(i32, eff_res.width / 2));
+                const ly = @intToFloat(f32, layout_box.y + @intCast(i32, eff_res.height / 2));
+                if (!self.cursor.wlr_cursor.warp(null, lx, ly)) {
+                    log.err("failed to warp cursor on output change", .{});
+                }
+            }
+        },
+    }
+
     var it = self.status_trackers.first;
     while (it) |node| : (it = node.next) node.data.sendOutput(.unfocused);
 
