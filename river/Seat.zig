@@ -122,10 +122,14 @@ pub fn focus(self: *Self, _target: ?*View) void {
     // While a layer surface is focused, views may not recieve focus
     if (self.focused == .layer) return;
 
-    // If the view is not currently visible, behave as if null was passed
     if (target) |view| {
-        if (view.output != self.focused_output or
-            view.pending.tags & self.focused_output.pending.tags == 0) target = null;
+        // If the view is not currently visible, behave as if null was passed
+        if (view.pending.tags & view.output.pending.tags == 0) {
+            target = null;
+        } else {
+            // If the view is not on the currently focused output, focus it
+            if (view.output != self.focused_output) self.focusOutput(view.output);
+        }
     }
 
     // If the target view is not fullscreen or null, then a fullscreen view
