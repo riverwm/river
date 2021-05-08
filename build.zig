@@ -63,11 +63,11 @@ pub fn build(b: *zbs.Builder) !void {
     scanner.addSystemProtocol("unstable/pointer-gestures/pointer-gestures-unstable-v1.xml");
     scanner.addSystemProtocol("unstable/xdg-output/xdg-output-unstable-v1.xml");
     scanner.addSystemProtocol("unstable/pointer-constraints/pointer-constraints-unstable-v1.xml");
-    scanner.addProtocolPath("protocol/river-control-unstable-v1.xml");
-    scanner.addProtocolPath("protocol/river-status-unstable-v1.xml");
-    scanner.addProtocolPath("protocol/river-layout-v2.xml");
-    scanner.addProtocolPath("protocol/wlr-layer-shell-unstable-v1.xml");
-    scanner.addProtocolPath("protocol/wlr-output-power-management-unstable-v1.xml");
+    scanner.addProtocolPath("protocol/staging/river-control-v1.xml");
+    scanner.addProtocolPath("protocol/staging/river-status-v1.xml");
+    scanner.addProtocolPath("protocol/staging/river-layout-v2.xml");
+    scanner.addProtocolPath("protocol/unstable/wlr-layer-shell-unstable-v1.xml");
+    scanner.addProtocolPath("protocol/unstable/wlr-output-power-management-unstable-v1.xml");
 
     {
         const river = b.addExecutable("river", "river/main.zig");

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<protocol name="river_control_unstable_v1">
+<protocol name="river_control_v1">
   <copyright>
     Copyright 2020 The River Developers
 
@@ -16,7 +16,14 @@
     OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
   </copyright>
 
-  <interface name="zriver_control_v1" version="1">
+  <description summary="warning staging protocol">
+    Warning! The protocol described in this file is currently in the testing
+    phase. Backward compatible changes may be added together with the
+    corresponding interface version bump. Backward incompatible changes can
+    only be done by creating a new major version of the extension.
+  </description>
+
+  <interface name="river_control_v1" version="1">
     <description summary="run compositor commands">
       This interface allows clients to run compositor commands and receive a
       success/failure response with output or a failure message respectively.
@@ -51,12 +58,12 @@
         given seat.
       </description>
       <arg name="seat" type="object" interface="wl_seat"/>
-      <arg name="callback" type="new_id" interface="zriver_command_callback_v1"
+      <arg name="callback" type="new_id" interface="river_command_callback_v1"
         summary="callback object"/>
     </request>
   </interface>
 
-  <interface name="zriver_command_callback_v1" version="1">
+  <interface name="river_command_callback_v1" version="1">
     <description summary="callback object">
       This object is created by the run_command request. Exactly one of the
       success or failure events will be sent. This object will be destroyed

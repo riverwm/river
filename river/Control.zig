@@ -22,7 +22,7 @@ const mem = std.mem;
 
 const wayland = @import("wayland");
 const wl = wayland.server.wl;
-const zriver = wayland.server.zriver;
+const river = wayland.server.river;
 
 const wlr = @import("wlroots");
 
@@ -42,7 +42,7 @@ server_destroy: wl.Listener(*wl.Server) = wl.Listener(*wl.Server).init(handleSer
 
 pub fn init(self: *Self, server: *Server) !void {
     self.* = .{
-        .global = try wl.Global.create(server.wl_server, zriver.ControlV1, 1, *Self, self, bind),
+        .global = try wl.Global.create(server.wl_server, river.ControlV1, 1, *Self, self, bind),
         .args_map = ArgMap.init(util.gpa),
     };
 
@@ -57,7 +57,7 @@ fn handleServerDestroy(listener: *wl.Listener(*wl.Server), wl_server: *wl.Server
 
 /// Called when a client binds our global
 fn bind(client: *wl.Client, self: *Self, version: u32, id: u32) callconv(.C) void {
-    const control = zriver.ControlV1.create(client, version, id) catch {
+    const control = river.ControlV1.create(client, version, id) catch {
         client.postNoMemory();
         return;
     };
@@ -69,7 +69,7 @@ fn bind(client: *wl.Client, self: *Self, version: u32, id: u32) callconv(.C) voi
     control.setHandler(*Self, handleRequest, handleDestroy, self);
 }
 
-fn handleRequest(control: *zriver.ControlV1, request: zriver.ControlV1.Request, self: *Self) void {
+fn handleRequest(control: *river.ControlV1, request: river.ControlV1.Request, self: *Self) void {
     switch (request) {
         .destroy => control.destroy(),
         .add_argument => |add_argument| {
@@ -88,7 +88,7 @@ fn handleRequest(control: *zriver.ControlV1, request: zriver.ControlV1.Request, 
         .run_command => |run_command| {
             const seat = @intToPtr(*Seat, wlr.Seat.Client.fromWlSeat(run_command.seat).?.seat.data);
 
-            const callback = zriver.CommandCallbackV1.create(
+            const callback = river.CommandCallbackV1.create(
                 control.getClient(),
                 control.getVersion(),
                 run_command.callback,
@@ -137,7 +137,7 @@ fn handleRequest(control: *zriver.ControlV1, request: zriver.ControlV1.Request, 
 }
 
 /// Remove the resource from the hash map and free all stored args
-fn handleDestroy(control: *zriver.ControlV1, self: *Self) void {
+fn handleDestroy(control: *river.ControlV1, self: *Self) void {
     var list = self.args_map.remove(
         .{ .client = control.getClient(), .id = control.getId() },
     ).?.value;

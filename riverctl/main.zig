@@ -22,12 +22,12 @@ const assert = std.debug.assert;
 
 const wayland = @import("wayland");
 const wl = wayland.client.wl;
-const zriver = wayland.client.zriver;
+const river = wayland.client.river;
 
 const gpa = std.heap.c_allocator;
 
 pub const Globals = struct {
-    control: ?*zriver.ControlV1 = null,
+    control: ?*river.ControlV1 = null,
     seat: ?*wl.Seat = null,
 };
 
@@ -80,15 +80,15 @@ fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, globals: *
             if (std.cstr.cmp(global.interface, wl.Seat.getInterface().name) == 0) {
                 assert(globals.seat == null); // TODO: support multiple seats
                 globals.seat = registry.bind(global.name, wl.Seat, 1) catch @panic("out of memory");
-            } else if (std.cstr.cmp(global.interface, zriver.ControlV1.getInterface().name) == 0) {
-                globals.control = registry.bind(global.name, zriver.ControlV1, 1) catch @panic("out of memory");
+            } else if (std.cstr.cmp(global.interface, river.ControlV1.getInterface().name) == 0) {
+                globals.control = registry.bind(global.name, river.ControlV1, 1) catch @panic("out of memory");
             }
         },
         .global_remove => {},
     }
 }
 
-fn callbackListener(callback: *zriver.CommandCallbackV1, event: zriver.CommandCallbackV1.Event, _: ?*c_void) void {
+fn callbackListener(callback: *river.CommandCallbackV1, event: river.CommandCallbackV1.Event, _: ?*c_void) void {
     switch (event) {
         .success => |success| {
             if (mem.len(success.output) > 0) {

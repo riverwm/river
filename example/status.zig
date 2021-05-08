@@ -19,10 +19,10 @@ const std = @import("std");
 
 const wayland = @import("wayland");
 const wl = wayland.client.wl;
-const zriver = wayland.client.zriver;
+const river = wayland.client.river;
 
 const SetupContext = struct {
-    status_manager: ?*zriver.StatusManagerV1 = null,
+    status_manager: ?*river.StatusManagerV1 = null,
     outputs: std.ArrayList(*wl.Output) = std.ArrayList(*wl.Output).init(std.heap.c_allocator),
     seats: std.ArrayList(*wl.Seat) = std.ArrayList(*wl.Seat).init(std.heap.c_allocator),
 };
@@ -56,8 +56,8 @@ pub fn main() !void {
 fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, context: *SetupContext) void {
     switch (event) {
         .global => |global| {
-            if (std.cstr.cmp(global.interface, zriver.StatusManagerV1.getInterface().name) == 0) {
-                context.status_manager = registry.bind(global.name, zriver.StatusManagerV1, 1) catch return;
+            if (std.cstr.cmp(global.interface, river.StatusManagerV1.getInterface().name) == 0) {
+                context.status_manager = registry.bind(global.name, river.StatusManagerV1, 1) catch return;
             } else if (std.cstr.cmp(global.interface, wl.Seat.getInterface().name) == 0) {
                 const seat = registry.bind(global.name, wl.Seat, 1) catch return;
                 context.seats.append(seat) catch @panic("out of memory");
@@ -70,7 +70,7 @@ fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, context: *
     }
 }
 
-fn outputStatusListener(output_status: *zriver.OutputStatusV1, event: zriver.OutputStatusV1.Event, data: ?*c_void) void {
+fn outputStatusListener(output_status: *river.OutputStatusV1, event: river.OutputStatusV1.Event, data: ?*c_void) void {
     switch (event) {
         .focused_tags => |focused_tags| std.debug.warn("Focused tags: {b:0>10}\n", .{focused_tags.tags}),
         .view_tags => |view_tags| {
@@ -80,7 +80,7 @@ fn outputStatusListener(output_status: *zriver.OutputStatusV1, event: zriver.Out
     }
 }
 
-fn seatStatusListener(seat_status: *zriver.SeatStatusV1, event: zriver.SeatStatusV1.Event, data: ?*c_void) void {
+fn seatStatusListener(seat_status: *river.SeatStatusV1, event: river.SeatStatusV1.Event, data: ?*c_void) void {
     switch (event) {
         .focused_output => |focused_output| std.debug.warn("Output id {} focused\n", .{
             @ptrCast(*wl.Proxy, focused_output.output orelse return).getId(),

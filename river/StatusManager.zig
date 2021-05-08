@@ -21,7 +21,7 @@ const std = @import("std");
 const wlr = @import("wlroots");
 const wayland = @import("wayland");
 const wl = wayland.server.wl;
-const zriver = wayland.server.zriver;
+const river = wayland.server.river;
 
 const util = @import("util.zig");
 
@@ -39,7 +39,7 @@ server_destroy: wl.Listener(*wl.Server) = wl.Listener(*wl.Server).init(handleSer
 
 pub fn init(self: *Self, server: *Server) !void {
     self.* = .{
-        .global = try wl.Global.create(server.wl_server, zriver.StatusManagerV1, 1, *Self, self, bind),
+        .global = try wl.Global.create(server.wl_server, river.StatusManagerV1, 1, *Self, self, bind),
     };
 
     server.wl_server.addDestroyListener(&self.server_destroy);
@@ -51,7 +51,7 @@ fn handleServerDestroy(listener: *wl.Listener(*wl.Server), wl_server: *wl.Server
 }
 
 fn bind(client: *wl.Client, self: *Self, version: u32, id: u32) callconv(.C) void {
-    const status_manager = zriver.StatusManagerV1.create(client, version, id) catch {
+    const status_manager = river.StatusManagerV1.create(client, version, id) catch {
         client.postNoMemory();
         log.crit("out of memory", .{});
         return;
@@ -60,8 +60,8 @@ fn bind(client: *wl.Client, self: *Self, version: u32, id: u32) callconv(.C) voi
 }
 
 fn handleRequest(
-    status_manager: *zriver.StatusManagerV1,
-    request: zriver.StatusManagerV1.Request,
+    status_manager: *river.StatusManagerV1,
+    request: river.StatusManagerV1.Request,
     self: *Self,
 ) void {
     switch (request) {
@@ -77,7 +77,7 @@ fn handleRequest(
                 return;
             };
 
-            const output_status = zriver.OutputStatusV1.create(
+            const output_status = river.OutputStatusV1.create(
                 status_manager.getClient(),
                 status_manager.getVersion(),
                 req.id,
@@ -102,7 +102,7 @@ fn handleRequest(
                 return;
             };
 
-            const seat_status = zriver.SeatStatusV1.create(
+            const seat_status = river.SeatStatusV1.create(
                 status_manager.getClient(),
                 status_manager.getVersion(),
                 req.id,

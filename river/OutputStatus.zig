@@ -20,7 +20,7 @@ const Self = @This();
 const std = @import("std");
 const wayland = @import("wayland");
 const wl = wayland.server.wl;
-const zriver = wayland.server.zriver;
+const river = wayland.server.river;
 
 const util = @import("util.zig");
 
@@ -31,9 +31,9 @@ const ViewStack = @import("view_stack.zig").ViewStack;
 const log = std.log.scoped(.river_status);
 
 output: *Output,
-output_status: *zriver.OutputStatusV1,
+output_status: *river.OutputStatusV1,
 
-pub fn init(self: *Self, output: *Output, output_status: *zriver.OutputStatusV1) void {
+pub fn init(self: *Self, output: *Output, output_status: *river.OutputStatusV1) void {
     self.* = .{ .output = output, .output_status = output_status };
 
     output_status.setHandler(*Self, handleRequest, handleDestroy, self);
@@ -43,13 +43,13 @@ pub fn init(self: *Self, output: *Output, output_status: *zriver.OutputStatusV1)
     self.sendFocusedTags();
 }
 
-fn handleRequest(output_status: *zriver.OutputStatusV1, request: zriver.OutputStatusV1.Request, self: *Self) void {
+fn handleRequest(output_status: *river.OutputStatusV1, request: river.OutputStatusV1.Request, self: *Self) void {
     switch (request) {
         .destroy => output_status.destroy(),
     }
 }
 
-fn handleDestroy(output_status: *zriver.OutputStatusV1, self: *Self) void {
+fn handleDestroy(output_status: *river.OutputStatusV1, self: *Self) void {
     const node = @fieldParentPtr(std.SinglyLinkedList(Self).Node, "data", self);
     self.output.status_trackers.remove(node);
 }
