@@ -75,7 +75,7 @@ pub fn init(self: *Self) !void {
     };
 
     self.seats.prepend(seat_node);
-    try seat_node.data.init(self, default_seat_name);
+    try seat_node.data.init(default_seat_name);
 
     if (build_options.xwayland) server.xwayland.setSeat(self.defaultSeat().wlr_seat);
 

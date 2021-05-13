@@ -17,6 +17,8 @@
 
 const std = @import("std");
 
+const server = &@import("../main.zig").server;
+
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
@@ -43,7 +45,7 @@ pub fn toggleFloat(
         if (view.pending.fullscreen) return;
 
         // Don't modify views which are the target of a cursor action
-        if (seat.input_manager.isCursorActionTarget(view)) return;
+        if (server.input_manager.isCursorActionTarget(view)) return;
 
         view.pending.float = !view.pending.float;
         view.applyPending();

@@ -17,6 +17,8 @@
 
 const std = @import("std");
 
+const server = &@import("../main.zig").server;
+
 const Box = @import("../Box.zig");
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
@@ -34,7 +36,7 @@ pub fn toggleFullscreen(
         const view = seat.focused.view;
 
         // Don't modify views which are the target of a cursor action
-        if (seat.input_manager.isCursorActionTarget(view)) return;
+        if (server.input_manager.isCursorActionTarget(view)) return;
 
         view.pending.fullscreen = !view.pending.fullscreen;
         view.applyPending();

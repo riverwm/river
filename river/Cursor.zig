@@ -154,7 +154,7 @@ pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
 
     // If this cursor belongs to the default seat, set the xcursor environment
     // variables and the xwayland cursor theme.
-    if (self.seat == self.seat.input_manager.defaultSeat()) {
+    if (self.seat == server.input_manager.defaultSeat()) {
         const size_str = try std.fmt.allocPrint0(util.gpa, "{}", .{size});
         defer util.gpa.free(size_str);
         if (c.setenv("XCURSOR_SIZE", size_str, 1) < 0) return error.OutOfMemory;
@@ -586,7 +586,7 @@ fn leaveMode(self: *Self, event: *wlr.Pointer.event.Button) void {
 }
 
 fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64, delta_y: f64, unaccel_dx: f64, unaccel_dy: f64) void {
-    self.seat.input_manager.relative_pointer_manager.sendRelativeMotion(
+    server.input_manager.relative_pointer_manager.sendRelativeMotion(
         self.seat.wlr_seat,
         @as(u64, time) * 1000,
         delta_x,
@@ -674,7 +674,7 @@ fn passthrough(self: *Self, time: u32) void {
         // If input is allowed on the surface, send pointer enter and motion
         // events. Note that wlroots won't actually send an enter event if
         // the surface has already been entered.
-        if (self.seat.input_manager.inputAllowed(surface)) {
+        if (server.input_manager.inputAllowed(surface)) {
             // The focus change must be checked before sending enter events
             const focus_change = self.seat.wlr_seat.pointer_state.focused_surface != surface;
 

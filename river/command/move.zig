@@ -156,7 +156,7 @@ fn getView(seat: *Seat) ?*View {
     if (view.pending.fullscreen) return null;
 
     // Do not touch views which are the target of a cursor action
-    if (seat.input_manager.isCursorActionTarget(view)) return null;
+    if (server.input_manager.isCursorActionTarget(view)) return null;
 
     return view;
 }

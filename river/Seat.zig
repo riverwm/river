@@ -46,7 +46,6 @@ const FocusTarget = union(enum) {
     none: void,
 };
 
-input_manager: *InputManager,
 wlr_seat: *wlr.Seat,
 
 /// Multiple mice are handled by the same Cursor
@@ -85,9 +84,8 @@ request_set_primary_selection: wl.Listener(*wlr.Seat.event.RequestSetPrimarySele
     wl.Listener(*wlr.Seat.event.RequestSetPrimarySelection).init(handleRequestSetPrimarySelection),
 // zig fmt: on
 
-pub fn init(self: *Self, input_manager: *InputManager, name: [*:0]const u8) !void {
+pub fn init(self: *Self, name: [*:0]const u8) !void {
     self.* = .{
-        .input_manager = input_manager,
         // This will be automatically destroyed when the display is destroyed
         .wlr_seat = try wlr.Seat.create(server.wl_server, name),
         .focused_output = &server.root.noop_output,
@@ -194,7 +192,7 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
     // If input is not allowed on the target surface (e.g. due to an active
     // input inhibitor) do not set focus. If there is no target surface we
     // still clear the focus.
-    if (if (target_surface) |wlr_surface| self.input_manager.inputAllowed(wlr_surface) else true) {
+    if (if (target_surface) |wlr_surface| server.input_manager.inputAllowed(wlr_surface) else true) {
         // First clear the current focus
         if (self.focused == .view) {
             self.focused.view.pending.focus -= 1;
@@ -238,7 +236,7 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
                 self.wlr_seat.keyboardNotifyEnter(wlr_surface, null, 0, null);
             }
 
-            if (self.input_manager.pointer_constraints.constraintForSurface(wlr_surface, self.wlr_seat)) |constraint| {
+            if (server.input_manager.pointer_constraints.constraintForSurface(wlr_surface, self.wlr_seat)) |constraint| {
                 @intToPtr(*PointerConstraint, constraint.data).setAsActive();
             } else if (self.cursor.constraint) |constraint| {
                 PointerConstraint.warpToHint(&self.cursor);
@@ -275,7 +273,7 @@ pub fn focusOutput(self: *Self, output: *Output) void {
 }
 
 pub fn handleActivity(self: Self) void {
-    self.input_manager.idle.notifyActivity(self.wlr_seat);
+    server.input_manager.idle.notifyActivity(self.wlr_seat);
 }
 
 /// Handle the unmapping of a view, removing it from the focus stack and
