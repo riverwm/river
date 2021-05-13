@@ -75,7 +75,7 @@ xwayland_unmanaged_views: if (build_options.xwayland)
     std.TailQueue(XwaylandUnmanaged)
 else
     void = if (build_options.xwayland)
-.{},
+    .{},
 
 /// Number of layout demands pending before the transaction may be started.
 pending_layout_demands: u32 = 0,
@@ -104,7 +104,7 @@ pub fn init(self: *Self) !void {
     };
 
     const noop_wlr_output = try server.noop_backend.noopAddOutput();
-    try self.noop_output.init(self, noop_wlr_output);
+    try self.noop_output.init(noop_wlr_output);
 
     server.backend.events.new_output.add(&self.new_output);
     self.output_manager.events.apply.add(&self.manager_apply);
@@ -134,7 +134,7 @@ fn handleNewOutput(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output)
         wlr_output.destroy();
         return;
     };
-    node.data.init(self, wlr_output) catch {
+    node.data.init(wlr_output) catch {
         wlr_output.destroy();
         util.gpa.destroy(node);
         return;

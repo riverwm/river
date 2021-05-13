@@ -17,6 +17,8 @@
 
 const std = @import("std");
 
+const server = &@import("../main.zig").server;
+
 const Direction = @import("../command.zig").Direction;
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
@@ -53,7 +55,7 @@ pub fn focusView(
         // Focus the next visible node if there is one
         if (it.next()) |view| {
             seat.focus(view);
-            output.root.startTransaction();
+            server.root.startTransaction();
             return;
         }
     }
@@ -66,7 +68,7 @@ pub fn focusView(
     };
 
     seat.focus(it.next());
-    output.root.startTransaction();
+    server.root.startTransaction();
 }
 
 fn filter(view: *View, filter_tags: u32) bool {

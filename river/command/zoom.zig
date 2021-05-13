@@ -17,6 +17,8 @@
 
 const std = @import("std");
 
+const server = &@import("../main.zig").server;
+
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 const View = @import("../View.zig");
@@ -53,7 +55,7 @@ pub fn zoom(
             output.views.push(to_bump);
             seat.focus(&to_bump.view);
             output.arrangeViews();
-            output.root.startTransaction();
+            server.root.startTransaction();
         }
     }
 }

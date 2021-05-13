@@ -17,6 +17,8 @@
 
 const std = @import("std");
 
+const server = &@import("../main.zig").server;
+
 const Error = @import("../command.zig").Error;
 const Direction = @import("../command.zig").Direction;
 const Seat = @import("../Seat.zig");
@@ -74,7 +76,7 @@ pub fn swap(
     output.views.swap(focused_node, to_swap);
 
     output.arrangeViews();
-    output.root.startTransaction();
+    server.root.startTransaction();
 }
 
 fn filter(view: *View, filter_tags: u32) bool {

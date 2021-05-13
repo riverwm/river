@@ -55,7 +55,6 @@ const State = struct {
     layout: ?*Layout = null,
 };
 
-root: *Root,
 wlr_output: *wlr.Output,
 
 /// All layer surfaces on the output, indexed by the layer enum.
@@ -98,7 +97,7 @@ enable: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleEnable),
 frame: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleFrame),
 mode: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleMode),
 
-pub fn init(self: *Self, root: *Root, wlr_output: *wlr.Output) !void {
+pub fn init(self: *Self, wlr_output: *wlr.Output) !void {
     // Some backends don't have modes. DRM+KMS does, and we need to set a mode
     // before we can use the output. The mode is a tuple of (width, height,
     // refresh rate), and each monitor supports only a specific set of modes. We
@@ -111,7 +110,6 @@ pub fn init(self: *Self, root: *Root, wlr_output: *wlr.Output) !void {
     }
 
     self.* = .{
-        .root = root,
         .wlr_output = wlr_output,
         .usable_box = undefined,
     };
@@ -179,7 +177,7 @@ pub fn arrangeFilter(view: *View, filter_tags: u32) bool {
 /// blocked until the layout demand has either finished or was aborted. Both
 /// cases will start a transaction.
 pub fn arrangeViews(self: *Self) void {
-    if (self == &self.root.noop_output) return;
+    if (self == &server.root.noop_output) return;
 
     // If there is already an active layout demand, discard it.
     if (self.layout_demand) |demand| {
@@ -418,17 +416,16 @@ fn arrangeLayer(
 /// and then remove it from the list of outputs.
 fn handleDestroy(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
-    const root = self.root;
 
     std.log.scoped(.server).debug("output '{}' destroyed", .{self.wlr_output.name});
 
     // Remove the destroyed output from root if it wasn't already removed
-    root.removeOutput(self);
+    server.root.removeOutput(self);
 
-    var it = root.all_outputs.first;
+    var it = server.root.all_outputs.first;
     while (it) |all_node| : (it = all_node.next) {
         if (all_node.data == self) {
-            root.all_outputs.remove(all_node);
+            server.root.all_outputs.remove(all_node);
             break;
         }
     }
@@ -454,7 +451,7 @@ fn handleEnable(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) vo
 
     // Add the output to root.outputs and the output layout if it has not
     // already been added.
-    if (wlr_output.enabled) self.root.addOutput(self);
+    if (wlr_output.enabled) server.root.addOutput(self);
 }
 
 fn handleFrame(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
@@ -468,7 +465,7 @@ fn handleMode(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void
     const self = @fieldParentPtr(Self, "mode", listener);
     self.arrangeLayers();
     self.arrangeViews();
-    self.root.startTransaction();
+    server.root.startTransaction();
 }
 
 pub fn getEffectiveResolution(self: *Self) struct { width: u32, height: u32 } {
@@ -499,7 +496,7 @@ pub fn handleLayoutNamespaceChange(self: *Self) void {
         if (mem.eql(u8, self.layoutNamespace(), node.data.namespace)) break &node.data;
     } else null;
     self.arrangeViews();
-    self.root.startTransaction();
+    server.root.startTransaction();
 }
 
 pub fn layoutNamespace(self: Self) []const u8 {

@@ -17,6 +17,8 @@
 
 const std = @import("std");
 
+const server = &@import("../main.zig").server;
+
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
@@ -32,7 +34,7 @@ pub fn setFocusedTags(
         seat.focused_output.pending.tags = tags;
         seat.focused_output.arrangeViews();
         seat.focus(null);
-        seat.focused_output.root.startTransaction();
+        server.root.startTransaction();
     }
 }
 
@@ -77,7 +79,7 @@ pub fn toggleFocusedTags(
         output.pending.tags = new_focused_tags;
         output.arrangeViews();
         seat.focus(null);
-        output.root.startTransaction();
+        server.root.startTransaction();
     }
 }
 

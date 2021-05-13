@@ -72,7 +72,7 @@ pub fn deinit(self: *Self) void {
 
 pub fn needsConfigure(self: Self) bool {
     const output = self.view.output;
-    const output_box = output.root.output_layout.getBox(output.wlr_output).?;
+    const output_box = server.root.output_layout.getBox(output.wlr_output).?;
     return self.xwayland_surface.x != self.view.pending.box.x + output_box.x or
         self.xwayland_surface.y != self.view.pending.box.y + output_box.y or
         self.xwayland_surface.width != self.view.pending.box.width or
@@ -83,7 +83,7 @@ pub fn needsConfigure(self: Self) bool {
 /// shouldTrackConfigure() is always false for xwayland views.
 pub fn configure(self: Self) void {
     const output = self.view.output;
-    const output_box = output.root.output_layout.getBox(output.wlr_output).?;
+    const output_box = server.root.output_layout.getBox(output.wlr_output).?;
 
     const state = &self.view.pending;
     self.xwayland_surface.setFullscreen(state.fullscreen);
@@ -156,7 +156,6 @@ fn handleDestroy(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface:
 fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "map", listener);
     const view = self.view;
-    const root = view.output.root;
 
     // Add listeners that are only active while mapped
     xwayland_surface.surface.?.events.commit.add(&self.commit);

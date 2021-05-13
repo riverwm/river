@@ -26,6 +26,7 @@ const wl = wayland.server.wl;
 const zwlr = wayland.server.zwlr;
 
 const c = @import("c.zig");
+const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Box = @import("Box.zig");
@@ -138,7 +139,6 @@ pub fn deinit(self: *Self) void {
 /// this is the default seat. Either argument may be null, in which case a
 /// default will be used.
 pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
-    const server = self.seat.input_manager.server;
     const size = _size orelse default_size;
 
     self.xcursor_manager.destroy();
@@ -536,7 +536,7 @@ pub fn enterMode(self: *Self, mode: @TagType(Mode), view: *View) void {
         .passthrough => unreachable,
         .down => {
             self.mode = .{ .down = view };
-            view.output.root.startTransaction();
+            server.root.startTransaction();
         },
         .move, .resize => {
             const cur_box = &view.current.box;
@@ -626,7 +626,7 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
         .down => |view| {
             self.wlr_cursor.move(device, dx, dy);
             // This takes surface-local coordinates
-            const output_box = view.output.root.output_layout.getBox(view.output.wlr_output).?;
+            const output_box = server.root.output_layout.getBox(view.output.wlr_output).?;
             self.seat.wlr_seat.pointerNotifyMotion(
                 time,
                 self.wlr_cursor.x - @intToFloat(f64, output_box.x + view.current.box.x - view.surface_box.x),

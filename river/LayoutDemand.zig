@@ -75,7 +75,7 @@ fn handleTimeout(layout: *Layout) callconv(.C) c_int {
     layout.output.layout_demand.?.deinit();
     layout.output.layout_demand = null;
 
-    layout.output.root.notifyLayoutDemandDone();
+    server.root.notifyLayoutDemandDone();
 
     return 0;
 }
@@ -107,7 +107,7 @@ pub fn apply(self: *Self, layout: *Layout) void {
     defer {
         output.layout_demand.?.deinit();
         output.layout_demand = null;
-        output.root.notifyLayoutDemandDone();
+        server.root.notifyLayoutDemandDone();
     }
 
     // Check that the number of proposed dimensions is correct.

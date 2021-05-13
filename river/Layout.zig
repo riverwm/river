@@ -24,6 +24,7 @@ const wayland = @import("wayland");
 const wl = wayland.server.wl;
 const river = wayland.server.river;
 
+const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Box = @import("Box.zig");
@@ -70,7 +71,7 @@ pub fn create(client: *wl.Client, version: u32, id: u32, output: *Output, namesp
 /// Returns true if the given namespace is already in use on the given output
 /// or on another output by a different client.
 fn namespaceInUse(namespace: []const u8, output: *Output, client: *wl.Client) bool {
-    var output_it = output.root.outputs.first;
+    var output_it = server.root.outputs.first;
     while (output_it) |output_node| : (output_it = output_node.next) {
         var layout_it = output_node.data.layouts.first;
         if (output_node.data.wlr_output == output.wlr_output) {
@@ -125,7 +126,7 @@ pub fn startLayoutDemand(self: *Self, views: u32) void {
     }
     self.layout.sendAdvertiseDone(serial);
 
-    self.output.root.trackLayoutDemands();
+    server.root.trackLayoutDemands();
 }
 
 fn handleRequest(layout: *river.LayoutV2, request: river.LayoutV2.Request, self: *Self) void {
@@ -183,7 +184,7 @@ fn handleDestroy(layout: *river.LayoutV2, self: *Self) void {
     if (self == self.output.pending.layout) {
         self.output.pending.layout = null;
         self.output.arrangeViews();
-        self.output.root.startTransaction();
+        server.root.startTransaction();
     }
 
     util.gpa.free(self.namespace);

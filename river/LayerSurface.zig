@@ -129,7 +129,7 @@ fn handleUnmap(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *
         seat.focus(null);
     }
 
-    self.output.root.startTransaction();
+    server.root.startTransaction();
 }
 
 fn handleCommit(listener: *wl.Listener(*wlr.Surface), wlr_surface: *wlr.Surface) void {
@@ -152,7 +152,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), wlr_surface: *wlr.Surface)
         self.state = new_state.*;
 
         self.output.arrangeLayers();
-        self.output.root.startTransaction();
+        server.root.startTransaction();
     }
 }
 

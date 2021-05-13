@@ -234,9 +234,9 @@ fn renderViewPopups(output: *const Output, view: *View, now: *os.timespec) void 
 }
 
 fn renderDragIcons(output: *const Output, now: *os.timespec) void {
-    const output_box = output.root.output_layout.getBox(output.wlr_output).?;
+    const output_box = server.root.output_layout.getBox(output.wlr_output).?;
 
-    var it = output.root.drag_icons.first;
+    var it = server.root.drag_icons.first;
     while (it) |node| : (it = node.next) {
         const drag_icon = &node.data;
 
@@ -255,9 +255,9 @@ fn renderDragIcons(output: *const Output, now: *os.timespec) void {
 
 /// Render all xwayland unmanaged windows that appear on the output
 fn renderXwaylandUnmanaged(output: *const Output, now: *os.timespec) void {
-    const output_box = output.root.output_layout.getBox(output.wlr_output).?;
+    const output_box = server.root.output_layout.getBox(output.wlr_output).?;
 
-    var it = output.root.xwayland_unmanaged_views.first;
+    var it = server.root.xwayland_unmanaged_views.first;
     while (it) |node| : (it = node.next) {
         const xwayland_surface = node.data.xwayland_surface;
 

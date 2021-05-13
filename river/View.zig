@@ -215,7 +215,7 @@ pub fn applyPending(self: *Self) void {
         self.post_fullscreen_box = self.current.box;
 
         self.pending.target_opacity = 1.0;
-        const layout_box = self.output.root.output_layout.getBox(self.output.wlr_output).?;
+        const layout_box = server.root.output_layout.getBox(self.output.wlr_output).?;
         self.pending.box = .{
             .x = 0,
             .y = 0,
@@ -236,7 +236,7 @@ pub fn applyPending(self: *Self) void {
 
     if (arrange_output) self.output.arrangeViews();
 
-    self.output.root.startTransaction();
+    server.root.startTransaction();
 }
 
 pub fn needsConfigure(self: Self) bool {
@@ -280,7 +280,7 @@ pub fn saveBuffers(self: *Self) void {
 pub fn notifyConfiguredOrApplyPending(self: *Self) void {
     self.pending_serial = null;
     if (self.shouldTrackConfigure())
-        self.output.root.notifyConfigured()
+        server.root.notifyConfigured()
     else {
         const self_tags_changed = self.pending.tags != self.current.tags;
         self.current = self.pending;
@@ -482,13 +482,11 @@ pub fn map(self: *Self) void {
 
     if (!self.current.float) self.output.arrangeViews();
 
-    self.output.root.startTransaction();
+    server.root.startTransaction();
 }
 
 /// Called by the impl when the surface will no longer be displayed
 pub fn unmap(self: *Self) void {
-    const root = self.output.root;
-
     log.debug("view '{}' unmapped", .{self.getTitle()});
 
     self.destroying = true;
@@ -510,7 +508,7 @@ pub fn unmap(self: *Self) void {
     // Still need to arrange if fullscreened from the layout
     if (!self.current.float) self.output.arrangeViews();
 
-    root.startTransaction();
+    server.root.startTransaction();
 }
 
 pub fn notifyTitle(self: Self) void {
@@ -608,7 +606,7 @@ fn handleForeignActivate(
     const self = @fieldParentPtr(Self, "foreign_activate", listener);
     const seat = @intToPtr(*Seat, event.seat.data);
     seat.focus(self);
-    self.output.root.startTransaction();
+    server.root.startTransaction();
 }
 
 fn handleForeignFullscreen(
