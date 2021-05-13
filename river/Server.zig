@@ -236,7 +236,7 @@ fn handleNewXwaylandSurface(listener: *wl.Listener(*wlr.XwaylandSurface), wlr_xw
         // The unmanged surface will add itself to the list of unmanaged views
         // in Root when it is mapped.
         const node = util.gpa.create(std.TailQueue(XwaylandUnmanaged).Node) catch return;
-        node.data.init(&self.root, wlr_xwayland_surface);
+        node.data.init(wlr_xwayland_surface);
         return;
     }
 

@@ -21,12 +21,10 @@ const std = @import("std");
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
+const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Box = @import("Box.zig");
-const Root = @import("Root.zig");
-
-root: *Root,
 
 /// The corresponding wlroots object
 xwayland_surface: *wlr.XwaylandSurface,
@@ -40,8 +38,8 @@ destroy: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).i
 map: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleMap),
 unmap: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleUnmap),
 
-pub fn init(self: *Self, root: *Root, xwayland_surface: *wlr.XwaylandSurface) void {
-    self.* = .{ .root = root, .xwayland_surface = xwayland_surface };
+pub fn init(self: *Self, xwayland_surface: *wlr.XwaylandSurface) void {
+    self.* = .{ .xwayland_surface = xwayland_surface };
 
     // Add listeners that are active over the the entire lifetime
     xwayland_surface.events.request_configure.add(&self.request_configure);
@@ -75,11 +73,10 @@ fn handleDestroy(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface:
 /// Called when the xwayland surface is mapped, or ready to display on-screen.
 fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "map", listener);
-    const root = self.root;
 
     // Add self to the list of unmanaged views in the root
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-    root.xwayland_unmanaged_views.prepend(node);
+    server.root.xwayland_unmanaged_views.prepend(node);
 
     // TODO: handle keyboard focus
     // if (wlr_xwayland_or_surface_wants_focus(self.xwayland_surface)) { ...
@@ -91,5 +88,5 @@ fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *
 
     // Remove self from the list of unmanged views in the root
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-    self.root.xwayland_unmanaged_views.remove(node);
+    server.root.xwayland_unmanaged_views.remove(node);
 }

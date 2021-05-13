@@ -29,7 +29,6 @@ const util = @import("util.zig");
 
 const Box = @import("Box.zig");
 const Output = @import("Output.zig");
-const Root = @import("Root.zig");
 const Seat = @import("Seat.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const XdgToplevel = @import("XdgToplevel.zig");

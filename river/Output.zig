@@ -33,7 +33,6 @@ const Box = @import("Box.zig");
 const LayerSurface = @import("LayerSurface.zig");
 const Layout = @import("Layout.zig");
 const LayoutDemand = @import("LayoutDemand.zig");
-const Root = @import("Root.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const AttachMode = @import("view_stack.zig").AttachMode;
