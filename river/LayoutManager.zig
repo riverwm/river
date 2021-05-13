@@ -24,6 +24,7 @@ const wayland = @import("wayland");
 const wl = wayland.server.wl;
 const river = wayland.server.river;
 
+const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Layout = @import("Layout.zig");
@@ -35,7 +36,7 @@ const log = std.log.scoped(.layout);
 global: *wl.Global,
 server_destroy: wl.Listener(*wl.Server) = wl.Listener(*wl.Server).init(handleServerDestroy),
 
-pub fn init(self: *Self, server: *Server) !void {
+pub fn init(self: *Self) !void {
     self.* = .{
         .global = try wl.Global.create(server.wl_server, river.LayoutManagerV2, 1, *Self, self, bind),
     };

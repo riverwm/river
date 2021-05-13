@@ -21,11 +21,10 @@ const std = @import("std");
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
+const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Server = @import("Server.zig");
-
-server: *Server,
 
 xdg_toplevel_decoration: *wlr.XdgToplevelDecorationV1,
 
@@ -36,12 +35,8 @@ request_mode: wl.Listener(*wlr.XdgToplevelDecorationV1) =
     wl.Listener(*wlr.XdgToplevelDecorationV1).init(handleRequestMode),
 // zig fmt: on
 
-pub fn init(
-    self: *Self,
-    server: *Server,
-    xdg_toplevel_decoration: *wlr.XdgToplevelDecorationV1,
-) void {
-    self.* = .{ .server = server, .xdg_toplevel_decoration = xdg_toplevel_decoration };
+pub fn init(self: *Self, xdg_toplevel_decoration: *wlr.XdgToplevelDecorationV1) void {
+    self.* = .{ .xdg_toplevel_decoration = xdg_toplevel_decoration };
 
     xdg_toplevel_decoration.events.destroy.add(&self.destroy);
     xdg_toplevel_decoration.events.request_mode.add(&self.request_mode);
@@ -67,7 +62,7 @@ fn handleRequestMode(
     const app_id: [*:0]const u8 = if (toplevel.app_id) |id| id else "NULL";
 
     _ = self.xdg_toplevel_decoration.setMode(
-        for (self.server.config.csd_filter.items) |filter_app_id| {
+        for (server.config.csd_filter.items) |filter_app_id| {
             if (std.mem.eql(u8, std.mem.span(app_id), filter_app_id)) break .client_side;
         } else .server_side,
     );

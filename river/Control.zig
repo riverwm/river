@@ -19,14 +19,13 @@ const Self = @This();
 
 const std = @import("std");
 const mem = std.mem;
-
+const wlr = @import("wlroots");
 const wayland = @import("wayland");
 const wl = wayland.server.wl;
 const zriver = wayland.server.zriver;
 
-const wlr = @import("wlroots");
-
 const command = @import("command.zig");
+const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Seat = @import("Seat.zig");
@@ -40,7 +39,7 @@ args_map: ArgMap,
 
 server_destroy: wl.Listener(*wl.Server) = wl.Listener(*wl.Server).init(handleServerDestroy),
 
-pub fn init(self: *Self, server: *Server) !void {
+pub fn init(self: *Self) !void {
     self.* = .{
         .global = try wl.Global.create(server.wl_server, zriver.ControlV1, 1, *Self, self, bind),
         .args_map = ArgMap.init(util.gpa),

@@ -23,6 +23,7 @@ const wayland = @import("wayland");
 const wl = wayland.server.wl;
 const zriver = wayland.server.zriver;
 
+const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Output = @import("Output.zig");
@@ -37,7 +38,7 @@ global: *wl.Global,
 
 server_destroy: wl.Listener(*wl.Server) = wl.Listener(*wl.Server).init(handleServerDestroy),
 
-pub fn init(self: *Self, server: *Server) !void {
+pub fn init(self: *Self) !void {
     self.* = .{
         .global = try wl.Global.create(server.wl_server, zriver.StatusManagerV1, 1, *Self, self, bind),
     };

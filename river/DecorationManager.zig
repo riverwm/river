@@ -21,12 +21,11 @@ const std = @import("std");
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
+const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Decoration = @import("Decoration.zig");
 const Server = @import("Server.zig");
-
-server: *Server,
 
 xdg_decoration_manager: *wlr.XdgDecorationManagerV1,
 
@@ -35,9 +34,8 @@ new_toplevel_decoration: wl.Listener(*wlr.XdgToplevelDecorationV1) =
     wl.Listener(*wlr.XdgToplevelDecorationV1).init(handleNewToplevelDecoration),
 // zig fmt: on
 
-pub fn init(self: *Self, server: *Server) !void {
+pub fn init(self: *Self) !void {
     self.* = .{
-        .server = server,
         .xdg_decoration_manager = try wlr.XdgDecorationManagerV1.create(server.wl_server),
     };
 
@@ -53,5 +51,5 @@ fn handleNewToplevelDecoration(
         xdg_toplevel_decoration.resource.postNoMemory();
         return;
     };
-    decoration.init(self.server, xdg_toplevel_decoration);
+    decoration.init(xdg_toplevel_decoration);
 }
