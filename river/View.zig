@@ -24,6 +24,7 @@ const os = std.os;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
+const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Box = @import("Box.zig");
@@ -147,14 +148,14 @@ pub fn init(self: *Self, output: *Output, tags: u32, surface: anytype) void {
         .output = output,
         .current = .{
             .tags = tags,
-            .target_opacity = output.root.server.config.opacity.initial,
+            .target_opacity = server.config.opacity.initial,
         },
         .pending = .{
             .tags = tags,
-            .target_opacity = output.root.server.config.opacity.initial,
+            .target_opacity = server.config.opacity.initial,
         },
         .saved_buffers = std.ArrayList(SavedBuffer).init(util.gpa),
-        .opacity = output.root.server.config.opacity.initial,
+        .opacity = server.config.opacity.initial,
     };
 
     if (@TypeOf(surface) == *wlr.XdgSurface) {
@@ -228,9 +229,9 @@ pub fn applyPending(self: *Self) void {
 
         // Restore configured opacity
         self.pending.target_opacity = if (self.pending.focus > 0)
-            self.output.root.server.config.opacity.focused
+            server.config.opacity.focused
         else
-            self.output.root.server.config.opacity.unfocused;
+            server.config.opacity.unfocused;
     }
 
     if (arrange_output) self.output.arrangeViews();
@@ -339,7 +340,6 @@ pub fn close(self: Self) void {
         .xwayland_view => |xwayland_view| xwayland_view.close(),
     }
 }
-
 pub inline fn forEachPopupSurface(
     self: Self,
     comptime T: type,
@@ -396,8 +396,7 @@ pub fn getConstraints(self: Self) Constraints {
 /// Modify the pending x/y of the view by the given deltas, clamping to the
 /// bounds of the output.
 pub fn move(self: *Self, delta_x: i32, delta_y: i32) void {
-    const config = &self.output.root.server.config;
-    const border_width = if (self.draw_borders) @intCast(i32, config.border_width) else 0;
+    const border_width = if (self.draw_borders) @intCast(i32, server.config.border_width) else 0;
     const output_resolution = self.output.getEffectiveResolution();
 
     const max_x = @intCast(i32, output_resolution.width) - @intCast(i32, self.pending.box.width) - border_width;
@@ -445,15 +444,13 @@ pub fn shouldTrackConfigure(self: Self) bool {
 
 /// Called by the impl when the surface is ready to be displayed
 pub fn map(self: *Self) void {
-    const root = self.output.root;
-
-    self.pending.target_opacity = self.output.root.server.config.opacity.unfocused;
+    self.pending.target_opacity = server.config.opacity.unfocused;
 
     log.debug("view '{}' mapped", .{self.getTitle()});
 
     if (self.foreign_toplevel_handle == null) {
         self.foreign_toplevel_handle = wlr.ForeignToplevelHandleV1.create(
-            root.server.foreign_toplevel_manager,
+            server.foreign_toplevel_manager,
         ) catch {
             log.crit("out of memory", .{});
             self.surface.?.resource.getClient().postNoMemory();
@@ -476,7 +473,7 @@ pub fn map(self: *Self) void {
 
     // Focus the new view, assuming the seat is focusing the proper output
     // and there isn't something else like a fullscreen view grabbing focus.
-    var it = root.server.input_manager.seats.first;
+    var it = server.input_manager.seats.first;
     while (it) |seat_node| : (it = seat_node.next) seat_node.data.focus(self);
 
     self.surface.?.sendEnter(self.output.wlr_output);
@@ -502,7 +499,7 @@ pub fn unmap(self: *Self) void {
     }
 
     // Inform all seats that the view has been unmapped so they can handle focus
-    var it = root.server.input_manager.seats.first;
+    var it = server.input_manager.seats.first;
     while (it) |node| : (it = node.next) {
         const seat = &node.data;
         seat.handleViewUnmap(self);
@@ -521,7 +518,7 @@ pub fn notifyTitle(self: Self) void {
         if (self.getTitle()) |s| handle.setTitle(s);
     }
     // Send title to all status listeners attached to a seat which focuses this view
-    var seat_it = self.output.root.server.input_manager.seats.first;
+    var seat_it = server.input_manager.seats.first;
     while (seat_it) |seat_node| : (seat_it = seat_node.next) {
         if (seat_node.data.focused == .view and seat_node.data.focused.view == &self) {
             var client_it = seat_node.data.status_trackers.first;
@@ -542,12 +539,11 @@ pub fn notifyAppId(self: Self) void {
 /// If the target opacity was reached, return true.
 fn incrementOpacity(self: *Self) bool {
     // TODO damage view when implementing damage based rendering
-    const config = &self.output.root.server.config;
     if (self.opacity < self.current.target_opacity) {
-        self.opacity += config.opacity.delta;
+        self.opacity += server.config.opacity.delta;
         if (self.opacity < self.current.target_opacity) return false;
     } else {
-        self.opacity -= config.opacity.delta;
+        self.opacity -= server.config.opacity.delta;
         if (self.opacity > self.current.target_opacity) return false;
     }
     self.opacity = self.current.target_opacity;
@@ -562,7 +558,7 @@ fn killOpacityTimer(self: *Self) void {
 
 /// Set the timeout on a views opacity timer
 fn armOpacityTimer(self: *Self) void {
-    const delta_t = self.output.root.server.config.opacity.delta_t;
+    const delta_t = server.config.opacity.delta_t;
     self.opacity_timer.?.timerUpdate(delta_t) catch |err| {
         log.err("failed to update opacity timer: {}", .{err});
         self.killOpacityTimer();
@@ -581,7 +577,7 @@ fn handleOpacityTimer(self: *Self) callconv(.C) c_int {
 
 /// Create an opacity timer for a view and arm it
 fn attachOpacityTimer(self: *Self) void {
-    const event_loop = self.output.root.server.wl_server.getEventLoop();
+    const event_loop = server.wl_server.getEventLoop();
     self.opacity_timer = event_loop.addTimer(*Self, handleOpacityTimer, self) catch {
         log.err("failed to create opacity timer for view '{}'", .{self.getTitle()});
         return;

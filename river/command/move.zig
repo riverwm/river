@@ -17,6 +17,8 @@
 
 const std = @import("std");
 
+const server = &@import("../main.zig").server;
+
 const Error = @import("../command.zig").Error;
 const PhysicalDirection = @import("../command.zig").PhysicalDirection;
 const Orientation = @import("../command.zig").Orientation;
@@ -61,7 +63,7 @@ pub fn snap(
         return Error.InvalidPhysicalDirection;
 
     const view = getView(seat) orelse return;
-    const border_width = @intCast(i32, view.output.root.server.config.border_width);
+    const border_width = @intCast(i32, server.config.border_width);
     const output_box = view.output.getEffectiveResolution();
     switch (direction) {
         .up => view.pending.box.y = border_width,
@@ -89,7 +91,7 @@ pub fn resize(
         return Error.InvalidOrientation;
 
     const view = getView(seat) orelse return;
-    const border_width = @intCast(i32, view.output.root.server.config.border_width);
+    const border_width = @intCast(i32, server.config.border_width);
     const output_box = view.output.getEffectiveResolution();
     switch (orientation) {
         .horizontal => {

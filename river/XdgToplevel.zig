@@ -21,6 +21,7 @@ const std = @import("std");
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
+const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Box = @import("Box.zig");
@@ -103,7 +104,6 @@ pub fn configure(self: Self) void {
 pub fn close(self: Self) void {
     self.xdg_surface.role_data.toplevel.sendClose();
 }
-
 pub inline fn forEachPopupSurface(
     self: Self,
     comptime T: type,
@@ -157,7 +157,6 @@ fn handleDestroy(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgS
 fn handleMap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurface) void {
     const self = @fieldParentPtr(Self, "map", listener);
     const view = self.view;
-    const root = view.output.root;
     const toplevel = self.xdg_surface.role_data.toplevel;
 
     // Add listeners that are only active while mapped
@@ -198,7 +197,7 @@ fn handleMap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurfa
         view.pending.box = view.float_box;
     } else {
         // Make views with app_ids listed in the float filter float
-        for (root.server.config.float_filter.items) |filter_app_id| {
+        for (server.config.float_filter.items) |filter_app_id| {
             if (std.mem.eql(u8, std.mem.span(app_id), std.mem.span(filter_app_id))) {
                 view.current.float = true;
                 view.pending.float = true;
@@ -210,7 +209,7 @@ fn handleMap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurfa
 
     // If the toplevel has an app_id which is not configured to use client side
     // decorations, inform it that it is tiled.
-    for (root.server.config.csd_filter.items) |filter_app_id| {
+    for (server.config.csd_filter.items) |filter_app_id| {
         if (std.mem.eql(u8, std.mem.span(app_id), filter_app_id)) {
             view.draw_borders = false;
             break;
@@ -225,7 +224,6 @@ fn handleMap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurfa
 /// Called when the surface is unmapped and will no longer be displayed.
 fn handleUnmap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurface) void {
     const self = @fieldParentPtr(Self, "unmap", listener);
-    const root = self.view.output.root;
 
     self.view.unmap();
 

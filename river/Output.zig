@@ -25,8 +25,8 @@ const wayland = @import("wayland");
 const wl = wayland.server.wl;
 const zwlr = wayland.server.zwlr;
 
-const c = @import("c.zig");
 const render = @import("render.zig");
+const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Box = @import("Box.zig");
@@ -133,7 +133,7 @@ pub fn init(self: *Self, root: *Root, wlr_output: *wlr.Output) !void {
     } else {
         // Ensure that a cursor image at the output's scale factor is loaded
         // for each seat.
-        var it = root.server.input_manager.seats.first;
+        var it = server.input_manager.seats.first;
         while (it) |node| : (it = node.next) {
             const seat = &node.data;
             seat.cursor.xcursor_manager.load(wlr_output.scale) catch
@@ -248,7 +248,7 @@ pub fn arrangeLayers(self: *Self) void {
         }
     } else null;
 
-    var it = self.root.server.input_manager.seats.first;
+    var it = server.input_manager.seats.first;
     while (it) |node| : (it = node.next) {
         const seat = &node.data;
 
@@ -503,5 +503,5 @@ pub fn handleLayoutNamespaceChange(self: *Self) void {
 }
 
 pub fn layoutNamespace(self: Self) []const u8 {
-    return self.layout_namespace orelse self.root.server.config.default_layout_namespace;
+    return self.layout_namespace orelse server.config.default_layout_namespace;
 }

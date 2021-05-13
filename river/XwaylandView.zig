@@ -22,6 +22,8 @@ const math = std.math;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
+const server = &@import("main.zig").server;
+
 const Box = @import("Box.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
@@ -187,7 +189,7 @@ fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wl
         view.pending.box = view.float_box;
     } else {
         // Make views with app_ids listed in the float filter float
-        for (root.server.config.float_filter.items) |filter_app_id| {
+        for (server.config.float_filter.items) |filter_app_id| {
             if (std.mem.eql(u8, std.mem.span(app_id), std.mem.span(filter_app_id))) {
                 view.current.float = true;
                 view.pending.float = true;

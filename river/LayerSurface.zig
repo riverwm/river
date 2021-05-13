@@ -21,6 +21,7 @@ const std = @import("std");
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
+const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Box = @import("Box.zig");
@@ -109,7 +110,7 @@ fn handleUnmap(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *
     self.output.layers[@intCast(usize, @enumToInt(self.state.layer))].remove(self_node);
 
     // If the unmapped surface is focused, clear focus
-    var it = self.output.root.server.input_manager.seats.first;
+    var it = server.input_manager.seats.first;
     while (it) |node| : (it = node.next) {
         const seat = &node.data;
         if (seat.focused == .layer and seat.focused.layer == self)
@@ -122,7 +123,7 @@ fn handleUnmap(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *
 
     // Ensure that focus is given to the appropriate view if there is no
     // other top/overlay layer surface to grab focus.
-    it = self.output.root.server.input_manager.seats.first;
+    it = server.input_manager.seats.first;
     while (it) |node| : (it = node.next) {
         const seat = &node.data;
         seat.focus(null);

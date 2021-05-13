@@ -22,6 +22,7 @@ const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 const pixman = @import("pixman");
 
+const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Box = @import("Box.zig");
@@ -47,7 +48,6 @@ const SurfaceRenderData = struct {
 
 /// The rendering order in this function must be kept in sync with Cursor.surfaceAt()
 pub fn renderOutput(output: *Output) void {
-    const config = &output.root.server.config;
     const renderer = output.wlr_output.backend.getRenderer().?;
 
     var now: os.timespec = undefined;
@@ -72,7 +72,7 @@ pub fn renderOutput(output: *Output) void {
         if (!view.destroying) renderViewPopups(output, view, &now);
     } else {
         // No fullscreen view, so render normal layers/views
-        renderer.clear(&config.background_color);
+        renderer.clear(&server.config.background_color);
 
         renderLayer(output, output.getLayer(.background).*, &now, .toplevels);
         renderLayer(output, output.getLayer(.bottom).*, &now, .toplevels);
@@ -324,7 +324,7 @@ fn renderTexture(
 }
 
 fn renderBorders(output: *const Output, view: *View, now: *os.timespec) void {
-    const config = &output.root.server.config;
+    const config = &server.config;
     const color = if (view.current.focus != 0) &config.border_color_focused else &config.border_color_unfocused;
     const border_width = config.border_width;
     const actual_box = if (view.saved_buffers.items.len != 0) view.saved_surface_box else view.surface_box;

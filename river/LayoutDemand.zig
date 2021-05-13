@@ -22,6 +22,7 @@ const wlr = @import("wlroots");
 const wayland = @import("wayland");
 const wl = wayland.server.wl;
 
+const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Layout = @import("Layout.zig");
@@ -46,13 +47,13 @@ view_boxen: []Box,
 timeout_timer: *wl.EventSource,
 
 pub fn init(layout: *Layout, views: u32) !Self {
-    const event_loop = layout.output.root.server.wl_server.getEventLoop();
+    const event_loop = server.wl_server.getEventLoop();
     const timeout_timer = try event_loop.addTimer(*Layout, handleTimeout, layout);
     errdefer timeout_timer.remove();
     try timeout_timer.timerUpdate(timeout_ms);
 
     return Self{
-        .serial = layout.output.root.server.wl_server.nextSerial(),
+        .serial = server.wl_server.nextSerial(),
         .views = @intCast(i32, views),
         .view_boxen = try util.gpa.alloc(Box, views),
         .timeout_timer = timeout_timer,
@@ -86,7 +87,7 @@ pub fn pushViewDimensions(self: *Self, output: *Output, x: i32, y: i32, width: u
 
     // Here we apply the offset to align the coords with the origin of the
     // usable area and shrink the dimensions to accomodate the border size.
-    const border_width = output.root.server.config.border_width;
+    const border_width = server.config.border_width;
     self.view_boxen[self.view_boxen.len - @intCast(usize, self.views)] = .{
         .x = x + output.usable_box.x + @intCast(i32, border_width),
         .y = y + output.usable_box.y + @intCast(i32, border_width),

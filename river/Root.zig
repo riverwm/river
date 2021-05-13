@@ -23,10 +23,10 @@ const assert = std.debug.assert;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
+const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Output = @import("Output.zig");
-const Server = @import("Server.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const XwaylandUnmanaged = @import("XwaylandUnmanaged.zig");
@@ -40,7 +40,6 @@ const DragIcon = @import("DragIcon.zig");
 // encountered during normal usage.
 const min_size = 50;
 
-server: *Server,
 new_output: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleNewOutput),
 
 output_layout: *wlr.OutputLayout,
@@ -76,7 +75,7 @@ xwayland_unmanaged_views: if (build_options.xwayland)
     std.TailQueue(XwaylandUnmanaged)
 else
     void = if (build_options.xwayland)
-    .{},
+.{},
 
 /// Number of layout demands pending before the transaction may be started.
 pending_layout_demands: u32 = 0,
@@ -86,7 +85,7 @@ pending_configures: u32 = 0,
 /// Handles timeout of transactions
 transaction_timer: *wl.EventSource,
 
-pub fn init(self: *Self, server: *Server) !void {
+pub fn init(self: *Self) !void {
     const output_layout = try wlr.OutputLayout.create();
     errdefer output_layout.destroy();
 
@@ -97,7 +96,6 @@ pub fn init(self: *Self, server: *Server) !void {
     errdefer transaction_timer.remove();
 
     self.* = .{
-        .server = server,
         .output_layout = output_layout,
         .output_manager = try wlr.OutputManagerV1.create(server.wl_server),
         .power_manager = try wlr.OutputPowerManagerV1.create(server.wl_server),
@@ -200,7 +198,7 @@ pub fn removeOutput(self: *Self, output: *Output) void {
     }
 
     // If any seat has the removed output focused, focus the fallback one
-    var seat_it = self.server.input_manager.seats.first;
+    var seat_it = server.input_manager.seats.first;
     while (seat_it) |seat_node| : (seat_it = seat_node.next) {
         const seat = &seat_node.data;
         if (seat.focused_output == output) {
@@ -241,7 +239,7 @@ pub fn addOutput(self: *Self, output: *Output) void {
         while (self.noop_output.views.last) |n| n.view.sendToOutput(output);
 
         // Focus the new output with all seats
-        var it = self.server.input_manager.seats.first;
+        var it = server.input_manager.seats.first;
         while (it) |seat_node| : (it = seat_node.next) {
             const seat = &seat_node.data;
             seat.focusOutput(output);
