@@ -24,6 +24,7 @@ const wl = @import("wayland").server.wl;
 const xkb = @import("xkbcommon");
 
 const command = @import("command.zig");
+const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const DragIcon = @import("DragIcon.zig");
@@ -88,8 +89,8 @@ pub fn init(self: *Self, input_manager: *InputManager, name: [*:0]const u8) !voi
     self.* = .{
         .input_manager = input_manager,
         // This will be automatically destroyed when the display is destroyed
-        .wlr_seat = try wlr.Seat.create(input_manager.server.wl_server, name),
-        .focused_output = &self.input_manager.server.root.noop_output,
+        .wlr_seat = try wlr.Seat.create(server.wl_server, name),
+        .focused_output = &server.root.noop_output,
     };
     self.wlr_seat.data = @ptrToInt(self);
 
@@ -202,7 +203,7 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
             if (build_options.xwayland and self.focused.view.impl == .xwayland_view)
                 self.focused.view.impl.xwayland_view.xwayland_surface.activate(false);
             if (self.focused.view.pending.focus == 0 and !self.focused.view.pending.fullscreen) {
-                self.focused.view.pending.target_opacity = self.input_manager.server.config.opacity.unfocused;
+                self.focused.view.pending.target_opacity = server.config.opacity.unfocused;
             }
         }
 
@@ -216,7 +217,7 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
                 if (build_options.xwayland and target_view.impl == .xwayland_view)
                     target_view.impl.xwayland_view.xwayland_surface.activate(true);
                 if (!target_view.pending.fullscreen) {
-                    target_view.pending.target_opacity = self.input_manager.server.config.opacity.focused;
+                    target_view.pending.target_opacity = server.config.opacity.focused;
                 }
             },
             .layer => |target_layer| std.debug.assert(self.focused_output == target_layer.output),
@@ -264,8 +265,6 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
 pub fn focusOutput(self: *Self, output: *Output) void {
     if (self.focused_output == output) return;
 
-    const root = &self.input_manager.server.root;
-
     var it = self.status_trackers.first;
     while (it) |node| : (it = node.next) node.data.sendOutput(.unfocused);
 
@@ -306,7 +305,7 @@ pub fn handleMapping(
     modifiers: wlr.Keyboard.ModifierMask,
     released: bool,
 ) bool {
-    const modes = &self.input_manager.server.config.modes;
+    const modes = &server.config.modes;
     for (modes.items[self.mode_id].mappings.items) |mapping| {
         if (std.meta.eql(modifiers, mapping.modifiers) and keysym == mapping.keysym and released == mapping.release) {
             // Execute the bound command
@@ -409,7 +408,7 @@ fn handleStartDrag(
             return;
         };
         node.data.init(self, wlr_drag_icon);
-        self.input_manager.server.root.drag_icons.prepend(node);
+        server.root.drag_icons.prepend(node);
     }
     self.cursor.mode = .passthrough;
 }

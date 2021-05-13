@@ -17,6 +17,8 @@
 
 const std = @import("std");
 
+const server = &@import("../main.zig").server;
+
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
@@ -39,9 +41,8 @@ pub fn enterMode(
         return Error.Other;
     }
 
-    const config = seat.input_manager.server.config;
     const target_mode = args[1];
-    const mode_id = config.mode_to_id.get(target_mode) orelse {
+    const mode_id = server.config.mode_to_id.get(target_mode) orelse {
         out.* = try std.fmt.allocPrint(
             allocator,
             "cannot enter non-existant mode '{}'",

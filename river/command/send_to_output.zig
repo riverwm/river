@@ -17,6 +17,8 @@
 
 const std = @import("std");
 
+const server = &@import("../main.zig").server;
+
 const Direction = @import("../command.zig").Direction;
 const Error = @import("../command.zig").Error;
 const Output = @import("../Output.zig");
@@ -34,20 +36,19 @@ pub fn sendToOutput(
     if (args.len > 2) return Error.TooManyArguments;
 
     const direction = std.meta.stringToEnum(Direction, args[1]) orelse return Error.InvalidDirection;
-    const root = &seat.input_manager.server.root;
 
     if (seat.focused == .view) {
         // If the noop output is focused, there is nowhere to send the view
-        if (seat.focused_output == &root.noop_output) {
-            std.debug.assert(root.outputs.len == 0);
+        if (seat.focused_output == &server.root.noop_output) {
+            std.debug.assert(server.root.outputs.len == 0);
             return;
         }
 
         // Send to the next/prev output in the list if there is one, else wrap
         const current_node = @fieldParentPtr(std.TailQueue(Output).Node, "data", seat.focused_output);
         const destination_output = switch (direction) {
-            .next => if (current_node.next) |node| &node.data else &root.outputs.first.?.data,
-            .previous => if (current_node.prev) |node| &node.data else &root.outputs.last.?.data,
+            .next => if (current_node.next) |node| &node.data else &server.root.outputs.first.?.data,
+            .previous => if (current_node.prev) |node| &node.data else &server.root.outputs.last.?.data,
         };
 
         // Move the view to the target output
@@ -57,6 +58,6 @@ pub fn sendToOutput(
         seat.focus(null);
         seat.focused_output.arrangeViews();
         destination_output.arrangeViews();
-        root.startTransaction();
+        server.root.startTransaction();
     }
 }

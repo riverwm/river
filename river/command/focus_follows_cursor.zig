@@ -17,6 +17,7 @@
 
 const std = @import("std");
 
+const server = &@import("../main.zig").server;
 const util = @import("../util.zig");
 
 const Config = @import("../Config.zig");
@@ -31,8 +32,6 @@ pub fn focusFollowsCursor(
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
-
-    const server = seat.input_manager.server;
 
     server.config.focus_follows_cursor =
         std.meta.stringToEnum(Config.FocusFollowsCursorMode, args[1]) orelse return Error.UnknownOption;

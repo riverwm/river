@@ -21,6 +21,7 @@ const wlr = @import("wlroots");
 const xkb = @import("xkbcommon");
 
 const c = @import("../c.zig");
+const server = &@import("../main.zig").server;
 const util = @import("../util.zig");
 
 const Error = @import("../command.zig").Error;
@@ -47,7 +48,7 @@ pub fn map(
     const modifiers = try parseModifiers(allocator, args[2 + offset], out);
     const keysym = try parseKeysym(allocator, args[3 + offset], out);
 
-    const mode_mappings = &seat.input_manager.server.config.modes.items[mode_id].mappings;
+    const mode_mappings = &server.config.modes.items[mode_id].mappings;
 
     const new = try Mapping.init(keysym, modifiers, optionals.release, args[4 + offset ..]);
     errdefer new.deinit();
@@ -96,7 +97,7 @@ pub fn mapPointer(
         .action = action,
     };
 
-    const mode_pointer_mappings = &seat.input_manager.server.config.modes.items[mode_id].pointer_mappings;
+    const mode_pointer_mappings = &server.config.modes.items[mode_id].pointer_mappings;
     if (pointerMappingExists(mode_pointer_mappings, modifiers, event_code)) |current| {
         mode_pointer_mappings.items[current] = new;
     } else {
@@ -105,7 +106,7 @@ pub fn mapPointer(
 }
 
 fn modeNameToId(allocator: *std.mem.Allocator, seat: *Seat, mode_name: []const u8, out: *?[]const u8) !usize {
-    const config = seat.input_manager.server.config;
+    const config = &server.config;
     return config.mode_to_id.get(mode_name) orelse {
         out.* = try std.fmt.allocPrint(
             allocator,
@@ -255,7 +256,7 @@ pub fn unmap(
     const modifiers = try parseModifiers(allocator, args[2 + offset], out);
     const keysym = try parseKeysym(allocator, args[3 + offset], out);
 
-    const mode_mappings = &seat.input_manager.server.config.modes.items[mode_id].mappings;
+    const mode_mappings = &server.config.modes.items[mode_id].mappings;
     const mapping_idx = mappingExists(mode_mappings, modifiers, keysym, optionals.release) orelse return;
 
     var mapping = mode_mappings.swapRemove(mapping_idx);
@@ -279,7 +280,7 @@ pub fn unmapPointer(
     const modifiers = try parseModifiers(allocator, args[2], out);
     const event_code = try parseEventCode(allocator, args[3], out);
 
-    const mode_pointer_mappings = &seat.input_manager.server.config.modes.items[mode_id].pointer_mappings;
+    const mode_pointer_mappings = &server.config.modes.items[mode_id].pointer_mappings;
     const mapping_idx = pointerMappingExists(mode_pointer_mappings, modifiers, event_code) orelse return;
 
     _ = mode_pointer_mappings.swapRemove(mapping_idx);

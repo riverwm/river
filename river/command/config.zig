@@ -17,6 +17,8 @@
 
 const std = @import("std");
 
+const server = &@import("../main.zig").server;
+
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
@@ -29,7 +31,6 @@ pub fn borderWidth(
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
 
-    const server = seat.input_manager.server;
     server.config.border_width = try std.fmt.parseInt(u32, args[1], 10);
     server.root.arrangeAll();
     server.root.startTransaction();
@@ -44,7 +45,7 @@ pub fn backgroundColor(
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
 
-    seat.input_manager.server.config.background_color = try parseRgba(args[1]);
+    server.config.background_color = try parseRgba(args[1]);
 }
 
 pub fn borderColorFocused(
@@ -56,7 +57,7 @@ pub fn borderColorFocused(
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
 
-    seat.input_manager.server.config.border_color_focused = try parseRgba(args[1]);
+    server.config.border_color_focused = try parseRgba(args[1]);
 }
 
 pub fn borderColorUnfocused(
@@ -68,7 +69,7 @@ pub fn borderColorUnfocused(
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
 
-    seat.input_manager.server.config.border_color_unfocused = try parseRgba(args[1]);
+    server.config.border_color_unfocused = try parseRgba(args[1]);
 }
 
 /// Parse a color in the format #RRGGBB or #RRGGBBAA

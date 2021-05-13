@@ -21,6 +21,7 @@ const std = @import("std");
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
+const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Seat = @import("Seat.zig");
@@ -37,8 +38,7 @@ pub fn init(self: *Self, seat: *Seat, wlr_drag_icon: *wlr.Drag.Icon) void {
 
 fn handleDestroy(listener: *wl.Listener(*wlr.Drag.Icon), wlr_drag_icon: *wlr.Drag.Icon) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
-    const root = &self.seat.input_manager.server.root;
     const node = @fieldParentPtr(std.SinglyLinkedList(Self).Node, "data", self);
-    root.drag_icons.remove(node);
+    server.root.drag_icons.remove(node);
     util.gpa.destroy(node);
 }

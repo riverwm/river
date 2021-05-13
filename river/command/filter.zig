@@ -17,6 +17,7 @@
 
 const std = @import("std");
 
+const server = &@import("../main.zig").server;
 const util = @import("../util.zig");
 
 const Error = @import("../command.zig").Error;
@@ -40,7 +41,7 @@ pub fn floatFilterAdd(
 ) Error!void {
     try appendFilter(
         allocator,
-        &seat.input_manager.server.config.float_filter,
+        &server.config.float_filter,
         args,
     );
 }
@@ -53,7 +54,7 @@ pub fn csdFilterAdd(
 ) Error!void {
     try appendFilter(
         allocator,
-        &seat.input_manager.server.config.csd_filter,
+        &server.config.csd_filter,
         args,
     );
 }

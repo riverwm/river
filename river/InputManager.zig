@@ -22,6 +22,7 @@ const std = @import("std");
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
+const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Seat = @import("Seat.zig");
@@ -33,7 +34,6 @@ const default_seat_name = "default";
 
 const log = std.log.scoped(.input_manager);
 
-server: *Server,
 new_input: wl.Listener(*wlr.InputDevice) = wl.Listener(*wlr.InputDevice).init(handleNewInput),
 
 idle: *wlr.Idle,
@@ -60,12 +60,11 @@ new_virtual_keyboard: wl.Listener(*wlr.VirtualKeyboardV1) =
     wl.Listener(*wlr.VirtualKeyboardV1).init(handleNewVirtualKeyboard),
 // zig fmt: on
 
-pub fn init(self: *Self, server: *Server) !void {
+pub fn init(self: *Self) !void {
     const seat_node = try util.gpa.create(std.TailQueue(Seat).Node);
     errdefer util.gpa.destroy(seat_node);
 
     self.* = .{
-        .server = server,
         // These are automatically freed when the display is destroyed
         .idle = try wlr.Idle.create(server.wl_server),
         .input_inhibit_manager = try wlr.InputInhibitManager.create(server.wl_server),
@@ -156,7 +155,7 @@ fn handleInhibitDeactivate(
 
     // Calling arrangeLayers() like this ensures that any top or overlay,
     // keyboard-interactive surfaces will re-grab focus.
-    var output_it = self.server.root.outputs.first;
+    var output_it = server.root.outputs.first;
     while (output_it) |output_node| : (output_it = output_node.next) {
         output_node.data.arrangeLayers();
     }
@@ -169,7 +168,7 @@ fn handleInhibitDeactivate(
         seat_node.data.mode_id = seat_node.data.prev_mode_id;
     }
 
-    self.server.root.startTransaction();
+    server.root.startTransaction();
 }
 
 /// This event is raised by the backend when a new input device becomes available.

@@ -115,7 +115,7 @@ pub fn init(self: *Self) !void {
     try self.decoration_manager.init(self);
     try self.root.init();
     // Must be called after root is initialized
-    try self.input_manager.init(self);
+    try self.input_manager.init();
     try self.control.init(self);
     try self.status_manager.init(self);
     try self.layout_manager.init(self);

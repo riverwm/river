@@ -20,6 +20,8 @@ const mem = std.mem;
 const wl = @import("wayland").server.wl;
 const util = @import("../util.zig");
 
+const server = &@import("../main.zig").server;
+
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
@@ -46,7 +48,6 @@ pub fn defaultLayout(
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
 
-    const server = seat.input_manager.server;
     server.config.default_layout_namespace = try util.gpa.dupe(u8, args[1]);
     var it = server.root.all_outputs.first;
     while (it) |node| : (it = node.next) {

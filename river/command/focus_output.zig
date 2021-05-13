@@ -17,6 +17,8 @@
 
 const std = @import("std");
 
+const server = &@import("../main.zig").server;
+
 const Direction = @import("../command.zig").Direction;
 const Error = @import("../command.zig").Error;
 const Output = @import("../Output.zig");
@@ -34,21 +36,20 @@ pub fn focusOutput(
     if (args.len > 2) return Error.TooManyArguments;
 
     const direction = std.meta.stringToEnum(Direction, args[1]) orelse return Error.InvalidDirection;
-    const root = &seat.input_manager.server.root;
 
     // If the noop output is focused, there are no other outputs to switch to
-    if (seat.focused_output == &root.noop_output) {
-        std.debug.assert(root.outputs.len == 0);
+    if (seat.focused_output == &server.root.noop_output) {
+        std.debug.assert(server.root.outputs.len == 0);
         return;
     }
 
     // Focus the next/prev output in the list if there is one, else wrap
     const focused_node = @fieldParentPtr(std.TailQueue(Output).Node, "data", seat.focused_output);
     seat.focusOutput(switch (direction) {
-        .next => if (focused_node.next) |node| &node.data else &root.outputs.first.?.data,
-        .previous => if (focused_node.prev) |node| &node.data else &root.outputs.last.?.data,
+        .next => if (focused_node.next) |node| &node.data else &server.root.outputs.first.?.data,
+        .previous => if (focused_node.prev) |node| &node.data else &server.root.outputs.last.?.data,
     });
 
     seat.focus(null);
-    root.startTransaction();
+    server.root.startTransaction();
 }

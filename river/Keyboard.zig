@@ -22,6 +22,7 @@ const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 const xkb = @import("xkbcommon");
 
+const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Seat = @import("Seat.zig");
@@ -60,8 +61,7 @@ pub fn init(self: *Self, seat: *Seat, input_device: *wlr.InputDevice) !void {
 
     if (!wlr_keyboard.setKeymap(keymap)) return error.SetKeymapFailed;
 
-    const config = &seat.input_manager.server.config;
-    wlr_keyboard.setRepeatInfo(config.repeat_rate, config.repeat_delay);
+    wlr_keyboard.setRepeatInfo(server.config.repeat_rate, server.config.repeat_delay);
 
     wlr_keyboard.events.key.add(&self.key);
     wlr_keyboard.events.modifiers.add(&self.modifiers);
@@ -149,9 +149,8 @@ fn handleBuiltinMapping(self: Self, keysym: xkb.Keysym) bool {
     switch (@enumToInt(keysym)) {
         @enumToInt(xkb.Keysym.XF86Switch_VT_1)...@enumToInt(xkb.Keysym.XF86Switch_VT_12) => {
             log.debug("switch VT keysym received", .{});
-            const backend = self.seat.input_manager.server.backend;
-            if (backend.isMulti()) {
-                if (backend.getSession()) |session| {
+            if (server.backend.isMulti()) {
+                if (server.backend.getSession()) |session| {
                     const vt = @enumToInt(keysym) - @enumToInt(xkb.Keysym.XF86Switch_VT_1) + 1;
                     const log_server = std.log.scoped(.server);
                     log_server.notice("switching to VT {}", .{vt});

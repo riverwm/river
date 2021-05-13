@@ -17,6 +17,7 @@
 
 const std = @import("std");
 
+const server = &@import("../main.zig").server;
 const util = @import("../util.zig");
 
 const Mode = @import("../Mode.zig");
@@ -34,7 +35,7 @@ pub fn declareMode(
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
 
-    const config = &seat.input_manager.server.config;
+    const config = &server.config;
     const new_mode_name = args[1];
 
     if (config.mode_to_id.get(new_mode_name) != null) return;

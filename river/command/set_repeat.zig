@@ -17,6 +17,8 @@
 
 const std = @import("std");
 
+const server = &@import("../main.zig").server;
+
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
@@ -33,9 +35,8 @@ pub fn setRepeat(
     const rate = try std.fmt.parseInt(u31, args[1], 10);
     const delay = try std.fmt.parseInt(u31, args[2], 10);
 
-    const config = &seat.input_manager.server.config;
-    config.repeat_rate = rate;
-    config.repeat_delay = delay;
+    server.config.repeat_rate = rate;
+    server.config.repeat_delay = delay;
 
     var it = seat.keyboards.first;
     while (it) |node| : (it = node.next) {

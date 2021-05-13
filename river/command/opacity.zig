@@ -17,6 +17,8 @@
 
 const std = @import("std");
 
+const server = &@import("../main.zig").server;
+
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 const View = @import("../View.zig");
@@ -35,8 +37,6 @@ pub fn opacity(
 ) Error!void {
     if (args.len < 6) return Error.NotEnoughArguments;
     if (args.len > 6) return Error.TooManyArguments;
-
-    const server = seat.input_manager.server;
 
     // Focused opacity
     server.config.opacity.focused = try std.fmt.parseFloat(f32, args[1]);

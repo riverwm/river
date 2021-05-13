@@ -94,7 +94,7 @@ swipe_end: wl.Listener(*wlr.Pointer.event.SwipeEnd) =
 pub fn init(self: *Self, seat: *Seat) !void {
     const wlr_cursor = try wlr.Cursor.create();
     errdefer wlr_cursor.destroy();
-    wlr_cursor.attachOutputLayout(seat.input_manager.server.root.output_layout);
+    wlr_cursor.attachOutputLayout(server.root.output_layout);
 
     // This is here so that self.xcursor_manager doesn't need to be an
     // optional pointer. This isn't optimal as it does a needless allocation,
@@ -105,7 +105,7 @@ pub fn init(self: *Self, seat: *Seat) !void {
     self.* = .{
         .seat = seat,
         .wlr_cursor = wlr_cursor,
-        .pointer_gestures = try wlr.PointerGesturesV1.create(seat.input_manager.server.wl_server),
+        .pointer_gestures = try wlr.PointerGesturesV1.create(server.wl_server),
         .xcursor_manager = xcursor_manager,
     };
     try self.setTheme(null, null);
@@ -346,8 +346,7 @@ fn handlePointerMapping(self: *Self, event: *wlr.Pointer.event.Button, view: *Vi
 
     const fullscreen = view.current.fullscreen or view.pending.fullscreen;
 
-    const config = self.seat.input_manager.server.config;
-    return for (config.modes.items[self.seat.mode_id].pointer_mappings.items) |mapping| {
+    return for (server.config.modes.items[self.seat.mode_id].pointer_mappings.items) |mapping| {
         if (event.button == mapping.event_code and std.meta.eql(modifiers, mapping.modifiers)) {
             switch (mapping.action) {
                 .move => if (!fullscreen) self.enterMode(.move, view),
@@ -427,14 +426,13 @@ fn handleRequestSetCursor(
 /// surface coordinates.
 /// This function must be kept in sync with the rendering order in render.zig.
 fn surfaceAt(self: Self, lx: f64, ly: f64, sx: *f64, sy: *f64) ?*wlr.Surface {
-    const root = self.seat.input_manager.server.root;
-    const wlr_output = root.output_layout.outputAt(lx, ly) orelse return null;
+    const wlr_output = server.root.output_layout.outputAt(lx, ly) orelse return null;
     const output = @intToPtr(*Output, wlr_output.data);
 
     // Get output-local coords from the layout coords
     var ox = lx;
     var oy = ly;
-    root.output_layout.outputCoords(wlr_output, &ox, &oy);
+    server.root.output_layout.outputCoords(wlr_output, &ox, &oy);
 
     // Check surfaces in the reverse order they are rendered in:
     // 1. overlay layer (+ popups)
@@ -643,8 +641,7 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
             view.applyPending();
         },
         .resize => |data| {
-            const config = &self.seat.input_manager.server.config;
-            const border_width = if (data.view.draw_borders) config.border_width else 0;
+            const border_width = if (data.view.draw_borders) server.config.border_width else 0;
 
             // Set width/height of view, clamp to view size constraints and output dimensions
             const box = &data.view.pending.box;
@@ -671,9 +668,6 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
 
 /// Pass an event on to the surface under the cursor, if any.
 fn passthrough(self: *Self, time: u32) void {
-    const root = &self.seat.input_manager.server.root;
-    const config = self.seat.input_manager.server.config;
-
     var sx: f64 = undefined;
     var sy: f64 = undefined;
     if (self.surfaceAt(self.wlr_cursor.x, self.wlr_cursor.y, &sx, &sy)) |surface| {
@@ -687,12 +681,12 @@ fn passthrough(self: *Self, time: u32) void {
             self.seat.wlr_seat.pointerNotifyEnter(surface, sx, sy);
             self.seat.wlr_seat.pointerNotifyMotion(time, sx, sy);
 
-            const follow_mode = config.focus_follows_cursor;
+            const follow_mode = server.config.focus_follows_cursor;
             if (follow_mode == .strict or (follow_mode == .normal and focus_change)) {
                 if (View.fromWlrSurface(surface)) |view| {
                     self.seat.focusOutput(view.output);
                     self.seat.focus(view);
-                    root.startTransaction();
+                    server.root.startTransaction();
                 }
             }
         }
