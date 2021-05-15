@@ -165,8 +165,9 @@ const Output = struct {
             },
 
             .layout_demand => |ev| {
-                const secondary_count = if (ev.view_count > output.main_count)
-                    ev.view_count - output.main_count
+                const main_count = math.clamp(output.main_count, 1, ev.view_count);
+                const secondary_count = if (ev.view_count > main_count)
+                    ev.view_count - main_count
                 else
                     0;
 
@@ -189,18 +190,18 @@ const Output = struct {
                 var secondary_height: u32 = undefined;
                 var secondary_height_rem: u32 = undefined;
 
-                if (output.main_count > 0 and secondary_count > 0) {
+                if (main_count > 0 and secondary_count > 0) {
                     main_width = @floatToInt(u32, output.main_factor * @intToFloat(f64, usable_width));
-                    main_height = usable_height / output.main_count;
-                    main_height_rem = usable_height % output.main_count;
+                    main_height = usable_height / main_count;
+                    main_height_rem = usable_height % main_count;
 
                     secondary_width = usable_width - main_width;
                     secondary_height = usable_height / secondary_count;
                     secondary_height_rem = usable_height % secondary_count;
-                } else if (output.main_count > 0) {
+                } else if (main_count > 0) {
                     main_width = usable_width;
-                    main_height = usable_height / output.main_count;
-                    main_height_rem = usable_height % output.main_count;
+                    main_height = usable_height / main_count;
+                    main_height_rem = usable_height % main_count;
                 } else if (secondary_width > 0) {
                     main_width = 0;
                     secondary_width = usable_width;
@@ -215,17 +216,17 @@ const Output = struct {
                     var width: u32 = undefined;
                     var height: u32 = undefined;
 
-                    if (i < output.main_count) {
+                    if (i < main_count) {
                         x = 0;
                         y = @intCast(i32, (i * main_height) + if (i > 0) main_height_rem else 0);
                         width = main_width;
                         height = main_height + if (i == 0) main_height_rem else 0;
                     } else {
                         x = @intCast(i32, main_width);
-                        y = @intCast(i32, (i - output.main_count) * secondary_height +
-                            if (i > output.main_count) secondary_height_rem else 0);
+                        y = @intCast(i32, (i - main_count) * secondary_height +
+                            if (i > main_count) secondary_height_rem else 0);
                         width = secondary_width;
-                        height = secondary_height + if (i == output.main_count) secondary_height_rem else 0;
+                        height = secondary_height + if (i == main_count) secondary_height_rem else 0;
                     }
 
                     x += @intCast(i32, view_padding);
