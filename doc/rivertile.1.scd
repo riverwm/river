@@ -57,7 +57,7 @@ Start *rivertile* with 4 pixels outer padding and 2 main views:
 
 Set the main location of rivertile to top at runtime:
 
-	riverctl send-layout-value rivertile string main_location top
+	riverctl set-layout-value rivertile string main_location top
 
 # AUTHORS
 
