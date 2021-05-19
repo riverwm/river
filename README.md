@@ -76,9 +76,9 @@ For complete documentation see the `river(1)`, `riverctl(1)`, and
 
 ## Development
 
-If you are interested in the development of river, please join us at
-[#river](https://webchat.freenode.net/#river) on freenode. You should also
-read [CONTRIBUTING.md](CONTRIBUTING.md) if you intend to submit patches.
+If you are interested in the development of river, please join us at #river
+on irc.libera.chat. You should also read [CONTRIBUTING.md](CONTRIBUTING.md)
+if you intend to submit patches.
 
 ## Licensing
 
