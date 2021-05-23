@@ -112,8 +112,8 @@ pub fn init() !Self {
 }
 
 pub fn deinit(self: *Self) void {
-    var it = self.mode_to_id.iterator();
-    while (it.next()) |e| util.gpa.free(e.key);
+    var it = self.mode_to_id.keyIterator();
+    while (it.next()) |key| util.gpa.free(key.*);
     self.mode_to_id.deinit();
 
     for (self.modes.items) |mode| mode.deinit();

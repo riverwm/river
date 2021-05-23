@@ -45,7 +45,7 @@ pub fn enterMode(
     const mode_id = server.config.mode_to_id.get(target_mode) orelse {
         out.* = try std.fmt.allocPrint(
             allocator,
-            "cannot enter non-existant mode '{}'",
+            "cannot enter non-existant mode '{s}'",
             .{target_mode},
         );
         return Error.Other;

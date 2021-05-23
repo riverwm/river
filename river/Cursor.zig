@@ -149,7 +149,7 @@ pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
     while (it) |node| : (it = node.next) {
         const wlr_output = node.data.wlr_output;
         self.xcursor_manager.load(wlr_output.scale) catch
-            log.err("failed to load xcursor theme '{}' at scale {}", .{ theme, wlr_output.scale });
+            log.err("failed to load xcursor theme '{s}' at scale {}", .{ theme, wlr_output.scale });
     }
 
     // If this cursor belongs to the default seat, set the xcursor environment
@@ -162,7 +162,7 @@ pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
 
         if (build_options.xwayland) {
             self.xcursor_manager.load(1) catch {
-                log.err("failed to load xcursor theme '{}' at scale 1", .{theme});
+                log.err("failed to load xcursor theme '{s}' at scale 1", .{theme});
                 return;
             };
             const wlr_xcursor = self.xcursor_manager.getXcursor("left_ptr", 1).?;
@@ -525,8 +525,8 @@ fn surfaceAtFilter(view: *View, filter_tags: u32) bool {
 }
 
 /// Enter move or resize mode
-pub fn enterMode(self: *Self, mode: @TagType(Mode), view: *View) void {
-    log.debug("enter {} mode", .{@tagName(mode)});
+pub fn enterMode(self: *Self, mode: std.meta.Tag((Mode)), view: *View) void {
+    log.debug("enter {s} mode", .{@tagName(mode)});
 
     self.seat.focus(view);
 
@@ -575,7 +575,7 @@ pub fn enterMode(self: *Self, mode: @TagType(Mode), view: *View) void {
 fn leaveMode(self: *Self, event: *wlr.Pointer.event.Button) void {
     std.debug.assert(self.mode != .passthrough);
 
-    log.debug("leave {} mode", .{@tagName(self.mode)});
+    log.debug("leave {s} mode", .{@tagName(self.mode)});
 
     // If we were in down mode, we need pass along the release event
     if (self.mode == .down)

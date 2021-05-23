@@ -446,7 +446,7 @@ pub fn shouldTrackConfigure(self: Self) bool {
 pub fn map(self: *Self) void {
     self.pending.target_opacity = server.config.opacity.unfocused;
 
-    log.debug("view '{}' mapped", .{self.getTitle()});
+    log.debug("view '{s}' mapped", .{self.getTitle()});
 
     if (self.foreign_toplevel_handle == null) {
         self.foreign_toplevel_handle = wlr.ForeignToplevelHandleV1.create(
@@ -487,7 +487,7 @@ pub fn map(self: *Self) void {
 
 /// Called by the impl when the surface will no longer be displayed
 pub fn unmap(self: *Self) void {
-    log.debug("view '{}' unmapped", .{self.getTitle()});
+    log.debug("view '{s}' unmapped", .{self.getTitle()});
 
     self.destroying = true;
     if (self.saved_buffers.items.len == 0) self.saveBuffers();
@@ -558,7 +558,7 @@ fn killOpacityTimer(self: *Self) void {
 fn armOpacityTimer(self: *Self) void {
     const delta_t = server.config.opacity.delta_t;
     self.opacity_timer.?.timerUpdate(delta_t) catch |err| {
-        log.err("failed to update opacity timer: {}", .{err});
+        log.err("failed to update opacity timer: {s}", .{err});
         self.killOpacityTimer();
     };
 }
@@ -577,7 +577,7 @@ fn handleOpacityTimer(self: *Self) callconv(.C) c_int {
 fn attachOpacityTimer(self: *Self) void {
     const event_loop = server.wl_server.getEventLoop();
     self.opacity_timer = event_loop.addTimer(*Self, handleOpacityTimer, self) catch {
-        log.err("failed to create opacity timer for view '{}'", .{self.getTitle()});
+        log.err("failed to create opacity timer for view '{s}'", .{self.getTitle()});
         return;
     };
     self.armOpacityTimer();

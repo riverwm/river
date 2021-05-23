@@ -19,6 +19,7 @@ const Self = @This();
 
 const build_options = @import("build_options");
 const std = @import("std");
+const mem = std.mem;
 const assert = std.debug.assert;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
@@ -75,7 +76,7 @@ xwayland_unmanaged_views: if (build_options.xwayland)
     std.TailQueue(XwaylandUnmanaged)
 else
     void = if (build_options.xwayland)
-    .{},
+.{},
 
 /// Number of layout demands pending before the transaction may be started.
 pending_layout_demands: u32 = 0,
@@ -128,7 +129,7 @@ pub fn deinit(self: *Self) void {
 
 fn handleNewOutput(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
     const self = @fieldParentPtr(Self, "new_output", listener);
-    std.log.scoped(.output_manager).debug("new output {}", .{wlr_output.name});
+    std.log.scoped(.output_manager).debug("new output {s}", .{mem.sliceTo(&wlr_output.name, 0)});
 
     const node = util.gpa.create(std.TailQueue(Output).Node) catch {
         wlr_output.destroy();
@@ -475,7 +476,7 @@ fn applyOutputConfig(self: *Self, config: *wlr.OutputConfigurationV1) bool {
         // Since we have done a successful test commit, this will only fail
         // due to error in the output's backend implementation.
         output.wlr_output.commit() catch
-            std.log.scoped(.output_manager).err("output commit failed for {}", .{output.wlr_output.name});
+            std.log.scoped(.output_manager).err("output commit failed for {s}", .{mem.sliceTo(&output.wlr_output.name, 0)});
 
         if (output.wlr_output.enabled) {
             // Moves the output if it is already in the layout
@@ -514,8 +515,8 @@ fn testOutputConfig(config: *wlr.OutputConfigurationV1, rollback: bool) bool {
 
         if (too_small) {
             std.log.scoped(.output_manager).info(
-                "The requested output resolution {}x{} scaled with {} for {} would be too small.",
-                .{ width, height, scale, wlr_output.name },
+                "The requested output resolution {}x{} scaled with {} for {s} would be too small.",
+                .{ width, height, scale, mem.sliceTo(&wlr_output.name, 0) },
             );
         }
 
@@ -586,11 +587,12 @@ fn handlePowerManagerSetMode(
 
     const log_text = if (enable) "Enabling" else "Disabling";
     std.log.scoped(.output_manager).debug(
-        "{} dpms for output {}",
-        .{ log_text, event.output.name },
+        "{s} dpms for output {s}",
+        .{ log_text, mem.sliceTo(&event.output.name, 0) },
     );
 
     event.output.enable(enable);
-    event.output.commit() catch
-        std.log.scoped(.server).err("output commit failed for {}", .{event.output.name});
+    event.output.commit() catch {
+        std.log.scoped(.server).err("output commit failed for {s}", .{mem.sliceTo(&event.output.name, 0)});
+    };
 }

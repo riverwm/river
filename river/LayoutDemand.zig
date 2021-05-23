@@ -18,6 +18,7 @@
 const Self = @This();
 
 const std = @import("std");
+const mem = std.mem;
 const wlr = @import("wlroots");
 const wayland = @import("wayland");
 const wl = wayland.server.wl;
@@ -69,8 +70,8 @@ pub fn deinit(self: *const Self) void {
 /// All further responses to the event will simply be ignored.
 fn handleTimeout(layout: *Layout) callconv(.C) c_int {
     log.notice(
-        "layout demand for layout '{}' on output '{}' timed out",
-        .{ layout.namespace, layout.output.wlr_output.name },
+        "layout demand for layout '{s}' on output '{s}' timed out",
+        .{ layout.namespace, mem.sliceTo(&layout.output.wlr_output.name, 0) },
     );
     layout.output.layout_demand.?.deinit();
     layout.output.layout_demand = null;

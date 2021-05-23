@@ -92,17 +92,17 @@ fn callbackListener(callback: *zriver.CommandCallbackV1, event: zriver.CommandCa
     switch (event) {
         .success => |success| {
             if (mem.len(success.output) > 0) {
-                const stdout = std.io.getStdOut().outStream();
-                stdout.print("{}\n", .{success.output}) catch @panic("failed to write to stdout");
+                const stdout = std.io.getStdOut().writer();
+                stdout.print("{s}\n", .{success.output}) catch @panic("failed to write to stdout");
             }
             os.exit(0);
         },
-        .failure => |failure| printErrorExit("Error: {}\n", .{failure.failure_message}),
+        .failure => |failure| printErrorExit("Error: {s}\n", .{failure.failure_message}),
     }
 }
 
 pub fn printErrorExit(comptime format: []const u8, args: anytype) noreturn {
-    const stderr = std.io.getStdErr().outStream();
+    const stderr = std.io.getStdErr().writer();
     stderr.print("err: " ++ format ++ "\n", args) catch std.os.exit(1);
     std.os.exit(1);
 }

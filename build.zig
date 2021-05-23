@@ -48,14 +48,12 @@ pub fn build(b: *zbs.Builder) !void {
 
     const examples = b.option(bool, "examples", "Set to true to build examples") orelse false;
 
-    // This logic must match std.build.resolveInstallPrefix()
-    const prefix = b.install_prefix orelse if (b.dest_dir) |_| "/usr" else b.cache_root;
-    const rel_config_path = if (mem.eql(u8, try fs.path.resolve(b.allocator, &[_][]const u8{prefix}), "/usr"))
+    const rel_config_path = if (mem.eql(u8, try fs.path.resolve(b.allocator, &[_][]const u8{b.install_prefix}), "/usr"))
         "../etc/river/init"
     else
         "etc/river/init";
     b.installFile("example/init", rel_config_path);
-    const abs_config_path = try fs.path.resolve(b.allocator, &[_][]const u8{ prefix, rel_config_path });
+    const abs_config_path = try fs.path.resolve(b.allocator, &[_][]const u8{ b.install_prefix, rel_config_path });
     assert(fs.path.isAbsolute(abs_config_path));
 
     const scanner = ScanProtocolsStep.create(b);
@@ -226,7 +224,7 @@ const ScdocStep = struct {
         for (scd_paths) |path| {
             const command = try std.fmt.allocPrint(
                 self.builder.allocator,
-                "scdoc < {} > {}",
+                "scdoc < {s} > {s}",
                 .{ path, path[0..(path.len - 4)] },
             );
             _ = try self.builder.exec(&[_][]const u8{ "sh", "-c", command });
@@ -243,7 +241,7 @@ const ScdocStep = struct {
 
             const output = try std.fmt.allocPrint(
                 self.builder.allocator,
-                "share/man/man{}/{}",
+                "share/man/man{s}/{s}",
                 .{ section, basename_no_ext },
             );
 

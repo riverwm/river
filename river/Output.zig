@@ -304,7 +304,7 @@ fn arrangeLayer(
             // should only ever be encountered very rarely and matches the
             // behavior of other compositors.
             std.log.scoped(.layer_shell).warn(
-                "margins of layer surface '{}' are too large to be reasonably handled. Closing.",
+                "margins of layer surface '{s}' are too large to be reasonably handled. Closing.",
                 .{layer_surface.wlr_layer_surface.namespace},
             );
             layer_surface.wlr_layer_surface.close();
@@ -333,7 +333,7 @@ fn arrangeLayer(
         if (vertical_margin_size >= bounds.height) {
             // TODO find a better solution, see explanation above
             std.log.scoped(.layer_shell).warn(
-                "margins of layer surface '{}' are too large to be reasonably handled. Closing.",
+                "margins of layer surface '{s}' are too large to be reasonably handled. Closing.",
                 .{layer_surface.wlr_layer_surface.namespace},
             );
             layer_surface.wlr_layer_surface.close();
@@ -419,7 +419,7 @@ fn arrangeLayer(
 fn handleDestroy(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
 
-    std.log.scoped(.server).debug("output '{}' destroyed", .{self.wlr_output.name});
+    std.log.scoped(.server).debug("output '{s}' destroyed", .{mem.sliceTo(&self.wlr_output.name, 0)});
 
     // Remove the destroyed output from root if it wasn't already removed
     server.root.removeOutput(self);
@@ -482,7 +482,7 @@ pub fn getEffectiveResolution(self: *Self) struct { width: u32, height: u32 } {
 
 fn setTitle(self: Self) void {
     var buf: ["river - ".len + self.wlr_output.name.len + 1]u8 = undefined;
-    const title = fmt.bufPrintZ(&buf, "river - {}", .{mem.spanZ(&self.wlr_output.name)}) catch unreachable;
+    const title = fmt.bufPrintZ(&buf, "river - {s}", .{mem.sliceTo(&self.wlr_output.name, 0)}) catch unreachable;
     if (self.wlr_output.isWl()) {
         self.wlr_output.wlSetTitle(title);
     } else if (wlr.config.has_x11_backend and self.wlr_output.isX11()) {

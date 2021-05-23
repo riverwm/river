@@ -77,8 +77,8 @@ fn handleRequest(control: *zriver.ControlV1, request: zriver.ControlV1.Request, 
                 return;
             };
 
-            const entry = self.args_map.getEntry(.{ .client = control.getClient(), .id = control.getId() }).?;
-            entry.value.append(util.gpa, owned_slice) catch {
+            const args = self.args_map.getPtr(.{ .client = control.getClient(), .id = control.getId() }).?;
+            args.append(util.gpa, owned_slice) catch {
                 control.getClient().postNoMemory();
                 util.gpa.free(owned_slice);
                 return;
@@ -96,16 +96,15 @@ fn handleRequest(control: *zriver.ControlV1, request: zriver.ControlV1.Request, 
                 return;
             };
 
-            const entry = self.args_map.getEntry(.{ .client = control.getClient(), .id = control.getId() }).?;
+            const args = self.args_map.getPtr(.{ .client = control.getClient(), .id = control.getId() }).?;
             defer {
-                for (entry.value.items) |arg| util.gpa.free(arg);
-                entry.value.items.len = 0;
+                for (args.items) |arg| util.gpa.free(arg);
+                args.items.len = 0;
             }
-            const args = entry.value.items;
 
             var out: ?[]const u8 = null;
             defer if (out) |s| util.gpa.free(s);
-            command.run(util.gpa, seat, args, &out) catch |err| {
+            command.run(util.gpa, seat, args.items, &out) catch |err| {
                 const failure_message = switch (err) {
                     command.Error.OutOfMemory => {
                         callback.getClient().postNoMemory();
@@ -137,9 +136,9 @@ fn handleRequest(control: *zriver.ControlV1, request: zriver.ControlV1.Request, 
 
 /// Remove the resource from the hash map and free all stored args
 fn handleDestroy(control: *zriver.ControlV1, self: *Self) void {
-    var list = self.args_map.remove(
+    var args = self.args_map.fetchRemove(
         .{ .client = control.getClient(), .id = control.getId() },
     ).?.value;
-    for (list.items) |arg| util.gpa.free(arg);
-    list.deinit(util.gpa);
+    for (args.items) |arg| util.gpa.free(arg);
+    args.deinit(util.gpa);
 }

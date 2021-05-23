@@ -319,13 +319,14 @@ pub fn handleMapping(
                     command.Error.Other => out.?,
                     else => command.errToMsg(err),
                 };
-                std.log.scoped(.command).err("{}: {}", .{ args[0], failure_message });
+                std.log.scoped(.command).err("{s}: {s}", .{ args[0], failure_message });
                 return true;
             };
             if (out) |s| {
-                const stdout = std.io.getStdOut().outStream();
-                stdout.print("{}", .{s}) catch
-                |err| std.log.scoped(.command).err("{}: write to stdout failed {}", .{ args[0], err });
+                const stdout = std.io.getStdOut().writer();
+                stdout.print("{s}", .{s}) catch |err| {
+                    std.log.scoped(.command).err("{s}: write to stdout failed {}", .{ args[0], err });
+                };
             }
             return true;
         }

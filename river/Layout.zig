@@ -99,8 +99,8 @@ fn handleRequestInert(layout: *river.LayoutV2, request: river.LayoutV2.Request, 
 /// Send a layout demand to the client
 pub fn startLayoutDemand(self: *Self, views: u32) void {
     log.debug(
-        "starting layout demand '{}' on output '{}'",
-        .{ self.namespace, self.output.wlr_output.name },
+        "starting layout demand '{s}' on output '{s}'",
+        .{ self.namespace, mem.sliceTo(&self.output.wlr_output.name, 0) },
     );
 
     std.debug.assert(self.output.layout_demand == null);
@@ -137,8 +137,8 @@ fn handleRequest(layout: *river.LayoutV2, request: river.LayoutV2.Request, self:
         // to the layout demand matching the serial.
         .push_view_dimensions => |req| {
             log.debug(
-                "layout '{}' on output '{}' pushed view dimensions: {} {} {} {}",
-                .{ self.namespace, self.output.wlr_output.name, req.x, req.y, req.width, req.height },
+                "layout '{s}' on output '{s}' pushed view dimensions: {} {} {} {}",
+                .{ self.namespace, mem.sliceTo(&self.output.wlr_output.name, 0), req.x, req.y, req.width, req.height },
             );
 
             if (self.output.layout_demand) |*layout_demand| {
@@ -154,8 +154,8 @@ fn handleRequest(layout: *river.LayoutV2, request: river.LayoutV2.Request, self:
         // of the layout demand matching the serial as done.
         .commit => |req| {
             log.debug(
-                "layout '{}' on output '{}' commited",
-                .{ self.namespace, self.output.wlr_output.name },
+                "layout '{s}' on output '{s}' commited",
+                .{ self.namespace, mem.sliceTo(&self.output.wlr_output.name, 0) },
             );
 
             if (self.output.layout_demand) |*layout_demand| {
@@ -170,8 +170,8 @@ fn handleRequest(layout: *river.LayoutV2, request: river.LayoutV2.Request, self:
 
 fn handleDestroy(layout: *river.LayoutV2, self: *Self) void {
     log.debug(
-        "destroying layout '{}' on output '{}'",
-        .{ self.namespace, self.output.wlr_output.name },
+        "destroying layout '{s}' on output '{s}'",
+        .{ self.namespace, mem.sliceTo(&self.output.wlr_output.name, 0) },
     );
 
     // Remove layout from the list

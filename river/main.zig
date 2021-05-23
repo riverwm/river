@@ -52,7 +52,7 @@ pub fn main() anyerror!void {
         _ = it.nextPosix();
         while (it.nextPosix()) |arg| {
             if (std.mem.eql(u8, arg, "-h")) {
-                const stdout = std.io.getStdOut().outStream();
+                const stdout = std.io.getStdOut().writer();
                 try stdout.print(usage, .{});
                 os.exit(0);
             } else if (std.mem.eql(u8, arg, "-c")) {
@@ -67,13 +67,13 @@ pub fn main() anyerror!void {
             } else if (std.mem.eql(u8, arg, "-l")) {
                 if (it.nextPosix()) |level_str| {
                     const log_level = std.fmt.parseInt(u3, level_str, 10) catch
-                        printErrorExit("Error: invalid log level '{}'", .{level_str});
+                        printErrorExit("Error: invalid log level '{s}'", .{level_str});
                     level = @intToEnum(std.log.Level, log_level);
                 } else {
                     printErrorExit("Error: flag '-l' requires exactly one argument", .{});
                 }
             } else {
-                const stderr = std.io.getStdErr().outStream();
+                const stderr = std.io.getStdErr().writer();
                 try stderr.print(usage, .{});
                 os.exit(1);
             }
@@ -99,7 +99,7 @@ pub fn main() anyerror!void {
     // Run the child in a new process group so that we can send SIGTERM to all
     // descendants on exit.
     const child_pgid = if (startup_command) |cmd| blk: {
-        std.log.info("running startup command '{}'", .{cmd});
+        std.log.info("running startup command '{s}'", .{cmd});
         const child_args = [_:null]?[*:0]const u8{ "/bin/sh", "-c", cmd, null };
         const pid = try os.fork();
         if (pid == 0) {
@@ -112,7 +112,7 @@ pub fn main() anyerror!void {
         break :blk pid;
     } else null;
     defer if (child_pgid) |pgid|
-        os.kill(-pgid, os.SIGTERM) catch |e| std.log.err("failed to kill startup process: {}", .{e});
+        os.kill(-pgid, os.SIGTERM) catch |e| std.log.err("failed to kill startup process: {s}", .{e});
 
     std.log.info("running server", .{});
 
@@ -122,7 +122,7 @@ pub fn main() anyerror!void {
 }
 
 fn printErrorExit(comptime format: []const u8, args: anytype) noreturn {
-    const stderr = std.io.getStdErr().outStream();
+    const stderr = std.io.getStdErr().writer();
     stderr.print(format ++ "\n", args) catch os.exit(1);
     os.exit(1);
 }
@@ -138,11 +138,11 @@ fn testConfigPath(comptime fmt: []const u8, args: anytype) std.fmt.AllocPrintErr
 
 fn getStartupCommand() std.fmt.AllocPrintError!?[:0]const u8 {
     if (os.getenv("XDG_CONFIG_HOME")) |xdg_config_home| {
-        if (try testConfigPath("{}/river/init", .{xdg_config_home})) |path| {
+        if (try testConfigPath("{s}/river/init", .{xdg_config_home})) |path| {
             return path;
         }
     } else if (os.getenv("HOME")) |home| {
-        if (try testConfigPath("{}/.config/river/init", .{home})) |path| {
+        if (try testConfigPath("{s}/.config/river/init", .{home})) |path| {
             return path;
         }
     }

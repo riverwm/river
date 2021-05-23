@@ -19,6 +19,7 @@ const Self = @This();
 
 const build_options = @import("build_options");
 const std = @import("std");
+const mem = std.mem;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
@@ -188,7 +189,7 @@ fn handleNewLayerSurface(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_
     const self = @fieldParentPtr(Self, "new_layer_surface", listener);
 
     log.debug(
-        "New layer surface: namespace {}, layer {}, anchor {}, size {}x{}, margin ({},{},{},{}), exclusive_zone {}",
+        "New layer surface: namespace {s}, layer {}, anchor {}, size {}x{}, margin ({},{},{},{}), exclusive_zone {}",
         .{
             wlr_layer_surface.namespace,
             wlr_layer_surface.client_pending.layer,
@@ -208,13 +209,13 @@ fn handleNewLayerSurface(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_
     if (wlr_layer_surface.output == null) {
         const output = self.input_manager.defaultSeat().focused_output;
         if (output == &self.root.noop_output) {
-            log.err("no output available for layer surface '{}'", .{wlr_layer_surface.namespace});
+            log.err("no output available for layer surface '{s}'", .{wlr_layer_surface.namespace});
             wlr_layer_surface.close();
             return;
         }
 
-        log.debug("new layer surface had null output, assigning it to output '{}'", .{
-            output.wlr_output.name,
+        log.debug("new layer surface had null output, assigning it to output '{s}'", .{
+            mem.sliceTo(&output.wlr_output.name, 0),
         });
         wlr_layer_surface.output = output.wlr_output;
     }
@@ -241,7 +242,7 @@ fn handleNewXwaylandSurface(listener: *wl.Listener(*wlr.XwaylandSurface), wlr_xw
     }
 
     log.debug(
-        "new xwayland surface: title '{}', class '{}'",
+        "new xwayland surface: title '{s}', class '{s}'",
         .{ wlr_xwayland_surface.title, wlr_xwayland_surface.class },
     );
 

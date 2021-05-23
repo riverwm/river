@@ -74,7 +74,7 @@ pub fn init(self: *Self, output: *Output, wlr_layer_surface: *wlr.LayerSurfaceV1
 fn handleDestroy(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wlr.LayerSurfaceV1) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
 
-    log.debug("layer surface '{}' destroyed", .{self.wlr_layer_surface.namespace});
+    log.debug("layer surface '{s}' destroyed", .{self.wlr_layer_surface.namespace});
 
     // Remove listeners active the entire lifetime of the layer surface
     self.destroy.link.remove();
@@ -90,7 +90,7 @@ fn handleDestroy(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface:
 fn handleMap(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wlr.LayerSurfaceV1) void {
     const self = @fieldParentPtr(Self, "map", listener);
 
-    log.debug("layer surface '{}' mapped", .{wlr_layer_surface.namespace});
+    log.debug("layer surface '{s}' mapped", .{wlr_layer_surface.namespace});
 
     // Add listeners that are only active while mapped
     wlr_layer_surface.surface.events.commit.add(&self.commit);
@@ -104,7 +104,7 @@ fn handleMap(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wl
 fn handleUnmap(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wlr.LayerSurfaceV1) void {
     const self = @fieldParentPtr(Self, "unmap", listener);
 
-    log.debug("layer surface '{}' unmapped", .{self.wlr_layer_surface.namespace});
+    log.debug("layer surface '{s}' unmapped", .{self.wlr_layer_surface.namespace});
 
     // remove listeners only active while the layer surface is mapped
     self.commit.link.remove();

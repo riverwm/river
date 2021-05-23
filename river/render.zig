@@ -17,6 +17,7 @@
 
 const build_options = @import("build_options");
 const std = @import("std");
+const mem = std.mem;
 const os = std.os;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
@@ -159,7 +160,7 @@ pub fn renderOutput(output: *Output) void {
 
     // TODO: handle failure
     output.wlr_output.commit() catch
-        log.err("output commit failed for {}", .{output.wlr_output.name});
+        log.err("output commit failed for {s}", .{mem.sliceTo(&output.wlr_output.name, 0)});
 }
 
 fn renderFilter(view: *View, filter_tags: u32) bool {

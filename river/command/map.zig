@@ -85,7 +85,7 @@ pub fn mapPointer(
     else {
         out.* = try std.fmt.allocPrint(
             allocator,
-            "invalid pointer action {}, must be move-view or resize-view",
+            "invalid pointer action {s}, must be move-view or resize-view",
             .{args[4]},
         );
         return Error.Other;
@@ -110,7 +110,7 @@ fn modeNameToId(allocator: *std.mem.Allocator, seat: *Seat, mode_name: []const u
     return config.mode_to_id.get(mode_name) orelse {
         out.* = try std.fmt.allocPrint(
             allocator,
-            "cannot add/remove mapping to/from non-existant mode '{}'",
+            "cannot add/remove mapping to/from non-existant mode '{s}'",
             .{mode_name},
         );
         return Error.Other;
@@ -153,7 +153,7 @@ fn parseEventCode(allocator: *std.mem.Allocator, event_code_str: []const u8, out
     defer allocator.free(event_code_name);
     const ret = c.libevdev_event_code_from_name(c.EV_KEY, event_code_name);
     if (ret < 1) {
-        out.* = try std.fmt.allocPrint(allocator, "unknown button {}", .{event_code_str});
+        out.* = try std.fmt.allocPrint(allocator, "unknown button {s}", .{event_code_str});
         return Error.Other;
     }
 
@@ -165,7 +165,7 @@ fn parseKeysym(allocator: *std.mem.Allocator, keysym_str: []const u8, out: *?[]c
     defer allocator.free(keysym_name);
     const keysym = xkb.Keysym.fromName(keysym_name, .case_insensitive);
     if (keysym == .NoSymbol) {
-        out.* = try std.fmt.allocPrint(allocator, "invalid keysym '{}'", .{keysym_str});
+        out.* = try std.fmt.allocPrint(allocator, "invalid keysym '{s}'", .{keysym_str});
         return Error.Other;
     }
     return keysym;
@@ -195,11 +195,7 @@ fn parseModifiers(
                 continue :outer;
             }
         }
-        out.* = try std.fmt.allocPrint(
-            allocator,
-            "invalid modifier '{}'",
-            .{mod_name},
-        );
+        out.* = try std.fmt.allocPrint(allocator, "invalid modifier '{s}'", .{mod_name});
         return Error.Other;
     }
     return modifiers;
