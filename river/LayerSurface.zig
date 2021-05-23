@@ -26,6 +26,7 @@ const util = @import("util.zig");
 
 const Box = @import("Box.zig");
 const Output = @import("Output.zig");
+const Subsurface = @import("Subsurface.zig");
 const XdgPopup = @import("XdgPopup.zig");
 
 const log = std.log.scoped(.layer_shell);
@@ -40,10 +41,11 @@ state: wlr.LayerSurfaceV1.State,
 destroy: wl.Listener(*wlr.LayerSurfaceV1) = wl.Listener(*wlr.LayerSurfaceV1).init(handleDestroy),
 map: wl.Listener(*wlr.LayerSurfaceV1) = wl.Listener(*wlr.LayerSurfaceV1).init(handleMap),
 unmap: wl.Listener(*wlr.LayerSurfaceV1) = wl.Listener(*wlr.LayerSurfaceV1).init(handleUnmap),
+new_popup: wl.Listener(*wlr.XdgPopup) = wl.Listener(*wlr.XdgPopup).init(handleNewPopup),
+new_subsurface: wl.Listener(*wlr.Subsurface) = wl.Listener(*wlr.Subsurface).init(handleNewSubsurface),
 
 // Listeners only active while the layer surface is mapped
 commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
-new_popup: wl.Listener(*wlr.XdgPopup) = wl.Listener(*wlr.XdgPopup).init(handleNewPopup),
 
 pub fn init(self: *Self, output: *Output, wlr_layer_surface: *wlr.LayerSurfaceV1) void {
     self.* = .{
@@ -62,9 +64,11 @@ pub fn init(self: *Self, output: *Output, wlr_layer_surface: *wlr.LayerSurfaceV1
     list.remove(node);
 
     // Set up listeners that are active for the entire lifetime of the layer surface
-    self.wlr_layer_surface.events.destroy.add(&self.destroy);
-    self.wlr_layer_surface.events.map.add(&self.map);
-    self.wlr_layer_surface.events.unmap.add(&self.unmap);
+    wlr_layer_surface.events.destroy.add(&self.destroy);
+    wlr_layer_surface.events.map.add(&self.map);
+    wlr_layer_surface.events.unmap.add(&self.unmap);
+    wlr_layer_surface.events.new_popup.add(&self.new_popup);
+    wlr_layer_surface.surface.events.new_subsurface.add(&self.new_subsurface);
 }
 
 fn handleDestroy(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wlr.LayerSurfaceV1) void {
@@ -76,6 +80,8 @@ fn handleDestroy(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface:
     self.destroy.link.remove();
     self.map.link.remove();
     self.unmap.link.remove();
+    self.new_popup.link.remove();
+    self.new_subsurface.link.remove();
 
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
     util.gpa.destroy(node);
@@ -88,7 +94,6 @@ fn handleMap(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wl
 
     // Add listeners that are only active while mapped
     wlr_layer_surface.surface.events.commit.add(&self.commit);
-    wlr_layer_surface.events.new_popup.add(&self.new_popup);
 
     wlr_layer_surface.surface.sendEnter(wlr_layer_surface.output.?);
 
@@ -103,7 +108,6 @@ fn handleUnmap(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *
 
     // remove listeners only active while the layer surface is mapped
     self.commit.link.remove();
-    self.new_popup.link.remove();
 
     // Remove from the output's list of layer surfaces
     const self_node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
@@ -154,15 +158,16 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), wlr_surface: *wlr.Surface)
         self.output.arrangeLayers();
         server.root.startTransaction();
     }
+
+    self.output.damage.addWhole();
 }
 
 fn handleNewPopup(listener: *wl.Listener(*wlr.XdgPopup), wlr_xdg_popup: *wlr.XdgPopup) void {
     const self = @fieldParentPtr(Self, "new_popup", listener);
+    XdgPopup.create(wlr_xdg_popup, .{ .layer_surface = self });
+}
 
-    // This will free itself on destroy
-    const xdg_popup = util.gpa.create(XdgPopup) catch {
-        wlr_xdg_popup.resource.postNoMemory();
-        return;
-    };
-    xdg_popup.init(self.output, &self.box, wlr_xdg_popup);
+fn handleNewSubsurface(listener: *wl.Listener(*wlr.Subsurface), new_wlr_subsurface: *wlr.Subsurface) void {
+    const self = @fieldParentPtr(Self, "new_subsurface", listener);
+    Subsurface.create(new_wlr_subsurface, .{ .layer_surface = self });
 }

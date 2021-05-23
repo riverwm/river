@@ -232,6 +232,9 @@ fn handleRequestConfigure(
 /// TODO: check for unexpected change in size and react as needed
 fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) void {
     const self = @fieldParentPtr(Self, "commit", listener);
+
+    self.view.output.damage.addWhole();
+
     self.view.surface_box = Box{
         .x = 0,
         .y = 0,

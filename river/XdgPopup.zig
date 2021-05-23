@@ -23,32 +23,44 @@ const wl = @import("wayland").server.wl;
 
 const util = @import("util.zig");
 
-const Box = @import("Box.zig");
-const Output = @import("Output.zig");
+const Subsurface = @import("Subsurface.zig");
+const Parent = Subsurface.Parent;
 
-const log = std.log.scoped(.server);
-
-/// The output this popup is displayed on.
-output: *Output,
-
-/// Box of the parent of this popup tree. Needed to unconstrain child popups.
-parent_box: *const Box,
-
-/// The corresponding wlroots object
+/// The parent at the root of this surface tree
+parent: Parent,
 wlr_xdg_popup: *wlr.XdgPopup,
 
+// Always active
 destroy: wl.Listener(*wlr.XdgSurface) = wl.Listener(*wlr.XdgSurface).init(handleDestroy),
+map: wl.Listener(*wlr.XdgSurface) = wl.Listener(*wlr.XdgSurface).init(handleMap),
+unmap: wl.Listener(*wlr.XdgSurface) = wl.Listener(*wlr.XdgSurface).init(handleUnmap),
 new_popup: wl.Listener(*wlr.XdgPopup) = wl.Listener(*wlr.XdgPopup).init(handleNewPopup),
+new_subsurface: wl.Listener(*wlr.Subsurface) = wl.Listener(*wlr.Subsurface).init(handleNewSubsurface),
 
-pub fn init(self: *Self, output: *Output, parent_box: *const Box, wlr_xdg_popup: *wlr.XdgPopup) void {
+// Only active while mapped
+commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
+
+pub fn create(wlr_xdg_popup: *wlr.XdgPopup, parent: Parent) void {
+    const self = util.gpa.create(Self) catch {
+        std.log.crit("out of memory", .{});
+        wlr_xdg_popup.resource.postNoMemory();
+        return;
+    };
     self.* = .{
-        .output = output,
-        .parent_box = parent_box,
+        .parent = parent,
         .wlr_xdg_popup = wlr_xdg_popup,
     };
 
+    const parent_box = switch (parent) {
+        .view => |view| &view.pending.box,
+        .layer_surface => |layer_surface| &layer_surface.box,
+    };
+    const output_dimensions = switch (parent) {
+        .view => |view| view.output.getEffectiveResolution(),
+        .layer_surface => |layer_surface| layer_surface.output.getEffectiveResolution(),
+    };
+
     // The output box relative to the parent of the popup
-    const output_dimensions = output.getEffectiveResolution();
     var box = wlr.Box{
         .x = -parent_box.x,
         .y = -parent_box.y,
@@ -58,27 +70,52 @@ pub fn init(self: *Self, output: *Output, parent_box: *const Box, wlr_xdg_popup:
     wlr_xdg_popup.unconstrainFromBox(&box);
 
     wlr_xdg_popup.base.events.destroy.add(&self.destroy);
+    wlr_xdg_popup.base.events.map.add(&self.map);
+    wlr_xdg_popup.base.events.unmap.add(&self.unmap);
     wlr_xdg_popup.base.events.new_popup.add(&self.new_popup);
+    wlr_xdg_popup.base.surface.events.new_subsurface.add(&self.new_subsurface);
 }
 
 fn handleDestroy(listener: *wl.Listener(*wlr.XdgSurface), wlr_xdg_surface: *wlr.XdgSurface) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
 
     self.destroy.link.remove();
+    self.map.link.remove();
+    self.unmap.link.remove();
     self.new_popup.link.remove();
+    self.new_subsurface.link.remove();
 
     util.gpa.destroy(self);
 }
 
-/// Called when a new xdg popup is requested by the client
+fn handleMap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurface) void {
+    const self = @fieldParentPtr(Self, "map", listener);
+
+    self.wlr_xdg_popup.base.surface.events.commit.add(&self.commit);
+    self.parent.damageWholeOutput();
+}
+
+fn handleUnmap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurface) void {
+    const self = @fieldParentPtr(Self, "unmap", listener);
+
+    self.commit.link.remove();
+    self.parent.damageWholeOutput();
+}
+
+fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) void {
+    const self = @fieldParentPtr(Self, "commit", listener);
+
+    self.parent.damageWholeOutput();
+}
+
 fn handleNewPopup(listener: *wl.Listener(*wlr.XdgPopup), wlr_xdg_popup: *wlr.XdgPopup) void {
     const self = @fieldParentPtr(Self, "new_popup", listener);
 
-    // This will free itself on destroy
-    const xdg_popup = util.gpa.create(Self) catch {
-        wlr_xdg_popup.resource.postNoMemory();
-        log.crit("out of memory", .{});
-        return;
-    };
-    xdg_popup.init(self.output, self.parent_box, wlr_xdg_popup);
+    Self.create(wlr_xdg_popup, self.parent);
+}
+
+fn handleNewSubsurface(listener: *wl.Listener(*wlr.Subsurface), new_wlr_subsurface: *wlr.Subsurface) void {
+    const self = @fieldParentPtr(Self, "new_subsurface", listener);
+
+    Subsurface.create(new_wlr_subsurface, self.parent);
 }
