@@ -278,13 +278,14 @@ pub fn saveBuffers(self: *Self) void {
 /// Otherwise, apply the pending state immediately.
 pub fn notifyConfiguredOrApplyPending(self: *Self) void {
     self.pending_serial = null;
-    if (self.shouldTrackConfigure())
-        server.root.notifyConfigured()
-    else {
+    if (self.shouldTrackConfigure()) {
+        server.root.notifyConfigured();
+    } else {
         const self_tags_changed = self.pending.tags != self.current.tags;
         self.current = self.pending;
         self.commitOpacityTransition();
         if (self_tags_changed) self.output.sendViewTags();
+        self.output.damage.addWhole();
     }
 }
 

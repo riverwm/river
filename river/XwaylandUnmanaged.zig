@@ -37,6 +37,7 @@ request_configure: wl.Listener(*wlr.XwaylandSurface.event.Configure) =
 destroy: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleDestroy),
 map: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleMap),
 unmap: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleUnmap),
+commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
 
 pub fn init(self: *Self, xwayland_surface: *wlr.XwaylandSurface) void {
     self.* = .{ .xwayland_surface = xwayland_surface };
@@ -78,6 +79,8 @@ fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wl
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
     server.root.xwayland_unmanaged_views.prepend(node);
 
+    xwayland_surface.surface.?.events.commit.add(&self.commit);
+
     // TODO: handle keyboard focus
     // if (wlr_xwayland_or_surface_wants_focus(self.xwayland_surface)) { ...
 }
@@ -89,4 +92,11 @@ fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *
     // Remove self from the list of unmanged views in the root
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
     server.root.xwayland_unmanaged_views.remove(node);
+
+    self.commit.link.remove();
+}
+
+fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) void {
+    var it = server.root.outputs.first;
+    while (it) |node| : (it = node.next) node.data.damage.addWhole();
 }

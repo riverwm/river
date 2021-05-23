@@ -53,7 +53,19 @@ pub fn renderOutput(output: *Output) void {
     var now: os.timespec = undefined;
     os.clock_gettime(os.CLOCK_MONOTONIC, &now) catch unreachable;
 
-    output.wlr_output.attachRender(null) catch return;
+    var needs_frame: bool = undefined;
+    var damage_region: pixman.Region32 = undefined;
+    damage_region.init();
+    defer damage_region.deinit();
+    output.damage.attachRender(&needs_frame, &damage_region) catch {
+        log.err("failed to attach renderer", .{});
+        return;
+    };
+
+    if (!needs_frame) {
+        output.wlr_output.rollback();
+        return;
+    }
 
     renderer.begin(@intCast(u32, output.wlr_output.width), @intCast(u32, output.wlr_output.height));
 

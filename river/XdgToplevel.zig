@@ -26,6 +26,7 @@ const util = @import("util.zig");
 
 const Box = @import("Box.zig");
 const Seat = @import("Seat.zig");
+const Subsurface = @import("Subsurface.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const XdgPopup = @import("XdgPopup.zig");
@@ -42,10 +43,11 @@ xdg_surface: *wlr.XdgSurface,
 destroy: wl.Listener(*wlr.XdgSurface) = wl.Listener(*wlr.XdgSurface).init(handleDestroy),
 map: wl.Listener(*wlr.XdgSurface) = wl.Listener(*wlr.XdgSurface).init(handleMap),
 unmap: wl.Listener(*wlr.XdgSurface) = wl.Listener(*wlr.XdgSurface).init(handleUnmap),
+new_popup: wl.Listener(*wlr.XdgPopup) = wl.Listener(*wlr.XdgPopup).init(handleNewPopup),
+new_subsurface: wl.Listener(*wlr.Subsurface) = wl.Listener(*wlr.Subsurface).init(handleNewSubsurface),
 
 // Listeners that are only active while the view is mapped
 commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
-new_popup: wl.Listener(*wlr.XdgPopup) = wl.Listener(*wlr.XdgPopup).init(handleNewPopup),
 // zig fmt: off
 request_fullscreen: wl.Listener(*wlr.XdgToplevel.event.SetFullscreen) =
     wl.Listener(*wlr.XdgToplevel.event.SetFullscreen).init(handleRequestFullscreen),
@@ -65,6 +67,8 @@ pub fn init(self: *Self, view: *View, xdg_surface: *wlr.XdgSurface) void {
     self.xdg_surface.events.destroy.add(&self.destroy);
     self.xdg_surface.events.map.add(&self.map);
     self.xdg_surface.events.unmap.add(&self.unmap);
+    self.xdg_surface.events.new_popup.add(&self.new_popup);
+    self.xdg_surface.surface.events.new_subsurface.add(&self.new_subsurface);
 }
 
 pub fn deinit(self: *Self) void {
@@ -73,6 +77,8 @@ pub fn deinit(self: *Self) void {
         self.destroy.link.remove();
         self.map.link.remove();
         self.unmap.link.remove();
+        self.new_popup.link.remove();
+        self.new_subsurface.link.remove();
     }
 }
 
@@ -161,7 +167,6 @@ fn handleMap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurfa
 
     // Add listeners that are only active while mapped
     self.xdg_surface.surface.events.commit.add(&self.commit);
-    self.xdg_surface.events.new_popup.add(&self.new_popup);
     toplevel.events.request_fullscreen.add(&self.request_fullscreen);
     toplevel.events.request_move.add(&self.request_move);
     toplevel.events.request_resize.add(&self.request_resize);
@@ -229,7 +234,6 @@ fn handleUnmap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSur
 
     // Remove listeners that are only active while mapped
     self.commit.link.remove();
-    self.new_popup.link.remove();
     self.request_fullscreen.link.remove();
     self.request_move.link.remove();
     self.request_resize.link.remove();
@@ -260,6 +264,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) voi
             view.sendFrameDone();
         }
     } else {
+        view.output.damage.addWhole();
         // TODO: handle unexpected change in dimensions
         if (!std.meta.eql(view.surface_box, new_box))
             log.err("view changed size unexpectedly", .{});
@@ -267,16 +272,14 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) voi
     }
 }
 
-/// Called when a new xdg popup is requested by the client
 fn handleNewPopup(listener: *wl.Listener(*wlr.XdgPopup), wlr_xdg_popup: *wlr.XdgPopup) void {
     const self = @fieldParentPtr(Self, "new_popup", listener);
+    XdgPopup.create(wlr_xdg_popup, .{ .view = self.view });
+}
 
-    // This will free itself on destroy
-    const xdg_popup = util.gpa.create(XdgPopup) catch {
-        wlr_xdg_popup.resource.postNoMemory();
-        return;
-    };
-    xdg_popup.init(self.view.output, &self.view.current.box, wlr_xdg_popup);
+fn handleNewSubsurface(listener: *wl.Listener(*wlr.Subsurface), new_wlr_subsurface: *wlr.Subsurface) void {
+    const self = @fieldParentPtr(Self, "new_subsurface", listener);
+    Subsurface.create(new_wlr_subsurface, .{ .view = self.view });
 }
 
 /// Called when the client asks to be fullscreened. We always honor the request

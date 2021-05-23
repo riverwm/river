@@ -404,6 +404,8 @@ fn commitTransaction(self: *Self) void {
         }
 
         if (view_tags_changed) output.sendViewTags();
+
+        output.damage.addWhole();
     }
 }
 

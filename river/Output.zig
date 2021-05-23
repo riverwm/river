@@ -55,6 +55,7 @@ const State = struct {
 };
 
 wlr_output: *wlr.Output,
+damage: *wlr.OutputDamage,
 
 /// All layer surfaces on the output, indexed by the layer enum.
 layers: [4]std.TailQueue(LayerSurface) = [1]std.TailQueue(LayerSurface){.{}} ** 4,
@@ -93,8 +94,8 @@ status_trackers: std.SinglyLinkedList(OutputStatus) = .{},
 
 destroy: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleDestroy),
 enable: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleEnable),
-frame: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleFrame),
 mode: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleMode),
+frame: wl.Listener(*wlr.OutputDamage) = wl.Listener(*wlr.OutputDamage).init(handleFrame),
 
 pub fn init(self: *Self, wlr_output: *wlr.Output) !void {
     // Some backends don't have modes. DRM+KMS does, and we need to set a mode
@@ -110,14 +111,16 @@ pub fn init(self: *Self, wlr_output: *wlr.Output) !void {
 
     self.* = .{
         .wlr_output = wlr_output,
+        .damage = try wlr.OutputDamage.create(wlr_output),
         .usable_box = undefined,
     };
     wlr_output.data = @ptrToInt(self);
 
     wlr_output.events.destroy.add(&self.destroy);
     wlr_output.events.enable.add(&self.enable);
-    wlr_output.events.frame.add(&self.frame);
     wlr_output.events.mode.add(&self.mode);
+
+    self.damage.events.frame.add(&self.frame);
 
     if (wlr_output.isNoop()) {
         // A noop output is always 0 x 0
@@ -453,7 +456,7 @@ fn handleEnable(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) vo
     if (wlr_output.enabled) server.root.addOutput(self);
 }
 
-fn handleFrame(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
+fn handleFrame(listener: *wl.Listener(*wlr.OutputDamage), wlr_output: *wlr.OutputDamage) void {
     // This function is called every time an output is ready to display a frame,
     // generally at the output's refresh rate (e.g. 60Hz).
     const self = @fieldParentPtr(Self, "frame", listener);
