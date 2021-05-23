@@ -18,7 +18,7 @@ riverctl map normal $mod+Shift Return spawn foot
 riverctl map normal $mod Q close
 
 # Mod+E to exit river
-riverctl map normal $mod E exit
+riverctl map normal $mod+Shift E exit
 
 # Mod+J and Mod+K to focus the next/previous view in the layout stack
 riverctl map normal $mod J focus-view next
