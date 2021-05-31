@@ -536,7 +536,6 @@ pub fn notifyAppId(self: Self) void {
 /// Change the opacity of a view by config.opacity.delta.
 /// If the target opacity was reached, return true.
 fn incrementOpacity(self: *Self) bool {
-    // TODO damage view when implementing damage based rendering
     if (self.opacity < self.current.target_opacity) {
         self.opacity += server.config.opacity.delta;
         if (self.opacity < self.current.target_opacity) return false;
@@ -545,6 +544,7 @@ fn incrementOpacity(self: *Self) bool {
         if (self.opacity > self.current.target_opacity) return false;
     }
     self.opacity = self.current.target_opacity;
+    self.output.damage.addWhole();
     return true;
 }
 
