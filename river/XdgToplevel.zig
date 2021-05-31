@@ -238,6 +238,7 @@ fn handleUnmap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSur
     self.request_move.link.remove();
     self.request_resize.link.remove();
     self.set_title.link.remove();
+    self.set_app_id.link.remove();
 }
 
 /// Called when the surface is comitted
