@@ -179,6 +179,7 @@ fn addServerDeps(exe: *zbs.LibExeObjStep, scanner: *ScanProtocolsStep) void {
 
     exe.linkLibC();
     exe.linkSystemLibrary("libevdev");
+    exe.linkSystemLibrary("libinput");
 
     exe.addPackage(wayland);
     exe.linkSystemLibrary("wayland-server");
