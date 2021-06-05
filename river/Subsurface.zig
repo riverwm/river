@@ -63,6 +63,11 @@ pub fn create(wlr_subsurface: *wlr.Subsurface, parent: Parent) void {
     wlr_subsurface.events.map.add(&subsurface.map);
     wlr_subsurface.events.unmap.add(&subsurface.unmap);
     wlr_subsurface.surface.events.new_subsurface.add(&subsurface.new_subsurface);
+
+    // There may already be subsurfaces present on this surface that we
+    // aren't aware of and won't receive a new_subsurface event for.
+    var it = wlr_subsurface.surface.subsurfaces.iterator(.forward);
+    while (it.next()) |s| Subsurface.create(s, parent);
 }
 
 fn handleDestroy(listener: *wl.Listener(*wlr.Subsurface), wlr_subsurface: *wlr.Subsurface) void {

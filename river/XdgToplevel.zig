@@ -64,11 +64,16 @@ pub fn init(self: *Self, view: *View, xdg_surface: *wlr.XdgSurface) void {
     xdg_surface.data = @ptrToInt(self);
 
     // Add listeners that are active over the view's entire lifetime
-    self.xdg_surface.events.destroy.add(&self.destroy);
-    self.xdg_surface.events.map.add(&self.map);
-    self.xdg_surface.events.unmap.add(&self.unmap);
-    self.xdg_surface.events.new_popup.add(&self.new_popup);
-    self.xdg_surface.surface.events.new_subsurface.add(&self.new_subsurface);
+    xdg_surface.events.destroy.add(&self.destroy);
+    xdg_surface.events.map.add(&self.map);
+    xdg_surface.events.unmap.add(&self.unmap);
+    xdg_surface.events.new_popup.add(&self.new_popup);
+    xdg_surface.surface.events.new_subsurface.add(&self.new_subsurface);
+
+    // There may already be subsurfaces present on this surface that we
+    // aren't aware of and won't receive a new_subsurface event for.
+    var it = xdg_surface.surface.subsurfaces.iterator(.forward);
+    while (it.next()) |s| Subsurface.create(s, .{ .view = view });
 }
 
 pub fn deinit(self: *Self) void {

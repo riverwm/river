@@ -74,6 +74,11 @@ pub fn create(wlr_xdg_popup: *wlr.XdgPopup, parent: Parent) void {
     wlr_xdg_popup.base.events.unmap.add(&self.unmap);
     wlr_xdg_popup.base.events.new_popup.add(&self.new_popup);
     wlr_xdg_popup.base.surface.events.new_subsurface.add(&self.new_subsurface);
+
+    // There may already be subsurfaces present on this surface that we
+    // aren't aware of and won't receive a new_subsurface event for.
+    var it = wlr_xdg_popup.base.surface.subsurfaces.iterator(.forward);
+    while (it.next()) |s| Subsurface.create(s, parent);
 }
 
 fn handleDestroy(listener: *wl.Listener(*wlr.XdgSurface), wlr_xdg_surface: *wlr.XdgSurface) void {
