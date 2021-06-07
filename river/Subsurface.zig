@@ -21,19 +21,26 @@ const std = @import("std");
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
+const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
+const DragIcon = @import("DragIcon.zig");
 const LayerSurface = @import("LayerSurface.zig");
 const View = @import("View.zig");
 
 pub const Parent = union(enum) {
     view: *View,
     layer_surface: *LayerSurface,
+    drag_icon: *DragIcon,
 
     pub fn damageWholeOutput(parent: Parent) void {
         switch (parent) {
             .view => |view| view.output.damage.addWhole(),
             .layer_surface => |layer_surface| layer_surface.output.damage.addWhole(),
+            .drag_icon => |drag_icon| {
+                var it = server.root.outputs.first;
+                while (it) |node| : (it = node.next) node.data.damage.addWhole();
+            },
         }
     }
 };
