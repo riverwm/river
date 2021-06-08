@@ -219,72 +219,72 @@ test "push/remove (*View)" {
     // Simple insertion
     {
         var it = views.first;
-        testing.expect(it == two);
+        try testing.expect(it == two);
         it = it.?.next;
-        testing.expect(it == five);
+        try testing.expect(it == five);
         it = it.?.next;
-        testing.expect(it == four);
+        try testing.expect(it == four);
         it = it.?.next;
-        testing.expect(it == one);
+        try testing.expect(it == one);
         it = it.?.next;
-        testing.expect(it == three);
+        try testing.expect(it == three);
         it = it.?.next;
 
-        testing.expect(it == null);
+        try testing.expect(it == null);
 
-        testing.expect(views.first == two);
-        testing.expect(views.last == three);
+        try testing.expect(views.first == two);
+        try testing.expect(views.last == three);
     }
 
     // Removal of first
     views.remove(two);
     {
         var it = views.first;
-        testing.expect(it == five);
+        try testing.expect(it == five);
         it = it.?.next;
-        testing.expect(it == four);
+        try testing.expect(it == four);
         it = it.?.next;
-        testing.expect(it == one);
+        try testing.expect(it == one);
         it = it.?.next;
-        testing.expect(it == three);
+        try testing.expect(it == three);
         it = it.?.next;
 
-        testing.expect(it == null);
+        try testing.expect(it == null);
 
-        testing.expect(views.first == five);
-        testing.expect(views.last == three);
+        try testing.expect(views.first == five);
+        try testing.expect(views.last == three);
     }
 
     // Removal of last
     views.remove(three);
     {
         var it = views.first;
-        testing.expect(it == five);
+        try testing.expect(it == five);
         it = it.?.next;
-        testing.expect(it == four);
+        try testing.expect(it == four);
         it = it.?.next;
-        testing.expect(it == one);
+        try testing.expect(it == one);
         it = it.?.next;
 
-        testing.expect(it == null);
+        try testing.expect(it == null);
 
-        testing.expect(views.first == five);
-        testing.expect(views.last == one);
+        try testing.expect(views.first == five);
+        try testing.expect(views.last == one);
     }
 
     // Remove from middle
     views.remove(four);
     {
         var it = views.first;
-        testing.expect(it == five);
+        try testing.expect(it == five);
         it = it.?.next;
-        testing.expect(it == one);
+        try testing.expect(it == one);
         it = it.?.next;
 
-        testing.expect(it == null);
+        try testing.expect(it == null);
 
-        testing.expect(views.first == five);
-        testing.expect(views.last == one);
+        try testing.expect(views.first == five);
+        try testing.expect(views.last == one);
     }
 
     // Reinsertion
@@ -293,21 +293,21 @@ test "push/remove (*View)" {
     views.push(four);
     {
         var it = views.first;
-        testing.expect(it == four);
+        try testing.expect(it == four);
         it = it.?.next;
-        testing.expect(it == three);
+        try testing.expect(it == three);
         it = it.?.next;
-        testing.expect(it == two);
+        try testing.expect(it == two);
         it = it.?.next;
-        testing.expect(it == five);
+        try testing.expect(it == five);
         it = it.?.next;
-        testing.expect(it == one);
+        try testing.expect(it == one);
         it = it.?.next;
 
-        testing.expect(it == null);
+        try testing.expect(it == null);
 
-        testing.expect(views.first == four);
-        testing.expect(views.last == one);
+        try testing.expect(views.first == four);
+        try testing.expect(views.last == one);
     }
 
     // Clear
@@ -317,8 +317,8 @@ test "push/remove (*View)" {
     views.remove(one);
     views.remove(five);
 
-    testing.expect(views.first == null);
-    testing.expect(views.last == null);
+    try testing.expect(views.first == null);
+    try testing.expect(views.last == null);
 }
 
 test "iteration (View)" {
@@ -377,69 +377,69 @@ test "iteration (View)" {
     // Iteration over all views
     {
         var it = ViewStack(View).iter(views.first, .forward, {}, filters.all);
-        testing.expect(it.next() == &two_a.view);
-        testing.expect(it.next() == &five_b.view);
-        testing.expect(it.next() == &four_b.view);
-        testing.expect(it.next() == &one_a_pb.view);
-        testing.expect(it.next() == &three_b_pa.view);
-        testing.expect(it.next() == null);
+        try testing.expect(it.next() == &two_a.view);
+        try testing.expect(it.next() == &five_b.view);
+        try testing.expect(it.next() == &four_b.view);
+        try testing.expect(it.next() == &one_a_pb.view);
+        try testing.expect(it.next() == &three_b_pa.view);
+        try testing.expect(it.next() == null);
     }
 
     // Iteration over no views
     {
         var it = ViewStack(View).iter(views.first, .forward, {}, filters.none);
-        testing.expect(it.next() == null);
+        try testing.expect(it.next() == null);
     }
 
     // Iteration over 'a' tags
     {
         var it = ViewStack(View).iter(views.first, .forward, @as(u32, 1 << 0), filters.current);
-        testing.expect(it.next() == &two_a.view);
-        testing.expect(it.next() == &one_a_pb.view);
-        testing.expect(it.next() == null);
+        try testing.expect(it.next() == &two_a.view);
+        try testing.expect(it.next() == &one_a_pb.view);
+        try testing.expect(it.next() == null);
     }
 
     // Iteration over 'b' tags
     {
         var it = ViewStack(View).iter(views.first, .forward, @as(u32, 1 << 1), filters.current);
-        testing.expect(it.next() == &five_b.view);
-        testing.expect(it.next() == &four_b.view);
-        testing.expect(it.next() == &three_b_pa.view);
-        testing.expect(it.next() == null);
+        try testing.expect(it.next() == &five_b.view);
+        try testing.expect(it.next() == &four_b.view);
+        try testing.expect(it.next() == &three_b_pa.view);
+        try testing.expect(it.next() == null);
     }
 
     // Reverse iteration over all views
     {
         var it = ViewStack(View).iter(views.last, .reverse, {}, filters.all);
-        testing.expect(it.next() == &three_b_pa.view);
-        testing.expect(it.next() == &one_a_pb.view);
-        testing.expect(it.next() == &four_b.view);
-        testing.expect(it.next() == &five_b.view);
-        testing.expect(it.next() == &two_a.view);
-        testing.expect(it.next() == null);
+        try testing.expect(it.next() == &three_b_pa.view);
+        try testing.expect(it.next() == &one_a_pb.view);
+        try testing.expect(it.next() == &four_b.view);
+        try testing.expect(it.next() == &five_b.view);
+        try testing.expect(it.next() == &two_a.view);
+        try testing.expect(it.next() == null);
     }
 
     // Reverse iteration over no views
     {
         var it = ViewStack(View).iter(views.last, .reverse, {}, filters.none);
-        testing.expect(it.next() == null);
+        try testing.expect(it.next() == null);
     }
 
     // Reverse iteration over 'a' tags
     {
         var it = ViewStack(View).iter(views.last, .reverse, @as(u32, 1 << 0), filters.current);
-        testing.expect(it.next() == &one_a_pb.view);
-        testing.expect(it.next() == &two_a.view);
-        testing.expect(it.next() == null);
+        try testing.expect(it.next() == &one_a_pb.view);
+        try testing.expect(it.next() == &two_a.view);
+        try testing.expect(it.next() == null);
     }
 
     // Reverse iteration over 'b' tags
     {
         var it = ViewStack(View).iter(views.last, .reverse, @as(u32, 1 << 1), filters.current);
-        testing.expect(it.next() == &three_b_pa.view);
-        testing.expect(it.next() == &four_b.view);
-        testing.expect(it.next() == &five_b.view);
-        testing.expect(it.next() == null);
+        try testing.expect(it.next() == &three_b_pa.view);
+        try testing.expect(it.next() == &four_b.view);
+        try testing.expect(it.next() == &five_b.view);
+        try testing.expect(it.next() == null);
     }
 
     // Swap, then iterate
@@ -467,19 +467,19 @@ test "iteration (View)" {
         ViewStack(View).swap(&views, view_a, view_b); // {5, 2, 4, 3, 1} -> {5, 3, 4, 2, 1}
 
         var it = ViewStack(View).iter(views.first, .forward, {}, filters.all);
-        testing.expect(it.next() == &five_b.view);
-        testing.expect(it.next() == &three_b_pa.view);
-        testing.expect(it.next() == &four_b.view);
-        testing.expect(it.next() == &two_a.view);
-        testing.expect(it.next() == &one_a_pb.view);
-        testing.expect(it.next() == null);
+        try testing.expect(it.next() == &five_b.view);
+        try testing.expect(it.next() == &three_b_pa.view);
+        try testing.expect(it.next() == &four_b.view);
+        try testing.expect(it.next() == &two_a.view);
+        try testing.expect(it.next() == &one_a_pb.view);
+        try testing.expect(it.next() == null);
 
         it = ViewStack(View).iter(views.last, .reverse, {}, filters.all);
-        testing.expect(it.next() == &one_a_pb.view);
-        testing.expect(it.next() == &two_a.view);
-        testing.expect(it.next() == &four_b.view);
-        testing.expect(it.next() == &three_b_pa.view);
-        testing.expect(it.next() == &five_b.view);
-        testing.expect(it.next() == null);
+        try testing.expect(it.next() == &one_a_pb.view);
+        try testing.expect(it.next() == &two_a.view);
+        try testing.expect(it.next() == &four_b.view);
+        try testing.expect(it.next() == &three_b_pa.view);
+        try testing.expect(it.next() == &five_b.view);
+        try testing.expect(it.next() == null);
     }
 }
