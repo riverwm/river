@@ -209,8 +209,7 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 ## CONFIGURATION
 
 *attach-mode* *top*|*bottom*
-	Configure where new views should attach to the view stack for the
-	currently focused output.
+	Configure where new views should attach to the view stack.
 
 *background-color* _#RRGGBB_|_#RRGGBBAA_
 	Set the background color.
