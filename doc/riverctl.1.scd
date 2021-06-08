@@ -267,6 +267,69 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 	and is made available through the _XCURSOR_THEME_ and _XCURSOR_SIZE_
 	environment variables.
 
+## INPUT CONFIGURATION
+
+The _input_ command can be used to create a configuration rule for an input
+device identified by its _name_.
+
+A list of all device properties that can be configured maybe found below.
+However note that not every input device supports every property.
+
+*input* _name_ *events* *enabled*|*disabled*|*disabled-on-external-mouse*
+	Configure whether the input devices events will be used by river.
+
+*input* _name_ *accel-profile* *none*|*flat*|*adaptive*
+	Set the pointer acceleration profile of the input device.
+
+*input* _name_ *pointer-accel* _factor_
+	Set the pointer acceleration factor of the input device. Needs a float
+	between -1.0 and 1.0.
+
+*input* _name_ *click-method* *none*|*button-areas*|*clickfinger*
+	Set the click method of the input device.
+
+*input* _name_ *drag* *enabled*|*disabled*
+	Enable or disable the tap-and-drag functionality of the input device.
+
+*input* _name_ *drag-lock* *enabled*|*disabled*
+	Enable or disable the drag lock functionality of the input device.
+
+*input* _name_ *disable-while-typing* *enabled*|*disabled*
+	Enable or disable the disable-while-typing functionality of the input device.
+
+*input* _name_ *middle-emulation* *enabled*|*disabled*
+	Enable or disable the middle click emulation functionality of the input device.
+
+*input* _name_ *natural-scroll* *enabled*|*disabled*
+	Enable or disable the natural scroll functionality of the input device. If
+	active, the scroll direction is inverted.
+
+*input* _name_ *left-handed* *enabled*|*disabled*
+	Enable or disable the left handed mode of the input device.
+
+*input* _name_ *tap* *enabled*|*disabled*
+	Enable or disable the tap functionality of the input device.
+
+*input* _name_ *tap-button-map* *left-right-middle*|*left-middle-right*
+	Configure the button mapping for tapping.
+
+	- _left-right-middle_: 1 finger tap equals left click, 2 finger tap equals
+	  right click, 3 finger tap equals middle click.
+	- _left-middle-right_: 1 finger tap equals left click, 2 finger tap equals
+	  middle click, 3 finger tap equals right click.
+
+*input* _name_ *scroll-method* *none*|*two-finger*|*edge*|*button*
+	Set the scroll method of the input device.
+
+	- _none_: No scrolling
+	- _two-finger_: Scroll by swiping with two fingers simultaneously
+	- _edge_: Scroll by swiping along the edge
+	- _button_: Scroll with pointer movement while holding down a button
+
+*input* _name_ *scroll-button* _button_
+	Set the scroll button of an input device. _button_ is the name of a linux
+	input event code.
+
 # EXAMPLES
 
 Bind bemenu-run to Super+P in normal mode:
