@@ -85,8 +85,8 @@ pub fn deinit(self: *Self) void {
     }
 }
 
-/// Returns true if a configure must be sent to ensure the dimensions of the
-/// pending_box are applied.
+/// Returns true if a configure must be sent to ensure that the pending
+/// dimensions are applied.
 pub fn needsConfigure(self: Self) bool {
     const server_pending = &self.xdg_surface.role_data.toplevel.server_pending;
     const state = &self.view.pending;
@@ -95,8 +95,10 @@ pub fn needsConfigure(self: Self) bool {
     // sync with the current dimensions or be the dimensions sent with the
     // most recent configure. In both cases server_pending has the values we
     // want to check against.
-    return (state.focus != 0) != server_pending.activated or
-        state.box.width != server_pending.width or
+    // Furthermore, we avoid a special case for newly mapped views which we
+    // have not yet configured by setting server_pending.width/height to the
+    // initial width/height of the view in handleMap().
+    return state.box.width != server_pending.width or
         state.box.height != server_pending.height;
 }
 
@@ -104,8 +106,6 @@ pub fn needsConfigure(self: Self) bool {
 pub fn configure(self: Self) void {
     const toplevel = self.xdg_surface.role_data.toplevel;
     const state = &self.view.pending;
-    _ = toplevel.setActivated(state.focus != 0);
-    _ = toplevel.setFullscreen(state.fullscreen);
     self.view.pending_serial = toplevel.setSize(state.box.width, state.box.height);
 }
 
@@ -113,6 +113,15 @@ pub fn configure(self: Self) void {
 pub fn close(self: Self) void {
     self.xdg_surface.role_data.toplevel.sendClose();
 }
+
+pub fn setActivated(self: Self, activated: bool) void {
+    _ = self.xdg_surface.role_data.toplevel.setActivated(activated);
+}
+
+pub fn setFullscreen(self: Self, fullscreen: bool) void {
+    _ = self.xdg_surface.role_data.toplevel.setFullscreen(fullscreen);
+}
+
 pub inline fn forEachPopupSurface(
     self: Self,
     comptime T: type,
@@ -188,6 +197,11 @@ fn handleMap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurfa
         @intCast(i32, view.float_box.width), 2));
     view.float_box.y = std.math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.height) -
         @intCast(i32, view.float_box.height), 2));
+
+    // We initialize these to avoid special-casing newly mapped views in
+    // the check preformed in needsConfigure().
+    toplevel.server_pending.width = @intCast(u32, initial_box.width);
+    toplevel.server_pending.height = @intCast(u32, initial_box.height);
 
     // Also use the view's  "natural" size as the initial regular dimensions,
     // for the case that it does not get arranged by a lyaout.

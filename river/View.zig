@@ -209,6 +209,7 @@ pub fn applyPending(self: *Self) void {
     // If switching to fullscreen set the dimensions to the full area of the output
     // and turn the view fully opaque
     if (!self.current.fullscreen and self.pending.fullscreen) {
+        self.setFullscreen(true);
         self.post_fullscreen_box = self.current.box;
 
         self.pending.target_opacity = 1.0;
@@ -222,6 +223,7 @@ pub fn applyPending(self: *Self) void {
     }
 
     if (self.current.fullscreen and !self.pending.fullscreen) {
+        self.setFullscreen(false);
         self.pending.box = self.post_fullscreen_box;
 
         // Restore configured opacity
@@ -244,10 +246,6 @@ pub fn needsConfigure(self: Self) bool {
 }
 
 pub fn configure(self: Self) void {
-    if (self.foreign_toplevel_handle) |handle| {
-        handle.setActivated(self.pending.focus != 0);
-        handle.setFullscreen(self.pending.fullscreen);
-    }
     switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.configure(),
         .xwayland_view => |xwayland_view| xwayland_view.configure(),
@@ -322,6 +320,23 @@ pub fn close(self: Self) void {
         .xwayland_view => |xwayland_view| xwayland_view.close(),
     }
 }
+
+pub fn setActivated(self: Self, activated: bool) void {
+    if (self.foreign_toplevel_handle) |handle| handle.setActivated(activated);
+    switch (self.impl) {
+        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.setActivated(activated),
+        .xwayland_view => |xwayland_view| xwayland_view.setActivated(activated),
+    }
+}
+
+pub fn setFullscreen(self: Self, fullscreen: bool) void {
+    if (self.foreign_toplevel_handle) |handle| handle.setFullscreen(fullscreen);
+    switch (self.impl) {
+        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.setFullscreen(fullscreen),
+        .xwayland_view => |xwayland_view| xwayland_view.setFullscreen(fullscreen),
+    }
+}
+
 pub inline fn forEachPopupSurface(
     self: Self,
     comptime T: type,

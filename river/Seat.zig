@@ -196,29 +196,30 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
     // still clear the focus.
     if (if (target_surface) |wlr_surface| server.input_manager.inputAllowed(wlr_surface) else true) {
         // First clear the current focus
-        if (self.focused == .view) {
-            self.focused.view.pending.focus -= 1;
-            // This is needed because xwayland views don't double buffer
-            // activated state.
-            if (build_options.xwayland and self.focused.view.impl == .xwayland_view)
-                self.focused.view.impl.xwayland_view.xwayland_surface.activate(false);
-            if (self.focused.view.pending.focus == 0 and !self.focused.view.pending.fullscreen) {
-                self.focused.view.pending.target_opacity = server.config.opacity.unfocused;
-            }
+        switch (self.focused) {
+            .view => |view| {
+                view.pending.focus -= 1;
+                if (view.pending.focus == 0) {
+                    view.setActivated(false);
+                    if (!view.pending.fullscreen) {
+                        view.pending.target_opacity = server.config.opacity.unfocused;
+                    }
+                }
+            },
+            .layer, .none => {},
         }
 
         // Set the new focus
         switch (new_focus) {
             .view => |target_view| {
                 std.debug.assert(self.focused_output == target_view.output);
-                target_view.pending.focus += 1;
-                // This is needed because xwayland views don't double buffer
-                // activated state.
-                if (build_options.xwayland and target_view.impl == .xwayland_view)
-                    target_view.impl.xwayland_view.xwayland_surface.activate(true);
-                if (!target_view.pending.fullscreen) {
-                    target_view.pending.target_opacity = server.config.opacity.focused;
+                if (target_view.pending.focus == 0) {
+                    target_view.setActivated(true);
+                    if (!target_view.pending.fullscreen) {
+                        target_view.pending.target_opacity = server.config.opacity.focused;
+                    }
                 }
+                target_view.pending.focus += 1;
             },
             .layer => |target_layer| std.debug.assert(self.focused_output == target_layer.output),
             .none => {},

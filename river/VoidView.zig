@@ -39,6 +39,14 @@ pub fn close(self: Self) void {
     unreachable;
 }
 
+pub fn setActivated(self: Self, activated: bool) void {
+    unreachable;
+}
+
+pub fn setFullscreen(self: Self, fullscreen: bool) void {
+    unreachable;
+}
+
 pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*wlr.Surface {
     unreachable;
 }

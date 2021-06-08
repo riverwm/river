@@ -84,7 +84,6 @@ pub fn configure(self: Self) void {
     const output_box = server.root.output_layout.getBox(output.wlr_output).?;
 
     const state = &self.view.pending;
-    self.xwayland_surface.setFullscreen(state.fullscreen);
     self.xwayland_surface.configure(
         @intCast(i16, state.box.x + output_box.x),
         @intCast(i16, state.box.y + output_box.y),
@@ -96,6 +95,14 @@ pub fn configure(self: Self) void {
 /// Close the view. This will lead to the unmap and destroy events being sent
 pub fn close(self: Self) void {
     self.xwayland_surface.close();
+}
+
+pub fn setActivated(self: Self, activated: bool) void {
+    self.xwayland_surface.activate(activated);
+}
+
+pub fn setFullscreen(self: Self, fullscreen: bool) void {
+    self.xwayland_surface.setFullscreen(fullscreen);
 }
 
 /// Return the surface at output coordinates ox, oy and set sx, sy to the
