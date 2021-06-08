@@ -261,7 +261,19 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) voi
         view.surface_box = new_box;
 
         if (s == self.xdg_surface.configure_serial) {
-            view.notifyConfiguredOrApplyPending();
+            // If this commit is in response to our configure and the
+            // transaction code is tracking this configure, notify it.
+            // Otherwise, apply the pending state immediately.
+            view.pending_serial = null;
+            if (view.shouldTrackConfigure()) {
+                server.root.notifyConfigured();
+            } else {
+                const self_tags_changed = view.pending.tags != view.current.tags;
+                view.current = view.pending;
+                view.commitOpacityTransition();
+                if (self_tags_changed) view.output.sendViewTags();
+                view.output.damage.addWhole();
+            }
         } else {
             // If the client has not yet acked our configure, we need to send a
             // frame done event so that it commits another buffer. These

@@ -273,22 +273,6 @@ pub fn saveBuffers(self: *Self) void {
     self.surface.?.forEachSurface(*std.ArrayList(SavedBuffer), saveBuffersIterator, &self.saved_buffers);
 }
 
-/// If this commit is in response to our configure and the
-/// transaction code is tracking this configure, notify it.
-/// Otherwise, apply the pending state immediately.
-pub fn notifyConfiguredOrApplyPending(self: *Self) void {
-    self.pending_serial = null;
-    if (self.shouldTrackConfigure()) {
-        server.root.notifyConfigured();
-    } else {
-        const self_tags_changed = self.pending.tags != self.current.tags;
-        self.current = self.pending;
-        self.commitOpacityTransition();
-        if (self_tags_changed) self.output.sendViewTags();
-        self.output.damage.addWhole();
-    }
-}
-
 fn saveBuffersIterator(
     surface: *wlr.Surface,
     surface_x: c_int,
