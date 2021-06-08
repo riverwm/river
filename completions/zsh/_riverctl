@@ -47,7 +47,7 @@ _riverctl() {
     'unmap:Remove the mapping defined by the arguments'
     'unmap-pointer:Remove the pointer mapping defined by the arguments'
     # Configuration
-    'attach-mode:Configure where new views should attach to the view stack for the currently focused output'
+    'attach-mode:Configure where new views should attach to the view stack'
     'background-color:Set the background color'
     'border-color-focused:Set the border color of focused views'
     'border-color-unfocused:Set the border color of unfocused views'

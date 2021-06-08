@@ -23,6 +23,7 @@ const util = @import("util.zig");
 
 const Server = @import("Server.zig");
 const Mode = @import("Mode.zig");
+const AttachMode = @import("view_stack.zig").AttachMode;
 
 pub const FocusFollowsCursorMode = enum {
     disabled,
@@ -63,6 +64,9 @@ focus_follows_cursor: FocusFollowsCursorMode = .disabled,
 /// value set. Call Output.handleLayoutNamespaceChange() on setting this if
 /// Output.layout_namespace is null.
 default_layout_namespace: []const u8 = &[0]u8{},
+
+/// Determines where new views will be attached to the view stack.
+attach_mode: AttachMode = .top,
 
 opacity: struct {
     /// The opacity of focused views

@@ -35,7 +35,6 @@ const Layout = @import("Layout.zig");
 const LayoutDemand = @import("LayoutDemand.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
-const AttachMode = @import("view_stack.zig").AttachMode;
 const OutputStatus = @import("OutputStatus.zig");
 
 const State = struct {
@@ -82,9 +81,6 @@ layouts: std.TailQueue(Layout) = .{},
 /// config.default_layout_namespace should be used instead.
 /// Call handleLayoutNamespaceChange() after setting this.
 layout_namespace: ?[]const u8 = null,
-
-/// Determines where new views will be attached to the view stack.
-attach_mode: AttachMode = .top,
 
 /// Bitmask that whitelists tags for newly spawned views
 spawn_tagmask: u32 = std.math.maxInt(u32),

@@ -19,6 +19,8 @@ const std = @import("std");
 
 const util = @import("../util.zig");
 
+const server = &@import("../main.zig").server;
+
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
@@ -32,9 +34,9 @@ pub fn attachMode(
     if (args.len > 2) return Error.TooManyArguments;
 
     if (std.mem.eql(u8, "top", args[1])) {
-        seat.focused_output.attach_mode = .top;
+        server.config.attach_mode = .top;
     } else if (std.mem.eql(u8, "bottom", args[1])) {
-        seat.focused_output.attach_mode = .bottom;
+        server.config.attach_mode = .bottom;
     } else {
         return Error.UnknownOption;
     }

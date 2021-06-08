@@ -41,7 +41,7 @@ complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a map-point
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a unmap                  -d 'Remove the mapping defined by the arguments'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a unmap-pointer          -d 'Remove the pointer mapping defined by the arguments'
 # Configuration
-complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a attach-mode            -d 'Configure where new views should attach to the view stack for the currently focused output'
+complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a attach-mode            -d 'Configure where new views should attach to the view stack'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a background-color       -d 'Set the background color'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a border-color-focused   -d 'Set the border color of focused views'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a border-color-unfocused -d 'Set the border color of unfocused views'
