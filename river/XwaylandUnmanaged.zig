@@ -30,10 +30,8 @@ const Box = @import("Box.zig");
 xwayland_surface: *wlr.XwaylandSurface,
 
 // Listeners that are always active over the view's lifetime
-// zig fmt: off
 request_configure: wl.Listener(*wlr.XwaylandSurface.event.Configure) =
     wl.Listener(*wlr.XwaylandSurface.event.Configure).init(handleRequestConfigure),
-// zig fmt: on
 destroy: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleDestroy),
 map: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleMap),
 unmap: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleUnmap),

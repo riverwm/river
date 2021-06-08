@@ -74,7 +74,6 @@ focus_stack: ViewStack(*View) = .{},
 /// List of status tracking objects relaying changes to this seat to clients.
 status_trackers: std.SinglyLinkedList(SeatStatus) = .{},
 
-// zig fmt: off
 request_set_selection: wl.Listener(*wlr.Seat.event.RequestSetSelection) =
     wl.Listener(*wlr.Seat.event.RequestSetSelection).init(handleRequestSetSelection),
 request_start_drag: wl.Listener(*wlr.Seat.event.RequestStartDrag) =
@@ -82,7 +81,6 @@ request_start_drag: wl.Listener(*wlr.Seat.event.RequestStartDrag) =
 start_drag: wl.Listener(*wlr.Drag) = wl.Listener(*wlr.Drag).init(handleStartDrag),
 request_set_primary_selection: wl.Listener(*wlr.Seat.event.RequestSetPrimarySelection) =
     wl.Listener(*wlr.Seat.event.RequestSetPrimarySelection).init(handleRequestSetPrimarySelection),
-// zig fmt: on
 
 pub fn init(self: *Self, name: [*:0]const u8) !void {
     self.* = .{

@@ -47,7 +47,6 @@ seats: std.TailQueue(Seat) = .{},
 
 exclusive_client: ?*wl.Client = null,
 
-// zig fmt: off
 inhibit_activate: wl.Listener(*wlr.InputInhibitManager) =
     wl.Listener(*wlr.InputInhibitManager).init(handleInhibitActivate),
 inhibit_deactivate: wl.Listener(*wlr.InputInhibitManager) =
@@ -58,7 +57,6 @@ new_virtual_pointer: wl.Listener(*wlr.VirtualPointerManagerV1.event.NewPointer) 
     wl.Listener(*wlr.VirtualPointerManagerV1.event.NewPointer).init(handleNewVirtualPointer),
 new_virtual_keyboard: wl.Listener(*wlr.VirtualKeyboardV1) =
     wl.Listener(*wlr.VirtualKeyboardV1).init(handleNewVirtualKeyboard),
-// zig fmt: on
 
 pub fn init(self: *Self) !void {
     const seat_node = try util.gpa.create(std.TailQueue(Seat).Node);

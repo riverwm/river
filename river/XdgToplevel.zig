@@ -48,14 +48,12 @@ new_subsurface: wl.Listener(*wlr.Subsurface) = wl.Listener(*wlr.Subsurface).init
 
 // Listeners that are only active while the view is mapped
 commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
-// zig fmt: off
 request_fullscreen: wl.Listener(*wlr.XdgToplevel.event.SetFullscreen) =
     wl.Listener(*wlr.XdgToplevel.event.SetFullscreen).init(handleRequestFullscreen),
 request_move: wl.Listener(*wlr.XdgToplevel.event.Move) =
     wl.Listener(*wlr.XdgToplevel.event.Move).init(handleRequestMove),
 request_resize: wl.Listener(*wlr.XdgToplevel.event.Resize) =
     wl.Listener(*wlr.XdgToplevel.event.Resize).init(handleRequestResize),
-// zig fmt: on
 set_title: wl.Listener(*wlr.XdgSurface) = wl.Listener(*wlr.XdgSurface).init(handleSetTitle),
 set_app_id: wl.Listener(*wlr.XdgSurface) = wl.Listener(*wlr.XdgSurface).init(handleSetAppId),
 

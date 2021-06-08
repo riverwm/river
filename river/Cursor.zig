@@ -68,7 +68,6 @@ pressed_count: u32 = 0,
 
 axis: wl.Listener(*wlr.Pointer.event.Axis) = wl.Listener(*wlr.Pointer.event.Axis).init(handleAxis),
 frame: wl.Listener(*wlr.Cursor) = wl.Listener(*wlr.Cursor).init(handleFrame),
-// zig fmt: off
 button: wl.Listener(*wlr.Pointer.event.Button) =
     wl.Listener(*wlr.Pointer.event.Button).init(handleButton),
 motion_absolute: wl.Listener(*wlr.Pointer.event.MotionAbsolute) =
@@ -89,7 +88,6 @@ swipe_update: wl.Listener(*wlr.Pointer.event.SwipeUpdate) =
     wl.Listener(*wlr.Pointer.event.SwipeUpdate).init(handleSwipeUpdate),
 swipe_end: wl.Listener(*wlr.Pointer.event.SwipeEnd) =
     wl.Listener(*wlr.Pointer.event.SwipeEnd).init(handleSwipeEnd),
-// zig fmt: on
 
 pub fn init(self: *Self, seat: *Seat) !void {
     const wlr_cursor = try wlr.Cursor.create();

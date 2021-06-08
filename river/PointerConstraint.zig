@@ -33,12 +33,8 @@ const View = @import("View.zig");
 constraint: *wlr.PointerConstraintV1,
 cursor: *Cursor,
 
-// zig fmt: off
-destroy: wl.Listener(*wlr.PointerConstraintV1) =
-    wl.Listener(*wlr.PointerConstraintV1).init(handleDestroy),
-set_region: wl.Listener(void) =
-    wl.Listener(void).init(handleSetRegion),
-// zig fmt: on
+destroy: wl.Listener(*wlr.PointerConstraintV1) = wl.Listener(*wlr.PointerConstraintV1).init(handleDestroy),
+set_region: wl.Listener(void) = wl.Listener(void).init(handleSetRegion),
 
 pub fn init(self: *Self, constraint: *wlr.PointerConstraintV1) void {
     const seat = @intToPtr(*Seat, constraint.seat.data);

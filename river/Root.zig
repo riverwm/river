@@ -46,7 +46,6 @@ new_output: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleNewOu
 output_layout: *wlr.OutputLayout,
 layout_change: wl.Listener(*wlr.OutputLayout) = wl.Listener(*wlr.OutputLayout).init(handleLayoutChange),
 
-// zig fmt: off
 output_manager: *wlr.OutputManagerV1,
 manager_apply: wl.Listener(*wlr.OutputConfigurationV1) =
     wl.Listener(*wlr.OutputConfigurationV1).init(handleManagerApply),
@@ -56,7 +55,6 @@ manager_test: wl.Listener(*wlr.OutputConfigurationV1) =
 power_manager: *wlr.OutputPowerManagerV1,
 power_manager_set_mode: wl.Listener(*wlr.OutputPowerManagerV1.event.SetMode) =
     wl.Listener(*wlr.OutputPowerManagerV1.event.SetMode).init(handlePowerManagerSetMode),
-// zig fmt: on
 
 /// A list of all outputs
 all_outputs: std.TailQueue(*Output) = .{},

@@ -39,10 +39,8 @@ xwayland_surface: *wlr.XwaylandSurface,
 destroy: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleDestroy),
 map: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleMap),
 unmap: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleUnmap),
-// zig fmt: off
 request_configure: wl.Listener(*wlr.XwaylandSurface.event.Configure) =
     wl.Listener(*wlr.XwaylandSurface.event.Configure).init(handleRequestConfigure),
-// zig fmt: on
 
 // Listeners that are only active while the view is mapped
 commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),

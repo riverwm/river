@@ -28,12 +28,10 @@ const Server = @import("Server.zig");
 
 xdg_toplevel_decoration: *wlr.XdgToplevelDecorationV1,
 
-// zig fmt: off
 destroy: wl.Listener(*wlr.XdgToplevelDecorationV1) =
     wl.Listener(*wlr.XdgToplevelDecorationV1).init(handleDestroy),
 request_mode: wl.Listener(*wlr.XdgToplevelDecorationV1) =
     wl.Listener(*wlr.XdgToplevelDecorationV1).init(handleRequestMode),
-// zig fmt: on
 
 pub fn init(self: *Self, xdg_toplevel_decoration: *wlr.XdgToplevelDecorationV1) void {
     self.* = .{ .xdg_toplevel_decoration = xdg_toplevel_decoration };

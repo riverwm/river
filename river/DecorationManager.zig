@@ -29,10 +29,8 @@ const Server = @import("Server.zig");
 
 xdg_decoration_manager: *wlr.XdgDecorationManagerV1,
 
-// zig fmt: off
 new_toplevel_decoration: wl.Listener(*wlr.XdgToplevelDecorationV1) =
     wl.Listener(*wlr.XdgToplevelDecorationV1).init(handleNewToplevelDecoration),
-// zig fmt: on
 
 pub fn init(self: *Self) !void {
     self.* = .{

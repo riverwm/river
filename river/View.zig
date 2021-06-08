@@ -133,14 +133,12 @@ draw_borders: bool = true,
 
 /// This is created when the view is mapped and destroyed with the view
 foreign_toplevel_handle: ?*wlr.ForeignToplevelHandleV1 = null,
-// zig fmt: off
 foreign_activate: wl.Listener(*wlr.ForeignToplevelHandleV1.event.Activated) =
     wl.Listener(*wlr.ForeignToplevelHandleV1.event.Activated).init(handleForeignActivate),
 foreign_fullscreen: wl.Listener(*wlr.ForeignToplevelHandleV1.event.Fullscreen) =
     wl.Listener(*wlr.ForeignToplevelHandleV1.event.Fullscreen).init(handleForeignFullscreen),
 foreign_close: wl.Listener(*wlr.ForeignToplevelHandleV1) =
     wl.Listener(*wlr.ForeignToplevelHandleV1).init(handleForeignClose),
-// zig fmt: on
 
 pub fn init(self: *Self, output: *Output, tags: u32, surface: anytype) void {
     self.* = .{
