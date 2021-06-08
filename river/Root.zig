@@ -282,6 +282,7 @@ pub fn startTransaction(self: *Self) void {
 
     // If a new transaction is started while another is in progress, we need
     // to reset the pending count to 0 and clear serials from the views
+    const preempting = self.pending_configures > 0;
     self.pending_configures = 0;
 
     // Iterate over all views of all outputs
@@ -317,16 +318,18 @@ pub fn startTransaction(self: *Self) void {
     }
 
     if (self.pending_configures > 0) {
-        std.log.scoped(.transaction).debug(
-            "started transaction with {} pending configure(s)",
-            .{self.pending_configures},
-        );
+        std.log.scoped(.transaction).debug("started transaction with {} pending configure(s)", .{
+            self.pending_configures,
+        });
 
-        // Set timeout to 200ms
-        self.transaction_timer.timerUpdate(200) catch {
-            std.log.scoped(.transaction).err("failed to update timer", .{});
-            self.commitTransaction();
-        };
+        // Timeout the transaction after 200ms. If we are preempting an
+        // already in progress transaction, don't extend the timeout.
+        if (!preempting) {
+            self.transaction_timer.timerUpdate(200) catch {
+                std.log.scoped(.transaction).err("failed to update timer", .{});
+                self.commitTransaction();
+            };
+        }
     } else {
         // No views need configures, clear the current timer in case we are
         // interrupting another transaction and commit.
