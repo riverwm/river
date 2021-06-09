@@ -169,6 +169,10 @@ fn handleRequest(layout: *river.LayoutV2, request: river.LayoutV2.Request, self:
 }
 
 fn handleDestroy(layout: *river.LayoutV2, self: *Self) void {
+    self.destroy();
+}
+
+pub fn destroy(self: *Self) void {
     log.debug(
         "destroying layout '{s}' on output '{s}'",
         .{ self.namespace, mem.sliceTo(&self.output.wlr_output.name, 0) },
@@ -189,4 +193,6 @@ fn handleDestroy(layout: *river.LayoutV2, self: *Self) void {
 
     util.gpa.free(self.namespace);
     util.gpa.destroy(node);
+
+    self.layout.setHandler(?*c_void, handleRequestInert, null, null);
 }

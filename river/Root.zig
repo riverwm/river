@@ -206,6 +206,9 @@ pub fn removeOutput(self: *Self, output: *Output) void {
         }
     }
 
+    // Destroy all layouts of the output
+    while (output.layouts.first) |layout_node| layout_node.data.destroy();
+
     // Arrange the root in case evacuated views affect the layout
     fallback_output.arrangeViews();
     self.startTransaction();

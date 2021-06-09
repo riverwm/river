@@ -18,6 +18,7 @@
 const Self = @This();
 
 const std = @import("std");
+const assert = std.debug.assert;
 const mem = std.mem;
 const fmt = std.fmt;
 const wlr = @import("wlroots");
@@ -410,8 +411,6 @@ fn arrangeLayer(
     }
 }
 
-/// Called when the output is destroyed. Evacuate all views from the output
-/// and then remove it from the list of outputs.
 fn handleDestroy(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
 
@@ -419,6 +418,9 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) v
 
     // Remove the destroyed output from root if it wasn't already removed
     server.root.removeOutput(self);
+    assert(self.views.first == null and self.views.last == null);
+    for (self.layers) |layer| assert(layer.len == 0);
+    assert(self.layouts.len == 0);
 
     var it = server.root.all_outputs.first;
     while (it) |all_node| : (it = all_node.next) {
