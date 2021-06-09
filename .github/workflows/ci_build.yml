@@ -23,7 +23,7 @@ jobs:
           xbps-install -S
           xbps-install -uy xbps
           xbps-install -uy zig wayland-devel wayland-protocols wlroots-devel \
-          	libxkbcommon-devel pixman-devel pkgconf scdoc git
+            libxkbcommon-devel pixman-devel pkgconf scdoc git gcc
 
       - name: checkout
         uses: actions/checkout@v2
@@ -50,7 +50,7 @@ jobs:
           xbps-install -uy xbps
           xbps-install -uy
           xbps-install -uy zig wayland-devel wayland-protocols wlroots-devel \
-          	libxkbcommon-devel pixman-devel pkgconf scdoc git
+            libxkbcommon-devel pixman-devel pkgconf scdoc git gcc
 
       - name: checkout
         uses: actions/checkout@v2
