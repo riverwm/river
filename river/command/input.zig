@@ -27,6 +27,37 @@ const Seat = @import("../Seat.zig");
 const InputConfig = @import("../InputConfig.zig");
 const InputManager = @import("../InputManager.zig");
 
+pub fn listInputs(
+    allocator: *mem.Allocator,
+    seat: *Seat,
+    args: []const []const u8,
+    out: *?[]const u8,
+) Error!void {
+    var input_list = std.ArrayList(u8).init(allocator);
+    const writer = input_list.writer();
+    var prev = false;
+
+    var it = server.input_manager.input_devices.first;
+    while (it) |node| : (it = node.next) {
+        const configured = for (server.input_manager.input_configs.items) |*input_config| {
+            if (mem.eql(u8, input_config.identifier, mem.sliceTo(node.data.identifier, 0))) {
+                break true;
+            }
+        } else false;
+
+        if (prev) try input_list.appendSlice("\n");
+        prev = true;
+
+        try writer.print("{s}\n\ttype: {s}\n\tconfigured: {s}\n", .{
+            node.data.identifier,
+            @tagName(node.data.device.type),
+            configured,
+        });
+    }
+
+    out.* = input_list.toOwnedSlice();
+}
+
 pub fn input(
     allocator: *mem.Allocator,
     seat: *Seat,
