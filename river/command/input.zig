@@ -58,6 +58,69 @@ pub fn listInputs(
     out.* = input_list.toOwnedSlice();
 }
 
+pub fn listInputConfigs(
+    allocator: *mem.Allocator,
+    seat: *Seat,
+    args: []const []const u8,
+    out: *?[]const u8,
+) Error!void {
+    var input_list = std.ArrayList(u8).init(allocator);
+    const writer = input_list.writer();
+
+    for (server.input_manager.input_configs.items) |*input_config, i| {
+        if (i > 0) try input_list.appendSlice("\n");
+
+        try writer.print("{s}\n", .{input_config.identifier});
+
+        if (input_config.event_state) |event_state| {
+            try writer.print("\tevents: {s}\n", .{@tagName(event_state)});
+        }
+        if (input_config.accel_profile) |accel_profile| {
+            try writer.print("\taccel-profile: {s}\n", .{@tagName(accel_profile)});
+        }
+        if (input_config.click_method) |click_method| {
+            try writer.print("\tclick-method: {s}\n", .{@tagName(click_method)});
+        }
+        if (input_config.drag_state) |drag_state| {
+            try writer.print("\tdrag: {s}\n", .{@tagName(drag_state)});
+        }
+        if (input_config.drag_lock) |drag_lock| {
+            try writer.print("\tdrag-lock: {s}\n", .{@tagName(drag_lock)});
+        }
+        if (input_config.dwt_state) |dwt_state| {
+            try writer.print("\tdisable-while-typing: {s}\n", .{@tagName(dwt_state)});
+        }
+        if (input_config.middle_emulation) |middle_emulation| {
+            try writer.print("\tmiddle-emulation: {s}\n", .{@tagName(middle_emulation)});
+        }
+        if (input_config.natural_scroll) |natural_scroll| {
+            try writer.print("\tnatual-scroll: {s}\n", .{@tagName(natural_scroll)});
+        }
+        if (input_config.left_handed) |left_handed| {
+            try writer.print("\tleft-handed: {s}\n", .{@tagName(left_handed)});
+        }
+        if (input_config.tap_state) |tap_state| {
+            try writer.print("\ttap: {s}\n", .{@tagName(tap_state)});
+        }
+        if (input_config.tap_button_map) |tap_button_map| {
+            try writer.print("\ttap-button-map: {s}\n", .{@tagName(tap_button_map)});
+        }
+        if (input_config.pointer_accel) |pointer_accel| {
+            try writer.print("\tpointer-accel: {d}\n", .{pointer_accel.value});
+        }
+        if (input_config.scroll_method) |scroll_method| {
+            try writer.print("\tscroll-method: {s}\n", .{scroll_method});
+        }
+        if (input_config.scroll_button) |scroll_button| {
+            try writer.print("\tscroll-button: {s}\n", .{
+                mem.sliceTo(c.libevdev_event_code_get_name(c.EV_KEY, scroll_button.button), 0),
+            });
+        }
+    }
+
+    out.* = input_list.toOwnedSlice();
+}
+
 pub fn input(
     allocator: *mem.Allocator,
     seat: *Seat,
