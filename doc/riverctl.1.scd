@@ -272,6 +272,9 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 *list-inputs*
 	List all input devices.
 
+*list-input-configs*
+	List all input configurations.
+
 The _input_ command can be used to create a configuration rule for an input
 device identified by its _name_.
 

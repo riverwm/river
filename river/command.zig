@@ -59,6 +59,7 @@ const str_to_impl_fn = [_]struct {
     .{ .name = "focus-view",             .impl = @import("command/focus_view.zig").focusView },
     .{ .name = "input",                  .impl = @import("command/input.zig").input },
     .{ .name = "list-inputs",            .impl = @import("command/input.zig").listInputs },
+    .{ .name = "list-input-configs",     .impl = @import("command/input.zig").listInputConfigs},
     .{ .name = "map",                    .impl = @import("command/map.zig").map },
     .{ .name = "map-pointer",            .impl = @import("command/map.zig").mapPointer },
     .{ .name = "mod-layout-value",       .impl = @import("command/layout.zig").modLayoutValue },
