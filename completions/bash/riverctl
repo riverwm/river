@@ -8,6 +8,9 @@ function __riverctl_completion ()
 			float-filter-add \
 			focus-output \
 			focus-view \
+			input \
+			list-inputs \
+			list-input-configs \
 			move \
 			resize \
 			snap \
@@ -40,7 +43,7 @@ function __riverctl_completion ()
 			focus-follow-cursor \
 			opacity \
 			set-repeat \
-			xcursor-theme
+			xcursor-theme"
 		COMPREPLY=($(compgen -W "${OPTS}" -- "${COMP_WORDS[1]}"))
 	elif [ "${COMP_CWORD}" -eq 2 ]
 	then
@@ -54,6 +57,40 @@ function __riverctl_completion ()
 			*) return ;;
 		esac
 		COMPREPLY=($(compgen -W "${OPTS}" -- "${COMP_WORDS[2]}"))
+	elif [ "${COMP_CWORD}" -eq 3 ]
+	then
+		if [ "${COMP_WORDS[1]}" == "input" ]
+		then
+			OPTS="events \
+				accel-profile \
+				pointer-accel \
+				click-method \
+				drag \
+				drag-lock \
+				disable-while-typing \
+				middle-emulation \
+				natural-scroll \
+				left-handed \
+				tap \
+				tap-button-map \
+				scroll-method \
+				scroll-button"
+			COMPREPLY=($(compgen -W "${OPTS}" -- "${COMP_WORDS[2]}"))
+		fi
+	elif [ "${COMP_CWORD}" -eq 4 ]
+	then
+		if [ "${COMP_WORDS[1]}" == "input" ]
+		then
+			case "${COMP_WORDS[3]}" in
+				"events") OPTS="enabled disabled disabled-on-external-mouse" ;;
+				"accel-profile") OPTS="none flat adaptive" ;;
+				"click-method") OPTS="none button-areas clickfinger" ;;
+				"drag"|"drag-lock"|"disable-while-typing"|"middle-emulation"|"left-handed"|"tap") OPTS="enabled disabled" ;;
+				"tap-button-map") OPTS="left-right-middle left-middle-right" ;;
+				"scroll-method") OPTS="none two-finger edge button" ;;
+				*) return ;;
+			esac
+		fi
 	else
 		return
 	fi
