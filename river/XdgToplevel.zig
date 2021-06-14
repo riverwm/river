@@ -185,8 +185,6 @@ fn handleMap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurfa
     toplevel.events.set_title.add(&self.set_title);
     toplevel.events.set_app_id.add(&self.set_app_id);
 
-    view.surface = self.xdg_surface.surface;
-
     // Use the view's initial size centered on the output as the default
     // floating dimensions
     var initial_box: wlr.Box = undefined;
@@ -202,6 +200,9 @@ fn handleMap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurfa
     // the check preformed in needsConfigure().
     toplevel.server_pending.width = @intCast(u32, initial_box.width);
     toplevel.server_pending.height = @intCast(u32, initial_box.height);
+
+    view.surface = self.xdg_surface.surface;
+    view.surface_box = Box.fromWlrBox(initial_box);
 
     // Also use the view's  "natural" size as the initial regular dimensions,
     // for the case that it does not get arranged by a lyaout.

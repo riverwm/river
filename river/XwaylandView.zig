@@ -163,11 +163,18 @@ fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wl
     const view = self.view;
 
     // Add listeners that are only active while mapped
-    xwayland_surface.surface.?.events.commit.add(&self.commit);
+    const surface = xwayland_surface.surface.?;
+    surface.events.commit.add(&self.commit);
     xwayland_surface.events.set_title.add(&self.set_title);
     xwayland_surface.events.set_class.add(&self.set_class);
 
-    view.surface = self.xwayland_surface.surface;
+    view.surface = surface;
+    self.view.surface_box = .{
+        .x = 0,
+        .y = 0,
+        .width = @intCast(u32, surface.current.width),
+        .height = @intCast(u32, surface.current.height),
+    };
 
     // Use the view's "natural" size centered on the output as the default
     // floating dimensions
@@ -240,7 +247,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) voi
 
     self.view.output.damage.addWhole();
 
-    self.view.surface_box = Box{
+    self.view.surface_box = .{
         .x = 0,
         .y = 0,
         .width = @intCast(u32, surface.current.width),
