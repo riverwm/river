@@ -93,6 +93,7 @@ destroy: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleDestroy)
 enable: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleEnable),
 mode: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleMode),
 frame: wl.Listener(*wlr.OutputDamage) = wl.Listener(*wlr.OutputDamage).init(handleFrame),
+damage_destroy: wl.Listener(*wlr.OutputDamage) = wl.Listener(*wlr.OutputDamage).init(handleDamageDestroy),
 
 pub fn init(self: *Self, wlr_output: *wlr.Output) !void {
     assert(!wlr_output.isNoop());
@@ -120,6 +121,7 @@ pub fn init(self: *Self, wlr_output: *wlr.Output) !void {
     wlr_output.events.mode.add(&self.mode);
 
     self.damage.events.frame.add(&self.frame);
+    self.damage.events.destroy.add(&self.damage_destroy);
 
     // Ensure that a cursor image at the output's scale factor is loaded
     // for each seat.
@@ -401,6 +403,15 @@ fn arrangeLayer(
         std.log.scoped(.layer_shell).debug("send configure, {} x {}", .{ layer_surface.box.width, layer_surface.box.height });
         layer_surface.wlr_layer_surface.configure(layer_surface.box.width, layer_surface.box.height);
     }
+}
+
+fn handleDamageDestroy(listener: *wl.Listener(*wlr.OutputDamage), wlr_output: *wlr.OutputDamage) void {
+    const self = @fieldParentPtr(Self, "damage_destroy", listener);
+    // The wlr.OutputDamage is only destroyed by wlroots when the output is
+    // destroyed and is never destroyed manually by river.
+    self.frame.link.remove();
+    // Ensure that it is safe to call remove() again in handleDestroy()
+    self.frame.link = .{ .prev = &self.frame.link, .next = &self.frame.link };
 }
 
 fn handleDestroy(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
