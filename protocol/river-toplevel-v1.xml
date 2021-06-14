@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="river_layout_v2">
+  <copyright>
+    Copyright 2021 The River Developers
+
+    Permission to use, copy, modify, and/or distribute this software for any
+    purpose with or without fee is hereby granted, provided that the above
+    copyright notice and this permission notice appear in all copies.
+
+    THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+    WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+    MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+    ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+    ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  </copyright>
+
+  <description summary="river specific information for toplevels">
+    This protocol extends wlr-foreign-toplevel-management-unstable-v1 to enable
+    clients to track and modify river specific toplevel states.
+
+    Warning! The protocol described in this file is currently in the testing
+    phase. Backward compatible changes may be added together with the
+    corresponding interface version bump. Backward incompatible changes can
+    only be done by creating a new major version of the extension.
+  </description>
+
+  <interface name="river_toplevel_manager_v1" version="1">
+    <description summary="manage river toplevel objects">
+      A global factory for river_toplevel_v1 objects.
+    </description>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the river_toplevel_manager object">
+        This request indicates that the client will not use the
+        river_toplevel_manager object any more. Objects that have been created
+        through this instance are not affected.
+      </description>
+    </request>
+
+    <request name="get_toplevel">
+      <description summary="create a river_toplevel_v1 object">
+        This creates a new rivre_toplevel_v1 object for a
+        zwlr_foreign_toplevel_handle_v1.
+      </description>
+      <arg name="id" type="new_id" interface="river_toplevel_v1"/>
+      <arg name="handle" type="object" inteface="zwlr_foreign_toplevel_handle_v1"/>
+    </request>
+  </interface>
+
+  <interface name="river_toplevel_v1" version="1">
+    <description summary="a river toplevel handle">
+      This objects is used to track and set river specific toplevel states.
+
+      After all states have been advertised, the done event of the
+      zlw_foreign_toplevel_handle_v1 is send.
+
+      States are double buffered and only applied on commit.
+    </description>
+
+    <event name="tags">
+      <description summary="tags of the toplevel">
+        Seont once when binding the interrface and again whenever the tags
+        of the toplevel change.
+      </description>
+      <arg name="tags" type="uint" summary="32-bit bitfiled"/>
+    </event>
+
+    <event name="floating">
+      <description summary="floating state of the toplevel">
+        Seont once when binding the interrface and again whenever the tags
+        of the toplevel change.
+      </description>
+      <arg name="floating" type="bool"/>
+    </event>
+
+    <event name="floating">
+      <description summary="floating state of the toplevel">
+        Seont once when binding the interrface and again whenever the tags
+        of the toplevel change.
+      </description>
+      <arg name="floating" type="bool"/>
+    </event>
+
+    <request name="set_tags">
+      <description summary="set the tags of the toplevel">
+        The client can use this request to change the pending tags of the view.
+        This state is double buffered and only applied when comitting.
+      </description>
+      <arg name="tags" type="uint" summary="32-bit bitfiled"/>
+    </request>
+
+    <request name="set_floating">
+      <description summary="set the floating state of the toplevel">
+        The client can use this request to change the pending floating state of
+        the view. This state is double buffered and only applied when comitting.
+      </description>
+      <arg name="floating" type="bool"/>
+    </request>
+
+    <request name="commit">
+      <description summary="commit pending state">
+        The client can use this request to ask the server to apply the pending
+        state changes.
+      </description>
+    </request>
+  </interface>
+</protocol>
+
