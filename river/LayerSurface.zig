@@ -66,10 +66,7 @@ pub fn init(self: *Self, output: *Output, wlr_layer_surface: *wlr.LayerSurfaceV1
     // we do want our listener called in order to send the initial configure.
     handleCommit(&self.commit, wlr_layer_surface.surface);
 
-    // There may already be subsurfaces present on this surface that we
-    // aren't aware of and won't receive a new_subsurface event for.
-    var it = wlr_layer_surface.surface.subsurfaces.iterator(.forward);
-    while (it.next()) |s| Subsurface.create(s, .{ .layer_surface = self });
+    Subsurface.handleExisting(wlr_layer_surface.surface, .{ .layer_surface = self });
 }
 
 fn handleDestroy(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wlr.LayerSurfaceV1) void {
