@@ -71,10 +71,18 @@ pub fn create(wlr_subsurface: *wlr.Subsurface, parent: Parent) void {
     wlr_subsurface.events.unmap.add(&subsurface.unmap);
     wlr_subsurface.surface.events.new_subsurface.add(&subsurface.new_subsurface);
 
-    // There may already be subsurfaces present on this surface that we
-    // aren't aware of and won't receive a new_subsurface event for.
-    var it = wlr_subsurface.surface.subsurfaces.iterator(.forward);
-    while (it.next()) |s| Subsurface.create(s, parent);
+    Subsurface.handleExisting(wlr_subsurface.surface, parent);
+}
+
+/// Create Subsurface structs to track subsurfaces already present on the
+/// given surface when river becomes aware of the surface as we won't
+/// recieve a new_subsurface event for them.
+pub fn handleExisting(surface: *wlr.Surface, parent: Parent) void {
+    var below_it = surface.subsurfaces_below.iterator(.forward);
+    while (below_it.next()) |s| Subsurface.create(s, parent);
+
+    var above_it = surface.subsurfaces_above.iterator(.forward);
+    while (above_it.next()) |s| Subsurface.create(s, parent);
 }
 
 fn handleDestroy(listener: *wl.Listener(*wlr.Subsurface), wlr_subsurface: *wlr.Subsurface) void {

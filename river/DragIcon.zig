@@ -47,10 +47,7 @@ pub fn init(drag_icon: *DragIcon, seat: *Seat, wlr_drag_icon: *wlr.Drag.Icon) vo
     wlr_drag_icon.events.unmap.add(&drag_icon.unmap);
     wlr_drag_icon.surface.events.new_subsurface.add(&drag_icon.new_subsurface);
 
-    // There may already be subsurfaces present on this surface that we
-    // aren't aware of and won't receive a new_subsurface event for.
-    var it = wlr_drag_icon.surface.subsurfaces.iterator(.forward);
-    while (it.next()) |s| Subsurface.create(s, .{ .drag_icon = drag_icon });
+    Subsurface.handleExisting(wlr_drag_icon.surface, .{ .drag_icon = drag_icon });
 }
 
 fn handleDestroy(listener: *wl.Listener(*wlr.Drag.Icon), wlr_drag_icon: *wlr.Drag.Icon) void {

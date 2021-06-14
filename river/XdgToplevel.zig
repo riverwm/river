@@ -68,10 +68,7 @@ pub fn init(self: *Self, view: *View, xdg_surface: *wlr.XdgSurface) void {
     xdg_surface.events.new_popup.add(&self.new_popup);
     xdg_surface.surface.events.new_subsurface.add(&self.new_subsurface);
 
-    // There may already be subsurfaces present on this surface that we
-    // aren't aware of and won't receive a new_subsurface event for.
-    var it = xdg_surface.surface.subsurfaces.iterator(.forward);
-    while (it.next()) |s| Subsurface.create(s, .{ .view = view });
+    Subsurface.handleExisting(xdg_surface.surface, .{ .view = view });
 }
 
 pub fn deinit(self: *Self) void {
