@@ -95,6 +95,8 @@ mode: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleMode),
 frame: wl.Listener(*wlr.OutputDamage) = wl.Listener(*wlr.OutputDamage).init(handleFrame),
 
 pub fn init(self: *Self, wlr_output: *wlr.Output) !void {
+    assert(!wlr_output.isNoop());
+
     // Some backends don't have modes. DRM+KMS does, and we need to set a mode
     // before we can use the output. The mode is a tuple of (width, height,
     // refresh rate), and each monitor supports only a specific set of modes. We
@@ -119,34 +121,24 @@ pub fn init(self: *Self, wlr_output: *wlr.Output) !void {
 
     self.damage.events.frame.add(&self.frame);
 
-    if (wlr_output.isNoop()) {
-        // A noop output is always 0 x 0
-        self.usable_box = .{
-            .x = 0,
-            .y = 0,
-            .width = 0,
-            .height = 0,
-        };
-    } else {
-        // Ensure that a cursor image at the output's scale factor is loaded
-        // for each seat.
-        var it = server.input_manager.seats.first;
-        while (it) |node| : (it = node.next) {
-            const seat = &node.data;
-            seat.cursor.xcursor_manager.load(wlr_output.scale) catch
-                std.log.scoped(.cursor).err("failed to load xcursor theme at scale {}", .{wlr_output.scale});
-        }
-
-        const effective_resolution = self.getEffectiveResolution();
-        self.usable_box = .{
-            .x = 0,
-            .y = 0,
-            .width = effective_resolution.width,
-            .height = effective_resolution.height,
-        };
-
-        self.setTitle();
+    // Ensure that a cursor image at the output's scale factor is loaded
+    // for each seat.
+    var it = server.input_manager.seats.first;
+    while (it) |node| : (it = node.next) {
+        const seat = &node.data;
+        seat.cursor.xcursor_manager.load(wlr_output.scale) catch
+            std.log.scoped(.cursor).err("failed to load xcursor theme at scale {}", .{wlr_output.scale});
     }
+
+    const effective_resolution = self.getEffectiveResolution();
+    self.usable_box = .{
+        .x = 0,
+        .y = 0,
+        .width = effective_resolution.width,
+        .height = effective_resolution.height,
+    };
+
+    self.setTitle();
 }
 
 pub fn getLayer(self: *Self, layer: zwlr.LayerShellV1.Layer) *std.TailQueue(LayerSurface) {

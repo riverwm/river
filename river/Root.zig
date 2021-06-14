@@ -94,16 +94,20 @@ pub fn init(self: *Self) !void {
     const transaction_timer = try event_loop.addTimer(*Self, handleTransactionTimeout, self);
     errdefer transaction_timer.remove();
 
+    const noop_wlr_output = try server.noop_backend.noopAddOutput();
     self.* = .{
         .output_layout = output_layout,
         .output_manager = try wlr.OutputManagerV1.create(server.wl_server),
         .power_manager = try wlr.OutputPowerManagerV1.create(server.wl_server),
         .transaction_timer = transaction_timer,
-        .noop_output = undefined,
+        .noop_output = .{
+            .wlr_output = noop_wlr_output,
+            // TODO: find a good way to not create a wlr.OutputDamage for the noop output
+            .damage = try wlr.OutputDamage.create(noop_wlr_output),
+            .usable_box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+        },
     };
-
-    const noop_wlr_output = try server.noop_backend.noopAddOutput();
-    try self.noop_output.init(noop_wlr_output);
+    noop_wlr_output.data = @ptrToInt(&self.noop_output);
 
     server.backend.events.new_output.add(&self.new_output);
     self.output_manager.events.apply.add(&self.manager_apply);
@@ -113,14 +117,6 @@ pub fn init(self: *Self) !void {
 }
 
 pub fn deinit(self: *Self) void {
-    // Need to remove these listeners as the noop output will be destroyed with
-    // the noop backend triggering the destroy event. However,
-    // Output.handleDestroy is not intended to handle the noop output being
-    // destroyed.
-    self.noop_output.destroy.link.remove();
-    self.noop_output.frame.link.remove();
-    self.noop_output.mode.link.remove();
-
     self.output_layout.destroy();
     self.transaction_timer.remove();
 }
