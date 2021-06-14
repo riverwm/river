@@ -47,6 +47,8 @@ fn handleDestroy(
     xdg_toplevel_decoration: *wlr.XdgToplevelDecorationV1,
 ) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
+    self.destroy.link.remove();
+    self.request_mode.link.remove();
     util.gpa.destroy(self);
 }
 
