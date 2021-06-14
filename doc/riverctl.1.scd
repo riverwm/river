@@ -32,8 +32,8 @@ over the Wayland protocol.
 	Add _app-id_ to the float filter list. Views with this _app-id_
 	will start floating.
 
-*focus-output* *next*|*previous*
-	Focus the next or previous output.
+*focus-output* *next*|*previous*|*up*|*right*|*down*|*left*
+	Focus the next or previous output or the closest output in any direction.
 
 *focus-view* *next*|*previous*
 	Focus the next or previous view in the stack.
@@ -50,8 +50,9 @@ over the Wayland protocol.
 	Snap the focused view to the specified screen edge. The view will
 	be set to floating.
 
-*send-to-output* *next*|*previous*
-	Send the focused view to the next or the previous output.
+*send-to-output* *next*|*previous*|*up*|*right*|*down*|*left*
+	Send the focused view to the next or previous output or the closest
+	output in any direction.
 
 *spawn* _shell_command_
 	Run _shell_command_ using _/bin/sh -c_. Put single quotes around
