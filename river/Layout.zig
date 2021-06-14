@@ -191,8 +191,8 @@ pub fn destroy(self: *Self) void {
         server.root.startTransaction();
     }
 
+    self.layout.setHandler(?*c_void, handleRequestInert, null, null);
+
     util.gpa.free(self.namespace);
     util.gpa.destroy(node);
-
-    self.layout.setHandler(?*c_void, handleRequestInert, null, null);
 }
