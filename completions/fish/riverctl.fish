@@ -1,10 +1,38 @@
+function __riverctl_list_input_devices
+    riverctl list-inputs | sed '/type:/d; /configured:/d'
+end
+
 function __fish_riverctl_complete_no_subcommand
     for i in (commandline -opc)
-        if contains -- $i close csd-filter-add exit float-filter-add focus-output focus-view move resize snap send-to-output spawn swap toggle-float toggle-fullscreen zoom default-layout output-layout set-layout-value mod-layout-value set-focused-tags set-view-tags toggle-focused-tags toggle-view-tags spawn-tagmask declare-mode enter-mode map map-pointer unmap unmap-pointer attach-mode background-color border-color-focused border-color-unfocused border-width focus-follows-cursor opacity set-repeat xcursor-theme
+        if contains -- $i close csd-filter-add exit float-filter-add focus-output focus-view input list-inputs list-input-configs move resize snap send-to-output spawn swap toggle-float toggle-fullscreen zoom default-layout output-layout set-layout-value mod-layout-value set-focused-tags set-view-tags toggle-focused-tags toggle-view-tags spawn-tagmask declare-mode enter-mode map map-pointer unmap unmap-pointer attach-mode background-color border-color-focused border-color-unfocused border-width focus-follows-cursor opacity set-repeat xcursor-theme
             return 1
         end
     end
     return 0
+end
+
+function __fish_riverctl_complete_from_input
+    set -l cmd (commandline -opc)
+    if test (count $cmd) -eq 2
+        return 0
+    end
+    return 1
+end
+
+function __fish_riverctl_complete_from_input_devices
+    set -l cmd (commandline -opc)
+    if test (count $cmd) -eq 3
+        return 0
+    end
+    return 1
+end
+
+function __fish_riverctl_complete_from_input_subcommands
+    set -l cmd (commandline -opc)
+    if test (count $cmd) -eq 4
+        return 0
+    end
+    return 1
 end
 
 # Actions
@@ -14,6 +42,9 @@ complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a exit     
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a float-filter-add       -d 'Add app-id to the float filter list'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a focus-output           -d 'Focus the next or previous output'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a focus-view             -d 'Focus the next or previous view in the stack'
+complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a input                  -d 'Create a configuration rule for an input device'
+complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a list-inputs            -d 'List all input devices'
+complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a list-input-configs     -d 'List all input configurations'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a move                   -d 'Move the focused view in the specified direction'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a resize                 -d 'Resize the focused view along the given axis'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a snap                   -d 'Snap the focused view to the specified screen edge'
@@ -63,7 +94,31 @@ complete -c riverctl -x -n '__fish_seen_subcommand_from map'                  -a
 complete -c riverctl -x -n '__fish_seen_subcommand_from unmap'                -a '-release'
 complete -c riverctl -x -n '__fish_seen_subcommand_from attach-mode'          -a 'top bottom'
 complete -c riverctl -x -n '__fish_seen_subcommand_from focus-follows-cursor' -a 'disabled normal strict'
-complete -c riverctl -x -n '__fish_seen_subcommand_from get-option'           -a '-output -focused-output'
-complete -c riverctl -x -n '__fish_seen_subcommand_from set-option'           -a '-output -focused-output'
-complete -c riverctl -x -n '__fish_seen_subcommand_from unset-option'         -a '-output -focused-output'
-complete -c riverctl -x -n '__fish_seen_subcommand_from mod-option'           -a '-output -focused-output'
+
+# Subcommands for 'input'
+complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_from_input'         -a "(__riverctl_list_input_devices)"
+complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_from_input_devices' -a 'events'               -d 'Configure whether the input device\'s events will be used'
+complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_from_input_devices' -a 'accel-profile'        -d 'Set the pointer acceleration profile'
+complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_from_input_devices' -a 'pointer-accel'        -d 'Set the pointer acceleration factor'
+complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_from_input_devices' -a 'click-method'         -d 'Set the click method'
+complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_from_input_devices' -a 'drag'                 -d 'Enable or disable the tap-and-drag functionality'
+complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_from_input_devices' -a 'drag-lock'            -d 'Enable or disable the drag lock functionality'
+complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_from_input_devices' -a 'disable-while-typing' -d 'Enable or disable the disable-while-typing functionality'
+complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_from_input_devices' -a 'middle-emulation'     -d 'Enable or disable the middle-emulation functionality'
+complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_from_input_devices' -a 'natural-scroll'       -d 'Enable or disable the natural-scroll functionality'
+complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_from_input_devices' -a 'left-handed'          -d 'Enable or disable the left handed mode'
+complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_from_input_devices' -a 'tap'                  -d 'Enable or disable the tap functionality'
+complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_from_input_devices' -a 'tap-button-map'       -d 'Configure the button mapping for tapping'
+complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_from_input_devices' -a 'scroll-method'        -d 'Set the scroll method'
+complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_from_input_devices' -a 'scroll-button'        -d 'Set the scroll button'
+
+# Subcommands for the subcommands of 'input'
+complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_from_input_subcommands; and __fish_seen_subcommand_from drag drag-lock disable-while-typing middle-emulation natural-scroll left-handed tap' -a 'enabled disabled'
+complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_from_input_subcommands; and __fish_seen_subcommand_from events'         -a 'enabled disabled disabled-on-external-mouse'
+complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_from_input_subcommands; and __fish_seen_subcommand_from accel-profile'  -a 'none flat adaptive'
+complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_from_input_subcommands; and __fish_seen_subcommand_from click-method'   -a 'none button-areas clickfinger'
+complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_from_input_subcommands; and __fish_seen_subcommand_from tap-button-map' -a 'left-right-middle left-middle-right'
+complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_from_input_subcommands; and __fish_seen_subcommand_from scroll-method'  -a 'none'       -d 'No scrolling'
+complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_from_input_subcommands; and __fish_seen_subcommand_from scroll-method'  -a 'two-finger' -d 'Scroll by swiping with two fingers simultaneously'
+complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_from_input_subcommands; and __fish_seen_subcommand_from scroll-method'  -a 'edge'       -d 'Scroll by swiping along the edge'
+complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_from_input_subcommands; and __fish_seen_subcommand_from scroll-method'  -a 'button'     -d 'Scroll with pointer movement while holding down a button'
