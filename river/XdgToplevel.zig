@@ -332,7 +332,7 @@ fn handleRequestMove(
 ) void {
     const self = @fieldParentPtr(Self, "request_move", listener);
     const seat = @intToPtr(*Seat, event.seat.seat.data);
-    if (self.view.pending.float or self.view.output.current.layout == null)
+    if ((self.view.pending.float or self.view.output.current.layout == null) and !self.view.pending.fullscreen)
         seat.cursor.enterMode(.move, self.view);
 }
 
@@ -340,7 +340,7 @@ fn handleRequestMove(
 fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), event: *wlr.XdgToplevel.event.Resize) void {
     const self = @fieldParentPtr(Self, "request_resize", listener);
     const seat = @intToPtr(*Seat, event.seat.seat.data);
-    if (self.view.pending.float or self.view.output.current.layout == null)
+    if ((self.view.pending.float or self.view.output.current.layout == null) and !self.view.pending.fullscreen)
         seat.cursor.enterMode(.resize, self.view);
 }
 
