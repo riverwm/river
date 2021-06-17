@@ -384,13 +384,12 @@ fn commitTransaction(self: *Self) void {
         var view_it = output.views.first;
         while (view_it) |view_node| {
             const view = &view_node.view;
+            view_it = view_node.next;
 
             if (view.destroying) {
-                view_it = view_node.next;
                 view.destroy();
                 continue;
             }
-            defer view_it = view_node.next;
 
             if (view.pending_serial != null and !view.shouldTrackConfigure()) continue;
 

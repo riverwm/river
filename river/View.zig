@@ -19,6 +19,7 @@ const Self = @This();
 
 const build_options = @import("build_options");
 const std = @import("std");
+const assert = std.debug.assert;
 const math = std.math;
 const os = std.os;
 const wlr = @import("wlroots");
@@ -486,7 +487,9 @@ pub fn map(self: *Self) void {
 pub fn unmap(self: *Self) void {
     log.debug("view '{s}' unmapped", .{self.getTitle()});
 
+    assert(!self.destroying);
     self.destroying = true;
+
     if (self.saved_buffers.items.len == 0) self.saveBuffers();
 
     if (self.opacity_timer != null) {

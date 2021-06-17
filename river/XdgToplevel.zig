@@ -248,8 +248,6 @@ fn handleMap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurfa
 fn handleUnmap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurface) void {
     const self = @fieldParentPtr(Self, "unmap", listener);
 
-    self.view.unmap();
-
     // Remove listeners that are only active while mapped
     self.commit.link.remove();
     self.request_fullscreen.link.remove();
@@ -257,6 +255,8 @@ fn handleUnmap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSur
     self.request_resize.link.remove();
     self.set_title.link.remove();
     self.set_app_id.link.remove();
+
+    self.view.unmap();
 }
 
 /// Called when the surface is comitted
