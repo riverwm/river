@@ -23,27 +23,22 @@ const util = @import("../util.zig");
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
-fn appendFilter(
-    allocator: *std.mem.Allocator,
-    list: *std.ArrayList([]const u8),
-    args: []const []const u8,
-) Error!void {
-    if (args.len < 2) return Error.NotEnoughArguments;
-    if (args.len > 2) return Error.TooManyArguments;
-    try list.append(try std.mem.dupe(allocator, u8, args[1]));
-}
-
 pub fn floatFilterAdd(
     allocator: *std.mem.Allocator,
     seat: *Seat,
     args: []const []const u8,
     out: *?[]const u8,
 ) Error!void {
-    try appendFilter(
-        allocator,
-        &server.config.float_filter,
-        args,
-    );
+    try modifyFilter(allocator, &server.config.float_filter, args, .add);
+}
+
+pub fn floatFilterRemove(
+    allocator: *std.mem.Allocator,
+    seat: *Seat,
+    args: []const []const u8,
+    out: *?[]const u8,
+) Error!void {
+    try modifyFilter(allocator, &server.config.float_filter, args, .remove);
 }
 
 pub fn csdFilterAdd(
@@ -52,9 +47,36 @@ pub fn csdFilterAdd(
     args: []const []const u8,
     out: *?[]const u8,
 ) Error!void {
-    try appendFilter(
-        allocator,
-        &server.config.csd_filter,
-        args,
-    );
+    try modifyFilter(allocator, &server.config.csd_filter, args, .add);
+}
+
+pub fn csdFilterRemove(
+    allocator: *std.mem.Allocator,
+    seat: *Seat,
+    args: []const []const u8,
+    out: *?[]const u8,
+) Error!void {
+    try modifyFilter(allocator, &server.config.csd_filter, args, .remove);
+}
+
+fn modifyFilter(
+    allocator: *std.mem.Allocator,
+    list: *std.ArrayList([]const u8),
+    args: []const []const u8,
+    operation: enum { add, remove },
+) Error!void {
+    if (args.len < 2) return Error.NotEnoughArguments;
+    if (args.len > 2) return Error.TooManyArguments;
+    for (list.items) |*filter, i| {
+        if (std.mem.eql(u8, filter.*, args[1])) {
+            if (operation == .remove) {
+                allocator.free(list.orderedRemove(i));
+            }
+            return;
+        }
+    }
+    if (operation == .add) {
+        try list.ensureUnusedCapacity(1);
+        list.appendAssumeCapacity(try std.mem.dupe(allocator, u8, args[1]));
+    }
 }
