@@ -23,14 +23,24 @@ over the Wayland protocol.
 *csd-filter-add* _app-id_
 	Add _app-id_ to the CSD filter list. Views with this _app-id_ are
 	told to use client side decoration instead of the default server
-	side decoration.
+	side decoration. Note that this affects only new views, not already
+	existing ones.
+
+*csd-filter-remove* _app-id_
+	Remove an _app-id_ from the CSD filter list. Note that this affects only new
+	views, not already existing ones.
 
 *exit*
 	Exit the compositor, terminating the Wayland session.
 
 *float-filter-add* _app-id_
 	Add _app-id_ to the float filter list. Views with this _app-id_
-	will start floating.
+	will start floating. Note that this affects only new views, not already
+	existing ones.
+
+*float-filter-remove* _app-id_
+	Remove an _app-id_ from the float filter list. Note that this affects only
+	new views, not already existing ones.
 
 *focus-output* *next*|*previous*|*up*|*right*|*down*|*left*
 	Focus the next or previous output or the closest output in any direction.
