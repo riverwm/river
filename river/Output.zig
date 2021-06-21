@@ -198,8 +198,12 @@ pub fn arrangeViews(self: *Self) void {
     }
 }
 
+const ArrangeLayersTarget = enum { mapped, unmapped };
+
 /// Arrange all layer surfaces of this output and adjust the usable area
-pub fn arrangeLayers(self: *Self) void {
+/// If target is unmapped, this function is pure aside from the
+/// wlr.LayerSurfaceV1.configure() calls made on umapped layer surfaces.
+pub fn arrangeLayers(self: *Self, target: ArrangeLayersTarget) void {
     const effective_resolution = self.getEffectiveResolution();
     const full_box: Box = .{
         .x = 0,
@@ -215,16 +219,18 @@ pub fn arrangeLayers(self: *Self) void {
 
     // Arrange all layer surfaces with exclusive zones, applying them to the
     // usable box along the way.
-    for (layers) |layer| self.arrangeLayer(self.getLayer(layer).*, full_box, &usable_box, true);
+    for (layers) |layer| self.arrangeLayer(self.getLayer(layer).*, full_box, &usable_box, true, target);
 
     // If the the usable_box has changed, we need to rearrange the output
-    if (!std.meta.eql(self.usable_box, usable_box)) {
+    if (target == .mapped and !std.meta.eql(self.usable_box, usable_box)) {
         self.usable_box = usable_box;
         self.arrangeViews();
     }
 
     // Arrange the layers without exclusive zones
-    for (layers) |layer| self.arrangeLayer(self.getLayer(layer).*, full_box, &usable_box, false);
+    for (layers) |layer| self.arrangeLayer(self.getLayer(layer).*, full_box, &usable_box, false, target);
+
+    if (target == .unmapped) return;
 
     // Find the topmost layer surface in the top or overlay layers which
     // requests keyboard interactivity if any.
@@ -268,6 +274,7 @@ fn arrangeLayer(
     full_box: Box,
     usable_box: *Box,
     exclusive: bool,
+    target: ArrangeLayersTarget,
 ) void {
     var it = layer.first;
     while (it) |node| : (it = node.next) {
@@ -348,8 +355,6 @@ fn arrangeLayer(
             new_box.height = current_state.desired_height;
         }
 
-        layer_surface.box = new_box;
-
         // Apply the exclusive zone to the current bounds
         const edges = [4]struct {
             single: zwlr.LayerSurfaceV1.Anchor,
@@ -399,9 +404,16 @@ fn arrangeLayer(
             }
         }
 
-        // Tell the client to assume the new size
-        std.log.scoped(.layer_shell).debug("send configure, {} x {}", .{ layer_surface.box.width, layer_surface.box.height });
-        layer_surface.wlr_layer_surface.configure(layer_surface.box.width, layer_surface.box.height);
+        switch (target) {
+            .mapped => {
+                assert(layer_surface.wlr_layer_surface.mapped);
+                layer_surface.box = new_box;
+                layer_surface.wlr_layer_surface.configure(new_box.width, new_box.height);
+            },
+            .unmapped => if (!layer_surface.wlr_layer_surface.mapped) {
+                layer_surface.wlr_layer_surface.configure(new_box.width, new_box.height);
+            },
+        }
     }
 }
 
@@ -466,7 +478,7 @@ fn handleFrame(listener: *wl.Listener(*wlr.OutputDamage), wlr_output: *wlr.Outpu
 
 fn handleMode(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
     const self = @fieldParentPtr(Self, "mode", listener);
-    self.arrangeLayers();
+    self.arrangeLayers(.mapped);
     self.arrangeViews();
     server.root.startTransaction();
 }

@@ -490,7 +490,7 @@ fn applyOutputConfig(self: *Self, config: *wlr.OutputConfigurationV1) bool {
         // Arrange layers to adjust the usable_box
         // We dont need to call arrangeViews() since arrangeLayers() will call
         // it for us because the usable_box changed
-        output.arrangeLayers();
+        output.arrangeLayers(.mapped);
         self.startTransaction();
     }
 

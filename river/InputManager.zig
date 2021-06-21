@@ -220,7 +220,7 @@ fn handleInhibitDeactivate(
     // keyboard-interactive surfaces will re-grab focus.
     var output_it = server.root.outputs.first;
     while (output_it) |output_node| : (output_it = output_node.next) {
-        output_node.data.arrangeLayers();
+        output_node.data.arrangeLayers(.mapped);
     }
 
     // After ensuring that any possible layer surface focus grab has occured,
