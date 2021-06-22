@@ -27,6 +27,10 @@ const util = @import("util.zig");
 const Decoration = @import("Decoration.zig");
 const Server = @import("Server.zig");
 
+/// List of all Decoration objects. This will clean itself up on exit through
+/// the wlr.XdgToplevelDecorationV1.events.destroy event.
+decorations: std.TailQueue(Decoration) = .{},
+
 xdg_decoration_manager: *wlr.XdgDecorationManagerV1,
 
 new_toplevel_decoration: wl.Listener(*wlr.XdgToplevelDecorationV1) =
@@ -45,9 +49,10 @@ fn handleNewToplevelDecoration(
     xdg_toplevel_decoration: *wlr.XdgToplevelDecorationV1,
 ) void {
     const self = @fieldParentPtr(Self, "new_toplevel_decoration", listener);
-    const decoration = util.gpa.create(Decoration) catch {
+    const decoration_node = util.gpa.create(std.TailQueue(Decoration).Node) catch {
         xdg_toplevel_decoration.resource.postNoMemory();
         return;
     };
-    decoration.init(xdg_toplevel_decoration);
+    decoration_node.data.init(xdg_toplevel_decoration);
+    self.decorations.append(decoration_node);
 }
