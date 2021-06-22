@@ -49,7 +49,10 @@ fn handleDestroy(
     const self = @fieldParentPtr(Self, "destroy", listener);
     self.destroy.link.remove();
     self.request_mode.link.remove();
-    util.gpa.destroy(self);
+
+    const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
+    server.decoration_manager.decorations.remove(node);
+    util.gpa.destroy(node);
 }
 
 fn handleRequestMode(
