@@ -43,6 +43,7 @@ function __riverctl_completion ()
 			focus-follow-cursor \
 			opacity \
 			set-repeat \
+			set-cursor-warp \
 			xcursor-theme"
 		COMPREPLY=($(compgen -W "${OPTS}" -- "${COMP_WORDS[1]}"))
 	elif [ "${COMP_CWORD}" -eq 2 ]
@@ -54,6 +55,7 @@ function __riverctl_completion ()
 			"map"|"unmap") OPTS="-release" ;;
 			"attach-mode") OPTS="top bottom" ;;
 			"focus-follows-cursor") OPTS="disabled normal strict" ;;
+			"set-cursor-warp") OPTS="disabled on-output-change" ;;
 			*) return ;;
 		esac
 		COMPREPLY=($(compgen -W "${OPTS}" -- "${COMP_WORDS[2]}"))
