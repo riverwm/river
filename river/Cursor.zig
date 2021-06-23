@@ -20,6 +20,7 @@ const Self = @This();
 const build_options = @import("build_options");
 const std = @import("std");
 const assert = std.debug.assert;
+const os = std.os;
 const math = std.math;
 const wlr = @import("wlroots");
 const wayland = @import("wayland");
@@ -671,6 +672,40 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
                 @intToFloat(f64, box.y + @intCast(i32, box.height) - data.offset_y),
             );
         },
+    }
+}
+
+/// Handle potential change in location of views on the output, as well as
+/// the target view of a cursor operation potentially being moved to a non-visible tag,
+/// becoming fullscreen, etc.
+pub fn maybeResetState(self: *Self) void {
+    switch (self.mode) {
+        .passthrough => {},
+        .down => |target| {
+            // If the target view is no longer visible, abort the operation.
+            if (target.current.tags & target.output.current.tags == 0) {
+                self.mode = .passthrough;
+            }
+        },
+        .resize, .move => {
+            // If the target view is no longer visible, or now fullscreen or no
+            // longer floating, abort the operation.
+            const target = if (self.mode == .resize) self.mode.resize.view else self.mode.move;
+            if (target.current.tags & target.output.current.tags == 0 or
+                (!target.current.float and target.output.current.layout != null) or
+                target.current.fullscreen)
+            {
+                self.mode = .passthrough;
+            }
+        },
+    }
+
+    if (self.mode == .passthrough) {
+        var now: os.timespec = undefined;
+        os.clock_gettime(os.CLOCK_MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
+        const msec = @intCast(u32, now.tv_sec * std.time.ms_per_s +
+            @divFloor(now.tv_nsec, std.time.ns_per_ms));
+        self.passthrough(msec);
     }
 }
 
