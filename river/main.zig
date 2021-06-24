@@ -16,16 +16,8 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
-const assert = std.debug.assert;
 const os = std.os;
-
 const wlr = @import("wlroots");
-
-// River requires wlroots 0.14
-comptime {
-    assert(wlr.version.major == 0);
-    assert(wlr.version.minor == 14);
-}
 
 const build_options = @import("build_options");
 
