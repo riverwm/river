@@ -49,6 +49,7 @@ _riverctl_subcommands()
         'focus-follows-cursor:Configure the focus behavior when moving cursor'
         'opacity:Configure server-side opacity of views'
         'set-repeat:Set the keyboard repeat rate and repeat delay'
+        'set-cursor-warp:Set the cursor warp mode.'
         'xcursor-theme:Set the xcursor theme'
         # Input
         'input:Configure input devices'
@@ -137,6 +138,7 @@ _riverctl()
                 unmap) _alternative 'arguments:optional:(-release)' ;;
                 attach-mode) _alternative 'arguments:args:(top bottom)' ;;
                 focus-follows-cursor) _alternative 'arguments:args:(disabled normal strict)' ;;
+                set-cursor-warp) _alternative 'arguments:args:(disabled on-output-change)' ;;
                 *) return 0 ;;
             esac
         ;;
@@ -144,4 +146,3 @@ _riverctl()
 }
 
 _riverctl "$@"
-

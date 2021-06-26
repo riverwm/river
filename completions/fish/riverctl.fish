@@ -4,7 +4,7 @@ end
 
 function __fish_riverctl_complete_no_subcommand
     for i in (commandline -opc)
-        if contains -- $i close csd-filter-add exit float-filter-add focus-output focus-view input list-inputs list-input-configs move resize snap send-to-output spawn swap toggle-float toggle-fullscreen zoom default-layout output-layout set-layout-value mod-layout-value set-focused-tags set-view-tags toggle-focused-tags toggle-view-tags spawn-tagmask declare-mode enter-mode map map-pointer unmap unmap-pointer attach-mode background-color border-color-focused border-color-unfocused border-width focus-follows-cursor opacity set-repeat xcursor-theme
+        if contains -- $i close csd-filter-add exit float-filter-add focus-output focus-view input list-inputs list-input-configs move resize snap send-to-output spawn swap toggle-float toggle-fullscreen zoom default-layout output-layout set-layout-value mod-layout-value set-focused-tags set-view-tags toggle-focused-tags toggle-view-tags spawn-tagmask declare-mode enter-mode map map-pointer unmap unmap-pointer attach-mode background-color border-color-focused border-color-unfocused border-width focus-follows-cursor opacity set-repeat set-cursor-warp xcursor-theme
             return 1
         end
     end
@@ -80,6 +80,7 @@ complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a border-wi
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a focus-follows-cursor   -d 'Configure the focus behavior when moving cursor'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a opacity                -d 'Configure server-side opacity of views'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a set-repeat             -d 'Set the keyboard repeat rate and repeat delay'
+complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a set-cursor-warp        -d 'Set the cursor warp mode.'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a xcursor-theme          -d 'Set the xcursor theme'
 
 # Subcommands
@@ -94,6 +95,7 @@ complete -c riverctl -x -n '__fish_seen_subcommand_from map'                  -a
 complete -c riverctl -x -n '__fish_seen_subcommand_from unmap'                -a '-release'
 complete -c riverctl -x -n '__fish_seen_subcommand_from attach-mode'          -a 'top bottom'
 complete -c riverctl -x -n '__fish_seen_subcommand_from focus-follows-cursor' -a 'disabled normal strict'
+complete -c riverctl -x -n '__fish_seen_subcommand_from set-cursor-warp'      -a 'disabled on-output-change'
 
 # Subcommands for 'input'
 complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_from_input'         -a "(__riverctl_list_input_devices)"
