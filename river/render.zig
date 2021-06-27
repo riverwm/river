@@ -52,7 +52,7 @@ pub fn renderOutput(output: *Output) void {
     const renderer = output.wlr_output.backend.getRenderer().?;
 
     var now: os.timespec = undefined;
-    os.clock_gettime(os.CLOCK_MONOTONIC, &now) catch unreachable;
+    os.clock_gettime(os.CLOCK_MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
 
     var needs_frame: bool = undefined;
     var damage_region: pixman.Region32 = undefined;
