@@ -44,9 +44,6 @@ installed:
 - pkg-config
 - scdoc (optional, but required for man page generation)
 
-*Note: NixOS users may refer to the
-[Building on NixOS wiki page](https://github.com/ifreund/river/wiki/Building-on-NixOS)*
-
 Then run, for example:
 ```
 zig build -Drelease-safe --prefix ~/.local install
