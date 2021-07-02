@@ -40,7 +40,7 @@ function __riverctl_completion ()
 			border-color-focused \
 			border-color-unfocused \
 			border-width \
-			focus-follow-cursor \
+			focus-follows-cursor \
 			opacity \
 			set-repeat \
 			set-cursor-warp \
