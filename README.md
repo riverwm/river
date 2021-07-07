@@ -55,7 +55,7 @@ To enable experimental Xwayland support pass the `-Dxwayland` option as well.
 River can either be run nested in an X11/wayland session or directly
 from a tty using KMS/DRM.
 
-On startup river will look for and run an executable file at one of the
+On startup river will look for and run an **executable** file at one of the
 following locations, checked in the order listed:
 
 - `$XDG_CONFIG_HOME/river/init`
@@ -70,6 +70,10 @@ in the example directory and installed to `/etc/river/init`.
 
 For complete documentation see the `river(1)`, `riverctl(1)`, and
 `rivertile(1)` man pages.
+
+As a supplement to the man pages, see also the [FAQ](https://github.com/ifreund/river/wiki#faq)
+in the wiki for common issues and have a look at the [recommended
+software](https://github.com/ifreund/river/wiki/Recommended-Software).
 
 ## Development
 
