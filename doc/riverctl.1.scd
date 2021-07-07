@@ -139,6 +139,10 @@ are ignored by river.
 	will be assigned the tags 000010001. If no tags would remain after
 	filtering, the _tagmask_ is ignored.
 
+*focus-previous-tags*
+	Sets tags to their previous value on the currently focused output,
+	allowing jumping back and forth between 2 tag setups.
+
 ## MAPPINGS
 
 Mappings are modal in river. Each mapping is associated with a mode and is

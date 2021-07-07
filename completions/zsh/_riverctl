@@ -33,6 +33,7 @@ _riverctl_subcommands()
         'toggle-focused-tags:Toggle visibility of views with tags corresponding to the set bits of tags'
         'toggle-view-tags:Toggle the tags of the currently focused view'
         'spawn-tagmask:Set a tagmask to filter the tags assigned to newly spawned views on the focused output'
+        'focus-previous-tags:Sets tags to their previous value on the focused output'
         # Mappings
         'declare-mode:Create a new mode'
         'enter-mode:Switch to given mode if it exists'
