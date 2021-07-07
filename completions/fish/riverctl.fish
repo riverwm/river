@@ -64,6 +64,7 @@ complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a set-view-
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a toggle-focused-tags    -d 'Toggle visibility of views with tags corresponding to the set bits of tags'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a toggle-view-tags       -d 'Toggle the tags of the currently focused view'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a spawn-tagmask          -d 'Set a tagmask to filter the tags assigned to newly spawned views on the focused output'
+complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a focus-previous-tags    -d 'Sets tags to their previous value on the focused output'
 # Mappings
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a declare-mode           -d 'Create a new mode'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a enter-mode             -d 'Switch to given mode if it exists'

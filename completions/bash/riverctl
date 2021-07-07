@@ -25,6 +25,7 @@ function __riverctl_completion ()
 			set-layout-value \
 			mod-layout-value \
 			set-focused-tags \
+			focus-previous-tags \
 			set-view-tags \
 			toggle-focused-tags \
 			toggle-view-tags \

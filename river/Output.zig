@@ -72,6 +72,9 @@ views: ViewStack(View) = .{},
 current: State = State{ .tags = 1 << 0 },
 pending: State = State{ .tags = 1 << 0 },
 
+/// Remembered version of tags (from last run)
+previous_tags: u32 = 1 << 0,
+
 /// The currently active LayoutDemand
 layout_demand: ?LayoutDemand = null,
 

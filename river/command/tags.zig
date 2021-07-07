@@ -31,6 +31,7 @@ pub fn setFocusedTags(
 ) Error!void {
     const tags = try parseTags(allocator, args, out);
     if (seat.focused_output.pending.tags != tags) {
+        seat.focused_output.previous_tags = seat.focused_output.pending.tags;
         seat.focused_output.pending.tags = tags;
         seat.focused_output.arrangeViews();
         seat.focus(null);
@@ -76,6 +77,7 @@ pub fn toggleFocusedTags(
     const output = seat.focused_output;
     const new_focused_tags = output.pending.tags ^ tags;
     if (new_focused_tags != 0) {
+        output.previous_tags = output.pending.tags;
         output.pending.tags = new_focused_tags;
         output.arrangeViews();
         seat.focus(null);
@@ -99,6 +101,23 @@ pub fn toggleViewTags(
             seat.focus(null);
             view.applyPending();
         }
+    }
+}
+
+/// Switch focus to tags that were selected previously
+pub fn focusPreviousTags(
+    allocator: *std.mem.Allocator,
+    seat: *Seat,
+    args: []const []const u8,
+    out: *?[]const u8,
+) Error!void {
+    const previous_tags = seat.focused_output.previous_tags;
+    if (seat.focused_output.pending.tags != previous_tags) {
+        seat.focused_output.previous_tags = seat.focused_output.pending.tags;
+        seat.focused_output.pending.tags = previous_tags;
+        seat.focused_output.arrangeViews();
+        seat.focus(null);
+        server.root.startTransaction();
     }
 }
 
