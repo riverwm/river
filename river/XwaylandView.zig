@@ -191,8 +191,6 @@ fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wl
     else
         false;
 
-    const app_id: [*:0]const u8 = if (self.xwayland_surface.class) |id| id else "NULL";
-
     if (self.xwayland_surface.parent != null or has_fixed_size) {
         // If the toplevel has a parent or has a fixed size make it float
         view.current.float = true;
@@ -200,12 +198,11 @@ fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wl
         view.pending.box = view.float_box;
     } else {
         // Make views with app_ids listed in the float filter float
-        for (server.config.float_filter.items) |filter_app_id| {
-            if (std.mem.eql(u8, std.mem.span(app_id), std.mem.span(filter_app_id))) {
+        if (self.xwayland_surface.class) |app_id| {
+            if (server.config.float_filter.contains(std.mem.span(app_id))) {
                 view.current.float = true;
                 view.pending.float = true;
                 view.pending.box = view.float_box;
-                break;
             }
         }
     }
