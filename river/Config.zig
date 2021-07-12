@@ -56,11 +56,11 @@ mode_to_id: std.StringHashMap(usize),
 /// All user-defined keymap modes, indexed by mode id
 modes: std.ArrayList(Mode),
 
-/// List of app_ids which will be started floating
-float_filter: std.ArrayList([]const u8),
+/// Set of app_ids which will be started floating
+float_filter: std.StringHashMapUnmanaged(void) = .{},
 
-/// List of app_ids which are allowed to use client side decorations
-csd_filter: std.ArrayList([]const u8),
+/// Set of app_ids which are allowed to use client side decorations
+csd_filter: std.StringHashMapUnmanaged(void) = .{},
 
 /// The selected focus_follows_cursor mode
 focus_follows_cursor: FocusFollowsCursorMode = .disabled,
@@ -99,10 +99,7 @@ pub fn init() !Self {
     var self = Self{
         .mode_to_id = std.StringHashMap(usize).init(util.gpa),
         .modes = std.ArrayList(Mode).init(util.gpa),
-        .float_filter = std.ArrayList([]const u8).init(util.gpa),
-        .csd_filter = std.ArrayList([]const u8).init(util.gpa),
     };
-
     errdefer self.deinit();
 
     // Start with two empty modes, "normal" and "locked"
@@ -124,18 +121,26 @@ pub fn init() !Self {
 }
 
 pub fn deinit(self: *Self) void {
-    var it = self.mode_to_id.keyIterator();
-    while (it.next()) |key| util.gpa.free(key.*);
-    self.mode_to_id.deinit();
+    {
+        var it = self.mode_to_id.keyIterator();
+        while (it.next()) |key| util.gpa.free(key.*);
+        self.mode_to_id.deinit();
+    }
 
     for (self.modes.items) |mode| mode.deinit();
     self.modes.deinit();
 
-    for (self.float_filter.items) |s| util.gpa.free(s);
-    self.float_filter.deinit();
+    {
+        var it = self.float_filter.keyIterator();
+        while (it.next()) |key| util.gpa.free(key.*);
+        self.float_filter.deinit(util.gpa);
+    }
 
-    for (self.csd_filter.items) |s| util.gpa.free(s);
-    self.csd_filter.deinit();
+    {
+        var it = self.csd_filter.keyIterator();
+        while (it.next()) |key| util.gpa.free(key.*);
+        self.csd_filter.deinit(util.gpa);
+    }
 
     util.gpa.free(self.default_layout_namespace);
 }

@@ -18,6 +18,7 @@
 const Self = @This();
 
 const std = @import("std");
+const mem = std.mem;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
@@ -208,7 +209,6 @@ fn handleMap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurfa
     const state = &toplevel.current;
     const has_fixed_size = state.min_width != 0 and state.min_height != 0 and
         (state.min_width == state.max_width or state.min_height == state.max_height);
-    const app_id: [*:0]const u8 = if (toplevel.app_id) |id| id else "NULL";
 
     if (toplevel.parent != null or has_fixed_size) {
         // If the toplevel has a parent or has a fixed size make it float
@@ -217,23 +217,19 @@ fn handleMap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurfa
         view.pending.box = view.float_box;
     } else {
         // Make views with app_ids listed in the float filter float
-        for (server.config.float_filter.items) |filter_app_id| {
-            if (std.mem.eql(u8, std.mem.span(app_id), std.mem.span(filter_app_id))) {
+        if (toplevel.app_id) |app_id| {
+            if (server.config.float_filter.contains(mem.span(app_id))) {
                 view.current.float = true;
                 view.pending.float = true;
                 view.pending.box = view.float_box;
-                break;
             }
         }
     }
 
     // If the toplevel has an app_id which is not configured to use client side
     // decorations, inform it that it is tiled.
-    for (server.config.csd_filter.items) |filter_app_id| {
-        if (std.mem.eql(u8, std.mem.span(app_id), filter_app_id)) {
-            view.draw_borders = false;
-            break;
-        }
+    if (toplevel.app_id != null and server.config.csd_filter.contains(mem.span(toplevel.app_id.?))) {
+        view.draw_borders = false;
     } else {
         _ = toplevel.setTiled(.{ .top = true, .bottom = true, .left = true, .right = true });
     }
