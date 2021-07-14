@@ -19,6 +19,7 @@ const Self = @This();
 
 const build_options = @import("build_options");
 const std = @import("std");
+const assert = std.debug.assert;
 const math = std.math;
 const wlr = @import("wlroots");
 const wayland = @import("wayland");
@@ -524,7 +525,7 @@ fn surfaceAtFilter(view: *View, filter_tags: u32) bool {
 
 /// Enter move or resize mode
 pub fn enterMode(self: *Self, mode: std.meta.Tag((Mode)), view: *View) void {
-    log.debug("enter {s} mode", .{@tagName(mode)});
+    log.debug("enter {s} cursor mode", .{@tagName(mode)});
 
     self.seat.focus(view);
 
@@ -535,18 +536,19 @@ pub fn enterMode(self: *Self, mode: std.meta.Tag((Mode)), view: *View) void {
             server.root.startTransaction();
         },
         .move, .resize => {
-            const cur_box = &view.current.box;
-            self.mode = switch (mode) {
+            switch (mode) {
                 .passthrough, .down => unreachable,
-                .move => .{ .move = view },
-                .resize => .{
-                    .resize = .{
+                .move => self.mode = .{ .move = view },
+                .resize => {
+                    const cur_box = &view.current.box;
+                    self.mode = .{ .resize = .{
                         .view = view,
                         .offset_x = cur_box.x + @intCast(i32, cur_box.width) - @floatToInt(i32, self.wlr_cursor.x),
                         .offset_y = cur_box.y + @intCast(i32, cur_box.height) - @floatToInt(i32, self.wlr_cursor.y),
-                    },
+                    } };
+                    view.setResizing(true);
                 },
-            };
+            }
 
             // Automatically float all views being moved by the pointer, if
             // their dimensions are set by a layout client. If however the views
@@ -556,6 +558,10 @@ pub fn enterMode(self: *Self, mode: std.meta.Tag((Mode)), view: *View) void {
                 view.pending.float = true;
                 view.float_box = view.current.box;
                 view.applyPending();
+            } else {
+                // The View.applyPending() call in the other branch starts
+                // the transaction needed after the seat.focus() call above.
+                server.root.startTransaction();
             }
 
             // Clear cursor focus, so that the surface does not receive events
@@ -571,13 +577,17 @@ pub fn enterMode(self: *Self, mode: std.meta.Tag((Mode)), view: *View) void {
 
 /// Return from down/move/resize to passthrough
 fn leaveMode(self: *Self, event: *wlr.Pointer.event.Button) void {
-    std.debug.assert(self.mode != .passthrough);
-
     log.debug("leave {s} mode", .{@tagName(self.mode)});
 
-    // If we were in down mode, we need pass along the release event
-    if (self.mode == .down)
-        _ = self.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
+    switch (self.mode) {
+        .passthrough => unreachable,
+        .down => {
+            // If we were in down mode, we need pass along the release event
+            _ = self.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
+        },
+        .move => {},
+        .resize => |resize| resize.view.setResizing(false),
+    }
 
     self.mode = .passthrough;
     self.passthrough(event.time_msec);
@@ -666,6 +676,8 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
 
 /// Pass an event on to the surface under the cursor, if any.
 fn passthrough(self: *Self, time: u32) void {
+    assert(self.mode == .passthrough);
+
     var sx: f64 = undefined;
     var sy: f64 = undefined;
     if (self.surfaceAt(self.wlr_cursor.x, self.wlr_cursor.y, &sx, &sy)) |surface| {

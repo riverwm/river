@@ -120,6 +120,10 @@ pub fn setFullscreen(self: Self, fullscreen: bool) void {
     _ = self.xdg_surface.role_data.toplevel.setFullscreen(fullscreen);
 }
 
+pub fn setResizing(self: Self, resizing: bool) void {
+    _ = self.xdg_surface.role_data.toplevel.setResizing(resizing);
+}
+
 pub inline fn forEachPopupSurface(
     self: Self,
     comptime T: type,
