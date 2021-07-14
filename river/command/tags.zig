@@ -26,7 +26,7 @@ const Seat = @import("../Seat.zig");
 pub fn setFocusedTags(
     allocator: *std.mem.Allocator,
     seat: *Seat,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     const tags = try parseTags(allocator, args, out);
@@ -42,7 +42,7 @@ pub fn setFocusedTags(
 pub fn spawnTagmask(
     allocator: *std.mem.Allocator,
     seat: *Seat,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     const tags = try parseTags(allocator, args, out);
@@ -53,7 +53,7 @@ pub fn spawnTagmask(
 pub fn setViewTags(
     allocator: *std.mem.Allocator,
     seat: *Seat,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     const tags = try parseTags(allocator, args, out);
@@ -69,7 +69,7 @@ pub fn setViewTags(
 pub fn toggleFocusedTags(
     allocator: *std.mem.Allocator,
     seat: *Seat,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     const tags = try parseTags(allocator, args, out);
@@ -87,7 +87,7 @@ pub fn toggleFocusedTags(
 pub fn toggleViewTags(
     allocator: *std.mem.Allocator,
     seat: *Seat,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     const tags = try parseTags(allocator, args, out);
@@ -104,7 +104,7 @@ pub fn toggleViewTags(
 
 fn parseTags(
     allocator: *std.mem.Allocator,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!u32 {
     if (args.len < 2) return Error.NotEnoughArguments;

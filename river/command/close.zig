@@ -24,7 +24,7 @@ const Seat = @import("../Seat.zig");
 pub fn close(
     allocator: *std.mem.Allocator,
     seat: *Seat,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     // Note: we don't call arrange() here as it will be called

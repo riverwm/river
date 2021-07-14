@@ -27,7 +27,7 @@ const Seat = @import("../Seat.zig");
 pub fn toggleFloat(
     allocator: *std.mem.Allocator,
     seat: *Seat,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     if (args.len > 1) return Error.TooManyArguments;

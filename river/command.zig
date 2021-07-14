@@ -40,7 +40,7 @@ pub const Orientation = enum {
 // zig fmt: off
 const str_to_impl_fn = [_]struct {
     name: []const u8,
-    impl: fn (*std.mem.Allocator, *Seat, []const []const u8, *?[]const u8) Error!void,
+    impl: fn (*std.mem.Allocator, *Seat, []const [:0]const u8, *?[]const u8) Error!void,
 }{
     .{ .name = "attach-mode",            .impl = @import("command/attach_mode.zig").attachMode },
     .{ .name = "background-color",       .impl = @import("command/config.zig").backgroundColor },
@@ -99,9 +99,9 @@ pub const Error = error{
     InvalidButton,
     InvalidCharacter,
     InvalidDirection,
+    InvalidType,
     InvalidPhysicalDirection,
     InvalidOrientation,
-    InvalidType,
     InvalidRgba,
     InvalidValue,
     UnknownOption,
@@ -119,7 +119,7 @@ pub const Error = error{
 pub fn run(
     allocator: *std.mem.Allocator,
     seat: *Seat,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     std.debug.assert(out.* == null);
@@ -144,9 +144,9 @@ pub fn errToMsg(err: Error) [:0]const u8 {
         Error.InvalidButton => "invalid button",
         Error.InvalidCharacter => "invalid character in argument",
         Error.InvalidDirection => "invalid direction. Must be 'next' or 'previous'",
+        Error.InvalidType => "invalid type",
         Error.InvalidPhysicalDirection => "invalid direction. Must be 'up', 'down', 'left' or 'right'",
         Error.InvalidOrientation => "invalid orientation. Must be 'horizontal', or 'vertical'",
-        Error.InvalidType => "invalid type",
         Error.InvalidRgba => "invalid color format, must be #RRGGBB or #RRGGBBAA",
         Error.InvalidValue => "invalid value",
         Error.OutOfMemory => "out of memory",

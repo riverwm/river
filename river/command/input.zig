@@ -30,7 +30,7 @@ const InputManager = @import("../InputManager.zig");
 pub fn listInputs(
     allocator: *mem.Allocator,
     seat: *Seat,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     var input_list = std.ArrayList(u8).init(allocator);
@@ -61,7 +61,7 @@ pub fn listInputs(
 pub fn listInputConfigs(
     allocator: *mem.Allocator,
     seat: *Seat,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     var input_list = std.ArrayList(u8).init(allocator);
@@ -124,7 +124,7 @@ pub fn listInputConfigs(
 pub fn input(
     allocator: *mem.Allocator,
     seat: *Seat,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     if (args.len < 4) return Error.NotEnoughArguments;
@@ -197,9 +197,7 @@ pub fn input(
         input_config.scroll_method = std.meta.stringToEnum(InputConfig.ScrollMethod, args[3]) orelse
             return Error.UnknownOption;
     } else if (mem.eql(u8, "scroll-button", args[2])) {
-        const event_code_name = try std.cstr.addNullByte(allocator, args[3]);
-        defer allocator.free(event_code_name);
-        const ret = c.libevdev_event_code_from_name(c.EV_KEY, event_code_name);
+        const ret = c.libevdev_event_code_from_name(c.EV_KEY, args[3]);
         if (ret < 1) return Error.InvalidButton;
         input_config.scroll_button = InputConfig.ScrollButton{ .button = @intCast(u32, ret) };
     } else {

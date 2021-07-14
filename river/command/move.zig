@@ -29,7 +29,7 @@ const Box = @import("../Box.zig");
 pub fn move(
     allocator: *std.mem.Allocator,
     seat: *Seat,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     if (args.len < 3) return Error.NotEnoughArguments;
@@ -53,7 +53,7 @@ pub fn move(
 pub fn snap(
     allocator: *std.mem.Allocator,
     seat: *Seat,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
@@ -80,7 +80,7 @@ pub fn snap(
 pub fn resize(
     allocator: *std.mem.Allocator,
     seat: *Seat,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     if (args.len < 3) return Error.NotEnoughArguments;

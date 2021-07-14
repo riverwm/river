@@ -32,7 +32,7 @@ fn opacityUpdateFilter(view: *View, context: void) bool {
 pub fn opacity(
     allocator: *std.mem.Allocator,
     seat: *Seat,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     if (args.len < 6) return Error.NotEnoughArguments;

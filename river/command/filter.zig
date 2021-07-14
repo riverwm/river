@@ -30,7 +30,7 @@ const Seat = @import("../Seat.zig");
 pub fn floatFilterAdd(
     allocator: *mem.Allocator,
     seat: *Seat,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
@@ -45,7 +45,7 @@ pub fn floatFilterAdd(
 pub fn floatFilterRemove(
     allocator: *mem.Allocator,
     seat: *Seat,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
@@ -57,7 +57,7 @@ pub fn floatFilterRemove(
 pub fn csdFilterAdd(
     allocator: *mem.Allocator,
     seat: *Seat,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
@@ -74,7 +74,7 @@ pub fn csdFilterAdd(
 pub fn csdFilterRemove(
     allocator: *mem.Allocator,
     seat: *Seat,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;

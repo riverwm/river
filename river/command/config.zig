@@ -26,7 +26,7 @@ const Config = @import("../Config.zig");
 pub fn borderWidth(
     allocator: *std.mem.Allocator,
     seat: *Seat,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
@@ -40,7 +40,7 @@ pub fn borderWidth(
 pub fn backgroundColor(
     allocator: *std.mem.Allocator,
     seat: *Seat,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
@@ -55,7 +55,7 @@ pub fn backgroundColor(
 pub fn borderColorFocused(
     allocator: *std.mem.Allocator,
     seat: *Seat,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
@@ -70,7 +70,7 @@ pub fn borderColorFocused(
 pub fn borderColorUnfocused(
     allocator: *std.mem.Allocator,
     seat: *Seat,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
@@ -85,7 +85,7 @@ pub fn borderColorUnfocused(
 pub fn setCursorWarp(
     allocator: *std.mem.Allocator,
     seat: *Seat,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;

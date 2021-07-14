@@ -25,7 +25,7 @@ const util = @import("util.zig");
 
 keysym: xkb.Keysym,
 modifiers: wlr.Keyboard.ModifierMask,
-command_args: []const []const u8,
+command_args: []const [:0]const u8,
 
 /// When set to true the mapping will be executed on key release rather than on press
 release: bool,
@@ -36,11 +36,11 @@ pub fn init(
     release: bool,
     command_args: []const []const u8,
 ) !Self {
-    const owned_args = try util.gpa.alloc([]u8, command_args.len);
+    const owned_args = try util.gpa.alloc([:0]u8, command_args.len);
     errdefer util.gpa.free(owned_args);
     for (command_args) |arg, i| {
         errdefer for (owned_args[0..i]) |a| util.gpa.free(a);
-        owned_args[i] = try std.mem.dupe(util.gpa, u8, arg);
+        owned_args[i] = try std.mem.dupeZ(util.gpa, u8, arg);
     }
     return Self{
         .keysym = keysym,

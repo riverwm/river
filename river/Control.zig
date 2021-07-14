@@ -31,7 +31,7 @@ const util = @import("util.zig");
 const Seat = @import("Seat.zig");
 const Server = @import("Server.zig");
 
-const ArgMap = std.AutoHashMap(struct { client: *wl.Client, id: u32 }, std.ArrayListUnmanaged([]const u8));
+const ArgMap = std.AutoHashMap(struct { client: *wl.Client, id: u32 }, std.ArrayListUnmanaged([:0]const u8));
 
 global: *wl.Global,
 
@@ -72,7 +72,7 @@ fn handleRequest(control: *zriver.ControlV1, request: zriver.ControlV1.Request, 
     switch (request) {
         .destroy => control.destroy(),
         .add_argument => |add_argument| {
-            const owned_slice = mem.dupe(util.gpa, u8, mem.span(add_argument.argument)) catch {
+            const owned_slice = util.gpa.dupeZ(u8, mem.span(add_argument.argument)) catch {
                 control.getClient().postNoMemory();
                 return;
             };

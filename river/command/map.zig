@@ -36,7 +36,7 @@ const Seat = @import("../Seat.zig");
 pub fn map(
     allocator: *std.mem.Allocator,
     seat: *Seat,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     const optionals = parseOptionalArgs(args[1..]);
@@ -68,7 +68,7 @@ pub fn map(
 pub fn mapPointer(
     allocator: *std.mem.Allocator,
     seat: *Seat,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     if (args.len < 5) return Error.NotEnoughArguments;
@@ -148,24 +148,20 @@ fn pointerMappingExists(
     return null;
 }
 
-fn parseEventCode(allocator: *std.mem.Allocator, event_code_str: []const u8, out: *?[]const u8) !u32 {
-    const event_code_name = try std.cstr.addNullByte(allocator, event_code_str);
-    defer allocator.free(event_code_name);
-    const ret = c.libevdev_event_code_from_name(c.EV_KEY, event_code_name);
-    if (ret < 1) {
-        out.* = try std.fmt.allocPrint(allocator, "unknown button {s}", .{event_code_str});
+fn parseEventCode(allocator: *std.mem.Allocator, name: [:0]const u8, out: *?[]const u8) !u32 {
+    const event_code = c.libevdev_event_code_from_name(c.EV_KEY, name);
+    if (event_code < 1) {
+        out.* = try std.fmt.allocPrint(allocator, "unknown button {s}", .{name});
         return Error.Other;
     }
 
-    return @intCast(u32, ret);
+    return @intCast(u32, event_code);
 }
 
-fn parseKeysym(allocator: *std.mem.Allocator, keysym_str: []const u8, out: *?[]const u8) !xkb.Keysym {
-    const keysym_name = try std.cstr.addNullByte(allocator, keysym_str);
-    defer allocator.free(keysym_name);
-    const keysym = xkb.Keysym.fromName(keysym_name, .case_insensitive);
+fn parseKeysym(allocator: *std.mem.Allocator, name: [:0]const u8, out: *?[]const u8) !xkb.Keysym {
+    const keysym = xkb.Keysym.fromName(name, .case_insensitive);
     if (keysym == .NoSymbol) {
-        out.* = try std.fmt.allocPrint(allocator, "invalid keysym '{s}'", .{keysym_str});
+        out.* = try std.fmt.allocPrint(allocator, "invalid keysym '{s}'", .{name});
         return Error.Other;
     }
     return keysym;
@@ -240,7 +236,7 @@ fn parseOptionalArgs(args: []const []const u8) OptionalArgsContainer {
 pub fn unmap(
     allocator: *std.mem.Allocator,
     seat: *Seat,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     const optionals = parseOptionalArgs(args[1..]);
@@ -266,7 +262,7 @@ pub fn unmap(
 pub fn unmapPointer(
     allocator: *std.mem.Allocator,
     seat: *Seat,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     if (args.len < 4) return Error.NotEnoughArguments;

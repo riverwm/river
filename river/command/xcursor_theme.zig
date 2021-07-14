@@ -23,15 +23,13 @@ const Seat = @import("../Seat.zig");
 pub fn xcursorTheme(
     allocator: *std.mem.Allocator,
     seat: *Seat,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 3) return Error.TooManyArguments;
 
-    // TODO: get rid of this allocation
-    const name = try std.cstr.addNullByte(allocator, args[1]);
-    defer allocator.free(name);
+    const name = args[1];
     const size = if (args.len == 3) try std.fmt.parseInt(u32, args[2], 10) else null;
 
     try seat.cursor.setTheme(name, size);

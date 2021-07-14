@@ -26,7 +26,7 @@ const Seat = @import("../Seat.zig");
 pub fn setRepeat(
     allocator: *std.mem.Allocator,
     seat: *Seat,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     if (args.len < 3) return Error.NotEnoughArguments;

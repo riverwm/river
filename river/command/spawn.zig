@@ -26,17 +26,15 @@ const Seat = @import("../Seat.zig");
 pub fn spawn(
     allocator: *std.mem.Allocator,
     seat: *Seat,
-    args: []const []const u8,
+    args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
 
-    const cmd = try std.mem.join(allocator, " ", args[1..]);
+    const cmd = try std.mem.joinZ(allocator, " ", args[1..]);
     defer allocator.free(cmd);
-    const cmdZ = try std.cstr.addNullByte(allocator, cmd);
-    defer allocator.free(cmdZ);
 
-    const child_args = [_:null]?[*:0]const u8{ "/bin/sh", "-c", cmdZ, null };
+    const child_args = [_:null]?[*:0]const u8{ "/bin/sh", "-c", cmd, null };
 
     const pid = std.os.fork() catch {
         out.* = try std.fmt.allocPrint(allocator, "fork/execve failed", .{});
