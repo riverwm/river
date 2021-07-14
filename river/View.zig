@@ -341,7 +341,7 @@ pub fn setFullscreen(self: Self, fullscreen: bool) void {
 pub fn setResizing(self: Self, resizing: bool) void {
     switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.setResizing(resizing),
-        .xwayland_view => unreachable,
+        .xwayland_view => {},
     }
 }
 
