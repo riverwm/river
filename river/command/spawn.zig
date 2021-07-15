@@ -30,11 +30,9 @@ pub fn spawn(
     out: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
+    if (args.len > 2) return Error.TooManyArguments;
 
-    const cmd = try std.mem.joinZ(allocator, " ", args[1..]);
-    defer allocator.free(cmd);
-
-    const child_args = [_:null]?[*:0]const u8{ "/bin/sh", "-c", cmd, null };
+    const child_args = [_:null]?[*:0]const u8{ "/bin/sh", "-c", args[1], null };
 
     const pid = std.os.fork() catch {
         out.* = try std.fmt.allocPrint(allocator, "fork/execve failed", .{});

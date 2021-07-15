@@ -65,9 +65,9 @@ over the Wayland protocol.
 	output in any direction.
 
 *spawn* _shell_command_
-	Run _shell_command_ using _/bin/sh -c_. Put single quotes around
-	_shell_command_ if you do not want special characters to get
-	interpreted by your shell before the command gets passed to _/bin/sh_.
+	Run _shell_command_ using `/bin/sh -c _shell_command_`. Note that
+	*spawn* only takes a single argument. To spawn a command taking
+	multiple arguments, wrapping the command in quotes is recommended.
 
 *swap* *next*|*previous*
 	Swap the focused view with the next/previous visible non-floating
@@ -336,9 +336,9 @@ However note that not every input device supports every property.
 
 # EXAMPLES
 
-Bind bemenu-run to Super+P in normal mode:
+Bind Super+Enter in normal mode to spawn a *foot*(1) terminal:
 
-	riverctl map normal Mod4 P spawn bemenu-run
+	riverctl map normal Mod4 Enter spawn 'foot --app-id=foobar'
 
 See also the example init script at /etc/river/init.
 
