@@ -36,12 +36,12 @@ const LayoutDemand = @import("LayoutDemand.zig");
 
 const log = std.log.scoped(.layout);
 
-layout: *river.LayoutV2,
+layout: *river.LayoutV3,
 namespace: []const u8,
 output: *Output,
 
 pub fn create(client: *wl.Client, version: u32, id: u32, output: *Output, namespace: []const u8) !void {
-    const layout = try river.LayoutV2.create(client, version, id);
+    const layout = try river.LayoutV3.create(client, version, id);
 
     if (namespaceInUse(namespace, output, client)) {
         layout.sendNamespaceInUse();
@@ -92,7 +92,7 @@ fn namespaceInUse(namespace: []const u8, output: *Output, client: *wl.Client) bo
 
 /// This exists to handle layouts that have been rendered inert (due to the
 /// namespace already being in use) until the client destroys them.
-fn handleRequestInert(layout: *river.LayoutV2, request: river.LayoutV2.Request, _: ?*c_void) void {
+fn handleRequestInert(layout: *river.LayoutV3, request: river.LayoutV3.Request, _: ?*c_void) void {
     if (request == .destroy) layout.destroy();
 }
 
@@ -108,28 +108,19 @@ pub fn startLayoutDemand(self: *Self, views: u32) void {
         log.err("failed starting layout demand", .{});
         return;
     };
-    const serial = self.output.layout_demand.?.serial;
 
-    // Then we let the client know that we require a layout
     self.layout.sendLayoutDemand(
         views,
         self.output.usable_box.width,
         self.output.usable_box.height,
         self.output.pending.tags,
-        serial,
+        self.output.layout_demand.?.serial,
     );
-
-    // And finally we advertise all visible views
-    var it = ViewStack(View).iter(self.output.views.first, .forward, self.output.pending.tags, Output.arrangeFilter);
-    while (it.next()) |view| {
-        self.layout.sendAdvertiseView(view.pending.tags, view.getAppId(), serial);
-    }
-    self.layout.sendAdvertiseDone(serial);
 
     server.root.trackLayoutDemands();
 }
 
-fn handleRequest(layout: *river.LayoutV2, request: river.LayoutV2.Request, self: *Self) void {
+fn handleRequest(layout: *river.LayoutV3, request: river.LayoutV3.Request, self: *Self) void {
     switch (request) {
         .destroy => layout.destroy(),
 
@@ -168,7 +159,7 @@ fn handleRequest(layout: *river.LayoutV2, request: river.LayoutV2.Request, self:
     }
 }
 
-fn handleDestroy(layout: *river.LayoutV2, self: *Self) void {
+fn handleDestroy(layout: *river.LayoutV3, self: *Self) void {
     self.destroy();
 }
 
