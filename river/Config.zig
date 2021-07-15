@@ -76,19 +76,6 @@ default_layout_namespace: []const u8 = &[0]u8{},
 /// Determines where new views will be attached to the view stack.
 attach_mode: AttachMode = .top,
 
-opacity: struct {
-    /// The opacity of focused views
-    focused: f32 = 1.0,
-    /// The opacity of unfocused views
-    unfocused: f32 = 1.0,
-    /// The initial opacity of new views
-    initial: f32 = 1.0,
-    /// View opacity transition step
-    delta: f32 = 1.0,
-    /// Time between view opacity transition steps in milliseconds
-    delta_t: u31 = 20,
-} = .{},
-
 /// Keyboard repeat rate in characters per second
 repeat_rate: u31 = 25,
 

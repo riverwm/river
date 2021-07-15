@@ -280,7 +280,6 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) voi
             } else {
                 const self_tags_changed = view.pending.tags != view.current.tags;
                 view.current = view.pending;
-                view.commitOpacityTransition();
                 if (self_tags_changed) view.output.sendViewTags();
                 view.output.damage.addWhole();
             }

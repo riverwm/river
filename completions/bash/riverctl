@@ -41,7 +41,6 @@ function __riverctl_completion ()
 			border-color-unfocused \
 			border-width \
 			focus-follows-cursor \
-			opacity \
 			set-repeat \
 			set-cursor-warp \
 			xcursor-theme"

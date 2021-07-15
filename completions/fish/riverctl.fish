@@ -4,7 +4,7 @@ end
 
 function __fish_riverctl_complete_no_subcommand
     for i in (commandline -opc)
-        if contains -- $i close csd-filter-add exit float-filter-add focus-output focus-view input list-inputs list-input-configs move resize snap send-to-output spawn swap toggle-float toggle-fullscreen zoom default-layout output-layout set-layout-value mod-layout-value set-focused-tags set-view-tags toggle-focused-tags toggle-view-tags spawn-tagmask declare-mode enter-mode map map-pointer unmap unmap-pointer attach-mode background-color border-color-focused border-color-unfocused border-width focus-follows-cursor opacity set-repeat set-cursor-warp xcursor-theme
+        if contains -- $i close csd-filter-add exit float-filter-add focus-output focus-view input list-inputs list-input-configs move resize snap send-to-output spawn swap toggle-float toggle-fullscreen zoom default-layout output-layout set-layout-value mod-layout-value set-focused-tags set-view-tags toggle-focused-tags toggle-view-tags spawn-tagmask declare-mode enter-mode map map-pointer unmap unmap-pointer attach-mode background-color border-color-focused border-color-unfocused border-width focus-follows-cursor set-repeat set-cursor-warp xcursor-theme
             return 1
         end
     end
@@ -78,7 +78,6 @@ complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a border-co
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a border-color-unfocused -d 'Set the border color of unfocused views'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a border-width           -d 'Set the border width to pixels'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a focus-follows-cursor   -d 'Configure the focus behavior when moving cursor'
-complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a opacity                -d 'Configure server-side opacity of views'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a set-repeat             -d 'Set the keyboard repeat rate and repeat delay'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a set-cursor-warp        -d 'Set the cursor warp mode.'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a xcursor-theme          -d 'Set the xcursor theme'

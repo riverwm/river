@@ -66,7 +66,6 @@ const str_to_impl_fn = [_]struct {
     .{ .name = "map-pointer",            .impl = @import("command/map.zig").mapPointer },
     .{ .name = "mod-layout-value",       .impl = @import("command/layout.zig").modLayoutValue },
     .{ .name = "move",                   .impl = @import("command/move.zig").move },
-    .{ .name = "opacity",                .impl = @import("command/opacity.zig").opacity },
     .{ .name = "output-layout",          .impl = @import("command/layout.zig").outputLayout },
     .{ .name = "resize",                 .impl = @import("command/move.zig").resize },
     .{ .name = "send-to-output",         .impl = @import("command/output.zig").sendToOutput },
