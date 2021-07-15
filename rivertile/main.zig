@@ -65,11 +65,9 @@ const usage =
 ;
 
 const Command = enum {
-    @"set-main-location",
-    @"set-main-count",
-    @"mod-main-count",
-    @"set-main-ratio",
-    @"mod-main-ratio",
+    @"main-location",
+    @"main-count",
+    @"main-ratio",
 };
 
 const Location = enum {
@@ -159,39 +157,41 @@ const Output = struct {
                     return;
                 };
                 switch (cmd) {
-                    .@"set-main-location" => {
+                    .@"main-location" => {
                         output.main_location = std.meta.stringToEnum(Location, raw_arg) orelse {
                             std.log.err("unknown location: {s}", .{raw_arg});
                             return;
                         };
                     },
-                    .@"set-main-count" => {
-                        output.main_count = std.fmt.parseInt(u32, raw_arg, 10) catch |err| {
-                            std.log.err("failed to parse argument: {}", .{err});
-                            return;
-                        };
-                    },
-                    .@"mod-main-count" => {
+                    .@"main-count" => {
                         const arg = std.fmt.parseInt(i32, raw_arg, 10) catch |err| {
                             std.log.err("failed to parse argument: {}", .{err});
                             return;
                         };
-                        const result = math.add(i33, output.main_count, arg) catch math.maxInt(u32);
-                        if (result > 0) output.main_count = @intCast(u32, result);
+                        switch (raw_arg[0]) {
+                            '+' => output.main_count = math.add(
+                                u32,
+                                output.main_count,
+                                @intCast(u32, arg),
+                            ) catch math.maxInt(u32),
+                            '-' => {
+                                const result = @as(i33, output.main_count) + arg;
+                                if (result >= 0) output.main_count = @intCast(u32, result);
+                            },
+                            else => output.main_count = @intCast(u32, arg),
+                        }
                     },
-                    .@"set-main-ratio" => {
+                    .@"main-ratio" => {
                         const arg = std.fmt.parseFloat(f64, raw_arg) catch |err| {
                             std.log.err("failed to parse argument: {}", .{err});
                             return;
                         };
-                        output.main_ratio = math.clamp(arg, 0.1, 0.9);
-                    },
-                    .@"mod-main-ratio" => {
-                        const arg = std.fmt.parseFloat(f64, raw_arg) catch |err| {
-                            std.log.err("failed to parse argument: {}", .{err});
-                            return;
-                        };
-                        output.main_ratio = math.clamp(output.main_ratio + arg, 0.1, 0.9);
+                        switch (raw_arg[0]) {
+                            '+', '-' => {
+                                output.main_ratio = math.clamp(output.main_ratio + arg, 0.1, 0.9);
+                            },
+                            else => output.main_ratio = math.clamp(arg, 0.1, 0.9),
+                        }
                     },
                 }
             },
@@ -360,7 +360,7 @@ pub fn main() !void {
     _ = try display.roundtrip();
 
     if (context.layout_manager == null) {
-        fatal("wayland compositor does not support river-layout-v2.\n", .{});
+        fatal("wayland compositor does not support river-layout-v3.\n", .{});
     }
 
     context.initialized = true;
