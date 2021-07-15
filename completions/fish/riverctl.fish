@@ -4,7 +4,7 @@ end
 
 function __fish_riverctl_complete_no_subcommand
     for i in (commandline -opc)
-        if contains -- $i close csd-filter-add exit float-filter-add focus-output focus-view input list-inputs list-input-configs move resize snap send-to-output spawn swap toggle-float toggle-fullscreen zoom default-layout output-layout set-layout-value mod-layout-value set-focused-tags set-view-tags toggle-focused-tags toggle-view-tags spawn-tagmask declare-mode enter-mode map map-pointer unmap unmap-pointer attach-mode background-color border-color-focused border-color-unfocused border-width focus-follows-cursor set-repeat set-cursor-warp xcursor-theme
+        if contains -- $i close csd-filter-add exit float-filter-add focus-output focus-view input list-inputs list-input-configs move resize snap send-to-output spawn swap toggle-float toggle-fullscreen zoom default-layout output-layout send-layout-cmd set-focused-tags set-view-tags toggle-focused-tags toggle-view-tags spawn-tagmask declare-mode enter-mode map map-pointer unmap unmap-pointer attach-mode background-color border-color-focused border-color-unfocused border-width focus-follows-cursor set-repeat set-cursor-warp xcursor-theme
             return 1
         end
     end
@@ -56,8 +56,7 @@ complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a toggle-fu
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a zoom                   -d 'Bump the focused view to the top of the layout stack'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a default-layout         -d 'Set the layout namespace to be used by all outputs by default.'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a output-layout          -d 'Set the layout namespace of currently focused output.'
-complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a set-layout-value       -d 'Set the value with name _name_ of the layout on the focused output with matching namespace.'
-complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a mod-layout-value       -d 'Modify the value with name _name_ of the layout on the focused output with matching namespace.'
+complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a send-layout-cmd        -d 'Send command to the layout client on the currently focused output with the given namespace'
 # Tag managements
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a set-focused-tags       -d 'Show views with tags corresponding to the set bits of tags'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a set-view-tags          -d 'Assign the currently focused view the tags corresponding to the set bits of tags'
