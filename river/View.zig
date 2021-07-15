@@ -71,9 +71,6 @@ const State = struct {
 
     float: bool = false,
     fullscreen: bool = false,
-
-    /// Opacity the view is transitioning to
-    target_opacity: f32,
 };
 
 const SavedBuffer = struct {
@@ -124,12 +121,6 @@ float_box: Box = undefined,
 /// and for more intuitive behavior if there is no active layout for the output.
 post_fullscreen_box: Box = undefined,
 
-/// The current opacity of this view
-opacity: f32,
-
-/// Opacity change timer event source
-opacity_timer: ?*wl.EventSource = null,
-
 draw_borders: bool = true,
 
 /// This is created when the view is mapped and destroyed with the view
@@ -144,16 +135,9 @@ foreign_close: wl.Listener(*wlr.ForeignToplevelHandleV1) =
 pub fn init(self: *Self, output: *Output, tags: u32, surface: anytype) void {
     self.* = .{
         .output = output,
-        .current = .{
-            .tags = tags,
-            .target_opacity = server.config.opacity.initial,
-        },
-        .pending = .{
-            .tags = tags,
-            .target_opacity = server.config.opacity.initial,
-        },
+        .current = .{ .tags = tags },
+        .pending = .{ .tags = tags },
         .saved_buffers = std.ArrayList(SavedBuffer).init(util.gpa),
-        .opacity = server.config.opacity.initial,
     };
 
     if (@TypeOf(surface) == *wlr.XdgSurface) {
@@ -213,7 +197,6 @@ pub fn applyPending(self: *Self) void {
         self.setFullscreen(true);
         self.post_fullscreen_box = self.current.box;
 
-        self.pending.target_opacity = 1.0;
         const layout_box = server.root.output_layout.getBox(self.output.wlr_output).?;
         self.pending.box = .{
             .x = 0,
@@ -226,12 +209,6 @@ pub fn applyPending(self: *Self) void {
     if (self.current.fullscreen and !self.pending.fullscreen) {
         self.setFullscreen(false);
         self.pending.box = self.post_fullscreen_box;
-
-        // Restore configured opacity
-        self.pending.target_opacity = if (self.pending.focus > 0)
-            server.config.opacity.focused
-        else
-            server.config.opacity.unfocused;
     }
 
     if (arrange_output) self.output.arrangeViews();
@@ -449,8 +426,6 @@ pub fn shouldTrackConfigure(self: Self) bool {
 
 /// Called by the impl when the surface is ready to be displayed
 pub fn map(self: *Self) void {
-    self.pending.target_opacity = server.config.opacity.unfocused;
-
     log.debug("view '{s}' mapped", .{self.getTitle()});
 
     if (self.foreign_toplevel_handle == null) {
@@ -499,10 +474,6 @@ pub fn unmap(self: *Self) void {
 
     if (self.saved_buffers.items.len == 0) self.saveBuffers();
 
-    if (self.opacity_timer != null) {
-        self.killOpacityTimer();
-    }
-
     // Inform all seats that the view has been unmapped so they can handle focus
     var it = server.input_manager.seats.first;
     while (it) |node| : (it = node.next) {
@@ -537,69 +508,6 @@ pub fn notifyTitle(self: Self) void {
 pub fn notifyAppId(self: Self) void {
     if (self.foreign_toplevel_handle) |handle| {
         if (self.getAppId()) |s| handle.setAppId(s);
-    }
-}
-
-/// Change the opacity of a view by config.opacity.delta.
-/// If the target opacity was reached, return true.
-fn incrementOpacity(self: *Self) bool {
-    self.output.damage.addWhole();
-    if (self.opacity < self.current.target_opacity) {
-        self.opacity += server.config.opacity.delta;
-        if (self.opacity < self.current.target_opacity) return false;
-    } else {
-        self.opacity -= server.config.opacity.delta;
-        if (self.opacity > self.current.target_opacity) return false;
-    }
-    self.opacity = self.current.target_opacity;
-    return true;
-}
-
-/// Destroy a views opacity timer
-fn killOpacityTimer(self: *Self) void {
-    self.opacity_timer.?.remove();
-    self.opacity_timer = null;
-}
-
-/// Set the timeout on a views opacity timer
-fn armOpacityTimer(self: *Self) void {
-    const delta_t = server.config.opacity.delta_t;
-    self.opacity_timer.?.timerUpdate(delta_t) catch |err| {
-        log.err("failed to update opacity timer: {s}", .{err});
-        self.killOpacityTimer();
-    };
-}
-
-/// Called by the opacity timer
-fn handleOpacityTimer(self: *Self) callconv(.C) c_int {
-    if (self.incrementOpacity()) {
-        self.killOpacityTimer();
-    } else {
-        self.armOpacityTimer();
-    }
-    return 0;
-}
-
-/// Create an opacity timer for a view and arm it
-fn attachOpacityTimer(self: *Self) void {
-    const event_loop = server.wl_server.getEventLoop();
-    self.opacity_timer = event_loop.addTimer(*Self, handleOpacityTimer, self) catch {
-        log.err("failed to create opacity timer for view '{s}'", .{self.getTitle()});
-        return;
-    };
-    self.armOpacityTimer();
-}
-
-/// Commit an opacity transition
-pub fn commitOpacityTransition(self: *Self) void {
-    if (self.opacity == self.current.target_opacity) return;
-
-    // A running timer can handle a target_opacity change
-    if (self.opacity_timer != null) return;
-
-    // Do the first step now, if that step was not enough, attach timer
-    if (!self.incrementOpacity()) {
-        self.attachOpacityTimer();
     }
 }
 

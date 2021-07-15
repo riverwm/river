@@ -199,12 +199,7 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
         switch (self.focused) {
             .view => |view| {
                 view.pending.focus -= 1;
-                if (view.pending.focus == 0) {
-                    view.setActivated(false);
-                    if (!view.pending.fullscreen) {
-                        view.pending.target_opacity = server.config.opacity.unfocused;
-                    }
-                }
+                if (view.pending.focus == 0) view.setActivated(false);
             },
             .layer, .none => {},
         }
@@ -213,12 +208,7 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
         switch (new_focus) {
             .view => |target_view| {
                 std.debug.assert(self.focused_output == target_view.output);
-                if (target_view.pending.focus == 0) {
-                    target_view.setActivated(true);
-                    if (!target_view.pending.fullscreen) {
-                        target_view.pending.target_opacity = server.config.opacity.focused;
-                    }
-                }
+                if (target_view.pending.focus == 0) target_view.setActivated(true);
                 target_view.pending.focus += 1;
             },
             .layer => |target_layer| std.debug.assert(self.focused_output == target_layer.output),

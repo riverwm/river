@@ -48,7 +48,6 @@ _riverctl_subcommands()
         'border-color-unfocused:Set the border color of unfocused views'
         'border-width:Set the border width to pixels'
         'focus-follows-cursor:Configure the focus behavior when moving cursor'
-        'opacity:Configure server-side opacity of views'
         'set-repeat:Set the keyboard repeat rate and repeat delay'
         'set-cursor-warp:Set the cursor warp mode.'
         'xcursor-theme:Set the xcursor theme'

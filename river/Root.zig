@@ -399,8 +399,6 @@ fn commitTransaction(self: *Self) void {
             view.current = view.pending;
 
             view.dropSavedBuffers();
-
-            view.commitOpacityTransition();
         }
 
         if (view_tags_changed) output.sendViewTags();

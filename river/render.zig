@@ -43,8 +43,6 @@ const SurfaceRenderData = struct {
     output_y: i32,
 
     when: *os.timespec,
-
-    opacity: f32,
 };
 
 /// The rendering order in this function must be kept in sync with Cursor.surfaceAt()
@@ -186,7 +184,6 @@ fn renderLayer(
             .output_x = layer_surface.box.x,
             .output_y = layer_surface.box.y,
             .when = now,
-            .opacity = 1.0,
         };
         switch (role) {
             .toplevels => layer_surface.wlr_layer_surface.surface.forEachSurface(
@@ -218,7 +215,6 @@ fn renderView(output: *const Output, view: *View, now: *os.timespec) void {
                     .height = @intCast(c_int, saved_buffer.box.height),
                 },
                 saved_buffer.transform,
-                view.opacity,
             );
     } else {
         // Since there is no stashed buffer, we are not in the middle of
@@ -228,7 +224,6 @@ fn renderView(output: *const Output, view: *View, now: *os.timespec) void {
             .output_x = view.current.box.x - view.surface_box.x,
             .output_y = view.current.box.y - view.surface_box.y,
             .when = now,
-            .opacity = view.opacity,
         };
 
         view.surface.?.forEachSurface(*SurfaceRenderData, renderSurfaceIterator, &rdata);
@@ -241,7 +236,6 @@ fn renderViewPopups(output: *const Output, view: *View, now: *os.timespec) void 
         .output_x = view.current.box.x - view.surface_box.x,
         .output_y = view.current.box.y - view.surface_box.y,
         .when = now,
-        .opacity = view.opacity,
     };
     view.forEachPopupSurface(*SurfaceRenderData, renderSurfaceIterator, &rdata);
 }
@@ -260,7 +254,6 @@ fn renderDragIcons(output: *const Output, now: *os.timespec) void {
             .output_y = @floatToInt(i32, drag_icon.seat.cursor.wlr_cursor.y) +
                 drag_icon.wlr_drag_icon.surface.sy - output_box.y,
             .when = now,
-            .opacity = 1.0,
         };
         drag_icon.wlr_drag_icon.surface.forEachSurface(*SurfaceRenderData, renderSurfaceIterator, &rdata);
     }
@@ -279,7 +272,6 @@ fn renderXwaylandUnmanaged(output: *const Output, now: *os.timespec) void {
             .output_x = xwayland_surface.x - output_box.x,
             .output_y = xwayland_surface.y - output_box.y,
             .when = now,
-            .opacity = 1.0,
         };
         xwayland_surface.surface.?.forEachSurface(*SurfaceRenderData, renderSurfaceIterator, &rdata);
     }
@@ -302,7 +294,6 @@ fn renderSurfaceIterator(
             .height = surface.current.height,
         },
         surface.current.transform,
-        rdata.opacity,
     );
 
     surface.sendFrameDone(rdata.when);
@@ -315,7 +306,6 @@ fn renderTexture(
     texture: *wlr.Texture,
     wlr_box: wlr.Box,
     transform: wl.Output.Transform,
-    opacity: f32,
 ) void {
     var box = wlr_box;
 
@@ -333,7 +323,7 @@ fn renderTexture(
     // This takes our matrix, the texture, and an alpha, and performs the actual
     // rendering on the GPU.
     const renderer = output.wlr_output.backend.getRenderer().?;
-    renderer.renderTextureWithMatrix(texture, &matrix, opacity) catch return;
+    renderer.renderTextureWithMatrix(texture, &matrix, 1.0) catch return;
 }
 
 fn renderBorders(output: *const Output, view: *View, now: *os.timespec) void {
