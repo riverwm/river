@@ -90,15 +90,11 @@ over the Wayland protocol.
 	Set the layout namespace of currently focused output, overriding
 	the value set with *default-layout* if any.
 
-*set-layout-value* _namespace_ _type_ _name_ _value_
-	Set the value with name _name_ of the layout on the focused output
-	with matching namespace. If there is no matching layout, this command
-	does nothing.
-
-*mod-layout-value* _namespace_ _type_ _name_ _value_
-	Modify the value with name _name_ of the layout on the focused
-	output with matching namespace. If there is no matching layout,
-	this command does nothing.
+*send-layout-cmd* _namespace_ _command_
+	Send _command_ to the layout client on the currently focused output
+	with the given _namespace_, if any. What commands a layout client
+	understands depends on the layout client. For rivertile, see the
+	documentation in the *rivertile*(1) man page.
 
 ## TAG MANAGEMENT
 

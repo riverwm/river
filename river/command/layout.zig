@@ -56,28 +56,20 @@ pub fn defaultLayout(
     }
 }
 
-const SetType = enum {
-    int,
-    fixed,
-    string,
-};
-
-/// riverctl set-layout-value rivertile int main_count 42
-/// riverctl set-layout-value rivertile fixed main_factor 42.0
-/// riverctl set-layout-value rivertile string main_location top
-pub fn setLayoutValue(
+/// riverctl send-layout-cmd rivertile "mod-main-count 1"
+/// riverctl send-layout-cmd rivertile "mod-main-factor -0.1"
+/// riverctl send-layout-cmd rivertile "main-location top"
+pub fn sendLayoutCmd(
     allocator: *std.mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
-    if (args.len < 5) return Error.NotEnoughArguments;
-    if (args.len > 5) return Error.TooManyArguments;
-
-    const target_namespace = args[1];
-    const kind = std.meta.stringToEnum(SetType, args[2]) orelse return Error.InvalidType;
+    if (args.len < 3) return Error.NotEnoughArguments;
+    if (args.len > 3) return Error.TooManyArguments;
 
     const output = seat.focused_output;
+    const target_namespace = args[1];
 
     var it = output.layouts.first;
     const layout = while (it) |node| : (it = node.next) {
@@ -85,68 +77,7 @@ pub fn setLayoutValue(
         if (mem.eql(u8, layout.namespace, target_namespace)) break layout;
     } else return;
 
-    const null_terminated_name = try util.gpa.dupeZ(u8, args[3]);
-    defer util.gpa.free(null_terminated_name);
-
-    switch (kind) {
-        .int => {
-            const value = try std.fmt.parseInt(i32, args[4], 10);
-            layout.layout.sendSetIntValue(null_terminated_name, value);
-        },
-        .fixed => {
-            const value = try std.fmt.parseFloat(f64, args[4]);
-            layout.layout.sendSetFixedValue(null_terminated_name, wl.Fixed.fromDouble(value));
-        },
-        .string => {
-            const null_terminated_value = try util.gpa.dupeZ(u8, args[4]);
-            defer util.gpa.free(null_terminated_value);
-            layout.layout.sendSetStringValue(null_terminated_name, null_terminated_value);
-        },
-    }
-
-    output.arrangeViews();
-}
-
-const ModType = enum {
-    int,
-    fixed,
-};
-
-/// riverctl mode-layout-value rivertile int main_count 42
-/// riverctl set-layout-value rivertile fixed main_factor 42.0
-pub fn modLayoutValue(
-    allocator: *std.mem.Allocator,
-    seat: *Seat,
-    args: []const [:0]const u8,
-    out: *?[]const u8,
-) Error!void {
-    if (args.len < 5) return Error.NotEnoughArguments;
-    if (args.len > 5) return Error.TooManyArguments;
-
-    const target_namespace = args[1];
-    const kind = std.meta.stringToEnum(ModType, args[2]) orelse return Error.InvalidType;
-
-    const output = seat.focused_output;
-
-    var it = output.layouts.first;
-    const layout = while (it) |node| : (it = node.next) {
-        const layout = &node.data;
-        if (mem.eql(u8, layout.namespace, target_namespace)) break layout;
-    } else return;
-
-    const null_terminated_name = try util.gpa.dupeZ(u8, args[3]);
-    defer util.gpa.free(null_terminated_name);
-
-    switch (kind) {
-        .int => {
-            const value = try std.fmt.parseInt(i32, args[4], 10);
-            layout.layout.sendModIntValue(null_terminated_name, value);
-        },
-        .fixed => {
-            const value = try std.fmt.parseFloat(f64, args[4]);
-            layout.layout.sendModFixedValue(null_terminated_name, wl.Fixed.fromDouble(value));
-        },
-    }
+    layout.layout.sendUserCommand(args[2]);
 
     output.arrangeViews();
 }
