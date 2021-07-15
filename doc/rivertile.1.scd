@@ -41,34 +41,33 @@ modified while rivertile is running with the help of *riverctl*(1).
 These commands may be sent to rivertile at runtime with the help of
 *riverctl*(1).
 
-*set-main-location* [*top*|*bottom*|*left*|*right*]
+*main-location* [*top*|*bottom*|*left*|*right*]
 	Set the location of the main area in the layout.
 
-*set-main-count* _count_
-	Set the number of views in the main area of the layout.
+*main-count* _value_
+	Set or modify the number of views in the main area of the layout. If
+	_value_ is prefixed by a +/- sign, _value_ is added/subtracted from the
+	current count. If there is no sign, the main count is set to _value_.
 
-*mod-main-count* _delta_
-	Modify the number of views in the main area of the layout by a
-	positive or negative _delta_.
-
-*set-main-ratio* _ratio_
-	Set the ratio of main area to total layout area. The _ratio_ must
-	be between 0.1 and 0.9, inclusive.
-
-*mod-main-ratio* _delta_
-	Modify the ratio of main area to total layout area by a positive or
-	negative _delta_. The resulting ratio will be clamped to be between
-	0.1 and 0.9, inclusive.
+*main-count* _value_
+	Set or modify the ratio of main area to total layout area. If _value_
+	is prefixed by a +/- sign, _value_ is added/subtracted from the current
+	ratio. If there is no sign, the main ratio is set to _value_. Note that
+	the ratio will always be clamped to the range 0.1 to 0.9.
 
 # EXAMPLES
 
-Start *rivertile* with 4 pixels outer padding and 2 main views:
+Start *rivertile* with 4 pixels outer padding and the *top* main location:
 
-	rivertile -outer-padding 4 -main-count 2
+	rivertile -outer-padding 4 -main-location top
 
-Set the main location of rivertile to *top* at runtime:
+Increase the main ratio by 0.1 at runtime:
 
-	riverctl send-layout-cmd rivertile "set-main-location top"
+	riverctl send-layout-cmd rivertile "main-ratio +0.1"
+
+Set the main count to 3 at runtime:
+
+	riverctl send-layout-cmd rivertile "main-count 3"
 
 # AUTHORS
 
