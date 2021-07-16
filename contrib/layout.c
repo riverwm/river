@@ -10,38 +10,39 @@
  * Q: Can I use this to port dwm layouts to river?
  * A: Yes you can! You just need to replace the logic in layout_handle_layout_demand().
  *    You don't even need to fully understand the protocol if all you want to
- *    do is just port some simple layouts.
+ *    do is just port some layouts.
  *
  * Q: I have no idea how any of this works.
- * A: If all you want to do is create simple layouts, you do not need to
- *    understand the Wayland parts of the code. If you still want to understand
- *    it and are already familiar with how Wayland clients work, read the
- *    protocol. If you are new to writing Wayland client code, you can read
- *    https://wayland-book.com, then read the protocol.
+ * A: If all you want to do is create layouts, you do not need to understand
+ *    the Wayland parts of the code. If you still want to understand it and are
+ *    familiar with how Wayland clients work, read the protocol. If you are new
+ *    to writing Wayland client code, you can read https://wayland-book.com,
+ *    then read the protocol.
  *
  * Q: How do I build this?
  * A: To build, you need to generate the header and code of the layout protocol
  *    extension and link against them. This is achieved with the following
  *    commands (You may want to setup a build system).
  *
- *        wayland-scanner private-code < river-layout-v2.xml > river-layout-v2.c
- *        wayland-scanner client-header < river-layout-v2.xml > river-layout-v2.h
+ *        wayland-scanner private-code < river-layout-v3.xml > river-layout-v3.c
+ *        wayland-scanner client-header < river-layout-v3.xml > river-layout-v3.h
  *        gcc -Wall -Wextra -Wpedantic -Wno-unused-parameter -c -o layout.o layout.c
- *        gcc -Wall -Wextra -Wpedantic -Wno-unused-parameter -c -o river-layout-v2.o river-layout-v2.c
- *        gcc -o layout layout.o river-layout-v2.o -lwayland-client
+ *        gcc -Wall -Wextra -Wpedantic -Wno-unused-parameter -c -o river-layout-v3.o river-layout-v3.c
+ *        gcc -o layout layout.o river-layout-v3.o -lwayland-client
  */
 
-#include<assert.h>
-#include<stdbool.h>
-#include<stdint.h>
-#include<stdio.h>
-#include<stdlib.h>
-#include<string.h>
+#include <assert.h>
+#include <ctype.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-#include<wayland-client.h>
-#include<wayland-client-protocol.h>
+#include <wayland-client.h>
+#include <wayland-client-protocol.h>
 
-#include"river-layout-v2.h"
+#include "river-layout-v3.h"
 
 /* A few macros to indulge the inner glibc user. */
 #define MIN(a, b) ( a < b ? a : b )
@@ -53,10 +54,10 @@ struct Output
 	struct wl_list link;
 
 	struct wl_output       *output;
-	struct river_layout_v2 *layout;
+	struct river_layout_v3 *layout;
 
 	uint32_t main_count;
-	double main_factor;
+	double main_ratio;
 	uint32_t view_padding;
 	uint32_t outer_padding;
 
@@ -69,25 +70,23 @@ struct Output
 struct wl_display  *wl_display;
 struct wl_registry *wl_registry;
 struct wl_callback *sync_callback;
-struct river_layout_manager_v2 *layout_manager;
+struct river_layout_manager_v3 *layout_manager;
 struct wl_list outputs;
 bool loop = true;
 int ret = EXIT_FAILURE;
 
-static void layout_handle_layout_demand (void *data, struct river_layout_v2 *river_layout_v2,
+static void layout_handle_layout_demand (void *data, struct river_layout_v3 *river_layout_v3,
 		uint32_t view_count, uint32_t width, uint32_t height, uint32_t tags, uint32_t serial)
 {
 	struct Output *output = (struct Output *)data;
 
 	/* Simple tiled layout with no frills.
 	 *
-	 * If you want to create your own simple layout, just rip the following
-	 * code out and replace it with your own logic. All content un-aware
-	 * dynamic tiling layouts you know, for example from dwm, can be easily
-	 * ported to river this way. If you want to create layouts that are
-	 * content aware, meaning they react to the currently visible windows,
-	 * you have to create handlers for the advertise_view and advertise_done
-	 * events. Happy hacking!
+	 * If you want to create your own layout, just rip the following code
+	 * out and replace it with your own logic. All dynamic tiling layouts
+	 * you know, for example from dwm, can be easily ported to river this
+	 * way. For more creative layouts, you probably also want to add custom
+	 * values. Happy hacking!
 	 */
 	width -= 2 * output->outer_padding, height -= 2 * output->outer_padding;
 	unsigned int main_size, stack_size, view_x, view_y, view_width, view_height;
@@ -103,7 +102,7 @@ static void layout_handle_layout_demand (void *data, struct river_layout_v2 *riv
 	}
 	else
 	{
-		main_size  = width * output->main_factor;
+		main_size  = width * output->main_ratio;
 		stack_size = width - main_size;
 	}
 	for (unsigned int i = 0; i < view_count; i++)
@@ -123,17 +122,28 @@ static void layout_handle_layout_demand (void *data, struct river_layout_v2 *riv
 			view_y      = (i - output->main_count) * view_height;
 		}
 
-		river_layout_v2_push_view_dimensions(output->layout, serial,
+		river_layout_v3_push_view_dimensions(output->layout,
 				view_x + output->view_padding + output->outer_padding,
 				view_y + output->view_padding + output->outer_padding,
 				view_width - (2 * output->view_padding),
-				view_height - (2 * output->view_padding));
+				view_height - (2 * output->view_padding),
+				serial);
 	}
 
-	river_layout_v2_commit(output->layout, serial);
+	/* Committing the layout means telling the server that your code is done
+	 * laying out windows. Make sure you have pushed exactly the right
+	 * amount of view dimensions, a mismatch is a protocol error.
+	 *
+	 * You also have to provide a layout name. This is a user facing string
+	 * that the server can forward to status bars. You can use it to tell
+	 * the user which layout is currently in use. You could also add some
+	 * status information about your layout, but in this example we are
+	 * boring and just use a static "[]=" like in dwm.
+	 */
+	river_layout_v3_commit(output->layout, "[]=", serial);
 }
 
-static void layout_handle_namespace_in_use (void *data, struct river_layout_v2 *river_layout_v2)
+static void layout_handle_namespace_in_use (void *data, struct river_layout_v3 *river_layout_v3)
 {
 	/* Oh no, the namespace we choose is already used by another client!
 	 * All we can do now is destroy the river_layout object. Because we are
@@ -146,81 +156,143 @@ static void layout_handle_namespace_in_use (void *data, struct river_layout_v2 *
 	loop = false;
 }
 
-static void layout_handle_set_int_value (void *data, struct river_layout_v2 *river_layout_v2,
-		const char *name, int32_t value)
+static bool skip_whitespace (char **ptr)
 {
-	/* This event is used by the server to tell us to change the value of
-	 * one of our layout parameters, identified by name. A layout_demand
-	 * event will be send immediately afterwards.
+	if ( *ptr == NULL )
+		return false;
+	while (isspace(**ptr))
+	{
+		(*ptr)++;
+		if ( **ptr == '\0' )
+			return false;
+	}
+	return true;
+}
+
+static bool skip_nonwhitespace (char **ptr)
+{
+	if ( *ptr == NULL )
+		return false;
+	while (! isspace(**ptr))
+	{
+		(*ptr)++;
+		if ( **ptr == '\0' )
+			return false;
+	}
+	return true;
+}
+
+static const char *get_second_word (char **ptr, const char *name)
+{
+	/* Skip to the next word. */
+	if ( !skip_nonwhitespace(ptr) || !skip_whitespace(ptr) )
+	{
+		fprintf(stderr, "ERROR: Too few arguments. '%s' needs one argument.\n", name);
+		return NULL;
+	}
+
+	/* Now we know where the second word begins. */
+	const char *second_word = *ptr;
+
+	/* Check if there is a third word. */
+	if ( skip_nonwhitespace(ptr) && skip_whitespace(ptr) )
+	{
+		fprintf(stderr, "ERROR: Too many arguments. '%s' needs one argument.\n", name);
+		return NULL;
+	}
+
+	return second_word;
+}
+
+static void handle_uint32_command (char **ptr, uint32_t *value, const char *name)
+{
+	const char *second_word = get_second_word(ptr, name);
+	if ( second_word == NULL )
+		return;
+	const int32_t arg = atoi(second_word);
+	if ( *second_word == '+' || *second_word == '-' )
+		*value = (uint32_t)MAX((int32_t)*value + arg, 0);
+	else
+		*value = (uint32_t)MAX(arg, 0);
+}
+
+static void handle_float_command(char **ptr, double *value, const char *name, double clamp_upper, double clamp_lower)
+{
+	const char *second_word = get_second_word(ptr, name);
+	if ( second_word == NULL )
+		return;
+	const double arg = atof(second_word);
+	if ( *second_word == '+' || *second_word == '-' )
+		*value = CLAMP(*value + arg, clamp_upper, clamp_lower);
+	else
+		*value = CLAMP(arg, clamp_upper, clamp_lower);
+}
+
+static bool word_comp (const char *word, const char *comp)
+{
+	if ( strncmp(word, comp, strlen(comp)) == 0 )
+	{
+		const char *after_comp = word + strlen(comp);
+		if ( isspace(*after_comp) ||  *after_comp == '\0' )
+			return true;
+	}
+	return false;
+
+}
+
+static void layout_handle_user_command (void *data, struct river_layout_v3 *river_layout_manager_v3,
+		const char *_command)
+{
+	/* The user_command event will be received whenever the user decided to
+	 * send us a command. As an example, commands can be used to change the
+	 * layout values. Parsing the commands is the job of the layout
+	 * generator, the server just sends us the raw string.
+	 *
+	 * After this event is recevied, the views on the output will be
+	 * re-arranged and so we will also receive a layout_demand event.
 	 */
+
 	struct Output *output = (struct Output *)data;
 
-	/* All integer parameters of this layout only accept positive values. */
-	if ( value < 0 )
+	/* Skip preceding whitespace. */
+	char *command = (char *)_command;
+	if (! skip_whitespace(&command))
 		return;
 
-	if ( strcmp(name, "main_count") == 0 )
-		output->main_count = (uint32_t)value;
-	else if ( strcmp(name, "view_padding") == 0 )
-		output->view_padding = (uint32_t)value;
-	else if ( strcmp(name, "outer_padding") == 0 )
-		output->outer_padding = (uint32_t)value;
-}
-
-static void layout_handle_mod_int_value (void *data, struct river_layout_v2 *river_layout_v2,
-		const char *name, int32_t delta)
-{
-	/* This event is used by the server to tell us to modify the value of
-	 * one of our layout parameters by a delta, identified by name. A
-	 * layout_demand event will be send immediately afterwards.
-	 */
-	struct Output *output = (struct Output *)data;
-	if ( strcmp(name, "main_count") == 0 )
+	if (word_comp(command, "main_count"))
+		handle_uint32_command(&command, &output->main_count, "main_count");
+	else if (word_comp(command, "view_padding"))
+		handle_uint32_command(&command, &output->view_padding, "view_padding");
+	else if (word_comp(command, "outer_padding"))
+		handle_uint32_command(&command, &output->outer_padding, "outer_padding");
+	else if (word_comp(command, "main_ratio"))
+		handle_float_command(&command, &output->main_ratio, "main_ratio", 0.1, 0.9);
+	else if (word_comp(command, "reset"))
 	{
-		if ( (int32_t)output->main_count + delta >= 0 )
-			output->main_count = output->main_count + delta;
+		/* This is an example of a command that does something different
+		 * than just modifying a value. It resets all values to their
+		 * defaults.
+		 */
+
+		if ( skip_nonwhitespace(&command) && skip_whitespace(&command) )
+		{
+			fputs("ERROR: Too many arguments. 'reset' has no arguments.\n", stderr);
+			return;
+		}
+
+		output->main_count    = 1;
+		output->main_ratio    = 0.6;
+		output->view_padding  = 5;
+		output->outer_padding = 5;
 	}
-	else if ( strcmp(name, "view_padding") == 0 )
-	{
-		if ( (int32_t)output->view_padding + delta >= 0 )
-			output->view_padding = output->view_padding + delta;
-	}
-	else if ( strcmp(name, "outer_padding") == 0 )
-	{
-		if ( (int32_t)output->outer_padding + delta >= 0 )
-			output->outer_padding = output->outer_padding + delta;
-	}
+	else
+		fprintf(stderr, "ERROR: Unknown command: %s\n", command);
 }
 
-static void layout_handle_set_fixed_value (void *data, struct river_layout_v2 *river_layout_v2,
-		const char *name, wl_fixed_t value)
-{
-	struct Output *output = (struct Output *)data;
-	if ( strcmp(name, "main_factor") == 0 )
-		output->main_factor = CLAMP(wl_fixed_to_double(value), 0.1, 0.9);
-}
-
-static void layout_handle_mod_fixed_value (void *data, struct river_layout_v2 *river_layout_v2,
-		const char *name, wl_fixed_t delta)
-{
-	struct Output *output = (struct Output *)data;
-	if ( strcmp(name, "main_factor") == 0 )
-		output->main_factor = CLAMP(output->main_factor + wl_fixed_to_double(delta), 0.1, 0.9);
-}
-
-/* A no-op function we plug into listeners when we don't want to handle an event. */
-static void noop () {}
-
-static const struct river_layout_v2_listener layout_listener = {
+static const struct river_layout_v3_listener layout_listener = {
 	.namespace_in_use = layout_handle_namespace_in_use,
 	.layout_demand    = layout_handle_layout_demand,
-	.set_int_value    = layout_handle_set_int_value,
-	.mod_int_value    = layout_handle_mod_int_value,
-	.set_fixed_value  = layout_handle_set_fixed_value,
-	.mod_fixed_value  = layout_handle_mod_fixed_value,
-	.set_string_value = noop,
-	.advertise_view   = noop,
-	.advertise_done   = noop,
+	.user_command     = layout_handle_user_command,
 };
 
 static void configure_output (struct Output *output)
@@ -231,9 +303,9 @@ static void configure_output (struct Output *output)
 	 * to use. It can be any arbitrary string. It should describe roughly
 	 * what kind of layout your client will create, so here we use "tile".
 	 */
-	output->layout = river_layout_manager_v2_get_layout(layout_manager,
+	output->layout = river_layout_manager_v3_get_layout(layout_manager,
 			output->output, "tile");
-	river_layout_v2_add_listener(output->layout, &layout_listener, output);
+	river_layout_v3_add_listener(output->layout, &layout_listener, output);
 }
 
 static bool create_output (struct wl_output *wl_output)
@@ -252,17 +324,21 @@ static bool create_output (struct wl_output *wl_output)
 	/* These are the parameters of our layout. In this case, they are the
 	 * ones you'd typically expect from a dynamic tiling layout, but if you
 	 * are creative, you can do more. You can use any arbitrary amount of
-	 * integer, fixed and string values in your layout. If the user wants to
-	 * change a value, the server lets us know using events of the
-	 * river_layout object. They need to be initialiued with defaults though.
+	 * all kinds of values in your layout. If the user wants to change a
+	 * value, the server lets us know using user_command event of the
+	 * river_layout object.
+	 *
+	 * A layout generator is responsible for having sane defaults for all
+	 * layout values. The server only sends user_command events when there
+	 * actually is a command the user wants to send us.
 	 */
 	output->main_count    = 1;
-	output->main_factor   = 0.6;
+	output->main_ratio    = 0.6;
 	output->view_padding  = 5;
 	output->outer_padding = 5;
 
 	/* If we already have the river_layout_manager, we can get a
-	 * river_layout for this output.
+	 * river_layout object for this output.
 	 */
 	if ( layout_manager != NULL )
 		configure_output(output);
@@ -274,7 +350,7 @@ static bool create_output (struct wl_output *wl_output)
 static void destroy_output (struct Output *output)
 {
 	if ( output->layout != NULL )
-		river_layout_v2_destroy(output->layout);
+		river_layout_v3_destroy(output->layout);
 	wl_output_destroy(output->output);
 	wl_list_remove(&output->link);
 	free(output);
@@ -290,10 +366,10 @@ static void destroy_all_outputs ()
 static void registry_handle_global (void *data, struct wl_registry *registry,
 		uint32_t name, const char *interface, uint32_t version)
 {
-	if (! strcmp(interface, river_layout_manager_v2_interface.name))
+	if ( strcmp(interface, river_layout_manager_v3_interface.name) == 0 )
 		layout_manager = wl_registry_bind(registry, name,
-				&river_layout_manager_v2_interface, 1);
-	else if (! strcmp(interface, wl_output_interface.name))
+				&river_layout_manager_v3_interface, 1);
+	else if ( strcmp(interface, wl_output_interface.name) == 0 )
 	{
 		struct wl_output *wl_output = wl_registry_bind(registry, name,
 				&wl_output_interface, version);
@@ -304,6 +380,9 @@ static void registry_handle_global (void *data, struct wl_registry *registry,
 		}
 	}
 }
+
+/* A no-op function we plug into listeners when we don't want to handle an event. */
+static void noop () {}
 
 static const struct wl_registry_listener registry_listener = {
 	.global        = registry_handle_global,
@@ -321,7 +400,7 @@ static void sync_handle_done (void *data, struct wl_callback *wl_callback,
 	 */
 	if ( layout_manager == NULL )
 	{
-		fputs("Wayland compositor does not support river-layout-v2.\n", stderr);
+		fputs("Wayland compositor does not support river-layout-v3.\n", stderr);
 		ret = EXIT_FAILURE;
 		loop = false;
 		return;
@@ -364,11 +443,16 @@ static bool init_wayland (void)
 
 	wl_list_init(&outputs);
 
+	/* The registry is a global object which is used to advertise all
+	 * available global objects.
+	 */
 	wl_registry = wl_display_get_registry(wl_display);
 	wl_registry_add_listener(wl_registry, &registry_listener, NULL);
 
 	/* The sync callback we attach here will be called when all previous
-	 * requests have been handled by the server.
+	 * requests have been handled by the server. This allows us to know the
+	 * end of the startup, at which point all necessary globals should be
+	 * bound.
 	 */
 	sync_callback = wl_display_sync(wl_display);
 	wl_callback_add_listener(sync_callback, &sync_callback_listener, NULL);
@@ -386,7 +470,7 @@ static void finish_wayland (void)
 	if ( sync_callback != NULL )
 		wl_callback_destroy(sync_callback);
 	if ( layout_manager != NULL )
-		river_layout_manager_v2_destroy(layout_manager);
+		river_layout_manager_v3_destroy(layout_manager);
 
 	wl_registry_destroy(wl_registry);
 	wl_display_disconnect(wl_display);
