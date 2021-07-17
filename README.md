@@ -4,7 +4,8 @@ River is a dynamic tiling wayland compositor with flexible runtime
 configuration.
 
 Join us at [#river](https://web.libera.chat/?channels=#river)
-on irc.libera.chat. Read our [wiki](https://github.com/ifreund/river/wiki).
+on irc.libera.chat. Read our man pages and our
+[wiki](https://github.com/ifreund/river/wiki).
 
 *Note: river is currently early in development. Expect breaking changes
 and missing features. If you run into a bug don't hesitate to
