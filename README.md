@@ -1,8 +1,10 @@
 # river
 
-river is a dynamic tiling wayland compositor that takes inspiration from
-[dwm](https://dwm.suckless.org) and
-[bspwm](https://github.com/baskerville/bspwm).
+River is a dynamic tiling wayland compositor with flexible runtime
+configuration.
+
+Join us at [#river](https://web.libera.chat/?channels=#river)
+on irc.libera.chat. Read our [wiki](https://github.com/ifreund/river/wiki).
 
 *Note: river is currently early in development. Expect breaking changes
 and missing features. If you run into a bug don't hesitate to
@@ -68,17 +70,6 @@ in the example directory.
 
 For complete documentation see the `river(1)`, `riverctl(1)`, and
 `rivertile(1)` man pages.
-
-As a supplement to the man pages, see also the [FAQ](https://github.com/ifreund/river/wiki#faq)
-in the wiki for common issues and have a look at the [recommended
-software](https://github.com/ifreund/river/wiki/Recommended-Software).
-
-## Development
-
-If you are interested in the development of river, please join us at
-[#river](https://web.libera.chat/?channels=#river) on irc.libera.chat. You
-should also read [CONTRIBUTING.md](CONTRIBUTING.md) if you intend to submit
-patches.
 
 ## Licensing
 
