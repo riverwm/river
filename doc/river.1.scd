@@ -32,19 +32,17 @@ utility may be used to communicate with river over these protocols.
 
 # CONFIGURATION
 
-On startup river will look for and run an executable file at one of the
-following locations, checked in the order listed:
-
-- $XDG_CONFIG_HOME/river/init
-- $HOME/.config/river/init
-- /etc/river/init
+On startup river will run an executable file at `$XDG_CONFIG_HOME/river/init`
+if such an executable exists. If $XDG_CONFIG_HOME is not set, ~/.config/ will
+be used instead.
 
 The executable init file will be run as a process group leader after river's
 wayland server is initialized but before entering the main loop. On exit,
 river will send SIGTERM to this process group.
 
-Usually this will be a shell script invoking *riverctl*(1) to create mappings,
-start programs such as a status bar, and preform other configuration.
+Usually this executable is a shell script invoking *riverctl*(1) to create
+mappings, start programs such as a layout generator or status bar, and
+preform other configuration.
 
 # ENVIRONMENT
 

@@ -48,14 +48,6 @@ pub fn build(b: *zbs.Builder) !void {
 
     const examples = b.option(bool, "examples", "Set to true to build examples") orelse false;
 
-    const rel_config_path = if (mem.eql(u8, try fs.path.resolve(b.allocator, &[_][]const u8{b.install_prefix}), "/usr"))
-        "../etc/river/init"
-    else
-        "etc/river/init";
-    b.installFile("example/init", rel_config_path);
-    const abs_config_path = try fs.path.resolve(b.allocator, &[_][]const u8{ b.install_prefix, rel_config_path });
-    assert(fs.path.isAbsolute(abs_config_path));
-
     const scanner = ScanProtocolsStep.create(b);
     scanner.addSystemProtocol("stable/xdg-shell/xdg-shell.xml");
     scanner.addSystemProtocol("unstable/pointer-gestures/pointer-gestures-unstable-v1.xml");
@@ -72,7 +64,6 @@ pub fn build(b: *zbs.Builder) !void {
         river.setTarget(target);
         river.setBuildMode(mode);
         river.addBuildOption(bool, "xwayland", xwayland);
-        river.addBuildOption([]const u8, "default_config_path", abs_config_path);
 
         addServerDeps(river, scanner);
 

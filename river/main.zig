@@ -16,6 +16,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
+const fs = std.fs;
 const os = std.os;
 const wlr = @import("wlroots");
 
@@ -86,9 +87,7 @@ pub fn main() anyerror!void {
         .warn, .err, .crit, .alert, .emerg => .err,
     });
 
-    if (startup_command == null) {
-        if (try getStartupCommand()) |path| startup_command = path;
-    }
+    if (startup_command == null) startup_command = try defaultInitPath();
 
     std.log.info("initializing server", .{});
     try server.init();
@@ -99,7 +98,7 @@ pub fn main() anyerror!void {
     // Run the child in a new process group so that we can send SIGTERM to all
     // descendants on exit.
     const child_pgid = if (startup_command) |cmd| blk: {
-        std.log.info("running startup command '{s}'", .{cmd});
+        std.log.info("running init executable '{s}'", .{cmd});
         const child_args = [_:null]?[*:0]const u8{ "/bin/sh", "-c", cmd, null };
         const pid = try os.fork();
         if (pid == 0) {
@@ -111,8 +110,9 @@ pub fn main() anyerror!void {
         // Since the child has called setsid, the pid is the pgid
         break :blk pid;
     } else null;
-    defer if (child_pgid) |pgid|
-        os.kill(-pgid, os.SIGTERM) catch |e| std.log.err("failed to kill startup process: {s}", .{e});
+    defer if (child_pgid) |pgid| os.kill(-pgid, os.SIGTERM) catch |err| {
+        std.log.err("failed to kill init process group: {s}", .{@errorName(err)});
+    };
 
     std.log.info("running server", .{});
 
@@ -127,29 +127,24 @@ fn printErrorExit(comptime format: []const u8, args: anytype) noreturn {
     os.exit(1);
 }
 
-fn testConfigPath(comptime fmt: []const u8, args: anytype) std.fmt.AllocPrintError!?[:0]const u8 {
-    const path = try std.fmt.allocPrintZ(util.gpa, fmt, args);
-    os.access(path, os.X_OK) catch {
+fn defaultInitPath() !?[:0]const u8 {
+    const path = blk: {
+        if (os.getenv("XDG_CONFIG_HOME")) |xdg_config_home| {
+            break :blk try fs.path.joinZ(util.gpa, &[_][]const u8{ xdg_config_home, "river/init" });
+        } else if (os.getenv("HOME")) |home| {
+            break :blk try fs.path.joinZ(util.gpa, &[_][]const u8{ home, ".config/river/init" });
+        } else {
+            return null;
+        }
+    };
+
+    os.accessZ(path, os.X_OK) catch |err| {
+        std.log.err("failed to run init executable {s}: {s}", .{ path, @errorName(err) });
         util.gpa.free(path);
         return null;
     };
-    return path;
-}
 
-fn getStartupCommand() std.fmt.AllocPrintError!?[:0]const u8 {
-    if (os.getenv("XDG_CONFIG_HOME")) |xdg_config_home| {
-        if (try testConfigPath("{s}/river/init", .{xdg_config_home})) |path| {
-            return path;
-        }
-    } else if (os.getenv("HOME")) |home| {
-        if (try testConfigPath("{s}/.config/river/init", .{home})) |path| {
-            return path;
-        }
-    }
-    if (try testConfigPath(build_options.default_config_path, .{})) |path| {
-        return path;
-    }
-    return null;
+    return path;
 }
 
 pub fn log(
