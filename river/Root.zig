@@ -416,7 +416,7 @@ fn handleLayoutChange(
 ) void {
     const self = @fieldParentPtr(Self, "layout_change", listener);
 
-    const config = self.ouputConfigFromCurrent() catch {
+    const config = self.outputConfigFromCurrent() catch {
         std.log.scoped(.output_manager).crit("out of memory", .{});
         return;
     };
@@ -437,7 +437,7 @@ fn handleManagerApply(
     }
 
     // Send the config that was actually applied
-    const applied_config = self.ouputConfigFromCurrent() catch {
+    const applied_config = self.outputConfigFromCurrent() catch {
         std.log.scoped(.output_manager).crit("out of memory", .{});
         return;
     };
@@ -554,7 +554,7 @@ fn applyHeadToOutput(head: *wlr.OutputConfigurationV1.Head, wlr_output: *wlr.Out
 }
 
 /// Create the config describing the current configuration
-fn ouputConfigFromCurrent(self: *Self) !*wlr.OutputConfigurationV1 {
+fn outputConfigFromCurrent(self: *Self) !*wlr.OutputConfigurationV1 {
     const config = try wlr.OutputConfigurationV1.create();
     // this destroys all associated config heads as well
     errdefer config.destroy();
