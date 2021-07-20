@@ -32,9 +32,9 @@ utility may be used to communicate with river over these protocols.
 
 # CONFIGURATION
 
-On startup river will run an executable file at `$XDG_CONFIG_HOME/river/init`
-if such an executable exists. If $XDG_CONFIG_HOME is not set, ~/.config/ will
-be used instead.
+On startup river will run an executable file at $XDG_CONFIG_HOME/river/init if
+such an executable exists. If $XDG_CONFIG_HOME is not set, ~/.config/river/init
+will be used instead.
 
 The executable init file will be run as a process group leader after river's
 wayland server is initialized but before entering the main loop. On exit,

@@ -59,8 +59,8 @@ River can either be run nested in an X11/wayland session or directly
 from a tty using KMS/DRM. Simply run the `river` command.
 
 On startup river will run an executable file at `$XDG_CONFIG_HOME/river/init`
-if such an executable exists. If $XDG_CONFIG_HOME is not set, ~/.config/ will
-be used instead.
+if such an executable exists. If `$XDG_CONFIG_HOME` is not set,
+`~/.config/river/init` will be used instead.
 
 Usually this executable is a shell script invoking *riverctl*(1) to create
 mappings, start programs such as a layout generator or status bar, and
