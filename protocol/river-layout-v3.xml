@@ -26,7 +26,7 @@
     a client may use when generating the layout is lost in transmission. This
     is an intentional limitation.
 
-    Additonally, this protocol allows the compositor to deliver arbitrary
+    Additionally, this protocol allows the compositor to deliver arbitrary
     user-provided commands associated with a layout to clients. A client
     may use these commands to implement runtime configuration/control, or
     may ignore them entirely. How the user provides these commands to the
@@ -166,7 +166,7 @@
     </request>
 
     <event name="user_command">
-      <description summary="an argument of a user command">
+      <description summary="a command sent by the user">
         This event informs the client of a command sent to it by the user.
 
         The semantic meaning of the command is left for the client to
