@@ -139,6 +139,8 @@ pub fn deinit(self: *Self) void {
 
     self.wl_server.destroyClients();
 
+    self.backend.destroy();
+
     self.root.deinit();
 
     self.wl_server.destroy();
