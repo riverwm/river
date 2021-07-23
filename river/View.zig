@@ -242,9 +242,9 @@ pub fn dropSavedBuffers(self: *Self) void {
 }
 
 pub fn saveBuffers(self: *Self) void {
-    std.debug.assert(self.saved_buffers.items.len == 0);
+    assert(self.saved_buffers.items.len == 0);
     self.saved_surface_box = self.surface_box;
-    self.surface.?.forEachSurface(*std.ArrayList(SavedBuffer), saveBuffersIterator, &self.saved_buffers);
+    self.forEachSurface(*std.ArrayList(SavedBuffer), saveBuffersIterator, &self.saved_buffers);
 }
 
 fn saveBuffersIterator(
@@ -322,15 +322,21 @@ pub fn setResizing(self: Self, resizing: bool) void {
     }
 }
 
-pub inline fn forEachPopupSurface(
+/// Iterates over all surfaces, subsurfaces, and popups in the tree
+pub inline fn forEachSurface(
     self: Self,
     comptime T: type,
     iterator: fn (surface: *wlr.Surface, sx: c_int, sy: c_int, data: T) callconv(.C) void,
     user_data: T,
 ) void {
     switch (self.impl) {
-        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.forEachPopupSurface(T, iterator, user_data),
-        .xwayland_view => {},
+        .xdg_toplevel => |xdg_toplevel| {
+            xdg_toplevel.xdg_surface.forEachSurface(T, iterator, user_data);
+        },
+        .xwayland_view => {
+            assert(build_options.xwayland);
+            self.surface.?.forEachSurface(T, iterator, user_data);
+        },
     }
 }
 

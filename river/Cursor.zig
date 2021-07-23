@@ -434,24 +434,46 @@ fn surfaceAt(self: Self, lx: f64, ly: f64, sx: *f64, sy: *f64) ?*wlr.Surface {
     var oy = ly;
     server.root.output_layout.outputCoords(wlr_output, &ox, &oy);
 
+    // Find the first visible fullscreen view in the stack if there is one
+    var it = ViewStack(View).iter(output.views.first, .forward, output.current.tags, surfaceAtFilter);
+    const fullscreen_view = while (it.next()) |view| {
+        if (view.current.fullscreen) break view;
+    } else null;
+
     // Check surfaces in the reverse order they are rendered in:
-    // 1. overlay layer (+ popups)
-    // 2. top, bottom, background popups
-    // 3. top layer
-    // 4. views
-    // 5. bottom, background layers
+    //
+    // fullscreen:
+    //  1. overlay layer toplevels and popups
+    //  2. xwayland unmanaged stuff
+    //  3. fullscreen view toplevels and popups
+    //
+    // non-fullscreen:
+    //  1. overlay layer toplevels and popups
+    //  2. top, bottom, background layer popups
+    //  3. top layer toplevels
+    //  4. xwayland unmanaged stuff
+    //  5. view toplevels and popups
+    //  6. bottom, background layer toplevels
+
     if (layerSurfaceAt(output.getLayer(.overlay).*, ox, oy, sx, sy)) |s| return s;
 
-    for ([_]zwlr.LayerShellV1.Layer{ .top, .bottom, .background }) |layer| {
-        if (layerPopupSurfaceAt(output.getLayer(layer).*, ox, oy, sx, sy)) |s| return s;
-    }
+    if (fullscreen_view) |view| {
+        if (build_options.xwayland) if (xwaylandUnmanagedSurfaceAt(ly, lx, sx, sy)) |s| return s;
+        if (view.surfaceAt(ox, oy, sx, sy)) |s| return s;
+    } else {
+        for ([_]zwlr.LayerShellV1.Layer{ .top, .bottom, .background }) |layer| {
+            if (layerPopupSurfaceAt(output.getLayer(layer).*, ox, oy, sx, sy)) |s| return s;
+        }
 
-    if (layerSurfaceAt(output.getLayer(.top).*, ox, oy, sx, sy)) |s| return s;
+        if (layerSurfaceAt(output.getLayer(.top).*, ox, oy, sx, sy)) |s| return s;
 
-    if (viewSurfaceAt(output.*, ox, oy, sx, sy)) |s| return s;
+        if (build_options.xwayland) if (xwaylandUnmanagedSurfaceAt(lx, ly, sx, sy)) |s| return s;
 
-    for ([_]zwlr.LayerShellV1.Layer{ .bottom, .background }) |layer| {
-        if (layerSurfaceAt(output.getLayer(layer).*, ox, oy, sx, sy)) |s| return s;
+        if (viewSurfaceAt(output, ox, oy, sx, sy)) |s| return s;
+
+        for ([_]zwlr.LayerShellV1.Layer{ .bottom, .background }) |layer| {
+            if (layerSurfaceAt(output.getLayer(layer).*, ox, oy, sx, sy)) |s| return s;
+        }
     }
 
     return null;
@@ -488,7 +510,7 @@ fn layerSurfaceAt(layer: std.TailQueue(LayerSurface), ox: f64, oy: f64, sx: *f64
 }
 
 /// Find the topmost visible view surface (incl. popups) at ox,oy.
-fn viewSurfaceAt(output: Output, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*wlr.Surface {
+fn viewSurfaceAt(output: *const Output, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*wlr.Surface {
     // focused, floating views
     var it = ViewStack(View).iter(output.views.first, .forward, output.current.tags, surfaceAtFilter);
     while (it.next()) |view| {
@@ -517,6 +539,20 @@ fn viewSurfaceAt(output: Output, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*wlr.Sur
         if (view.surfaceAt(ox, oy, sx, sy)) |found| return found;
     }
 
+    return null;
+}
+
+fn xwaylandUnmanagedSurfaceAt(lx: f64, ly: f64, sx: *f64, sy: *f64) ?*wlr.Surface {
+    var it = server.root.xwayland_unmanaged_views.first;
+    while (it) |node| : (it = node.next) {
+        const xwayland_surface = node.data.xwayland_surface;
+        if (xwayland_surface.surface.?.surfaceAt(
+            lx - @intToFloat(f64, xwayland_surface.x),
+            ly - @intToFloat(f64, xwayland_surface.y),
+            sx,
+            sy,
+        )) |found| return found;
+    }
     return null;
 }
 
