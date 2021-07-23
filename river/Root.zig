@@ -405,7 +405,7 @@ fn commitTransaction(self: *Self) void {
 
         output.damage.addWhole();
     }
-    server.input_manager.maybeResetCursorState();
+    server.input_manager.updateCursorState();
 }
 
 /// Send the new output configuration to all wlr-output-manager clients

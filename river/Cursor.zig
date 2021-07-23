@@ -774,34 +774,31 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
 /// Handle potential change in location of views on the output, as well as
 /// the target view of a cursor operation potentially being moved to a non-visible tag,
 /// becoming fullscreen, etc.
-pub fn maybeResetState(self: *Self) void {
-    switch (self.mode) {
-        .passthrough => {},
-        .down => |target| {
-            // If the target view is no longer visible, abort the operation.
-            if (target.current.tags & target.output.current.tags == 0) {
-                self.mode = .passthrough;
-            }
-        },
-        .resize, .move => {
-            // If the target view is no longer visible, or now fullscreen or no
-            // longer floating, abort the operation.
-            const target = if (self.mode == .resize) self.mode.resize.view else self.mode.move;
-            if (target.current.tags & target.output.current.tags == 0 or
-                (!target.current.float and target.output.current.layout != null) or
-                target.current.fullscreen)
-            {
-                self.mode = .passthrough;
-            }
-        },
-    }
-
-    if (self.mode == .passthrough) {
+pub fn updateState(self: *Self) void {
+    if (self.shouldExitMode()) {
+        self.mode = .passthrough;
         var now: os.timespec = undefined;
         os.clock_gettime(os.CLOCK_MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
         const msec = @intCast(u32, now.tv_sec * std.time.ms_per_s +
             @divFloor(now.tv_nsec, std.time.ns_per_ms));
         self.passthrough(msec);
+    }
+}
+
+fn shouldExitMode(self: Self) bool {
+    switch (self.mode) {
+        .passthrough => return false,
+        .down => |target| {
+            // The target view is no longer visible
+            return target.current.tags & target.output.current.tags == 0;
+        },
+        .resize, .move => {
+            const target = if (self.mode == .resize) self.mode.resize.view else self.mode.move;
+            // The target view is no longer visible, is part of the layout, or is fullscreen.
+            return target.current.tags & target.output.current.tags == 0 or
+                (!target.current.float and target.output.current.layout != null) or
+                target.current.fullscreen;
+        },
     }
 }
 

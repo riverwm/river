@@ -273,7 +273,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) voi
                 view.current = view.pending;
                 if (self_tags_changed) view.output.sendViewTags();
                 view.output.damage.addWhole();
-                server.input_manager.maybeResetCursorState();
+                server.input_manager.updateCursorState();
             }
         } else {
             // If the client has not yet acked our configure, we need to send a

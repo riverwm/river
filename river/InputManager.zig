@@ -178,9 +178,9 @@ pub fn inputAllowed(self: Self, wlr_surface: *wlr.Surface) bool {
         true;
 }
 
-pub fn maybeResetCursorState(self: Self) void {
+pub fn updateCursorState(self: Self) void {
     var it = self.seats.first;
-    while (it) |node| : (it = node.next) node.data.cursor.maybeResetState();
+    while (it) |node| : (it = node.next) node.data.cursor.updateState();
 }
 
 fn handleInhibitActivate(
