@@ -405,11 +405,7 @@ fn commitTransaction(self: *Self) void {
 
         output.damage.addWhole();
     }
-
-    var seat_it = server.input_manager.seats.first;
-    while (seat_it) |seat_node| : (seat_it = seat_node.next) {
-        seat_node.data.cursor.maybeResetState();
-    }
+    server.input_manager.maybeResetCursorState();
 }
 
 /// Send the new output configuration to all wlr-output-manager clients

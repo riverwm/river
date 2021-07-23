@@ -178,6 +178,11 @@ pub fn inputAllowed(self: Self, wlr_surface: *wlr.Surface) bool {
         true;
 }
 
+pub fn maybeResetCursorState(self: Self) void {
+    var it = self.seats.first;
+    while (it) |node| : (it = node.next) node.data.cursor.maybeResetState();
+}
+
 fn handleInhibitActivate(
     listener: *wl.Listener(*wlr.InputInhibitManager),
     input_inhibit_manager: *wlr.InputInhibitManager,
