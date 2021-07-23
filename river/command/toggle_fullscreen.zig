@@ -35,9 +35,6 @@ pub fn toggleFullscreen(
     if (seat.focused == .view) {
         const view = seat.focused.view;
 
-        // Don't modify views which are the target of a cursor action
-        if (server.input_manager.isCursorActionTarget(view)) return;
-
         view.pending.fullscreen = !view.pending.fullscreen;
         view.applyPending();
     }

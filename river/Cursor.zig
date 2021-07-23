@@ -179,17 +179,13 @@ pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
     }
 }
 
-pub fn isCursorActionTarget(self: Self, view: *const View) bool {
-    return switch (self.mode) {
+pub fn handleViewUnmap(self: *Self, view: *View) void {
+    if (switch (self.mode) {
         .passthrough => false,
         .down => |target_view| target_view == view,
         .move => |target_view| target_view == view,
         .resize => |data| data.view == view,
-    };
-}
-
-pub fn handleViewUnmap(self: *Self, view: *View) void {
-    if (self.isCursorActionTarget(view)) {
+    }) {
         self.mode = .passthrough;
         self.clearFocus();
     }
