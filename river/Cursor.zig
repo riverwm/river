@@ -232,7 +232,7 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
         }
     }
 
-    if (self.surfaceAt(self.wlr_cursor.x, self.wlr_cursor.y)) |result| {
+    if (self.surfaceAt()) |result| {
         switch (result.parent) {
             .view => |view| {
                 // If a view has been clicked on, give that view keyboard focus and
@@ -427,11 +427,12 @@ const SurfaceAtResult = struct {
     },
 };
 
-/// Find the topmost surface under the output layout coordinates lx/ly
-/// returns the surface if found and sets the sx/sy parameters to the
-/// surface coordinates.
+/// Find the surface under the cursor if any, and return information about that
+/// surface and the cursor's position in surface local coords.
 /// This function must be kept in sync with the rendering order in render.zig.
-fn surfaceAt(self: Self, lx: f64, ly: f64) ?SurfaceAtResult {
+pub fn surfaceAt(self: Self) ?SurfaceAtResult {
+    const lx = self.wlr_cursor.x;
+    const ly = self.wlr_cursor.y;
     const wlr_output = server.root.output_layout.outputAt(lx, ly) orelse return null;
     const output = @intToPtr(*Output, wlr_output.data);
 
@@ -708,7 +709,7 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
         if (self.mode == .passthrough or self.mode == .down) {
             if (constraint.type == .locked) return;
 
-            const result = self.surfaceAt(self.wlr_cursor.x, self.wlr_cursor.y) orelse return;
+            const result = self.surfaceAt() orelse return;
 
             if (result.surface != constraint.surface) return;
 
@@ -812,7 +813,7 @@ pub fn maybeResetState(self: *Self) void {
 fn passthrough(self: *Self, time: u32) void {
     assert(self.mode == .passthrough);
 
-    if (self.surfaceAt(self.wlr_cursor.x, self.wlr_cursor.y)) |result| {
+    if (self.surfaceAt()) |result| {
         // If input is allowed on the surface, send pointer enter and motion
         // events. Note that wlroots won't actually send an enter event if
         // the surface has already been entered.
