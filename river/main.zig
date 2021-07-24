@@ -40,7 +40,7 @@ pub var level: std.log.Level = switch (std.builtin.mode) {
 const usage: []const u8 =
     \\usage: river [options]
     \\
-    \\  -h            Print this help message and exit.
+    \\  -help         Print this help message and exit.
     \\  -c <command>  Run `sh -c <command>` on startup.
     \\  -l <level>    Set the log level to a value from 0 to 7.
     \\  -version      Print the version number and exit.
@@ -65,7 +65,7 @@ pub fn main() anyerror!void {
         os.exit(1);
     }
 
-    if (result.boolFlag("-h")) {
+    if (result.boolFlag("-help")) {
         try io.getStdOut().writeAll(usage);
         os.exit(0);
     }
