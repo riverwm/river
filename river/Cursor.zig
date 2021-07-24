@@ -775,7 +775,7 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
 /// the target view of a cursor operation potentially being moved to a non-visible tag,
 /// becoming fullscreen, etc.
 pub fn updateState(self: *Self) void {
-    if (self.shouldExitMode()) {
+    if (self.shouldPassthrough()) {
         self.mode = .passthrough;
         var now: os.timespec = undefined;
         os.clock_gettime(os.CLOCK_MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
@@ -785,9 +785,14 @@ pub fn updateState(self: *Self) void {
     }
 }
 
-fn shouldExitMode(self: Self) bool {
+fn shouldPassthrough(self: Self) bool {
     switch (self.mode) {
-        .passthrough => return false,
+        .passthrough => {
+            // If we are not currently in down/resize/move mode, we *always* need to passthrough()
+            // as what is under the cursor may have changed and we are not locked to a single
+            // target view.
+            return true;
+        },
         .down => |target| {
             // The target view is no longer visible
             return target.current.tags & target.output.current.tags == 0;
