@@ -51,11 +51,14 @@ const flags = @import("flags");
 const usage =
     \\usage: rivertile [options]
     \\
-    \\  -h, --help      Print this help message and exit.
+    \\  -help           Print this help message and exit.
     \\  -version        Print the version number and exit.
     \\  -view-padding   Set the padding around views in pixels. (Default 6)
     \\  -outer-padding  Set the padding around the edge of the layout area in
     \\                  pixels. (Default 6)
+    \\
+    \\  The following commands may be sent to rivertile at runtime:
+    \\
     \\  -main-location  Set the initial location of the main area in the
     \\                  layout. (Default left)
     \\  -main-count     Set the initial number of views in the main area of the
@@ -314,8 +317,7 @@ pub fn main() !void {
     // https://github.com/ziglang/zig/issues/7807
     const argv: [][*:0]const u8 = os.argv;
     const result = flags.parse(argv[1..], &[_]flags.Flag{
-        .{ .name = "-h", .kind = .boolean },
-        .{ .name = "--help", .kind = .boolean },
+        .{ .name = "-help", .kind = .boolean },
         .{ .name = "-version", .kind = .boolean },
         .{ .name = "-view-padding", .kind = .arg },
         .{ .name = "-outer-padding", .kind = .arg },
@@ -328,7 +330,7 @@ pub fn main() !void {
     };
     if (result.args.len != 0) fatalPrintUsage("unknown option '{s}'", .{result.args[0]});
 
-    if (result.boolFlag("-h") or result.boolFlag("--help")) {
+    if (result.boolFlag("-help")) {
         try std.io.getStdOut().writeAll(usage);
         os.exit(0);
     }
