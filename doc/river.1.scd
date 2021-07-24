@@ -31,10 +31,10 @@ utility may be used to communicate with river over these protocols.
 	_shell_command_ will be run with _/bin/sh -c_. See the *CONFIGURATION*
 	section for more details.
 
-*-l* _log_level_
-	Set the log level of river to a value from 0 to 7 with 0 being the
-	least verbose and 7 being the most verbose. The default log level of
-	release-safe builds is 5.
+*-log-level* [*error*|*warn*|*info*|*debug*]
+	Set the log level of river. At the *error* log level, only errors
+	are logged.  At the *debug* log level, everything is logged including
+	verbose debug messages.
 
 # CONFIGURATION
 

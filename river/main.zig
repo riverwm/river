@@ -28,24 +28,17 @@ const util = @import("util.zig");
 
 const Server = @import("Server.zig");
 
-pub var server: Server = undefined;
-
-pub var level: std.log.Level = switch (std.builtin.mode) {
-    .Debug => .debug,
-    .ReleaseSafe => .notice,
-    .ReleaseFast => .err,
-    .ReleaseSmall => .emerg,
-};
-
 const usage: []const u8 =
     \\usage: river [options]
     \\
-    \\  -help         Print this help message and exit.
-    \\  -c <command>  Run `sh -c <command>` on startup.
-    \\  -l <level>    Set the log level to a value from 0 to 7.
-    \\  -version      Print the version number and exit.
+    \\  -help              Print this help message and exit.
+    \\  -version           Print the version number and exit.
+    \\  -c <command>       Run `sh -c <command>` on startup.
+    \\  -log-level <level> Set the log level to error, warning, info, or debug.
     \\
 ;
+
+pub var server: Server = undefined;
 
 pub fn main() anyerror!void {
     // This line is here because of https://github.com/ziglang/zig/issues/7807
@@ -54,7 +47,7 @@ pub fn main() anyerror!void {
         .{ .name = "-help", .kind = .boolean },
         .{ .name = "-version", .kind = .boolean },
         .{ .name = "-c", .kind = .arg },
-        .{ .name = "-l", .kind = .arg },
+        .{ .name = "-log-level", .kind = .arg },
     }) catch {
         try io.getStdErr().writeAll(usage);
         os.exit(1);
@@ -73,13 +66,18 @@ pub fn main() anyerror!void {
         try io.getStdOut().writeAll(build_options.version);
         os.exit(0);
     }
-    if (result.argFlag("-l")) |level_str| {
-        const log_level = std.fmt.parseInt(u3, std.mem.span(level_str), 10) catch {
+    if (result.argFlag("-log-level")) |level_str| {
+        const level = std.meta.stringToEnum(LogLevel, std.mem.span(level_str)) orelse {
             std.log.err("invalid log level '{s}'", .{level_str});
             try io.getStdErr().writeAll(usage);
             os.exit(1);
         };
-        level = @intToEnum(std.log.Level, log_level);
+        runtime_log_level = switch (level) {
+            .@"error" => .err,
+            .warning => .warn,
+            .info => .info,
+            .debug => .debug,
+        };
     }
     const startup_command = blk: {
         if (result.argFlag("-c")) |command| {
@@ -89,7 +87,7 @@ pub fn main() anyerror!void {
         }
     };
 
-    wlr.log.init(switch (level) {
+    wlr.log.init(switch (runtime_log_level) {
         .debug => .debug,
         .notice, .info => .info,
         .warn, .err, .crit, .alert, .emerg => .err,
@@ -145,4 +143,41 @@ fn defaultInitPath() !?[:0]const u8 {
     };
 
     return path;
+}
+
+/// Tell std.log to leave all log level filtering to us.
+pub const log_level: std.log.Level = .debug;
+
+/// Set the default log level based on the build mode.
+var runtime_log_level: std.log.Level = switch (std.builtin.mode) {
+    .Debug => .debug,
+    .ReleaseSafe, .ReleaseFast, .ReleaseSmall => .info,
+};
+
+/// River only exposes these 4 log levels to the user for simplicity
+const LogLevel = enum {
+    @"error",
+    warning,
+    info,
+    debug,
+};
+
+pub fn log(
+    comptime message_level: std.log.Level,
+    comptime scope: @TypeOf(.EnumLiteral),
+    comptime format: []const u8,
+    args: anytype,
+) void {
+    if (@enumToInt(message_level) > @enumToInt(runtime_log_level)) return;
+
+    const river_level: LogLevel = switch (message_level) {
+        .emerg, .alert, .crit, .err => .@"error",
+        .warn => .warning,
+        .notice, .info => .info,
+        .debug => .debug,
+    };
+    const scope_prefix = if (scope == .default) ": " else "(" ++ @tagName(scope) ++ "): ";
+
+    const stderr = std.io.getStdErr().writer();
+    stderr.print(@tagName(river_level) ++ scope_prefix ++ format ++ "\n", args) catch {};
 }
