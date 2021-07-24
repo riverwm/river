@@ -17,6 +17,12 @@ modified while rivertile is running with the help of *riverctl*(1).
 
 # OPTIONS
 
+*-help*
+	Print a help message and exit.
+
+*-version*
+	Print the version number and exit.
+
 *-view-padding* _pixels_
 	Set the padding around views in pixels. (Default: 6)
 

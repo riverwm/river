@@ -6,12 +6,20 @@ riverctl - command-line interface for controlling river
 
 # SYNOPSIS
 
-*riverctl* _command_ [_command specific arguments_]
+*riverctl* [_options_] _command_ [_command specific arguments_]
 
 # DESCRIPTION
 
 *riverctl* is a command-line utility used to control and configure river
 over the Wayland protocol.
+
+# OPTIONS
+
+*-help*
+	Print a help message and exit.
+
+*-version*
+	Print the version number and exit.
 
 # COMMANDS
 

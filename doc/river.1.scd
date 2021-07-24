@@ -6,7 +6,7 @@ river - dynamic tiling Wayland compositor
 
 # SYNOPSIS
 
-*river* [*-c* _shell_command_] [*-l* _log_level_]
+*river* [_options_]
 
 # DESCRIPTION
 
@@ -19,6 +19,12 @@ including several river-specific protocol extensions. The *riverctl*(1)
 utility may be used to communicate with river over these protocols.
 
 # OPTIONS
+
+*-help*
+	Print a help message and exit.
+
+*-version*
+	Print the version number and exit.
 
 *-c* _shell_command_
 	Override the default search paths for an init executable: instead
