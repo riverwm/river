@@ -6,6 +6,12 @@ const zbs = std.build;
 
 const ScanProtocolsStep = @import("deps/zig-wayland/build.zig").ScanProtocolsStep;
 
+/// While a river release is in development, this string should contain the version in development
+/// with the "-dev" suffix.
+/// When a release is tagged, the "-dev" suffix should be removed for the commit that gets tagged.
+/// Directly after the tagged commit, the version should be bumped and the "-dev" suffix added.
+const version = "0.1.0-dev";
+
 pub fn build(b: *zbs.Builder) !void {
     const target = b.standardTargetOptions(.{});
     const mode = b.standardReleaseOptions();
@@ -48,6 +54,21 @@ pub fn build(b: *zbs.Builder) !void {
 
     const examples = b.option(bool, "examples", "Set to true to build examples") orelse false;
 
+    const full_version = blk: {
+        if (mem.endsWith(u8, version, "-dev")) {
+            var ret: u8 = undefined;
+            const git_dir = try fs.path.join(b.allocator, &[_][]const u8{ b.build_root, ".git" });
+            const git_commit_hash = b.execAllowFail(
+                &[_][]const u8{ "git", "--git-dir", git_dir, "--work-tree", b.build_root, "rev-parse", "--short", "HEAD" },
+                &ret,
+                .Inherit,
+            ) catch break :blk version;
+            break :blk try std.fmt.allocPrintZ(b.allocator, "{s}-{s}", .{ version, git_commit_hash });
+        } else {
+            break :blk version;
+        }
+    };
+
     const scanner = ScanProtocolsStep.create(b);
     scanner.addSystemProtocol("stable/xdg-shell/xdg-shell.xml");
     scanner.addSystemProtocol("unstable/pointer-gestures/pointer-gestures-unstable-v1.xml");
@@ -64,6 +85,7 @@ pub fn build(b: *zbs.Builder) !void {
         river.setTarget(target);
         river.setBuildMode(mode);
         river.addBuildOption(bool, "xwayland", xwayland);
+        river.addBuildOption([:0]const u8, "version", full_version);
 
         addServerDeps(river, scanner);
 
@@ -74,6 +96,7 @@ pub fn build(b: *zbs.Builder) !void {
         const riverctl = b.addExecutable("riverctl", "riverctl/main.zig");
         riverctl.setTarget(target);
         riverctl.setBuildMode(mode);
+        riverctl.addBuildOption([:0]const u8, "version", full_version);
 
         riverctl.step.dependOn(&scanner.step);
         riverctl.addPackage(scanner.getPkg());
@@ -89,6 +112,7 @@ pub fn build(b: *zbs.Builder) !void {
         const rivertile = b.addExecutable("rivertile", "rivertile/main.zig");
         rivertile.setTarget(target);
         rivertile.setBuildMode(mode);
+        rivertile.addBuildOption([:0]const u8, "version", full_version);
 
         rivertile.step.dependOn(&scanner.step);
         rivertile.addPackage(scanner.getPkg());
