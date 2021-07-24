@@ -173,13 +173,14 @@ pub fn destroy(self: *Self) void {
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
     self.output.layouts.remove(node);
 
-    // If we are the currently active layout of an output,  clean up. The output
-    // will always end up with no layout at this point, so we directly start the
-    // transaction.
-    if (self == self.output.pending.layout) {
+    // If we are the currently active layout of an output, clean up.
+    if (self.output.pending.layout == self) {
         self.output.pending.layout = null;
-        self.output.arrangeViews();
-        server.root.startTransaction();
+        if (self.output.layout_demand) |*layout_demand| {
+            layout_demand.deinit();
+            self.output.layout_demand = null;
+            server.root.notifyLayoutDemandDone();
+        }
     }
 
     self.layout.setHandler(?*c_void, handleRequestInert, null, null);
