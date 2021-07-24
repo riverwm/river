@@ -2,7 +2,7 @@ RIVERTILE(1) "github.com/ifreund/river" "General Commands Manual"
 
 # NAME
 
-rivertile - Tiled layout generator for river
+rivertile - tiled layout generator for river
 
 # SYNOPSIS
 
