@@ -87,7 +87,7 @@ pub fn main() anyerror!void {
         }
     };
 
-    wlr.log.init(switch (runtime_log_level) {
+    river_init_wlroots_log(switch (runtime_log_level) {
         .debug => .debug,
         .notice, .info => .info,
         .warn, .err, .crit, .alert, .emerg => .err,
@@ -180,4 +180,15 @@ pub fn log(
 
     const stderr = std.io.getStdErr().writer();
     stderr.print(@tagName(river_level) ++ scope_prefix ++ format ++ "\n", args) catch {};
+}
+
+/// See wlroots_log_wrapper.c
+extern fn river_init_wlroots_log(importance: wlr.log.Importance) void;
+export fn river_wlroots_log_callback(importance: wlr.log.Importance, ptr: [*:0]const u8, len: usize) void {
+    switch (importance) {
+        .err => log(.err, .wlroots, "{s}", .{ptr[0..len]}),
+        .info => log(.info, .wlroots, "{s}", .{ptr[0..len]}),
+        .debug => log(.debug, .wlroots, "{s}", .{ptr[0..len]}),
+        .silent, .last => unreachable,
+    }
 }

@@ -211,6 +211,7 @@ fn addServerDeps(exe: *zbs.LibExeObjStep, scanner: *ScanProtocolsStep) void {
     exe.linkSystemLibrary("wlroots");
 
     exe.addPackagePath("flags", "common/flags.zig");
+    exe.addCSourceFile("river/wlroots_log_wrapper.c", &[_][]const u8{ "-std=c99", "-O2" });
 
     // TODO: remove when zig issue #131 is implemented
     scanner.addCSource(exe);
