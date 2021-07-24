@@ -26,6 +26,77 @@ const zriver = wayland.client.zriver;
 
 const gpa = std.heap.c_allocator;
 
+const usage =
+    \\Usage: riverctl [options]
+    \\
+    \\  -help                   Print this help message and exit.
+    \\  -version                Print the version number and exit.
+    \\
+    \\
+    \\  close                   Close the focused view.
+    \\  csd-filter-add          Add app-id to the CSD filter list.
+    \\  exit                    Exit the compositor.
+    \\  float-filter-add        Add app-id to the float filter list.
+    \\  focus-output            Focus the next or previous output.
+    \\  focus-view              Focus the next or previous view in the stack.
+    \\  move                    Move the focused view.
+    \\  resize                  Resize the focused view along the given axis.
+    \\  snap                    Snap the focused view.
+    \\  send-to-output          Send the focused view to the next/previous
+    \\                          output.
+    \\  spawn                   Run shell_command using /bin/sh -c.
+    \\  swap                    Swap the focused view.
+    \\  toggle-float            Toggle the floating state of the focused view.
+    \\  toggle-fullscreen       Toggle the fullscreen state of the focused view.
+    \\  zoom                    Bump the focused view to the top of the layout
+    \\                          stack.
+    \\  default-layout          Set the layout namespace of all outputs.
+    \\  output-layout           Set the layout namespace of currently focused
+    \\                          output.
+    \\  send-layout-cmd         Send command to the layout client.
+    \\
+    \\
+    \\  set-focused-tags        Show views with tags corresponding to the set
+    \\                          bits of tags.
+    \\  set-view-tags           Assign the currently focused view the tags
+    \\                          corresponding to the set bits of tags.
+    \\  toggle-focused-tags     Toggle visibility of views with tags
+    \\                          corresponding to the set bits of tags.
+    \\  toggle-view-tags        Toggle the tags of the currently focused view.
+    \\  spawn-tagmask           Set a tagmask to filter the tags assigned to
+    \\                          newly spawned view.
+    \\  focus-previous-tags     Sets tags to their previous value.
+    \\
+    \\
+    \\  declare-mode            Create a new mode.
+    \\  enter-mode              Switch to given mode if it exists.
+    \\  map                     Run command when key is pressed while modifiers
+    \\                          are held down and in the specified mode.
+    \\  map-pointer             Move or resize views when button and modifiers
+    \\                          are held down while in the specified mode.
+    \\  unmap                   Remove the mapping defined by the arguments.
+    \\  unmap-pointer           Remove the pointer mapping defined by the
+    \\                          arguments.
+    \\
+    \\
+    \\  attach-mode             Configure where new views should attach to
+    \\                          the view stack.
+    \\  background-color        Set the background color.
+    \\  border-color-focused    Set the border color of focused views.
+    \\  border-color-unfocused  Set the border color of unfocused views.
+    \\  border-width            Set the border width to pixels.
+    \\  focus-follows-cursor    Configure the focus behavior when moving cursor.
+    \\  set-repeat              Set the keyboard repeat rate and repeat delay.
+    \\  set-cursor-warp         Set the cursor warp mode.
+    \\  xcursor-theme           Set the xcursor theme.
+    \\
+    \\
+    \\  input                   Configure input devices.
+    \\  list-inputs             List all input devices.
+    \\  list-input-configs      List all input configurations.
+    \\
+;
+
 pub const Globals = struct {
     control: ?*zriver.ControlV1 = null,
     seat: ?*wl.Seat = null,
@@ -63,6 +134,11 @@ fn _main() !void {
 
     // This next line is needed cause of https://github.com/ziglang/zig/issues/2622
     const args = os.argv;
+
+    if (mem.eql(u8, mem.span(args[1]), "-help")) {
+        try std.io.getStdOut().writeAll(usage);
+        std.os.exit(0);
+    }
 
     if (mem.eql(u8, mem.span(args[1]), "-version")) {
         try std.io.getStdOut().writeAll(@import("build_options").version);
