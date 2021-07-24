@@ -100,6 +100,7 @@ pub fn build(b: *zbs.Builder) !void {
 
         riverctl.step.dependOn(&scanner.step);
         riverctl.addPackage(scanner.getPkg());
+        riverctl.addPackagePath("flags", "common/flags.zig");
         riverctl.linkLibC();
         riverctl.linkSystemLibrary("wayland-client");
 

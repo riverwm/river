@@ -40,7 +40,7 @@ pub var level: std.log.Level = switch (std.builtin.mode) {
 const usage: []const u8 =
     \\usage: river [options]
     \\
-    \\  -h            Print this help message and exit.
+    \\  -help         Print this help message and exit.
     \\  -c <command>  Run `sh -c <command>` on startup.
     \\  -l <level>    Set the log level to a value from 0 to 7.
     \\  -version      Print the version number and exit.
@@ -51,7 +51,7 @@ pub fn main() anyerror!void {
     // This line is here because of https://github.com/ziglang/zig/issues/7807
     const argv: [][*:0]const u8 = os.argv;
     const result = flags.parse(argv[1..], &[_]flags.Flag{
-        .{ .name = "-h", .kind = .boolean },
+        .{ .name = "-help", .kind = .boolean },
         .{ .name = "-version", .kind = .boolean },
         .{ .name = "-c", .kind = .arg },
         .{ .name = "-l", .kind = .arg },
@@ -59,18 +59,18 @@ pub fn main() anyerror!void {
         try io.getStdErr().writeAll(usage);
         os.exit(1);
     };
+    if (result.boolFlag("-help")) {
+        try io.getStdOut().writeAll(usage);
+        os.exit(0);
+    }
     if (result.args.len != 0) {
         std.log.err("unknown option '{s}'", .{result.args[0]});
         try io.getStdErr().writeAll(usage);
         os.exit(1);
     }
 
-    if (result.boolFlag("-h")) {
-        try io.getStdOut().writeAll(usage);
-        os.exit(0);
-    }
     if (result.boolFlag("-version")) {
-        try io.getStdOut().writeAll(@import("build_options").version);
+        try io.getStdOut().writeAll(build_options.version);
         os.exit(0);
     }
     if (result.argFlag("-l")) |level_str| {

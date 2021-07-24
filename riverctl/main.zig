@@ -17,12 +17,26 @@
 
 const std = @import("std");
 const mem = std.mem;
+const io = std.io;
 const os = std.os;
 const assert = std.debug.assert;
 
 const wayland = @import("wayland");
 const wl = wayland.client.wl;
 const zriver = wayland.client.zriver;
+
+const flags = @import("flags");
+
+const usage =
+    \\usage: riverctl [options] <command>
+    \\
+    \\  -help           Print this help message and exit.
+    \\  -version        Print the version number and exit.
+    \\
+    \\Complete documentation of the recognized commands may be found in
+    \\the riverctl(1) man page.
+    \\
+;
 
 const gpa = std.heap.c_allocator;
 
@@ -37,11 +51,11 @@ pub fn main() !void {
             return err;
 
         switch (err) {
-            error.RiverControlNotAdvertised => printErrorExit(
+            error.RiverControlNotAdvertised => fatal(
                 \\The Wayland server does not support river-control-unstable-v1.
                 \\Do your versions of river and riverctl match?
             , .{}),
-            error.SeatNotAdverstised => printErrorExit(
+            error.SeatNotAdverstised => fatal(
                 \\The Wayland server did not advertise any seat.
             , .{}),
             else => return err,
@@ -50,6 +64,24 @@ pub fn main() !void {
 }
 
 fn _main() !void {
+    // This line is here because of https://github.com/ziglang/zig/issues/7807
+    const argv: [][*:0]const u8 = os.argv;
+    const result = flags.parse(argv[1..], &[_]flags.Flag{
+        .{ .name = "-help", .kind = .boolean },
+        .{ .name = "-version", .kind = .boolean },
+    }) catch {
+        try io.getStdErr().writeAll(usage);
+        os.exit(1);
+    };
+    if (result.boolFlag("-help")) {
+        try io.getStdOut().writeAll(usage);
+        os.exit(0);
+    }
+    if (result.boolFlag("-version")) {
+        try io.getStdOut().writeAll(@import("build_options").version);
+        os.exit(0);
+    }
+
     const display = try wl.Display.connect(null);
     const registry = try display.getRegistry();
 
@@ -61,19 +93,9 @@ fn _main() !void {
     const control = globals.control orelse return error.RiverControlNotAdvertised;
     const seat = globals.seat orelse return error.SeatNotAdverstised;
 
-    // This next line is needed cause of https://github.com/ziglang/zig/issues/2622
-    const args = os.argv;
-
-    if (mem.eql(u8, mem.span(args[1]), "-version")) {
-        try std.io.getStdOut().writeAll(@import("build_options").version);
-        std.os.exit(0);
-    }
-
-    // Skip our name, send all other args
-    for (args[1..]) |arg| control.addArgument(arg);
+    for (result.args) |arg| control.addArgument(arg);
 
     const callback = try control.runCommand(seat);
-
     callback.setListener(?*c_void, callbackListener, null);
 
     // Loop until our callback is called and we exit.
@@ -103,12 +125,19 @@ fn callbackListener(callback: *zriver.CommandCallbackV1, event: zriver.CommandCa
             }
             os.exit(0);
         },
-        .failure => |failure| printErrorExit("Error: {s}\n", .{failure.failure_message}),
+        .failure => |failure| {
+            // A small hack to provide usage text when river reports an unknown command.
+            if (std.cstr.cmp(failure.failure_message, "unknown command") == 0) {
+                std.log.err("unknown command", .{});
+                io.getStdErr().writeAll(usage) catch {};
+                os.exit(1);
+            }
+            fatal("{s}", .{failure.failure_message});
+        },
     }
 }
 
-pub fn printErrorExit(comptime format: []const u8, args: anytype) noreturn {
-    const stderr = std.io.getStdErr().writer();
-    stderr.print("err: " ++ format ++ "\n", args) catch std.os.exit(1);
+fn fatal(comptime format: []const u8, args: anytype) noreturn {
+    std.log.err(format, args);
     std.os.exit(1);
 }

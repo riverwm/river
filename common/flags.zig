@@ -85,7 +85,7 @@ pub fn parse(args: [][*:0]const u8, comptime flags: []const Flag) !ParseResult(f
                     .arg => {
                         arg_idx += 1;
                         if (arg_idx == args.len) {
-                            std.log.err("flag '" ++ flag.name ++
+                            std.log.err("option '" ++ flag.name ++
                                 "' requires an argument but none was provided!", .{});
                             return error.MissingFlagArgument;
                         }
