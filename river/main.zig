@@ -42,6 +42,7 @@ const usage: []const u8 =
     \\  -h            Print this help message and exit.
     \\  -c <command>  Run `sh -c <command>` on startup.
     \\  -l <level>    Set the log level to a value from 0 to 7.
+    \\  -version      Print the version number and exit.
     \\
 ;
 
@@ -73,6 +74,9 @@ pub fn main() anyerror!void {
                 } else {
                     printErrorExit("Error: flag '-l' requires exactly one argument", .{});
                 }
+            } else if (std.mem.eql(u8, arg, "-version")) {
+                try std.io.getStdOut().writeAll(build_options.version);
+                os.exit(0);
             } else {
                 const stderr = std.io.getStdErr().writer();
                 try stderr.print(usage, .{});

@@ -61,9 +61,15 @@ fn _main() !void {
     const control = globals.control orelse return error.RiverControlNotAdvertised;
     const seat = globals.seat orelse return error.SeatNotAdverstised;
 
-    // Skip our name, send all other args
     // This next line is needed cause of https://github.com/ziglang/zig/issues/2622
     const args = os.argv;
+
+    if (mem.eql(u8, mem.span(args[1]), "-version")) {
+        try std.io.getStdOut().writeAll(@import("build_options").version);
+        std.os.exit(0);
+    }
+
+    // Skip our name, send all other args
     for (args[1..]) |arg| control.addArgument(arg);
 
     const callback = try control.runCommand(seat);

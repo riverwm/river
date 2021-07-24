@@ -52,6 +52,7 @@ const usage =
     \\Usage: rivertile [options]
     \\
     \\  -h, --help      Print this help message and exit.
+    \\  -version        Print the version number and exit.
     \\  -view-padding   Set the padding around views in pixels. (Default 6)
     \\  -outer-padding  Set the padding around the edge of the layout area in
     \\                  pixels. (Default 6)
@@ -315,6 +316,7 @@ pub fn main() !void {
     const args = Args(0, &[_]FlagDef{
         .{ .name = "-h", .kind = .boolean },
         .{ .name = "--help", .kind = .boolean },
+        .{ .name = "-version", .kind = .boolean },
         .{ .name = "-view-padding", .kind = .arg },
         .{ .name = "-outer-padding", .kind = .arg },
         .{ .name = "-main-location", .kind = .arg },
@@ -324,6 +326,10 @@ pub fn main() !void {
 
     if (args.boolFlag("-h") or args.boolFlag("--help")) {
         try std.io.getStdOut().writeAll(usage);
+        std.os.exit(0);
+    }
+    if (args.boolFlag("-version")) {
+        try std.io.getStdOut().writeAll(@import("build_options").version);
         std.os.exit(0);
     }
     if (args.argFlag("-view-padding")) |raw| {
