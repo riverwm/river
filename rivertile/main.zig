@@ -39,17 +39,17 @@
 const std = @import("std");
 const mem = std.mem;
 const math = std.math;
+const os = std.os;
 const assert = std.debug.assert;
 
 const wayland = @import("wayland");
 const wl = wayland.client.wl;
 const river = wayland.client.river;
 
-const Args = @import("args").Args;
-const FlagDef = @import("args").FlagDef;
+const flags = @import("flags");
 
 const usage =
-    \\Usage: rivertile [options]
+    \\usage: rivertile [options]
     \\
     \\  -h, --help      Print this help message and exit.
     \\  -version        Print the version number and exit.
@@ -312,8 +312,8 @@ const Output = struct {
 
 pub fn main() !void {
     // https://github.com/ziglang/zig/issues/7807
-    const argv: [][*:0]const u8 = std.os.argv;
-    const args = Args(0, &[_]FlagDef{
+    const argv: [][*:0]const u8 = os.argv;
+    const result = flags.parse(argv[1..], &[_]flags.Flag{
         .{ .name = "-h", .kind = .boolean },
         .{ .name = "--help", .kind = .boolean },
         .{ .name = "-version", .kind = .boolean },
@@ -322,40 +322,44 @@ pub fn main() !void {
         .{ .name = "-main-location", .kind = .arg },
         .{ .name = "-main-count", .kind = .arg },
         .{ .name = "-main-ratio", .kind = .arg },
-    }).parse(argv[1..]);
+    }) catch {
+        try std.io.getStdErr().writeAll(usage);
+        os.exit(1);
+    };
+    if (result.args.len != 0) fatalPrintUsage("unknown option '{s}'", .{result.args[0]});
 
-    if (args.boolFlag("-h") or args.boolFlag("--help")) {
+    if (result.boolFlag("-h") or result.boolFlag("--help")) {
         try std.io.getStdOut().writeAll(usage);
-        std.os.exit(0);
+        os.exit(0);
     }
-    if (args.boolFlag("-version")) {
+    if (result.boolFlag("-version")) {
         try std.io.getStdOut().writeAll(@import("build_options").version);
-        std.os.exit(0);
+        os.exit(0);
     }
-    if (args.argFlag("-view-padding")) |raw| {
+    if (result.argFlag("-view-padding")) |raw| {
         view_padding = std.fmt.parseUnsigned(u32, mem.span(raw), 10) catch
-            fatal("invalid value '{s}' provided to -view-padding", .{raw});
+            fatalPrintUsage("invalid value '{s}' provided to -view-padding", .{raw});
     }
-    if (args.argFlag("-outer-padding")) |raw| {
+    if (result.argFlag("-outer-padding")) |raw| {
         outer_padding = std.fmt.parseUnsigned(u32, mem.span(raw), 10) catch
-            fatal("invalid value '{s}' provided to -outer-padding", .{raw});
+            fatalPrintUsage("invalid value '{s}' provided to -outer-padding", .{raw});
     }
-    if (args.argFlag("-main-location")) |raw| {
+    if (result.argFlag("-main-location")) |raw| {
         default_main_location = std.meta.stringToEnum(Location, mem.span(raw)) orelse
-            fatal("invalid value '{s}' provided to -main-location", .{raw});
+            fatalPrintUsage("invalid value '{s}' provided to -main-location", .{raw});
     }
-    if (args.argFlag("-main-count")) |raw| {
+    if (result.argFlag("-main-count")) |raw| {
         default_main_count = std.fmt.parseUnsigned(u32, mem.span(raw), 10) catch
-            fatal("invalid value '{s}' provided to -main-count", .{raw});
+            fatalPrintUsage("invalid value '{s}' provided to -main-count", .{raw});
     }
-    if (args.argFlag("-main-ratio")) |raw| {
+    if (result.argFlag("-main-ratio")) |raw| {
         default_main_ratio = std.fmt.parseFloat(f64, mem.span(raw)) catch
-            fatal("invalid value '{s}' provided to -main-ratio", .{raw});
+            fatalPrintUsage("invalid value '{s}' provided to -main-ratio", .{raw});
     }
 
     const display = wl.Display.connect(null) catch {
         std.debug.warn("Unable to connect to Wayland server.\n", .{});
-        std.os.exit(1);
+        os.exit(1);
     };
     defer display.disconnect();
 
@@ -404,8 +408,13 @@ fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, context: *
     }
 }
 
-pub fn fatal(comptime format: []const u8, args: anytype) noreturn {
-    const stderr = std.io.getStdErr().writer();
-    stderr.print("err: " ++ format ++ "\n", args) catch {};
-    std.os.exit(1);
+fn fatal(comptime format: []const u8, args: anytype) noreturn {
+    std.log.err(format, args);
+    os.exit(1);
+}
+
+fn fatalPrintUsage(comptime format: []const u8, args: anytype) noreturn {
+    std.log.err(format, args);
+    std.io.getStdErr().writeAll(usage) catch {};
+    os.exit(1);
 }

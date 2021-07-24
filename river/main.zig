@@ -21,8 +21,7 @@ const fs = std.fs;
 const io = std.io;
 const os = std.os;
 const wlr = @import("wlroots");
-const Args = @import("args").Args;
-const FlagDef = @import("args").FlagDef;
+const flags = @import("flags");
 
 const c = @import("c.zig");
 const util = @import("util.zig");
@@ -39,7 +38,7 @@ pub var level: std.log.Level = switch (std.builtin.mode) {
 };
 
 const usage: []const u8 =
-    \\Usage: river [options]
+    \\usage: river [options]
     \\
     \\  -h            Print this help message and exit.
     \\  -c <command>  Run `sh -c <command>` on startup.
@@ -51,28 +50,39 @@ const usage: []const u8 =
 pub fn main() anyerror!void {
     // This line is here because of https://github.com/ziglang/zig/issues/7807
     const argv: [][*:0]const u8 = os.argv;
-    const args = Args(0, &[_]FlagDef{
+    const result = flags.parse(argv[1..], &[_]flags.Flag{
         .{ .name = "-h", .kind = .boolean },
         .{ .name = "-version", .kind = .boolean },
         .{ .name = "-c", .kind = .arg },
         .{ .name = "-l", .kind = .arg },
-    }).parse(argv[1..]);
+    }) catch {
+        try io.getStdErr().writeAll(usage);
+        os.exit(1);
+    };
+    if (result.args.len != 0) {
+        std.log.err("unknown option '{s}'", .{result.args[0]});
+        try io.getStdErr().writeAll(usage);
+        os.exit(1);
+    }
 
-    if (args.boolFlag("-h")) {
+    if (result.boolFlag("-h")) {
         try io.getStdOut().writeAll(usage);
         os.exit(0);
     }
-    if (args.boolFlag("-version")) {
+    if (result.boolFlag("-version")) {
         try io.getStdOut().writeAll(@import("build_options").version);
         os.exit(0);
     }
-    if (args.argFlag("-l")) |level_str| {
-        const log_level = std.fmt.parseInt(u3, std.mem.span(level_str), 10) catch
-            fatal("Error: invalid log level '{s}'", .{level_str});
+    if (result.argFlag("-l")) |level_str| {
+        const log_level = std.fmt.parseInt(u3, std.mem.span(level_str), 10) catch {
+            std.log.err("invalid log level '{s}'", .{level_str});
+            try io.getStdErr().writeAll(usage);
+            os.exit(1);
+        };
         level = @intToEnum(std.log.Level, log_level);
     }
     const startup_command = blk: {
-        if (args.argFlag("-c")) |command| {
+        if (result.argFlag("-c")) |command| {
             break :blk try util.gpa.dupeZ(u8, std.mem.span(command));
         } else {
             break :blk try defaultInitPath();
@@ -117,11 +127,6 @@ pub fn main() anyerror!void {
     std.log.info("shutting down", .{});
 }
 
-pub fn fatal(comptime format: []const u8, args: anytype) noreturn {
-    io.getStdErr().writer().print(format ++ "\n", args) catch {};
-    os.exit(1);
-}
-
 fn defaultInitPath() !?[:0]const u8 {
     const path = blk: {
         if (os.getenv("XDG_CONFIG_HOME")) |xdg_config_home| {
@@ -140,20 +145,4 @@ fn defaultInitPath() !?[:0]const u8 {
     };
 
     return path;
-}
-
-pub fn log(
-    comptime message_level: std.log.Level,
-    comptime scope: @TypeOf(.foobar),
-    comptime format: []const u8,
-    args: anytype,
-) void {
-    if (@enumToInt(message_level) <= @enumToInt(level)) {
-        // Don't store/log messages in release small mode to save space
-        if (std.builtin.mode != .ReleaseSmall) {
-            const stderr = io.getStdErr().writer();
-            stderr.print(@tagName(message_level) ++ ": (" ++ @tagName(scope) ++ ") " ++
-                format ++ "\n", args) catch return;
-        }
-    }
 }
