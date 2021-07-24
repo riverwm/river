@@ -116,6 +116,7 @@ pub fn build(b: *zbs.Builder) !void {
 
         rivertile.step.dependOn(&scanner.step);
         rivertile.addPackage(scanner.getPkg());
+        rivertile.addPackagePath("args", "common/args.zig");
         rivertile.linkLibC();
         rivertile.linkSystemLibrary("wayland-client");
 
@@ -207,6 +208,8 @@ fn addServerDeps(exe: *zbs.LibExeObjStep, scanner: *ScanProtocolsStep) void {
 
     exe.addPackage(wlroots);
     exe.linkSystemLibrary("wlroots");
+
+    exe.addPackagePath("args", "common/args.zig");
 
     // TODO: remove when zig issue #131 is implemented
     scanner.addCSource(exe);

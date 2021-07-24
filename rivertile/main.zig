@@ -45,8 +45,8 @@ const wayland = @import("wayland");
 const wl = wayland.client.wl;
 const river = wayland.client.river;
 
-const Args = @import("args.zig").Args;
-const FlagDef = @import("args.zig").FlagDef;
+const Args = @import("args").Args;
+const FlagDef = @import("args").FlagDef;
 
 const usage =
     \\Usage: rivertile [options]

@@ -113,14 +113,14 @@ pub fn Args(comptime num_positionals: comptime_int, comptime flag_defs: []const 
             for (self.flags) |flag| {
                 if (cstr.cmp(flag.name, flag_name) == 0) return flag.value.boolean;
             }
-            unreachable;
+            unreachable; // Invalid flag_name
         }
 
         pub fn argFlag(self: Self, flag_name: [*:0]const u8) ?[*:0]const u8 {
             for (self.flags) |flag| {
                 if (cstr.cmp(flag.name, flag_name) == 0) return flag.value.arg;
             }
-            unreachable;
+            unreachable; // Invalid flag_name
         }
     };
 }

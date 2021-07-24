@@ -15,12 +15,14 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+const build_options = @import("build_options");
 const std = @import("std");
 const fs = std.fs;
+const io = std.io;
 const os = std.os;
 const wlr = @import("wlroots");
-
-const build_options = @import("build_options");
+const Args = @import("args").Args;
+const FlagDef = @import("args").FlagDef;
 
 const c = @import("c.zig");
 const util = @import("util.zig");
@@ -47,51 +49,41 @@ const usage: []const u8 =
 ;
 
 pub fn main() anyerror!void {
-    var startup_command: ?[:0]const u8 = null;
-    {
-        var it = std.process.args();
-        // Skip our name
-        _ = it.nextPosix();
-        while (it.nextPosix()) |arg| {
-            if (std.mem.eql(u8, arg, "-h")) {
-                const stdout = std.io.getStdOut().writer();
-                try stdout.print(usage, .{});
-                os.exit(0);
-            } else if (std.mem.eql(u8, arg, "-c")) {
-                if (it.nextPosix()) |command| {
-                    // If the user used '-c' multiple times the variable
-                    // already holds a path and needs to be freed.
-                    if (startup_command) |cmd| util.gpa.free(cmd);
-                    startup_command = try util.gpa.dupeZ(u8, command);
-                } else {
-                    printErrorExit("Error: flag '-c' requires exactly one argument", .{});
-                }
-            } else if (std.mem.eql(u8, arg, "-l")) {
-                if (it.nextPosix()) |level_str| {
-                    const log_level = std.fmt.parseInt(u3, level_str, 10) catch
-                        printErrorExit("Error: invalid log level '{s}'", .{level_str});
-                    level = @intToEnum(std.log.Level, log_level);
-                } else {
-                    printErrorExit("Error: flag '-l' requires exactly one argument", .{});
-                }
-            } else if (std.mem.eql(u8, arg, "-version")) {
-                try std.io.getStdOut().writeAll(build_options.version);
-                os.exit(0);
-            } else {
-                const stderr = std.io.getStdErr().writer();
-                try stderr.print(usage, .{});
-                os.exit(1);
-            }
-        }
+    // This line is here because of https://github.com/ziglang/zig/issues/7807
+    const argv: [][*:0]const u8 = os.argv;
+    const args = Args(0, &[_]FlagDef{
+        .{ .name = "-h", .kind = .boolean },
+        .{ .name = "-version", .kind = .boolean },
+        .{ .name = "-c", .kind = .arg },
+        .{ .name = "-l", .kind = .arg },
+    }).parse(argv[1..]);
+
+    if (args.boolFlag("-h")) {
+        try io.getStdOut().writeAll(usage);
+        os.exit(0);
     }
+    if (args.boolFlag("-version")) {
+        try io.getStdOut().writeAll(@import("build_options").version);
+        os.exit(0);
+    }
+    if (args.argFlag("-l")) |level_str| {
+        const log_level = std.fmt.parseInt(u3, std.mem.span(level_str), 10) catch
+            fatal("Error: invalid log level '{s}'", .{level_str});
+        level = @intToEnum(std.log.Level, log_level);
+    }
+    const startup_command = blk: {
+        if (args.argFlag("-c")) |command| {
+            break :blk try util.gpa.dupeZ(u8, std.mem.span(command));
+        } else {
+            break :blk try defaultInitPath();
+        }
+    };
 
     wlr.log.init(switch (level) {
         .debug => .debug,
         .notice, .info => .info,
         .warn, .err, .crit, .alert, .emerg => .err,
     });
-
-    if (startup_command == null) startup_command = try defaultInitPath();
 
     std.log.info("initializing server", .{});
     try server.init();
@@ -125,9 +117,8 @@ pub fn main() anyerror!void {
     std.log.info("shutting down", .{});
 }
 
-fn printErrorExit(comptime format: []const u8, args: anytype) noreturn {
-    const stderr = std.io.getStdErr().writer();
-    stderr.print(format ++ "\n", args) catch os.exit(1);
+pub fn fatal(comptime format: []const u8, args: anytype) noreturn {
+    io.getStdErr().writer().print(format ++ "\n", args) catch {};
     os.exit(1);
 }
 
@@ -160,7 +151,7 @@ pub fn log(
     if (@enumToInt(message_level) <= @enumToInt(level)) {
         // Don't store/log messages in release small mode to save space
         if (std.builtin.mode != .ReleaseSmall) {
-            const stderr = std.io.getStdErr().writer();
+            const stderr = io.getStdErr().writer();
             stderr.print(@tagName(message_level) ++ ": (" ++ @tagName(scope) ++ ") " ++
                 format ++ "\n", args) catch return;
         }
