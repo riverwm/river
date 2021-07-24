@@ -96,7 +96,7 @@ pub fn setCursorWarp(
 
 /// Parse a color in the format #RRGGBB or #RRGGBBAA
 fn parseRgba(string: []const u8) ![4]f32 {
-    if (string[0] != '#' or (string.len != 7 and string.len != 9)) return error.InvalidRgba;
+    if ((string.len != 7 and string.len != 9) or string[0] != '#') return error.InvalidRgba;
 
     const r = try std.fmt.parseInt(u8, string[1..3], 16);
     const g = try std.fmt.parseInt(u8, string[3..5], 16);
