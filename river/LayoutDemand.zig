@@ -18,6 +18,7 @@
 const Self = @This();
 
 const std = @import("std");
+const assert = std.debug.assert;
 const mem = std.mem;
 const wlr = @import("wlroots");
 const wayland = @import("wayland");
@@ -135,6 +136,6 @@ pub fn apply(self: *Self, layout: *Layout) void {
         }
         view.applyConstraints();
     }
-    std.debug.assert(i == self.view_boxen.len);
-    output.pending.layout = layout;
+    assert(i == self.view_boxen.len);
+    assert(output.pending.layout == layout);
 }
