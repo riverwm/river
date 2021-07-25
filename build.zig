@@ -52,8 +52,6 @@ pub fn build(b: *zbs.Builder) !void {
         "Set to true to install fish completion for riverctl. Defaults to true.",
     ) orelse true;
 
-    const examples = b.option(bool, "examples", "Set to true to build examples") orelse false;
-
     const full_version = blk: {
         if (mem.endsWith(u8, version, "-dev")) {
             var ret: u8 = undefined;
@@ -150,23 +148,6 @@ pub fn build(b: *zbs.Builder) !void {
             "completions/fish/riverctl.fish",
             "share/fish/vendor_completions.d/riverctl.fish",
         );
-    }
-
-    if (examples) {
-        inline for (.{"status"}) |example_name| {
-            const example = b.addExecutable(example_name, "example/" ++ example_name ++ ".zig");
-            example.setTarget(target);
-            example.setBuildMode(mode);
-
-            example.step.dependOn(&scanner.step);
-            example.addPackage(scanner.getPkg());
-            example.linkLibC();
-            example.linkSystemLibrary("wayland-client");
-
-            scanner.addCSource(example);
-
-            example.install();
-        }
     }
 
     {
