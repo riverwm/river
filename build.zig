@@ -124,30 +124,23 @@ pub fn build(b: *zbs.Builder) !void {
         rivertile.install();
     }
 
+    b.installFile("protocol/river-layout-v3.xml", "share/river/river-layout-v3.xml");
+
     if (man_pages) {
         const scdoc_step = ScdocStep.create(b);
         try scdoc_step.install();
     }
 
     if (bash_completion) {
-        b.installFile(
-            "completions/bash/riverctl",
-            "share/bash-completion/completions/riverctl",
-        );
+        b.installFile("completions/bash/riverctl", "share/bash-completion/completions/riverctl");
     }
 
     if (zsh_completion) {
-        b.installFile(
-            "completions/zsh/_riverctl",
-            "share/zsh/site-functions/_riverctl",
-        );
+        b.installFile("completions/zsh/_riverctl", "share/zsh/site-functions/_riverctl");
     }
 
     if (fish_completion) {
-        b.installFile(
-            "completions/fish/riverctl.fish",
-            "share/fish/vendor_completions.d/riverctl.fish",
-        );
+        b.installFile("completions/fish/riverctl.fish", "share/fish/vendor_completions.d/riverctl.fish");
     }
 
     {
