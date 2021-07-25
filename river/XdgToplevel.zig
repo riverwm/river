@@ -272,6 +272,11 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) voi
                 const self_tags_changed = view.pending.tags != view.current.tags;
                 view.current = view.pending;
                 if (self_tags_changed) view.output.sendViewTags();
+
+                // This is necessary if this view was part of a transaction that didn't get completed
+                // before some change occured that caused shouldTrackConfigure() to return false.
+                view.dropSavedBuffers();
+
                 view.output.damage.addWhole();
                 server.input_manager.updateCursorState();
             }
