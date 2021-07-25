@@ -191,11 +191,11 @@ fn handleNewLayerSurface(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_
     const self = @fieldParentPtr(Self, "new_layer_surface", listener);
 
     log.debug(
-        "New layer surface: namespace {s}, layer {}, anchor {}, size {}x{}, margin ({},{},{},{}), exclusive_zone {}",
+        "new layer surface: namespace {s}, layer {s}, anchor {b:0>4}, size {},{}, margin {},{},{},{}, exclusive_zone {}",
         .{
             wlr_layer_surface.namespace,
-            wlr_layer_surface.client_pending.layer,
-            wlr_layer_surface.client_pending.anchor,
+            @tagName(wlr_layer_surface.client_pending.layer),
+            @bitCast(u32, wlr_layer_surface.client_pending.anchor),
             wlr_layer_surface.client_pending.desired_width,
             wlr_layer_surface.client_pending.desired_height,
             wlr_layer_surface.client_pending.margin.top,
