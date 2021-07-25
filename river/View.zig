@@ -115,10 +115,8 @@ saved_buffers: std.ArrayList(SavedBuffer),
 /// view returns to floating mode.
 float_box: Box = undefined,
 
-/// While a view is in fullscreen, it is still arranged if a layout is active but
-/// the resulting dimensions are stored here instead of being applied to the view's
-/// state. This allows us to avoid an arrange when the view returns from fullscreen
-/// and for more intuitive behavior if there is no active layout for the output.
+/// This state exists purely to allow for more intuitive behavior when
+/// exiting fullscreen if there is no active layout.
 post_fullscreen_box: Box = undefined,
 
 draw_borders: bool = true,
@@ -175,40 +173,40 @@ pub fn destroy(self: *Self) void {
 pub fn applyPending(self: *Self) void {
     var arrange_output = false;
 
-    if (self.current.tags != self.pending.tags)
-        arrange_output = true;
+    if (self.current.tags != self.pending.tags) arrange_output = true;
 
     // If switching from float -> layout or layout -> float arrange the output
-    // to get assigned a new size or fill the hole in the layout left behind
-    if (self.current.float != self.pending.float)
+    // to get assigned a new size or fill the hole in the layout left behind.
+    if (self.current.float != self.pending.float) {
+        assert(!self.pending.fullscreen); // float state modifed while in fullscreen
         arrange_output = true;
+    }
 
-    // If switching from float to non-float, save the dimensions
-    if (self.current.float and !self.pending.float)
-        self.float_box = self.current.box;
+    // If switching from float to non-float, save the dimensions.
+    if (self.current.float and !self.pending.float) self.float_box = self.current.box;
 
-    // If switching from non-float to float, apply the saved float dimensions
-    if (!self.current.float and self.pending.float)
-        self.pending.box = self.float_box;
+    // If switching from non-float to float, apply the saved float dimensions.
+    if (!self.current.float and self.pending.float) self.pending.box = self.float_box;
 
-    // If switching to fullscreen set the dimensions to the full area of the output
-    // and turn the view fully opaque
+    // If switching to fullscreen, set the dimensions to the full area of the output
+    // Since no other views will be visible, we can skip arranging the output.
     if (!self.current.fullscreen and self.pending.fullscreen) {
         self.setFullscreen(true);
         self.post_fullscreen_box = self.current.box;
-
-        const layout_box = server.root.output_layout.getBox(self.output.wlr_output).?;
+        const dimensions = self.output.getEffectiveResolution();
         self.pending.box = .{
             .x = 0,
             .y = 0,
-            .width = @intCast(u32, layout_box.width),
-            .height = @intCast(u32, layout_box.height),
+            .width = dimensions.width,
+            .height = dimensions.height,
         };
     }
 
     if (self.current.fullscreen and !self.pending.fullscreen) {
         self.setFullscreen(false);
         self.pending.box = self.post_fullscreen_box;
+        // If switching from fullscreen to layout, we need to arrange the output.
+        if (!self.pending.float) arrange_output = true;
     }
 
     if (arrange_output) self.output.arrangeViews();

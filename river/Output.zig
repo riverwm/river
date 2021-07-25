@@ -156,7 +156,7 @@ pub fn sendViewTags(self: Self) void {
 }
 
 pub fn arrangeFilter(view: *View, filter_tags: u32) bool {
-    return !view.destroying and !view.pending.float and
+    return !view.destroying and !view.pending.float and !view.pending.fullscreen and
         view.pending.tags & filter_tags != 0;
 }
 
