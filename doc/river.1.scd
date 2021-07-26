@@ -14,7 +14,7 @@ river - dynamic tiling Wayland compositor
 a stack of views laid out dynamically by an external layout generator. Tags
 are used instead of workspaces allowing for increased flexibility.
 
-All runtime configuration and control happens through wayland protocols,
+All runtime configuration and control happens through Wayland protocols,
 including several river-specific protocol extensions. The *riverctl*(1)
 utility may be used to communicate with river over these protocols.
 
@@ -43,7 +43,7 @@ such an executable exists. If $XDG_CONFIG_HOME is not set, ~/.config/river/init
 will be used instead.
 
 The executable init file will be run as a process group leader after river's
-wayland server is initialized but before entering the main loop. On exit,
+Wayland server is initialized but before entering the main loop. On exit,
 river will send SIGTERM to this process group.
 
 Usually this executable is a shell script invoking *riverctl*(1) to create
