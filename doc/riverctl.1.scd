@@ -230,13 +230,13 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 *attach-mode* *top*|*bottom*
 	Configure where new views should attach to the view stack.
 
-*background-color* _#RRGGBB_|_#RRGGBBAA_
+*background-color* _0xRRGGBB_|_0xRRGGBBAA_
 	Set the background color.
 
-*border-color-focused* _#RRGGBB_|_#RRGGBBAA_
+*border-color-focused* _0xRRGGBB_|_0xRRGGBBAA_
 	Set the border color of focused views.
 
-*border-color-unfocused* _#RRGGBB_|_#RRGGBBAA_
+*border-color-unfocused* _0xRRGGBB_|_0xRRGGBBAA_
 	Set the border color of unfocused views.
 
 *border-width* _pixels_

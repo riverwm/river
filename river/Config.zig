@@ -48,7 +48,7 @@ border_width: u32 = 2,
 border_color_focused: [4]f32 = [_]f32{ 0.57647059, 0.63137255, 0.63137255, 1.0 }, // Solarized base1
 
 /// Color of border of unfocused window in RGBA
-border_color_unfocused: [4]f32 = [_]f32{ 0.34509804, 0.43137255, 0.45882353, 1.0 }, // Solarized base0
+border_color_unfocused: [4]f32 = [_]f32{ 0.34509804, 0.43137255, 0.45882353, 1.0 }, // Solarized base01
 
 /// Map of keymap mode name to mode id
 mode_to_id: std.StringHashMap(usize),

@@ -16,6 +16,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
+const fmt = std.fmt;
 
 const server = &@import("../main.zig").server;
 
@@ -32,7 +33,7 @@ pub fn borderWidth(
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
 
-    server.config.border_width = try std.fmt.parseInt(u32, args[1], 10);
+    server.config.border_width = try fmt.parseInt(u32, args[1], 10);
     server.root.arrangeAll();
     server.root.startTransaction();
 }
@@ -94,14 +95,15 @@ pub fn setCursorWarp(
         return Error.UnknownOption;
 }
 
-/// Parse a color in the format #RRGGBB or #RRGGBBAA
+/// Parse a color in the format 0xRRGGBB or 0xRRGGBBAA
 fn parseRgba(string: []const u8) ![4]f32 {
-    if ((string.len != 7 and string.len != 9) or string[0] != '#') return error.InvalidRgba;
+    if (string.len != 8 and string.len != 10) return error.InvalidRgba;
+    if (string[0] != '0' or string[1] != 'x') return error.InvalidRgba;
 
-    const r = try std.fmt.parseInt(u8, string[1..3], 16);
-    const g = try std.fmt.parseInt(u8, string[3..5], 16);
-    const b = try std.fmt.parseInt(u8, string[5..7], 16);
-    const a = if (string.len == 9) try std.fmt.parseInt(u8, string[7..9], 16) else 255;
+    const r = try fmt.parseInt(u8, string[2..4], 16);
+    const g = try fmt.parseInt(u8, string[4..6], 16);
+    const b = try fmt.parseInt(u8, string[6..8], 16);
+    const a = if (string.len == 10) try fmt.parseInt(u8, string[8..10], 16) else 255;
 
     return [4]f32{
         @intToFloat(f32, r) / 255.0,

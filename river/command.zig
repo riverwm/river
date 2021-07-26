@@ -144,7 +144,7 @@ pub fn errToMsg(err: Error) [:0]const u8 {
         Error.InvalidDirection => "invalid direction. Must be 'next' or 'previous'",
         Error.InvalidPhysicalDirection => "invalid direction. Must be 'up', 'down', 'left' or 'right'",
         Error.InvalidOrientation => "invalid orientation. Must be 'horizontal', or 'vertical'",
-        Error.InvalidRgba => "invalid color format, must be #RRGGBB or #RRGGBBAA",
+        Error.InvalidRgba => "invalid color format, must be hexadecimal 0xRRGGBB or 0xRRGGBBAA",
         Error.InvalidValue => "invalid value",
         Error.OutOfMemory => "out of memory",
         Error.Other => unreachable,
