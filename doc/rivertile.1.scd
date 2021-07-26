@@ -55,7 +55,7 @@ These commands may be sent to rivertile at runtime with the help of
 	_value_ is prefixed by a +/- sign, _value_ is added/subtracted from the
 	current count. If there is no sign, the main count is set to _value_.
 
-*main-count* _value_
+*main-ratio* _value_
 	Set or modify the ratio of the main area to total layout area. If
 	_value_ is prefixed by a +/- sign, _value_ is added/subtracted from
 	the current ratio. If there is no sign, the main ratio is set to
