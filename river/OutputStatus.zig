@@ -40,7 +40,7 @@ pub fn init(self: *Self, output: *Output, output_status: *zriver.OutputStatusV1)
 
     // Send view/focused tags once on bind.
     self.sendViewTags();
-    self.sendFocusedTags();
+    self.sendFocusedTags(output.current.tags);
 }
 
 fn handleRequest(output_status: *zriver.OutputStatusV1, request: zriver.OutputStatusV1.Request, self: *Self) void {
@@ -73,7 +73,6 @@ pub fn sendViewTags(self: Self) void {
     self.output_status.sendViewTags(&wl_array);
 }
 
-/// Send the currently focused tags of the output to the client.
-pub fn sendFocusedTags(self: Self) void {
-    self.output_status.sendFocusedTags(self.output.current.tags);
+pub fn sendFocusedTags(self: Self, tags: u32) void {
+    self.output_status.sendFocusedTags(tags);
 }

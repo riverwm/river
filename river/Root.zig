@@ -368,16 +368,15 @@ fn commitTransaction(self: *Self) void {
         const output = &output_node.data;
 
         // Apply pending state of the output
-        const output_tags_changed = output.pending.tags != output.current.tags;
-        output.current = output.pending;
-        if (output_tags_changed) {
+        if (output.pending.tags != output.current.tags) {
             std.log.scoped(.output).debug(
                 "changing current focus: {b:0>10} to {b:0>10}",
                 .{ output.current.tags, output.pending.tags },
             );
             var it = output.status_trackers.first;
-            while (it) |node| : (it = node.next) node.data.sendFocusedTags();
+            while (it) |node| : (it = node.next) node.data.sendFocusedTags(output.pending.tags);
         }
+        output.current = output.pending;
 
         var view_tags_changed = false;
 
