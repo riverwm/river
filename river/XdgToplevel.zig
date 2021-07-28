@@ -69,7 +69,7 @@ pub fn init(self: *Self, view: *View, xdg_surface: *wlr.XdgSurface) void {
     xdg_surface.events.new_popup.add(&self.new_popup);
     xdg_surface.surface.events.new_subsurface.add(&self.new_subsurface);
 
-    Subsurface.handleExisting(xdg_surface.surface, .{ .view = view });
+    Subsurface.handleExisting(xdg_surface.surface, .{ .xdg_toplevel = self });
 }
 
 pub fn deinit(self: *Self) void {
@@ -80,6 +80,9 @@ pub fn deinit(self: *Self) void {
         self.unmap.link.remove();
         self.new_popup.link.remove();
         self.new_subsurface.link.remove();
+
+        Subsurface.destroySubsurfaces(self.xdg_surface.surface);
+        XdgPopup.destroyPopups(self.xdg_surface);
     }
 }
 
@@ -157,7 +160,6 @@ pub fn getConstraints(self: Self) View.Constraints {
     };
 }
 
-/// Called when the xdg surface is destroyed
 fn handleDestroy(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurface) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
     self.deinit();
@@ -298,12 +300,12 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) voi
 
 fn handleNewPopup(listener: *wl.Listener(*wlr.XdgPopup), wlr_xdg_popup: *wlr.XdgPopup) void {
     const self = @fieldParentPtr(Self, "new_popup", listener);
-    XdgPopup.create(wlr_xdg_popup, .{ .view = self.view });
+    XdgPopup.create(wlr_xdg_popup, .{ .xdg_toplevel = self });
 }
 
 fn handleNewSubsurface(listener: *wl.Listener(*wlr.Subsurface), new_wlr_subsurface: *wlr.Subsurface) void {
     const self = @fieldParentPtr(Self, "new_subsurface", listener);
-    Subsurface.create(new_wlr_subsurface, .{ .view = self.view });
+    Subsurface.create(new_wlr_subsurface, .{ .xdg_toplevel = self });
 }
 
 /// Called when the client asks to be fullscreened. We always honor the request

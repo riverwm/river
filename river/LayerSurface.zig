@@ -82,6 +82,12 @@ fn handleDestroy(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface:
     self.commit.link.remove();
     self.new_subsurface.link.remove();
 
+    Subsurface.destroySubsurfaces(self.wlr_layer_surface.surface);
+    var it = wlr_layer_surface.popups.iterator(.forward);
+    while (it.next()) |wlr_xdg_popup| {
+        if (@intToPtr(?*XdgPopup, wlr_xdg_popup.base.data)) |xdg_popup| xdg_popup.destroy();
+    }
+
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
     util.gpa.destroy(node);
 }

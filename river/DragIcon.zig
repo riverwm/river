@@ -61,6 +61,8 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Drag.Icon), wlr_drag_icon: *wlr.Dra
     drag_icon.unmap.link.remove();
     drag_icon.new_subsurface.link.remove();
 
+    Subsurface.destroySubsurfaces(wlr_drag_icon.surface);
+
     util.gpa.destroy(node);
 }
 
