@@ -1,0 +1,110 @@
+# Build river with rusl libc and run the test suite every time a commit is pushed to master or
+# a pull request is opened against master.
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+name: voidlinux-musl
+
+jobs:
+  default_build_musl:
+    name: default build on musl
+    runs-on: ubuntu-latest
+    container: voidlinux/voidlinux-musl:latest
+
+    steps:
+      - name: install deps
+        run: |
+          xbps-install -S
+          xbps-install -uy xbps
+          # wlroots dependencies as well as we build from source
+          xbps-install -uy MesaLib-devel libseat-devel eudev-libudev-devel libdrm-devel \
+            libinput-devel libxkbcommon-devel pixman-devel wayland-devel wayland-protocols \
+            xcb-util-errors-devel xcb-util-wm-devel xcb-util-renderutil-devel libxcb-devel \
+            xcb-util-cursor-devel xcb-util-devel xcb-util-image-devel xcb-util-keysyms-devel \
+            xcb-util-xrm-devel xorg-server-xwayland pkg-config meson git gcc \
+            zig pkgconf scdoc
+
+          git clone https://github.com/swaywm/wlroots.git
+          cd wlroots
+          git checkout 0.14.0
+          meson build --auto-features=enabled -Dexamples=false -Dwerror=false -Db_ndebug=false
+          ninja -C build install
+      - name: checkout
+        uses: actions/checkout@v2
+        with:
+          submodules: true
+
+      - name: build
+        run: |
+          zig build
+
+      - name: test
+        run: |
+          zig build test
+
+  xwayland_build:
+    name: xwayland build on musl
+    runs-on: ubuntu-latest
+    container: voidlinux/voidlinux-musl:latest
+
+    steps:
+      - name: install deps
+        run: |
+          xbps-install -S
+          xbps-install -uy xbps
+          # wlroots dependencies as well as we build from source
+          xbps-install -uy MesaLib-devel libseat-devel eudev-libudev-devel libdrm-devel \
+            libinput-devel libxkbcommon-devel pixman-devel wayland-devel wayland-protocols \
+            xcb-util-errors-devel xcb-util-wm-devel xcb-util-renderutil-devel libxcb-devel \
+            xcb-util-cursor-devel xcb-util-devel xcb-util-image-devel xcb-util-keysyms-devel \
+            xcb-util-xrm-devel xorg-server-xwayland pkg-config meson git gcc \
+            zig pkgconf scdoc
+
+          git clone https://github.com/swaywm/wlroots.git
+          cd wlroots
+          git checkout 0.14.0
+          meson build --auto-features=enabled -Dexamples=false -Dwerror=false -Db_ndebug=false
+          ninja -C build install
+      - name: checkout
+        uses: actions/checkout@v2
+        with:
+          submodules: true
+
+      - name: build
+        run: |
+          zig build -Dxwayland=true
+
+      - name: test
+        run: |
+          zig build -Dxwayland=true test
+
+  zig_fmt:
+    name: zig fmt on musl
+    runs-on: ubuntu-latest
+    container: voidlinux/voidlinux-musl:latest
+
+    steps:
+      - name: install deps
+        run: |
+          xbps-install -S
+          xbps-install -uy xbps
+          xbps-install -uy zig git
+
+      - name: checkout
+        uses: actions/checkout@v2
+        with:
+          submodules: true
+
+      - name: fmt
+        run: |
+          zig fmt --check river/
+          zig fmt --check riverctl/
+          zig fmt --check rivertile/
+          zig fmt --check example/
+          zig fmt --check build.zig
