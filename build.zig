@@ -124,7 +124,26 @@ pub fn build(b: *zbs.Builder) !void {
         rivertile.install();
     }
 
-    b.installFile("protocol/river-layout-v3.xml", "share/river/river-layout-v3.xml");
+    {
+        const file = try fs.path.join(b.allocator, &[_][]const u8{ b.cache_root, "river-protocols.pc" });
+        const pkgconfig_file = try std.fs.cwd().createFile(file, .{});
+
+        const writer = pkgconfig_file.writer();
+        try writer.print(
+            \\prefix={s}
+            \\datadir=${{prefix}}/share
+            \\pkgdatadir=${{datadir}}/river-protocols
+            \\
+            \\Name: river-protocols
+            \\URL: https://github.com/ifreund/river
+            \\Description: protocol files for the river wayland compositor
+            \\Version: {s}
+        , .{ b.install_prefix, full_version });
+        defer pkgconfig_file.close();
+
+        b.installFile("protocol/river-layout-v3.xml", "share/river-protocols/river-layout-v3.xml");
+        b.installFile(file, "share/pkgconfig/river-protocols.pc");
+    }
 
     if (man_pages) {
         const scdoc_step = ScdocStep.create(b);
