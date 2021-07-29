@@ -136,7 +136,7 @@ _riverctl()
                 map) _alternative 'arguments:optional:(-release)' ;;
                 unmap) _alternative 'arguments:optional:(-release)' ;;
                 attach-mode) _alternative 'arguments:args:(top bottom)' ;;
-                focus-follows-cursor) _alternative 'arguments:args:(disabled normal strict)' ;;
+                focus-follows-cursor) _alternative 'arguments:args:(disabled normal)' ;;
                 set-cursor-warp) _alternative 'arguments:args:(disabled on-output-change)' ;;
                 *) return 0 ;;
             esac
