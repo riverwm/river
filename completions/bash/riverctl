@@ -53,7 +53,7 @@ function __riverctl_completion ()
 			"resize") OPTS="horizontal vertical" ;;
 			"map"|"unmap") OPTS="-release" ;;
 			"attach-mode") OPTS="top bottom" ;;
-			"focus-follows-cursor") OPTS="disabled normal strict" ;;
+			"focus-follows-cursor") OPTS="disabled normal" ;;
 			"set-cursor-warp") OPTS="disabled on-output-change" ;;
 			*) return ;;
 		esac
