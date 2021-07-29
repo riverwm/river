@@ -822,8 +822,7 @@ fn passthrough(self: *Self, time: u32) void {
             self.seat.wlr_seat.pointerNotifyEnter(result.surface, result.sx, result.sy);
             self.seat.wlr_seat.pointerNotifyMotion(time, result.sx, result.sy);
 
-            const follow_mode = server.config.focus_follows_cursor;
-            if (follow_mode == .strict or (follow_mode == .normal and focus_change)) {
+            if (server.config.focus_follows_cursor == .normal and focus_change) {
                 switch (result.parent) {
                     .view => |view| {
                         if (self.seat.focused != .view or self.seat.focused.view != view) {
