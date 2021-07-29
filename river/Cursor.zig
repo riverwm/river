@@ -826,9 +826,11 @@ fn passthrough(self: *Self, time: u32) void {
             if (follow_mode == .strict or (follow_mode == .normal and focus_change)) {
                 switch (result.parent) {
                     .view => |view| {
-                        self.seat.focusOutput(view.output);
-                        self.seat.focus(view);
-                        server.root.startTransaction();
+                        if (self.seat.focused != .view or self.seat.focused.view != view) {
+                            self.seat.focusOutput(view.output);
+                            self.seat.focus(view);
+                            server.root.startTransaction();
+                        }
                     },
                     .layer_surface => {},
                 }
