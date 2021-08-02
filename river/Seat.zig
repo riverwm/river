@@ -256,6 +256,16 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
 pub fn focusOutput(self: *Self, output: *Output) void {
     if (self.focused_output == output) return;
 
+    var it = self.status_trackers.first;
+    while (it) |node| : (it = node.next) node.data.sendOutput(.unfocused);
+
+    self.focused_output = output;
+
+    it = self.status_trackers.first;
+    while (it) |node| : (it = node.next) node.data.sendOutput(.focused);
+
+    if (self.focused_output == &server.root.noop_output) return;
+
     // Warp pointer to center of newly focused output (In layout coordinates),
     // but only if cursor is not already on the output and this feature is enabled.
     switch (server.config.warp_cursor) {
@@ -272,14 +282,6 @@ pub fn focusOutput(self: *Self, output: *Output) void {
             }
         },
     }
-
-    var it = self.status_trackers.first;
-    while (it) |node| : (it = node.next) node.data.sendOutput(.unfocused);
-
-    self.focused_output = output;
-
-    it = self.status_trackers.first;
-    while (it) |node| : (it = node.next) node.data.sendOutput(.focused);
 }
 
 pub fn handleActivity(self: Self) void {
