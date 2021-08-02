@@ -105,9 +105,9 @@
         The compositor sends this event to inform the client that it requires a
         layout for a set of views.
 
-        The usable width and height height indicate the space in which the
-        client can safely position views without interfering with desktop
-        widgets such as panels.
+        The usable width and height indicate the space in which the client
+        can safely position views without interfering with desktop widgets
+        such as panels.
 
         The serial of this event is used to identify subsequent requests as
         belonging to this layout demand. Beware that the client might need
