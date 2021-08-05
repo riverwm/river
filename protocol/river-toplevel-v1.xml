@@ -55,8 +55,6 @@
 
       After all states have been advertised, the done event of the
       zwlr_foreign_toplevel_handle_v1 is send.
-
-      States are double buffered and only applied on commit.
     </description>
 
     <event name="tags">
@@ -74,37 +72,6 @@
       </description>
       <arg name="floating" type="bool"/>
     </event>
-
-    <event name="floating">
-      <description summary="floating state of the toplevel">
-        Sent once when binding the interface and again whenever the tags
-        of the toplevel change.
-      </description>
-      <arg name="floating" type="bool"/>
-    </event>
-
-    <request name="set_tags">
-      <description summary="set the tags of the toplevel">
-        The client can use this request to change the pending tags of the view.
-        This state is double buffered and only applied when committing.
-      </description>
-      <arg name="tags" type="uint" summary="32-bit bitfield"/>
-    </request>
-
-    <request name="set_floating">
-      <description summary="set the floating state of the toplevel">
-        The client can use this request to change the pending floating state of
-        the view. This state is double buffered and only applied when committing.
-      </description>
-      <arg name="floating" type="bool"/>
-    </request>
-
-    <request name="commit">
-      <description summary="commit pending state">
-        The client can use this request to ask the server to apply the pending
-        state changes.
-      </description>
-    </request>
   </interface>
 </protocol>
 
