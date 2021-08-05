@@ -60,6 +60,9 @@ const usage =
     \\                  layout. (Default left)
     \\  -main-count     Set the initial number of views in the main area of the
     \\                  layout. (Default 1)
+    \\  -main-cols      Set the initial number of columns to spread the main
+    \\                  area of the layout over. (Default 1)
+    \\                  layout. (Default 1)
     \\  -main-ratio     Set the initial ratio of main area to total layout
     \\                  area. (Default: 0.6)
     \\
@@ -68,6 +71,7 @@ const usage =
 const Command = enum {
     @"main-location",
     @"main-count",
+    @"main-cols",
     @"main-ratio",
 };
 
@@ -83,6 +87,7 @@ var view_padding: u32 = 6;
 var outer_padding: u32 = 6;
 var default_main_location: Location = .left;
 var default_main_count: u32 = 1;
+var default_main_cols: u32 = 1;
 var default_main_ratio: f64 = 0.6;
 
 /// We don't free resources on exit, only when output globals are removed.
@@ -109,6 +114,7 @@ const Output = struct {
 
     main_location: Location,
     main_count: u32,
+    main_cols: u32,
     main_ratio: f64,
 
     layout: *river.LayoutV3 = undefined,
@@ -119,6 +125,7 @@ const Output = struct {
             .name = name,
             .main_location = default_main_location,
             .main_count = default_main_count,
+            .main_cols = default_main_cols,
             .main_ratio = default_main_ratio,
         };
         if (context.initialized) try output.getLayout(context);
@@ -181,6 +188,32 @@ const Output = struct {
                             },
                             else => output.main_count = @intCast(u32, arg),
                         }
+
+                        if (output.main_count < output.main_cols) {
+                            output.main_cols = output.main_count;
+                        }
+                    },
+                    .@"main-cols" => {
+                        const arg = std.fmt.parseInt(i32, raw_arg, 10) catch |err| {
+                            std.log.err("failed to parse argument: {}", .{err});
+                            return;
+                        };
+                        switch (raw_arg[0]) {
+                            '+' => output.main_cols = math.add(
+                                u32,
+                                output.main_cols,
+                                @intCast(u32, arg),
+                            ) catch math.maxInt(u32),
+                            '-' => {
+                                const result = @as(i33, output.main_cols) + arg;
+                                if (result >= 0) output.main_cols = @intCast(u32, result);
+                            },
+                            else => output.main_cols = @intCast(u32, arg),
+                        }
+
+                        if (output.main_cols > output.main_count) {
+                            output.main_count = output.main_cols;
+                        }
                     },
                     .@"main-ratio" => {
                         const arg = std.fmt.parseFloat(f64, raw_arg) catch |err| {
@@ -199,6 +232,7 @@ const Output = struct {
 
             .layout_demand => |ev| {
                 const main_count = math.clamp(output.main_count, 1, ev.view_count);
+                const main_cols = math.clamp(output.main_cols, 1, main_count);
                 const secondary_count = if (ev.view_count > main_count)
                     ev.view_count - main_count
                 else
@@ -217,7 +251,7 @@ const Output = struct {
                 // view slightly larger if the height is not evenly divisible
                 var main_width: u32 = undefined;
                 var main_height: u32 = undefined;
-                var main_height_rem: u32 = undefined;
+                var main_count_per_col: u32 = undefined;
 
                 var secondary_width: u32 = undefined;
                 var secondary_height: u32 = undefined;
@@ -225,21 +259,27 @@ const Output = struct {
 
                 if (main_count > 0 and secondary_count > 0) {
                     main_width = @floatToInt(u32, output.main_ratio * @intToFloat(f64, usable_width));
-                    main_height = usable_height / main_count;
-                    main_height_rem = usable_height % main_count;
+
+                    // The main_width will be split between the main columns, so just remove the remainder
+                    main_width -= usable_width % main_cols;
+
+                    main_height = usable_height;
 
                     secondary_width = usable_width - main_width;
                     secondary_height = usable_height / secondary_count;
                     secondary_height_rem = usable_height % secondary_count;
                 } else if (main_count > 0) {
                     main_width = usable_width;
-                    main_height = usable_height / main_count;
-                    main_height_rem = usable_height % main_count;
+                    main_height = usable_height;
                 } else if (secondary_width > 0) {
                     main_width = 0;
                     secondary_width = usable_width;
                     secondary_height = usable_height / secondary_count;
                     secondary_height_rem = usable_height % secondary_count;
+                }
+
+                if (main_count > 0) {
+                    main_count_per_col = main_count / main_cols;
                 }
 
                 var i: u32 = 0;
@@ -250,10 +290,28 @@ const Output = struct {
                     var height: u32 = undefined;
 
                     if (i < main_count) {
-                        x = 0;
-                        y = @intCast(i32, (i * main_height) + if (i > 0) main_height_rem else 0);
-                        width = main_width;
-                        height = main_height + if (i == 0) main_height_rem else 0;
+                        var col: u32 = undefined;
+                        var row: u32 = undefined;
+
+                        width = main_width / main_cols;
+
+                        row = i % main_count_per_col;
+                        col = i / main_count_per_col;
+
+                        if (col + 1 >= main_cols) {
+                            // The last column includes any remainders
+                            if (col + 1 > main_cols) {
+                                // The row is the index minus everything in non-overflow columns
+                                row = i - ((main_cols - 1) * main_count_per_col);
+                                col = main_cols - 1;
+                            }
+                            height = main_height / (main_count_per_col + (main_count % main_cols));
+                        } else {
+                            height = main_height / main_count_per_col;
+                        }
+
+                        x = @intCast(i32, col * width);
+                        y = @intCast(i32, row * height);
                     } else {
                         x = @intCast(i32, main_width);
                         y = @intCast(i32, (i - main_count) * secondary_height +
