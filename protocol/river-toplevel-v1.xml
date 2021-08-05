@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<protocol name="river_layout_v2">
+<protocol name="river_toplevel_v1">
   <copyright>
     Copyright 2021 The River Developers
 
@@ -41,7 +41,7 @@
 
     <request name="get_toplevel">
       <description summary="create a river_toplevel_v1 object">
-        This creates a new rivre_toplevel_v1 object for a
+        This creates a new river_toplevel_v1 object for a
         zwlr_foreign_toplevel_handle_v1.
       </description>
       <arg name="id" type="new_id" interface="river_toplevel_v1"/>
@@ -54,22 +54,22 @@
       This objects is used to track and set river specific toplevel states.
 
       After all states have been advertised, the done event of the
-      zlw_foreign_toplevel_handle_v1 is send.
+      zwlr_foreign_toplevel_handle_v1 is send.
 
       States are double buffered and only applied on commit.
     </description>
 
     <event name="tags">
       <description summary="tags of the toplevel">
-        Seont once when binding the interrface and again whenever the tags
+        Sent once when binding the interface and again whenever the tags
         of the toplevel change.
       </description>
-      <arg name="tags" type="uint" summary="32-bit bitfiled"/>
+      <arg name="tags" type="uint" summary="32-bit bitfield"/>
     </event>
 
     <event name="floating">
       <description summary="floating state of the toplevel">
-        Seont once when binding the interrface and again whenever the tags
+        Sent once when binding the interface and again whenever the tags
         of the toplevel change.
       </description>
       <arg name="floating" type="bool"/>
@@ -77,7 +77,7 @@
 
     <event name="floating">
       <description summary="floating state of the toplevel">
-        Seont once when binding the interrface and again whenever the tags
+        Sent once when binding the interface and again whenever the tags
         of the toplevel change.
       </description>
       <arg name="floating" type="bool"/>
@@ -86,15 +86,15 @@
     <request name="set_tags">
       <description summary="set the tags of the toplevel">
         The client can use this request to change the pending tags of the view.
-        This state is double buffered and only applied when comitting.
+        This state is double buffered and only applied when committing.
       </description>
-      <arg name="tags" type="uint" summary="32-bit bitfiled"/>
+      <arg name="tags" type="uint" summary="32-bit bitfield"/>
     </request>
 
     <request name="set_floating">
       <description summary="set the floating state of the toplevel">
         The client can use this request to change the pending floating state of
-        the view. This state is double buffered and only applied when comitting.
+        the view. This state is double buffered and only applied when committing.
       </description>
       <arg name="floating" type="bool"/>
     </request>
