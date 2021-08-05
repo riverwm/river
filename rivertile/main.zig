@@ -251,7 +251,7 @@ const Output = struct {
                 // view slightly larger if the height is not evenly divisible
                 var main_width: u32 = undefined;
                 var main_height: u32 = undefined;
-                var main_count_per_col: u32 = undefined;
+                var main_rows_per_col: u32 = undefined;
 
                 var secondary_width: u32 = undefined;
                 var secondary_height: u32 = undefined;
@@ -279,7 +279,7 @@ const Output = struct {
                 }
 
                 if (main_count > 0) {
-                    main_count_per_col = main_count / main_cols;
+                    main_rows_per_col = main_count / main_cols;
                 }
 
                 var i: u32 = 0;
@@ -292,22 +292,29 @@ const Output = struct {
                     if (i < main_count) {
                         var col: u32 = undefined;
                         var row: u32 = undefined;
+                        var rows_in_col: u32 = undefined;
 
                         width = main_width / main_cols;
 
-                        row = i % main_count_per_col;
-                        col = i / main_count_per_col;
+                        row = i % main_rows_per_col;
+                        col = i / main_rows_per_col;
 
                         if (col + 1 >= main_cols) {
                             // The last column includes any remainders
-                            if (col + 1 > main_cols) {
-                                // The row is the index minus everything in non-overflow columns
-                                row = i - ((main_cols - 1) * main_count_per_col);
-                                col = main_cols - 1;
-                            }
-                            height = main_height / (main_count_per_col + (main_count % main_cols));
+                            var other_cols_total: u32 = ((main_cols - 1) * main_rows_per_col);
+
+                            rows_in_col = main_count - other_cols_total;
+
+                            col = main_cols - 1;
+                            row = i - other_cols_total;
                         } else {
-                            height = main_height / main_count_per_col;
+                            rows_in_col = main_rows_per_col;
+                        }
+
+                        height = main_height / rows_in_col;
+                        if (row == 0) {
+                            // The first row in the column gets the remainder of the height
+                            height += main_height % rows_in_col;
                         }
 
                         x = @intCast(i32, col * width);
