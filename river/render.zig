@@ -93,32 +93,32 @@ pub fn renderOutput(output: *Output) void {
         it = ViewStack(View).iter(output.views.last, .reverse, output.current.tags, renderFilter);
         while (it.next()) |view| {
             if (view.current.focus != 0 or view.current.float) continue;
-            renderView(output, view, &now);
             if (view.draw_borders) renderBorders(output, view, &now);
+            renderView(output, view, &now);
         }
 
         // focused, non-floating views
         it = ViewStack(View).iter(output.views.last, .reverse, output.current.tags, renderFilter);
         while (it.next()) |view| {
             if (view.current.focus == 0 or view.current.float) continue;
-            renderView(output, view, &now);
             if (view.draw_borders) renderBorders(output, view, &now);
+            renderView(output, view, &now);
         }
 
         // non-focused, floating views
         it = ViewStack(View).iter(output.views.last, .reverse, output.current.tags, renderFilter);
         while (it.next()) |view| {
             if (view.current.focus != 0 or !view.current.float) continue;
-            renderView(output, view, &now);
             if (view.draw_borders) renderBorders(output, view, &now);
+            renderView(output, view, &now);
         }
 
         // focused, floating views
         it = ViewStack(View).iter(output.views.last, .reverse, output.current.tags, renderFilter);
         while (it.next()) |view| {
             if (view.current.focus == 0 or !view.current.float) continue;
-            renderView(output, view, &now);
             if (view.draw_borders) renderBorders(output, view, &now);
+            renderView(output, view, &now);
         }
 
         if (build_options.xwayland) renderXwaylandUnmanaged(output, &now);
