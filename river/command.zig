@@ -103,6 +103,7 @@ pub const Error = error{
     InvalidRgba,
     InvalidValue,
     UnknownOption,
+    ConflictingOptions,
     OutOfMemory,
     Other,
 };
@@ -136,6 +137,7 @@ pub fn errToMsg(err: Error) [:0]const u8 {
         Error.NoCommand => "no command given",
         Error.UnknownCommand => "unknown command",
         Error.UnknownOption => "unknown option",
+        Error.ConflictingOptions => "options conflict",
         Error.NotEnoughArguments => "not enough arguments",
         Error.TooManyArguments => "too many arguments",
         Error.Overflow => "value out of bounds",

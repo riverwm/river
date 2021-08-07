@@ -60,6 +60,12 @@ mode_id: usize = 0,
 /// ID of previous keymap mode, used when returning from "locked" mode
 prev_mode_id: usize = 0,
 
+/// Timer for repeating keyboard mappings
+mapping_repeat_timer: *wl.EventSource = undefined,
+
+/// Currently repeating mapping, if any
+mapping_repeat_command_args: ?[]const [:0]const u8 = null,
+
 /// Currently focused output, may be the noop output if no real output
 /// is currently available for focus.
 focused_output: *Output,
@@ -83,10 +89,15 @@ request_set_primary_selection: wl.Listener(*wlr.Seat.event.RequestSetPrimarySele
     wl.Listener(*wlr.Seat.event.RequestSetPrimarySelection).init(handleRequestSetPrimarySelection),
 
 pub fn init(self: *Self, name: [*:0]const u8) !void {
+    const event_loop = server.wl_server.getEventLoop();
+    const mapping_repeat_timer = try event_loop.addTimer(*Self, handleMappingRepeatTimeout, self);
+    errdefer mapping_repeat_timer.remove();
+
     self.* = .{
         // This will be automatically destroyed when the display is destroyed
         .wlr_seat = try wlr.Seat.create(server.wl_server, name),
         .focused_output = &server.root.noop_output,
+        .mapping_repeat_timer = mapping_repeat_timer,
     };
     self.wlr_seat.data = @ptrToInt(self);
 
@@ -100,6 +111,7 @@ pub fn init(self: *Self, name: [*:0]const u8) !void {
 
 pub fn deinit(self: *Self) void {
     self.cursor.deinit();
+    self.mapping_repeat_timer.remove();
 
     while (self.keyboards.pop()) |node| {
         node.data.deinit();
@@ -320,28 +332,54 @@ pub fn handleMapping(
     const modes = &server.config.modes;
     for (modes.items[self.mode_id].mappings.items) |mapping| {
         if (std.meta.eql(modifiers, mapping.modifiers) and keysym == mapping.keysym and released == mapping.release) {
-            // Execute the bound command
-            const args = mapping.command_args;
-            var out: ?[]const u8 = null;
-            defer if (out) |s| util.gpa.free(s);
-            command.run(util.gpa, self, args, &out) catch |err| {
-                const failure_message = switch (err) {
-                    command.Error.Other => out.?,
-                    else => command.errToMsg(err),
-                };
-                std.log.scoped(.command).err("{s}: {s}", .{ args[0], failure_message });
-                return true;
-            };
-            if (out) |s| {
-                const stdout = std.io.getStdOut().writer();
-                stdout.print("{s}", .{s}) catch |err| {
-                    std.log.scoped(.command).err("{s}: write to stdout failed {}", .{ args[0], err });
+            if (mapping.repeat) {
+                self.mapping_repeat_command_args = mapping.command_args;
+                self.mapping_repeat_timer.timerUpdate(server.config.repeat_delay) catch {
+                    log.err("failed to update mapping repeat timer", .{});
                 };
             }
+            self.runMappedCommand(mapping.command_args);
             return true;
         }
     }
     return false;
+}
+
+fn runMappedCommand(self: *Self, args: []const [:0]const u8) void {
+    var out: ?[]const u8 = null;
+    defer if (out) |s| util.gpa.free(s);
+    command.run(util.gpa, self, args, &out) catch |err| {
+        const failure_message = switch (err) {
+            command.Error.Other => out.?,
+            else => command.errToMsg(err),
+        };
+        std.log.scoped(.command).err("{s}: {s}", .{ args[0], failure_message });
+        return;
+    };
+    if (out) |s| {
+        const stdout = std.io.getStdOut().writer();
+        stdout.print("{s}", .{s}) catch |err| {
+            std.log.scoped(.command).err("{s}: write to stdout failed {}", .{ args[0], err });
+        };
+    }
+}
+
+pub fn clearRepeatingMapping(self: *Self) void {
+    self.mapping_repeat_timer.timerUpdate(0) catch {
+        log.err("failed to clear mapping repeat timer", .{});
+    };
+    self.mapping_repeat_command_args = null;
+}
+
+/// Repeat key mapping
+fn handleMappingRepeatTimeout(self: *Self) callconv(.C) c_int {
+    if (self.mapping_repeat_command_args) |args| {
+        self.mapping_repeat_timer.timerUpdate(server.config.repeat_rate) catch {
+            log.err("failed to update mapping repeat timer", .{});
+        };
+        self.runMappedCommand(args);
+    }
+    return 0;
 }
 
 /// Add a newly created input device to the seat and update the reported

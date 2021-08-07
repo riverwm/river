@@ -30,10 +30,14 @@ command_args: []const [:0]const u8,
 /// When set to true the mapping will be executed on key release rather than on press
 release: bool,
 
+/// When set to true the mapping will be executed repeatedly while key is pressed
+repeat: bool,
+
 pub fn init(
     keysym: xkb.Keysym,
     modifiers: wlr.Keyboard.ModifierMask,
     release: bool,
+    repeat: bool,
     command_args: []const []const u8,
 ) !Self {
     const owned_args = try util.gpa.alloc([:0]u8, command_args.len);
@@ -46,6 +50,7 @@ pub fn init(
         .keysym = keysym,
         .modifiers = modifiers,
         .release = release,
+        .repeat = repeat,
         .command_args = owned_args,
     };
 }

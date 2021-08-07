@@ -133,7 +133,7 @@ _riverctl()
                 snap) _alternative 'arguments:args:(up down left right)' ;;
                 send-to-output) _alternative 'arguments:args:(next previous)' ;;
                 swap) _alternative 'arguments:args:(next previous)' ;;
-                map) _alternative 'arguments:optional:(-release)' ;;
+                map) _alternative 'arguments:optional:(-release -repeat)' ;;
                 unmap) _alternative 'arguments:optional:(-release)' ;;
                 attach-mode) _alternative 'arguments:args:(top bottom)' ;;
                 focus-follows-cursor) _alternative 'arguments:args:(disabled normal)' ;;
