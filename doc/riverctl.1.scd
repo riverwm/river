@@ -190,7 +190,7 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 	and in the specified _mode_.
 
 	- _-release_: if passed activate on key release instead of key press
-	- _-repeat: if passed activate repeatedly until key release; may not
+	- _-repeat_: if passed activate repeatedly until key release; may not
 	  be used with -release
 	- _mode_: name of the mode for which to create the mapping
 	- _modifiers_: one or more of the modifiers listed above, separated
