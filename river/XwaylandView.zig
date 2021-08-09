@@ -214,12 +214,12 @@ fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wl
 fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "unmap", listener);
 
-    self.view.unmap();
-
     // Remove listeners that are only active while mapped
     self.commit.link.remove();
     self.set_title.link.remove();
     self.set_class.link.remove();
+
+    self.view.unmap();
 }
 
 fn handleRequestConfigure(
