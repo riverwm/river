@@ -48,7 +48,10 @@ pub fn defaultLayout(
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
 
+    const old_default_layout_namespace = server.config.default_layout_namespace;
     server.config.default_layout_namespace = try util.gpa.dupe(u8, args[1]);
+    util.gpa.free(old_default_layout_namespace);
+
     var it = server.root.all_outputs.first;
     while (it) |node| : (it = node.next) {
         const output = node.data;
