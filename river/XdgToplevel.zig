@@ -231,7 +231,10 @@ fn handleMap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurfa
         _ = toplevel.setTiled(.{ .top = true, .bottom = true, .left = true, .right = true });
     }
 
-    view.map();
+    view.map() catch {
+        log.crit("out of memory", .{});
+        xdg_surface.resource.getClient().postNoMemory();
+    };
 }
 
 /// Called when the surface is unmapped and will no longer be displayed.

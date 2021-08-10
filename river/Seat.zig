@@ -149,27 +149,22 @@ pub fn focus(self: *Self, _target: ?*View) void {
         } else null;
     }
 
+    // Focus the target view or clear the focus if target is null
     if (target) |view| {
-        // Find or allocate a new node in the focus stack for the target view
+        // Find the node for this view in the focus stack and move it to the top.
         var it = self.focus_stack.first;
         while (it) |node| : (it = node.next) {
-            // If the view is found, move it to the top of the stack
             if (node.view == view) {
                 const new_focus_node = self.focus_stack.remove(node);
                 self.focus_stack.push(node);
                 break;
             }
         } else {
-            // The view is not in the stack, so allocate a new node and prepend it
-            const new_focus_node = util.gpa.create(ViewStack(*View).Node) catch return;
-            new_focus_node.view = view;
-            self.focus_stack.push(new_focus_node);
+            // A node is added when new Views are mapped in Seat.handleViewMap()
+            unreachable;
         }
-
-        // Focus the target view
         self.setFocusRaw(.{ .view = view });
     } else {
-        // Otherwise clear the focus
         self.setFocusRaw(.{ .none = {} });
     }
 }
@@ -286,6 +281,13 @@ pub fn focusOutput(self: *Self, output: *Output) void {
 
 pub fn handleActivity(self: Self) void {
     server.input_manager.idle.notifyActivity(self.wlr_seat);
+}
+
+pub fn handleViewMap(self: *Self, view: *View) !void {
+    const new_focus_node = try util.gpa.create(ViewStack(*View).Node);
+    new_focus_node.view = view;
+    self.focus_stack.append(new_focus_node);
+    self.focus(view);
 }
 
 /// Handle the unmapping of a view, removing it from the focus stack and

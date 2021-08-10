@@ -207,7 +207,10 @@ fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wl
         }
     }
 
-    view.map();
+    view.map() catch {
+        std.log.crit("out of memory", .{});
+        surface.resource.getClient().postNoMemory();
+    };
 }
 
 /// Called when the surface is unmapped and will no longer be displayed.

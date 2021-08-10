@@ -161,15 +161,6 @@ pub fn defaultSeat(self: Self) *Seat {
     return &self.seats.first.?.data;
 }
 
-/// Must be called whenever a view is unmapped.
-pub fn handleViewUnmap(self: Self, view: *View) void {
-    var it = self.seats.first;
-    while (it) |node| : (it = node.next) {
-        const seat = &node.data;
-        seat.handleViewUnmap(view);
-    }
-}
-
 /// Returns true if input is currently allowed on the passed surface.
 pub fn inputAllowed(self: Self, wlr_surface: *wlr.Surface) bool {
     return if (self.exclusive_client) |exclusive_client|

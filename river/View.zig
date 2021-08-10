@@ -429,36 +429,30 @@ pub fn shouldTrackConfigure(self: Self) bool {
 }
 
 /// Called by the impl when the surface is ready to be displayed
-pub fn map(self: *Self) void {
+pub fn map(self: *Self) !void {
     log.debug("view '{s}' mapped", .{self.getTitle()});
 
     if (self.foreign_toplevel_handle == null) {
-        self.foreign_toplevel_handle = wlr.ForeignToplevelHandleV1.create(
-            server.foreign_toplevel_manager,
-        ) catch {
-            log.crit("out of memory", .{});
-            self.surface.?.resource.getClient().postNoMemory();
-            return;
-        };
+        const handle = try wlr.ForeignToplevelHandleV1.create(server.foreign_toplevel_manager);
+        self.foreign_toplevel_handle = handle;
 
-        self.foreign_toplevel_handle.?.events.request_activate.add(&self.foreign_activate);
-        self.foreign_toplevel_handle.?.events.request_fullscreen.add(&self.foreign_fullscreen);
-        self.foreign_toplevel_handle.?.events.request_close.add(&self.foreign_close);
+        handle.events.request_activate.add(&self.foreign_activate);
+        handle.events.request_fullscreen.add(&self.foreign_fullscreen);
+        handle.events.request_close.add(&self.foreign_close);
 
-        if (self.getTitle()) |s| self.foreign_toplevel_handle.?.setTitle(s);
-        if (self.getAppId()) |s| self.foreign_toplevel_handle.?.setAppId(s);
+        if (self.getTitle()) |s| handle.setTitle(s);
+        if (self.getAppId()) |s| handle.setAppId(s);
 
-        self.foreign_toplevel_handle.?.outputEnter(self.output.wlr_output);
+        handle.outputEnter(self.output.wlr_output);
     }
 
     // Add the view to the stack of its output
     const node = @fieldParentPtr(ViewStack(Self).Node, "view", self);
     self.output.views.attach(node, server.config.attach_mode);
 
-    // Focus the new view, assuming the seat is focusing the proper output
-    // and there isn't something else like a fullscreen view grabbing focus.
+    // Inform all seats that the view has been mapped so they can handle focus
     var it = server.input_manager.seats.first;
-    while (it) |seat_node| : (it = seat_node.next) seat_node.data.focus(self);
+    while (it) |seat_node| : (it = seat_node.next) try seat_node.data.handleViewMap(self);
 
     self.surface.?.sendEnter(self.output.wlr_output);
 
@@ -480,10 +474,7 @@ pub fn unmap(self: *Self) void {
 
     // Inform all seats that the view has been unmapped so they can handle focus
     var it = server.input_manager.seats.first;
-    while (it) |node| : (it = node.next) {
-        const seat = &node.data;
-        seat.handleViewUnmap(self);
-    }
+    while (it) |seat_node| : (it = seat_node.next) seat_node.data.handleViewUnmap(self);
 
     self.output.sendViewTags();
 
