@@ -59,6 +59,10 @@ pub fn map(
         mode_mappings.items[current].deinit();
         mode_mappings.items[current] = new;
     } else {
+        // Repeating mappings borrow the Mapping directly. To prevent a
+        // possible crash if the Mapping ArrayList is reallocated, stop any
+        // currently repeating mappings.
+        seat.clearRepeatingMapping();
         try mode_mappings.append(new);
     }
 }
@@ -258,8 +262,9 @@ pub fn unmap(
     const mode_mappings = &server.config.modes.items[mode_id].mappings;
     const mapping_idx = mappingExists(mode_mappings, modifiers, keysym, optionals.release) orelse return;
 
-    // Repeating mappings borrow the args from Mapping directly. To prevent a crash in the
-    // unlikely case of a repeating mapping unmapping itself, clear any current repeat.
+    // Repeating mappings borrow the Mapping directly. To prevent a possible
+    // crash if the Mapping ArrayList is reallocated, stop any currently
+    // repeating mappings.
     seat.clearRepeatingMapping();
 
     var mapping = mode_mappings.swapRemove(mapping_idx);

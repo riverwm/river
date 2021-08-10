@@ -31,6 +31,7 @@ const DragIcon = @import("DragIcon.zig");
 const Cursor = @import("Cursor.zig");
 const InputManager = @import("InputManager.zig");
 const Keyboard = @import("Keyboard.zig");
+const Mapping = @import("Mapping.zig");
 const LayerSurface = @import("LayerSurface.zig");
 const Output = @import("Output.zig");
 const SeatStatus = @import("SeatStatus.zig");
@@ -64,7 +65,7 @@ prev_mode_id: usize = 0,
 mapping_repeat_timer: *wl.EventSource = undefined,
 
 /// Currently repeating mapping, if any
-mapping_repeat_command_args: ?[]const [:0]const u8 = null,
+repeating_mapping: ?*const Mapping = null,
 
 /// Currently focused output, may be the noop output if no real output
 /// is currently available for focus.
@@ -330,24 +331,25 @@ pub fn handleMapping(
     released: bool,
 ) bool {
     const modes = &server.config.modes;
-    for (modes.items[self.mode_id].mappings.items) |mapping| {
+    for (modes.items[self.mode_id].mappings.items) |*mapping| {
         if (std.meta.eql(modifiers, mapping.modifiers) and keysym == mapping.keysym and released == mapping.release) {
             if (mapping.repeat) {
-                self.mapping_repeat_command_args = mapping.command_args;
+                self.repeating_mapping = mapping;
                 self.mapping_repeat_timer.timerUpdate(server.config.repeat_delay) catch {
                     log.err("failed to update mapping repeat timer", .{});
                 };
             }
-            self.runMappedCommand(mapping.command_args);
+            self.runMappedCommand(mapping);
             return true;
         }
     }
     return false;
 }
 
-fn runMappedCommand(self: *Self, args: []const [:0]const u8) void {
+fn runMappedCommand(self: *Self, mapping: *const Mapping) void {
     var out: ?[]const u8 = null;
     defer if (out) |s| util.gpa.free(s);
+    const args = mapping.command_args;
     command.run(util.gpa, self, args, &out) catch |err| {
         const failure_message = switch (err) {
             command.Error.Other => out.?,
@@ -368,16 +370,16 @@ pub fn clearRepeatingMapping(self: *Self) void {
     self.mapping_repeat_timer.timerUpdate(0) catch {
         log.err("failed to clear mapping repeat timer", .{});
     };
-    self.mapping_repeat_command_args = null;
+    self.repeating_mapping = null;
 }
 
 /// Repeat key mapping
 fn handleMappingRepeatTimeout(self: *Self) callconv(.C) c_int {
-    if (self.mapping_repeat_command_args) |args| {
+    if (self.repeating_mapping) |mapping| {
         self.mapping_repeat_timer.timerUpdate(server.config.repeat_rate) catch {
             log.err("failed to update mapping repeat timer", .{});
         };
-        self.runMappedCommand(args);
+        self.runMappedCommand(mapping);
     }
     return 0;
 }
