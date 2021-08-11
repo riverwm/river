@@ -17,8 +17,13 @@
   </copyright>
 
   <description summary="river specific information for toplevels">
-    This protocol extends wlr-foreign-toplevel-management-unstable-v1 to enable
-    clients to track and modify river specific toplevel states.
+    This protocol extends wlr-foreign-toplevel-management-unstable-v1 by events
+    advertising special client states which are unique to the river Wayland
+    compositor.
+
+    Note that this protocol does not provide any way for clients to control
+    these states of other clients. That functionality can be implemented using a
+    specialized protocol extension.
 
     Warning! The protocol described in this file is currently in the testing
     phase. Backward compatible changes may be added together with the
@@ -28,49 +33,34 @@
 
   <interface name="river_toplevel_manager_v1" version="1">
     <description summary="manage river toplevel objects">
-      A global factory for river_toplevel_v1 objects.
+      This object will send the events for all zwlr_foreign_toplevel_handle_v1
+      objects. It is a global object to not increase the amount of needed
+      round trips. Clients can be identified by the toplevel handle.
     </description>
 
     <request name="destroy" type="destructor">
       <description summary="destroy the river_toplevel_manager object">
         This request indicates that the client will not use the
-        river_toplevel_manager object any more. Objects that have been created
-        through this instance are not affected.
+        river_toplevel_manager object any more.
       </description>
     </request>
-
-    <request name="get_toplevel">
-      <description summary="create a river_toplevel_v1 object">
-        This creates a new river_toplevel_v1 object for a
-        zwlr_foreign_toplevel_handle_v1.
-      </description>
-      <arg name="id" type="new_id" interface="river_toplevel_v1"/>
-      <arg name="handle" type="object" inteface="zwlr_foreign_toplevel_handle_v1"/>
-    </request>
-  </interface>
-
-  <interface name="river_toplevel_v1" version="1">
-    <description summary="a river toplevel handle">
-      This objects is used to track and set river specific toplevel states.
-
-      After all states have been advertised, the done event of the
-      zwlr_foreign_toplevel_handle_v1 is send.
-    </description>
 
     <event name="tags">
       <description summary="tags of the toplevel">
-        Sent once when binding the interface and again whenever the tags
-        of the toplevel change.
+        Sent once for every toplevel when binding the interface and again
+        whenever the tags of a toplevel change.
       </description>
       <arg name="tags" type="uint" summary="32-bit bitfield"/>
+      <arg name="handle" type="object" interface="zwlr_foreign_toplevel_handle_v1"/>
     </event>
 
     <event name="floating">
       <description summary="floating state of the toplevel">
-        Sent once when binding the interface and again whenever the tags
-        of the toplevel change.
+        Sent once for every toplevel when binding the interface and again
+        whenever the tags of a toplevel change.
       </description>
       <arg name="floating" type="bool"/>
+      <arg name="handle" type="object" interface="zwlr_foreign_toplevel_handle_v1"/>
     </event>
   </interface>
 </protocol>
