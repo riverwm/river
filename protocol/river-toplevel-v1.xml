@@ -54,12 +54,17 @@
       <arg name="handle" type="object" interface="zwlr_foreign_toplevel_handle_v1"/>
     </event>
 
+    <enum name="float_state">
+      <entry name="layout" value="0"/>
+      <entry name="floating" value="1"/>
+    </enum>
+
     <event name="floating">
       <description summary="floating state of the toplevel">
         Sent once for every toplevel when binding the interface and again
         whenever the tags of a toplevel change.
       </description>
-      <arg name="floating" type="bool"/>
+      <arg name="float_state" type="uint" enum="float_state"/>
       <arg name="handle" type="object" interface="zwlr_foreign_toplevel_handle_v1"/>
     </event>
   </interface>
