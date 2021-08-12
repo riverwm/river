@@ -48,6 +48,9 @@ border_color_focused: [4]f32 = [_]f32{ 0.57647059, 0.63137255, 0.63137255, 1.0 }
 /// Color of border of unfocused window in RGBA
 border_color_unfocused: [4]f32 = [_]f32{ 0.34509804, 0.43137255, 0.45882353, 1.0 }, // Solarized base01
 
+/// Color of border of urgent window in RGBA
+border_color_urgent: [4]f32 = [_]f32{ 0.86274510, 0.19607843, 0.18431373, 1.0 }, // Solarized red
+
 /// Map of keymap mode name to mode id
 mode_to_id: std.StringHashMap(usize),
 

@@ -155,6 +155,18 @@ pub fn sendViewTags(self: Self) void {
     while (it) |node| : (it = node.next) node.data.sendViewTags();
 }
 
+pub fn sendUrgentTags(self: Self) void {
+    var urgent_tags: u32 = 0;
+
+    var view_it = self.views.first;
+    while (view_it) |node| : (view_it = node.next) {
+        if (node.view.current.urgent) urgent_tags |= node.view.current.tags;
+    }
+
+    var it = self.status_trackers.first;
+    while (it) |node| : (it = node.next) node.data.sendUrgentTags(urgent_tags);
+}
+
 pub fn arrangeFilter(view: *View, filter_tags: u32) bool {
     return !view.destroying and !view.pending.float and !view.pending.fullscreen and
         view.pending.tags & filter_tags != 0;

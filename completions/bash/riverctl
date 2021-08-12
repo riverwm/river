@@ -39,6 +39,7 @@ function __riverctl_completion ()
 			background-color \
 			border-color-focused \
 			border-color-unfocused \
+			border-color-urgent \
 			border-width \
 			focus-follows-cursor \
 			set-repeat \

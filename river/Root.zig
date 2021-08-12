@@ -379,6 +379,7 @@ fn commitTransaction(self: *Self) void {
         output.current = output.pending;
 
         var view_tags_changed = false;
+        var urgent_tags_dirty = false;
 
         var view_it = output.views.first;
         while (view_it) |view_node| {
@@ -395,12 +396,15 @@ fn commitTransaction(self: *Self) void {
             // Apply pending state of the view
             view.pending_serial = null;
             if (view.pending.tags != view.current.tags) view_tags_changed = true;
+            if (view.pending.urgent != view.current.urgent) urgent_tags_dirty = true;
+            if (view.pending.urgent and view_tags_changed) urgent_tags_dirty = true;
             view.current = view.pending;
 
             view.dropSavedBuffers();
         }
 
         if (view_tags_changed) output.sendViewTags();
+        if (urgent_tags_dirty) output.sendUrgentTags();
 
         output.damage.addWhole();
     }

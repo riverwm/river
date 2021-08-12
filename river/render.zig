@@ -311,7 +311,11 @@ fn renderTexture(
 
 fn renderBorders(output: *const Output, view: *View, now: *os.timespec) void {
     const config = &server.config;
-    const color = if (view.current.focus != 0) &config.border_color_focused else &config.border_color_unfocused;
+    const color = blk: {
+        if (view.current.urgent) break :blk &config.border_color_urgent;
+        if (view.current.focus != 0) break :blk &config.border_color_focused;
+        break :blk &config.border_color_unfocused;
+    };
     const border_width = config.border_width;
     const actual_box = if (view.saved_buffers.items.len != 0) view.saved_surface_box else view.surface_box;
 

@@ -59,6 +59,7 @@ xwayland: if (build_options.xwayland) *wlr.Xwayland else void,
 new_xwayland_surface: if (build_options.xwayland) wl.Listener(*wlr.XwaylandSurface) else void,
 
 foreign_toplevel_manager: *wlr.ForeignToplevelManagerV1,
+xdg_activation: *wlr.XdgActivationV1,
 
 decoration_manager: DecorationManager,
 input_manager: InputManager,
@@ -109,6 +110,7 @@ pub fn init(self: *Self) !void {
     }
 
     self.foreign_toplevel_manager = try wlr.ForeignToplevelManagerV1.create(self.wl_server);
+    self.xdg_activation = try wlr.XdgActivationV1.create(self.wl_server);
 
     _ = try wlr.PrimarySelectionDeviceManagerV1.create(self.wl_server);
 

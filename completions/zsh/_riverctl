@@ -45,6 +45,7 @@ _riverctl_subcommands()
         'background-color:Set the background color'
         'border-color-focused:Set the border color of focused views'
         'border-color-unfocused:Set the border color of unfocused views'
+        'border-color-urgent:Set the border color of urgent views'
         'border-width:Set the border width to pixels'
         'focus-follows-cursor:Configure the focus behavior when moving cursor'
         'set-repeat:Set the keyboard repeat rate and repeat delay'
