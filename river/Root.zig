@@ -178,17 +178,15 @@ pub fn removeOutput(self: *Self, output: *Output) void {
     }
 
     // Close all layer surfaces on the removed output
-    for (output.layers) |*layer, layer_idx| {
-        while (layer.pop()) |layer_node| {
+    for (output.layers) |*layer| {
+        // Closing the layer surface will cause LayerSurface.handleUnmap()
+        // to be called synchronously, which will remove it from this list.
+        while (layer.first) |layer_node| {
             const layer_surface = &layer_node.data;
-            // We need to move the closing layer surface to the noop output
-            // since it may not be immediately destoryed. This just a request
-            // to close which will trigger unmap and destroy events in
-            // response, and the LayerSurface needs a valid output to
-            // handle them.
-            self.noop_output.layers[layer_idx].prepend(layer_node);
-            layer_surface.output = &self.noop_output;
+
             layer_surface.wlr_layer_surface.close();
+            layer_surface.wlr_layer_surface.output = null;
+            layer_surface.output = undefined;
         }
     }
 
