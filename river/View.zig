@@ -71,6 +71,7 @@ const State = struct {
 
     float: bool = false,
     fullscreen: bool = false,
+    urgent: bool = false,
 };
 
 const SavedBuffer = struct {
@@ -130,6 +131,9 @@ foreign_fullscreen: wl.Listener(*wlr.ForeignToplevelHandleV1.event.Fullscreen) =
 foreign_close: wl.Listener(*wlr.ForeignToplevelHandleV1) =
     wl.Listener(*wlr.ForeignToplevelHandleV1).init(handleForeignClose),
 
+request_activate: wl.Listener(*wlr.XdgActivationV1.event.RequestActivate) =
+    wl.Listener(*wlr.XdgActivationV1.event.RequestActivate).init(handleRequestActivate),
+
 pub fn init(self: *Self, output: *Output, tags: u32, surface: anytype) void {
     self.* = .{
         .output = output,
@@ -163,6 +167,8 @@ pub fn destroy(self: *Self) void {
         .xdg_toplevel => |*xdg_toplevel| xdg_toplevel.deinit(),
         .xwayland_view => |*xwayland_view| xwayland_view.deinit(),
     }
+
+    self.request_activate.link.remove();
 
     const node = @fieldParentPtr(ViewStack(Self).Node, "view", self);
     self.output.views.remove(node);
@@ -276,6 +282,11 @@ pub fn sendToOutput(self: *Self, destination_output: *Output) void {
 
     self.output.sendViewTags();
     destination_output.sendViewTags();
+
+    if (self.pending.urgent) {
+        self.output.sendUrgentTags();
+        destination_output.sendUrgentTags();
+    }
 
     if (self.surface) |surface| {
         surface.sendLeave(self.output.wlr_output);
@@ -446,6 +457,8 @@ pub fn map(self: *Self) !void {
         handle.outputEnter(self.output.wlr_output);
     }
 
+    server.xdg_activation.events.request_activate.add(&self.request_activate);
+
     // Add the view to the stack of its output
     const node = @fieldParentPtr(ViewStack(Self).Node, "view", self);
     self.output.views.attach(node, server.config.attach_mode);
@@ -534,4 +547,17 @@ fn handleForeignClose(
 ) void {
     const self = @fieldParentPtr(Self, "foreign_close", listener);
     self.close();
+}
+
+fn handleRequestActivate(
+    listener: *wl.Listener(*wlr.XdgActivationV1.event.RequestActivate),
+    event: *wlr.XdgActivationV1.event.RequestActivate,
+) void {
+    const self = @fieldParentPtr(Self, "request_activate", listener);
+    if (fromWlrSurface(event.surface)) |view| {
+        if (view.current.focus == 0) {
+            view.pending.urgent = true;
+            server.root.startTransaction();
+        }
+    }
 }

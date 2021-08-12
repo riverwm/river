@@ -218,6 +218,7 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
                 std.debug.assert(self.focused_output == target_view.output);
                 if (target_view.pending.focus == 0) target_view.setActivated(true);
                 target_view.pending.focus += 1;
+                target_view.pending.urgent = false;
             },
             .layer => |target_layer| std.debug.assert(self.focused_output == target_layer.output),
             .none => {},

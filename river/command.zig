@@ -46,6 +46,7 @@ const str_to_impl_fn = [_]struct {
     .{ .name = "background-color",       .impl = @import("command/config.zig").backgroundColor },
     .{ .name = "border-color-focused",   .impl = @import("command/config.zig").borderColorFocused },
     .{ .name = "border-color-unfocused", .impl = @import("command/config.zig").borderColorUnfocused },
+    .{ .name = "border-color-urgent",    .impl = @import("command/config.zig").borderColorUrgent },
     .{ .name = "border-width",           .impl = @import("command/config.zig").borderWidth },
     .{ .name = "close",                  .impl = @import("command/close.zig").close },
     .{ .name = "csd-filter-add",         .impl = @import("command/filter.zig").csdFilterAdd },

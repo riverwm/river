@@ -83,6 +83,21 @@ pub fn borderColorUnfocused(
     while (it) |node| : (it = node.next) node.data.damage.addWhole();
 }
 
+pub fn borderColorUrgent(
+    allocator: *std.mem.Allocator,
+    seat: *Seat,
+    args: []const [:0]const u8,
+    out: *?[]const u8,
+) Error!void {
+    if (args.len < 2) return Error.NotEnoughArguments;
+    if (args.len > 2) return Error.TooManyArguments;
+
+    server.config.border_color_urgent = try parseRgba(args[1]);
+
+    var it = server.root.outputs.first;
+    while (it) |node| : (it = node.next) node.data.damage.addWhole();
+}
+
 pub fn setCursorWarp(
     allocator: *std.mem.Allocator,
     seat: *Seat,

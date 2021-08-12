@@ -38,9 +38,16 @@ pub fn init(self: *Self, output: *Output, output_status: *zriver.OutputStatusV1)
 
     output_status.setHandler(*Self, handleRequest, handleDestroy, self);
 
-    // Send view/focused tags once on bind.
+    // Send view/focused/urgent tags once on bind.
     self.sendViewTags();
     self.sendFocusedTags(output.current.tags);
+
+    var urgent_tags: u32 = 0;
+    var view_it = self.output.views.first;
+    while (view_it) |node| : (view_it = node.next) {
+        if (node.view.current.urgent) urgent_tags |= node.view.current.tags;
+    }
+    self.sendUrgentTags(urgent_tags);
 }
 
 pub fn destroy(self: *Self) void {
@@ -81,4 +88,10 @@ pub fn sendViewTags(self: Self) void {
 
 pub fn sendFocusedTags(self: Self, tags: u32) void {
     self.output_status.sendFocusedTags(tags);
+}
+
+pub fn sendUrgentTags(self: Self, tags: u32) void {
+    if (self.output_status.getVersion() >= 2) {
+        self.output_status.sendUrgentTags(tags);
+    }
 }

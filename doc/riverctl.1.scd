@@ -241,6 +241,9 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 *border-color-unfocused* _0xRRGGBB_|_0xRRGGBBAA_
 	Set the border color of unfocused views.
 
+*border-color-urgent* _0xRRGGBB_|_0xRRGGBBAA_
+	Set the border color of urgent views.
+
 *border-width* _pixels_
 	Set the border width to _pixels_.
 

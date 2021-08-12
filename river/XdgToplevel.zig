@@ -275,8 +275,11 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) voi
                 server.root.notifyConfigured();
             } else {
                 const self_tags_changed = view.pending.tags != view.current.tags;
+                const urgent_tags_dirty = view.pending.urgent != view.current.urgent or
+                    (view.pending.urgent and self_tags_changed);
                 view.current = view.pending;
                 if (self_tags_changed) view.output.sendViewTags();
+                if (urgent_tags_dirty) view.output.sendUrgentTags();
 
                 // This is necessary if this view was part of a transaction that didn't get completed
                 // before some change occured that caused shouldTrackConfigure() to return false.
