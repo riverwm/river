@@ -139,6 +139,9 @@ fn handleUnmap(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *
 fn handleCommit(listener: *wl.Listener(*wlr.Surface), wlr_surface: *wlr.Surface) void {
     const self = @fieldParentPtr(Self, "commit", listener);
 
+    // Ignore commits if the surface has been closed.
+    if (self.wlr_layer_surface.closed) return;
+
     assert(self.wlr_layer_surface.output != null);
 
     // If a surface is committed while it is not mapped, we may need to send a configure.
