@@ -43,6 +43,13 @@ pub fn init(self: *Self, output: *Output, output_status: *zriver.OutputStatusV1)
     self.sendFocusedTags(output.current.tags);
 }
 
+pub fn destroy(self: *Self) void {
+    const node = @fieldParentPtr(std.SinglyLinkedList(Self).Node, "data", self);
+    self.output.status_trackers.remove(node);
+    self.output_status.setHandler(*Self, handleRequest, null, self);
+    util.gpa.destroy(node);
+}
+
 fn handleRequest(output_status: *zriver.OutputStatusV1, request: zriver.OutputStatusV1.Request, self: *Self) void {
     switch (request) {
         .destroy => output_status.destroy(),
@@ -50,8 +57,7 @@ fn handleRequest(output_status: *zriver.OutputStatusV1, request: zriver.OutputSt
 }
 
 fn handleDestroy(output_status: *zriver.OutputStatusV1, self: *Self) void {
-    const node = @fieldParentPtr(std.SinglyLinkedList(Self).Node, "data", self);
-    self.output.status_trackers.remove(node);
+    self.destroy();
 }
 
 /// Send the current tags of each view on the output to the client.
