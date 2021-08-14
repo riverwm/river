@@ -376,7 +376,9 @@ pub fn clearRepeatingMapping(self: *Self) void {
 /// Repeat key mapping
 fn handleMappingRepeatTimeout(self: *Self) callconv(.C) c_int {
     if (self.repeating_mapping) |mapping| {
-        self.mapping_repeat_timer.timerUpdate(server.config.repeat_rate) catch {
+        const rate = server.config.repeat_rate;
+        const ms_delay = if (rate > 0) 1000 / rate else 0;
+        self.mapping_repeat_timer.timerUpdate(ms_delay) catch {
             log.err("failed to update mapping repeat timer", .{});
         };
         self.runMappedCommand(mapping);
