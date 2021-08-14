@@ -62,7 +62,7 @@ mode_id: usize = 0,
 prev_mode_id: usize = 0,
 
 /// Timer for repeating keyboard mappings
-mapping_repeat_timer: *wl.EventSource = undefined,
+mapping_repeat_timer: *wl.EventSource,
 
 /// Currently repeating mapping, if any
 repeating_mapping: ?*const Mapping = null,
