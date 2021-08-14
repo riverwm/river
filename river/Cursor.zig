@@ -40,6 +40,111 @@ const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const XwaylandUnmanaged = @import("XwaylandUnmanaged.zig");
 
+pub const ResizeDirection = enum {
+    top,
+    right,
+    bottom,
+    left,
+    topleft,
+    topright,
+    botleft,
+    botright,
+
+    /// Returns the resize direction that makes the most sense based on the
+    /// position of the cursor on the current surface.
+    pub fn fromCursorPosition(cursor: *Self, view: *View) ResizeDirection {
+        const view_box = &view.current.box;
+        const output_box = server.root.output_layout.getBox(view.output.wlr_output).?;
+        const pointer_surface_x = (@floatToInt(i32, cursor.wlr_cursor.x) - output_box.x) - view_box.x;
+        const pointer_surface_y = (@floatToInt(i32, cursor.wlr_cursor.y) - output_box.y) - view_box.y;
+
+        const Position = enum {
+            start, // top or left
+            center,
+            end, // bottom or right
+
+            /// Arbitrary minimum size of resize "handle" area.
+            const min_size = 20;
+
+            comptime {
+                // Otherwise an integer underflow may occur.
+                assert(min_size < View.min_size / 2);
+            }
+
+            fn fromCoords(pos: i32, size: u32) @This() {
+                const handle: u32 = math.max(min_size, size / 5);
+                if (pos < handle) return .start;
+                if (pos > size - handle) return .end;
+                return .center;
+            }
+        };
+
+        const horizontal = Position.fromCoords(pointer_surface_x, view_box.width);
+        const vertical = Position.fromCoords(pointer_surface_y, view_box.height);
+
+        // The compiler complains when returning on outer switch...
+        switch (horizontal) {
+            .start => return switch (vertical) {
+                .start => .topleft,
+                .center => .left,
+                .end => .botleft,
+            },
+            .center => return switch (vertical) {
+                .start => .top,
+                .center => .botright, // the center should not be a dead-zone
+                .end => .bottom,
+            },
+            .end => return switch (vertical) {
+                .start => .topright,
+                .center => .right,
+                .end => .botright,
+            },
+        }
+    }
+
+    /// Tries to convert wlr.Edges to ResizeDirection.
+    pub fn fromWlrEdges(edges: wlr.Edges) !ResizeDirection {
+        // Only two edges may be active at max and they must not be opposing.
+        if (edges.top and edges.bottom) return error.InvalidEdges;
+        if (edges.right and edges.left) return error.InvalidEdges;
+
+        if (edges.top) {
+            if (edges.right) return .topright;
+            if (edges.left) return .topleft;
+            return .top;
+        }
+
+        if (edges.bottom) {
+            if (edges.right) return .botright;
+            if (edges.left) return .botleft;
+            return .bottom;
+        }
+
+        if (edges.right) return .right;
+
+        if (edges.left) return .left;
+
+        return .botright;
+    }
+
+    /// Return the canonical name of the cursor belonging the the resize
+    /// operation corresponding to the resize direction. The return value is a
+    /// NULL terminated string, since the return of this function will only ever
+    /// be used when calling functions from C libraries.
+    pub fn cursorNameZ(self: ResizeDirection) [*:0]const u8 {
+        return switch (self) {
+            .top => "n-resize",
+            .right => "e-resize",
+            .bottom => "s-resize",
+            .left => "w-resize",
+            .topleft => "nw-resize",
+            .topright => "ne-resize",
+            .botleft => "sw-resize",
+            .botright => "se-resize",
+        };
+    }
+};
+
 const Mode = union(enum) {
     passthrough: void,
     down: *View,
@@ -58,7 +163,9 @@ const Mode = union(enum) {
         view: *View,
         delta_x: f64 = 0,
         delta_y: f64 = 0,
-        /// Offset from the lower right corner of the view
+        direction: ResizeDirection,
+
+        /// The distance between cursor and the nearest corner or edge.
         offset_x: i32,
         offset_y: i32,
     },
@@ -233,7 +340,7 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
     if (event.state == .pressed) {
         self.pressed_count += 1;
     } else {
-        std.debug.assert(self.pressed_count > 0);
+        assert(self.pressed_count > 0);
         self.pressed_count -= 1;
         if (self.pressed_count == 0 and self.mode != .passthrough) {
             self.leaveMode(event);
@@ -251,7 +358,7 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
                     // handled we are done here
                     if (self.handlePointerMapping(event, view)) return;
                     // Otherwise enter cursor down mode, giving keyboard focus
-                    self.enterMode(.down, view);
+                    self.enterMode(.down, view, null);
                 }
             },
             .layer_surface => |layer_surface| {
@@ -355,8 +462,12 @@ fn handlePointerMapping(self: *Self, event: *wlr.Pointer.event.Button, view: *Vi
     return for (server.config.modes.items[self.seat.mode_id].pointer_mappings.items) |mapping| {
         if (event.button == mapping.event_code and std.meta.eql(modifiers, mapping.modifiers)) {
             switch (mapping.action) {
-                .move => if (!fullscreen) self.enterMode(.move, view),
-                .resize => if (!fullscreen) self.enterMode(.resize, view),
+                .move => if (!fullscreen) self.enterMode(.move, view, null),
+                .resize => if (!fullscreen) self.enterMode(
+                    .resize,
+                    view,
+                    ResizeDirection.fromCursorPosition(self, view),
+                ),
             }
             break true;
         }
@@ -647,7 +758,7 @@ fn surfaceAtFilter(view: *View, filter_tags: u32) bool {
     return view.surface != null and view.current.tags & filter_tags != 0;
 }
 
-pub fn enterMode(self: *Self, mode: std.meta.Tag((Mode)), view: *View) void {
+pub fn enterMode(self: *Self, mode: std.meta.Tag((Mode)), view: *View, resize_direction: ?ResizeDirection) void {
     log.debug("enter {s} cursor mode", .{@tagName(mode)});
 
     self.seat.focus(view);
@@ -655,21 +766,48 @@ pub fn enterMode(self: *Self, mode: std.meta.Tag((Mode)), view: *View) void {
     switch (mode) {
         .passthrough => unreachable,
         .down => {
+            assert(resize_direction == null);
             self.mode = .{ .down = view };
             server.root.startTransaction();
         },
         .move, .resize => {
             switch (mode) {
                 .passthrough, .down => unreachable,
-                .move => self.mode = .{ .move = .{ .view = view } },
+                .move => {
+                    assert(resize_direction == null);
+                    self.mode = .{ .move = .{ .view = view } };
+                },
                 .resize => {
-                    const cur_box = &view.current.box;
+                    view.setResizing(true);
+
                     self.mode = .{ .resize = .{
                         .view = view,
-                        .offset_x = cur_box.x + @intCast(i32, cur_box.width) - @floatToInt(i32, self.wlr_cursor.x),
-                        .offset_y = cur_box.y + @intCast(i32, cur_box.height) - @floatToInt(i32, self.wlr_cursor.y),
+                        .direction = resize_direction.?,
+                        .offset_x = undefined,
+                        .offset_y = undefined,
                     } };
-                    view.setResizing(true);
+
+                    const cur_box = &view.current.box;
+                    const pointer_surface_x = @floatToInt(i32, self.wlr_cursor.x) - cur_box.x;
+                    const pointer_surface_y = @floatToInt(i32, self.wlr_cursor.y) - cur_box.y;
+                    switch (resize_direction.?) {
+                        .top, .left, .topleft => {
+                            self.mode.resize.offset_x = pointer_surface_x;
+                            self.mode.resize.offset_y = pointer_surface_y;
+                        },
+                        .topright => {
+                            self.mode.resize.offset_x = util.safeIntDownCast(i32, cur_box.width) - pointer_surface_x;
+                            self.mode.resize.offset_y = pointer_surface_y;
+                        },
+                        .bottom, .right, .botright => {
+                            self.mode.resize.offset_x = util.safeIntDownCast(i32, cur_box.width) - pointer_surface_x;
+                            self.mode.resize.offset_y = util.safeIntDownCast(i32, cur_box.height) - pointer_surface_y;
+                        },
+                        .botleft => {
+                            self.mode.resize.offset_x = pointer_surface_x;
+                            self.mode.resize.offset_y = util.safeIntDownCast(i32, cur_box.height) - pointer_surface_y;
+                        },
+                    }
                 },
             }
 
@@ -691,7 +829,7 @@ pub fn enterMode(self: *Self, mode: std.meta.Tag((Mode)), view: *View) void {
             self.seat.wlr_seat.pointerNotifyClearFocus();
 
             self.xcursor_manager.setCursorImage(
-                if (mode == .move) "move" else "se-resize",
+                if (mode == .resize) self.mode.resize.direction.cursorNameZ() else "move",
                 self.wlr_cursor,
             );
         },
@@ -796,19 +934,52 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
             view.applyPending();
         },
         .resize => |*data| {
+            // TODO: Overhaul this logic with saturating arithmetics (zig 0.9.0)
+
             dx += data.delta_x;
             dy += data.delta_y;
             data.delta_x = dx - @trunc(dx);
             data.delta_y = dy - @trunc(dy);
 
             const border_width = if (data.view.draw_borders) server.config.border_width else 0;
-
-            // Set width/height of view, clamp to view size constraints and output dimensions
             const box = &data.view.pending.box;
-            box.width = @intCast(u32, math.max(0, @intCast(i32, box.width) + @floatToInt(i32, dx)));
-            box.height = @intCast(u32, math.max(0, @intCast(i32, box.height) + @floatToInt(i32, dy)));
+            const constraints = data.view.getConstraints();
 
-            data.view.applyConstraints();
+            // Using two points instead of a box makes this logic a bit more
+            // readable for humans.
+            var botright_x = box.x + @intCast(i32, box.width);
+            var botright_y = box.y + @intCast(i32, box.height);
+
+            switch (data.direction) {
+                .top, .topleft, .topright => {
+                    const min_y = math.max(border_width, botright_y - constraints.max_height);
+                    const max_y = botright_y - constraints.min_height;
+                    box.y = math.clamp(box.y + @floatToInt(i32, dy), min_y, max_y);
+                },
+                .bottom, .botleft, .botright => {
+                    const min_y = math.add(i32, box.y, constraints.min_height) catch math.maxInt(i32);
+                    const max_y = math.add(i32, box.y, constraints.max_height) catch math.maxInt(i32);
+                    botright_y = math.clamp(botright_y + @floatToInt(i32, dy), min_y, max_y);
+                },
+                .left, .right => {},
+            }
+
+            switch (data.direction) {
+                .right, .topright, .botright => {
+                    const min_x = math.add(i32, box.x, constraints.min_width) catch math.maxInt(i32);
+                    const max_x = math.add(i32, box.x, constraints.max_width) catch math.maxInt(i32);
+                    botright_x = math.clamp(botright_x + @floatToInt(i32, dx), min_x, max_x);
+                },
+                .left, .topleft, .botleft => {
+                    const min_x: i32 = math.max(border_width, botright_x - constraints.max_width);
+                    const max_x: i32 = botright_x - constraints.min_width;
+                    box.x = math.clamp(box.x + @floatToInt(i32, dx), min_x, max_x);
+                },
+                .top, .bottom => {},
+            }
+
+            box.width = @intCast(u32, botright_x - box.x);
+            box.height = @intCast(u32, botright_y - box.y);
 
             const output_resolution = data.view.output.getEffectiveResolution();
             box.width = math.min(box.width, output_resolution.width - border_width - @intCast(u32, box.x));
@@ -816,12 +987,31 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
 
             data.view.applyPending();
 
-            // Keep cursor locked to the original offset from the bottom right corner
-            self.wlr_cursor.warpClosest(
-                device,
-                @intToFloat(f64, box.x + @intCast(i32, box.width) - data.offset_x),
-                @intToFloat(f64, box.y + @intCast(i32, box.height) - data.offset_y),
-            );
+            // Warp cursor so that its distance to the dragged corner remains
+            // constant. We have to do this here in a second switch instead of
+            // in the one above to follow the view constraints.
+            switch (data.direction) {
+                .top, .left, .topleft => self.wlr_cursor.warpClosest(
+                    device,
+                    @intToFloat(f64, box.x + data.offset_x),
+                    @intToFloat(f64, box.y + data.offset_y),
+                ),
+                .topright => self.wlr_cursor.warpClosest(
+                    device,
+                    @intToFloat(f64, box.x + @intCast(i32, box.width) - data.offset_x),
+                    @intToFloat(f64, box.y + data.offset_y),
+                ),
+                .bottom, .right, .botright => self.wlr_cursor.warpClosest(
+                    device,
+                    @intToFloat(f64, box.x + @intCast(i32, box.width) - data.offset_x),
+                    @intToFloat(f64, box.y + @intCast(i32, box.height) - data.offset_y),
+                ),
+                .botleft => self.wlr_cursor.warpClosest(
+                    device,
+                    @intToFloat(f64, box.x + data.offset_x),
+                    @intToFloat(f64, box.y + @intCast(i32, box.height) - data.offset_y),
+                ),
+            }
         },
     }
 }

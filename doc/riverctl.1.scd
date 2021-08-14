@@ -214,6 +214,13 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 		- move-view
 		- resize-view
 
+	When _mode_ is resize-view, if the pointer is near a corner, the view
+	can be resized alongside both x and y axis, and if the pointer is near
+	an edge, the axis parallel to the edge is locked. The view is anchored
+	at the corner or edge opposite to the pointer. The pointer being in the
+	center of the view will be treated as if the pointer was in the lower
+	right corner.
+
 *unmap* [_-release_] _mode_ _modifiers_ _key_
 	Remove the mapping defined by the arguments:
 
