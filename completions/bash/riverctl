@@ -51,7 +51,8 @@ function __riverctl_completion ()
 			"focus-output"|"focus-view"|"send-to-output"|"swap") OPTS="next previous" ;;
 			"move"|"snap") OPTS="up down left right" ;;
 			"resize") OPTS="horizontal vertical" ;;
-			"map"|"unmap") OPTS="-release" ;;
+			"map") OPTS="-release -repeat" ;;
+			"unmap") OPTS="-release" ;;
 			"attach-mode") OPTS="top bottom" ;;
 			"focus-follows-cursor") OPTS="disabled normal" ;;
 			"set-cursor-warp") OPTS="disabled on-output-change" ;;

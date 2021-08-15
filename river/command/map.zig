@@ -44,19 +44,25 @@ pub fn map(
     const offset = optionals.i;
     if (args.len - offset < 5) return Error.NotEnoughArguments;
 
+    if (optionals.release and optionals.repeat) return Error.ConflictingOptions;
+
     const mode_id = try modeNameToId(allocator, seat, args[1 + offset], out);
     const modifiers = try parseModifiers(allocator, args[2 + offset], out);
     const keysym = try parseKeysym(allocator, args[3 + offset], out);
 
     const mode_mappings = &server.config.modes.items[mode_id].mappings;
 
-    const new = try Mapping.init(keysym, modifiers, optionals.release, args[4 + offset ..]);
+    const new = try Mapping.init(keysym, modifiers, optionals.release, optionals.repeat, args[4 + offset ..]);
     errdefer new.deinit();
 
     if (mappingExists(mode_mappings, modifiers, keysym, optionals.release)) |current| {
         mode_mappings.items[current].deinit();
         mode_mappings.items[current] = new;
     } else {
+        // Repeating mappings borrow the Mapping directly. To prevent a
+        // possible crash if the Mapping ArrayList is reallocated, stop any
+        // currently repeating mappings.
+        seat.clearRepeatingMapping();
         try mode_mappings.append(new);
     }
 }
@@ -200,6 +206,7 @@ fn parseModifiers(
 const OptionalArgsContainer = struct {
     i: usize,
     release: bool,
+    repeat: bool,
 };
 
 /// Parses optional args (such as -release) and return the index of the first argument that is
@@ -212,12 +219,16 @@ fn parseOptionalArgs(args: []const []const u8) OptionalArgsContainer {
         // i is the number of arguments consumed
         .i = 0,
         .release = false,
+        .repeat = false,
     };
 
     var i: usize = 0;
     for (args) |arg| {
         if (std.mem.eql(u8, arg, "-release")) {
             parsed.release = true;
+            i += 1;
+        } else if (std.mem.eql(u8, arg, "-repeat")) {
+            parsed.repeat = true;
             i += 1;
         } else {
             // Break if the arg is not an option
@@ -250,6 +261,11 @@ pub fn unmap(
 
     const mode_mappings = &server.config.modes.items[mode_id].mappings;
     const mapping_idx = mappingExists(mode_mappings, modifiers, keysym, optionals.release) orelse return;
+
+    // Repeating mappings borrow the Mapping directly. To prevent a possible
+    // crash if the Mapping ArrayList is reallocated, stop any currently
+    // repeating mappings.
+    seat.clearRepeatingMapping();
 
     var mapping = mode_mappings.swapRemove(mapping_idx);
     mapping.deinit();
