@@ -150,8 +150,8 @@ are ignored by river.
 ## MAPPINGS
 
 Mappings are modal in river. Each mapping is associated with a mode and is
-only active while in that mode. There are two special modes: "default" and
-"locked". The default mode is the initial mode for every seat. The locked
+only active while in that mode. There are two special modes: "normal" and
+"locked". The normal mode is the initial mode for every seat. The locked
 mode is automatically entered while an input inhibitor (such as a lockscreen)
 is active. It cannot be left or entered manually.
 
