@@ -31,6 +31,7 @@ const util = @import("util.zig");
 const DragIcon = @import("DragIcon.zig");
 const Cursor = @import("Cursor.zig");
 const InputManager = @import("InputManager.zig");
+const InputRelay = @import("InputRelay.zig");
 const Keyboard = @import("Keyboard.zig");
 const Mapping = @import("Mapping.zig");
 const LayerSurface = @import("LayerSurface.zig");
@@ -85,6 +86,9 @@ status_trackers: std.SinglyLinkedList(SeatStatus) = .{},
 /// True if a pointer drag is currently in progress
 pointer_drag: bool = false,
 
+/// Relay for communication between text_input and input_method.
+relay: InputRelay = undefined,
+
 request_set_selection: wl.Listener(*wlr.Seat.event.RequestSetSelection) =
     wl.Listener(*wlr.Seat.event.RequestSetSelection).init(handleRequestSetSelection),
 request_start_drag: wl.Listener(*wlr.Seat.event.RequestStartDrag) =
@@ -107,6 +111,7 @@ pub fn init(self: *Self, name: [*:0]const u8) !void {
     };
     self.wlr_seat.data = @ptrToInt(self);
 
+    self.relay.init(self);
     try self.cursor.init(self);
 
     self.wlr_seat.events.request_set_selection.add(&self.request_set_selection);
@@ -243,6 +248,8 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
                 self.wlr_seat.keyboardNotifyEnter(wlr_surface, null, 0, null);
             }
 
+            self.relay.setSurfaceFocus(wlr_surface);
+
             if (server.input_manager.pointer_constraints.constraintForSurface(wlr_surface, self.wlr_seat)) |constraint| {
                 @intToPtr(*PointerConstraint, constraint.data).setAsActive();
             } else if (self.cursor.constraint) |constraint| {
@@ -252,6 +259,7 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
             }
         } else {
             self.wlr_seat.keyboardClearFocus();
+            self.relay.setSurfaceFocus(null);
 
             if (self.cursor.constraint) |constraint| {
                 PointerConstraint.warpToHint(&self.cursor);

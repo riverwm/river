@@ -120,6 +120,16 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
         }
     }
 
+    // TODO: Probably not a great implementation yet.
+    // if (!handled) {
+    //     const keyboard_grab = self.getInputMethodGrab();
+    //     if (keyboard_grab) |kb| {
+    //         kb.setKeyboard(kb.keyboard);
+    //         kb.sendKey(event.time_msec, event.keycode, event.state);
+    //         handled = true;
+    //     }
+    // }
+
     if (!handled) {
         // Otherwise, we pass it along to the client.
         const wlr_seat = self.seat.wlr_seat;
@@ -163,4 +173,18 @@ fn handleBuiltinMapping(self: Self, keysym: xkb.Keysym) bool {
         },
         else => return false,
     }
+}
+
+/// Returns null if the keyboard is not grabbed by an input method,
+/// or if event is from virtual keyboard of the same client as grab.
+/// TODO: see https://gitlab.freedesktop.org/wlroots/wlroots/-/issues/2322
+fn getInputMethodGrab(self: Self) ?*wlr.InputMethodV2.KeyboardGrab {
+    const input_method = self.seat.relay.input_method;
+    const virtual_keyboard = self.input_device.getVirtualKeyboard();
+    if (input_method == null or input_method.?.keyboard_grab == null or
+        (virtual_keyboard != null and
+        virtual_keyboard.?.resource.getClient() == input_method.?.keyboard_grab.?.resource.getClient()))
+    {
+        return null;
+    } else return input_method.?.keyboard_grab;
 }

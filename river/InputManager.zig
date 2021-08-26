@@ -28,8 +28,10 @@ const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const InputConfig = @import("InputConfig.zig");
+const InputRelay = @import("InputRelay.zig");
 const Seat = @import("Seat.zig");
 const Server = @import("Server.zig");
+const TextInput = @import("TextInput.zig");
 const View = @import("View.zig");
 const PointerConstraint = @import("PointerConstraint.zig");
 
@@ -90,6 +92,8 @@ pointer_constraints: *wlr.PointerConstraintsV1,
 relative_pointer_manager: *wlr.RelativePointerManagerV1,
 virtual_pointer_manager: *wlr.VirtualPointerManagerV1,
 virtual_keyboard_manager: *wlr.VirtualKeyboardManagerV1,
+input_method_manager: *wlr.InputMethodManagerV2,
+text_input_manager: *wlr.TextInputManagerV3,
 
 input_configs: std.ArrayList(InputConfig),
 input_devices: std.TailQueue(InputDevice) = .{},
@@ -107,6 +111,10 @@ new_virtual_pointer: wl.Listener(*wlr.VirtualPointerManagerV1.event.NewPointer) 
     wl.Listener(*wlr.VirtualPointerManagerV1.event.NewPointer).init(handleNewVirtualPointer),
 new_virtual_keyboard: wl.Listener(*wlr.VirtualKeyboardV1) =
     wl.Listener(*wlr.VirtualKeyboardV1).init(handleNewVirtualKeyboard),
+new_text_input: wl.Listener(*wlr.TextInputV3) =
+    wl.Listener(*wlr.TextInputV3).init(handleNewTextInput),
+new_input_method: wl.Listener(*wlr.InputMethodV2) =
+    wl.Listener(*wlr.InputMethodV2).init(handleNewInputMethod),
 
 pub fn init(self: *Self) !void {
     const seat_node = try util.gpa.create(std.TailQueue(Seat).Node);
@@ -120,6 +128,8 @@ pub fn init(self: *Self) !void {
         .relative_pointer_manager = try wlr.RelativePointerManagerV1.create(server.wl_server),
         .virtual_pointer_manager = try wlr.VirtualPointerManagerV1.create(server.wl_server),
         .virtual_keyboard_manager = try wlr.VirtualKeyboardManagerV1.create(server.wl_server),
+        .input_method_manager = try wlr.InputMethodManagerV2.create(server.wl_server),
+        .text_input_manager = try wlr.TextInputManagerV3.create(server.wl_server),
         .input_configs = std.ArrayList(InputConfig).init(util.gpa),
     };
 
@@ -134,6 +144,8 @@ pub fn init(self: *Self) !void {
     self.pointer_constraints.events.new_constraint.add(&self.new_pointer_constraint);
     self.virtual_pointer_manager.events.new_virtual_pointer.add(&self.new_virtual_pointer);
     self.virtual_keyboard_manager.events.new_virtual_keyboard.add(&self.new_virtual_keyboard);
+    self.text_input_manager.events.text_input.add(&self.new_text_input);
+    self.input_method_manager.events.input_method.add(&self.new_input_method);
 }
 
 pub fn deinit(self: *Self) void {
@@ -275,4 +287,52 @@ fn handleNewVirtualKeyboard(
     const self = @fieldParentPtr(Self, "new_virtual_keyboard", listener);
     const seat = @intToPtr(*Seat, virtual_keyboard.seat.data);
     seat.addDevice(&virtual_keyboard.input_device);
+}
+
+fn handleNewTextInput(
+    listener: *wl.Listener(*wlr.TextInputV3),
+    wlr_text_input: *wlr.TextInputV3,
+) void {
+    const self = @fieldParentPtr(Self, "new_text_input", listener);
+    const seat = @intToPtr(*Seat, wlr_text_input.seat.data);
+    const relay = &seat.relay;
+
+    const text_input_node = util.gpa.create(std.TailQueue(TextInput).Node) catch {
+        wlr_text_input.resource.postNoMemory();
+        return;
+    };
+    text_input_node.data.init(relay, wlr_text_input);
+    relay.text_inputs.append(text_input_node);
+
+    log.debug("new text input on seat {s}", .{relay.seat.wlr_seat.name});
+}
+
+fn handleNewInputMethod(
+    listener: *wl.Listener(*wlr.InputMethodV2),
+    input_method: *wlr.InputMethodV2,
+) void {
+    const self = @fieldParentPtr(Self, "new_input_method", listener);
+    const seat = @intToPtr(*Seat, input_method.seat.data);
+    const relay = &seat.relay;
+
+    // Only one input_method can be bound to a seat.
+    if (relay.input_method != null) {
+        log.debug("attempted to connect second input method to a seat", .{});
+        input_method.sendUnavailable();
+        return;
+    }
+
+    relay.input_method = input_method;
+
+    input_method.events.commit.add(&relay.input_method_commit);
+    input_method.events.grab_keyboard.add(&relay.grab_keyboard);
+    input_method.events.destroy.add(&relay.input_method_destroy);
+
+    log.debug("new input method on seat {s}", .{relay.seat.wlr_seat.name});
+
+    const text_input = relay.getFocusableTextInput() orelse return;
+    if (text_input.pending_focused_surface) |surface| {
+        text_input.wlr_text_input.sendEnter(surface);
+        text_input.setPendingFocusedSurface(null);
+    }
 }
