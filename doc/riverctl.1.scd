@@ -41,14 +41,14 @@ over the Wayland protocol.
 *exit*
 	Exit the compositor, terminating the Wayland session.
 
-*float-filter-add* _app-id_
-	Add _app-id_ to the float filter list. Views with this _app-id_
-	will start floating. Note that this affects only new views, not already
-	existing ones.
+*float-filter-add* *app-id*|*title* _pattern_
+	Add a pattern to the float filter list. Note that this affects only new
+	views, not already existing ones. Title updates are also not taken into
+	account.
 
-*float-filter-remove* _app-id_
-	Remove an _app-id_ from the float filter list. Note that this affects only
-	new views, not already existing ones.
+*float-filter-remove* *app-id*|*title* _pattern_
+	Remove an app-id or title from the float filter list. Note that this
+	affects only new views, not already existing ones.
 
 *focus-output* *next*|*previous*|*up*|*right*|*down*|*left*
 	Focus the next or previous output or the closest output in any direction.
