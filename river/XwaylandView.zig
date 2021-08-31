@@ -196,15 +196,10 @@ fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wl
         view.current.float = true;
         view.pending.float = true;
         view.pending.box = view.float_box;
-    } else {
-        // Make views with app_ids listed in the float filter float
-        if (self.xwayland_surface.class) |app_id| {
-            if (server.config.float_filter.contains(std.mem.span(app_id))) {
-                view.current.float = true;
-                view.pending.float = true;
-                view.pending.box = view.float_box;
-            }
-        }
+    } else if (server.config.shouldFloat(view)) {
+        view.current.float = true;
+        view.pending.float = true;
+        view.pending.box = view.float_box;
     }
 
     view.map() catch {

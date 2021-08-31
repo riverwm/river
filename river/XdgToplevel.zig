@@ -212,15 +212,10 @@ fn handleMap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurfa
         view.current.float = true;
         view.pending.float = true;
         view.pending.box = view.float_box;
-    } else {
-        // Make views with app_ids listed in the float filter float
-        if (toplevel.app_id) |app_id| {
-            if (server.config.float_filter.contains(mem.span(app_id))) {
-                view.current.float = true;
-                view.pending.float = true;
-                view.pending.box = view.float_box;
-            }
-        }
+    } else if (server.config.shouldFloat(view)) {
+        view.current.float = true;
+        view.pending.float = true;
+        view.pending.box = view.float_box;
     }
 
     // If the toplevel has an app_id which is not configured to use client side

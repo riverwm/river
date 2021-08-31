@@ -27,19 +27,31 @@ const ViewStack = @import("view_stack.zig").ViewStack;
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
+const FilterKind = enum {
+    @"app-id",
+    title,
+};
+
 pub fn floatFilterAdd(
     allocator: *mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
-    if (args.len < 2) return Error.NotEnoughArguments;
-    if (args.len > 2) return Error.TooManyArguments;
+    if (args.len < 3) return Error.NotEnoughArguments;
+    if (args.len > 3) return Error.TooManyArguments;
 
-    const gop = try server.config.float_filter.getOrPut(util.gpa, args[1]);
+    const kind = std.meta.stringToEnum(FilterKind, args[1]) orelse return Error.UnknownOption;
+    const map = switch (kind) {
+        .@"app-id" => &server.config.float_filter_app_ids,
+        .title => &server.config.float_filter_titles,
+    };
+
+    const key = args[2];
+    const gop = try map.getOrPut(util.gpa, key);
     if (gop.found_existing) return;
-    errdefer assert(server.config.float_filter.remove(args[1]));
-    gop.key_ptr.* = try std.mem.dupe(util.gpa, u8, args[1]);
+    errdefer assert(map.remove(args[1]));
+    gop.key_ptr.* = try std.mem.dupe(util.gpa, u8, key);
 }
 
 pub fn floatFilterRemove(
@@ -48,10 +60,17 @@ pub fn floatFilterRemove(
     args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
-    if (args.len < 2) return Error.NotEnoughArguments;
-    if (args.len > 2) return Error.TooManyArguments;
+    if (args.len < 3) return Error.NotEnoughArguments;
+    if (args.len > 3) return Error.TooManyArguments;
 
-    if (server.config.float_filter.fetchRemove(args[1])) |kv| util.gpa.free(kv.key);
+    const kind = std.meta.stringToEnum(FilterKind, args[1]) orelse return Error.UnknownOption;
+    const map = switch (kind) {
+        .@"app-id" => &server.config.float_filter_app_ids,
+        .title => &server.config.float_filter_titles,
+    };
+
+    const key = args[2];
+    if (map.fetchRemove(key)) |kv| util.gpa.free(kv.key);
 }
 
 pub fn csdFilterAdd(
