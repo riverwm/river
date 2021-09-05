@@ -141,8 +141,6 @@ fn handleNewOutput(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output)
     };
     ptr_node.data = &node.data;
 
-    wlr_output.enableAdaptiveSync(true);
-
     self.all_outputs.append(ptr_node);
     self.addOutput(&node.data);
 }
