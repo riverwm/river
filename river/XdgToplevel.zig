@@ -218,9 +218,9 @@ fn handleMap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurfa
         view.pending.box = view.float_box;
     }
 
-    // If the toplevel has an app_id which is not configured to use client side
-    // decorations, inform it that it is tiled.
-    if (toplevel.app_id != null and server.config.csd_filter.contains(mem.span(toplevel.app_id.?))) {
+    // If the view has an app_id or title which is not configured to use client
+    // side decorations, inform it that it is tiled.
+    if (server.config.csdAllowed(view)) {
         view.draw_borders = false;
     } else {
         _ = toplevel.setTiled(.{ .top = true, .bottom = true, .left = true, .right = true });
