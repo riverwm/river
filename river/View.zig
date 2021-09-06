@@ -76,7 +76,9 @@ const State = struct {
 
 const SavedBuffer = struct {
     client_buffer: *wlr.ClientBuffer,
-    box: Box,
+    /// x/y relative to the root surface in the surface tree.
+    surface_box: Box,
+    source_box: wlr.FBox,
     transform: wl.Output.Transform,
 };
 
@@ -258,14 +260,17 @@ fn saveBuffersIterator(
     saved_buffers: *std.ArrayList(SavedBuffer),
 ) callconv(.C) void {
     if (surface.buffer) |buffer| {
+        var source_box: wlr.FBox = undefined;
+        surface.getBufferSourceBox(&source_box);
         saved_buffers.append(.{
             .client_buffer = buffer,
-            .box = Box{
+            .surface_box = .{
                 .x = surface_x,
                 .y = surface_y,
                 .width = @intCast(u32, surface.current.width),
                 .height = @intCast(u32, surface.current.height),
             },
+            .source_box = source_box,
             .transform = surface.current.transform,
         }) catch return;
         _ = buffer.base.lock();

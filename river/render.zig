@@ -197,18 +197,21 @@ fn renderView(output: *const Output, view: *View, now: *os.timespec) void {
     // If we have saved buffers, we are in the middle of a transaction
     // and need to render those buffers until the transaction is complete.
     if (view.saved_buffers.items.len != 0) {
-        for (view.saved_buffers.items) |saved_buffer|
+        for (view.saved_buffers.items) |saved_buffer| {
+            const texture = saved_buffer.client_buffer.texture orelse continue;
             renderTexture(
                 output,
-                saved_buffer.client_buffer.texture orelse continue,
+                texture,
                 .{
-                    .x = saved_buffer.box.x + view.current.box.x - view.saved_surface_box.x,
-                    .y = saved_buffer.box.y + view.current.box.y - view.saved_surface_box.y,
-                    .width = @intCast(c_int, saved_buffer.box.width),
-                    .height = @intCast(c_int, saved_buffer.box.height),
+                    .x = saved_buffer.surface_box.x + view.current.box.x - view.saved_surface_box.x,
+                    .y = saved_buffer.surface_box.y + view.current.box.y - view.saved_surface_box.y,
+                    .width = @intCast(c_int, saved_buffer.surface_box.width),
+                    .height = @intCast(c_int, saved_buffer.surface_box.height),
                 },
+                &saved_buffer.source_box,
                 saved_buffer.transform,
             );
+        }
     } else {
         // Since there are no stashed buffers, we are not in the middle of
         // a transaction and may simply render the most recent buffers provided
@@ -267,15 +270,21 @@ fn renderSurfaceIterator(
     surface_y: c_int,
     rdata: *SurfaceRenderData,
 ) callconv(.C) void {
+    const texture = surface.getTexture() orelse return;
+
+    var source_box: wlr.FBox = undefined;
+    surface.getBufferSourceBox(&source_box);
+
     renderTexture(
         rdata.output,
-        surface.getTexture() orelse return,
+        texture,
         .{
             .x = rdata.output_x + surface_x,
             .y = rdata.output_y + surface_y,
             .width = surface.current.width,
             .height = surface.current.height,
         },
+        &source_box,
         surface.current.transform,
     );
 
@@ -287,10 +296,11 @@ fn renderSurfaceIterator(
 fn renderTexture(
     output: *const Output,
     texture: *wlr.Texture,
-    wlr_box: wlr.Box,
+    dest_box: wlr.Box,
+    source_box: *const wlr.FBox,
     transform: wl.Output.Transform,
 ) void {
-    var box = wlr_box;
+    var box = dest_box;
 
     // Scale the box to the output's current scaling factor
     scaleBox(&box, output.wlr_output.scale);
@@ -306,7 +316,7 @@ fn renderTexture(
     // This takes our matrix, the texture, and an alpha, and performs the actual
     // rendering on the GPU.
     const renderer = output.wlr_output.backend.getRenderer().?;
-    renderer.renderTextureWithMatrix(texture, &matrix, 1.0) catch return;
+    renderer.renderSubtextureWithMatrix(texture, source_box, &matrix, 1.0) catch return;
 }
 
 fn renderBorders(output: *const Output, view: *View, now: *os.timespec) void {
