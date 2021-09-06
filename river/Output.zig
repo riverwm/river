@@ -31,7 +31,6 @@ const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Box = @import("Box.zig");
-const Config = @import("Config.zig");
 const LayerSurface = @import("LayerSurface.zig");
 const Layout = @import("Layout.zig");
 const LayoutDemand = @import("LayoutDemand.zig");
