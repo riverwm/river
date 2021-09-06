@@ -31,6 +31,7 @@ const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Box = @import("Box.zig");
+const Config = @import("Config.zig");
 const LayerSurface = @import("LayerSurface.zig");
 const Layout = @import("Layout.zig");
 const LayoutDemand = @import("LayoutDemand.zig");
@@ -112,7 +113,9 @@ pub fn init(self: *Self, wlr_output: *wlr.Output) !void {
         try wlr_output.commit();
     }
 
-    wlr_output.enableAdaptiveSync(true);
+    if (server.config.adaptive_sync == .enabled) {
+        wlr_output.enableAdaptiveSync(true);
+    }
 
     self.* = .{
         .wlr_output = wlr_output,
