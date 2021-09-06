@@ -50,7 +50,7 @@ pub fn floatFilterAdd(
     const key = args[2];
     const gop = try map.getOrPut(util.gpa, key);
     if (gop.found_existing) return;
-    errdefer assert(map.remove(args[1]));
+    errdefer assert(map.remove(key));
     gop.key_ptr.* = try std.mem.dupe(util.gpa, u8, key);
 }
 
