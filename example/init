@@ -148,9 +148,9 @@ riverctl border-color-unfocused 0x586e75
 # Set repeat rate
 riverctl set-repeat 50 300
 
-# Set app-ids of views which should float
-riverctl float-filter-add "float"
-riverctl float-filter-add "popup"
+# Make certain views start floating
+riverctl float-filter-add app-id float
+riverctl float-filter-add title "popup title with spaces"
 
 # Set app-ids of views which should use client side decorations
 riverctl csd-filter-add "gedit"
