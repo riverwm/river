@@ -62,8 +62,9 @@ modes: std.ArrayList(Mode),
 float_filter_app_ids: std.StringHashMapUnmanaged(void) = .{},
 float_filter_titles: std.StringHashMapUnmanaged(void) = .{},
 
-/// Set of app_ids which are allowed to use client side decorations
-csd_filter: std.StringHashMapUnmanaged(void) = .{},
+/// Sets of app_ids and titles which are allowed to use client side decorations
+csd_filter_app_ids: std.StringHashMapUnmanaged(void) = .{},
+csd_filter_titles: std.StringHashMapUnmanaged(void) = .{},
 
 /// The selected focus_follows_cursor mode
 focus_follows_cursor: FocusFollowsCursorMode = .disabled,
@@ -133,9 +134,15 @@ pub fn deinit(self: *Self) void {
     }
 
     {
-        var it = self.csd_filter.keyIterator();
+        var it = self.csd_filter_app_ids.keyIterator();
         while (it.next()) |key| util.gpa.free(key.*);
-        self.csd_filter.deinit(util.gpa);
+        self.csd_filter_app_ids.deinit(util.gpa);
+    }
+
+    {
+        var it = self.csd_filter_titles.keyIterator();
+        while (it.next()) |key| util.gpa.free(key.*);
+        self.csd_filter_titles.deinit(util.gpa);
     }
 
     util.gpa.free(self.default_layout_namespace);
@@ -150,6 +157,22 @@ pub fn shouldFloat(self: Self, view: *View) bool {
 
     if (view.getTitle()) |title| {
         if (self.float_filter_titles.contains(std.mem.span(title))) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+pub fn csdAllowed(self: Self, view: *View) bool {
+    if (view.getAppId()) |app_id| {
+        if (self.csd_filter_app_ids.contains(std.mem.span(app_id))) {
+            return true;
+        }
+    }
+
+    if (view.getTitle()) |title| {
+        if (self.csd_filter_titles.contains(std.mem.span(title))) {
             return true;
         }
     }

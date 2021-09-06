@@ -28,15 +28,15 @@ over the Wayland protocol.
 *close*
 	Close the focused view.
 
-*csd-filter-add* _app-id_
-	Add _app-id_ to the CSD filter list. Views with this _app-id_ are
-	told to use client side decoration instead of the default server
-	side decoration. Note that this affects both new views, as well as already
-	existing ones.
+*csd-filter-add* *app-id*|*title* _pattern_
+	Add _pattern_ to the CSD filter list. Views with this _pattern_ are told to
+	use client side decoration instead of the default server side decoration.
+	Note that this affects new views as well as already existing ones. Title
+	updates are not taken into account.
 
-*csd-filter-remove* _app-id_
-	Remove an _app-id_ from the CSD filter list. Note that this affects both new
-	views, as well as already existing ones.
+*csd-filter-remove* *app-id*|*title* _pattern_
+	Remove _pattern_ from the CSD filter list. Note that this affects new views
+	as well as already existing ones.
 
 *exit*
 	Exit the compositor, terminating the Wayland session.
