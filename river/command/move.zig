@@ -50,6 +50,40 @@ pub fn move(
     apply(view);
 }
 
+pub fn setPosition(
+    allocator: *std.mem.Allocator,
+    seat: *Seat,
+    args: []const [:0]const u8,
+    out: *?[]const u8,
+) Error!void {
+    if (args.len < 3) return Error.NotEnoughArguments;
+    if (args.len > 3) return Error.TooManyArguments;
+
+    const x = try std.fmt.parseInt(i32, args[1], 10);
+    const y = try std.fmt.parseInt(i32, args[2], 10);
+
+    const view = getView(seat) orelse return;
+    view.setPosition(x, y);
+    apply(view);
+}
+
+pub fn setGeometry(
+    allocator: *std.mem.Allocator,
+    seat: *Seat,
+    args: []const [:0]const u8,
+    out: *?[]const u8,
+) Error!void {
+    if (args.len < 3) return Error.NotEnoughArguments;
+    if (args.len > 3) return Error.TooManyArguments;
+
+    const width = try std.fmt.parseInt(u32, args[1], 10);
+    const height = try std.fmt.parseInt(u32, args[2], 10);
+
+    const view = getView(seat) orelse return;
+    view.setGeometry(width, height);
+    apply(view);
+}
+
 pub fn snap(
     allocator: *std.mem.Allocator,
     seat: *Seat,
@@ -91,45 +125,9 @@ pub fn resize(
         return Error.InvalidOrientation;
 
     const view = getView(seat) orelse return;
-    const border_width = @intCast(i32, server.config.border_width);
-    const output_box = view.output.getEffectiveResolution();
     switch (orientation) {
-        .horizontal => {
-            var real_delta: i32 = @intCast(i32, view.pending.box.width);
-            if (delta > 0) {
-                view.pending.box.width += @intCast(u32, delta);
-            } else {
-                // Prevent underflow
-                view.pending.box.width -=
-                    std.math.min(view.pending.box.width, @intCast(u32, -1 * delta));
-            }
-            view.applyConstraints();
-            // Do not grow bigger than the output
-            view.pending.box.width = std.math.min(
-                view.pending.box.width,
-                output_box.width - @intCast(u32, 2 * border_width),
-            );
-            real_delta -= @intCast(i32, view.pending.box.width);
-            view.move(@divFloor(real_delta, 2), 0);
-        },
-        .vertical => {
-            var real_delta: i32 = @intCast(i32, view.pending.box.height);
-            if (delta > 0) {
-                view.pending.box.height += @intCast(u32, delta);
-            } else {
-                // Prevent underflow
-                view.pending.box.height -=
-                    std.math.min(view.pending.box.height, @intCast(u32, -1 * delta));
-            }
-            view.applyConstraints();
-            // Do not grow bigger than the output
-            view.pending.box.height = std.math.min(
-                view.pending.box.height,
-                output_box.height - @intCast(u32, 2 * border_width),
-            );
-            real_delta -= @intCast(i32, view.pending.box.height);
-            view.move(0, @divFloor(real_delta, 2));
-        },
+        .horizontal => view.resize(delta, 0),
+        .vertical => view.resize(0, delta),
     }
 
     apply(view);

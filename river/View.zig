@@ -397,23 +397,191 @@ pub fn getConstraints(self: Self) Constraints {
     };
 }
 
-/// Modify the pending x/y of the view by the given deltas, clamping to the
-/// bounds of the output.
+/// Move the view by the given deltas, preserving the view's original size.
+/// Moving past an output's border snaps the view back inside, as shown below.
+///
+///     +-------------+              +-------------+
+///     |   output    |              |   output    |
+///     |      +------+--+           |   +---------+
+///     |      | view |  |  ----->   |   | view    |
+///     |      |      |  |           |   |         |
+///     |      +------+--+           |   +---------+
+///     +-------------+              +-------------+
+///
 pub fn move(self: *Self, delta_x: i32, delta_y: i32) void {
     const border_width = if (self.draw_borders) @intCast(i32, server.config.border_width) else 0;
-    const output_resolution = self.output.getEffectiveResolution();
+    const output = self.output.getEffectiveResolution();
 
-    const max_x = @intCast(i32, output_resolution.width) - @intCast(i32, self.pending.box.width) - border_width;
-    self.pending.box.x += delta_x;
-    self.pending.box.x = math.max(self.pending.box.x, border_width);
-    self.pending.box.x = math.min(self.pending.box.x, max_x);
-    self.pending.box.x = math.max(self.pending.box.x, 0);
+    var dx: i32 = delta_x;
+    var dy: i32 = delta_y;
 
-    const max_y = @intCast(i32, output_resolution.height) - @intCast(i32, self.pending.box.height) - border_width;
-    self.pending.box.y += delta_y;
-    self.pending.box.y = math.max(self.pending.box.y, border_width);
-    self.pending.box.y = math.min(self.pending.box.y, max_y);
-    self.pending.box.y = math.max(self.pending.box.y, 0);
+    if (dx > 0) {
+        const available = @intCast(i32, output.width) -
+            (self.pending.box.x + @intCast(i32, self.pending.box.width)) -
+            border_width;
+        dx = math.clamp(dx, 0, available);
+    } else if (dx < 0) {
+        const available = self.pending.box.x - border_width;
+        dx = -math.clamp(-dx, 0, available);
+    }
+
+    if (dy > 0) {
+        const available = @intCast(i32, output.height) -
+            (self.pending.box.y + @intCast(i32, self.pending.box.height)) -
+            border_width;
+        dy = math.clamp(dy, 0, available);
+    } else if (dy < 0) {
+        const available = self.pending.box.x - border_width;
+        dy = -math.clamp(-dy, 0, available);
+    }
+
+    self.setPosition(self.pending.box.x + dx, self.pending.box.y + dy);
+}
+
+/// Resize the view by the given deltas. `resize` tries to keep the view as
+/// centered as possible during the resize.
+///
+///     +-------------+                                 +-------------+
+///     |   output    |                                 |   output    |
+///     |      +------+                                 |   +---------+
+///     |      | view |  -- resize +3 horizontally -->  |   | view    |
+///     |      |      |                                 |   |         |
+///     |      +------+                                 |   +---------+
+///     +-------------+                                 +-------------+
+///
+pub fn resize(self: *Self, delta_width: i32, delta_height: i32) void {
+    const border_width = if (self.draw_borders) server.config.border_width else 0;
+    const output = self.output.getEffectiveResolution();
+
+    var dw = delta_width;
+    var dh = delta_height;
+    var dx = @divFloor(-dw, 2);
+    var dy = @divFloor(-dh, 2);
+
+    if (delta_width > 0) {
+        const available = output.width - 2 * border_width - self.pending.box.width;
+        dw = math.min(@intCast(i32, available), delta_width);
+
+        const available_left = self.pending.box.x - @intCast(i32, border_width);
+        dx = math.min(dx, available_left);
+    }
+
+    if (delta_height > 0) {
+        const available = output.width - 2 * border_width - self.pending.box.width;
+        dw = math.min(@intCast(i32, available), delta_width);
+
+        const available_top = self.pending.box.y - @intCast(i32, border_width);
+        dy = math.min(dy, available_top);
+    }
+
+    // When calculating the new width/height we don't care about making the
+    // window too small, as `View.setGeometry` ensures that the resulting
+    // window satisfies it's size constraints.
+    const new_width = if (dw > 0)
+        self.pending.box.width + @intCast(u32, dw)
+    else
+        self.pending.box.width - math.min(self.pending.box.width, @intCast(u32, -dw));
+    const new_height = if (dh > 0)
+        self.pending.box.height + @intCast(u32, dh)
+    else
+        self.pending.box.height - math.min(self.pending.box.height, @intCast(u32, -dh));
+
+    self.move(dx, dy);
+    self.setGeometry(new_width, new_height);
+}
+
+/// Set the pending x/y of the view to (x,y).  Any parts of view which extend
+/// beyond the current output are silently truncated, as shown below.
+///
+///       +-------------+              +-------------+
+///       |   output    |              |   output    |
+///       |      +------+--+  ------>  |      +------+
+///       |      | view |  |           |      | view |
+///       +------+------+  |           +------+------+
+///              +---------+
+///
+pub fn setPosition(self: *Self, x: i32, y: i32) void {
+    self.setPositionAndGeometry(x, y, self.pending.box.width, self.pending.box.height);
+}
+
+/// Set the pending width/height of the view to width/height. Any parts of view
+/// which extend beyond the current output are silently truncated, as shown below.
+///
+///       +-------------+              +-------------+
+///       |   output    |              |   output    |
+///       |      +------+--+  ------>  |      +------+
+///       |      | view |  |           |      | view |
+///       +------+------+  |           +------+------+
+///              +---------+
+///
+pub fn setGeometry(self: *Self, width: u32, height: u32) void {
+    self.setPositionAndGeometry(self.pending.box.x, self.pending.box.y, width, height);
+}
+
+/// Set the position of view to (x, y) and geometry to width x height.
+/// Any parts of view which extend beyond the current output are silently
+/// truncated, as shown below.
+///
+///       +-------------+              +-------------+
+///       |   output    |              |   output    |
+///       |      +------+--+  ------>  |      +------+
+///       |      | view |  |           |      | view |
+///       +------+------+  |           +------+------+
+///              +---------+
+///
+pub fn setPositionAndGeometry(
+    self: *Self,
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+) void {
+    const border_width = if (self.draw_borders) server.config.border_width else 0;
+    const output = self.output.getEffectiveResolution();
+    const max_width = output.width - border_width;
+    const max_height = output.height - border_width;
+
+    const x_start = math.clamp(x, @intCast(i32, border_width), @intCast(i32, max_width));
+    const y_start = math.clamp(y, @intCast(i32, border_width), @intCast(i32, max_height));
+
+    const x_end = math.min(
+        x + @intCast(i32, width),
+        @intCast(i32, max_width),
+    );
+    const y_end = math.min(
+        y + @intCast(i32, height),
+        @intCast(i32, max_height),
+    );
+
+    self.pending.box.x = x_start;
+    self.pending.box.y = y_start;
+    self.pending.box.width = @intCast(u32, x_end - x_start);
+    self.pending.box.height = @intCast(u32, y_end - y_start);
+
+    // Now we have guaranteed that self.pending is completely visible on its
+    // output. The only remaining issue to take care of is clamping the view's
+    // width/height to its constraints.
+    self.applyConstraints();
+
+    // view.applyConstraints() only changes the width and height of our view,
+    // so the only thing we might have to do is move the entire view left (to
+    // bring the full width into view)
+    const x_overhang =
+        self.pending.box.x +
+        @intCast(i32, self.pending.box.width) -
+        x_end;
+    if (x_overhang > 0) {
+        self.pending.box.x -= x_overhang;
+    }
+
+    // or move the entire view up (to bring the full height into view)
+    const y_overhang =
+        y_start +
+        @intCast(i32, self.pending.box.height) -
+        y_end;
+    if (y_overhang > 0) {
+        self.pending.box.y -= y_overhang;
+    }
 }
 
 /// Find and return the view corresponding to a given surface, if any

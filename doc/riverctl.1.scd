@@ -72,6 +72,18 @@ over the Wayland protocol.
 	Send the focused view to the next or previous output or the closest
 	output in any direction.
 
+*set-geometry* _width_ _height_
+	Set the geometry focused view to _width_x_height_. The view will always
+	remain within the bounds of the current output. Any parts of the view that
+	end up outside of the current output are silently truncated.
+	The view will be set to floating.
+
+*set-position* _x_ _y_
+	Set the position of the focused view to (x, y), relative to the current
+	output. The view will always remain within the bounds of the current
+	output. Any parts of the view that end up outside of the current output are
+	silently truncated. The view will be set to floating.
+
 *spawn* _shell_command_
 	Run _shell_command_ using `/bin/sh -c _shell_command_`. Note that
 	*spawn* only takes a single argument. To spawn a command taking
