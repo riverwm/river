@@ -147,6 +147,10 @@ are ignored by river.
 	Sets tags to their previous value on the currently focused output,
 	allowing jumping back and forth between 2 tag setups.
 
+*send-to-previous-tags*
+	Assign the currently focused view the previous tags of the currently
+	focused output.
+
 ## MAPPINGS
 
 Mappings are modal in river. Each mapping is associated with a mode and is
