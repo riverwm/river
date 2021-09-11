@@ -121,6 +121,22 @@ pub fn focusPreviousTags(
     }
 }
 
+/// Set the tags of the focused view to the tags that were selected previously
+pub fn sendToPreviousTags(
+    allocator: *std.mem.Allocator,
+    seat: *Seat,
+    args: []const []const u8,
+    out: *?[]const u8,
+) Error!void {
+    const previous_tags = seat.focused_output.previous_tags;
+    if (seat.focused == .view) {
+        const view = seat.focused.view;
+        view.pending.tags = previous_tags;
+        seat.focus(null);
+        view.applyPending();
+    }
+}
+
 fn parseTags(
     allocator: *std.mem.Allocator,
     args: []const [:0]const u8,

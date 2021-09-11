@@ -83,6 +83,7 @@ const str_to_impl_fn = [_]struct {
     .{ .name = "toggle-fullscreen",      .impl = @import("command/toggle_fullscreen.zig").toggleFullscreen },
     .{ .name = "toggle-view-tags",       .impl = @import("command/tags.zig").toggleViewTags },
     .{ .name = "focus-previous-tags",    .impl = @import("command/tags.zig").focusPreviousTags },
+    .{ .name = "send-to-previous-tags",  .impl = @import("command/tags.zig").sendToPreviousTags },
     .{ .name = "unmap",                  .impl = @import("command/map.zig").unmap },
     .{ .name = "unmap-pointer",          .impl = @import("command/map.zig").unmapPointer },
     .{ .name = "xcursor-theme",          .impl = @import("command/xcursor_theme.zig").xcursorTheme },
