@@ -40,6 +40,9 @@ view: *View,
 /// The corresponding wlroots object
 xdg_surface: *wlr.XdgSurface,
 
+/// Set to true when the client acks the configure with serial View.pending_serial.
+acked_pending_serial: bool = false,
+
 // Listeners that are always active over the view's lifetime
 destroy: wl.Listener(*wlr.XdgSurface) = wl.Listener(*wlr.XdgSurface).init(handleDestroy),
 map: wl.Listener(*wlr.XdgSurface) = wl.Listener(*wlr.XdgSurface).init(handleMap),
@@ -48,6 +51,8 @@ new_popup: wl.Listener(*wlr.XdgPopup) = wl.Listener(*wlr.XdgPopup).init(handleNe
 new_subsurface: wl.Listener(*wlr.Subsurface) = wl.Listener(*wlr.Subsurface).init(handleNewSubsurface),
 
 // Listeners that are only active while the view is mapped
+ack_configure: wl.Listener(*wlr.XdgSurface.Configure) =
+    wl.Listener(*wlr.XdgSurface.Configure).init(handleAckConfigure),
 commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
 request_fullscreen: wl.Listener(*wlr.XdgToplevel.event.SetFullscreen) =
     wl.Listener(*wlr.XdgToplevel.event.SetFullscreen).init(handleRequestFullscreen),
@@ -104,10 +109,11 @@ pub fn needsConfigure(self: Self) bool {
 }
 
 /// Send a configure event, applying the pending state of the view.
-pub fn configure(self: Self) void {
+pub fn configure(self: *Self) void {
     const toplevel = self.xdg_surface.role_data.toplevel;
     const state = &self.view.pending;
     self.view.pending_serial = toplevel.setSize(state.box.width, state.box.height);
+    self.acked_pending_serial = false;
 }
 
 /// Close the view. This will lead to the unmap and destroy events being sent
@@ -173,6 +179,7 @@ fn handleMap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurfa
     const toplevel = self.xdg_surface.role_data.toplevel;
 
     // Add listeners that are only active while mapped
+    self.xdg_surface.events.ack_configure.add(&self.ack_configure);
     self.xdg_surface.surface.events.commit.add(&self.commit);
     toplevel.events.request_fullscreen.add(&self.request_fullscreen);
     toplevel.events.request_move.add(&self.request_move);
@@ -237,6 +244,7 @@ fn handleUnmap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSur
     const self = @fieldParentPtr(Self, "unmap", listener);
 
     // Remove listeners that are only active while mapped
+    self.ack_configure.link.remove();
     self.commit.link.remove();
     self.request_fullscreen.link.remove();
     self.request_move.link.remove();
@@ -247,7 +255,18 @@ fn handleUnmap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSur
     self.view.unmap();
 }
 
-/// Called when the surface is comitted
+fn handleAckConfigure(
+    listener: *wl.Listener(*wlr.XdgSurface.Configure),
+    acked_configure: *wlr.XdgSurface.Configure,
+) void {
+    const self = @fieldParentPtr(Self, "ack_configure", listener);
+    if (self.view.pending_serial) |serial| {
+        if (serial == acked_configure.serial) {
+            self.acked_pending_serial = true;
+        }
+    }
+}
+
 fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) void {
     const self = @fieldParentPtr(Self, "commit", listener);
     const view = self.view;
@@ -257,11 +276,11 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) voi
     const new_box = Box.fromWlrBox(wlr_box);
 
     // If we have sent a configure changing the size
-    if (view.pending_serial) |s| {
+    if (view.pending_serial != null) {
         // Update the stored dimensions of the surface
         view.surface_box = new_box;
 
-        if (s == self.xdg_surface.configure_serial) {
+        if (self.acked_pending_serial) {
             // If this commit is in response to our configure and the
             // transaction code is tracking this configure, notify it.
             // Otherwise, apply the pending state immediately.

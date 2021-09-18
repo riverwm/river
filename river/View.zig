@@ -229,10 +229,10 @@ pub fn needsConfigure(self: Self) bool {
     };
 }
 
-pub fn configure(self: Self) void {
+pub fn configure(self: *Self) void {
     switch (self.impl) {
-        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.configure(),
-        .xwayland_view => |xwayland_view| xwayland_view.configure(),
+        .xdg_toplevel => |*xdg_toplevel| xdg_toplevel.configure(),
+        .xwayland_view => |*xwayland_view| xwayland_view.configure(),
     }
 }
 
