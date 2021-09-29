@@ -38,6 +38,7 @@ const Output = @import("Output.zig");
 const Seat = @import("Seat.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
+const XwaylandUnmanaged = @import("XwaylandUnmanaged.zig");
 
 const Mode = union(enum) {
     passthrough: void,
@@ -249,6 +250,7 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
                     self.seat.setFocusRaw(.{ .layer = layer_surface });
                 }
             },
+            .xwayland_unmanaged => assert(build_options.xwayland),
         }
         _ = self.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
     }
@@ -420,6 +422,7 @@ const SurfaceAtResult = struct {
     parent: union(enum) {
         view: *View,
         layer_surface: *LayerSurface,
+        xwayland_unmanaged: if (build_options.xwayland) *XwaylandUnmanaged else void,
     },
 };
 
@@ -461,7 +464,7 @@ pub fn surfaceAt(self: Self) ?SurfaceAtResult {
     if (layerSurfaceAt(output.getLayer(.overlay).*, ox, oy)) |s| return s;
 
     if (fullscreen_view) |view| {
-        //if (build_options.xwayland) if (xwaylandUnmanagedSurfaceAt(ly, lx)) |s| return s;
+        if (build_options.xwayland) if (xwaylandUnmanagedSurfaceAt(ly, lx)) |s| return s;
         var sx: f64 = undefined;
         var sy: f64 = undefined;
         if (view.surfaceAt(ox, oy, &sx, &sy)) |found| {
@@ -479,7 +482,7 @@ pub fn surfaceAt(self: Self) ?SurfaceAtResult {
 
         if (layerSurfaceAt(output.getLayer(.top).*, ox, oy)) |s| return s;
 
-        //if (build_options.xwayland) if (xwaylandUnmanagedSurfaceAt(lx, ly)) |s| return s;
+        if (build_options.xwayland) if (xwaylandUnmanagedSurfaceAt(lx, ly)) |s| return s;
 
         if (viewSurfaceAt(output, ox, oy)) |s| return s;
 
@@ -603,16 +606,25 @@ fn viewSurfaceAt(output: *const Output, ox: f64, oy: f64) ?SurfaceAtResult {
     return null;
 }
 
-fn xwaylandUnmanagedSurfaceAt(lx: f64, ly: f64) ?*wlr.Surface {
+fn xwaylandUnmanagedSurfaceAt(lx: f64, ly: f64) ?SurfaceAtResult {
     var it = server.root.xwayland_unmanaged_views.first;
     while (it) |node| : (it = node.next) {
         const xwayland_surface = node.data.xwayland_surface;
+        var sx: f64 = undefined;
+        var sy: f64 = undefined;
         if (xwayland_surface.surface.?.surfaceAt(
             lx - @intToFloat(f64, xwayland_surface.x),
             ly - @intToFloat(f64, xwayland_surface.y),
-            sx,
-            sy,
-        )) |found| return found;
+            &sx,
+            &sy,
+        )) |found| {
+            return SurfaceAtResult{
+                .surface = found,
+                .sx = sx,
+                .sy = sy,
+                .parent = .{ .xwayland_unmanaged = &node.data },
+            };
+        }
     }
     return null;
 }
@@ -832,6 +844,7 @@ fn passthrough(self: *Self, time: u32) void {
                         }
                     },
                     .layer_surface => {},
+                    .xwayland_unmanaged => assert(build_options.xwayland),
                 }
             }
         }

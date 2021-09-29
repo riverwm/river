@@ -26,6 +26,7 @@ const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Server = @import("Server.zig");
+const View = @import("View.zig");
 
 xdg_toplevel_decoration: *wlr.XdgToplevelDecorationV1,
 
@@ -62,8 +63,8 @@ fn handleRequestMode(
 ) void {
     const self = @fieldParentPtr(Self, "request_mode", listener);
 
-    const toplevel = self.xdg_toplevel_decoration.surface.role_data.toplevel;
-    if (toplevel.app_id != null and server.config.csd_filter.contains(mem.span(toplevel.app_id.?))) {
+    const view = @intToPtr(*View, self.xdg_toplevel_decoration.surface.data);
+    if (server.config.csdAllowed(view)) {
         _ = self.xdg_toplevel_decoration.setMode(.client_side);
     } else {
         _ = self.xdg_toplevel_decoration.setMode(.server_side);

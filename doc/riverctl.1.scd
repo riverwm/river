@@ -28,27 +28,27 @@ over the Wayland protocol.
 *close*
 	Close the focused view.
 
-*csd-filter-add* _app-id_
-	Add _app-id_ to the CSD filter list. Views with this _app-id_ are
-	told to use client side decoration instead of the default server
-	side decoration. Note that this affects both new views, as well as already
-	existing ones.
+*csd-filter-add* *app-id*|*title* _pattern_
+	Add _pattern_ to the CSD filter list. Views with this _pattern_ are told to
+	use client side decoration instead of the default server side decoration.
+	Note that this affects new views as well as already existing ones. Title
+	updates are not taken into account.
 
-*csd-filter-remove* _app-id_
-	Remove an _app-id_ from the CSD filter list. Note that this affects both new
-	views, as well as already existing ones.
+*csd-filter-remove* *app-id*|*title* _pattern_
+	Remove _pattern_ from the CSD filter list. Note that this affects new views
+	as well as already existing ones.
 
 *exit*
 	Exit the compositor, terminating the Wayland session.
 
-*float-filter-add* _app-id_
-	Add _app-id_ to the float filter list. Views with this _app-id_
-	will start floating. Note that this affects only new views, not already
-	existing ones.
+*float-filter-add* *app-id*|*title* _pattern_
+	Add a pattern to the float filter list. Note that this affects only new
+	views, not already existing ones. Title updates are also not taken into
+	account.
 
-*float-filter-remove* _app-id_
-	Remove an _app-id_ from the float filter list. Note that this affects only
-	new views, not already existing ones.
+*float-filter-remove* *app-id*|*title* _pattern_
+	Remove an app-id or title from the float filter list. Note that this
+	affects only new views, not already existing ones.
 
 *focus-output* *next*|*previous*|*up*|*right*|*down*|*left*
 	Focus the next or previous output or the closest output in any direction.
@@ -146,6 +146,10 @@ are ignored by river.
 *focus-previous-tags*
 	Sets tags to their previous value on the currently focused output,
 	allowing jumping back and forth between 2 tag setups.
+
+*send-to-previous-tags*
+	Assign the currently focused view the previous tags of the currently
+	focused output.
 
 ## MAPPINGS
 

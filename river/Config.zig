@@ -24,6 +24,7 @@ const util = @import("util.zig");
 const Server = @import("Server.zig");
 const Mode = @import("Mode.zig");
 const AttachMode = @import("view_stack.zig").AttachMode;
+const View = @import("View.zig");
 
 pub const FocusFollowsCursorMode = enum {
     disabled,
@@ -59,11 +60,13 @@ mode_to_id: std.StringHashMap(usize),
 /// All user-defined keymap modes, indexed by mode id
 modes: std.ArrayList(Mode),
 
-/// Set of app_ids which will be started floating
-float_filter: std.StringHashMapUnmanaged(void) = .{},
+/// Sets of app_ids and titles which will be started floating
+float_filter_app_ids: std.StringHashMapUnmanaged(void) = .{},
+float_filter_titles: std.StringHashMapUnmanaged(void) = .{},
 
-/// Set of app_ids which are allowed to use client side decorations
-csd_filter: std.StringHashMapUnmanaged(void) = .{},
+/// Sets of app_ids and titles which are allowed to use client side decorations
+csd_filter_app_ids: std.StringHashMapUnmanaged(void) = .{},
+csd_filter_titles: std.StringHashMapUnmanaged(void) = .{},
 
 /// The selected focus_follows_cursor mode
 focus_follows_cursor: FocusFollowsCursorMode = .disabled,
@@ -124,16 +127,60 @@ pub fn deinit(self: *Self) void {
     self.modes.deinit();
 
     {
-        var it = self.float_filter.keyIterator();
+        var it = self.float_filter_app_ids.keyIterator();
         while (it.next()) |key| util.gpa.free(key.*);
-        self.float_filter.deinit(util.gpa);
+        self.float_filter_app_ids.deinit(util.gpa);
     }
 
     {
-        var it = self.csd_filter.keyIterator();
+        var it = self.float_filter_titles.keyIterator();
         while (it.next()) |key| util.gpa.free(key.*);
-        self.csd_filter.deinit(util.gpa);
+        self.float_filter_titles.deinit(util.gpa);
+    }
+
+    {
+        var it = self.csd_filter_app_ids.keyIterator();
+        while (it.next()) |key| util.gpa.free(key.*);
+        self.csd_filter_app_ids.deinit(util.gpa);
+    }
+
+    {
+        var it = self.csd_filter_titles.keyIterator();
+        while (it.next()) |key| util.gpa.free(key.*);
+        self.csd_filter_titles.deinit(util.gpa);
     }
 
     util.gpa.free(self.default_layout_namespace);
+}
+
+pub fn shouldFloat(self: Self, view: *View) bool {
+    if (view.getAppId()) |app_id| {
+        if (self.float_filter_app_ids.contains(std.mem.span(app_id))) {
+            return true;
+        }
+    }
+
+    if (view.getTitle()) |title| {
+        if (self.float_filter_titles.contains(std.mem.span(title))) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+pub fn csdAllowed(self: Self, view: *View) bool {
+    if (view.getAppId()) |app_id| {
+        if (self.csd_filter_app_ids.contains(std.mem.span(app_id))) {
+            return true;
+        }
+    }
+
+    if (view.getTitle()) |title| {
+        if (self.csd_filter_titles.contains(std.mem.span(title))) {
+            return true;
+        }
+    }
+
+    return false;
 }
