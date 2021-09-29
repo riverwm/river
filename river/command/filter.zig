@@ -27,19 +27,31 @@ const ViewStack = @import("view_stack.zig").ViewStack;
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
+const FilterKind = enum {
+    @"app-id",
+    title,
+};
+
 pub fn floatFilterAdd(
     allocator: *mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
-    if (args.len < 2) return Error.NotEnoughArguments;
-    if (args.len > 2) return Error.TooManyArguments;
+    if (args.len < 3) return Error.NotEnoughArguments;
+    if (args.len > 3) return Error.TooManyArguments;
 
-    const gop = try server.config.float_filter.getOrPut(util.gpa, args[1]);
+    const kind = std.meta.stringToEnum(FilterKind, args[1]) orelse return Error.UnknownOption;
+    const map = switch (kind) {
+        .@"app-id" => &server.config.float_filter_app_ids,
+        .title => &server.config.float_filter_titles,
+    };
+
+    const key = args[2];
+    const gop = try map.getOrPut(util.gpa, key);
     if (gop.found_existing) return;
-    errdefer assert(server.config.float_filter.remove(args[1]));
-    gop.key_ptr.* = try std.mem.dupe(util.gpa, u8, args[1]);
+    errdefer assert(map.remove(key));
+    gop.key_ptr.* = try std.mem.dupe(util.gpa, u8, key);
 }
 
 pub fn floatFilterRemove(
@@ -48,10 +60,17 @@ pub fn floatFilterRemove(
     args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
-    if (args.len < 2) return Error.NotEnoughArguments;
-    if (args.len > 2) return Error.TooManyArguments;
+    if (args.len < 3) return Error.NotEnoughArguments;
+    if (args.len > 3) return Error.TooManyArguments;
 
-    if (server.config.float_filter.fetchRemove(args[1])) |kv| util.gpa.free(kv.key);
+    const kind = std.meta.stringToEnum(FilterKind, args[1]) orelse return Error.UnknownOption;
+    const map = switch (kind) {
+        .@"app-id" => &server.config.float_filter_app_ids,
+        .title => &server.config.float_filter_titles,
+    };
+
+    const key = args[2];
+    if (map.fetchRemove(key)) |kv| util.gpa.free(kv.key);
 }
 
 pub fn csdFilterAdd(
@@ -60,15 +79,22 @@ pub fn csdFilterAdd(
     args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
-    if (args.len < 2) return Error.NotEnoughArguments;
-    if (args.len > 2) return Error.TooManyArguments;
+    if (args.len < 3) return Error.NotEnoughArguments;
+    if (args.len > 3) return Error.TooManyArguments;
 
-    const gop = try server.config.csd_filter.getOrPut(util.gpa, args[1]);
+    const kind = std.meta.stringToEnum(FilterKind, args[1]) orelse return Error.UnknownOption;
+    const map = switch (kind) {
+        .@"app-id" => &server.config.csd_filter_app_ids,
+        .title => &server.config.csd_filter_titles,
+    };
+
+    const key = args[2];
+    const gop = try map.getOrPut(util.gpa, key);
     if (gop.found_existing) return;
-    errdefer assert(server.config.csd_filter.remove(args[1]));
-    gop.key_ptr.* = try std.mem.dupe(util.gpa, u8, args[1]);
+    errdefer assert(map.remove(key));
+    gop.key_ptr.* = try std.mem.dupe(util.gpa, u8, key);
 
-    csdFilterUpdateViews(args[1], .add);
+    csdFilterUpdateViews(kind, key, .add);
 }
 
 pub fn csdFilterRemove(
@@ -77,23 +103,29 @@ pub fn csdFilterRemove(
     args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
-    if (args.len < 2) return Error.NotEnoughArguments;
-    if (args.len > 2) return Error.TooManyArguments;
+    if (args.len < 3) return Error.NotEnoughArguments;
+    if (args.len > 3) return Error.TooManyArguments;
 
-    if (server.config.csd_filter.fetchRemove(args[1])) |kv| {
+    const kind = std.meta.stringToEnum(FilterKind, args[1]) orelse return Error.UnknownOption;
+    const map = switch (kind) {
+        .@"app-id" => &server.config.csd_filter_app_ids,
+        .title => &server.config.csd_filter_titles,
+    };
+
+    const key = args[2];
+    if (map.fetchRemove(key)) |kv| {
         util.gpa.free(kv.key);
-        csdFilterUpdateViews(args[1], .remove);
+        csdFilterUpdateViews(kind, key, .remove);
     }
 }
 
-fn csdFilterUpdateViews(app_id: []const u8, operation: enum { add, remove }) void {
+fn csdFilterUpdateViews(kind: FilterKind, pattern: []const u8, operation: enum { add, remove }) void {
     var decoration_it = server.decoration_manager.decorations.first;
     while (decoration_it) |decoration_node| : (decoration_it = decoration_node.next) {
         const xdg_toplevel_decoration = decoration_node.data.xdg_toplevel_decoration;
-        const view = @intToPtr(*View, xdg_toplevel_decoration.surface.data);
-        const view_app_id = mem.span(view.getAppId()) orelse continue;
 
-        if (mem.eql(u8, app_id, view_app_id)) {
+        const view = @intToPtr(*View, xdg_toplevel_decoration.surface.data);
+        if (viewMatchesPattern(kind, pattern, view)) {
             const toplevel = view.impl.xdg_toplevel.xdg_surface.role_data.toplevel;
             switch (operation) {
                 .add => {
@@ -109,4 +141,13 @@ fn csdFilterUpdateViews(app_id: []const u8, operation: enum { add, remove }) voi
             }
         }
     }
+}
+
+fn viewMatchesPattern(kind: FilterKind, pattern: []const u8, view: *View) bool {
+    const p = switch (kind) {
+        .@"app-id" => mem.span(view.getAppId()),
+        .title => mem.span(view.getTitle()),
+    } orelse return false;
+
+    return mem.eql(u8, pattern, p);
 }

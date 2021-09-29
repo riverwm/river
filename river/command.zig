@@ -36,59 +36,59 @@ pub const Orientation = enum {
     vertical,
 };
 
-// TODO: this could be replaced with a comptime hashmap
 // zig fmt: off
-const str_to_impl_fn = [_]struct {
-    name: []const u8,
-    impl: fn (*std.mem.Allocator, *Seat, []const [:0]const u8, *?[]const u8) Error!void,
-}{
-    .{ .name = "attach-mode",            .impl = @import("command/attach_mode.zig").attachMode },
-    .{ .name = "background-color",       .impl = @import("command/config.zig").backgroundColor },
-    .{ .name = "border-color-focused",   .impl = @import("command/config.zig").borderColorFocused },
-    .{ .name = "border-color-unfocused", .impl = @import("command/config.zig").borderColorUnfocused },
-    .{ .name = "border-color-urgent",    .impl = @import("command/config.zig").borderColorUrgent },
-    .{ .name = "border-width",           .impl = @import("command/config.zig").borderWidth },
-    .{ .name = "close",                  .impl = @import("command/close.zig").close },
-    .{ .name = "csd-filter-add",         .impl = @import("command/filter.zig").csdFilterAdd },
-    .{ .name = "csd-filter-remove",      .impl = @import("command/filter.zig").csdFilterRemove },
-    .{ .name = "declare-mode",           .impl = @import("command/declare_mode.zig").declareMode },
-    .{ .name = "default-layout",         .impl = @import("command/layout.zig").defaultLayout },
-    .{ .name = "enter-mode",             .impl = @import("command/enter_mode.zig").enterMode },
-    .{ .name = "exit",                   .impl = @import("command/exit.zig").exit },
-    .{ .name = "float-filter-add",       .impl = @import("command/filter.zig").floatFilterAdd },
-    .{ .name = "float-filter-remove",    .impl = @import("command/filter.zig").floatFilterRemove },
-    .{ .name = "focus-follows-cursor",   .impl = @import("command/focus_follows_cursor.zig").focusFollowsCursor },
-    .{ .name = "focus-output",           .impl = @import("command/output.zig").focusOutput },
-    .{ .name = "focus-view",             .impl = @import("command/focus_view.zig").focusView },
-    .{ .name = "input",                  .impl = @import("command/input.zig").input },
-    .{ .name = "list-input-configs",     .impl = @import("command/input.zig").listInputConfigs},
-    .{ .name = "list-inputs",            .impl = @import("command/input.zig").listInputs },
-    .{ .name = "map",                    .impl = @import("command/map.zig").map },
-    .{ .name = "map-pointer",            .impl = @import("command/map.zig").mapPointer },
-    .{ .name = "move",                   .impl = @import("command/move.zig").move },
-    .{ .name = "output-layout",          .impl = @import("command/layout.zig").outputLayout },
-    .{ .name = "resize",                 .impl = @import("command/move.zig").resize },
-    .{ .name = "send-layout-cmd",        .impl = @import("command/layout.zig").sendLayoutCmd },
-    .{ .name = "send-to-output",         .impl = @import("command/output.zig").sendToOutput },
-    .{ .name = "set-adaptive-sync",      .impl = @import("command/config.zig").setAdaptiveSync },
-    .{ .name = "set-cursor-warp",        .impl = @import("command/config.zig").setCursorWarp },
-    .{ .name = "set-focused-tags",       .impl = @import("command/tags.zig").setFocusedTags },
-    .{ .name = "set-repeat",             .impl = @import("command/set_repeat.zig").setRepeat },
-    .{ .name = "set-view-tags",          .impl = @import("command/tags.zig").setViewTags },
-    .{ .name = "snap",                   .impl = @import("command/move.zig").snap },
-    .{ .name = "spawn",                  .impl = @import("command/spawn.zig").spawn },
-    .{ .name = "spawn-tagmask",          .impl = @import("command/tags.zig").spawnTagmask },
-    .{ .name = "swap",                   .impl = @import("command/swap.zig").swap},
-    .{ .name = "toggle-float",           .impl = @import("command/toggle_float.zig").toggleFloat },
-    .{ .name = "toggle-focused-tags",    .impl = @import("command/tags.zig").toggleFocusedTags },
-    .{ .name = "toggle-fullscreen",      .impl = @import("command/toggle_fullscreen.zig").toggleFullscreen },
-    .{ .name = "toggle-view-tags",       .impl = @import("command/tags.zig").toggleViewTags },
-    .{ .name = "focus-previous-tags",    .impl = @import("command/tags.zig").focusPreviousTags },
-    .{ .name = "unmap",                  .impl = @import("command/map.zig").unmap },
-    .{ .name = "unmap-pointer",          .impl = @import("command/map.zig").unmapPointer },
-    .{ .name = "xcursor-theme",          .impl = @import("command/xcursor_theme.zig").xcursorTheme },
-    .{ .name = "zoom",                   .impl = @import("command/zoom.zig").zoom },
-};
+const command_impls = std.ComptimeStringMap(
+    fn (*std.mem.Allocator, *Seat, []const [:0]const u8, *?[]const u8) Error!void,
+    .{
+        .{ "attach-mode",               @import("command/attach_mode.zig").attachMode },
+        .{ "background-color",          @import("command/config.zig").backgroundColor },
+        .{ "border-color-focused",      @import("command/config.zig").borderColorFocused },
+        .{ "border-color-unfocused",    @import("command/config.zig").borderColorUnfocused },
+        .{ "border-color-urgent",       @import("command/config.zig").borderColorUrgent },
+        .{ "border-width",              @import("command/config.zig").borderWidth },
+        .{ "close",                     @import("command/close.zig").close },
+        .{ "csd-filter-add",            @import("command/filter.zig").csdFilterAdd },
+        .{ "csd-filter-remove",         @import("command/filter.zig").csdFilterRemove },
+        .{ "declare-mode",              @import("command/declare_mode.zig").declareMode },
+        .{ "default-layout",            @import("command/layout.zig").defaultLayout },
+        .{ "enter-mode",                @import("command/enter_mode.zig").enterMode },
+        .{ "exit",                      @import("command/exit.zig").exit },
+        .{ "float-filter-add",          @import("command/filter.zig").floatFilterAdd },
+        .{ "float-filter-remove",       @import("command/filter.zig").floatFilterRemove },
+        .{ "focus-follows-cursor",      @import("command/focus_follows_cursor.zig").focusFollowsCursor },
+        .{ "focus-output",              @import("command/output.zig").focusOutput },
+        .{ "focus-previous-tags",       @import("command/tags.zig").focusPreviousTags },
+        .{ "focus-view",                @import("command/focus_view.zig").focusView },
+        .{ "input",                     @import("command/input.zig").input },
+        .{ "list-input-configs",        @import("command/input.zig").listInputConfigs},
+        .{ "list-inputs",               @import("command/input.zig").listInputs },
+        .{ "map",                       @import("command/map.zig").map },
+        .{ "map-pointer",               @import("command/map.zig").mapPointer },
+        .{ "move",                      @import("command/move.zig").move },
+        .{ "output-layout",             @import("command/layout.zig").outputLayout },
+        .{ "resize",                    @import("command/move.zig").resize },
+        .{ "send-layout-cmd",           @import("command/layout.zig").sendLayoutCmd },
+        .{ "send-to-output",            @import("command/output.zig").sendToOutput },
+        .{ "send-to-previous-tags",     @import("command/tags.zig").sendToPreviousTags },
+        .{ "set-cursor-warp",           @import("command/config.zig").setCursorWarp },
+        .{ "set-focused-tags",          @import("command/tags.zig").setFocusedTags },
+        .{ "set-repeat",                @import("command/set_repeat.zig").setRepeat },
+        .{ "set-view-tags",             @import("command/tags.zig").setViewTags },
+    	.{ .name = "set-adaptive-sync", @import("command/config.zig").setAdaptiveSync },
+        .{ "snap",                      @import("command/move.zig").snap },
+        .{ "spawn",                     @import("command/spawn.zig").spawn },
+        .{ "spawn-tagmask",             @import("command/tags.zig").spawnTagmask },
+        .{ "swap",                      @import("command/swap.zig").swap},
+        .{ "toggle-float",              @import("command/toggle_float.zig").toggleFloat },
+        .{ "toggle-focused-tags",       @import("command/tags.zig").toggleFocusedTags },
+        .{ "toggle-fullscreen",         @import("command/toggle_fullscreen.zig").toggleFullscreen },
+        .{ "toggle-view-tags",          @import("command/tags.zig").toggleViewTags },
+        .{ "unmap",                     @import("command/map.zig").unmap },
+        .{ "unmap-pointer",             @import("command/map.zig").unmapPointer },
+        .{ "xcursor-theme",             @import("command/xcursor_theme.zig").xcursorTheme },
+        .{ "zoom",                      @import("command/zoom.zig").zoom },
+    },
+);
 // zig fmt: on
 
 pub const Error = error{
@@ -125,11 +125,7 @@ pub fn run(
 ) Error!void {
     std.debug.assert(out.* == null);
     if (args.len == 0) return Error.NoCommand;
-
-    const impl_fn = for (str_to_impl_fn) |definition| {
-        if (std.mem.eql(u8, args[0], definition.name)) break definition.impl;
-    } else return Error.UnknownCommand;
-
+    const impl_fn = command_impls.get(args[0]) orelse return Error.UnknownCommand;
     try impl_fn(allocator, seat, args, out);
 }
 
