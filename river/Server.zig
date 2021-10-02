@@ -144,10 +144,10 @@ pub fn deinit(self: *Self) void {
     self.backend.destroy();
 
     self.root.deinit();
+    self.input_manager.deinit();
 
     self.wl_server.destroy();
 
-    self.input_manager.deinit();
     self.config.deinit();
 }
 
