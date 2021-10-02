@@ -303,13 +303,15 @@ pub fn sendToOutput(self: *Self, destination_output: *Output) void {
         self.foreign_toplevel_handle.?.outputEnter(destination_output.wlr_output);
     }
 
-    const dimensions = destination_output.getEffectiveResolution();
-    self.pending.box = .{
-        .x = 0,
-        .y = 0,
-        .width = dimensions.width,
-        .height = dimensions.height,
-    };
+    if (self.pending.fullscreen) {
+        const dimensions = destination_output.getEffectiveResolution();
+        self.pending.box = .{
+            .x = 0,
+            .y = 0,
+            .width = dimensions.width,
+            .height = dimensions.height,
+        };
+    }
     self.output = destination_output;
 }
 
