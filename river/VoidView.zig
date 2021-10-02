@@ -23,10 +23,6 @@ const wlr = @import("wlroots");
 const Box = @import("Box.zig");
 const View = @import("View.zig");
 
-pub fn deinit(self: *Self) void {
-    unreachable;
-}
-
 pub fn needsConfigure(self: Self) bool {
     unreachable;
 }

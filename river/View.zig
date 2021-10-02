@@ -88,12 +88,11 @@ impl: Impl = undefined,
 /// The output this view is currently associated with
 output: *Output,
 
-/// This is non-null from the point where the view is mapped until the
-/// surface is destroyed by wlroots.
+/// This is non-null exactly when the view is mapped
 surface: ?*wlr.Surface = null,
 
-/// This View struct outlasts the wlroots object it wraps. This bool is set to
-/// true when the backing wlr.XdgToplevel or equivalent has been destroyed.
+/// This indicates that the view should be destroyed when the current
+/// transaction completes. See View.destroy()
 destroying: bool = false,
 
 /// The double-buffered state of the view
@@ -153,28 +152,22 @@ pub fn init(self: *Self, output: *Output, tags: u32, surface: anytype) void {
     } else unreachable;
 }
 
-/// Deinit the view, remove it from the view stack and free the memory.
+/// If saved buffers of the view are currently in use by a transaction,
+/// mark this view for destruction when the transaction completes. Otherwise
+/// destroy immediately.
 pub fn destroy(self: *Self) void {
-    self.dropSavedBuffers();
-    self.saved_buffers.deinit();
+    assert(self.surface == null);
+    self.destroying = true;
 
-    if (self.foreign_toplevel_handle) |handle| {
-        self.foreign_activate.link.remove();
-        self.foreign_fullscreen.link.remove();
-        self.foreign_close.link.remove();
-        handle.destroy();
+    // If there are still saved buffers, then this view needs to be kept
+    // around until the current transaction completes. This function will be
+    // called again in Root.commitTransaction()
+    if (self.saved_buffers.items.len == 0) {
+        self.saved_buffers.deinit();
+
+        const node = @fieldParentPtr(ViewStack(Self).Node, "view", self);
+        util.gpa.destroy(node);
     }
-
-    switch (self.impl) {
-        .xdg_toplevel => |*xdg_toplevel| xdg_toplevel.deinit(),
-        .xwayland_view => |*xwayland_view| xwayland_view.deinit(),
-    }
-
-    self.request_activate.link.remove();
-
-    const node = @fieldParentPtr(ViewStack(Self).Node, "view", self);
-    self.output.views.remove(node);
-    util.gpa.destroy(node);
 }
 
 /// Handle changes to pending state and start a transaction to apply them
@@ -457,7 +450,8 @@ pub fn shouldTrackConfigure(self: Self) bool {
 pub fn map(self: *Self) !void {
     log.debug("view '{s}' mapped", .{self.getTitle()});
 
-    if (self.foreign_toplevel_handle == null) {
+    {
+        assert(self.foreign_toplevel_handle == null);
         const handle = try wlr.ForeignToplevelHandleV1.create(server.foreign_toplevel_manager);
         self.foreign_toplevel_handle = handle;
 
@@ -494,14 +488,23 @@ pub fn map(self: *Self) !void {
 pub fn unmap(self: *Self) void {
     log.debug("view '{s}' unmapped", .{self.getTitle()});
 
-    assert(!self.destroying);
-    self.destroying = true;
-
     if (self.saved_buffers.items.len == 0) self.saveBuffers();
+
+    assert(self.surface != null);
+    self.surface = null;
 
     // Inform all seats that the view has been unmapped so they can handle focus
     var it = server.input_manager.seats.first;
     while (it) |seat_node| : (it = seat_node.next) seat_node.data.handleViewUnmap(self);
+
+    assert(self.foreign_toplevel_handle != null);
+    self.foreign_activate.link.remove();
+    self.foreign_fullscreen.link.remove();
+    self.foreign_close.link.remove();
+    self.foreign_toplevel_handle.?.destroy();
+    self.foreign_toplevel_handle = null;
+
+    self.request_activate.link.remove();
 
     self.output.sendViewTags();
 

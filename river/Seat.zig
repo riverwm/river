@@ -183,7 +183,7 @@ pub fn focus(self: *Self, _target: ?*View) void {
 }
 
 fn pendingFilter(view: *View, filter_tags: u32) bool {
-    return !view.destroying and view.pending.tags & filter_tags != 0;
+    return view.surface != null and view.pending.tags & filter_tags != 0;
 }
 
 /// Switch focus to the target, handling unfocus and input inhibition

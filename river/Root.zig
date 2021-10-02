@@ -291,7 +291,7 @@ pub fn startTransaction(self: *Self) void {
         while (view_it) |view_node| : (view_it = view_node.next) {
             const view = &view_node.view;
 
-            if (view.destroying) continue;
+            if (view.surface == null) continue;
 
             if (view.shouldTrackConfigure()) {
                 // Clear the serial in case this transaction is interrupting a prior one.
@@ -386,10 +386,13 @@ fn commitTransaction(self: *Self) void {
             const view = &view_node.view;
             view_it = view_node.next;
 
-            if (view.destroying) {
-                view.destroy();
+            if (view.surface == null) {
+                view.dropSavedBuffers();
+                view.output.views.remove(view_node);
+                if (view.destroying) view.destroy();
                 continue;
             }
+            assert(!view.destroying);
 
             if (view.pending_serial != null and !view.shouldTrackConfigure()) continue;
 

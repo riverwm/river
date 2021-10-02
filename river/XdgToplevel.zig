@@ -77,20 +77,6 @@ pub fn init(self: *Self, view: *View, xdg_surface: *wlr.XdgSurface) void {
     Subsurface.handleExisting(xdg_surface.surface, .{ .xdg_toplevel = self });
 }
 
-pub fn deinit(self: *Self) void {
-    if (self.view.surface != null) {
-        // Remove listeners that are active for the entire lifetime of the view
-        self.destroy.link.remove();
-        self.map.link.remove();
-        self.unmap.link.remove();
-        self.new_popup.link.remove();
-        self.new_subsurface.link.remove();
-
-        Subsurface.destroySubsurfaces(self.xdg_surface.surface);
-        XdgPopup.destroyPopups(self.xdg_surface);
-    }
-}
-
 /// Returns true if a configure must be sent to ensure that the pending
 /// dimensions are applied.
 pub fn needsConfigure(self: Self) bool {
@@ -168,8 +154,18 @@ pub fn getConstraints(self: Self) View.Constraints {
 
 fn handleDestroy(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurface) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
-    self.deinit();
-    self.view.surface = null;
+
+    // Remove listeners that are active for the entire lifetime of the view
+    self.destroy.link.remove();
+    self.map.link.remove();
+    self.unmap.link.remove();
+    self.new_popup.link.remove();
+    self.new_subsurface.link.remove();
+
+    Subsurface.destroySubsurfaces(self.xdg_surface.surface);
+    XdgPopup.destroyPopups(self.xdg_surface);
+
+    self.view.destroy();
 }
 
 /// Called when the xdg surface is mapped, or ready to display on-screen.
