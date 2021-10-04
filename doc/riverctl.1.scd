@@ -351,9 +351,9 @@ However note that not every input device supports every property.
 
 # EXAMPLES
 
-Bind Super+Enter in normal mode to spawn a *foot*(1) terminal:
+Bind Super+Return in normal mode to spawn a *foot*(1) terminal:
 
-	riverctl map normal Mod4 Enter spawn 'foot --app-id=foobar'
+	riverctl map normal Mod4 Return spawn 'foot --app-id=foobar'
 
 See also the example init script at /etc/river/init.
 
