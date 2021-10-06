@@ -18,10 +18,14 @@ from pywayland.protocol.wayland import WlOutput
 try:
     from pywayland.protocol.river_layout_v3 import RiverLayoutManagerV3
 except:
-    print("Your pywayland package does not have bindings for river-layout-v3.")
-    print("You can add the bindings with the following command:")
-    print("     python3 -m pywayland.scanner -i /usr/share/wayland/wayland.xml river-layout-v3.xml")
-    print("Note that you may need root privileges if you have pywayland installed system-wide.")
+    river_layout_help = """
+    Your pywayland package does not have bindings for river-layout-v3.
+    You can generate the bindings with the following command:
+         python3 -m pywayland.scanner -i /usr/share/wayland/wayland.xml river-layout-v3.xml
+    It is recommended to use a virtual environment to avoid modifying your
+    system-wide python installation, See: https://docs.python.org/3/library/venv.html
+    """
+    print(river_layout_help)
     quit()
 
 layout_manager = None
@@ -53,12 +57,12 @@ def layout_handle_layout_demand(layout, view_count, usable_w, usable_h, tags, se
     # Committing the layout means telling the server that your code is done
     # laying out windows. Make sure you have pushed exactly the right amount of
     # view dimensions, a mismatch is a fatal protocol error.
-    # 
+    #
     # You also have to provide a layout name. This is a user facing string that
     # the server can forward to status bars. You can use it to tell the user
     # which layout is currently in use. You could also add some status
     # information status information about your layout, which is what we do here.
-    layout.commit(f"{view_count} windows layed out by python", serial)
+    layout.commit(f"{view_count} windows laid out by python", serial)
 
 def layout_handle_namespace_in_use(layout):
     # Oh no, the namespace we choose is already used by another client! All we
@@ -67,7 +71,7 @@ def layout_handle_namespace_in_use(layout):
     # client could instead destroy only the one single affected layout object
     # and recover from this mishap. Writing such a client is left as an exercise
     # for the reader.
-    print(f"Namespace already in use!")
+    print("Namespace already in use!")
     global loop
     loop = False
 
@@ -136,4 +140,3 @@ for output in outputs:
     outputs.remove(output)
 
 display.disconnect()
-
