@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="river_control_v2">
+  <copyright>
+    Copyright 2021 The River Developers
+
+    Permission to use, copy, modify, and/or distribute this software for any
+    purpose with or without fee is hereby granted, provided that the above
+    copyright notice and this permission notice appear in all copies.
+
+    THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+    WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+    MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+    ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+    ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  </copyright>
+
+  <description summary="let clients register global keybinds">
+    This protocol specifies a way for clients to register global keybinds.
+
+    Warning! The protocol described in this file is currently in the
+    testing phase. Backward compatible changes may be added together with
+    the corresponding interface version bump. Backward incompatible changes
+    can only be done by creating a new major version of the extension.
+  </description>
+
+  <interface name="river_keybind_manager_v1" version="1">
+    <description summary="manage keybind objects">
+      A global factory for river.
+    <description>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the river_keybind_manager_v1 object">
+        This request indicates that the client will not use the
+        river_keybind_manager object any more. Objects that have been created
+        through this instance are not affected.
+      </description>
+    </request>
+
+    <request name="register_keybind">
+      <description summary="create a river_keybind_v1 object">
+        This creates a new river_keybind_v1 object for a specific modifier and
+        keycode combination.
+        <!-- TODO what happens when the keybind is already registered? -->
+      </description>
+      <arg name="id" type="new_id" interface="river_keybind_v1"/>
+      <arg name="modifier" type="uint"/>
+      <arg name="key_code" type="uint"/>
+    </request>
+  </interface>
+
+  <interface name="river_keybind_v1" version="1">
+    <description summary="a requested keybind">
+      This object represents a registered keybind.
+    </description>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the river_keybind_v1 object">
+        This request indicates that the client will not use the river_keybind
+        object any more.
+
+        The registered keybind will be released by the server.
+      </description>
+    </request>
+
+    <event name="pressed">
+      <description summary="the keybind has been pressed">
+        This event indicates that the keybind has been pressed on a specific
+        seat.
+      </description>
+      <arg name="seat" type="object" interface="wl_seat"/>
+      <!-- TODO is the time needed? Maybe a serial? -->
+    </event>
+
+    <event name="released">
+      <description summary="the keybind has been released">
+        This event indicates that the keybind has been released on a specific
+        seat.
+      </description>
+      <arg name="seat" type="object" interface="wl_seat"/>
+    </event>
+  </interface>
+</protocol>
