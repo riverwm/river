@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="river_view_management_v1">
+  <copyright>
+    Copyright 2021 The River Developers
+
+    Permission to use, copy, modify, and/or distribute this software for any
+    purpose with or without fee is hereby granted, provided that the above
+    copyright notice and this permission notice appear in all copies.
+
+    THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+    WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+    MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+    ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+    ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  </copyright>
+
+  <description summary="let clients control view management">
+    This protocol specifies a way for clients to control view management.
+
+    Warning! The protocol described in this file is currently in the
+    testing phase. Backward compatible changes may be added together with
+    the corresponding interface version bump. Backward incompatible changes
+    can only be done by creating a new major version of the extension.
+  </description>
+
+  <interface name="river_view_manager_v1" version="1">
+    <description summary="manage views">
+      This interface lets clients control view management of the server as well
+      as certain global states.
+
+      All settings are double buffered and will only take effect once committed.
+      This also includes all settings of all river_view_handle_v1 objects.
+
+      Only a single instance of this interface is allowed control over the
+      severs view management. If this interface is bound while another is
+      active, it will receive the access_denied event and must be destroyed
+      immediately. All further requests are ignored and no events are send.
+    <description>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the river_view_manager_v1 object">
+        This request indicates that the client will not use the
+        river_view_manager object any more. Objects that have been created
+        through this instance are not affected.
+      </description>
+    </request>
+
+    <event name="access_denied">
+      <description summary="access denied">
+        The server does not grant this client control over view management.
+
+        The client will not receive any events through this inteface and all
+        requests will be ignored by the server.
+       
+        The river_view_manager object should be destroyed immediately.
+      </description>
+    </event>
+
+    <event name="new_view">
+      <description summary="a new view">
+        This event notifies the client of a new view which it can manage.
+
+        If the client does not manage this view, it will not be displayed and
+        remains hidden.
+
+        The views data (title, app-id, etc.) will be advertised immediately
+        after binding. When all information of this view (and possibly other new
+        views) has been advertised, the river_view_manager.done event is send.
+        Clients should probably wait until that event before responding to the
+        server.
+      </description>
+      <arg name="view" type="new_id" interface="river_view_handle_v1"/>
+    </event>
+
+    <event name="usable_area">
+      <description summary="useable space of an output">
+        This event informs the client of the area on an output that is
+        unobstructed by desktop widgets such as bars and panels, in output local
+        coordinates per XDG-Output protocol extension.
+
+        The client is not required to, but generally it makes sense to only
+        position views in this area.
+      </description>
+      <arg name="output" type="object" interface="wl_output"/>
+      <arg name="x" type="uint"/>
+      <arg name="y" type="uint"/>
+      <arg name="width" type="uint"/>
+      <arg name="height" type="uint"/>
+    </event>
+
+    <event name="done">
+      <description summary="all information has been advertised">
+        The server sends this event to inform the client that all current
+        information, both global and of all views, has been advertised.
+
+        Clients should probably wait until this event to act on any information
+        received through other events.
+      </description>
+    </event>
+
+    <request name="set_background_color">
+      <description summary="set the background color">
+        Set the background color.
+      </description>
+      <arg name="color" type="string"/>
+      <!-- TODO what is the best way to send a specific color through Wayland? -->
+    </request>
+
+    <request name="commit">
+      <description summary="apply all view states">
+        This requests asks the server to commit all pending view and global
+        states.
+      </description>
+    </request>
+  </interface>
+
+  <interface name="river_view_handle_v1">
+    <description summary="a view handle">
+      This interface represents a single view.
+
+      All view settings are double buffered and will only take effect once the
+      river_view_manager.commit request is called.
+
+      After all information of all views has been advertised, the server sends
+      river_view_manager_v1.done.
+    <description>
+
+    <event name="title">
+      <description summary="view title">
+        The title of the view.
+
+        Send once on binding and on every update.
+      </description>
+      <arg name="title" type="string"/>
+    </event>
+
+    <event name="app_id">
+      <description summary="view app-id">
+        The app-id of the view.
+
+        Send once on binding and on every update.
+      </description>
+      <arg name="app_id" type="string"/>
+    </event>
+
+    <event name="parent">
+      <description summary="parent view">
+        The parent view of this view.
+      </description>
+      <arg name="parent" type="object" interface="river_view_handle_v1"/>
+    </event>
+
+    <event name="min_dimensions">
+      <description summary="mininum view dimensions">
+        The minimum dimensions of this view. The server will always respect
+        these, even if the view management client requests smaller dimensions.
+
+        Send once on binding and on every update.
+      </description>
+      <arg name="app_id" type="string"/>
+    </event>
+
+    <event name="max_dimensions">
+      <description summary="maxinum view dimensions">
+        The maximum dimensions of this view. The server will always respect
+        these, even if the view management client requests larger dimensions.
+
+        Send once on binding and on every update.
+      </description>
+      <arg name="app_id" type="string"/>
+    </event>
+
+    <event name="pointer_enter">
+      <description summary="pointer entered view">
+        The pointer of the specified seat entered the view.
+      </description>
+      <arg name="seat" type="object" interface="wl_seat"/>
+    </event>
+
+    <event name="closed">
+      <description summary="view has been closed">
+        The view has been closed.
+      </description>
+    </event>
+
+    <request name="kill">
+      <description summary="kill the view">
+        Ask the server to kill the view. If successful, a closed event will be
+        received.
+      </description>
+    </request>
+
+    <request name="set_output">
+      <description summary="set the output of a view">
+        Ask the server to put the view on an output.
+
+        Initially views will not have an output. If the client wants to display
+        them, it has to specify a wl_output for them to appear on. If the client
+        later wants to hide the view, it can call set_output again with NULL as
+        output.
+      </description>
+      <arg name="output" type="object" interface="wl_output" allow-null="true"/>
+    </request>
+
+    <request name="set_z_position">
+      <description summary="set the z position of a view">
+        Set the z position of a view, in positive integers.
+
+        Initially all views will have a z position of 0.
+
+        If two or more views have the same z position, the z order is up to
+        the server and undefined.
+      </description>
+      <arg name="z" type="uint"/>
+    </request>
+
+    <request name="set_position">
+      <description summary="set the z position of a view">
+        Set the position of a view, in output local coordinates per XDG-Output
+        protocol extension.
+
+        Initially all views will have a position of 0 0.
+      </description>
+      <arg name="x" type="uint"/>
+      <arg name="y" type="uint"/>
+    </request>
+
+    <request name="set_dimensions">
+      <description summary="set the dimensions of a view">
+        Set the dimensions of a view, in positive integers.
+
+        There is no guarantee that these exact dimensions will end up being
+        used. The minimum and maximum dimensions of a view will take precedence.
+        A view may choose to ignore the request and use different dimensions,
+        which will also be honoured by the server.
+
+        Initially all views will have the dimensions the view initially
+        committed.
+      </description>
+      <arg name="width" type="uint"/>
+      <arg name="height" type="uint"/>
+    </request>
+
+    <request name="focus">
+      <description summary="focus a view">
+        Focus a view with the specified seat.
+
+        A seat can only focus a single view at once. Focusing a view will
+        implicitly unfocus the previously focused view.
+      </description>
+      <arg name="seat" type="object" interface="wl_seat"/>
+    </request>
+
+    <request name="unfocus">
+      <description summary="unfocus a view">
+        Unfocus a view with the specified seat.
+      </description>
+      <arg name="seat" type="object" interface="wl_seat"/>
+    </request>
+
+    <request name="set_border_color">
+      <description summary="set the border color of a view">
+        Set the border color of a view.
+      </description>
+      <arg name="color" type="string"/>
+      <!-- TODO what is the best way to send a specific color through Wayland? -->
+    </request>
+  </inteface>
+</protocol>
