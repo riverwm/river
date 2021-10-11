@@ -22,10 +22,10 @@ const Seat = @import("../Seat.zig");
 
 /// Close the focused view, if any.
 pub fn close(
-    allocator: *std.mem.Allocator,
+    _: std.mem.Allocator,
     seat: *Seat,
-    args: []const [:0]const u8,
-    out: *?[]const u8,
+    _: []const [:0]const u8,
+    _: *?[]const u8,
 ) Error!void {
     // Note: we don't call arrange() here as it will be called
     // automatically when the view is unmapped.

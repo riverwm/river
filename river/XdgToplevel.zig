@@ -147,7 +147,7 @@ pub fn getConstraints(self: Self) View.Constraints {
     };
 }
 
-fn handleDestroy(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurface) void {
+fn handleDestroy(listener: *wl.Listener(*wlr.XdgSurface), _: *wlr.XdgSurface) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
 
     // Remove listeners that are active for the entire lifetime of the view
@@ -163,7 +163,6 @@ fn handleDestroy(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgS
     self.view.destroy();
 }
 
-/// Called when the xdg surface is mapped, or ready to display on-screen.
 fn handleMap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurface) void {
     const self = @fieldParentPtr(Self, "map", listener);
     const view = self.view;
@@ -225,13 +224,13 @@ fn handleMap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurfa
     }
 
     view.map() catch {
-        log.crit("out of memory", .{});
+        log.err("out of memory", .{});
         xdg_surface.resource.getClient().postNoMemory();
     };
 }
 
 /// Called when the surface is unmapped and will no longer be displayed.
-fn handleUnmap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurface) void {
+fn handleUnmap(listener: *wl.Listener(*wlr.XdgSurface), _: *wlr.XdgSurface) void {
     const self = @fieldParentPtr(Self, "unmap", listener);
 
     // Remove listeners that are only active while mapped
@@ -258,7 +257,7 @@ fn handleAckConfigure(
     }
 }
 
-fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) void {
+fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     const self = @fieldParentPtr(Self, "commit", listener);
     const view = self.view;
 
@@ -356,13 +355,13 @@ fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), ev
 }
 
 /// Called when the client sets / updates its title
-fn handleSetTitle(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurface) void {
+fn handleSetTitle(listener: *wl.Listener(*wlr.XdgSurface), _: *wlr.XdgSurface) void {
     const self = @fieldParentPtr(Self, "set_title", listener);
     self.view.notifyTitle();
 }
 
 /// Called when the client sets / updates its app_id
-fn handleSetAppId(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurface) void {
+fn handleSetAppId(listener: *wl.Listener(*wlr.XdgSurface), _: *wlr.XdgSurface) void {
     const self = @fieldParentPtr(Self, "set_app_id", listener);
     self.view.notifyAppId();
 }

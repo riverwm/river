@@ -48,14 +48,14 @@ pub fn init(self: *Self, xwayland_surface: *wlr.XwaylandSurface) void {
 }
 
 fn handleRequestConfigure(
-    listener: *wl.Listener(*wlr.XwaylandSurface.event.Configure),
+    _: *wl.Listener(*wlr.XwaylandSurface.event.Configure),
     event: *wlr.XwaylandSurface.event.Configure,
 ) void {
     event.surface.configure(event.x, event.y, event.width, event.height);
 }
 
 /// Called when the xwayland surface is destroyed
-fn handleDestroy(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
+fn handleDestroy(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
 
     // Remove listeners that are active for the entire lifetime
@@ -84,7 +84,7 @@ fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wl
 }
 
 /// Called when the surface is unmapped and will no longer be displayed.
-fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
+fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "unmap", listener);
 
     // Remove self from the list of unmanged views in the root
@@ -94,7 +94,7 @@ fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *
     self.commit.link.remove();
 }
 
-fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) void {
+fn handleCommit(_: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     var it = server.root.outputs.first;
     while (it) |node| : (it = node.next) node.data.damage.addWhole();
 }

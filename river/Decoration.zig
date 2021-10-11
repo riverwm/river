@@ -46,7 +46,7 @@ pub fn init(self: *Self, xdg_toplevel_decoration: *wlr.XdgToplevelDecorationV1) 
 
 fn handleDestroy(
     listener: *wl.Listener(*wlr.XdgToplevelDecorationV1),
-    xdg_toplevel_decoration: *wlr.XdgToplevelDecorationV1,
+    _: *wlr.XdgToplevelDecorationV1,
 ) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
     self.destroy.link.remove();
@@ -59,7 +59,7 @@ fn handleDestroy(
 
 fn handleRequestMode(
     listener: *wl.Listener(*wlr.XdgToplevelDecorationV1),
-    xdg_toplevel_decoration: *wlr.XdgToplevelDecorationV1,
+    _: *wlr.XdgToplevelDecorationV1,
 ) void {
     const self = @fieldParentPtr(Self, "request_mode", listener);
 

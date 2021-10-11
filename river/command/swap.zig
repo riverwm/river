@@ -27,10 +27,10 @@ const ViewStack = @import("../view_stack.zig").ViewStack;
 
 /// Swap the currently focused view with either the view higher or lower in the visible stack
 pub fn swap(
-    allocator: *std.mem.Allocator,
+    _: std.mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
-    out: *?[]const u8,
+    _: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;

@@ -25,10 +25,10 @@ const Seat = @import("../Seat.zig");
 const Config = @import("../Config.zig");
 
 pub fn borderWidth(
-    allocator: *std.mem.Allocator,
-    seat: *Seat,
+    _: std.mem.Allocator,
+    _: *Seat,
     args: []const [:0]const u8,
-    out: *?[]const u8,
+    _: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
@@ -39,10 +39,10 @@ pub fn borderWidth(
 }
 
 pub fn backgroundColor(
-    allocator: *std.mem.Allocator,
-    seat: *Seat,
+    _: std.mem.Allocator,
+    _: *Seat,
     args: []const [:0]const u8,
-    out: *?[]const u8,
+    _: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
@@ -54,10 +54,10 @@ pub fn backgroundColor(
 }
 
 pub fn borderColorFocused(
-    allocator: *std.mem.Allocator,
-    seat: *Seat,
+    _: std.mem.Allocator,
+    _: *Seat,
     args: []const [:0]const u8,
-    out: *?[]const u8,
+    _: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
@@ -69,10 +69,10 @@ pub fn borderColorFocused(
 }
 
 pub fn borderColorUnfocused(
-    allocator: *std.mem.Allocator,
-    seat: *Seat,
+    _: std.mem.Allocator,
+    _: *Seat,
     args: []const [:0]const u8,
-    out: *?[]const u8,
+    _: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
@@ -84,10 +84,10 @@ pub fn borderColorUnfocused(
 }
 
 pub fn borderColorUrgent(
-    allocator: *std.mem.Allocator,
-    seat: *Seat,
+    _: std.mem.Allocator,
+    _: *Seat,
     args: []const [:0]const u8,
-    out: *?[]const u8,
+    _: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
@@ -99,10 +99,10 @@ pub fn borderColorUrgent(
 }
 
 pub fn setCursorWarp(
-    allocator: *std.mem.Allocator,
-    seat: *Seat,
+    _: std.mem.Allocator,
+    _: *Seat,
     args: []const [:0]const u8,
-    out: *?[]const u8,
+    _: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;

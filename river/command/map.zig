@@ -34,7 +34,7 @@ const Seat = @import("../Seat.zig");
 /// Example:
 /// map normal Mod4+Shift Return spawn foot
 pub fn map(
-    allocator: *std.mem.Allocator,
+    allocator: std.mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
@@ -46,7 +46,7 @@ pub fn map(
 
     if (optionals.release and optionals.repeat) return Error.ConflictingOptions;
 
-    const mode_id = try modeNameToId(allocator, seat, args[1 + offset], out);
+    const mode_id = try modeNameToId(allocator, args[1 + offset], out);
     const modifiers = try parseModifiers(allocator, args[2 + offset], out);
     const keysym = try parseKeysym(allocator, args[3 + offset], out);
 
@@ -72,15 +72,15 @@ pub fn map(
 /// Example:
 /// map-pointer normal Mod4 BTN_LEFT move-view
 pub fn mapPointer(
-    allocator: *std.mem.Allocator,
-    seat: *Seat,
+    allocator: std.mem.Allocator,
+    _: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     if (args.len < 5) return Error.NotEnoughArguments;
     if (args.len > 5) return Error.TooManyArguments;
 
-    const mode_id = try modeNameToId(allocator, seat, args[1], out);
+    const mode_id = try modeNameToId(allocator, args[1], out);
     const modifiers = try parseModifiers(allocator, args[2], out);
     const event_code = try parseEventCode(allocator, args[3], out);
 
@@ -111,7 +111,7 @@ pub fn mapPointer(
     }
 }
 
-fn modeNameToId(allocator: *std.mem.Allocator, seat: *Seat, mode_name: []const u8, out: *?[]const u8) !usize {
+fn modeNameToId(allocator: std.mem.Allocator, mode_name: []const u8, out: *?[]const u8) !usize {
     const config = &server.config;
     return config.mode_to_id.get(mode_name) orelse {
         out.* = try std.fmt.allocPrint(
@@ -154,7 +154,7 @@ fn pointerMappingExists(
     return null;
 }
 
-fn parseEventCode(allocator: *std.mem.Allocator, name: [:0]const u8, out: *?[]const u8) !u32 {
+fn parseEventCode(allocator: std.mem.Allocator, name: [:0]const u8, out: *?[]const u8) !u32 {
     const event_code = c.libevdev_event_code_from_name(c.EV_KEY, name);
     if (event_code < 1) {
         out.* = try std.fmt.allocPrint(allocator, "unknown button {s}", .{name});
@@ -164,7 +164,7 @@ fn parseEventCode(allocator: *std.mem.Allocator, name: [:0]const u8, out: *?[]co
     return @intCast(u32, event_code);
 }
 
-fn parseKeysym(allocator: *std.mem.Allocator, name: [:0]const u8, out: *?[]const u8) !xkb.Keysym {
+fn parseKeysym(allocator: std.mem.Allocator, name: [:0]const u8, out: *?[]const u8) !xkb.Keysym {
     const keysym = xkb.Keysym.fromName(name, .case_insensitive);
     if (keysym == .NoSymbol) {
         out.* = try std.fmt.allocPrint(allocator, "invalid keysym '{s}'", .{name});
@@ -174,11 +174,11 @@ fn parseKeysym(allocator: *std.mem.Allocator, name: [:0]const u8, out: *?[]const
 }
 
 fn parseModifiers(
-    allocator: *std.mem.Allocator,
+    allocator: std.mem.Allocator,
     modifiers_str: []const u8,
     out: *?[]const u8,
 ) !wlr.Keyboard.ModifierMask {
-    var it = std.mem.split(modifiers_str, "+");
+    var it = std.mem.split(u8, modifiers_str, "+");
     var modifiers = wlr.Keyboard.ModifierMask{};
     outer: while (it.next()) |mod_name| {
         if (mem.eql(u8, mod_name, "None")) continue;
@@ -245,7 +245,7 @@ fn parseOptionalArgs(args: []const []const u8) OptionalArgsContainer {
 /// Example:
 /// unmap normal Mod4+Shift Return
 pub fn unmap(
-    allocator: *std.mem.Allocator,
+    allocator: std.mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
@@ -255,7 +255,7 @@ pub fn unmap(
     const offset = optionals.i;
     if (args.len - offset < 4) return Error.NotEnoughArguments;
 
-    const mode_id = try modeNameToId(allocator, seat, args[1 + offset], out);
+    const mode_id = try modeNameToId(allocator, args[1 + offset], out);
     const modifiers = try parseModifiers(allocator, args[2 + offset], out);
     const keysym = try parseKeysym(allocator, args[3 + offset], out);
 
@@ -276,15 +276,15 @@ pub fn unmap(
 /// Example:
 /// unmap-pointer normal Mod4 BTN_LEFT
 pub fn unmapPointer(
-    allocator: *std.mem.Allocator,
-    seat: *Seat,
+    allocator: std.mem.Allocator,
+    _: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     if (args.len < 4) return Error.NotEnoughArguments;
     if (args.len > 4) return Error.TooManyArguments;
 
-    const mode_id = try modeNameToId(allocator, seat, args[1], out);
+    const mode_id = try modeNameToId(allocator, args[1], out);
     const modifiers = try parseModifiers(allocator, args[2], out);
     const event_code = try parseEventCode(allocator, args[3], out);
 

@@ -27,10 +27,10 @@ const Seat = @import("../Seat.zig");
 
 /// Declare a new keymap mode
 pub fn declareMode(
-    allocator: *std.mem.Allocator,
-    seat: *Seat,
+    _: std.mem.Allocator,
+    _: *Seat,
     args: []const [:0]const u8,
-    out: *?[]const u8,
+    _: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
@@ -40,8 +40,8 @@ pub fn declareMode(
 
     if (config.mode_to_id.get(new_mode_name) != null) return;
 
-    try config.modes.ensureCapacity(config.modes.items.len + 1);
-    const owned_name = try std.mem.dupe(util.gpa, u8, new_mode_name);
+    try config.modes.ensureUnusedCapacity(1);
+    const owned_name = try util.gpa.dupe(u8, new_mode_name);
     errdefer util.gpa.free(owned_name);
     try config.mode_to_id.putNoClobber(owned_name, config.modes.items.len);
     config.modes.appendAssumeCapacity(Mode.init());

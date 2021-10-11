@@ -408,14 +408,11 @@ fn commitTransaction(self: *Self) void {
 }
 
 /// Send the new output configuration to all wlr-output-manager clients
-fn handleLayoutChange(
-    listener: *wl.Listener(*wlr.OutputLayout),
-    output_layout: *wlr.OutputLayout,
-) void {
+fn handleLayoutChange(listener: *wl.Listener(*wlr.OutputLayout), _: *wlr.OutputLayout) void {
     const self = @fieldParentPtr(Self, "layout_change", listener);
 
     const config = self.outputConfigFromCurrent() catch {
-        std.log.scoped(.output_manager).crit("out of memory", .{});
+        std.log.scoped(.output_manager).err("out of memory", .{});
         return;
     };
     self.output_manager.setConfiguration(config);
@@ -436,17 +433,16 @@ fn handleManagerApply(
 
     // Send the config that was actually applied
     const applied_config = self.outputConfigFromCurrent() catch {
-        std.log.scoped(.output_manager).crit("out of memory", .{});
+        std.log.scoped(.output_manager).err("out of memory", .{});
         return;
     };
     self.output_manager.setConfiguration(applied_config);
 }
 
 fn handleManagerTest(
-    listener: *wl.Listener(*wlr.OutputConfigurationV1),
+    _: *wl.Listener(*wlr.OutputConfigurationV1),
     config: *wlr.OutputConfigurationV1,
 ) void {
-    const self = @fieldParentPtr(Self, "manager_test", listener);
     defer config.destroy();
 
     if (testOutputConfig(config, true)) {
@@ -553,6 +549,8 @@ fn applyHeadToOutput(head: *wlr.OutputConfigurationV1.Head, wlr_output: *wlr.Out
 
 /// Create the config describing the current configuration
 fn outputConfigFromCurrent(self: *Self) !*wlr.OutputConfigurationV1 {
+    // TODO there no real reason this needs to allocate memory every time it is called.
+    // consider improving this wlroots api or reimplementing in zig-wlroots/river.
     const config = try wlr.OutputConfigurationV1.create();
     // this destroys all associated config heads as well
     errdefer config.destroy();
@@ -575,11 +573,9 @@ fn createHead(self: *Self, output: *Output, config: *wlr.OutputConfigurationV1) 
 }
 
 fn handlePowerManagerSetMode(
-    listener: *wl.Listener(*wlr.OutputPowerManagerV1.event.SetMode),
+    _: *wl.Listener(*wlr.OutputPowerManagerV1.event.SetMode),
     event: *wlr.OutputPowerManagerV1.event.SetMode,
 ) void {
-    const self = @fieldParentPtr(Self, "power_manager_set_mode", listener);
-
     const enable = event.mode == .on;
 
     const log_text = if (enable) "Enabling" else "Disabling";

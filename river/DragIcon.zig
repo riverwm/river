@@ -74,16 +74,15 @@ fn handleMap(listener: *wl.Listener(*wlr.Drag.Icon), wlr_drag_icon: *wlr.Drag.Ic
     while (it) |node| : (it = node.next) node.data.damage.addWhole();
 }
 
-fn handleUnmap(listener: *wl.Listener(*wlr.Drag.Icon), wlr_drag_icon: *wlr.Drag.Icon) void {
+fn handleUnmap(listener: *wl.Listener(*wlr.Drag.Icon), _: *wlr.Drag.Icon) void {
     const drag_icon = @fieldParentPtr(DragIcon, "unmap", listener);
 
     drag_icon.commit.link.remove();
     var it = server.root.outputs.first;
     while (it) |node| : (it = node.next) node.data.damage.addWhole();
 }
-fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) void {
-    const drag_icon = @fieldParentPtr(DragIcon, "commit", listener);
 
+fn handleCommit(_: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     var it = server.root.outputs.first;
     while (it) |node| : (it = node.next) node.data.damage.addWhole();
 }

@@ -23,7 +23,6 @@ const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 const pixman = @import("pixman");
 
-const log = @import("log.zig");
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
@@ -103,7 +102,7 @@ fn constrainToRegion(self: *Self) void {
     }
 }
 
-fn handleDestroy(listener: *wl.Listener(*wlr.PointerConstraintV1), constraint: *wlr.PointerConstraintV1) void {
+fn handleDestroy(listener: *wl.Listener(*wlr.PointerConstraintV1), _: *wlr.PointerConstraintV1) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
 
     self.destroy.link.remove();

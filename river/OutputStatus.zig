@@ -57,13 +57,13 @@ pub fn destroy(self: *Self) void {
     util.gpa.destroy(node);
 }
 
-fn handleRequest(output_status: *zriver.OutputStatusV1, request: zriver.OutputStatusV1.Request, self: *Self) void {
+fn handleRequest(output_status: *zriver.OutputStatusV1, request: zriver.OutputStatusV1.Request, _: *Self) void {
     switch (request) {
         .destroy => output_status.destroy(),
     }
 }
 
-fn handleDestroy(output_status: *zriver.OutputStatusV1, self: *Self) void {
+fn handleDestroy(_: *zriver.OutputStatusV1, self: *Self) void {
     self.destroy();
 }
 
@@ -77,7 +77,7 @@ pub fn sendViewTags(self: Self) void {
         if (node.view.surface == null) continue;
         view_tags.append(node.view.current.tags) catch {
             self.output_status.postNoMemory();
-            log.crit("out of memory", .{});
+            log.err("out of memory", .{});
             return;
         };
     }

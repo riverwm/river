@@ -328,11 +328,11 @@ test "iteration (View)" {
     const allocator = testing.allocator;
 
     const filters = struct {
-        fn all(view: *View, context: void) bool {
+        fn all(_: *View, _: void) bool {
             return true;
         }
 
-        fn none(view: *View, context: void) bool {
+        fn none(_: *View, _: void) bool {
             return false;
         }
 

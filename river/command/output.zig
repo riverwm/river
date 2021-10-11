@@ -28,10 +28,10 @@ const Output = @import("../Output.zig");
 const Seat = @import("../Seat.zig");
 
 pub fn focusOutput(
-    allocator: *std.mem.Allocator,
+    _: std.mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
-    out: *?[]const u8,
+    _: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
@@ -48,10 +48,10 @@ pub fn focusOutput(
 }
 
 pub fn sendToOutput(
-    allocator: *std.mem.Allocator,
+    _: std.mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
-    out: *?[]const u8,
+    _: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;

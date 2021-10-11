@@ -24,7 +24,7 @@ const Seat = @import("../Seat.zig");
 
 /// Switch to the given mode
 pub fn enterMode(
-    allocator: *std.mem.Allocator,
+    allocator: std.mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,

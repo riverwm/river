@@ -77,9 +77,9 @@ pub fn init(self: *Self) !void {
     errdefer self.wl_server.destroy();
 
     const loop = self.wl_server.getEventLoop();
-    self.sigint_source = try loop.addSignal(*wl.Server, std.os.SIGINT, terminate, self.wl_server);
+    self.sigint_source = try loop.addSignal(*wl.Server, std.os.SIG.INT, terminate, self.wl_server);
     errdefer self.sigint_source.remove();
-    self.sigterm_source = try loop.addSignal(*wl.Server, std.os.SIGTERM, terminate, self.wl_server);
+    self.sigterm_source = try loop.addSignal(*wl.Server, std.os.SIG.TERM, terminate, self.wl_server);
     errdefer self.sigterm_source.remove();
 
     // This frees itself when the wl.Server is destroyed
@@ -170,6 +170,7 @@ pub fn start(self: Self) !void {
 
 /// Handle SIGINT and SIGTERM by gracefully stopping the server
 fn terminate(signal: c_int, wl_server: *wl.Server) callconv(.C) c_int {
+    _ = signal;
     wl_server.terminate();
     return 0;
 }

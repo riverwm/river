@@ -25,10 +25,10 @@ const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
 pub fn attachMode(
-    allocator: *std.mem.Allocator,
-    seat: *Seat,
+    _: std.mem.Allocator,
+    _: *Seat,
     args: []const [:0]const u8,
-    out: *?[]const u8,
+    _: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;

@@ -59,7 +59,7 @@ pub const AccelProfile = enum {
     adaptive,
 
     pub fn apply(accel_profile: AccelProfile, device: *c.libinput_device) void {
-        const want = @intToEnum(c.libinput_config_accel_profile, switch (accel_profile) {
+        const want = @as(c_uint, switch (accel_profile) {
             .none => c.LIBINPUT_CONFIG_ACCEL_PROFILE_NONE,
             .flat => c.LIBINPUT_CONFIG_ACCEL_PROFILE_FLAT,
             .adaptive => c.LIBINPUT_CONFIG_ACCEL_PROFILE_ADAPTIVE,
@@ -78,13 +78,13 @@ pub const ClickMethod = enum {
     clickfinger,
 
     pub fn apply(click_method: ClickMethod, device: *c.libinput_device) void {
-        const want = @intToEnum(c.libinput_config_click_method, switch (click_method) {
+        const want = @as(c_uint, switch (click_method) {
             .none => c.LIBINPUT_CONFIG_CLICK_METHOD_NONE,
             .@"button-areas" => c.LIBINPUT_CONFIG_CLICK_METHOD_BUTTON_AREAS,
             .clickfinger => c.LIBINPUT_CONFIG_CLICK_METHOD_CLICKFINGER,
         });
         const supports = c.libinput_device_config_click_get_methods(device);
-        if (supports & @intCast(u32, @enumToInt(want)) == 0) return;
+        if (supports & want == 0) return;
         _ = c.libinput_device_config_click_set_method(device, want);
     }
 };
@@ -94,7 +94,7 @@ pub const DragState = enum {
     enabled,
 
     pub fn apply(drag_state: DragState, device: *c.libinput_device) void {
-        const want = @intToEnum(c.libinput_config_drag_state, switch (drag_state) {
+        const want = @as(c_uint, switch (drag_state) {
             .disabled => c.LIBINPUT_CONFIG_DRAG_DISABLED,
             .enabled => c.LIBINPUT_CONFIG_DRAG_ENABLED,
         });
@@ -111,7 +111,7 @@ pub const DragLock = enum {
     enabled,
 
     pub fn apply(drag_lock: DragLock, device: *c.libinput_device) void {
-        const want = @intToEnum(c.libinput_config_drag_lock_state, switch (drag_lock) {
+        const want = @as(c_uint, switch (drag_lock) {
             .disabled => c.LIBINPUT_CONFIG_DRAG_LOCK_DISABLED,
             .enabled => c.LIBINPUT_CONFIG_DRAG_LOCK_ENABLED,
         });
@@ -128,7 +128,7 @@ pub const DwtState = enum {
     enabled,
 
     pub fn apply(dwt_state: DwtState, device: *c.libinput_device) void {
-        const want = @intToEnum(c.libinput_config_dwt_state, switch (dwt_state) {
+        const want = @as(c_uint, switch (dwt_state) {
             .disabled => c.LIBINPUT_CONFIG_DWT_DISABLED,
             .enabled => c.LIBINPUT_CONFIG_DWT_ENABLED,
         });
@@ -145,7 +145,7 @@ pub const MiddleEmulation = enum {
     enabled,
 
     pub fn apply(middle_emulation: MiddleEmulation, device: *c.libinput_device) void {
-        const want = @intToEnum(c.libinput_config_middle_emulation_state, switch (middle_emulation) {
+        const want = @as(c_uint, switch (middle_emulation) {
             .disabled => c.LIBINPUT_CONFIG_MIDDLE_EMULATION_DISABLED,
             .enabled => c.LIBINPUT_CONFIG_MIDDLE_EMULATION_ENABLED,
         });
@@ -196,7 +196,7 @@ pub const TapState = enum {
     enabled,
 
     pub fn apply(tap_state: TapState, device: *c.libinput_device) void {
-        const want = @intToEnum(c.libinput_config_tap_state, switch (tap_state) {
+        const want = @as(c_uint, switch (tap_state) {
             .disabled => c.LIBINPUT_CONFIG_TAP_DISABLED,
             .enabled => c.LIBINPUT_CONFIG_TAP_ENABLED,
         });
@@ -213,7 +213,7 @@ pub const TapButtonMap = enum {
     @"left-right-middle",
 
     pub fn apply(tap_button_map: TapButtonMap, device: *c.libinput_device) void {
-        const want = @intToEnum(c.libinput_config_tap_button_map, switch (tap_button_map) {
+        const want = @as(c_uint, switch (tap_button_map) {
             .@"left-right-middle" => c.LIBINPUT_CONFIG_TAP_MAP_LRM,
             .@"left-middle-right" => c.LIBINPUT_CONFIG_TAP_MAP_LMR,
         });
@@ -243,14 +243,14 @@ pub const ScrollMethod = enum {
     button,
 
     pub fn apply(scroll_method: ScrollMethod, device: *c.libinput_device) void {
-        const want = @intToEnum(c.libinput_config_scroll_method, switch (scroll_method) {
+        const want = @as(c_uint, switch (scroll_method) {
             .none => c.LIBINPUT_CONFIG_SCROLL_NO_SCROLL,
             .@"two-finger" => c.LIBINPUT_CONFIG_SCROLL_2FG,
             .edge => c.LIBINPUT_CONFIG_SCROLL_EDGE,
             .button => c.LIBINPUT_CONFIG_SCROLL_ON_BUTTON_DOWN,
         });
         const supports = c.libinput_device_config_scroll_get_methods(device);
-        if (supports & @intCast(u32, @enumToInt(want)) == 0) return;
+        if (supports & want == 0) return;
         _ = c.libinput_device_config_scroll_set_method(device, want);
     }
 };

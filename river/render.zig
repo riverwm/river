@@ -48,7 +48,7 @@ const SurfaceRenderData = struct {
 /// The rendering order in this function must be kept in sync with Cursor.surfaceAt()
 pub fn renderOutput(output: *Output) void {
     var now: os.timespec = undefined;
-    os.clock_gettime(os.CLOCK_MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
+    os.clock_gettime(os.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
 
     var needs_frame: bool = undefined;
     var damage_region: pixman.Region32 = undefined;
@@ -91,7 +91,7 @@ pub fn renderOutput(output: *Output) void {
         it = ViewStack(View).iter(output.views.last, .reverse, output.current.tags, renderFilter);
         while (it.next()) |view| {
             if (view.current.focus != 0 or view.current.float) continue;
-            if (view.draw_borders) renderBorders(output, view, &now);
+            if (view.draw_borders) renderBorders(output, view);
             renderView(output, view, &now);
         }
 
@@ -99,7 +99,7 @@ pub fn renderOutput(output: *Output) void {
         it = ViewStack(View).iter(output.views.last, .reverse, output.current.tags, renderFilter);
         while (it.next()) |view| {
             if (view.current.focus == 0 or view.current.float) continue;
-            if (view.draw_borders) renderBorders(output, view, &now);
+            if (view.draw_borders) renderBorders(output, view);
             renderView(output, view, &now);
         }
 
@@ -107,7 +107,7 @@ pub fn renderOutput(output: *Output) void {
         it = ViewStack(View).iter(output.views.last, .reverse, output.current.tags, renderFilter);
         while (it.next()) |view| {
             if (view.current.focus != 0 or !view.current.float) continue;
-            if (view.draw_borders) renderBorders(output, view, &now);
+            if (view.draw_borders) renderBorders(output, view);
             renderView(output, view, &now);
         }
 
@@ -115,7 +115,7 @@ pub fn renderOutput(output: *Output) void {
         it = ViewStack(View).iter(output.views.last, .reverse, output.current.tags, renderFilter);
         while (it.next()) |view| {
             if (view.current.focus == 0 or !view.current.float) continue;
-            if (view.draw_borders) renderBorders(output, view, &now);
+            if (view.draw_borders) renderBorders(output, view);
             renderView(output, view, &now);
         }
 
@@ -316,7 +316,7 @@ fn renderTexture(
     server.renderer.renderSubtextureWithMatrix(texture, source_box, &matrix, 1.0) catch return;
 }
 
-fn renderBorders(output: *const Output, view: *View, now: *os.timespec) void {
+fn renderBorders(output: *const Output, view: *View) void {
     const config = &server.config;
     const color = blk: {
         if (view.current.urgent) break :blk &config.border_color_urgent;

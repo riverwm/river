@@ -28,11 +28,13 @@ const InputConfig = @import("../InputConfig.zig");
 const InputManager = @import("../InputManager.zig");
 
 pub fn listInputs(
-    allocator: *mem.Allocator,
-    seat: *Seat,
+    allocator: mem.Allocator,
+    _: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
+    if (args.len > 1) return error.TooManyArguments;
+
     var input_list = std.ArrayList(u8).init(allocator);
     const writer = input_list.writer();
     var prev = false;
@@ -59,11 +61,13 @@ pub fn listInputs(
 }
 
 pub fn listInputConfigs(
-    allocator: *mem.Allocator,
-    seat: *Seat,
+    allocator: mem.Allocator,
+    _: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
+    if (args.len > 1) return error.TooManyArguments;
+
     var input_list = std.ArrayList(u8).init(allocator);
     const writer = input_list.writer();
 
@@ -122,10 +126,10 @@ pub fn listInputConfigs(
 }
 
 pub fn input(
-    allocator: *mem.Allocator,
-    seat: *Seat,
+    _: mem.Allocator,
+    _: *Seat,
     args: []const [:0]const u8,
-    out: *?[]const u8,
+    _: *?[]const u8,
 ) Error!void {
     if (args.len < 4) return Error.NotEnoughArguments;
     if (args.len > 4) return Error.TooManyArguments;

@@ -231,7 +231,7 @@ pub fn configure(self: *Self) void {
 
 pub fn sendFrameDone(self: Self) void {
     var now: os.timespec = undefined;
-    os.clock_gettime(os.CLOCK_MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
+    os.clock_gettime(os.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
     self.surface.?.sendFrameDone(&now);
 }
 
@@ -313,7 +313,7 @@ fn sendEnter(self: *Self, output: *Output) void {
     self.forEachSurface(*wlr.Output, sendEnterIterator, output.wlr_output);
 }
 
-fn sendEnterIterator(surface: *wlr.Surface, sx: c_int, sy: c_int, wlr_output: *wlr.Output) callconv(.C) void {
+fn sendEnterIterator(surface: *wlr.Surface, _: c_int, _: c_int, wlr_output: *wlr.Output) callconv(.C) void {
     surface.sendEnter(wlr_output);
 }
 
@@ -321,7 +321,7 @@ fn sendLeave(self: *Self, output: *Output) void {
     self.forEachSurface(*wlr.Output, sendLeaveIterator, output.wlr_output);
 }
 
-fn sendLeaveIterator(surface: *wlr.Surface, sx: c_int, sy: c_int, wlr_output: *wlr.Output) callconv(.C) void {
+fn sendLeaveIterator(surface: *wlr.Surface, _: c_int, _: c_int, wlr_output: *wlr.Output) callconv(.C) void {
     surface.sendLeave(wlr_output);
 }
 
@@ -577,17 +577,16 @@ fn handleForeignFullscreen(
 
 fn handleForeignClose(
     listener: *wl.Listener(*wlr.ForeignToplevelHandleV1),
-    event: *wlr.ForeignToplevelHandleV1,
+    _: *wlr.ForeignToplevelHandleV1,
 ) void {
     const self = @fieldParentPtr(Self, "foreign_close", listener);
     self.close();
 }
 
 fn handleRequestActivate(
-    listener: *wl.Listener(*wlr.XdgActivationV1.event.RequestActivate),
+    _: *wl.Listener(*wlr.XdgActivationV1.event.RequestActivate),
     event: *wlr.XdgActivationV1.event.RequestActivate,
 ) void {
-    const self = @fieldParentPtr(Self, "request_activate", listener);
     if (fromWlrSurface(event.surface)) |view| {
         if (view.current.focus == 0) {
             view.pending.urgent = true;
