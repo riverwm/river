@@ -20,6 +20,7 @@ const mem = std.mem;
 const io = std.io;
 const os = std.os;
 const assert = std.debug.assert;
+const builtin = @import("builtin");
 
 const wayland = @import("wayland");
 const wl = wayland.client.wl;
@@ -47,8 +48,7 @@ pub const Globals = struct {
 
 pub fn main() !void {
     _main() catch |err| {
-        if (std.builtin.mode == .Debug)
-            return err;
+        if (builtin.mode == .Debug) return err;
 
         switch (err) {
             error.RiverControlNotAdvertised => fatal(
@@ -96,7 +96,7 @@ fn _main() !void {
     for (result.args) |arg| control.addArgument(arg);
 
     const callback = try control.runCommand(seat);
-    callback.setListener(?*c_void, callbackListener, null);
+    callback.setListener(?*anyopaque, callbackListener, null);
 
     // Loop until our callback is called and we exit.
     while (true) _ = try display.dispatch();
@@ -116,7 +116,7 @@ fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, globals: *
     }
 }
 
-fn callbackListener(callback: *zriver.CommandCallbackV1, event: zriver.CommandCallbackV1.Event, _: ?*c_void) void {
+fn callbackListener(_: *zriver.CommandCallbackV1, event: zriver.CommandCallbackV1.Event, _: ?*anyopaque) void {
     switch (event) {
         .success => |success| {
             if (mem.len(success.output) > 0) {

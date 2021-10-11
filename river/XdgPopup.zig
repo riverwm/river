@@ -43,7 +43,7 @@ commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit)
 
 pub fn create(wlr_xdg_popup: *wlr.XdgPopup, parent: Parent) void {
     const xdg_popup = util.gpa.create(XdgPopup) catch {
-        std.log.crit("out of memory", .{});
+        std.log.err("out of memory", .{});
         wlr_xdg_popup.resource.postNoMemory();
         return;
     };
@@ -104,26 +104,26 @@ pub fn destroyPopups(wlr_xdg_surface: *wlr.XdgSurface) void {
     }
 }
 
-fn handleDestroy(listener: *wl.Listener(*wlr.XdgSurface), wlr_xdg_surface: *wlr.XdgSurface) void {
+fn handleDestroy(listener: *wl.Listener(*wlr.XdgSurface), _: *wlr.XdgSurface) void {
     const xdg_popup = @fieldParentPtr(XdgPopup, "surface_destroy", listener);
     xdg_popup.destroy();
 }
 
-fn handleMap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurface) void {
+fn handleMap(listener: *wl.Listener(*wlr.XdgSurface), _: *wlr.XdgSurface) void {
     const xdg_popup = @fieldParentPtr(XdgPopup, "map", listener);
 
     xdg_popup.wlr_xdg_popup.base.surface.events.commit.add(&xdg_popup.commit);
     xdg_popup.parent.damageWholeOutput();
 }
 
-fn handleUnmap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurface) void {
+fn handleUnmap(listener: *wl.Listener(*wlr.XdgSurface), _: *wlr.XdgSurface) void {
     const xdg_popup = @fieldParentPtr(XdgPopup, "unmap", listener);
 
     xdg_popup.commit.link.remove();
     xdg_popup.parent.damageWholeOutput();
 }
 
-fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) void {
+fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     const xdg_popup = @fieldParentPtr(XdgPopup, "commit", listener);
 
     xdg_popup.parent.damageWholeOutput();

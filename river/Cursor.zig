@@ -178,7 +178,7 @@ pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
     // If this cursor belongs to the default seat, set the xcursor environment
     // variables and the xwayland cursor theme.
     if (self.seat == server.input_manager.defaultSeat()) {
-        const size_str = try std.fmt.allocPrint0(util.gpa, "{}", .{size});
+        const size_str = try std.fmt.allocPrintZ(util.gpa, "{}", .{size});
         defer util.gpa.free(size_str);
         if (c.setenv("XCURSOR_SIZE", size_str, 1) < 0) return error.OutOfMemory;
         if (theme) |t| if (c.setenv("XCURSOR_THEME", t, 1) < 0) return error.OutOfMemory;
@@ -400,7 +400,7 @@ fn handlePointerMapping(self: *Self, event: *wlr.Pointer.event.Button, view: *Vi
 /// Frame events are sent after regular pointer events to group multiple
 /// events together. For instance, two axis events may happen at the same
 /// time, in which case a frame event won't be sent in between.
-fn handleFrame(listener: *wl.Listener(*wlr.Cursor), wlr_cursor: *wlr.Cursor) void {
+fn handleFrame(listener: *wl.Listener(*wlr.Cursor), _: *wlr.Cursor) void {
     const self = @fieldParentPtr(Self, "frame", listener);
     self.seat.wlr_seat.pointerNotifyFrame();
 }
@@ -867,7 +867,7 @@ pub fn updateState(self: *Self) void {
     if (self.shouldPassthrough()) {
         self.mode = .passthrough;
         var now: os.timespec = undefined;
-        os.clock_gettime(os.CLOCK_MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
+        os.clock_gettime(os.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
         const msec = @intCast(u32, now.tv_sec * std.time.ms_per_s +
             @divFloor(now.tv_nsec, std.time.ns_per_ms));
         self.passthrough(msec);

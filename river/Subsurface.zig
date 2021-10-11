@@ -38,7 +38,7 @@ pub const Parent = union(enum) {
         switch (parent) {
             .xdg_toplevel => |xdg_toplevel| xdg_toplevel.view.output.damage.addWhole(),
             .layer_surface => |layer_surface| layer_surface.output.damage.addWhole(),
-            .drag_icon => |drag_icon| {
+            .drag_icon => |_| {
                 var it = server.root.outputs.first;
                 while (it) |node| : (it = node.next) node.data.damage.addWhole();
             },
@@ -61,7 +61,7 @@ commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit)
 
 pub fn create(wlr_subsurface: *wlr.Subsurface, parent: Parent) void {
     const subsurface = util.gpa.create(Subsurface) catch {
-        std.log.crit("out of memory", .{});
+        std.log.err("out of memory", .{});
         wlr_subsurface.resource.getClient().postNoMemory();
         return;
     };
@@ -125,7 +125,7 @@ pub fn destroySubsurfaces(surface: *wlr.Surface) void {
     }
 }
 
-fn handleDestroy(listener: *wl.Listener(*wlr.Subsurface), wlr_subsurface: *wlr.Subsurface) void {
+fn handleDestroy(listener: *wl.Listener(*wlr.Subsurface), _: *wlr.Subsurface) void {
     const subsurface = @fieldParentPtr(Subsurface, "subsurface_destroy", listener);
 
     subsurface.destroy();
@@ -138,14 +138,14 @@ fn handleMap(listener: *wl.Listener(*wlr.Subsurface), wlr_subsurface: *wlr.Subsu
     subsurface.parent.damageWholeOutput();
 }
 
-fn handleUnmap(listener: *wl.Listener(*wlr.Subsurface), wlr_subsurface: *wlr.Subsurface) void {
+fn handleUnmap(listener: *wl.Listener(*wlr.Subsurface), _: *wlr.Subsurface) void {
     const subsurface = @fieldParentPtr(Subsurface, "unmap", listener);
 
     subsurface.commit.link.remove();
     subsurface.parent.damageWholeOutput();
 }
 
-fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) void {
+fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     const subsurface = @fieldParentPtr(Subsurface, "commit", listener);
 
     subsurface.parent.damageWholeOutput();

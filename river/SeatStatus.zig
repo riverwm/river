@@ -41,13 +41,13 @@ pub fn init(self: *Self, seat: *Seat, seat_status: *zriver.SeatStatusV1) void {
     self.sendFocusedView();
 }
 
-fn handleRequest(seat_status: *zriver.SeatStatusV1, request: zriver.SeatStatusV1.Request, self: *Self) void {
+fn handleRequest(seat_status: *zriver.SeatStatusV1, request: zriver.SeatStatusV1.Request, _: *Self) void {
     switch (request) {
         .destroy => seat_status.destroy(),
     }
 }
 
-fn handleDestroy(seat_status: *zriver.SeatStatusV1, self: *Self) void {
+fn handleDestroy(_: *zriver.SeatStatusV1, self: *Self) void {
     const node = @fieldParentPtr(std.SinglyLinkedList(Self).Node, "data", self);
     self.seat.status_trackers.remove(node);
     util.gpa.destroy(node);

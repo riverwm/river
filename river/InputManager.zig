@@ -71,7 +71,7 @@ pub const InputDevice = struct {
         self.destroy.link.remove();
     }
 
-    fn handleDestroy(listener: *wl.Listener(*wlr.InputDevice), device: *wlr.InputDevice) void {
+    fn handleDestroy(listener: *wl.Listener(*wlr.InputDevice), _: *wlr.InputDevice) void {
         const self = @fieldParentPtr(InputDevice, "destroy", listener);
         log.debug("removed input device: {s}", .{self.identifier});
         self.deinit();
@@ -172,7 +172,7 @@ pub fn updateCursorState(self: Self) void {
 
 fn handleInhibitActivate(
     listener: *wl.Listener(*wlr.InputInhibitManager),
-    input_inhibit_manager: *wlr.InputInhibitManager,
+    _: *wlr.InputInhibitManager,
 ) void {
     const self = @fieldParentPtr(Self, "inhibit_activate", listener);
 
@@ -193,7 +193,7 @@ fn handleInhibitActivate(
 
 fn handleInhibitDeactivate(
     listener: *wl.Listener(*wlr.InputInhibitManager),
-    input_inhibit_manager: *wlr.InputInhibitManager,
+    _: *wlr.InputInhibitManager,
 ) void {
     const self = @fieldParentPtr(Self, "inhibit_deactivate", listener);
 
@@ -241,9 +241,13 @@ fn handleNewInput(listener: *wl.Listener(*wlr.InputDevice), device: *wlr.InputDe
     }
 }
 
-fn handleNewPointerConstraint(listener: *wl.Listener(*wlr.PointerConstraintV1), constraint: *wlr.PointerConstraintV1) void {
+fn handleNewPointerConstraint(
+    _: *wl.Listener(*wlr.PointerConstraintV1),
+    constraint: *wlr.PointerConstraintV1,
+) void {
     const pointer_constraint = util.gpa.create(PointerConstraint) catch {
-        log.crit("out of memory", .{});
+        constraint.resource.getClient().postNoMemory();
+        log.err("out of memory", .{});
         return;
     };
 
@@ -269,10 +273,9 @@ fn handleNewVirtualPointer(
 }
 
 fn handleNewVirtualKeyboard(
-    listener: *wl.Listener(*wlr.VirtualKeyboardV1),
+    _: *wl.Listener(*wlr.VirtualKeyboardV1),
     virtual_keyboard: *wlr.VirtualKeyboardV1,
 ) void {
-    const self = @fieldParentPtr(Self, "new_virtual_keyboard", listener);
     const seat = @intToPtr(*Seat, virtual_keyboard.seat.data);
     seat.addDevice(&virtual_keyboard.input_device);
 }

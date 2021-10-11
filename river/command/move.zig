@@ -27,10 +27,10 @@ const View = @import("../View.zig");
 const Box = @import("../Box.zig");
 
 pub fn move(
-    allocator: *std.mem.Allocator,
+    _: std.mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
-    out: *?[]const u8,
+    _: *?[]const u8,
 ) Error!void {
     if (args.len < 3) return Error.NotEnoughArguments;
     if (args.len > 3) return Error.TooManyArguments;
@@ -51,10 +51,10 @@ pub fn move(
 }
 
 pub fn snap(
-    allocator: *std.mem.Allocator,
+    _: std.mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
-    out: *?[]const u8,
+    _: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
@@ -78,10 +78,10 @@ pub fn snap(
 }
 
 pub fn resize(
-    allocator: *std.mem.Allocator,
+    _: std.mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
-    out: *?[]const u8,
+    _: *?[]const u8,
 ) Error!void {
     if (args.len < 3) return Error.NotEnoughArguments;
     if (args.len > 3) return Error.TooManyArguments;

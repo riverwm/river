@@ -17,9 +17,11 @@
 
 const build_options = @import("build_options");
 const std = @import("std");
+const mem = std.mem;
 const fs = std.fs;
 const io = std.io;
 const os = std.os;
+const builtin = @import("builtin");
 const wlr = @import("wlroots");
 const flags = @import("flags");
 
@@ -66,18 +68,20 @@ pub fn main() anyerror!void {
         try io.getStdOut().writeAll(build_options.version ++ "\n");
         os.exit(0);
     }
-    if (result.argFlag("-log-level")) |level_str| {
-        const level = std.meta.stringToEnum(LogLevel, level_str) orelse {
-            std.log.err("invalid log level '{s}'", .{level_str});
+    if (result.argFlag("-log-level")) |level| {
+        if (mem.eql(u8, level, std.log.Level.err.asText())) {
+            runtime_log_level = .err;
+        } else if (mem.eql(u8, level, std.log.Level.warn.asText())) {
+            runtime_log_level = .warn;
+        } else if (mem.eql(u8, level, std.log.Level.info.asText())) {
+            runtime_log_level = .info;
+        } else if (mem.eql(u8, level, std.log.Level.debug.asText())) {
+            runtime_log_level = .debug;
+        } else {
+            std.log.err("invalid log level '{s}'", .{level});
             try io.getStdErr().writeAll(usage);
             os.exit(1);
-        };
-        runtime_log_level = switch (level) {
-            .@"error" => .err,
-            .warning => .warn,
-            .info => .info,
-            .debug => .debug,
-        };
+        }
     }
     const startup_command = blk: {
         if (result.argFlag("-c")) |command| {
@@ -89,8 +93,8 @@ pub fn main() anyerror!void {
 
     river_init_wlroots_log(switch (runtime_log_level) {
         .debug => .debug,
-        .notice, .info => .info,
-        .warn, .err, .crit, .alert, .emerg => .err,
+        .info => .info,
+        .warn, .err => .err,
     });
 
     std.log.info("initializing server", .{});
@@ -107,14 +111,14 @@ pub fn main() anyerror!void {
         const pid = try os.fork();
         if (pid == 0) {
             if (c.setsid() < 0) unreachable;
-            if (os.system.sigprocmask(os.SIG_SETMASK, &os.empty_sigset, null) < 0) unreachable;
+            if (os.system.sigprocmask(os.SIG.SETMASK, &os.empty_sigset, null) < 0) unreachable;
             os.execveZ("/bin/sh", &child_args, std.c.environ) catch c._exit(1);
         }
         util.gpa.free(cmd);
         // Since the child has called setsid, the pid is the pgid
         break :blk pid;
     } else null;
-    defer if (child_pgid) |pgid| os.kill(-pgid, os.SIGTERM) catch |err| {
+    defer if (child_pgid) |pgid| os.kill(-pgid, os.SIG.TERM) catch |err| {
         std.log.err("failed to kill init process group: {s}", .{@errorName(err)});
     };
 
@@ -149,37 +153,23 @@ fn defaultInitPath() !?[:0]const u8 {
 pub const log_level: std.log.Level = .debug;
 
 /// Set the default log level based on the build mode.
-var runtime_log_level: std.log.Level = switch (std.builtin.mode) {
+var runtime_log_level: std.log.Level = switch (builtin.mode) {
     .Debug => .debug,
     .ReleaseSafe, .ReleaseFast, .ReleaseSmall => .info,
 };
 
-/// River only exposes these 4 log levels to the user for simplicity
-const LogLevel = enum {
-    @"error",
-    warning,
-    info,
-    debug,
-};
-
 pub fn log(
-    comptime message_level: std.log.Level,
+    comptime level: std.log.Level,
     comptime scope: @TypeOf(.EnumLiteral),
     comptime format: []const u8,
     args: anytype,
 ) void {
-    if (@enumToInt(message_level) > @enumToInt(runtime_log_level)) return;
+    if (@enumToInt(level) > @enumToInt(runtime_log_level)) return;
 
-    const river_level: LogLevel = switch (message_level) {
-        .emerg, .alert, .crit, .err => .@"error",
-        .warn => .warning,
-        .notice, .info => .info,
-        .debug => .debug,
-    };
     const scope_prefix = if (scope == .default) ": " else "(" ++ @tagName(scope) ++ "): ";
 
     const stderr = std.io.getStdErr().writer();
-    stderr.print(@tagName(river_level) ++ scope_prefix ++ format ++ "\n", args) catch {};
+    stderr.print(level.asText() ++ scope_prefix ++ format ++ "\n", args) catch {};
 }
 
 /// See wlroots_log_wrapper.c

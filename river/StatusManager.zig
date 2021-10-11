@@ -40,30 +40,30 @@ server_destroy: wl.Listener(*wl.Server) = wl.Listener(*wl.Server).init(handleSer
 
 pub fn init(self: *Self) !void {
     self.* = .{
-        .global = try wl.Global.create(server.wl_server, zriver.StatusManagerV1, 2, *Self, self, bind),
+        .global = try wl.Global.create(server.wl_server, zriver.StatusManagerV1, 2, ?*anyopaque, null, bind),
     };
 
     server.wl_server.addDestroyListener(&self.server_destroy);
 }
 
-fn handleServerDestroy(listener: *wl.Listener(*wl.Server), wl_server: *wl.Server) void {
+fn handleServerDestroy(listener: *wl.Listener(*wl.Server), _: *wl.Server) void {
     const self = @fieldParentPtr(Self, "server_destroy", listener);
     self.global.destroy();
 }
 
-fn bind(client: *wl.Client, self: *Self, version: u32, id: u32) callconv(.C) void {
+fn bind(client: *wl.Client, _: ?*anyopaque, version: u32, id: u32) callconv(.C) void {
     const status_manager = zriver.StatusManagerV1.create(client, version, id) catch {
         client.postNoMemory();
-        log.crit("out of memory", .{});
+        log.err("out of memory", .{});
         return;
     };
-    status_manager.setHandler(*Self, handleRequest, null, self);
+    status_manager.setHandler(?*anyopaque, handleRequest, null, null);
 }
 
 fn handleRequest(
     status_manager: *zriver.StatusManagerV1,
     request: zriver.StatusManagerV1.Request,
-    self: *Self,
+    _: ?*anyopaque,
 ) void {
     switch (request) {
         .destroy => status_manager.destroy(),
@@ -74,7 +74,7 @@ fn handleRequest(
 
             const node = util.gpa.create(std.SinglyLinkedList(OutputStatus).Node) catch {
                 status_manager.getClient().postNoMemory();
-                log.crit("out of memory", .{});
+                log.err("out of memory", .{});
                 return;
             };
 
@@ -85,7 +85,7 @@ fn handleRequest(
             ) catch {
                 status_manager.getClient().postNoMemory();
                 util.gpa.destroy(node);
-                log.crit("out of memory", .{});
+                log.err("out of memory", .{});
                 return;
             };
 
@@ -99,7 +99,7 @@ fn handleRequest(
 
             const node = util.gpa.create(std.SinglyLinkedList(SeatStatus).Node) catch {
                 status_manager.getClient().postNoMemory();
-                log.crit("out of memory", .{});
+                log.err("out of memory", .{});
                 return;
             };
 
@@ -110,7 +110,7 @@ fn handleRequest(
             ) catch {
                 status_manager.getClient().postNoMemory();
                 util.gpa.destroy(node);
-                log.crit("out of memory", .{});
+                log.err("out of memory", .{});
                 return;
             };
 

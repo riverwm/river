@@ -45,7 +45,7 @@ pub fn create(client: *wl.Client, version: u32, id: u32, output: *Output, namesp
 
     if (namespaceInUse(namespace, output, client)) {
         layout.sendNamespaceInUse();
-        layout.setHandler(?*c_void, handleRequestInert, null, null);
+        layout.setHandler(?*anyopaque, handleRequestInert, null, null);
         return;
     }
 
@@ -92,7 +92,7 @@ fn namespaceInUse(namespace: []const u8, output: *Output, client: *wl.Client) bo
 
 /// This exists to handle layouts that have been rendered inert (due to the
 /// namespace already being in use) until the client destroys them.
-fn handleRequestInert(layout: *river.LayoutV3, request: river.LayoutV3.Request, _: ?*c_void) void {
+fn handleRequestInert(layout: *river.LayoutV3, request: river.LayoutV3.Request, _: ?*anyopaque) void {
     if (request == .destroy) layout.destroy();
 }
 
@@ -159,7 +159,7 @@ fn handleRequest(layout: *river.LayoutV3, request: river.LayoutV3.Request, self:
     }
 }
 
-fn handleDestroy(layout: *river.LayoutV3, self: *Self) void {
+fn handleDestroy(_: *river.LayoutV3, self: *Self) void {
     self.destroy();
 }
 
@@ -183,7 +183,7 @@ pub fn destroy(self: *Self) void {
         }
     }
 
-    self.layout.setHandler(?*c_void, handleRequestInert, null, null);
+    self.layout.setHandler(?*anyopaque, handleRequestInert, null, null);
 
     util.gpa.free(self.namespace);
     util.gpa.destroy(node);

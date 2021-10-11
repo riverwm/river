@@ -236,7 +236,7 @@ pub fn arrangeLayers(self: *Self, target: ArrangeLayersTarget) void {
 
     // Arrange all layer surfaces with exclusive zones, applying them to the
     // usable box along the way.
-    for (layers) |layer| self.arrangeLayer(self.getLayer(layer).*, full_box, &usable_box, true, target);
+    for (layers) |layer| arrangeLayer(self.getLayer(layer).*, full_box, &usable_box, true, target);
 
     // If the the usable_box has changed, we need to rearrange the output
     if (target == .mapped and !std.meta.eql(self.usable_box, usable_box)) {
@@ -245,7 +245,7 @@ pub fn arrangeLayers(self: *Self, target: ArrangeLayersTarget) void {
     }
 
     // Arrange the layers without exclusive zones
-    for (layers) |layer| self.arrangeLayer(self.getLayer(layer).*, full_box, &usable_box, false, target);
+    for (layers) |layer| arrangeLayer(self.getLayer(layer).*, full_box, &usable_box, false, target);
 
     if (target == .unmapped) return;
 
@@ -286,7 +286,6 @@ pub fn arrangeLayers(self: *Self, target: ArrangeLayersTarget) void {
 
 /// Arrange the layer surfaces of a given layer
 fn arrangeLayer(
-    self: *Self,
     layer: std.TailQueue(LayerSurface),
     full_box: Box,
     usable_box: *Box,
@@ -424,7 +423,7 @@ fn arrangeLayer(
     }
 }
 
-fn handleDamageDestroy(listener: *wl.Listener(*wlr.OutputDamage), wlr_output: *wlr.OutputDamage) void {
+fn handleDamageDestroy(listener: *wl.Listener(*wlr.OutputDamage), _: *wlr.OutputDamage) void {
     const self = @fieldParentPtr(Self, "damage_destroy", listener);
     // The wlr.OutputDamage is only destroyed by wlroots when the output is
     // destroyed and is never destroyed manually by river.
@@ -433,7 +432,7 @@ fn handleDamageDestroy(listener: *wl.Listener(*wlr.OutputDamage), wlr_output: *w
     self.frame.link = .{ .prev = &self.frame.link, .next = &self.frame.link };
 }
 
-fn handleDestroy(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
+fn handleDestroy(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
 
     std.log.scoped(.server).debug("output '{s}' destroyed", .{self.wlr_output.name});
@@ -476,14 +475,14 @@ fn handleEnable(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) vo
     if (wlr_output.enabled) server.root.addOutput(self);
 }
 
-fn handleFrame(listener: *wl.Listener(*wlr.OutputDamage), wlr_output: *wlr.OutputDamage) void {
+fn handleFrame(listener: *wl.Listener(*wlr.OutputDamage), _: *wlr.OutputDamage) void {
     // This function is called every time an output is ready to display a frame,
     // generally at the output's refresh rate (e.g. 60Hz).
     const self = @fieldParentPtr(Self, "frame", listener);
     render.renderOutput(self);
 }
 
-fn handleMode(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
+fn handleMode(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
     const self = @fieldParentPtr(Self, "mode", listener);
     self.arrangeLayers(.mapped);
     self.arrangeViews();

@@ -24,7 +24,7 @@ const Seat = @import("../Seat.zig");
 
 /// Switch focus to the passed tags.
 pub fn setFocusedTags(
-    allocator: *std.mem.Allocator,
+    allocator: std.mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
@@ -41,7 +41,7 @@ pub fn setFocusedTags(
 
 /// Set the spawn tagmask
 pub fn spawnTagmask(
-    allocator: *std.mem.Allocator,
+    allocator: std.mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
@@ -52,7 +52,7 @@ pub fn spawnTagmask(
 
 /// Set the tags of the focused view.
 pub fn setViewTags(
-    allocator: *std.mem.Allocator,
+    allocator: std.mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
@@ -68,7 +68,7 @@ pub fn setViewTags(
 
 /// Toggle focus of the passsed tags.
 pub fn toggleFocusedTags(
-    allocator: *std.mem.Allocator,
+    allocator: std.mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
@@ -87,7 +87,7 @@ pub fn toggleFocusedTags(
 
 /// Toggle the passed tags of the focused view
 pub fn toggleViewTags(
-    allocator: *std.mem.Allocator,
+    allocator: std.mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
@@ -106,11 +106,12 @@ pub fn toggleViewTags(
 
 /// Switch focus to tags that were selected previously
 pub fn focusPreviousTags(
-    allocator: *std.mem.Allocator,
+    _: std.mem.Allocator,
     seat: *Seat,
     args: []const []const u8,
-    out: *?[]const u8,
+    _: *?[]const u8,
 ) Error!void {
+    if (args.len > 1) return error.TooManyArguments;
     const previous_tags = seat.focused_output.previous_tags;
     if (seat.focused_output.pending.tags != previous_tags) {
         seat.focused_output.previous_tags = seat.focused_output.pending.tags;
@@ -123,11 +124,12 @@ pub fn focusPreviousTags(
 
 /// Set the tags of the focused view to the tags that were selected previously
 pub fn sendToPreviousTags(
-    allocator: *std.mem.Allocator,
+    _: std.mem.Allocator,
     seat: *Seat,
     args: []const []const u8,
-    out: *?[]const u8,
+    _: *?[]const u8,
 ) Error!void {
+    if (args.len > 1) return error.TooManyArguments;
     const previous_tags = seat.focused_output.previous_tags;
     if (seat.focused == .view) {
         const view = seat.focused.view;
@@ -138,7 +140,7 @@ pub fn sendToPreviousTags(
 }
 
 fn parseTags(
-    allocator: *std.mem.Allocator,
+    allocator: std.mem.Allocator,
     args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!u32 {

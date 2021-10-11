@@ -24,8 +24,8 @@ const Seat = @import("../Seat.zig");
 
 /// Spawn a program.
 pub fn spawn(
-    allocator: *std.mem.Allocator,
-    seat: *Seat,
+    allocator: std.mem.Allocator,
+    _: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
@@ -42,7 +42,7 @@ pub fn spawn(
     if (pid == 0) {
         // Clean things up for the child in an intermediate fork
         if (c.setsid() < 0) unreachable;
-        if (std.os.system.sigprocmask(std.os.SIG_SETMASK, &std.os.empty_sigset, null) < 0) unreachable;
+        if (std.os.system.sigprocmask(std.os.SIG.SETMASK, &std.os.empty_sigset, null) < 0) unreachable;
 
         const pid2 = std.os.fork() catch c._exit(1);
         if (pid2 == 0) std.os.execveZ("/bin/sh", &child_args, std.c.environ) catch c._exit(1);
@@ -52,8 +52,8 @@ pub fn spawn(
 
     // Wait the intermediate child.
     const ret = std.os.waitpid(pid, 0);
-    if (!std.os.WIFEXITED(ret.status) or
-        (std.os.WIFEXITED(ret.status) and std.os.WEXITSTATUS(ret.status) != 0))
+    if (!std.os.W.IFEXITED(ret.status) or
+        (std.os.W.IFEXITED(ret.status) and std.os.W.EXITSTATUS(ret.status) != 0))
     {
         out.* = try std.fmt.allocPrint(allocator, "fork/execve failed", .{});
         return Error.Other;

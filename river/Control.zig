@@ -48,7 +48,7 @@ pub fn init(self: *Self) !void {
     server.wl_server.addDestroyListener(&self.server_destroy);
 }
 
-fn handleServerDestroy(listener: *wl.Listener(*wl.Server), wl_server: *wl.Server) void {
+fn handleServerDestroy(listener: *wl.Listener(*wl.Server), _: *wl.Server) void {
     const self = @fieldParentPtr(Self, "server_destroy", listener);
     self.global.destroy();
     self.args_map.deinit();

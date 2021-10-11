@@ -143,7 +143,7 @@ pub fn getConstraints(self: Self) View.Constraints {
 }
 
 /// Called when the xwayland surface is destroyed
-fn handleDestroy(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
+fn handleDestroy(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
 
     // Remove listeners that are active for the entire lifetime of the view
@@ -202,13 +202,13 @@ fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wl
     }
 
     view.map() catch {
-        std.log.crit("out of memory", .{});
+        std.log.err("out of memory", .{});
         surface.resource.getClient().postNoMemory();
     };
 }
 
 /// Called when the surface is unmapped and will no longer be displayed.
-fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
+fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "unmap", listener);
 
     // Remove listeners that are only active while mapped
@@ -253,12 +253,12 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) voi
     };
 }
 
-fn handleSetTitle(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
+fn handleSetTitle(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "set_title", listener);
     self.view.notifyTitle();
 }
 
-fn handleSetClass(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
+fn handleSetClass(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "set_class", listener);
     self.view.notifyAppId();
 }

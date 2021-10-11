@@ -27,10 +27,10 @@ const ViewStack = @import("../view_stack.zig").ViewStack;
 /// Bump the focused view to the top of the stack. If the view on the top of
 /// the stack is focused, bump the second view to the top.
 pub fn zoom(
-    allocator: *std.mem.Allocator,
+    _: std.mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
-    out: *?[]const u8,
+    _: *?[]const u8,
 ) Error!void {
     if (args.len > 1) return Error.TooManyArguments;
 

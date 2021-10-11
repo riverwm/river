@@ -23,7 +23,6 @@ const server = &@import("../main.zig").server;
 const util = @import("../util.zig");
 
 const View = @import("../View.zig");
-const ViewStack = @import("view_stack.zig").ViewStack;
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
@@ -33,10 +32,10 @@ const FilterKind = enum {
 };
 
 pub fn floatFilterAdd(
-    allocator: *mem.Allocator,
-    seat: *Seat,
+    _: mem.Allocator,
+    _: *Seat,
     args: []const [:0]const u8,
-    out: *?[]const u8,
+    _: *?[]const u8,
 ) Error!void {
     if (args.len < 3) return Error.NotEnoughArguments;
     if (args.len > 3) return Error.TooManyArguments;
@@ -51,14 +50,14 @@ pub fn floatFilterAdd(
     const gop = try map.getOrPut(util.gpa, key);
     if (gop.found_existing) return;
     errdefer assert(map.remove(key));
-    gop.key_ptr.* = try std.mem.dupe(util.gpa, u8, key);
+    gop.key_ptr.* = try util.gpa.dupe(u8, key);
 }
 
 pub fn floatFilterRemove(
-    allocator: *mem.Allocator,
-    seat: *Seat,
+    _: mem.Allocator,
+    _: *Seat,
     args: []const [:0]const u8,
-    out: *?[]const u8,
+    _: *?[]const u8,
 ) Error!void {
     if (args.len < 3) return Error.NotEnoughArguments;
     if (args.len > 3) return Error.TooManyArguments;
@@ -74,10 +73,10 @@ pub fn floatFilterRemove(
 }
 
 pub fn csdFilterAdd(
-    allocator: *mem.Allocator,
-    seat: *Seat,
+    _: mem.Allocator,
+    _: *Seat,
     args: []const [:0]const u8,
-    out: *?[]const u8,
+    _: *?[]const u8,
 ) Error!void {
     if (args.len < 3) return Error.NotEnoughArguments;
     if (args.len > 3) return Error.TooManyArguments;
@@ -92,16 +91,16 @@ pub fn csdFilterAdd(
     const gop = try map.getOrPut(util.gpa, key);
     if (gop.found_existing) return;
     errdefer assert(map.remove(key));
-    gop.key_ptr.* = try std.mem.dupe(util.gpa, u8, key);
+    gop.key_ptr.* = try util.gpa.dupe(u8, key);
 
     csdFilterUpdateViews(kind, key, .add);
 }
 
 pub fn csdFilterRemove(
-    allocator: *mem.Allocator,
-    seat: *Seat,
+    _: mem.Allocator,
+    _: *Seat,
     args: []const [:0]const u8,
-    out: *?[]const u8,
+    _: *?[]const u8,
 ) Error!void {
     if (args.len < 3) return Error.NotEnoughArguments;
     if (args.len > 3) return Error.TooManyArguments;

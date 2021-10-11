@@ -105,7 +105,7 @@ fn handleMap(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wl
     self.output.arrangeLayers(.mapped);
 }
 
-fn handleUnmap(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wlr.LayerSurfaceV1) void {
+fn handleUnmap(listener: *wl.Listener(*wlr.LayerSurfaceV1), _: *wlr.LayerSurfaceV1) void {
     const self = @fieldParentPtr(Self, "unmap", listener);
 
     log.debug("layer surface '{s}' unmapped", .{self.wlr_layer_surface.namespace});
@@ -137,7 +137,7 @@ fn handleUnmap(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *
     server.root.startTransaction();
 }
 
-fn handleCommit(listener: *wl.Listener(*wlr.Surface), wlr_surface: *wlr.Surface) void {
+fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     const self = @fieldParentPtr(Self, "commit", listener);
 
     assert(self.wlr_layer_surface.output != null);

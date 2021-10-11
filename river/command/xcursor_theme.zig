@@ -21,10 +21,10 @@ const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
 pub fn xcursorTheme(
-    allocator: *std.mem.Allocator,
+    _: std.mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
-    out: *?[]const u8,
+    _: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 3) return Error.TooManyArguments;

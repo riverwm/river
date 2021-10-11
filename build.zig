@@ -16,12 +16,6 @@ pub fn build(b: *zbs.Builder) !void {
     const target = b.standardTargetOptions(.{});
     const mode = b.standardReleaseOptions();
 
-    const xwayland = b.option(
-        bool,
-        "xwayland",
-        "Set to true to enable xwayland support",
-    ) orelse false;
-
     const man_pages = b.option(
         bool,
         "man-pages",
@@ -52,6 +46,12 @@ pub fn build(b: *zbs.Builder) !void {
         "Set to true to install fish completion for riverctl. Defaults to true.",
     ) orelse true;
 
+    const xwayland = b.option(
+        bool,
+        "xwayland",
+        "Set to true to enable xwayland support",
+    ) orelse false;
+
     const full_version = blk: {
         if (mem.endsWith(u8, version, "-dev")) {
             var ret: u8 = undefined;
@@ -70,6 +70,10 @@ pub fn build(b: *zbs.Builder) !void {
         }
     };
 
+    const options = b.addOptions();
+    options.addOption(bool, "xwayland", xwayland);
+    options.addOption([]const u8, "version", full_version);
+
     const scanner = ScanProtocolsStep.create(b);
     scanner.addSystemProtocol("stable/xdg-shell/xdg-shell.xml");
     scanner.addSystemProtocol("unstable/pointer-gestures/pointer-gestures-unstable-v1.xml");
@@ -85,8 +89,7 @@ pub fn build(b: *zbs.Builder) !void {
         const river = b.addExecutable("river", "river/main.zig");
         river.setTarget(target);
         river.setBuildMode(mode);
-        river.addBuildOption(bool, "xwayland", xwayland);
-        river.addBuildOption([:0]const u8, "version", full_version);
+        river.addOptions("build_options", options);
 
         addServerDeps(river, scanner);
 
@@ -97,11 +100,14 @@ pub fn build(b: *zbs.Builder) !void {
         const riverctl = b.addExecutable("riverctl", "riverctl/main.zig");
         riverctl.setTarget(target);
         riverctl.setBuildMode(mode);
-        riverctl.addBuildOption([:0]const u8, "version", full_version);
+        riverctl.addOptions("build_options", options);
 
         riverctl.step.dependOn(&scanner.step);
-        riverctl.addPackage(scanner.getPkg());
         riverctl.addPackagePath("flags", "common/flags.zig");
+        riverctl.addPackage(.{
+            .name = "wayland",
+            .path = .{ .generated = &scanner.result },
+        });
         riverctl.linkLibC();
         riverctl.linkSystemLibrary("wayland-client");
 
@@ -114,11 +120,14 @@ pub fn build(b: *zbs.Builder) !void {
         const rivertile = b.addExecutable("rivertile", "rivertile/main.zig");
         rivertile.setTarget(target);
         rivertile.setBuildMode(mode);
-        rivertile.addBuildOption([:0]const u8, "version", full_version);
+        rivertile.addOptions("build_options", options);
 
         rivertile.step.dependOn(&scanner.step);
-        rivertile.addPackage(scanner.getPkg());
         rivertile.addPackagePath("flags", "common/flags.zig");
+        rivertile.addPackage(.{
+            .name = "wayland",
+            .path = .{ .generated = &scanner.result },
+        });
         rivertile.linkLibC();
         rivertile.linkSystemLibrary("wayland-client");
 
@@ -169,7 +178,7 @@ pub fn build(b: *zbs.Builder) !void {
         const river_test = b.addTest("river/test_main.zig");
         river_test.setTarget(target);
         river_test.setBuildMode(mode);
-        river_test.addBuildOption(bool, "xwayland", xwayland);
+        river_test.addOptions("build_options", options);
 
         addServerDeps(river_test, scanner);
 
@@ -179,12 +188,21 @@ pub fn build(b: *zbs.Builder) !void {
 }
 
 fn addServerDeps(exe: *zbs.LibExeObjStep, scanner: *ScanProtocolsStep) void {
-    const wayland = scanner.getPkg();
-    const xkbcommon = zbs.Pkg{ .name = "xkbcommon", .path = "deps/zig-xkbcommon/src/xkbcommon.zig" };
-    const pixman = zbs.Pkg{ .name = "pixman", .path = "deps/zig-pixman/pixman.zig" };
+    const wayland = zbs.Pkg{
+        .name = "wayland",
+        .path = .{ .generated = &scanner.result },
+    };
+    const xkbcommon = zbs.Pkg{
+        .name = "xkbcommon",
+        .path = .{ .path = "deps/zig-xkbcommon/src/xkbcommon.zig" },
+    };
+    const pixman = zbs.Pkg{
+        .name = "pixman",
+        .path = .{ .path = "deps/zig-pixman/pixman.zig" },
+    };
     const wlroots = zbs.Pkg{
         .name = "wlroots",
-        .path = "deps/zig-wlroots/src/wlroots.zig",
+        .path = .{ .path = "deps/zig-wlroots/src/wlroots.zig" },
         .dependencies = &[_]zbs.Pkg{ wayland, xkbcommon, pixman },
     };
 
@@ -232,7 +250,7 @@ const ScdocStep = struct {
     fn init(builder: *zbs.Builder) ScdocStep {
         return ScdocStep{
             .builder = builder,
-            .step = zbs.Step.init(.Custom, "Generate man pages", builder.allocator, make),
+            .step = zbs.Step.init(.custom, "Generate man pages", builder.allocator, make),
         };
     }
 

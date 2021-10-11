@@ -94,16 +94,16 @@ pub fn init() !Self {
     errdefer self.deinit();
 
     // Start with two empty modes, "normal" and "locked"
-    try self.modes.ensureCapacity(2);
+    try self.modes.ensureTotalCapacity(2);
     {
         // Normal mode, id 0
-        const owned_slice = try std.mem.dupe(util.gpa, u8, "normal");
+        const owned_slice = try util.gpa.dupe(u8, "normal");
         try self.mode_to_id.putNoClobber(owned_slice, 0);
         self.modes.appendAssumeCapacity(Mode.init());
     }
     {
         // Locked mode, id 1
-        const owned_slice = try std.mem.dupe(util.gpa, u8, "locked");
+        const owned_slice = try util.gpa.dupe(u8, "locked");
         try self.mode_to_id.putNoClobber(owned_slice, 1);
         self.modes.appendAssumeCapacity(Mode.init());
     }

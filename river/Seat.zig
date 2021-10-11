@@ -173,7 +173,7 @@ pub fn focus(self: *Self, _target: ?*View) void {
         var it = self.focus_stack.first;
         while (it) |node| : (it = node.next) {
             if (node.view == view) {
-                const new_focus_node = self.focus_stack.remove(node);
+                self.focus_stack.remove(node);
                 self.focus_stack.push(node);
                 break;
             }
@@ -474,7 +474,7 @@ fn handleStartDrag(listener: *wl.Listener(*wlr.Drag), wlr_drag: *wlr.Drag) void 
 
     if (wlr_drag.icon) |wlr_drag_icon| {
         const node = util.gpa.create(std.SinglyLinkedList(DragIcon).Node) catch {
-            log.crit("out of memory", .{});
+            log.err("out of memory", .{});
             wlr_drag.seat_client.client.postNoMemory();
             return;
         };
@@ -484,7 +484,7 @@ fn handleStartDrag(listener: *wl.Listener(*wlr.Drag), wlr_drag: *wlr.Drag) void 
     self.cursor.mode = .passthrough;
 }
 
-fn handlePointerDragDestroy(listener: *wl.Listener(*wlr.Drag), wlr_drag: *wlr.Drag) void {
+fn handlePointerDragDestroy(listener: *wl.Listener(*wlr.Drag), _: *wlr.Drag) void {
     const self = @fieldParentPtr(Self, "pointer_drag_destroy", listener);
     self.pointer_drag_destroy.link.remove();
 

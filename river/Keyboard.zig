@@ -95,7 +95,7 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
     // First check translated keysyms as xkb reports them
     for (wlr_keyboard.xkb_state.?.keyGetSyms(keycode)) |sym| {
         // Handle builtin mapping only when keys are pressed
-        if (!released and self.handleBuiltinMapping(sym)) {
+        if (!released and handleBuiltinMapping(sym)) {
             handled = true;
             break;
         } else if (self.seat.handleMapping(sym, modifiers, released)) {
@@ -110,7 +110,7 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
         const layout_index = wlr_keyboard.xkb_state.?.keyGetLayout(keycode);
         for (wlr_keyboard.keymap.?.keyGetSymsByLevel(keycode, layout_index, 0)) |sym| {
             // Handle builtin mapping only when keys are pressed
-            if (!released and self.handleBuiltinMapping(sym)) {
+            if (!released and handleBuiltinMapping(sym)) {
                 handled = true;
                 break;
             } else if (self.seat.handleMapping(sym, modifiers, released)) {
@@ -129,14 +129,14 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
 }
 
 /// Simply pass modifiers along to the client
-fn handleModifiers(listener: *wl.Listener(*wlr.Keyboard), wlr_keyboard: *wlr.Keyboard) void {
+fn handleModifiers(listener: *wl.Listener(*wlr.Keyboard), _: *wlr.Keyboard) void {
     const self = @fieldParentPtr(Self, "modifiers", listener);
 
     self.seat.wlr_seat.setKeyboard(self.input_device);
     self.seat.wlr_seat.keyboardNotifyModifiers(&self.input_device.device.keyboard.modifiers);
 }
 
-fn handleDestroy(listener: *wl.Listener(*wlr.Keyboard), wlr_keyboard: *wlr.Keyboard) void {
+fn handleDestroy(listener: *wl.Listener(*wlr.Keyboard), _: *wlr.Keyboard) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
 
@@ -147,15 +147,15 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Keyboard), wlr_keyboard: *wlr.Keybo
 
 /// Handle any builtin, harcoded compsitor mappings such as VT switching.
 /// Returns true if the keysym was handled.
-fn handleBuiltinMapping(self: Self, keysym: xkb.Keysym) bool {
+fn handleBuiltinMapping(keysym: xkb.Keysym) bool {
     switch (@enumToInt(keysym)) {
-        @enumToInt(xkb.Keysym.XF86Switch_VT_1)...@enumToInt(xkb.Keysym.XF86Switch_VT_12) => {
+        xkb.Keysym.XF86Switch_VT_1...xkb.Keysym.XF86Switch_VT_12 => {
             log.debug("switch VT keysym received", .{});
             if (server.backend.isMulti()) {
                 if (server.backend.getSession()) |session| {
-                    const vt = @enumToInt(keysym) - @enumToInt(xkb.Keysym.XF86Switch_VT_1) + 1;
+                    const vt = @enumToInt(keysym) - xkb.Keysym.XF86Switch_VT_1 + 1;
                     const log_server = std.log.scoped(.server);
-                    log_server.notice("switching to VT {}", .{vt});
+                    log_server.info("switching to VT {}", .{vt});
                     session.changeVt(vt) catch log_server.err("changing VT failed", .{});
                 }
             }

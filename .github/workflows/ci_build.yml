@@ -10,7 +10,7 @@ name: voidlinux glibc
 
 jobs:
   default_build:
-    name: default build
+    name: build/test/fmt
     runs-on: ubuntu-latest
     container: voidlinux/voidlinux:latest
 
@@ -25,7 +25,7 @@ jobs:
             libffi-devel wayland-protocols xcb-util-errors-devel xcb-util-wm-devel \
             xcb-util-renderutil-devel libxcb-devel xcb-util-cursor-devel xcb-util-devel \
             xcb-util-image-devel xcb-util-keysyms-devel xcb-util-xrm-devel \
-            xorg-server-xwayland pkg-config meson git gcc zig pkgconf scdoc
+            xorg-server-xwayland pkg-config meson git gcc pkgconf scdoc wget tar xz
 
           git clone https://gitlab.freedesktop.org/wayland/wayland.git
           cd wayland
@@ -40,6 +40,13 @@ jobs:
           meson build --auto-features=enabled -Drenderers=gles2 -Dexamples=false \
             -Dwerror=false -Db_ndebug=false --prefix /usr
           ninja -C build install
+
+          wget https://ziglang.org/download/0.9.0/zig-linux-x86_64-0.9.0.tar.xz
+          tar -xvf zig-linux-x86_64-0.9.0.tar.xz
+          mv zig-linux-x86_64-0.9.0/zig /usr/bin/
+          mv zig-linux-x86_64-0.9.0/lib /usr/lib/zig
+          zig env
+
       - name: checkout
         uses: actions/checkout@v2
         with:
@@ -53,65 +60,13 @@ jobs:
         run: |
           zig build test
 
-  xwayland_build:
-    name: xwayland build
-    runs-on: ubuntu-latest
-    container: voidlinux/voidlinux:latest
-
-    steps:
-      - name: install deps
+      - name: xwayland build
         run: |
-          xbps-install -Sy xbps
-          xbps-install -uy
-          # wayland/wlroots dependencies as well as we build from source
-          xbps-install -y MesaLib-devel libseat-devel eudev-libudev-devel libdrm-devel \
-            libinput-devel libxkbcommon-devel pixman-devel expat-devel libxml2-devel \
-            libffi-devel wayland-protocols xcb-util-errors-devel xcb-util-wm-devel \
-            xcb-util-renderutil-devel libxcb-devel xcb-util-cursor-devel xcb-util-devel \
-            xcb-util-image-devel xcb-util-keysyms-devel xcb-util-xrm-devel \
-            xorg-server-xwayland pkg-config meson git gcc zig pkgconf scdoc
+          zig build -Dxwayland
 
-          git clone https://gitlab.freedesktop.org/wayland/wayland.git
-          cd wayland
-          git checkout 1.20.0
-          meson build -Ddocumentation=false -Dtests=false --prefix /usr
-          ninja -C build install
-          cd ..
-
-          git clone https://gitlab.freedesktop.org/wlroots/wlroots.git
-          cd wlroots
-          git checkout 0.15.0
-          meson build --auto-features=enabled -Drenderers=gles2 -Dexamples=false \
-            -Dwerror=false -Db_ndebug=false --prefix /usr
-          ninja -C build install
-      - name: checkout
-        uses: actions/checkout@v2
-        with:
-          submodules: true
-
-      - name: build
+      - name: xwayland test
         run: |
-          zig build -Dxwayland=true
-
-      - name: test
-        run: |
-          zig build -Dxwayland=true test
-
-  zig_fmt:
-    name: zig fmt
-    runs-on: ubuntu-latest
-    container: voidlinux/voidlinux:latest
-
-    steps:
-      - name: install deps
-        run: |
-          xbps-install -Sy xbps
-          xbps-install -uy zig git
-
-      - name: checkout
-        uses: actions/checkout@v2
-        with:
-          submodules: true
+          zig build -Dxwayland test
 
       - name: fmt
         run: |

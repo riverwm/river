@@ -23,38 +23,38 @@ const wlr = @import("wlroots");
 const Box = @import("Box.zig");
 const View = @import("View.zig");
 
-pub fn needsConfigure(self: Self) bool {
+pub fn needsConfigure(_: Self) bool {
     unreachable;
 }
 
-pub fn configure(self: Self) void {
+pub fn configure(_: Self) void {
     unreachable;
 }
 
-pub fn close(self: Self) void {
+pub fn setActivated(_: Self, _: bool) void {
     unreachable;
 }
 
-pub fn setActivated(self: Self, activated: bool) void {
+pub fn setFullscreen(_: Self, _: bool) void {
     unreachable;
 }
 
-pub fn setFullscreen(self: Self, fullscreen: bool) void {
+pub fn close(_: Self) void {
     unreachable;
 }
 
-pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*wlr.Surface {
+pub fn surfaceAt(_: Self, _: f64, _: f64, _: *f64, _: *f64) ?*wlr.Surface {
     unreachable;
 }
 
-pub fn getTitle(self: Self) ?[*:0]const u8 {
+pub fn getTitle(_: Self) ?[*:0]const u8 {
     unreachable;
 }
 
-pub fn getAppId(self: Self) ?[*:0]const u8 {
+pub fn getAppId(_: Self) ?[*:0]const u8 {
     unreachable;
 }
 
-pub fn getConstraints(self: Self) View.Constraints {
+pub fn getConstraints(_: Self) View.Constraints {
     unreachable;
 }
