@@ -46,6 +46,8 @@ request_configure: wl.Listener(*wlr.XwaylandSurface.event.Configure) =
 commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
 set_title: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleSetTitle),
 set_class: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleSetClass),
+request_fullscreen: wl.Listener(*wlr.XwaylandSurface) =
+    wl.Listener(*wlr.XwaylandSurface).init(handleRequestFullscreen),
 
 pub fn init(self: *Self, view: *View, xwayland_surface: *wlr.XwaylandSurface) void {
     self.* = .{ .view = view, .xwayland_surface = xwayland_surface };
@@ -163,6 +165,7 @@ fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wl
     surface.events.commit.add(&self.commit);
     xwayland_surface.events.set_title.add(&self.set_title);
     xwayland_surface.events.set_class.add(&self.set_class);
+    xwayland_surface.events.request_fullscreen.add(&self.request_fullscreen);
 
     view.surface = surface;
     self.view.surface_box = .{
@@ -212,6 +215,7 @@ fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *
     self.commit.link.remove();
     self.set_title.link.remove();
     self.set_class.link.remove();
+    self.request_fullscreen.link.remove();
 
     self.view.unmap();
 }
@@ -231,8 +235,6 @@ fn handleRequestConfigure(
     }
 }
 
-/// Called when the surface is comitted
-/// TODO: check for unexpected change in size and react as needed
 fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) void {
     const self = @fieldParentPtr(Self, "commit", listener);
 
@@ -246,14 +248,18 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) voi
     };
 }
 
-/// Called then the window updates its title
 fn handleSetTitle(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "set_title", listener);
     self.view.notifyTitle();
 }
 
-/// Called then the window updates its class
 fn handleSetClass(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "set_class", listener);
     self.view.notifyAppId();
+}
+
+fn handleRequestFullscreen(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
+    const self = @fieldParentPtr(Self, "request_fullscreen", listener);
+    self.view.pending.fullscreen = xwayland_surface.fullscreen;
+    self.view.applyPending();
 }

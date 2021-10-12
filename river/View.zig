@@ -323,7 +323,7 @@ pub fn setActivated(self: Self, activated: bool) void {
     }
 }
 
-pub fn setFullscreen(self: Self, fullscreen: bool) void {
+fn setFullscreen(self: Self, fullscreen: bool) void {
     if (self.foreign_toplevel_handle) |handle| handle.setFullscreen(fullscreen);
     switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.setFullscreen(fullscreen),
