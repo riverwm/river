@@ -19,6 +19,7 @@ const build_options = @import("build_options");
 const std = @import("std");
 const fs = std.fs;
 const io = std.io;
+const mem = std.mem;
 const os = std.os;
 const wlr = @import("wlroots");
 const flags = @import("flags");
@@ -93,6 +94,8 @@ pub fn main() anyerror!void {
         .warn, .err, .crit, .alert, .emerg => .err,
     });
 
+    try driverCheck();
+
     std.log.info("initializing server", .{});
     try server.init();
     defer server.deinit();
@@ -143,6 +146,56 @@ fn defaultInitPath() !?[:0]const u8 {
     };
 
     return path;
+}
+
+/// Print warning if proprietary drivers are used.
+fn driverCheck() !void {
+    const modules = fs.cwd().openFile("/proc/modules", .{}) catch |err| {
+        if (err == error.FileNotFound) return; // Weird OS config, but technically possible.
+        return err;
+    };
+    defer modules.close();
+
+    const reader = modules.reader();
+    var buffer: [10]u8 = undefined;
+    while (true) {
+        // Get first word of line.
+        const module = (reader.readUntilDelimiterOrEof(&buffer, ' ') catch |err| {
+            if (err == error.StreamTooLong) {
+                // If the module name does not fit into the buffer, it
+                // definitely is not one of the ones we check for, so skip the
+                // line.
+                (try skipLine(&reader)) orelse return;
+                continue;
+            }
+            return err;
+        }) orelse return;
+
+        // Names of proprietary driver modules taken from Sway.
+        if (mem.eql(u8, module, "nvidia") or mem.eql(u8, module, "fglrx")) {
+            std.log.info("Proprietary drivers in use.", .{});
+            std.log.warn("Proprietary drivers are not supported. Bug reports will be ignored. Use at your own risk", .{});
+            return;
+        }
+
+        // Module name did not match that of a known proprietary driver. The
+        // rest of the line is uninteresting for us, it needs to be skipped so
+        // that the next line can be checked.
+        (try skipLine(&reader)) orelse return;
+    }
+}
+
+/// Skip from the current position to the end of the line. Return null if EOF is reached.
+fn skipLine(reader: anytype) !?void {
+    while (true) {
+        switch (reader.readByte() catch |err| {
+            if (err == error.EndOfStream) return null;
+            return err;
+        }) {
+            '\n' => return,
+            else => {},
+        }
+    }
 }
 
 /// Tell std.log to leave all log level filtering to us.
