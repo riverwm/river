@@ -630,7 +630,9 @@ fn xwaylandUnmanagedSurfaceAt(lx: f64, ly: f64) ?SurfaceAtResult {
 }
 
 fn surfaceAtFilter(view: *View, filter_tags: u32) bool {
-    return !view.destroying and view.current.tags & filter_tags != 0;
+    // TODO(wlroots): we can remove this view.surface != null check as surfaceAt
+    // will start filtering by mapped views by default in 0.15.0
+    return view.surface != null and view.current.tags & filter_tags != 0;
 }
 
 pub fn enterMode(self: *Self, mode: std.meta.Tag((Mode)), view: *View) void {

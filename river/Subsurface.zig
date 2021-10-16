@@ -95,6 +95,8 @@ pub fn destroy(subsurface: *Subsurface) void {
     subsurface.unmap.link.remove();
     subsurface.new_subsurface.link.remove();
 
+    if (subsurface.wlr_subsurface.mapped) subsurface.commit.link.remove();
+
     Subsurface.destroySubsurfaces(subsurface.wlr_subsurface.surface);
 
     subsurface.wlr_subsurface.data = 0;

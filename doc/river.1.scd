@@ -69,7 +69,7 @@ Set the keyboard layout to colemak:
 
 # AUTHORS
 
-Maintained by Isaac Freund <ifreund@ifreund.xyz> who is assisted by open
+Maintained by Isaac Freund <mail@isaacfreund.com> who is assisted by open
 source contributors. For more information about river's development, see
 <https://github.com/ifreund/river>.
 

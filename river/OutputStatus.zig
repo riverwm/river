@@ -74,7 +74,7 @@ pub fn sendViewTags(self: Self) void {
 
     var it = self.output.views.first;
     while (it) |node| : (it = node.next) {
-        if (node.view.destroying) continue;
+        if (node.view.surface == null) continue;
         view_tags.append(node.view.current.tags) catch {
             self.output_status.postNoMemory();
             log.crit("out of memory", .{});
