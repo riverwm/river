@@ -226,13 +226,18 @@ fn handleRequestConfigure(
 ) void {
     const self = @fieldParentPtr(Self, "request_configure", listener);
 
-    // Allow xwayland views to set their own dimensions (but not position)
-    // if floating or unmapped
-    if (self.view.surface == null or self.view.pending.float) {
+    // If unmapped, let the client do whatever it wants
+    if (self.view.surface == null) {
+        self.xwayland_surface.configure(event.x, event.y, event.width, event.height);
+        return;
+    }
+
+    // Allow xwayland views to set their own dimensions (but not position) if floating
+    if (self.view.pending.float) {
         self.view.pending.box.width = event.width;
         self.view.pending.box.height = event.height;
-        self.configure();
     }
+    self.configure();
 }
 
 fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) void {
