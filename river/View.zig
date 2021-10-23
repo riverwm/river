@@ -123,7 +123,7 @@ post_fullscreen_box: Box = undefined,
 
 draw_borders: bool = true,
 
-/// This is created when the view is mapped and destroyed with the view
+/// This is created when the view is mapped and destroyed when unmapped
 foreign_toplevel_handle: ?*wlr.ForeignToplevelHandleV1 = null,
 foreign_activate: wl.Listener(*wlr.ForeignToplevelHandleV1.event.Activated) =
     wl.Listener(*wlr.ForeignToplevelHandleV1.event.Activated).init(handleForeignActivate),
@@ -286,9 +286,10 @@ pub fn sendToOutput(self: *Self, destination_output: *Output) void {
         destination_output.sendUrgentTags();
     }
 
-    if (self.surface) |surface| {
-        surface.sendLeave(self.output.wlr_output);
-        surface.sendEnter(destination_output.wlr_output);
+    // if the view is mapped send enter/leave events
+    if (self.surface != null) {
+        self.sendLeave(self.output);
+        self.sendEnter(destination_output);
 
         // Must be present if surface is non-null indicating that the view
         // is mapped.
@@ -306,6 +307,22 @@ pub fn sendToOutput(self: *Self, destination_output: *Output) void {
         };
     }
     self.output = destination_output;
+}
+
+fn sendEnter(self: *Self, output: *Output) void {
+    self.forEachSurface(*wlr.Output, sendEnterIterator, output.wlr_output);
+}
+
+fn sendEnterIterator(surface: *wlr.Surface, sx: c_int, sy: c_int, wlr_output: *wlr.Output) callconv(.C) void {
+    surface.sendEnter(wlr_output);
+}
+
+fn sendLeave(self: *Self, output: *Output) void {
+    self.forEachSurface(*wlr.Output, sendLeaveIterator, output.wlr_output);
+}
+
+fn sendLeaveIterator(surface: *wlr.Surface, sx: c_int, sy: c_int, wlr_output: *wlr.Output) callconv(.C) void {
+    surface.sendLeave(wlr_output);
 }
 
 pub fn close(self: Self) void {
@@ -475,7 +492,7 @@ pub fn map(self: *Self) !void {
     var it = server.input_manager.seats.first;
     while (it) |seat_node| : (it = seat_node.next) try seat_node.data.handleViewMap(self);
 
-    self.surface.?.sendEnter(self.output.wlr_output);
+    self.sendEnter(self.output);
 
     self.output.sendViewTags();
 

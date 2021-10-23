@@ -738,6 +738,24 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
     switch (self.mode) {
         .passthrough => {
             self.wlr_cursor.move(device, dx, dy);
+
+            if (self.surfaceAt()) |result| {
+                const focus_change = self.seat.wlr_seat.pointer_state.focused_surface != result.surface;
+                if (server.config.focus_follows_cursor == .normal and focus_change) {
+                    switch (result.parent) {
+                        .view => |view| {
+                            if (self.seat.focused != .view or self.seat.focused.view != view) {
+                                self.seat.focusOutput(view.output);
+                                self.seat.focus(view);
+                                server.root.startTransaction();
+                            }
+                        },
+                        .layer_surface => {},
+                        .xwayland_unmanaged => assert(build_options.xwayland),
+                    }
+                }
+            }
+
             self.passthrough(time);
         },
         .down => |view| {
@@ -830,25 +848,8 @@ fn passthrough(self: *Self, time: u32) void {
         // events. Note that wlroots won't actually send an enter event if
         // the surface has already been entered.
         if (server.input_manager.inputAllowed(result.surface)) {
-            // The focus change must be checked before sending enter events
-            const focus_change = self.seat.wlr_seat.pointer_state.focused_surface != result.surface;
-
             self.seat.wlr_seat.pointerNotifyEnter(result.surface, result.sx, result.sy);
             self.seat.wlr_seat.pointerNotifyMotion(time, result.sx, result.sy);
-
-            if (server.config.focus_follows_cursor == .normal and focus_change) {
-                switch (result.parent) {
-                    .view => |view| {
-                        if (self.seat.focused != .view or self.seat.focused.view != view) {
-                            self.seat.focusOutput(view.output);
-                            self.seat.focus(view);
-                            server.root.startTransaction();
-                        }
-                    },
-                    .layer_surface => {},
-                    .xwayland_unmanaged => assert(build_options.xwayland),
-                }
-            }
         }
     } else {
         // There is either no surface under the cursor or input is disallowed
