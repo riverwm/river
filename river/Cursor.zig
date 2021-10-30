@@ -43,9 +43,21 @@ const XwaylandUnmanaged = @import("XwaylandUnmanaged.zig");
 const Mode = union(enum) {
     passthrough: void,
     down: *View,
-    move: *View,
+    move: struct {
+        view: *View,
+        /// View coordinates are stored as i32s as they are in logical pixels.
+        /// However, it is possible to move the cursor by a fraction of a
+        /// logical pixel and this happens in practice with low dpi, high
+        /// polling rate mice. Therefore we must accumulate the current
+        /// fractional offset of the mouse to avoid rounding down tiny
+        /// motions to 0.
+        delta_x: f64 = 0,
+        delta_y: f64 = 0,
+    },
     resize: struct {
         view: *View,
+        delta_x: f64 = 0,
+        delta_y: f64 = 0,
         /// Offset from the lower right corner of the view
         offset_x: i32,
         offset_y: i32,
@@ -184,7 +196,7 @@ pub fn handleViewUnmap(self: *Self, view: *View) void {
     if (switch (self.mode) {
         .passthrough => false,
         .down => |target_view| target_view == view,
-        .move => |target_view| target_view == view,
+        .move => |data| data.view == view,
         .resize => |data| data.view == view,
     }) {
         self.mode = .passthrough;
@@ -649,7 +661,7 @@ pub fn enterMode(self: *Self, mode: std.meta.Tag((Mode)), view: *View) void {
         .move, .resize => {
             switch (mode) {
                 .passthrough, .down => unreachable,
-                .move => self.mode = .{ .move = view },
+                .move => self.mode = .{ .move = .{ .view = view } },
                 .resize => {
                     const cur_box = &view.current.box;
                     self.mode = .{ .resize = .{
@@ -768,8 +780,14 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
                 self.wlr_cursor.y - @intToFloat(f64, output_box.y + view.current.box.y - view.surface_box.y),
             );
         },
-        .move => |view| {
-            view.move(@floatToInt(i32, delta_x), @floatToInt(i32, delta_y));
+        .move => |*data| {
+            dx += data.delta_x;
+            dy += data.delta_y;
+            data.delta_x = dx - @trunc(dx);
+            data.delta_y = dy - @trunc(dy);
+
+            const view = data.view;
+            view.move(@floatToInt(i32, dx), @floatToInt(i32, dy));
             self.wlr_cursor.move(
                 device,
                 @intToFloat(f64, view.pending.box.x - view.current.box.x),
@@ -777,13 +795,18 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
             );
             view.applyPending();
         },
-        .resize => |data| {
+        .resize => |*data| {
+            dx += data.delta_x;
+            dy += data.delta_y;
+            data.delta_x = dx - @trunc(dx);
+            data.delta_y = dy - @trunc(dy);
+
             const border_width = if (data.view.draw_borders) server.config.border_width else 0;
 
             // Set width/height of view, clamp to view size constraints and output dimensions
             const box = &data.view.pending.box;
-            box.width = @intCast(u32, math.max(0, @intCast(i32, box.width) + @floatToInt(i32, delta_x)));
-            box.height = @intCast(u32, math.max(0, @intCast(i32, box.height) + @floatToInt(i32, delta_y)));
+            box.width = @intCast(u32, math.max(0, @intCast(i32, box.width) + @floatToInt(i32, dx)));
+            box.height = @intCast(u32, math.max(0, @intCast(i32, box.height) + @floatToInt(i32, dy)));
 
             data.view.applyConstraints();
 
@@ -830,7 +853,7 @@ fn shouldPassthrough(self: Self) bool {
             return target.current.tags & target.output.current.tags == 0;
         },
         .resize, .move => {
-            const target = if (self.mode == .resize) self.mode.resize.view else self.mode.move;
+            const target = if (self.mode == .resize) self.mode.resize.view else self.mode.move.view;
             // The target view is no longer visible, is part of the layout, or is fullscreen.
             return target.current.tags & target.output.current.tags == 0 or
                 (!target.current.float and target.output.current.layout != null) or
