@@ -140,7 +140,7 @@ fn apply(view: *View) void {
     // dimensions are set by a layout client. If however the views are
     // unarranged, leave them as non-floating so the next active layout can
     // affect them.
-    if (view.output.current.layout != null)
+    if (view.output.pending.layout != null)
         view.pending.float = true;
 
     view.float_box = view.pending.box;

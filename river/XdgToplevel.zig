@@ -311,7 +311,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) voi
         view.surface_box = new_box;
         // If the client has decided to resize itself and the view is floating,
         // then respect that resize.
-        if (view.pending.float and size_changed) {
+        if ((self.view.pending.float or self.view.output.pending.layout == null) and size_changed) {
             view.pending.box.width = new_box.width;
             view.pending.box.height = new_box.height;
             view.applyPending();
@@ -348,7 +348,7 @@ fn handleRequestMove(
 ) void {
     const self = @fieldParentPtr(Self, "request_move", listener);
     const seat = @intToPtr(*Seat, event.seat.seat.data);
-    if ((self.view.pending.float or self.view.output.current.layout == null) and !self.view.pending.fullscreen)
+    if ((self.view.pending.float or self.view.output.pending.layout == null) and !self.view.pending.fullscreen)
         seat.cursor.enterMode(.move, self.view);
 }
 
@@ -356,7 +356,7 @@ fn handleRequestMove(
 fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), event: *wlr.XdgToplevel.event.Resize) void {
     const self = @fieldParentPtr(Self, "request_resize", listener);
     const seat = @intToPtr(*Seat, event.seat.seat.data);
-    if ((self.view.pending.float or self.view.output.current.layout == null) and !self.view.pending.fullscreen)
+    if ((self.view.pending.float or self.view.output.pending.layout == null) and !self.view.pending.fullscreen)
         seat.cursor.enterMode(.resize, self.view);
 }
 
