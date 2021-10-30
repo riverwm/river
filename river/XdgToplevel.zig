@@ -307,10 +307,15 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) voi
         }
     } else {
         view.output.damage.addWhole();
-        // TODO: handle unexpected change in dimensions
-        if (!std.meta.eql(view.surface_box, new_box))
-            log.err("view changed size unexpectedly", .{});
+        const size_changed = !std.meta.eql(view.surface_box, new_box);
         view.surface_box = new_box;
+        // If the client has decided to resize itself and the view is floating,
+        // then respect that resize.
+        if (view.pending.float and size_changed) {
+            view.pending.box.width = new_box.width;
+            view.pending.box.height = new_box.height;
+            view.applyPending();
+        }
     }
 }
 
