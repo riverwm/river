@@ -33,7 +33,7 @@ pub fn borderWidth(
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
 
-    server.config.border_width = try fmt.parseInt(u32, args[1], 10);
+    server.config.border_width = try fmt.parseInt(u16, args[1], 10);
     server.root.arrangeAll();
     server.root.startTransaction();
 }
