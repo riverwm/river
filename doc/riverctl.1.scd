@@ -15,7 +15,7 @@ over the Wayland protocol.
 
 # OPTIONS
 
-*-help*
+*-h*
 	Print a help message and exit.
 
 *-version*

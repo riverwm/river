@@ -20,7 +20,7 @@ utility may be used to communicate with river over these protocols.
 
 # OPTIONS
 
-*-help*
+*-h*
 	Print a help message and exit.
 
 *-version*

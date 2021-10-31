@@ -31,7 +31,7 @@ const Server = @import("Server.zig");
 const usage: []const u8 =
     \\usage: river [options]
     \\
-    \\  -help              Print this help message and exit.
+    \\  -h                 Print this help message and exit.
     \\  -version           Print the version number and exit.
     \\  -c <command>       Run `sh -c <command>` on startup.
     \\  -log-level <level> Set the log level to error, warning, info, or debug.
@@ -44,7 +44,7 @@ pub fn main() anyerror!void {
     // This line is here because of https://github.com/ziglang/zig/issues/7807
     const argv: [][*:0]const u8 = os.argv;
     const result = flags.parse(argv[1..], &[_]flags.Flag{
-        .{ .name = "-help", .kind = .boolean },
+        .{ .name = "-h", .kind = .boolean },
         .{ .name = "-version", .kind = .boolean },
         .{ .name = "-c", .kind = .arg },
         .{ .name = "-log-level", .kind = .arg },
@@ -52,7 +52,7 @@ pub fn main() anyerror!void {
         try io.getStdErr().writeAll(usage);
         os.exit(1);
     };
-    if (result.boolFlag("-help")) {
+    if (result.boolFlag("-h")) {
         try io.getStdOut().writeAll(usage);
         os.exit(0);
     }

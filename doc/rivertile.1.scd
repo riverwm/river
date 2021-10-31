@@ -17,7 +17,7 @@ modified while rivertile is running with the help of *riverctl*(1).
 
 # OPTIONS
 
-*-help*
+*-h*
 	Print a help message and exit.
 
 *-version*

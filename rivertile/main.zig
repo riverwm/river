@@ -51,7 +51,7 @@ const flags = @import("flags");
 const usage =
     \\usage: rivertile [options]
     \\
-    \\  -help           Print this help message and exit.
+    \\  -h              Print this help message and exit.
     \\  -version        Print the version number and exit.
     \\  -view-padding   Set the padding around views in pixels. (Default 6)
     \\  -outer-padding  Set the padding around the edge of the layout area in
@@ -314,7 +314,7 @@ pub fn main() !void {
     // https://github.com/ziglang/zig/issues/7807
     const argv: [][*:0]const u8 = os.argv;
     const result = flags.parse(argv[1..], &[_]flags.Flag{
-        .{ .name = "-help", .kind = .boolean },
+        .{ .name = "-h", .kind = .boolean },
         .{ .name = "-version", .kind = .boolean },
         .{ .name = "-view-padding", .kind = .arg },
         .{ .name = "-outer-padding", .kind = .arg },
@@ -325,7 +325,7 @@ pub fn main() !void {
         try std.io.getStdErr().writeAll(usage);
         os.exit(1);
     };
-    if (result.boolFlag("-help")) {
+    if (result.boolFlag("-h")) {
         try std.io.getStdOut().writeAll(usage);
         os.exit(0);
     }

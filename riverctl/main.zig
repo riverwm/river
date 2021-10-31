@@ -30,7 +30,7 @@ const flags = @import("flags");
 const usage =
     \\usage: riverctl [options] <command>
     \\
-    \\  -help           Print this help message and exit.
+    \\  -h              Print this help message and exit.
     \\  -version        Print the version number and exit.
     \\
     \\Complete documentation of the recognized commands may be found in
@@ -67,13 +67,13 @@ fn _main() !void {
     // This line is here because of https://github.com/ziglang/zig/issues/7807
     const argv: [][*:0]const u8 = os.argv;
     const result = flags.parse(argv[1..], &[_]flags.Flag{
-        .{ .name = "-help", .kind = .boolean },
+        .{ .name = "-h", .kind = .boolean },
         .{ .name = "-version", .kind = .boolean },
     }) catch {
         try io.getStdErr().writeAll(usage);
         os.exit(1);
     };
-    if (result.boolFlag("-help")) {
+    if (result.boolFlag("-h")) {
         try io.getStdOut().writeAll(usage);
         os.exit(0);
     }
