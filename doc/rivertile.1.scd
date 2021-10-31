@@ -10,7 +10,7 @@ rivertile - tiled layout generator for river
 
 # DESCRIPTION
 
-*rivertile* is a layout client for *river*(1). It provides a simple tiled
+*rivertile* is a layout generator for *river*(1). It provides a simple tiled
 layout with split main/secondary stacks. The initial state may be configured
 with various options passed on startup. Some values may additionally be
 modified while rivertile is running with the help of *riverctl*(1).

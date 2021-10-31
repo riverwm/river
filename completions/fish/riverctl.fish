@@ -56,7 +56,7 @@ complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a toggle-fu
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a zoom                   -d 'Bump the focused view to the top of the layout stack'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a default-layout         -d 'Set the layout namespace to be used by all outputs by default.'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a output-layout          -d 'Set the layout namespace of currently focused output.'
-complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a send-layout-cmd        -d 'Send command to the layout client on the currently focused output with the given namespace'
+complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a send-layout-cmd        -d 'Send command to the layout generator on the currently focused output with the given namespace'
 # Tag managements
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a set-focused-tags       -d 'Show views with tags corresponding to the set bits of tags'
 complete -c riverctl -x -n '__fish_riverctl_complete_no_subcommand' -a set-view-tags          -d 'Assign the currently focused view the tags corresponding to the set bits of tags'

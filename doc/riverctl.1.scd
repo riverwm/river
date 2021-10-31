@@ -99,9 +99,9 @@ over the Wayland protocol.
 	the value set with *default-layout* if any.
 
 *send-layout-cmd* _namespace_ _command_
-	Send _command_ to the layout client on the currently focused output
-	with the given _namespace_, if any. What commands a layout client
-	understands depends on the layout client. For rivertile, see the
+	Send _command_ to the layout generator on the currently focused output
+	with the given _namespace_, if any. What commands a layout generator
+	understands depends on the layout generator. For rivertile, see the
 	documentation in the *rivertile*(1) man page.
 
 ## TAG MANAGEMENT
