@@ -14,7 +14,7 @@ river - dynamic tiling Wayland compositor
 a stack of views laid out dynamically by an external layout generator. Tags
 are used instead of workspaces allowing for increased flexibility.
 
-All runtime configuration and control happens through Wayland protocols,
+All configuration and control happens at runtime through Wayland protocols,
 including several river-specific protocol extensions. The *riverctl*(1)
 utility may be used to communicate with river over these protocols.
 

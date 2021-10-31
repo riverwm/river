@@ -17,7 +17,7 @@ riverctl map normal $mod+Shift Return spawn foot
 # Mod+Q to close the focused view
 riverctl map normal $mod Q close
 
-# Mod+E to exit river
+# Mod+Shift+E to exit river
 riverctl map normal $mod+Shift E exit
 
 # Mod+J and Mod+K to focus the next/previous view in the layout stack
@@ -121,7 +121,7 @@ riverctl map passthrough $mod F11 enter-mode normal
 # not have a modifier
 for mode in normal locked
 do
-    # Eject the optical drive
+    # Eject the optical drive (well if you still have one that is)
     riverctl map $mode None XF86Eject spawn 'eject -T'
 
     # Control pulse audio volume with pamixer (https://github.com/cdemoulins/pamixer)
@@ -145,7 +145,7 @@ riverctl background-color 0x002b36
 riverctl border-color-focused 0x93a1a1
 riverctl border-color-unfocused 0x586e75
 
-# Set repeat rate
+# Set keyboard repeat rate
 riverctl set-repeat 50 300
 
 # Make certain views start floating
@@ -158,4 +158,4 @@ riverctl csd-filter-add app-id "gedit"
 # Set and exec into the default layout generator, rivertile.
 # River will send the process group of the init executable SIGTERM on exit.
 riverctl default-layout rivertile
-exec rivertile
+exec rivertile -view-padding 6 -outer-padding 6
