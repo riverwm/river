@@ -38,10 +38,12 @@ const XwaylandView = if (build_options.xwayland) @import("XwaylandView.zig") els
 const log = std.log.scoped(.view);
 
 pub const Constraints = struct {
-    min_width: u32,
-    max_width: u32,
-    min_height: u32,
-    max_height: u32,
+    // u31 is large enough that well behaved client will not be limited and has
+    // the advantage that is coerces to both i32 and u32.
+    min_width: u31,
+    max_width: u31,
+    min_height: u31,
+    max_height: u31,
 };
 
 // Minimum width/height for surfaces.
@@ -408,9 +410,15 @@ pub fn applyConstraints(self: *Self) void {
 
 /// Return bounds on the dimensions of the view
 pub fn getConstraints(self: Self) Constraints {
-    return switch (self.impl) {
+    const cons = switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.getConstraints(),
         .xwayland_view => |xwayland_view| xwayland_view.getConstraints(),
+    };
+    return .{
+        .min_height = math.max(min_size, cons.min_height),
+        .min_width = math.max(min_size, cons.min_width),
+        .max_height = cons.max_height,
+        .max_width = cons.max_width,
     };
 }
 

@@ -145,10 +145,10 @@ pub fn getAppId(self: Self) ?[*:0]const u8 {
 pub fn getConstraints(self: Self) View.Constraints {
     const state = &self.xdg_surface.role_data.toplevel.current;
     return .{
-        .min_width = std.math.max(state.min_width, View.min_size),
-        .max_width = if (state.max_width > 0) state.max_width else std.math.maxInt(u32),
-        .min_height = std.math.max(state.min_height, View.min_size),
-        .max_height = if (state.max_height > 0) state.max_height else std.math.maxInt(u32),
+        .min_width = util.safeIntDownCast(u31, state.min_width),
+        .min_height = util.safeIntDownCast(u31, state.min_height),
+        .max_width = if (state.max_width > 0) util.safeIntDownCast(u31, state.max_width) else std.math.maxInt(u31),
+        .max_height = if (state.max_height > 0) util.safeIntDownCast(u31, state.max_height) else std.math.maxInt(u31),
     };
 }
 

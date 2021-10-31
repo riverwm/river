@@ -17,6 +17,21 @@
 
 const std = @import("std");
 const os = std.os;
+const math = std.math;
 
 /// The global general-purpose allocator used throughout river's code
 pub const gpa = std.heap.c_allocator;
+
+/// like @intCast(), but only for casting to a type with fewer bits and casting
+/// a value too large for the target type is not undefined.
+pub fn safeIntDownCast(comptime T: type, val: anytype) T {
+    comptime {
+        const out_info = @typeInfo(T);
+        const in_info = @typeInfo(@TypeOf(val));
+        if (out_info != .Int or in_info != .Int) @compileError("only integer types are supported");
+        if (out_info.Int.bits > in_info.Int.bits) @compileError("out type must be smaller than in type");
+    }
+    const max = std.math.maxInt(T);
+    if (val >= max) return max;
+    return @intCast(T, val);
+}
