@@ -1,4 +1,4 @@
-RIVERTILE(1) "github.com/ifreund/river" "General Commands Manual"
+RIVERTILE(1) "github.com/riverwm/river" "General Commands Manual"
 
 # NAME
 
@@ -80,7 +80,7 @@ Set the main count to 3 at runtime:
 
 Maintained by Isaac Freund <mail@isaacfreund.com> who is assisted by open
 source contributors. For more information about river's development, see
-<https://github.com/ifreund/river>.
+<https://github.com/riverwm/river>.
 
 # SEE ALSO
 

@@ -1,4 +1,4 @@
-RIVERCTL(1) "github.com/ifreund/river" "General Commands Manual"
+RIVERCTL(1) "github.com/riverwm/river" "General Commands Manual"
 
 # NAME
 
@@ -361,7 +361,7 @@ See also the example init script at /etc/river/init.
 
 Maintained by Isaac Freund <mail@isaacfreund.com> who is assisted by open
 source contributors. For more information about river's development, see
-<https://github.com/ifreund/river>.
+<https://github.com/riverwm/river>.
 
 # SEE ALSO
 

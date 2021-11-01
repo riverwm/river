@@ -135,7 +135,7 @@ pub fn build(b: *zbs.Builder) !void {
             \\pkgdatadir=${{datadir}}/river-protocols
             \\
             \\Name: river-protocols
-            \\URL: https://github.com/ifreund/river
+            \\URL: https://github.com/riverwm/river
             \\Description: protocol files for the river wayland compositor
             \\Version: {s}
         , .{ b.install_prefix, full_version });

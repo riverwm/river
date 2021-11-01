@@ -5,11 +5,11 @@ configuration.
 
 Join us at [#river](https://web.libera.chat/?channels=#river)
 on irc.libera.chat. Read our man pages and our
-[wiki](https://github.com/ifreund/river/wiki).
+[wiki](https://github.com/riverwm/river/wiki).
 
 *Note: river is currently early in development. Expect breaking changes
 and missing features. If you run into a bug don't hesitate to
-[open an issue](https://github.com/ifreund/river/issues/new)*
+[open an issue](https://github.com/riverwm/river/issues/new)*
 
 ## Design goals
 

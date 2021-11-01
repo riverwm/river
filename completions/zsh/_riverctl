@@ -1,6 +1,6 @@
 #compdef riverctl
 #
-# Completion script for riverctl, part of river <https://github.com/ifreund/river>
+# Completion script for riverctl, part of river <https://github.com/riverwm/river>
 
 _riverctl_subcommands()
 {
