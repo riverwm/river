@@ -61,7 +61,10 @@ pub fn build(b: *zbs.Builder) !void {
                 &ret,
                 .Inherit,
             ) catch break :blk version;
-            break :blk try std.fmt.allocPrintZ(b.allocator, "{s}-{s}", .{ version, git_commit_hash });
+            break :blk try std.fmt.allocPrintZ(b.allocator, "{s}-{s}", .{
+                version,
+                mem.trim(u8, git_commit_hash, &std.ascii.spaces),
+            });
         } else {
             break :blk version;
         }

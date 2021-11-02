@@ -78,7 +78,7 @@ fn _main() !void {
         os.exit(0);
     }
     if (result.boolFlag("-version")) {
-        try io.getStdOut().writeAll(@import("build_options").version);
+        try io.getStdOut().writeAll(@import("build_options").version ++ "\n");
         os.exit(0);
     }
 

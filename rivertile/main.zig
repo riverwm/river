@@ -332,7 +332,7 @@ pub fn main() !void {
     if (result.args.len != 0) fatalPrintUsage("unknown option '{s}'", .{result.args[0]});
 
     if (result.boolFlag("-version")) {
-        try std.io.getStdOut().writeAll(@import("build_options").version);
+        try std.io.getStdOut().writeAll(@import("build_options").version ++ "\n");
         os.exit(0);
     }
     if (result.argFlag("-view-padding")) |raw| {
