@@ -35,12 +35,13 @@ git submodule update --init
 ```
 
 To compile river first ensure that you have the following dependencies
-installed:
+installed. The "development" versions are required if applicable to your
+distribution.
 
-- [zig](https://ziglang.org/download/) 0.8.0
+- [zig](https://ziglang.org/download/) 0.8
 - wayland
 - wayland-protocols
-- [wlroots](https://github.com/swaywm/wlroots) 0.14.0
+- [wlroots](https://github.com/swaywm/wlroots) 0.14
 - xkbcommon
 - libevdev
 - pixman
