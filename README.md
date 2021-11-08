@@ -41,7 +41,7 @@ distribution.
 - [zig](https://ziglang.org/download/) 0.8
 - wayland
 - wayland-protocols
-- [wlroots](https://github.com/swaywm/wlroots) 0.14
+- [wlroots](https://gitlab.freedesktop.org/wlroots/wlroots) 0.14
 - xkbcommon
 - libevdev
 - pixman
