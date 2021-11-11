@@ -355,7 +355,9 @@ Bind Super+Return in normal mode to spawn a *foot*(1) terminal:
 
 	riverctl map normal Mod4 Return spawn 'foot --app-id=foobar'
 
-See also the example init script at /etc/river/init.
+Bind Super+Shift+J to swap the focused view with the next visible view:
+
+	riverctl map normal Mod4+Shift J swap next
 
 # AUTHORS
 
