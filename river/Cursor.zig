@@ -750,24 +750,7 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
     switch (self.mode) {
         .passthrough => {
             self.wlr_cursor.move(device, dx, dy);
-
-            if (self.surfaceAt()) |result| {
-                const focus_change = self.seat.wlr_seat.pointer_state.focused_surface != result.surface;
-                if (server.config.focus_follows_cursor == .normal and focus_change) {
-                    switch (result.parent) {
-                        .view => |view| {
-                            if (self.seat.focused != .view or self.seat.focused.view != view) {
-                                self.seat.focusOutput(view.output);
-                                self.seat.focus(view);
-                                server.root.startTransaction();
-                            }
-                        },
-                        .layer_surface => {},
-                        .xwayland_unmanaged => assert(build_options.xwayland),
-                    }
-                }
-            }
-
+            self.checkFocusFollowsCursor();
             self.passthrough(time);
         },
         .down => |view| {
@@ -823,6 +806,27 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
                 @intToFloat(f64, box.y + @intCast(i32, box.height) - data.offset_y),
             );
         },
+    }
+}
+
+pub fn checkFocusFollowsCursor(self: *Self) void {
+    // Don't do focus-follows-cursor if a drag is in progress as focus change can't occur
+    if (self.seat.pointer_drag) return;
+    if (server.config.focus_follows_cursor == .disabled) return;
+    if (self.surfaceAt()) |result| {
+        if (self.seat.wlr_seat.pointer_state.focused_surface != result.surface) {
+            switch (result.parent) {
+                .view => |view| {
+                    if (self.seat.focused != .view or self.seat.focused.view != view) {
+                        self.seat.focusOutput(view.output);
+                        self.seat.focus(view);
+                        server.root.startTransaction();
+                    }
+                },
+                .layer_surface => {},
+                .xwayland_unmanaged => assert(build_options.xwayland),
+            }
+        }
     }
 }
 
