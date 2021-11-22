@@ -28,7 +28,6 @@ const command = @import("command.zig");
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
-const DragIcon = @import("DragIcon.zig");
 const Cursor = @import("Cursor.zig");
 const InputManager = @import("InputManager.zig");
 const Keyboard = @import("Keyboard.zig");
@@ -82,15 +81,10 @@ focus_stack: ViewStack(*View) = .{},
 /// List of status tracking objects relaying changes to this seat to clients.
 status_trackers: std.SinglyLinkedList(SeatStatus) = .{},
 
-/// True if a pointer drag is currently in progress
-pointer_drag: bool = false,
-
 request_set_selection: wl.Listener(*wlr.Seat.event.RequestSetSelection) =
     wl.Listener(*wlr.Seat.event.RequestSetSelection).init(handleRequestSetSelection),
 request_start_drag: wl.Listener(*wlr.Seat.event.RequestStartDrag) =
     wl.Listener(*wlr.Seat.event.RequestStartDrag).init(handleRequestStartDrag),
-start_drag: wl.Listener(*wlr.Drag) = wl.Listener(*wlr.Drag).init(handleStartDrag),
-pointer_drag_destroy: wl.Listener(*wlr.Drag) = wl.Listener(*wlr.Drag).init(handlePointerDragDestroy),
 request_set_primary_selection: wl.Listener(*wlr.Seat.event.RequestSetPrimarySelection) =
     wl.Listener(*wlr.Seat.event.RequestSetPrimarySelection).init(handleRequestSetPrimarySelection),
 
@@ -111,7 +105,6 @@ pub fn init(self: *Self, name: [*:0]const u8) !void {
 
     self.wlr_seat.events.request_set_selection.add(&self.request_set_selection);
     self.wlr_seat.events.request_start_drag.add(&self.request_start_drag);
-    self.wlr_seat.events.start_drag.add(&self.start_drag);
     self.wlr_seat.events.request_set_primary_selection.add(&self.request_set_primary_selection);
 }
 
@@ -453,43 +446,7 @@ fn handleRequestStartDrag(
         if (event.drag.source) |source| source.destroy();
         return;
     }
-
-    if (self.pointer_drag) {
-        log.debug("ignoring request to start pointer drag, " ++
-            "another pointer drag is already in progress", .{});
-        if (event.drag.source) |source| source.destroy();
-        return;
-    }
-
-    log.debug("starting pointer drag", .{});
-    self.wlr_seat.startPointerDrag(event.drag, event.serial);
-}
-
-fn handleStartDrag(listener: *wl.Listener(*wlr.Drag), wlr_drag: *wlr.Drag) void {
-    const self = @fieldParentPtr(Self, "start_drag", listener);
-
-    assert(wlr_drag.grab_type == .keyboard_pointer);
-
-    self.pointer_drag = true;
-    wlr_drag.events.destroy.add(&self.pointer_drag_destroy);
-
-    if (wlr_drag.icon) |wlr_drag_icon| {
-        const node = util.gpa.create(std.SinglyLinkedList(DragIcon).Node) catch {
-            log.crit("out of memory", .{});
-            return;
-        };
-        node.data.init(self, wlr_drag_icon);
-        server.root.drag_icons.prepend(node);
-    }
-    self.cursor.mode = .passthrough;
-}
-
-fn handlePointerDragDestroy(listener: *wl.Listener(*wlr.Drag), wlr_drag: *wlr.Drag) void {
-    const self = @fieldParentPtr(Self, "pointer_drag_destroy", listener);
-    self.pointer_drag = false;
-    self.pointer_drag_destroy.link.remove();
-    self.cursor.checkFocusFollowsCursor();
-    self.cursor.updateState();
+    self.cursor.startPointerDrag(event);
 }
 
 fn handleRequestSetPrimarySelection(

@@ -24,10 +24,10 @@ const wl = @import("wayland").server.wl;
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
-const Seat = @import("Seat.zig");
+const Cursor = @import("Cursor.zig");
 const Subsurface = @import("Subsurface.zig");
 
-seat: *Seat,
+cursor: *Cursor,
 wlr_drag_icon: *wlr.Drag.Icon,
 
 // Always active
@@ -39,8 +39,8 @@ new_subsurface: wl.Listener(*wlr.Subsurface) = wl.Listener(*wlr.Subsurface).init
 // Only active while mapped
 commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
 
-pub fn init(drag_icon: *DragIcon, seat: *Seat, wlr_drag_icon: *wlr.Drag.Icon) void {
-    drag_icon.* = .{ .seat = seat, .wlr_drag_icon = wlr_drag_icon };
+pub fn init(drag_icon: *DragIcon, cursor: *Cursor, wlr_drag_icon: *wlr.Drag.Icon) void {
+    drag_icon.* = .{ .cursor = cursor, .wlr_drag_icon = wlr_drag_icon };
 
     wlr_drag_icon.events.destroy.add(&drag_icon.destroy);
     wlr_drag_icon.events.map.add(&drag_icon.map);

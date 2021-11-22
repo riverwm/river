@@ -33,6 +33,7 @@ const util = @import("util.zig");
 
 const Box = @import("Box.zig");
 const Config = @import("Config.zig");
+const DragIcon = @import("DragIcon.zig");
 const LayerSurface = @import("LayerSurface.zig");
 const Output = @import("Output.zig");
 const Seat = @import("Seat.zig");
@@ -81,6 +82,9 @@ constraint: ?*wlr.PointerConstraintV1 = null,
 /// Number of distinct buttons currently pressed
 pressed_count: u32 = 0,
 
+/// True if a pointer drag is currently in progress
+pointer_drag: bool = false,
+
 axis: wl.Listener(*wlr.Pointer.event.Axis) = wl.Listener(*wlr.Pointer.event.Axis).init(handleAxis),
 frame: wl.Listener(*wlr.Cursor) = wl.Listener(*wlr.Cursor).init(handleFrame),
 button: wl.Listener(*wlr.Pointer.event.Button) =
@@ -103,6 +107,10 @@ swipe_update: wl.Listener(*wlr.Pointer.event.SwipeUpdate) =
     wl.Listener(*wlr.Pointer.event.SwipeUpdate).init(handleSwipeUpdate),
 swipe_end: wl.Listener(*wlr.Pointer.event.SwipeEnd) =
     wl.Listener(*wlr.Pointer.event.SwipeEnd).init(handleSwipeEnd),
+
+pointer_drag_destroy: wl.Listener(*wlr.Drag) = wl.Listener(*wlr.Drag).init(handlePointerDragDestroy),
+pointer_drag_data_source_destroy: wl.Listener(*wlr.DataSource) =
+    wl.Listener(*wlr.DataSource).init(handlePointerDragDataSourceDestroy),
 
 pub fn init(self: *Self, seat: *Seat) !void {
     const wlr_cursor = try wlr.Cursor.create();
@@ -204,7 +212,7 @@ pub fn handleViewUnmap(self: *Self, view: *View) void {
     }
 }
 
-fn clearFocus(self: Self) void {
+pub fn clearFocus(self: Self) void {
     self.xcursor_manager.setCursorImage("left_ptr", self.wlr_cursor);
     self.seat.wlr_seat.pointerNotifyClearFocus();
 }
@@ -811,7 +819,7 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
 
 pub fn checkFocusFollowsCursor(self: *Self) void {
     // Don't do focus-follows-cursor if a drag is in progress as focus change can't occur
-    if (self.seat.pointer_drag) return;
+    if (self.pointer_drag) return;
     if (server.config.focus_follows_cursor == .disabled) return;
     if (self.surfaceAt()) |result| {
         if (self.seat.wlr_seat.pointer_state.focused_surface != result.surface) {
@@ -883,4 +891,68 @@ fn passthrough(self: *Self, time: u32) void {
         // Reset the cursor image to the default and clear focus.
         self.clearFocus();
     }
+}
+
+pub fn startPointerDrag(self: *Self, event: *wlr.Seat.event.RequestStartDrag) void {
+    if (self.pointer_drag) {
+        log.debug("ignoring request to start pointer drag, " ++
+            "another pointer drag is already in progress", .{});
+        if (event.drag.source) |source| source.destroy();
+        return;
+    }
+
+    if (event.drag.icon) |wlr_drag_icon| {
+        const node = util.gpa.create(std.SinglyLinkedList(DragIcon).Node) catch {
+            log.crit("out of memory", .{});
+            wlr_drag_icon.surface.resource.getClient().postNoMemory();
+            return;
+        };
+        node.data.init(self, wlr_drag_icon);
+        server.root.drag_icons.prepend(node);
+    }
+
+    log.debug("starting pointer drag", .{});
+
+    assert(!self.pointer_drag);
+    self.pointer_drag = true;
+
+    // TODO: It seems that we need to wait until the data source is destroyed
+    // before potentially sending pointer enter events to avoid breaking
+    // further pointer input in firefox and the gtk3-demo Tool Palette example.
+    // I suspect a GTK bug here, this could use further investigation and
+    // testing with non GTK based clients.
+    if (event.drag.source) |source| {
+        source.events.destroy.add(&self.pointer_drag_data_source_destroy);
+    } else {
+        event.drag.events.destroy.add(&self.pointer_drag_destroy);
+    }
+
+    assert(self.mode == .down);
+    self.mode = .passthrough;
+    self.seat.wlr_seat.startPointerDrag(event.drag, event.serial);
+}
+
+fn handlePointerDragDestroy(listener: *wl.Listener(*wlr.Drag), wlr_drag: *wlr.Drag) void {
+    const self = @fieldParentPtr(Self, "pointer_drag_destroy", listener);
+
+    self.pointer_drag_destroy.link.remove();
+    self.finishPointerDrag();
+}
+
+fn handlePointerDragDataSourceDestroy(
+    listener: *wl.Listener(*wlr.DataSource),
+    wlr_data_source: *wlr.DataSource,
+) void {
+    const self = @fieldParentPtr(Self, "pointer_drag_data_source_destroy", listener);
+
+    self.pointer_drag_data_source_destroy.link.remove();
+    self.finishPointerDrag();
+}
+
+fn finishPointerDrag(self: *Self) void {
+    log.debug("pointer drag finished", .{});
+
+    assert(self.pointer_drag);
+    self.pointer_drag = false;
+    self.checkFocusFollowsCursor();
 }

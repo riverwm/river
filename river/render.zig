@@ -235,9 +235,9 @@ fn renderDragIcons(output: *const Output, now: *os.timespec) void {
 
         var rdata = SurfaceRenderData{
             .output = output,
-            .output_x = @floatToInt(i32, drag_icon.seat.cursor.wlr_cursor.x) +
+            .output_x = @floatToInt(i32, drag_icon.cursor.wlr_cursor.x) +
                 drag_icon.wlr_drag_icon.surface.sx - output_box.x,
-            .output_y = @floatToInt(i32, drag_icon.seat.cursor.wlr_cursor.y) +
+            .output_y = @floatToInt(i32, drag_icon.cursor.wlr_cursor.y) +
                 drag_icon.wlr_drag_icon.surface.sy - output_box.y,
             .when = now,
         };
