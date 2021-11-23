@@ -84,6 +84,7 @@ status_trackers: std.SinglyLinkedList(SeatStatus) = .{},
 
 /// True if a pointer drag is currently in progress
 pointer_drag: bool = false,
+pointer_drag_idle_source: ?*wl.EventSource = null,
 
 request_set_selection: wl.Listener(*wlr.Seat.event.RequestSetSelection) =
     wl.Listener(*wlr.Seat.event.RequestSetSelection).init(handleRequestSetSelection),
@@ -128,6 +129,8 @@ pub fn deinit(self: *Self) void {
         self.focus_stack.remove(node);
         util.gpa.destroy(node);
     }
+
+    if (self.pointer_drag_idle_source) |idle_source| idle_source.remove();
 }
 
 /// Set the current focus. If a visible view is passed it will be focused.
@@ -476,6 +479,7 @@ fn handleStartDrag(listener: *wl.Listener(*wlr.Drag), wlr_drag: *wlr.Drag) void 
     if (wlr_drag.icon) |wlr_drag_icon| {
         const node = util.gpa.create(std.SinglyLinkedList(DragIcon).Node) catch {
             log.crit("out of memory", .{});
+            wlr_drag.seat_client.client.postNoMemory();
             return;
         };
         node.data.init(self, wlr_drag_icon);
@@ -486,8 +490,25 @@ fn handleStartDrag(listener: *wl.Listener(*wlr.Drag), wlr_drag: *wlr.Drag) void 
 
 fn handlePointerDragDestroy(listener: *wl.Listener(*wlr.Drag), wlr_drag: *wlr.Drag) void {
     const self = @fieldParentPtr(Self, "pointer_drag_destroy", listener);
-    self.pointer_drag = false;
     self.pointer_drag_destroy.link.remove();
+
+    // TODO(wlroots): wlroots 0.14 doesn't send the wl_data_device.leave event
+    // until after this signal has been emitted. Triggering a wl_pointer.enter
+    // before the wl_data_device.leave breaks clients, so use an idle event
+    // source as a workaround. This has been fixed on the wlroots master branch
+    // in commit c9ba9e82.
+    const event_loop = server.wl_server.getEventLoop();
+    assert(self.pointer_drag_idle_source == null);
+    self.pointer_drag_idle_source = event_loop.addIdle(*Self, finishPointerDragDestroy, self) catch {
+        log.crit("out of memory", .{});
+        wlr_drag.seat_client.client.postNoMemory();
+        return;
+    };
+}
+
+fn finishPointerDragDestroy(self: *Self) callconv(.C) void {
+    self.pointer_drag_idle_source = null;
+    self.pointer_drag = false;
     self.cursor.checkFocusFollowsCursor();
     self.cursor.updateState();
 }
