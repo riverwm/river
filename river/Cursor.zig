@@ -444,6 +444,13 @@ const SurfaceAtResult = struct {
 pub fn surfaceAt(self: Self) ?SurfaceAtResult {
     const lx = self.wlr_cursor.x;
     const ly = self.wlr_cursor.y;
+    return surfaceAtPosition(lx, ly);
+}
+
+/// Find the surface on the given position if any, and return information about that
+/// surface and the given position in surface local coords.
+/// This function must be kept in sync with the rendering order in render.zig.
+pub fn surfaceAtPosition(lx: f64, ly: f64) ?SurfaceAtResult {
     const wlr_output = server.root.output_layout.outputAt(lx, ly) orelse return null;
     const output = @intToPtr(*Output, wlr_output.data);
 
