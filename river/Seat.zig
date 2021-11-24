@@ -36,6 +36,7 @@ const Mapping = @import("Mapping.zig");
 const LayerSurface = @import("LayerSurface.zig");
 const Output = @import("Output.zig");
 const SeatStatus = @import("SeatStatus.zig");
+const Touch = @import("Touch.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 
@@ -52,6 +53,11 @@ wlr_seat: *wlr.Seat,
 
 /// Multiple mice are handled by the same Cursor
 cursor: Cursor = undefined,
+
+touch: Touch = undefined,
+
+/// True if there is a touch device
+has_touch: bool = false,
 
 /// Mulitple keyboards are handled separately
 keyboards: std.TailQueue(Keyboard) = .{},
@@ -109,6 +115,7 @@ pub fn init(self: *Self, name: [*:0]const u8) !void {
     self.wlr_seat.data = @ptrToInt(self);
 
     try self.cursor.init(self);
+    try self.touch.init(self);
 
     self.wlr_seat.events.request_set_selection.add(&self.request_set_selection);
     self.wlr_seat.events.request_start_drag.add(&self.request_start_drag);
@@ -118,6 +125,7 @@ pub fn init(self: *Self, name: [*:0]const u8) !void {
 
 pub fn deinit(self: *Self) void {
     self.cursor.deinit();
+    self.touch.deinit();
     self.mapping_repeat_timer.remove();
 
     while (self.keyboards.pop()) |node| {
@@ -401,6 +409,7 @@ pub fn addDevice(self: *Self, device: *wlr.InputDevice) void {
     switch (device.type) {
         .keyboard => self.addKeyboard(device) catch return,
         .pointer => self.addPointer(device),
+        .touch => self.addTouch(device),
         else => return,
     }
 
@@ -410,6 +419,7 @@ pub fn addDevice(self: *Self, device: *wlr.InputDevice) void {
     self.wlr_seat.setCapabilities(.{
         .pointer = true,
         .keyboard = self.keyboards.len > 0,
+        .touch = self.has_touch,
     });
 }
 
@@ -434,6 +444,11 @@ fn addPointer(self: Self, device: *wlr.InputDevice) void {
     // opportunity to do libinput configuration on the device to set
     // acceleration, etc.
     self.cursor.wlr_cursor.attachInputDevice(device);
+}
+
+fn addTouch(self: *Self, device: *wlr.InputDevice) void {
+    self.touch.wlr_cursor.attachInputDevice(device);
+    self.has_touch = true;
 }
 
 fn handleRequestSetSelection(
