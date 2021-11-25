@@ -36,7 +36,6 @@ const Mapping = @import("Mapping.zig");
 const LayerSurface = @import("LayerSurface.zig");
 const Output = @import("Output.zig");
 const SeatStatus = @import("SeatStatus.zig");
-const Touch = @import("Touch.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 
@@ -53,8 +52,6 @@ wlr_seat: *wlr.Seat,
 
 /// Multiple mice are handled by the same Cursor
 cursor: Cursor = undefined,
-
-touch: Touch = undefined,
 
 /// True if there is a touch device
 has_touch: bool = false,
@@ -115,7 +112,6 @@ pub fn init(self: *Self, name: [*:0]const u8) !void {
     self.wlr_seat.data = @ptrToInt(self);
 
     try self.cursor.init(self);
-    try self.touch.init(self);
 
     self.wlr_seat.events.request_set_selection.add(&self.request_set_selection);
     self.wlr_seat.events.request_start_drag.add(&self.request_start_drag);
@@ -125,7 +121,6 @@ pub fn init(self: *Self, name: [*:0]const u8) !void {
 
 pub fn deinit(self: *Self) void {
     self.cursor.deinit();
-    self.touch.deinit();
     self.mapping_repeat_timer.remove();
 
     while (self.keyboards.pop()) |node| {
@@ -447,7 +442,7 @@ fn addPointer(self: Self, device: *wlr.InputDevice) void {
 }
 
 fn addTouch(self: *Self, device: *wlr.InputDevice) void {
-    self.touch.wlr_cursor.attachInputDevice(device);
+    self.cursor.wlr_cursor.attachInputDevice(device);
     self.has_touch = true;
 }
 

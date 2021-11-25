@@ -104,6 +104,13 @@ swipe_update: wl.Listener(*wlr.Pointer.event.SwipeUpdate) =
 swipe_end: wl.Listener(*wlr.Pointer.event.SwipeEnd) =
     wl.Listener(*wlr.Pointer.event.SwipeEnd).init(handleSwipeEnd),
 
+touch_up: wl.Listener(*wlr.Touch.event.Up) =
+    wl.Listener(*wlr.Touch.event.Up).init(handleTouchUp),
+touch_down: wl.Listener(*wlr.Touch.event.Down) =
+    wl.Listener(*wlr.Touch.event.Down).init(handleTouchDown),
+touch_motion: wl.Listener(*wlr.Touch.event.Motion) =
+    wl.Listener(*wlr.Touch.event.Motion).init(handleTouchMotion),
+
 pub fn init(self: *Self, seat: *Seat) !void {
     const wlr_cursor = try wlr.Cursor.create();
     errdefer wlr_cursor.destroy();
@@ -141,6 +148,10 @@ pub fn init(self: *Self, seat: *Seat) !void {
     wlr_cursor.events.pinch_update.add(&self.pinch_update);
     wlr_cursor.events.pinch_end.add(&self.pinch_end);
     seat.wlr_seat.events.request_set_cursor.add(&self.request_set_cursor);
+
+    wlr_cursor.events.touch_up.add(&self.touch_up);
+    wlr_cursor.events.touch_down.add(&self.touch_down);
+    wlr_cursor.events.touch_motion.add(&self.touch_motion);
 }
 
 pub fn deinit(self: *Self) void {
@@ -430,6 +441,63 @@ fn handleRequestSetCursor(
         log.debug("focused client set cursor", .{});
         self.wlr_cursor.setSurface(event.surface, event.hotspot_x, event.hotspot_y);
     }
+}
+
+fn handleTouchMotion(
+    listener: *wl.Listener(*wlr.Touch.event.Motion),
+    event: *wlr.Touch.event.Motion,
+) void {
+    const self = @fieldParentPtr(Self, "touch_motion", listener);
+
+    self.seat.handleActivity();
+
+    var lx: f64 = undefined;
+    var ly: f64 = undefined;
+    self.wlr_cursor.absoluteToLayoutCoords(event.device, event.x, event.y, &lx, &ly);
+
+    if (surfaceAtPosition(lx, ly)) |result| {
+        _ = self.seat.wlr_seat.touchNotifyMotion(event.time_msec, event.touch_id, result.sx, result.sy);
+    }
+}
+
+fn handleTouchUp(
+    listener: *wl.Listener(*wlr.Touch.event.Up),
+    event: *wlr.Touch.event.Up,
+) void {
+    const self = @fieldParentPtr(Self, "touch_up", listener);
+
+    self.seat.handleActivity();
+
+    _ = self.seat.wlr_seat.touchNotifyUp(event.time_msec, event.touch_id);
+}
+
+fn handleTouchDown(
+    listener: *wl.Listener(*wlr.Touch.event.Down),
+    event: *wlr.Touch.event.Down,
+) void {
+    const self = @fieldParentPtr(Self, "touch_down", listener);
+
+    self.seat.handleActivity();
+
+    var lx: f64 = undefined;
+    var ly: f64 = undefined;
+    self.wlr_cursor.absoluteToLayoutCoords(event.device, event.x, event.y, &lx, &ly);
+
+    if (surfaceAtPosition(lx, ly)) |result| {
+        switch (result.parent) {
+            .view => |view| {
+                if (self.seat.focused != .view or self.seat.focused.view != view) {
+                    self.seat.focus(view);
+                    server.root.startTransaction();
+                }
+            },
+            .layer_surface => {},
+            .xwayland_unmanaged => assert(build_options.xwayland),
+        }
+        _ = self.seat.wlr_seat.touchNotifyDown(result.surface, event.time_msec, event.touch_id, result.sx, result.sy);
+    }
+
+    self.hide();
 }
 
 const SurfaceAtResult = struct {
