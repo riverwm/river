@@ -21,11 +21,8 @@ const std = @import("std");
 const wlr = @import("wlroots");
 const wayland = @import("wayland");
 const wl = wayland.server.wl;
-const zwlr = wayland.server.zwlr;
 
-const c = @import("c.zig");
 const server = &@import("main.zig").server;
-const util = @import("util.zig");
 
 const Cursor = @import("Cursor.zig");
 const Seat = @import("Seat.zig");
