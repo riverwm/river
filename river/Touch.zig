@@ -17,7 +17,9 @@
 
 const Self = @This();
 
+const build_options = @import("build_options");
 const std = @import("std");
+const assert = std.debug.assert;
 const wlr = @import("wlroots");
 const wayland = @import("wayland");
 const wl = wayland.server.wl;
@@ -99,6 +101,15 @@ fn handleTouchDown(
     self.wlr_cursor.absoluteToLayoutCoords(event.device, event.x, event.y, &lx, &ly);
 
     if (Cursor.surfaceAtPosition(lx, ly)) |result| {
+        switch (result.parent) {
+            .view => |view| {
+                self.seat.focusOutput(view.output);
+                self.seat.focus(view);
+                server.root.startTransaction();
+            },
+            .layer_surface => {},
+            .xwayland_unmanaged => assert(build_options.xwayland),
+        }
         _ = self.seat.wlr_seat.touchNotifyDown(result.surface, event.time_msec, event.touch_id, result.sx, result.sy);
     }
 
