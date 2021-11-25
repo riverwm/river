@@ -103,9 +103,10 @@ fn handleTouchDown(
     if (Cursor.surfaceAtPosition(lx, ly)) |result| {
         switch (result.parent) {
             .view => |view| {
-                self.seat.focusOutput(view.output);
-                self.seat.focus(view);
-                server.root.startTransaction();
+                if (self.seat.focused != .view or self.seat.focused.view != view) {
+                    self.seat.focus(view);
+                    server.root.startTransaction();
+                }
             },
             .layer_surface => {},
             .xwayland_unmanaged => assert(build_options.xwayland),
