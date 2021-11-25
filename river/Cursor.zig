@@ -830,7 +830,6 @@ pub fn checkFocusFollowsCursor(self: *Self) void {
             switch (result.parent) {
                 .view => |view| {
                     if (self.seat.focused != .view or self.seat.focused.view != view) {
-                        self.seat.focusOutput(view.output);
                         self.seat.focus(view);
                         server.root.startTransaction();
                     }
