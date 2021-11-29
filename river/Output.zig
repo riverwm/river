@@ -308,23 +308,15 @@ fn arrangeLayer(
 
         // Horizontal alignment
         const horizontal_margin_size = current_state.margin.left + current_state.margin.right;
-        if (horizontal_margin_size >= bounds.width) {
-            // TODO find a better solution
-            // We currently have not reached a conclusion on how to gracefully
-            // handle this case yet, so we just close the surface. That will
-            // cause the output to be re-arranged eventually, so we can just
-            // exit here. Technically doing this is incorrect, but this case
-            // should only ever be encountered very rarely and matches the
-            // behavior of other compositors.
+        if (horizontal_margin_size + current_state.desired_width > bounds.width) {
             std.log.scoped(.layer_shell).warn(
                 "margins of layer surface '{s}' are too large to be reasonably handled. Closing.",
                 .{layer_surface.wlr_layer_surface.namespace},
             );
+            // This will cause the output to be rearranged, so it's fine to
+            // stop this attempt early.
             layer_surface.wlr_layer_surface.close();
             return;
-        } else if (horizontal_margin_size + current_state.desired_width > bounds.width) {
-            new_box.y = bounds.y;
-            new_box.width = bounds.width - horizontal_margin_size;
         } else if (current_state.desired_width == 0) {
             std.debug.assert(current_state.anchor.right and current_state.anchor.left);
             new_box.x = bounds.x + @intCast(i32, current_state.margin.left);
@@ -343,17 +335,15 @@ fn arrangeLayer(
 
         // Vertical alignment
         const vertical_margin_size = current_state.margin.bottom + current_state.margin.top;
-        if (vertical_margin_size >= bounds.height) {
-            // TODO find a better solution, see explanation above
+        if (vertical_margin_size + current_state.desired_height > bounds.height) {
             std.log.scoped(.layer_shell).warn(
                 "margins of layer surface '{s}' are too large to be reasonably handled. Closing.",
                 .{layer_surface.wlr_layer_surface.namespace},
             );
             layer_surface.wlr_layer_surface.close();
+            // This will cause the output to be rearranged, so it's fine to
+            // stop this attempt early.
             return;
-        } else if (vertical_margin_size + current_state.desired_height > bounds.height) {
-            new_box.y = bounds.y;
-            new_box.height = bounds.height - vertical_margin_size;
         } else if (current_state.desired_height == 0) {
             std.debug.assert(current_state.anchor.top and current_state.anchor.bottom);
             new_box.y = bounds.y + @intCast(i32, current_state.margin.top);
