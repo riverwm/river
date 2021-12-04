@@ -53,8 +53,8 @@ wlr_seat: *wlr.Seat,
 /// Multiple mice are handled by the same Cursor
 cursor: Cursor = undefined,
 
-/// True if there is a touch device
-has_touch: bool = false,
+/// Number of active touch devices
+touch_devices: usize = 0,
 
 /// Mulitple keyboards are handled separately
 keyboards: std.TailQueue(Keyboard) = .{},
@@ -414,7 +414,7 @@ pub fn addDevice(self: *Self, device: *wlr.InputDevice) void {
     self.wlr_seat.setCapabilities(.{
         .pointer = true,
         .keyboard = self.keyboards.len > 0,
-        .touch = self.has_touch,
+        .touch = self.touch_devices > 0,
     });
 }
 
@@ -443,7 +443,7 @@ fn addPointer(self: Self, device: *wlr.InputDevice) void {
 
 fn addTouch(self: *Self, device: *wlr.InputDevice) void {
     self.cursor.wlr_cursor.attachInputDevice(device);
-    self.has_touch = true;
+    self.touch_devices += 1;
 }
 
 fn handleRequestSetSelection(
