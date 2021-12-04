@@ -203,11 +203,6 @@ pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
     }
 }
 
-/// Hides the cursor.
-pub fn hide(self: *Self) void {
-    self.wlr_cursor.setImage(0, 0, 0, 0, 0, 0, 0);
-}
-
 pub fn handleViewUnmap(self: *Self, view: *View) void {
     if (switch (self.mode) {
         .passthrough => false,
@@ -496,8 +491,6 @@ fn handleTouchDown(
         }
         _ = self.seat.wlr_seat.touchNotifyDown(result.surface, event.time_msec, event.touch_id, result.sx, result.sy);
     }
-
-    self.hide();
 }
 
 const SurfaceAtResult = struct {
