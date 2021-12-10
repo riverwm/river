@@ -255,16 +255,25 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
                 }
             },
             .layer_surface => |layer_surface| {
+                self.seat.focusOutput(layer_surface.output);
                 // If a keyboard inteactive layer surface has been clicked on,
                 // give it keyboard focus.
                 if (layer_surface.wlr_layer_surface.current.keyboard_interactive == .exclusive) {
-                    self.seat.focusOutput(layer_surface.output);
                     self.seat.setFocusRaw(.{ .layer = layer_surface });
+                } else {
+                    self.seat.focus(null);
                 }
+                server.root.startTransaction();
             },
             .xwayland_unmanaged => assert(build_options.xwayland),
         }
         _ = self.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
+    } else if (server.root.output_layout.outputAt(self.wlr_cursor.x, self.wlr_cursor.y)) |wlr_output| {
+        // If the user clicked on empty space of an output, focus it.
+        const output = @intToPtr(*Output, wlr_output.data);
+        self.seat.focusOutput(output);
+        self.seat.focus(null);
+        server.root.startTransaction();
     }
 }
 
