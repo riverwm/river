@@ -63,9 +63,11 @@ pub fn ParseResult(comptime flags: []const Flag) type {
             unreachable; // Invalid flag_name
         }
 
-        pub fn argFlag(self: Self, flag_name: [*:0]const u8) ?[*:0]const u8 {
+        pub fn argFlag(self: Self, flag_name: [*:0]const u8) ?[:0]const u8 {
             for (self.flag_data) |flag_data| {
-                if (cstr.cmp(flag_data.name, flag_name) == 0) return flag_data.value.arg;
+                if (cstr.cmp(flag_data.name, flag_name) == 0) {
+                    return std.mem.span(flag_data.value.arg);
+                }
             }
             unreachable; // Invalid flag_name
         }

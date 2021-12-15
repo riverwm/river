@@ -67,7 +67,7 @@ pub fn main() anyerror!void {
         os.exit(0);
     }
     if (result.argFlag("-log-level")) |level_str| {
-        const level = std.meta.stringToEnum(LogLevel, std.mem.span(level_str)) orelse {
+        const level = std.meta.stringToEnum(LogLevel, level_str) orelse {
             std.log.err("invalid log level '{s}'", .{level_str});
             try io.getStdErr().writeAll(usage);
             os.exit(1);
@@ -81,7 +81,7 @@ pub fn main() anyerror!void {
     }
     const startup_command = blk: {
         if (result.argFlag("-c")) |command| {
-            break :blk try util.gpa.dupeZ(u8, std.mem.span(command));
+            break :blk try util.gpa.dupeZ(u8, command);
         } else {
             break :blk try defaultInitPath();
         }
