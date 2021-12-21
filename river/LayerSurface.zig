@@ -21,6 +21,7 @@ const std = @import("std");
 const assert = std.debug.assert;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
+const zwlr = @import("wayland").server.zwlr;
 
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
@@ -36,7 +37,7 @@ output: *Output,
 wlr_layer_surface: *wlr.LayerSurfaceV1,
 
 box: Box = undefined,
-state: wlr.LayerSurfaceV1.State,
+layer: zwlr.LayerShellV1.Layer,
 
 destroy: wl.Listener(*wlr.LayerSurfaceV1) = wl.Listener(*wlr.LayerSurfaceV1).init(handleDestroy),
 map: wl.Listener(*wlr.LayerSurfaceV1) = wl.Listener(*wlr.LayerSurfaceV1).init(handleMap),
@@ -49,7 +50,7 @@ pub fn init(self: *Self, output: *Output, wlr_layer_surface: *wlr.LayerSurfaceV1
     self.* = .{
         .output = output,
         .wlr_layer_surface = wlr_layer_surface,
-        .state = wlr_layer_surface.current,
+        .layer = wlr_layer_surface.current.layer,
     };
     wlr_layer_surface.data = @ptrToInt(self);
 
@@ -100,7 +101,7 @@ fn handleMap(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wl
     wlr_layer_surface.surface.sendEnter(wlr_layer_surface.output.?);
 
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-    self.output.getLayer(self.state.layer).append(node);
+    self.output.getLayer(self.layer).append(node);
     self.output.arrangeLayers(.mapped);
 }
 
@@ -111,7 +112,7 @@ fn handleUnmap(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *
 
     // Remove from the output's list of layer surfaces
     const self_node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-    self.output.layers[@intCast(usize, @enumToInt(self.state.layer))].remove(self_node);
+    self.output.layers[@intCast(usize, @enumToInt(self.layer))].remove(self_node);
 
     // If the unmapped surface is focused, clear focus
     var it = server.input_manager.seats.first;
@@ -144,22 +145,21 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), wlr_surface: *wlr.Surface)
     // If a surface is committed while it is not mapped, we may need to send a configure.
     if (!self.wlr_layer_surface.mapped) {
         const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-        self.output.getLayer(self.state.layer).append(node);
+        self.layer = self.wlr_layer_surface.current.layer;
+        self.output.getLayer(self.layer).append(node);
         self.output.arrangeLayers(.unmapped);
-        self.output.getLayer(self.state.layer).remove(node);
+        self.output.getLayer(self.layer).remove(node);
         return;
     }
 
-    const new_state = &self.wlr_layer_surface.current;
-    if (!std.meta.eql(self.state, new_state.*)) {
+    if (self.wlr_layer_surface.current.committed != 0) {
         // If the layer changed, move the LayerSurface to the proper list
-        if (self.state.layer != new_state.layer) {
+        if (self.wlr_layer_surface.current.layer != self.layer) {
             const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-            self.output.getLayer(self.state.layer).remove(node);
-            self.output.getLayer(new_state.layer).append(node);
+            self.output.getLayer(self.layer).remove(node);
+            self.layer = self.wlr_layer_surface.current.layer;
+            self.output.getLayer(self.layer).append(node);
         }
-
-        self.state = new_state.*;
 
         self.output.arrangeLayers(.mapped);
         server.root.startTransaction();
