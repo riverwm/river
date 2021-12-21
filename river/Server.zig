@@ -47,7 +47,10 @@ sigint_source: *wl.EventSource,
 sigterm_source: *wl.EventSource,
 
 backend: *wlr.Backend,
-noop_backend: *wlr.Backend,
+headless_backend: *wlr.Backend,
+
+renderer: *wlr.Renderer,
+allocator: *wlr.Allocator,
 
 xdg_shell: *wlr.XdgShell,
 new_xdg_surface: wl.Listener(*wlr.XdgSurface),
@@ -82,27 +85,27 @@ pub fn init(self: *Self) !void {
     // This frees itself when the wl.Server is destroyed
     self.backend = try wlr.Backend.autocreate(self.wl_server);
 
-    // This backend is used to create a noop output for use when no actual
+    // This backend is used to create a headless output for use when no actual
     // outputs are available. This frees itself when the wl.Server is destroyed.
-    self.noop_backend = try wlr.Backend.createNoop(self.wl_server);
+    self.headless_backend = try wlr.Backend.createHeadless(self.wl_server);
 
-    // This will never be null for the non-custom backends in wlroots
-    const renderer = self.backend.getRenderer().?;
-    try renderer.initServer(self.wl_server);
+    self.renderer = try wlr.Renderer.autocreate(self.backend);
+    errdefer self.renderer.destroy();
+    try self.renderer.initServer(self.wl_server);
 
-    const compositor = try wlr.Compositor.create(self.wl_server, renderer);
+    self.allocator = try wlr.Allocator.autocreate(self.backend, self.renderer);
+    errdefer self.allocator.destroy();
 
-    // Set up xdg shell
+    const compositor = try wlr.Compositor.create(self.wl_server, self.renderer);
+
     self.xdg_shell = try wlr.XdgShell.create(self.wl_server);
     self.new_xdg_surface.setNotify(handleNewXdgSurface);
     self.xdg_shell.events.new_surface.add(&self.new_xdg_surface);
 
-    // Set up layer shell
     self.layer_shell = try wlr.LayerShellV1.create(self.wl_server);
     self.new_layer_surface.setNotify(handleNewLayerSurface);
     self.layer_shell.events.new_surface.add(&self.new_layer_surface);
 
-    // Set up xwayland if built with support
     if (build_options.xwayland) {
         self.xwayland = try wlr.Xwayland.create(self.wl_server, compositor, false);
         self.new_xwayland_surface.setNotify(handleNewXwaylandSurface);
@@ -142,6 +145,8 @@ pub fn deinit(self: *Self) void {
     self.wl_server.destroyClients();
 
     self.backend.destroy();
+    self.renderer.destroy();
+    self.allocator.destroy();
 
     self.root.deinit();
     self.input_manager.deinit();
@@ -196,15 +201,15 @@ fn handleNewLayerSurface(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_
         "new layer surface: namespace {s}, layer {s}, anchor {b:0>4}, size {},{}, margin {},{},{},{}, exclusive_zone {}",
         .{
             wlr_layer_surface.namespace,
-            @tagName(wlr_layer_surface.client_pending.layer),
-            @bitCast(u32, wlr_layer_surface.client_pending.anchor),
-            wlr_layer_surface.client_pending.desired_width,
-            wlr_layer_surface.client_pending.desired_height,
-            wlr_layer_surface.client_pending.margin.top,
-            wlr_layer_surface.client_pending.margin.right,
-            wlr_layer_surface.client_pending.margin.bottom,
-            wlr_layer_surface.client_pending.margin.left,
-            wlr_layer_surface.client_pending.exclusive_zone,
+            @tagName(wlr_layer_surface.pending.layer),
+            @bitCast(u32, wlr_layer_surface.pending.anchor),
+            wlr_layer_surface.pending.desired_width,
+            wlr_layer_surface.pending.desired_height,
+            wlr_layer_surface.pending.margin.top,
+            wlr_layer_surface.pending.margin.right,
+            wlr_layer_surface.pending.margin.bottom,
+            wlr_layer_surface.pending.margin.left,
+            wlr_layer_surface.pending.exclusive_zone,
         },
     );
 
@@ -218,9 +223,7 @@ fn handleNewLayerSurface(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_
             return;
         }
 
-        log.debug("new layer surface had null output, assigning it to output '{s}'", .{
-            mem.sliceTo(&output.wlr_output.name, 0),
-        });
+        log.debug("new layer surface had null output, assigning it to output '{s}'", .{output.wlr_output.name});
         wlr_layer_surface.output = output.wlr_output;
     }
 

@@ -94,7 +94,7 @@ pub fn init(self: *Self) !void {
     const transaction_timer = try event_loop.addTimer(*Self, handleTransactionTimeout, self);
     errdefer transaction_timer.remove();
 
-    const noop_wlr_output = try server.noop_backend.noopAddOutput();
+    const noop_wlr_output = try server.headless_backend.headlessAddOutput();
     self.* = .{
         .output_layout = output_layout,
         .output_manager = try wlr.OutputManagerV1.create(server.wl_server),
@@ -123,7 +123,7 @@ pub fn deinit(self: *Self) void {
 
 fn handleNewOutput(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
     const self = @fieldParentPtr(Self, "new_output", listener);
-    std.log.scoped(.output_manager).debug("new output {s}", .{mem.sliceTo(&wlr_output.name, 0)});
+    std.log.scoped(.output_manager).debug("new output {s}", .{wlr_output.name});
 
     const node = util.gpa.create(std.TailQueue(Output).Node) catch {
         wlr_output.destroy();
@@ -480,7 +480,7 @@ fn applyOutputConfig(self: *Self, config: *wlr.OutputConfigurationV1) bool {
         // Since we have done a successful test commit, this will only fail
         // due to error in the output's backend implementation.
         output.wlr_output.commit() catch
-            std.log.scoped(.output_manager).err("output commit failed for {s}", .{mem.sliceTo(&output.wlr_output.name, 0)});
+            std.log.scoped(.output_manager).err("output commit failed for {s}", .{output.wlr_output.name});
 
         if (output.wlr_output.enabled) {
             // Moves the output if it is already in the layout
@@ -520,7 +520,7 @@ fn testOutputConfig(config: *wlr.OutputConfigurationV1, rollback: bool) bool {
         if (too_small) {
             std.log.scoped(.output_manager).info(
                 "The requested output resolution {}x{} scaled with {} for {s} would be too small.",
-                .{ width, height, scale, mem.sliceTo(&wlr_output.name, 0) },
+                .{ width, height, scale, wlr_output.name },
             );
         }
 
@@ -592,11 +592,11 @@ fn handlePowerManagerSetMode(
     const log_text = if (enable) "Enabling" else "Disabling";
     std.log.scoped(.output_manager).debug(
         "{s} dpms for output {s}",
-        .{ log_text, mem.sliceTo(&event.output.name, 0) },
+        .{ log_text, event.output.name },
     );
 
     event.output.enable(enable);
     event.output.commit() catch {
-        std.log.scoped(.server).err("output commit failed for {s}", .{mem.sliceTo(&event.output.name, 0)});
+        std.log.scoped(.server).err("output commit failed for {s}", .{event.output.name});
     };
 }

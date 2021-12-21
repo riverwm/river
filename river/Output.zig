@@ -99,7 +99,9 @@ frame: wl.Listener(*wlr.OutputDamage) = wl.Listener(*wlr.OutputDamage).init(hand
 damage_destroy: wl.Listener(*wlr.OutputDamage) = wl.Listener(*wlr.OutputDamage).init(handleDamageDestroy),
 
 pub fn init(self: *Self, wlr_output: *wlr.Output) !void {
-    assert(!wlr_output.isNoop());
+    assert(!wlr_output.isHeadless());
+
+    if (!wlr_output.initRender(server.allocator, server.renderer)) return;
 
     // Some backends don't have modes. DRM+KMS does, and we need to set a mode
     // before we can use the output. The mode is a tuple of (width, height,
@@ -413,10 +415,10 @@ fn arrangeLayer(
             .mapped => {
                 assert(layer_surface.wlr_layer_surface.mapped);
                 layer_surface.box = new_box;
-                layer_surface.wlr_layer_surface.configure(new_box.width, new_box.height);
+                _ = layer_surface.wlr_layer_surface.configure(new_box.width, new_box.height);
             },
             .unmapped => if (!layer_surface.wlr_layer_surface.mapped) {
-                layer_surface.wlr_layer_surface.configure(new_box.width, new_box.height);
+                _ = layer_surface.wlr_layer_surface.configure(new_box.width, new_box.height);
             },
         }
     }
@@ -434,7 +436,7 @@ fn handleDamageDestroy(listener: *wl.Listener(*wlr.OutputDamage), wlr_output: *w
 fn handleDestroy(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
 
-    std.log.scoped(.server).debug("output '{s}' destroyed", .{mem.sliceTo(&self.wlr_output.name, 0)});
+    std.log.scoped(.server).debug("output '{s}' destroyed", .{self.wlr_output.name});
 
     // Remove the destroyed output from root if it wasn't already removed
     server.root.removeOutput(self);
@@ -499,8 +501,8 @@ pub fn getEffectiveResolution(self: *Self) struct { width: u32, height: u32 } {
 }
 
 fn setTitle(self: Self) void {
-    var buf: ["river - ".len + self.wlr_output.name.len + 1]u8 = undefined;
-    const title = fmt.bufPrintZ(&buf, "river - {s}", .{mem.sliceTo(&self.wlr_output.name, 0)}) catch unreachable;
+    const title = fmt.allocPrintZ(util.gpa, "river - {s}", .{self.wlr_output.name}) catch return;
+    defer util.gpa.free(title);
     if (self.wlr_output.isWl()) {
         self.wlr_output.wlSetTitle(title);
     } else if (wlr.config.has_x11_backend and self.wlr_output.isX11()) {
