@@ -80,18 +80,13 @@ pub fn init(self: *Self, view: *View, xdg_surface: *wlr.XdgSurface) void {
 /// Returns true if a configure must be sent to ensure that the pending
 /// dimensions are applied.
 pub fn needsConfigure(self: Self) bool {
-    const server_pending = &self.xdg_surface.role_data.toplevel.server_pending;
+    const scheduled = &self.xdg_surface.role_data.toplevel.scheduled;
     const state = &self.view.pending;
 
-    // Checking server_pending is sufficient here since it will be either in
-    // sync with the current dimensions or be the dimensions sent with the
-    // most recent configure. In both cases server_pending has the values we
-    // want to check against.
-    // Furthermore, we avoid a special case for newly mapped views which we
-    // have not yet configured by setting server_pending.width/height to the
-    // initial width/height of the view in handleMap().
-    return state.box.width != server_pending.width or
-        state.box.height != server_pending.height;
+    // We avoid a special case for newly mapped views which we have not yet
+    // configured by setting scheduled.width/height to the initial width/height
+    // of the view in handleMap().
+    return state.box.width != scheduled.width or state.box.height != scheduled.height;
 }
 
 /// Send a configure event, applying the pending state of the view.
@@ -196,8 +191,8 @@ fn handleMap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurfa
 
     // We initialize these to avoid special-casing newly mapped views in
     // the check preformed in needsConfigure().
-    toplevel.server_pending.width = @intCast(u32, initial_box.width);
-    toplevel.server_pending.height = @intCast(u32, initial_box.height);
+    toplevel.scheduled.width = @intCast(u32, initial_box.width);
+    toplevel.scheduled.height = @intCast(u32, initial_box.height);
 
     view.surface = self.xdg_surface.surface;
     view.surface_box = Box.fromWlrBox(initial_box);

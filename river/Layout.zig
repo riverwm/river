@@ -100,7 +100,7 @@ fn handleRequestInert(layout: *river.LayoutV3, request: river.LayoutV3.Request, 
 pub fn startLayoutDemand(self: *Self, views: u32) void {
     log.debug(
         "starting layout demand '{s}' on output '{s}'",
-        .{ self.namespace, mem.sliceTo(&self.output.wlr_output.name, 0) },
+        .{ self.namespace, self.output.wlr_output.name },
     );
 
     std.debug.assert(self.output.layout_demand == null);
@@ -129,7 +129,7 @@ fn handleRequest(layout: *river.LayoutV3, request: river.LayoutV3.Request, self:
         .push_view_dimensions => |req| {
             log.debug(
                 "layout '{s}' on output '{s}' pushed view dimensions: {} {} {} {}",
-                .{ self.namespace, mem.sliceTo(&self.output.wlr_output.name, 0), req.x, req.y, req.width, req.height },
+                .{ self.namespace, self.output.wlr_output.name, req.x, req.y, req.width, req.height },
             );
 
             if (self.output.layout_demand) |*layout_demand| {
@@ -146,7 +146,7 @@ fn handleRequest(layout: *river.LayoutV3, request: river.LayoutV3.Request, self:
         .commit => |req| {
             log.debug(
                 "layout '{s}' on output '{s}' commited",
-                .{ self.namespace, mem.sliceTo(&self.output.wlr_output.name, 0) },
+                .{ self.namespace, self.output.wlr_output.name },
             );
 
             if (self.output.layout_demand) |*layout_demand| {
@@ -166,7 +166,7 @@ fn handleDestroy(layout: *river.LayoutV3, self: *Self) void {
 pub fn destroy(self: *Self) void {
     log.debug(
         "destroying layout '{s}' on output '{s}'",
-        .{ self.namespace, mem.sliceTo(&self.output.wlr_output.name, 0) },
+        .{ self.namespace, self.output.wlr_output.name },
     );
 
     // Remove layout from the list

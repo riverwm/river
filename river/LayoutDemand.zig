@@ -72,7 +72,7 @@ pub fn deinit(self: *const Self) void {
 fn handleTimeout(layout: *Layout) callconv(.C) c_int {
     log.notice(
         "layout demand for layout '{s}' on output '{s}' timed out",
-        .{ layout.namespace, mem.sliceTo(&layout.output.wlr_output.name, 0) },
+        .{ layout.namespace, layout.output.wlr_output.name },
     );
     layout.output.layout_demand.?.deinit();
     layout.output.layout_demand = null;

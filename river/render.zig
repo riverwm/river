@@ -47,8 +47,6 @@ const SurfaceRenderData = struct {
 
 /// The rendering order in this function must be kept in sync with Cursor.surfaceAt()
 pub fn renderOutput(output: *Output) void {
-    const renderer = output.wlr_output.backend.getRenderer().?;
-
     var now: os.timespec = undefined;
     os.clock_gettime(os.CLOCK_MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
 
@@ -66,7 +64,7 @@ pub fn renderOutput(output: *Output) void {
         return;
     }
 
-    renderer.begin(@intCast(u32, output.wlr_output.width), @intCast(u32, output.wlr_output.height));
+    server.renderer.begin(@intCast(u32, output.wlr_output.width), @intCast(u32, output.wlr_output.height));
 
     // Find the first visible fullscreen view in the stack if there is one
     var it = ViewStack(View).iter(output.views.first, .forward, output.current.tags, renderFilter);
@@ -77,12 +75,12 @@ pub fn renderOutput(output: *Output) void {
     // If we have a fullscreen view to render, render it.
     if (fullscreen_view) |view| {
         // Always clear with solid black for fullscreen
-        renderer.clear(&[_]f32{ 0, 0, 0, 1 });
+        server.renderer.clear(&[_]f32{ 0, 0, 0, 1 });
         renderView(output, view, &now);
         if (build_options.xwayland) renderXwaylandUnmanaged(output, &now);
     } else {
         // No fullscreen view, so render normal layers/views
-        renderer.clear(&server.config.background_color);
+        server.renderer.clear(&server.config.background_color);
 
         renderLayer(output, output.getLayer(.background).*, &now, .toplevels);
         renderLayer(output, output.getLayer(.bottom).*, &now, .toplevels);
@@ -146,11 +144,11 @@ pub fn renderOutput(output: *Output) void {
 
     // Conclude rendering and swap the buffers, showing the final frame
     // on-screen.
-    renderer.end();
+    server.renderer.end();
 
     // TODO: handle failure
     output.wlr_output.commit() catch
-        log.err("output commit failed for {s}", .{mem.sliceTo(&output.wlr_output.name, 0)});
+        log.err("output commit failed for {s}", .{output.wlr_output.name});
 }
 
 fn renderFilter(view: *View, filter_tags: u32) bool {
@@ -315,8 +313,7 @@ fn renderTexture(
 
     // This takes our matrix, the texture, and an alpha, and performs the actual
     // rendering on the GPU.
-    const renderer = output.wlr_output.backend.getRenderer().?;
-    renderer.renderSubtextureWithMatrix(texture, source_box, &matrix, 1.0) catch return;
+    server.renderer.renderSubtextureWithMatrix(texture, source_box, &matrix, 1.0) catch return;
 }
 
 fn renderBorders(output: *const Output, view: *View, now: *os.timespec) void {
@@ -361,11 +358,7 @@ fn renderBorders(output: *const Output, view: *View, now: *os.timespec) void {
 fn renderRect(output: *const Output, box: Box, color: *const [4]f32) void {
     var wlr_box = box.toWlrBox();
     scaleBox(&wlr_box, output.wlr_output.scale);
-    output.wlr_output.backend.getRenderer().?.renderRect(
-        &wlr_box,
-        color,
-        &output.wlr_output.transform_matrix,
-    );
+    server.renderer.renderRect(&wlr_box, color, &output.wlr_output.transform_matrix);
 }
 
 /// Scale a wlr_box, taking the possibility of fractional scaling into account.

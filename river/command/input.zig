@@ -40,7 +40,7 @@ pub fn listInputs(
     var it = server.input_manager.input_devices.first;
     while (it) |node| : (it = node.next) {
         const configured = for (server.input_manager.input_configs.items) |*input_config| {
-            if (mem.eql(u8, input_config.identifier, mem.sliceTo(node.data.identifier, 0))) {
+            if (mem.eql(u8, input_config.identifier, node.data.identifier)) {
                 break true;
             }
         } else false;

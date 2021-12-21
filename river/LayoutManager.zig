@@ -67,7 +67,7 @@ fn handleRequest(layout_manager: *river.LayoutManagerV3, request: river.LayoutMa
             const wlr_output = wlr.Output.fromWlOutput(req.output) orelse return;
             const output = @intToPtr(*Output, wlr_output.data);
 
-            log.debug("bind layout '{s}' on output '{s}'", .{ req.namespace, mem.sliceTo(&output.wlr_output.name, 0) });
+            log.debug("bind layout '{s}' on output '{s}'", .{ req.namespace, output.wlr_output.name });
 
             Layout.create(
                 layout_manager.getClient(),

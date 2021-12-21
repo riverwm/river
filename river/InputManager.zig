@@ -51,11 +51,7 @@ pub const InputDevice = struct {
         const identifier = try std.fmt.allocPrint(
             util.gpa,
             "{}:{}:{s}",
-            .{ device.vendor, device.product, mem.trim(
-                u8,
-                mem.sliceTo(device.name, 0),
-                &ascii.spaces,
-            ) },
+            .{ device.vendor, device.product, mem.trim(u8, mem.span(device.name), &ascii.spaces) },
         );
         for (identifier) |*char| {
             if (char.* == ' ' or !std.ascii.isPrint(char.*)) {
@@ -238,7 +234,7 @@ fn handleNewInput(listener: *wl.Listener(*wlr.InputDevice), device: *wlr.InputDe
 
     // Apply matching input device configuration, if exists.
     for (self.input_configs.items) |*input_config| {
-        if (mem.eql(u8, input_config.identifier, mem.sliceTo(input_device_node.data.identifier, 0))) {
+        if (mem.eql(u8, input_config.identifier, input_device_node.data.identifier)) {
             input_config.apply(&input_device_node.data);
             break; // There will only ever be one InputConfig for any unique identifier;
         }

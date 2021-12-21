@@ -81,11 +81,17 @@ pub fn create(wlr_subsurface: *wlr.Subsurface, parent: Parent) void {
 /// given surface when river becomes aware of the surface as we won't
 /// recieve a new_subsurface event for them.
 pub fn handleExisting(surface: *wlr.Surface, parent: Parent) void {
-    var below_it = surface.subsurfaces_below.iterator(.forward);
-    while (below_it.next()) |s| Subsurface.create(s, parent);
+    var below_it = surface.current.subsurfaces_below.iterator(.forward);
+    while (below_it.next()) |parent_state| {
+        const subsurface = @fieldParentPtr(wlr.Subsurface, "current", parent_state);
+        Subsurface.create(subsurface, parent);
+    }
 
-    var above_it = surface.subsurfaces_above.iterator(.forward);
-    while (above_it.next()) |s| Subsurface.create(s, parent);
+    var above_it = surface.current.subsurfaces_above.iterator(.forward);
+    while (above_it.next()) |parent_state| {
+        const subsurface = @fieldParentPtr(wlr.Subsurface, "current", parent_state);
+        Subsurface.create(subsurface, parent);
+    }
 }
 
 /// Destroy this Subsurface and all of its children
@@ -104,13 +110,15 @@ pub fn destroy(subsurface: *Subsurface) void {
 }
 
 pub fn destroySubsurfaces(surface: *wlr.Surface) void {
-    var below_it = surface.subsurfaces_below.iterator(.forward);
-    while (below_it.next()) |wlr_subsurface| {
+    var below_it = surface.current.subsurfaces_below.iterator(.forward);
+    while (below_it.next()) |parent_state| {
+        const wlr_subsurface = @fieldParentPtr(wlr.Subsurface, "current", parent_state);
         if (@intToPtr(?*Subsurface, wlr_subsurface.data)) |s| s.destroy();
     }
 
-    var above_it = surface.subsurfaces_above.iterator(.forward);
-    while (above_it.next()) |wlr_subsurface| {
+    var above_it = surface.current.subsurfaces_above.iterator(.forward);
+    while (above_it.next()) |parent_state| {
+        const wlr_subsurface = @fieldParentPtr(wlr.Subsurface, "current", parent_state);
         if (@intToPtr(?*Subsurface, wlr_subsurface.data)) |s| s.destroy();
     }
 }
