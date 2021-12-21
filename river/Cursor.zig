@@ -64,6 +64,13 @@ const Mode = union(enum) {
     },
 };
 
+const Image = enum {
+    none,
+    left_ptr,
+    move,
+    @"se-resize",
+};
+
 const default_size = 24;
 
 const log = std.log.scoped(.cursor);
@@ -75,6 +82,8 @@ seat: *Seat,
 wlr_cursor: *wlr.Cursor,
 pointer_gestures: *wlr.PointerGesturesV1,
 xcursor_manager: *wlr.XcursorManager,
+
+image: Image = .none,
 
 constraint: ?*wlr.PointerConstraintV1 = null,
 
@@ -204,8 +213,21 @@ pub fn handleViewUnmap(self: *Self, view: *View) void {
     }
 }
 
-fn clearFocus(self: Self) void {
-    self.xcursor_manager.setCursorImage("left_ptr", self.wlr_cursor);
+/// It seems that setCursorImage is actually fairly expensive to call repeatedly
+/// as it does no checks to see if the the given image is already set. Therefore,
+/// do that check here.
+fn setImage(self: *Self, image: Image) void {
+    if (image == self.image) return;
+    self.image = image;
+
+    // TODO: this is a workaround until updating to zig 0.9.0
+    const image_z = util.gpa.dupeZ(u8, @tagName(image)) catch return;
+    defer util.gpa.free(image_z);
+    self.xcursor_manager.setCursorImage(image_z, self.wlr_cursor);
+}
+
+fn clearFocus(self: *Self) void {
+    self.setImage(.left_ptr);
     self.seat.wlr_seat.pointerNotifyClearFocus();
 }
 
@@ -699,10 +721,7 @@ pub fn enterMode(self: *Self, mode: std.meta.Tag((Mode)), view: *View) void {
             // Clear cursor focus, so that the surface does not receive events
             self.seat.wlr_seat.pointerNotifyClearFocus();
 
-            self.xcursor_manager.setCursorImage(
-                if (mode == .move) "move" else "se-resize",
-                self.wlr_cursor,
-            );
+            self.setImage(if (mode == .move) .move else .@"se-resize");
         },
     }
 }
