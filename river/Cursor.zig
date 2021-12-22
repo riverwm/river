@@ -65,7 +65,8 @@ const Mode = union(enum) {
 };
 
 const Image = enum {
-    none,
+    /// The current image of the cursor is unknown, perhaps because it was set by a client.
+    unknown,
     left_ptr,
     move,
     @"se-resize",
@@ -83,7 +84,7 @@ wlr_cursor: *wlr.Cursor,
 pointer_gestures: *wlr.PointerGesturesV1,
 xcursor_manager: *wlr.XcursorManager,
 
-image: Image = .none,
+image: Image = .unknown,
 
 constraint: ?*wlr.PointerConstraintV1 = null,
 
@@ -217,6 +218,8 @@ pub fn handleViewUnmap(self: *Self, view: *View) void {
 /// as it does no checks to see if the the given image is already set. Therefore,
 /// do that check here.
 fn setImage(self: *Self, image: Image) void {
+    assert(image != .unknown);
+
     if (image == self.image) return;
     self.image = image;
 
@@ -455,6 +458,7 @@ fn handleRequestSetCursor(
         // cursor moves between outputs.
         log.debug("focused client set cursor", .{});
         self.wlr_cursor.setSurface(event.surface, event.hotspot_x, event.hotspot_y);
+        self.image = .unknown;
     }
 }
 
