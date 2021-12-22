@@ -74,6 +74,8 @@ pub fn create(wlr_subsurface: *wlr.Subsurface, parent: Parent) void {
     wlr_subsurface.events.unmap.add(&subsurface.unmap);
     wlr_subsurface.surface.events.new_subsurface.add(&subsurface.new_subsurface);
 
+    if (wlr_subsurface.mapped) wlr_subsurface.surface.events.commit.add(&subsurface.commit);
+
     Subsurface.handleExisting(wlr_subsurface.surface, parent);
 }
 
