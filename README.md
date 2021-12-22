@@ -7,9 +7,10 @@ Join us at [#river](https://web.libera.chat/?channels=#river)
 on irc.libera.chat. Read our man pages and our
 [wiki](https://github.com/riverwm/river/wiki).
 
-*Note: river is currently early in development. Expect breaking changes
-and missing features. If you run into a bug don't hesitate to
-[open an issue](https://github.com/riverwm/river/issues/new)*
+*Note: river is currently early in development. Expect breaking
+changes and missing features. Bugs should however be rare at
+this point, if you run into one don't hesitate to [open an
+issue](https://github.com/riverwm/river/issues/new)*
 
 ## Design goals
 
