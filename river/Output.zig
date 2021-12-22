@@ -317,7 +317,7 @@ fn arrangeLayer(
             );
             // This will cause the output to be rearranged, so it's fine to
             // stop this attempt early.
-            layer_surface.wlr_layer_surface.close();
+            layer_surface.wlr_layer_surface.destroy();
             return;
         } else if (current_state.desired_width == 0) {
             std.debug.assert(current_state.anchor.right and current_state.anchor.left);
@@ -342,7 +342,7 @@ fn arrangeLayer(
                 "margins of layer surface '{s}' are too large to be reasonably handled. Closing.",
                 .{layer_surface.wlr_layer_surface.namespace},
             );
-            layer_surface.wlr_layer_surface.close();
+            layer_surface.wlr_layer_surface.destroy();
             // This will cause the output to be rearranged, so it's fine to
             // stop this attempt early.
             return;
