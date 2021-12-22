@@ -219,7 +219,7 @@ fn handleNewLayerSurface(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_
         const output = self.input_manager.defaultSeat().focused_output;
         if (output == &self.root.noop_output) {
             log.err("no output available for layer surface '{s}'", .{wlr_layer_surface.namespace});
-            wlr_layer_surface.close();
+            wlr_layer_surface.destroy();
             return;
         }
 

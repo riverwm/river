@@ -179,15 +179,8 @@ pub fn removeOutput(self: *Self, output: *Output) void {
 
     // Close all layer surfaces on the removed output
     for (output.layers) |*layer| {
-        // Closing the layer surface will cause LayerSurface.handleUnmap()
-        // to be called synchronously, which will remove it from this list.
-        while (layer.first) |layer_node| {
-            const layer_surface = &layer_node.data;
-
-            layer_surface.wlr_layer_surface.close();
-            layer_surface.wlr_layer_surface.output = null;
-            layer_surface.output = undefined;
-        }
+        // Destroying the layer surface will cause it to be removed from this list.
+        while (layer.first) |layer_node| layer_node.data.wlr_layer_surface.destroy();
     }
 
     // If any seat has the removed output focused, focus the fallback one
