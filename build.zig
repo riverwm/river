@@ -157,6 +157,8 @@ pub fn build(b: *zbs.Builder) !void {
         b.installFile(file, "share/pkgconfig/river-protocols.pc");
     }
 
+    b.installFile("river.desktop", "share/wayland-sessions/river.desktop");
+
     if (man_pages) {
         const scdoc_step = ScdocStep.create(b);
         try scdoc_step.install();
