@@ -40,7 +40,6 @@ const log = std.log.scoped(.input_manager);
 new_input: wl.Listener(*wlr.InputDevice) = wl.Listener(*wlr.InputDevice).init(handleNewInput),
 
 idle: *wlr.Idle,
-input_inhibit_manager: *wlr.InputInhibitManager,
 pointer_constraints: *wlr.PointerConstraintsV1,
 relative_pointer_manager: *wlr.RelativePointerManagerV1,
 virtual_pointer_manager: *wlr.VirtualPointerManagerV1,
@@ -52,10 +51,6 @@ seats: std.TailQueue(Seat) = .{},
 
 exclusive_client: ?*wl.Client = null,
 
-inhibit_activate: wl.Listener(*wlr.InputInhibitManager) =
-    wl.Listener(*wlr.InputInhibitManager).init(handleInhibitActivate),
-inhibit_deactivate: wl.Listener(*wlr.InputInhibitManager) =
-    wl.Listener(*wlr.InputInhibitManager).init(handleInhibitDeactivate),
 new_pointer_constraint: wl.Listener(*wlr.PointerConstraintV1) =
     wl.Listener(*wlr.PointerConstraintV1).init(handleNewPointerConstraint),
 new_virtual_pointer: wl.Listener(*wlr.VirtualPointerManagerV1.event.NewPointer) =
@@ -70,7 +65,6 @@ pub fn init(self: *Self) !void {
     self.* = .{
         // These are automatically freed when the display is destroyed
         .idle = try wlr.Idle.create(server.wl_server),
-        .input_inhibit_manager = try wlr.InputInhibitManager.create(server.wl_server),
         .pointer_constraints = try wlr.PointerConstraintsV1.create(server.wl_server),
         .relative_pointer_manager = try wlr.RelativePointerManagerV1.create(server.wl_server),
         .virtual_pointer_manager = try wlr.VirtualPointerManagerV1.create(server.wl_server),
@@ -87,8 +81,6 @@ pub fn init(self: *Self) !void {
     if (build_options.xwayland) server.xwayland.setSeat(self.defaultSeat().wlr_seat);
 
     server.backend.events.new_input.add(&self.new_input);
-    self.input_inhibit_manager.events.activate.add(&self.inhibit_activate);
-    self.input_inhibit_manager.events.deactivate.add(&self.inhibit_deactivate);
     self.pointer_constraints.events.new_constraint.add(&self.new_pointer_constraint);
     self.virtual_pointer_manager.events.new_virtual_pointer.add(&self.new_virtual_pointer);
     self.virtual_keyboard_manager.events.new_virtual_keyboard.add(&self.new_virtual_keyboard);
@@ -124,56 +116,6 @@ pub fn inputAllowed(self: Self, wlr_surface: *wlr.Surface) bool {
 pub fn updateCursorState(self: Self) void {
     var it = self.seats.first;
     while (it) |node| : (it = node.next) node.data.cursor.updateState();
-}
-
-fn handleInhibitActivate(
-    listener: *wl.Listener(*wlr.InputInhibitManager),
-    _: *wlr.InputInhibitManager,
-) void {
-    const self = @fieldParentPtr(Self, "inhibit_activate", listener);
-
-    log.debug("input inhibitor activated", .{});
-
-    var seat_it = self.seats.first;
-    while (seat_it) |seat_node| : (seat_it = seat_node.next) {
-        // Clear focus of all seats
-        seat_node.data.setFocusRaw(.{ .none = {} });
-
-        // Enter locked mode
-        seat_node.data.prev_mode_id = seat_node.data.mode_id;
-        seat_node.data.enterMode(1);
-    }
-
-    self.exclusive_client = self.input_inhibit_manager.active_client;
-}
-
-fn handleInhibitDeactivate(
-    listener: *wl.Listener(*wlr.InputInhibitManager),
-    _: *wlr.InputInhibitManager,
-) void {
-    const self = @fieldParentPtr(Self, "inhibit_deactivate", listener);
-
-    log.debug("input inhibitor deactivated", .{});
-
-    self.exclusive_client = null;
-
-    // Calling arrangeLayers() like this ensures that any top or overlay,
-    // keyboard-interactive surfaces will re-grab focus.
-    var output_it = server.root.outputs.first;
-    while (output_it) |output_node| : (output_it = output_node.next) {
-        output_node.data.arrangeLayers(.mapped);
-    }
-
-    // After ensuring that any possible layer surface focus grab has occured,
-    // have each Seat handle focus and enter their previous mode.
-    var seat_it = self.seats.first;
-    while (seat_it) |seat_node| : (seat_it = seat_node.next) {
-        const seat = &seat_node.data;
-        seat.enterMode(seat.prev_mode_id);
-        seat.focus(null);
-    }
-
-    server.root.startTransaction();
 }
 
 fn handleNewInput(listener: *wl.Listener(*wlr.InputDevice), wlr_device: *wlr.InputDevice) void {

@@ -223,51 +223,46 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
         .none => null,
     };
 
-    // If input is not allowed on the target surface (e.g. due to an active
-    // input inhibitor) do not set focus. If there is no target surface we
-    // still clear the focus.
-    if (if (target_surface) |wlr_surface| server.input_manager.inputAllowed(wlr_surface) else true) {
-        // First clear the current focus
-        switch (self.focused) {
-            .view => |view| {
-                view.pending.focus -= 1;
-                if (view.pending.focus == 0) view.setActivated(false);
-            },
-            .xwayland_override_redirect, .layer, .none => {},
+    // First clear the current focus
+    switch (self.focused) {
+        .view => |view| {
+            view.pending.focus -= 1;
+            if (view.pending.focus == 0) view.setActivated(false);
+        },
+        .xwayland_override_redirect, .layer, .none => {},
+    }
+
+    // Set the new focus
+    switch (new_focus) {
+        .view => |target_view| {
+            assert(self.focused_output == target_view.output);
+            if (target_view.pending.focus == 0) target_view.setActivated(true);
+            target_view.pending.focus += 1;
+            target_view.pending.urgent = false;
+        },
+        .layer => |target_layer| assert(self.focused_output == target_layer.output),
+        .xwayland_override_redirect, .none => {},
+    }
+    self.focused = new_focus;
+
+    // Send keyboard enter/leave events and handle pointer constraints
+    if (target_surface) |wlr_surface| {
+        self.keyboardNotifyEnter(wlr_surface);
+
+        if (server.input_manager.pointer_constraints.constraintForSurface(wlr_surface, self.wlr_seat)) |constraint| {
+            @intToPtr(*PointerConstraint, constraint.data).setAsActive();
+        } else if (self.cursor.constraint) |constraint| {
+            PointerConstraint.warpToHint(&self.cursor);
+            constraint.sendDeactivated();
+            self.cursor.constraint = null;
         }
+    } else {
+        self.wlr_seat.keyboardClearFocus();
 
-        // Set the new focus
-        switch (new_focus) {
-            .view => |target_view| {
-                assert(self.focused_output == target_view.output);
-                if (target_view.pending.focus == 0) target_view.setActivated(true);
-                target_view.pending.focus += 1;
-                target_view.pending.urgent = false;
-            },
-            .layer => |target_layer| assert(self.focused_output == target_layer.output),
-            .xwayland_override_redirect, .none => {},
-        }
-        self.focused = new_focus;
-
-        // Send keyboard enter/leave events and handle pointer constraints
-        if (target_surface) |wlr_surface| {
-            self.keyboardNotifyEnter(wlr_surface);
-
-            if (server.input_manager.pointer_constraints.constraintForSurface(wlr_surface, self.wlr_seat)) |constraint| {
-                @intToPtr(*PointerConstraint, constraint.data).setAsActive();
-            } else if (self.cursor.constraint) |constraint| {
-                PointerConstraint.warpToHint(&self.cursor);
-                constraint.sendDeactivated();
-                self.cursor.constraint = null;
-            }
-        } else {
-            self.wlr_seat.keyboardClearFocus();
-
-            if (self.cursor.constraint) |constraint| {
-                PointerConstraint.warpToHint(&self.cursor);
-                constraint.sendDeactivated();
-                self.cursor.constraint = null;
-            }
+        if (self.cursor.constraint) |constraint| {
+            PointerConstraint.warpToHint(&self.cursor);
+            constraint.sendDeactivated();
+            self.cursor.constraint = null;
         }
     }
 
