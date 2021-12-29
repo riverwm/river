@@ -916,13 +916,8 @@ fn passthrough(self: *Self, time: u32) void {
     assert(self.mode == .passthrough);
 
     if (self.surfaceAt()) |result| {
-        // If input is allowed on the surface, send pointer enter and motion
-        // events. Note that wlroots won't actually send an enter event if
-        // the surface has already been entered.
-        if (server.input_manager.inputAllowed(result.surface)) {
-            self.seat.wlr_seat.pointerNotifyEnter(result.surface, result.sx, result.sy);
-            self.seat.wlr_seat.pointerNotifyMotion(time, result.sx, result.sy);
-        }
+        self.seat.wlr_seat.pointerNotifyEnter(result.surface, result.sx, result.sy);
+        self.seat.wlr_seat.pointerNotifyMotion(time, result.sx, result.sy);
     } else {
         // There is either no surface under the cursor or input is disallowed
         // Reset the cursor image to the default and clear focus.
