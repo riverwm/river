@@ -42,7 +42,19 @@ const XwaylandUnmanaged = @import("XwaylandUnmanaged.zig");
 
 const Mode = union(enum) {
     passthrough: void,
-    down: *View,
+    down: struct {
+        // TODO: To handle the surface with pointer focus being moved during
+        // down mode we need to store the starting location of the surface as
+        // well and take that into account. This is currently not at all easy
+        // to do, but moing to the wlroots scene graph will allow us to fix this.
+
+        // Initial cursor position in layout coordinates
+        lx: f64,
+        ly: f64,
+        // Initial cursor position in surface-local coordinates
+        sx: f64,
+        sy: f64,
+    },
     move: struct {
         view: *View,
         /// View coordinates are stored as i32s as they are in logical pixels.
@@ -204,8 +216,7 @@ pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
 
 pub fn handleViewUnmap(self: *Self, view: *View) void {
     if (switch (self.mode) {
-        .passthrough => false,
-        .down => |target_view| target_view == view,
+        .passthrough, .down => false,
         .move => |data| data.view == view,
         .resize => |data| data.view == view,
     }) {
@@ -255,29 +266,33 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
 
     self.seat.handleActivity();
 
-    if (event.state == .pressed) {
-        self.pressed_count += 1;
-    } else {
+    if (event.state == .released) {
         std.debug.assert(self.pressed_count > 0);
         self.pressed_count -= 1;
         if (self.pressed_count == 0 and self.mode != .passthrough) {
             self.leaveMode(event);
-            return;
+        } else {
+            _ = self.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
         }
+        return;
+    }
+
+    assert(event.state == .pressed);
+    self.pressed_count += 1;
+
+    if (self.pressed_count > 1) {
+        _ = self.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
+        return;
     }
 
     if (self.surfaceAt()) |result| {
         switch (result.parent) {
             .view => |view| {
-                // If a view has been clicked on, give that view keyboard focus and
-                // perhaps enter move/resize mode.
-                if (event.state == .pressed and self.pressed_count == 1) {
-                    // If there is an active mapping for this button which is
-                    // handled we are done here
-                    if (self.handlePointerMapping(event, view)) return;
-                    // Otherwise enter cursor down mode, giving keyboard focus
-                    self.enterMode(.down, view);
-                }
+                // If there is an active mapping for this button which is
+                // handled we are done here
+                if (self.handlePointerMapping(event, view)) return;
+                // Otherwise focus the view
+                self.seat.focus(view);
             },
             .layer_surface => |layer_surface| {
                 self.seat.focusOutput(layer_surface.output);
@@ -288,11 +303,21 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
                 } else {
                     self.seat.focus(null);
                 }
-                server.root.startTransaction();
             },
             .xwayland_unmanaged => assert(build_options.xwayland),
         }
         _ = self.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
+
+        self.mode = .{
+            .down = .{
+                .lx = self.wlr_cursor.x,
+                .ly = self.wlr_cursor.y,
+                .sx = result.sx,
+                .sy = result.sy,
+            },
+        };
+
+        server.root.startTransaction();
     } else if (server.root.output_layout.outputAt(self.wlr_cursor.x, self.wlr_cursor.y)) |wlr_output| {
         // If the user clicked on empty space of an output, focus it.
         const output = @intToPtr(*Output, wlr_output.data);
@@ -680,52 +705,42 @@ fn surfaceAtFilter(view: *View, filter_tags: u32) bool {
     return view.surface != null and view.current.tags & filter_tags != 0;
 }
 
-pub fn enterMode(self: *Self, mode: std.meta.Tag((Mode)), view: *View) void {
+pub fn enterMode(self: *Self, mode: enum { move, resize }, view: *View) void {
     log.debug("enter {s} cursor mode", .{@tagName(mode)});
 
     self.seat.focus(view);
 
     switch (mode) {
-        .passthrough => unreachable,
-        .down => {
-            self.mode = .{ .down = view };
-            server.root.startTransaction();
-        },
-        .move, .resize => {
-            switch (mode) {
-                .passthrough, .down => unreachable,
-                .move => self.mode = .{ .move = .{ .view = view } },
-                .resize => {
-                    const cur_box = &view.current.box;
-                    self.mode = .{ .resize = .{
-                        .view = view,
-                        .offset_x = cur_box.x + @intCast(i32, cur_box.width) - @floatToInt(i32, self.wlr_cursor.x),
-                        .offset_y = cur_box.y + @intCast(i32, cur_box.height) - @floatToInt(i32, self.wlr_cursor.y),
-                    } };
-                    view.setResizing(true);
-                },
-            }
-
-            // Automatically float all views being moved by the pointer, if
-            // their dimensions are set by a layout generator. If however the views
-            // are unarranged, leave them as non-floating so the next active
-            // layout can affect them.
-            if (!view.current.float and view.output.current.layout != null) {
-                view.pending.float = true;
-                view.float_box = view.current.box;
-                view.applyPending();
-            } else {
-                // The View.applyPending() call in the other branch starts
-                // the transaction needed after the seat.focus() call above.
-                server.root.startTransaction();
-            }
-
-            // Clear cursor focus, so that the surface does not receive events
-            self.seat.wlr_seat.pointerNotifyClearFocus();
-
-            self.setImage(if (mode == .move) .move else .@"se-resize");
+        .move => self.mode = .{ .move = .{ .view = view } },
+        .resize => {
+            const cur_box = &view.current.box;
+            self.mode = .{ .resize = .{
+                .view = view,
+                .offset_x = cur_box.x + @intCast(i32, cur_box.width) - @floatToInt(i32, self.wlr_cursor.x),
+                .offset_y = cur_box.y + @intCast(i32, cur_box.height) - @floatToInt(i32, self.wlr_cursor.y),
+            } };
+            view.setResizing(true);
         },
     }
+
+    // Automatically float all views being moved by the pointer, if
+    // their dimensions are set by a layout generator. If however the views
+    // are unarranged, leave them as non-floating so the next active
+    // layout can affect them.
+    if (!view.current.float and view.output.current.layout != null) {
+        view.pending.float = true;
+        view.float_box = view.current.box;
+        view.applyPending();
+    } else {
+        // The View.applyPending() call in the other branch starts
+        // the transaction needed after the seat.focus() call above.
+        server.root.startTransaction();
+    }
+
+    // Clear cursor focus, so that the surface does not receive events
+    self.seat.wlr_seat.pointerNotifyClearFocus();
+
+    self.setImage(if (mode == .move) .move else .@"se-resize");
 }
 
 /// Return from down/move/resize to passthrough
@@ -783,14 +798,12 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
             self.checkFocusFollowsCursor();
             self.passthrough(time);
         },
-        .down => |view| {
+        .down => |down| {
             self.wlr_cursor.move(device, dx, dy);
-            // This takes surface-local coordinates
-            const output_box = server.root.output_layout.getBox(view.output.wlr_output).?;
             self.seat.wlr_seat.pointerNotifyMotion(
                 time,
-                self.wlr_cursor.x - @intToFloat(f64, output_box.x + view.current.box.x - view.surface_box.x),
-                self.wlr_cursor.y - @intToFloat(f64, output_box.y + view.current.box.y - view.surface_box.y),
+                down.sx + (self.wlr_cursor.x - down.lx),
+                down.sy + (self.wlr_cursor.y - down.ly),
             );
         },
         .move => |*data| {
@@ -882,9 +895,11 @@ fn shouldPassthrough(self: Self) bool {
             // target view.
             return true;
         },
-        .down => |target| {
-            // The target view is no longer visible
-            return target.current.tags & target.output.current.tags == 0;
+        .down => {
+            // TODO: It's hard to determine from the target surface alone whether
+            // the surface is visible or not currently. Switching to the wlroots
+            // scene graph will fix this, but for now just don't bother.
+            return false;
         },
         .resize, .move => {
             const target = if (self.mode == .resize) self.mode.resize.view else self.mode.move.view;
