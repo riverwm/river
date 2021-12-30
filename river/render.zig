@@ -63,6 +63,35 @@ pub fn renderOutput(output: *Output) void {
 
     server.renderer.begin(@intCast(u32, output.wlr_output.width), @intCast(u32, output.wlr_output.height));
 
+    if (server.lock_manager.locked) {
+        server.renderer.clear(&[_]f32{ 0, 0, 0, 1 }); // solid black
+
+        // TODO: this isn't frame-perfect if the output mode is changed. We
+        // could possibly delay rendering new frames after the mode change
+        // until the surface commits a buffer of the correct size.
+        if (output.lock_surface) |lock_surface| {
+            var rdata = SurfaceRenderData{
+                .output = output,
+                .output_x = 0,
+                .output_y = 0,
+                .when = &now,
+            };
+            lock_surface.wlr_lock_surface.surface.forEachSurface(
+                *SurfaceRenderData,
+                renderSurfaceIterator,
+                &rdata,
+            );
+        }
+
+        renderDragIcons(output, &now);
+
+        output.wlr_output.renderSoftwareCursors(null);
+        server.renderer.end();
+        output.wlr_output.commit() catch
+            log.err("output commit failed for {s}", .{output.wlr_output.name});
+        return;
+    }
+
     // Find the first visible fullscreen view in the stack if there is one
     var it = ViewStack(View).iter(output.views.first, .forward, output.current.tags, renderFilter);
     const fullscreen_view = while (it.next()) |view| {
@@ -131,19 +160,10 @@ pub fn renderOutput(output: *Output) void {
 
     renderDragIcons(output, &now);
 
-    // Hardware cursors are rendered by the GPU on a separate plane, and can be
-    // moved around without re-rendering what's beneath them - which is more
-    // efficient. However, not all hardware supports hardware cursors. For this
-    // reason, wlroots provides a software fallback, which we ask it to render
-    // here. wlr_cursor handles configuring hardware vs software cursors for you,
-    // and this function is a no-op when hardware cursors are in use.
     output.wlr_output.renderSoftwareCursors(null);
 
-    // Conclude rendering and swap the buffers, showing the final frame
-    // on-screen.
     server.renderer.end();
 
-    // TODO: handle failure
     output.wlr_output.commit() catch
         log.err("output commit failed for {s}", .{output.wlr_output.name});
 }

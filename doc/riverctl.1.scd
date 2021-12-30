@@ -154,11 +154,11 @@ are ignored by river.
 
 ## MAPPINGS
 
-Mappings are modal in river. Each mapping is associated with a mode and is
-only active while in that mode. There are two special modes: "normal" and
-"locked". The normal mode is the initial mode on startup. The locked mode
-is automatically entered while a lock screen is active. It cannot be entered
-or exited manually.
+Mappings are modal in river. Each mapping is associated with a mode and
+is only active while in that mode. There are two special modes: "normal"
+and "locked". The normal mode is the initial mode on startup. The locked
+mode is automatically entered while the session is locked (e.g. due to
+a screenlocker). It cannot be entered or exited manually.
 
 The following modifiers are available for use in mappings:
 

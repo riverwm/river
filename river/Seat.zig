@@ -35,6 +35,7 @@ const Keyboard = @import("Keyboard.zig");
 const KeyboardGroup = @import("KeyboardGroup.zig");
 const KeycodeSet = @import("KeycodeSet.zig");
 const LayerSurface = @import("LayerSurface.zig");
+const LockSurface = @import("LockSurface.zig");
 const Mapping = @import("Mapping.zig");
 const Output = @import("Output.zig");
 const SeatStatus = @import("SeatStatus.zig");
@@ -50,6 +51,7 @@ const FocusTarget = union(enum) {
     view: *View,
     xwayland_override_redirect: *XwaylandOverrideRedirect,
     layer: *LayerSurface,
+    lock_surface: *LockSurface,
     none: void,
 };
 
@@ -76,7 +78,6 @@ keyboard_groups: std.TailQueue(KeyboardGroup) = .{},
 /// is currently available for focus.
 focused_output: *Output,
 
-/// Currently focused view/layer surface if any
 focused: FocusTarget = .none,
 
 /// Stack of views in most recently focused order
@@ -149,6 +150,9 @@ pub fn deinit(self: *Self) void {
 pub fn focus(self: *Self, _target: ?*View) void {
     var target = _target;
 
+    // Views may not recieve focus while locked.
+    if (server.lock_manager.locked) return;
+
     // While a layer surface is focused, views may not recieve focus
     if (self.focused == .layer) return;
 
@@ -220,6 +224,7 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
             break :blk target_override_redirect.xwayland_surface.surface;
         },
         .layer => |target_layer| target_layer.wlr_layer_surface.surface,
+        .lock_surface => |lock_surface| lock_surface.wlr_lock_surface.surface,
         .none => null,
     };
 
@@ -229,18 +234,23 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
             view.pending.focus -= 1;
             if (view.pending.focus == 0) view.setActivated(false);
         },
-        .xwayland_override_redirect, .layer, .none => {},
+        .xwayland_override_redirect, .layer, .lock_surface, .none => {},
     }
 
     // Set the new focus
     switch (new_focus) {
         .view => |target_view| {
+            assert(!server.lock_manager.locked);
             assert(self.focused_output == target_view.output);
             if (target_view.pending.focus == 0) target_view.setActivated(true);
             target_view.pending.focus += 1;
             target_view.pending.urgent = false;
         },
-        .layer => |target_layer| assert(self.focused_output == target_layer.output),
+        .layer => |target_layer| {
+            assert(!server.lock_manager.locked);
+            assert(self.focused_output == target_layer.output);
+        },
+        .lock_surface => assert(server.lock_manager.locked),
         .xwayland_override_redirect, .none => {},
     }
     self.focused = new_focus;
