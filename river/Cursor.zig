@@ -33,6 +33,7 @@ const util = @import("util.zig");
 const Box = @import("Box.zig");
 const Config = @import("Config.zig");
 const LayerSurface = @import("LayerSurface.zig");
+const LockSurface = @import("LockSurface.zig");
 const Output = @import("Output.zig");
 const Seat = @import("Seat.zig");
 const View = @import("View.zig");
@@ -286,8 +287,12 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
     }
 
     if (self.surfaceAt()) |result| {
+        // TODO if result.surface is a subsurface/popup keyboard focus is still given
+        // to the main surface of the parent. This needs to be fixed in focus()/setFocusRaw().
         switch (result.parent) {
             .view => |view| {
+                assert(!server.lock_manager.locked);
+
                 // If there is an active mapping for this button which is
                 // handled we are done here
                 if (self.handlePointerMapping(event, view)) return;
@@ -295,6 +300,8 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
                 self.seat.focus(view);
             },
             .layer_surface => |layer_surface| {
+                assert(!server.lock_manager.locked);
+
                 self.seat.focusOutput(layer_surface.output);
                 // If a keyboard inteactive layer surface has been clicked on,
                 // give it keyboard focus.
@@ -304,7 +311,14 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
                     self.seat.focus(null);
                 }
             },
-            .xwayland_unmanaged => assert(build_options.xwayland),
+            .lock_surface => |lock_surface| {
+                assert(server.lock_manager.locked);
+                self.seat.setFocusRaw(.{ .lock_surface = lock_surface });
+            },
+            .xwayland_unmanaged => {
+                assert(!server.lock_manager.locked);
+                assert(build_options.xwayland);
+            },
         }
         _ = self.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
 
@@ -318,12 +332,14 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
         };
 
         server.root.startTransaction();
-    } else if (server.root.output_layout.outputAt(self.wlr_cursor.x, self.wlr_cursor.y)) |wlr_output| {
-        // If the user clicked on empty space of an output, focus it.
-        const output = @intToPtr(*Output, wlr_output.data);
-        self.seat.focusOutput(output);
-        self.seat.focus(null);
-        server.root.startTransaction();
+    } else if (!server.lock_manager.locked) {
+        if (server.root.output_layout.outputAt(self.wlr_cursor.x, self.wlr_cursor.y)) |wlr_output| {
+            // If the user clicked on empty space of an output, focus it.
+            const output = @intToPtr(*Output, wlr_output.data);
+            self.seat.focusOutput(output);
+            self.seat.focus(null);
+            server.root.startTransaction();
+        }
     }
 }
 
@@ -494,6 +510,7 @@ const SurfaceAtResult = struct {
     parent: union(enum) {
         view: *View,
         layer_surface: *LayerSurface,
+        lock_surface: *LockSurface,
         xwayland_unmanaged: if (build_options.xwayland) *XwaylandUnmanaged else void,
     },
 };
@@ -511,6 +528,22 @@ pub fn surfaceAt(self: Self) ?SurfaceAtResult {
     var ox = lx;
     var oy = ly;
     server.root.output_layout.outputCoords(wlr_output, &ox, &oy);
+
+    if (server.lock_manager.locked) {
+        if (output.lock_surface) |lock_surface| {
+            var sx: f64 = undefined;
+            var sy: f64 = undefined;
+            if (lock_surface.wlr_lock_surface.surface.surfaceAt(ox, oy, &sx, &sy)) |found| {
+                return SurfaceAtResult{
+                    .surface = found,
+                    .sx = sx,
+                    .sy = sy,
+                    .parent = .{ .lock_surface = lock_surface },
+                };
+            }
+        }
+        return null;
+    }
 
     // Find the first visible fullscreen view in the stack if there is one
     var it = ViewStack(View).iter(output.views.first, .forward, output.current.tags, surfaceAtFilter);
@@ -866,7 +899,7 @@ pub fn checkFocusFollowsCursor(self: *Self) void {
                         server.root.startTransaction();
                     }
                 },
-                .layer_surface => {},
+                .layer_surface, .lock_surface => {},
                 .xwayland_unmanaged => assert(build_options.xwayland),
             }
         }
@@ -902,6 +935,7 @@ fn shouldPassthrough(self: Self) bool {
             return false;
         },
         .resize, .move => {
+            assert(!server.lock_manager.locked);
             const target = if (self.mode == .resize) self.mode.resize.view else self.mode.move.view;
             // The target view is no longer visible, is part of the layout, or is fullscreen.
             return target.current.tags & target.output.current.tags == 0 or
@@ -916,6 +950,7 @@ fn passthrough(self: *Self, time: u32) void {
     assert(self.mode == .passthrough);
 
     if (self.surfaceAt()) |result| {
+        assert((result.parent == .lock_surface) == server.lock_manager.locked);
         self.seat.wlr_seat.pointerNotifyEnter(result.surface, result.sx, result.sy);
         self.seat.wlr_seat.pointerNotifyMotion(time, result.sx, result.sy);
     } else {

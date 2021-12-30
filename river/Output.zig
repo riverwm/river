@@ -33,6 +33,7 @@ const Box = @import("Box.zig");
 const LayerSurface = @import("LayerSurface.zig");
 const Layout = @import("Layout.zig");
 const LayoutDemand = @import("LayoutDemand.zig");
+const LockSurface = @import("LockSurface.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const OutputStatus = @import("OutputStatus.zig");
@@ -66,6 +67,8 @@ usable_box: Box,
 
 /// The top of the stack is the "most important" view.
 views: ViewStack(View) = .{},
+
+lock_surface: ?*LockSurface = null,
 
 /// The double-buffered state of the output.
 current: State = State{ .tags = 1 << 0 },

@@ -76,7 +76,7 @@ pub fn create(wlr_xdg_popup: *wlr.XdgPopup, parent: Parent) void {
             };
             wlr_xdg_popup.unconstrainFromBox(&box);
         },
-        .drag_icon => unreachable,
+        .drag_icon, .lock_surface => unreachable,
     }
 
     wlr_xdg_popup.base.events.destroy.add(&xdg_popup.surface_destroy);

@@ -26,17 +26,20 @@ const util = @import("util.zig");
 
 const DragIcon = @import("DragIcon.zig");
 const LayerSurface = @import("LayerSurface.zig");
+const LockSurface = @import("LockSurface.zig");
 const XdgToplevel = @import("XdgToplevel.zig");
 
 pub const Parent = union(enum) {
     xdg_toplevel: *XdgToplevel,
     layer_surface: *LayerSurface,
+    lock_surface: *LockSurface,
     drag_icon: *DragIcon,
 
     pub fn damageWholeOutput(parent: Parent) void {
         switch (parent) {
             .xdg_toplevel => |xdg_toplevel| xdg_toplevel.view.output.damage.addWhole(),
             .layer_surface => |layer_surface| layer_surface.output.damage.addWhole(),
+            .lock_surface => |lock_surface| lock_surface.output().damage.addWhole(),
             .drag_icon => |_| {
                 var it = server.root.outputs.first;
                 while (it) |node| : (it = node.next) node.data.damage.addWhole();
