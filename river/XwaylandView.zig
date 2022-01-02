@@ -91,6 +91,7 @@ pub fn close(self: Self) void {
 
 pub fn setActivated(self: Self, activated: bool) void {
     self.xwayland_surface.activate(activated);
+    self.xwayland_surface.restack(null, .above);
 }
 
 pub fn setFullscreen(self: Self, fullscreen: bool) void {
