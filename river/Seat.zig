@@ -128,6 +128,12 @@ pub fn deinit(self: *Self) void {
         self.focus_stack.remove(node);
         util.gpa.destroy(node);
     }
+
+    self.request_set_selection.link.remove();
+    self.request_start_drag.link.remove();
+    self.start_drag.link.remove();
+    if (self.pointer_drag) self.pointer_drag_destroy.link.remove();
+    self.request_set_primary_selection.link.remove();
 }
 
 /// Set the current focus. If a visible view is passed it will be focused.
