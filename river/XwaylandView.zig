@@ -48,6 +48,8 @@ set_title: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface)
 set_class: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleSetClass),
 request_fullscreen: wl.Listener(*wlr.XwaylandSurface) =
     wl.Listener(*wlr.XwaylandSurface).init(handleRequestFullscreen),
+request_minimize: wl.Listener(*wlr.XwaylandSurface.event.Minimize) =
+    wl.Listener(*wlr.XwaylandSurface.event.Minimize).init(handleRequestMinimize),
 
 pub fn init(self: *Self, view: *View, xwayland_surface: *wlr.XwaylandSurface) void {
     self.* = .{ .view = view, .xwayland_surface = xwayland_surface };
@@ -90,6 +92,10 @@ pub fn close(self: Self) void {
 }
 
 pub fn setActivated(self: Self, activated: bool) void {
+    // See comment on handleRequestMinimize() for details
+    if (activated and self.xwayland_surface.minimized) {
+        self.xwayland_surface.setMinimized(false);
+    }
     self.xwayland_surface.activate(activated);
     self.xwayland_surface.restack(null, .above);
 }
@@ -167,6 +173,7 @@ fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wl
     xwayland_surface.events.set_title.add(&self.set_title);
     xwayland_surface.events.set_class.add(&self.set_class);
     xwayland_surface.events.request_fullscreen.add(&self.request_fullscreen);
+    xwayland_surface.events.request_minimize.add(&self.request_minimize);
 
     view.surface = surface;
     self.view.surface_box = .{
@@ -217,6 +224,7 @@ fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSur
     self.set_title.link.remove();
     self.set_class.link.remove();
     self.request_fullscreen.link.remove();
+    self.request_minimize.link.remove();
 
     self.view.unmap();
 }
@@ -268,4 +276,16 @@ fn handleRequestFullscreen(listener: *wl.Listener(*wlr.XwaylandSurface), xwaylan
     const self = @fieldParentPtr(Self, "request_fullscreen", listener);
     self.view.pending.fullscreen = xwayland_surface.fullscreen;
     self.view.applyPending();
+}
+
+/// Some X11 clients will minimize themselves regardless of how we respond.
+/// Therefore to ensure they don't get stuck in this minimized state we tell
+/// them their request has been honored without actually doing anything and
+/// unminimize them if they gain focus while minimized.
+fn handleRequestMinimize(
+    listener: *wl.Listener(*wlr.XwaylandSurface.event.Minimize),
+    event: *wlr.XwaylandSurface.event.Minimize,
+) void {
+    const self = @fieldParentPtr(Self, "request_minimize", listener);
+    self.xwayland_surface.setMinimized(event.minimize);
 }
