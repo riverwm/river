@@ -233,11 +233,7 @@ fn setImage(self: *Self, image: Image) void {
 
     if (image == self.image) return;
     self.image = image;
-
-    // TODO: this is a workaround until updating to zig 0.9.0
-    const image_z = util.gpa.dupeZ(u8, @tagName(image)) catch return;
-    defer util.gpa.free(image_z);
-    self.xcursor_manager.setCursorImage(image_z, self.wlr_cursor);
+    self.xcursor_manager.setCursorImage(@tagName(image), self.wlr_cursor);
 }
 
 fn clearFocus(self: *Self) void {
