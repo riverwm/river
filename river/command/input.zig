@@ -204,6 +204,10 @@ pub fn input(
         const ret = c.libevdev_event_code_from_name(c.EV_KEY, args[3]);
         if (ret < 1) return Error.InvalidButton;
         input_config.scroll_button = InputConfig.ScrollButton{ .button = @intCast(u32, ret) };
+    } else if (mem.eql(u8, "scroll-factor", args[2])) {
+        input_config.scroll_factor = InputConfig.ScrollFactor{
+            .value = std.math.fabs(try std.fmt.parseFloat(f64, args[3])),
+        };
     } else {
         return Error.UnknownCommand;
     }

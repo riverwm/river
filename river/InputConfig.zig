@@ -265,6 +265,10 @@ pub const ScrollButton = struct {
     }
 };
 
+pub const ScrollFactor = struct {
+    value: f64
+};
+
 identifier: []const u8,
 
 event_state: ?EventState = null,
@@ -281,6 +285,7 @@ tap_button_map: ?TapButtonMap = null,
 pointer_accel: ?PointerAccel = null,
 scroll_method: ?ScrollMethod = null,
 scroll_button: ?ScrollButton = null,
+scroll_factor: ?ScrollFactor = null,
 
 pub fn deinit(self: *Self) void {
     util.gpa.free(self.identifier);

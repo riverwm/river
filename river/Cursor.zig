@@ -40,6 +40,8 @@ const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const XwaylandUnmanaged = @import("XwaylandUnmanaged.zig");
 
+const InputConfig = @import("InputConfig.zig");
+
 const Mode = union(enum) {
     passthrough: void,
     down: struct {
@@ -247,12 +249,14 @@ fn handleAxis(listener: *wl.Listener(*wlr.Pointer.event.Axis), event: *wlr.Point
 
     self.seat.handleActivity();
 
+    const scroll_factor = server.input_manager.input_configs.scroll_factor || 1.0;
+
     // Notify the client with pointer focus of the axis event.
     self.seat.wlr_seat.pointerNotifyAxis(
         event.time_msec,
         event.orientation,
-        event.delta,
-        event.delta_discrete,
+        scroll_factor * event.delta,
+        @floatToInt(i32, scroll_factor * @intToFloat(f64, event.delta_discrete)),
         event.source,
     );
 }
