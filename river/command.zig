@@ -72,6 +72,7 @@ const command_impls = std.ComptimeStringMap(
         .{ "send-to-previous-tags",     @import("command/tags.zig").sendToPreviousTags },
         .{ "set-cursor-warp",           @import("command/config.zig").setCursorWarp },
         .{ "set-focused-tags",          @import("command/tags.zig").setFocusedTags },
+        .{ "cycle-focused-tags",        @import("command/tags.zig").cycleFocusedTags },
         .{ "set-repeat",                @import("command/set_repeat.zig").setRepeat },
         .{ "set-view-tags",             @import("command/tags.zig").setViewTags },
         .{ "snap",                      @import("command/move.zig").snap },

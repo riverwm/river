@@ -19,6 +19,7 @@ const std = @import("std");
 
 const server = &@import("../main.zig").server;
 
+const Direction = @import("../command.zig").Direction;
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
@@ -37,6 +38,69 @@ pub fn setFocusedTags(
         seat.focus(null);
         server.root.startTransaction();
     }
+}
+
+/// Change focus to the tags by one tag.
+pub fn cycleFocusedTags(
+    _: std.mem.Allocator,
+    seat: *Seat,
+    args: []const [:0]const u8,
+    _: *?[]const u8,
+) Error!void {
+    if (args.len < 3) return Error.NotEnoughArguments;
+    if (args.len > 3) return Error.TooManyArguments;
+
+    const direction = std.meta.stringToEnum(Direction, args[1]) orelse return Error.InvalidDirection;
+    const n_tags: u32 = try std.fmt.parseInt(u32, args[2], 10);
+    var tags = seat.focused_output.pending.tags;
+    seat.focused_output.previous_tags = tags;
+
+    var new_tags = tags;
+    if (direction == Direction.next) {
+        var i: u6 = 0;
+        var mask: u32 = 1;
+        while (i < (n_tags - 1)) : (i += 1) {
+            mask <<= 1;
+        }
+
+        const wrap = ((tags & mask) != 0);
+
+        // If highest bit (last tag) is set => unset it
+        if (wrap) {
+            tags ^= mask;
+        }
+        new_tags = (tags << 1);
+
+        // If highest bit was set => set lowest bit to wrap to first tag
+        if (wrap) {
+            new_tags |= 0b1;
+        }
+    } else {
+        const wrap = ((tags & 0b1) != 0);
+
+        // If lowest bit is set (first tag) => unset it
+        if (wrap) {
+            tags ^= 0b1;
+        }
+        new_tags = (tags >> 1);
+
+        // If lowest bit was set => set highest bit to wrap to last tag
+        if (wrap) {
+            var i: u6 = 0;
+            var mask: u32 = 1;
+            while (i < (n_tags - 1)) : (i += 1) {
+                mask <<= 1;
+            }
+            new_tags |= mask;
+        }
+    }
+
+    seat.focused_output.pending.tags = new_tags;
+    seat.focused_output.arrangeViews();
+    seat.focus(null);
+    server.root.startTransaction();
+
+    seat.focused_output.previous_tags = seat.focused_output.pending.tags;
 }
 
 /// Set the spawn tagmask
