@@ -46,9 +46,13 @@ pub fn map(
 
     if (optionals.release and optionals.repeat) return Error.ConflictingOptions;
 
-    const mode_id = try modeNameToId(allocator, args[1 + offset], out);
-    const modifiers = try parseModifiers(allocator, args[2 + offset], out);
-    const keysym = try parseKeysym(allocator, args[3 + offset], out);
+    const mode_raw = args[1 + offset];
+    const modifiers_raw = args[2 + offset];
+    const keysym_raw = args[3 + offset];
+
+    const mode_id = try modeNameToId(allocator, mode_raw, out);
+    const modifiers = try parseModifiers(allocator, modifiers_raw, out);
+    const keysym = try parseKeysym(allocator, keysym_raw, out);
 
     const mode_mappings = &server.config.modes.items[mode_id].mappings;
 
@@ -58,6 +62,13 @@ pub fn map(
     if (mappingExists(mode_mappings, modifiers, keysym, optionals.release)) |current| {
         mode_mappings.items[current].deinit();
         mode_mappings.items[current] = new;
+        // Warn user if they overwrote an existing keybinding using riverctl.
+        const opts = if (optionals.release) "-release " else "";
+        out.* = try std.fmt.allocPrint(
+            allocator,
+            "overwrote an existing keybinding: {s} {s}{s} {s}",
+            .{ mode_raw, opts, modifiers_raw, keysym_raw },
+        );
     } else {
         // Repeating mappings borrow the Mapping directly. To prevent a
         // possible crash if the Mapping ArrayList is reallocated, stop any
