@@ -54,25 +54,31 @@ pub fn create(wlr_xdg_popup: *wlr.XdgPopup, parent: Parent) void {
     assert(wlr_xdg_popup.base.data == 0);
     wlr_xdg_popup.base.data = @ptrToInt(xdg_popup);
 
-    const parent_box = switch (parent) {
-        .xdg_toplevel => |xdg_toplevel| &xdg_toplevel.view.pending.box,
-        .layer_surface => |layer_surface| &layer_surface.box,
+    switch (parent) {
+        .xdg_toplevel => |xdg_toplevel| {
+            const output_dimensions = xdg_toplevel.view.output.getEffectiveResolution();
+            // The output box relative to the parent of the xdg_popup
+            var box = wlr.Box{
+                .x = xdg_toplevel.view.surface_box.x - xdg_toplevel.view.pending.box.x,
+                .y = xdg_toplevel.view.surface_box.y - xdg_toplevel.view.pending.box.y,
+                .width = @intCast(c_int, output_dimensions.width),
+                .height = @intCast(c_int, output_dimensions.height),
+            };
+            wlr_xdg_popup.unconstrainFromBox(&box);
+        },
+        .layer_surface => |layer_surface| {
+            const output_dimensions = layer_surface.output.getEffectiveResolution();
+            // The output box relative to the parent of the xdg_popup
+            var box = wlr.Box{
+                .x = layer_surface.box.x,
+                .y = layer_surface.box.y,
+                .width = @intCast(c_int, output_dimensions.width),
+                .height = @intCast(c_int, output_dimensions.height),
+            };
+            wlr_xdg_popup.unconstrainFromBox(&box);
+        },
         .drag_icon => unreachable,
-    };
-    const output_dimensions = switch (parent) {
-        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.view.output.getEffectiveResolution(),
-        .layer_surface => |layer_surface| layer_surface.output.getEffectiveResolution(),
-        .drag_icon => unreachable,
-    };
-
-    // The output box relative to the parent of the xdg_popup
-    var box = wlr.Box{
-        .x = -parent_box.x,
-        .y = -parent_box.y,
-        .width = @intCast(c_int, output_dimensions.width),
-        .height = @intCast(c_int, output_dimensions.height),
-    };
-    wlr_xdg_popup.unconstrainFromBox(&box);
+    }
 
     wlr_xdg_popup.base.events.destroy.add(&xdg_popup.surface_destroy);
     wlr_xdg_popup.base.events.map.add(&xdg_popup.map);
