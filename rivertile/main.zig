@@ -170,11 +170,7 @@ const Output = struct {
                             return;
                         };
                         switch (raw_arg[0]) {
-                            '+' => output.main_count = math.add(
-                                u32,
-                                output.main_count,
-                                @intCast(u32, arg),
-                            ) catch math.maxInt(u32),
+                            '+' => output.main_count +|= @intCast(u32, arg),
                             '-' => {
                                 const result = @as(i33, output.main_count) + arg;
                                 if (result >= 0) output.main_count = @intCast(u32, result);
