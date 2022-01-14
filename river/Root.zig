@@ -469,7 +469,22 @@ fn processOutputConfig(
                 wlr_output.setCustomMode(custom_mode.width, custom_mode.height, custom_mode.refresh);
             }
             wlr_output.setScale(head.state.scale);
-            wlr_output.setTransform(head.state.transform);
+
+            var transform: wl.Output.Transform = blk: {
+                if (@enumToInt(head.state.transform) >= 0) {
+                    break :blk head.state.transform;
+                } else if (wlr_output.isDrm()) {
+                    break :blk wlr_output.getPanelOrientation();
+                }
+                break :blk wl.Output.Transform.normal;
+            };
+            if (wlr_output.transform != transform) {
+                std.log.scoped(.output).debug(
+                    "set {s} transform to {s}",
+                    .{ head.state.output.name, @tagName(transform) },
+                );
+                wlr_output.setTransform(transform);
+            }
 
             switch (action) {
                 .test_only => {
