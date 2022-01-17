@@ -162,14 +162,17 @@ is active. It cannot be entered or exited manually.
 The following modifiers are available for use in mappings:
 
 	- Shift
-	- Lock (Caps lock)
-	- Control (Ctrl)
+	- Lock
+	- Control
 	- Mod1 (Alt)
 	- Mod2
 	- Mod3
-	- Mod4 (Super, Logo, Windows)
+	- Mod4 (Super)
 	- Mod5
-	- None (Create a mapping without modifiers)
+	- None
+
+Alt and Super are aliases for Mod1 and Mod4 respectively. None allows creating
+a mapping without modifiers
 
 Keys are specified by their XKB keysym name. See
 _/usr/include/xkbcommon/xkbcommon-keysyms.h_ for the complete list.
