@@ -187,9 +187,11 @@ fn parseModifiers(
             .{ .name = "Lock", .field_name = "caps" },
             .{ .name = "Control", .field_name = "ctrl" },
             .{ .name = "Mod1", .field_name = "alt" },
+            .{ .name = "Alt", .field_name = "alt" },
             .{ .name = "Mod2", .field_name = "mod2" },
             .{ .name = "Mod3", .field_name = "mod3" },
             .{ .name = "Mod4", .field_name = "logo" },
+            .{ .name = "Super", .field_name = "logo" },
             .{ .name = "Mod5", .field_name = "mod5" },
         }) |def| {
             if (std.mem.eql(u8, def.name, mod_name)) {
