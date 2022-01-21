@@ -70,6 +70,7 @@ const command_impls = std.ComptimeStringMap(
         .{ "send-layout-cmd",           @import("command/layout.zig").sendLayoutCmd },
         .{ "send-to-output",            @import("command/output.zig").sendToOutput },
         .{ "send-to-previous-tags",     @import("command/tags.zig").sendToPreviousTags },
+        .{ "set-cursor-state",          @import("command/config.zig").setCursorState },
         .{ "set-cursor-warp",           @import("command/config.zig").setCursorWarp },
         .{ "set-focused-tags",          @import("command/tags.zig").setFocusedTags },
         .{ "set-repeat",                @import("command/set_repeat.zig").setRepeat },

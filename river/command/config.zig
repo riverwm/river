@@ -93,6 +93,39 @@ pub fn borderColorUrgent(
     while (it) |node| : (it = node.next) node.data.damage.addWhole();
 }
 
+pub fn setCursorState(
+    _: std.mem.Allocator,
+    seat: *Seat,
+    args: []const [:0]const u8,
+    _: *?[]const u8,
+) Error!void {
+    if (args.len < 2) return Error.NotEnoughArguments;
+    if (args.len > 2) return Error.TooManyArguments;
+
+    const cursor_state = std.meta.stringToEnum(enum { normal, hidden, disabled }, args[1]) orelse
+        return Error.UnknownOption;
+
+    switch (cursor_state) {
+        .normal => {
+            if (seat.cursor.mode == .disabled) seat.cursor.leaveMode(null);
+            if (seat.cursor.image == .none and !seat.cursor.auto_hidden) {
+                seat.cursor.auto_hidden = true; // should show it though
+                seat.cursor.auto_hide_timer.timerUpdate(5000) catch {};
+            }
+        },
+        .hidden => {
+            if (seat.cursor.mode == .disabled) seat.cursor.leaveMode(null);
+            seat.cursor.auto_hide_timer.timerUpdate(0) catch {};
+            seat.cursor.setImage(.none);
+            seat.cursor.auto_hidden = false;
+        },
+        .disabled => {
+            seat.cursor.enterMode(.disabled, null);
+            seat.cursor.auto_hide_timer.timerUpdate(0) catch {};
+        },
+    }
+}
+
 pub fn setCursorWarp(
     _: *Seat,
     args: []const [:0]const u8,

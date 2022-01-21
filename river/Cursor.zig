@@ -41,6 +41,7 @@ const XwaylandUnmanaged = @import("XwaylandUnmanaged.zig");
 
 const Mode = union(enum) {
     passthrough: void,
+    disabled: void,
     down: struct {
         // TODO: To handle the surface with pointer focus being moved during
         // down mode we need to store the starting location of the surface as
@@ -78,6 +79,7 @@ const Mode = union(enum) {
 const Image = enum {
     /// The current image of the cursor is unknown, perhaps because it was set by a client.
     unknown,
+    none,
     left_ptr,
     move,
     @"se-resize",
@@ -96,6 +98,10 @@ pointer_gestures: *wlr.PointerGesturesV1,
 xcursor_manager: *wlr.XcursorManager,
 
 image: Image = .unknown,
+auto_hide_timer: *wl.EventSource,
+/// Only ever useful if image == .none to determine whether the cursor has been
+/// hidden automatically, or explicitly
+auto_hidden: bool = false,
 
 constraint: ?*wlr.PointerConstraintV1 = null,
 
@@ -136,11 +142,16 @@ pub fn init(self: *Self, seat: *Seat) !void {
     const xcursor_manager = try wlr.XcursorManager.create(null, default_size);
     errdefer xcursor_manager.destroy();
 
+    const event_loop = server.wl_server.getEventLoop();
+    const auto_hide_timer = try event_loop.addTimer(*Self, handleAutoHide, self);
+    errdefer auto_hide_timer.remove();
+
     self.* = .{
         .seat = seat,
         .wlr_cursor = wlr_cursor,
         .pointer_gestures = try wlr.PointerGesturesV1.create(server.wl_server),
         .xcursor_manager = xcursor_manager,
+        .auto_hide_timer = auto_hide_timer,
     };
     try self.setTheme(null, null);
 
@@ -165,6 +176,7 @@ pub fn init(self: *Self, seat: *Seat) !void {
 }
 
 pub fn deinit(self: *Self) void {
+    self.auto_hide_timer.remove();
     self.xcursor_manager.destroy();
     self.wlr_cursor.destroy();
 }
@@ -220,7 +232,7 @@ pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
 
 pub fn handleViewUnmap(self: *Self, view: *View) void {
     if (switch (self.mode) {
-        .passthrough, .down => false,
+        .passthrough, .disabled, .down => false,
         .move => |data| data.view == view,
         .resize => |data| data.view == view,
     }) {
@@ -229,15 +241,29 @@ pub fn handleViewUnmap(self: *Self, view: *View) void {
     }
 }
 
+fn handleAutoHide(self: *Self) callconv(.C) c_int {
+    // TODO: auto-show on activity
+    self.setImage(.none);
+    self.auto_hidden = true;
+
+    return 0;
+}
+
 /// It seems that setCursorImage is actually fairly expensive to call repeatedly
 /// as it does no checks to see if the the given image is already set. Therefore,
 /// do that check here.
-fn setImage(self: *Self, image: Image) void {
+pub fn setImage(self: *Self, image: Image) void {
     assert(image != .unknown);
 
     if (image == self.image) return;
+    if (self.image == .none and !self.auto_hidden) return;
     self.image = image;
-    self.xcursor_manager.setCursorImage(@tagName(image), self.wlr_cursor);
+    // TODO: this is apparently not the only place where we gotta interrupt setting it
+    if (image == .none) {
+        self.wlr_cursor.setImage(null, 0, 0, 0, 0, 0, 0);
+    } else {
+        self.xcursor_manager.setCursorImage(@tagName(image), self.wlr_cursor);
+    }
 }
 
 fn clearFocus(self: *Self) void {
@@ -248,6 +274,7 @@ fn clearFocus(self: *Self) void {
 /// Axis event is a scroll wheel or similiar
 fn handleAxis(listener: *wl.Listener(*wlr.Pointer.event.Axis), event: *wlr.Pointer.event.Axis) void {
     const self = @fieldParentPtr(Self, "axis", listener);
+    if (self.mode == .disabled) return;
 
     self.seat.handleActivity();
 
@@ -263,8 +290,10 @@ fn handleAxis(listener: *wl.Listener(*wlr.Pointer.event.Axis), event: *wlr.Point
 
 fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.Pointer.event.Button) void {
     const self = @fieldParentPtr(Self, "button", listener);
+    if (self.mode == .disabled) return; // actually, should move this further down
 
     self.seat.handleActivity();
+    self.auto_hide_timer.timerUpdate(5000) catch {};
 
     if (event.state == .released) {
         assert(self.pressed_count > 0);
@@ -332,6 +361,8 @@ fn handlePinchBegin(
     event: *wlr.Pointer.event.PinchBegin,
 ) void {
     const self = @fieldParentPtr(Self, "pinch_begin", listener);
+    if (self.mode == .disabled) return;
+    self.auto_hide_timer.timerUpdate(5000) catch {};
     self.pointer_gestures.sendPinchBegin(
         self.seat.wlr_seat,
         event.time_msec,
@@ -344,6 +375,8 @@ fn handlePinchUpdate(
     event: *wlr.Pointer.event.PinchUpdate,
 ) void {
     const self = @fieldParentPtr(Self, "pinch_update", listener);
+    if (self.mode == .disabled) return;
+    self.auto_hide_timer.timerUpdate(5000) catch {};
     self.pointer_gestures.sendPinchUpdate(
         self.seat.wlr_seat,
         event.time_msec,
@@ -359,6 +392,8 @@ fn handlePinchEnd(
     event: *wlr.Pointer.event.PinchEnd,
 ) void {
     const self = @fieldParentPtr(Self, "pinch_end", listener);
+    if (self.mode == .disabled) return;
+    self.auto_hide_timer.timerUpdate(5000) catch {};
     self.pointer_gestures.sendPinchEnd(
         self.seat.wlr_seat,
         event.time_msec,
@@ -371,6 +406,8 @@ fn handleSwipeBegin(
     event: *wlr.Pointer.event.SwipeBegin,
 ) void {
     const self = @fieldParentPtr(Self, "swipe_begin", listener);
+    if (self.mode == .disabled) return;
+    self.auto_hide_timer.timerUpdate(5000) catch {};
     self.pointer_gestures.sendSwipeBegin(
         self.seat.wlr_seat,
         event.time_msec,
@@ -383,6 +420,7 @@ fn handleSwipeUpdate(
     event: *wlr.Pointer.event.SwipeUpdate,
 ) void {
     const self = @fieldParentPtr(Self, "swipe_update", listener);
+    if (self.mode == .disabled) return;
     self.pointer_gestures.sendSwipeUpdate(
         self.seat.wlr_seat,
         event.time_msec,
@@ -396,6 +434,8 @@ fn handleSwipeEnd(
     event: *wlr.Pointer.event.SwipeEnd,
 ) void {
     const self = @fieldParentPtr(Self, "swipe_end", listener);
+    if (self.mode == .disabled) return;
+    self.auto_hide_timer.timerUpdate(5000) catch {};
     self.pointer_gestures.sendSwipeEnd(
         self.seat.wlr_seat,
         event.time_msec,
@@ -427,6 +467,7 @@ fn handlePointerMapping(self: *Self, event: *wlr.Pointer.event.Button, view: *Vi
 /// time, in which case a frame event won't be sent in between.
 fn handleFrame(listener: *wl.Listener(*wlr.Cursor), _: *wlr.Cursor) void {
     const self = @fieldParentPtr(Self, "frame", listener);
+    if (self.mode == .disabled) return;
     self.seat.wlr_seat.pointerNotifyFrame();
 }
 
@@ -441,6 +482,7 @@ fn handleMotionAbsolute(
     event: *wlr.Pointer.event.MotionAbsolute,
 ) void {
     const self = @fieldParentPtr(Self, "motion_absolute", listener);
+    if (self.mode == .disabled) return;
 
     self.seat.handleActivity();
 
@@ -460,6 +502,7 @@ fn handleMotion(
     event: *wlr.Pointer.event.Motion,
 ) void {
     const self = @fieldParentPtr(Self, "motion", listener);
+    if (self.mode == .disabled) return;
 
     self.seat.handleActivity();
 
@@ -472,6 +515,8 @@ fn handleRequestSetCursor(
 ) void {
     // This event is rasied by the seat when a client provides a cursor image
     const self = @fieldParentPtr(Self, "request_set_cursor", listener);
+    if (self.image == .none) return; // TODO: save the requested image
+
     const focused_client = self.seat.wlr_seat.pointer_state.focused_client;
 
     // This can be sent by any client, so we check to make sure this one is
@@ -705,12 +750,25 @@ fn surfaceAtFilter(view: *View, filter_tags: u32) bool {
     return view.surface != null and view.current.tags & filter_tags != 0;
 }
 
-pub fn enterMode(self: *Self, mode: enum { move, resize }, view: *View) void {
+pub fn enterMode(self: *Self, mode: enum { disabled, move, resize }, _view: ?*View) void {
     log.debug("enter {s} cursor mode", .{@tagName(mode)});
 
+    assert(self.mode != .disabled);
+
+    if (mode == .disabled) {
+        self.auto_hidden = false;
+        self.mode = .disabled;
+        self.seat.wlr_seat.pointerNotifyClearFocus();
+        self.setImage(.none);
+        // TODO: remove pointer capability on seat
+        return;
+    }
+
+    var view = _view.?;
     self.seat.focus(view);
 
     switch (mode) {
+        .disabled => unreachable,
         .move => self.mode = .{ .move = .{ .view = view } },
         .resize => {
             const cur_box = &view.current.box;
@@ -743,25 +801,29 @@ pub fn enterMode(self: *Self, mode: enum { move, resize }, view: *View) void {
     self.setImage(if (mode == .move) .move else .@"se-resize");
 }
 
-/// Return from down/move/resize to passthrough
-fn leaveMode(self: *Self, event: *wlr.Pointer.event.Button) void {
+/// Return from disabled/down/move/resize to passthrough
+pub fn leaveMode(self: *Self, event: ?*wlr.Pointer.event.Button) void {
     log.debug("leave {s} mode", .{@tagName(self.mode)});
 
     switch (self.mode) {
         .passthrough => unreachable,
+        .disabled => {}, // TODO: what now? reset the image? prolly that + restore ptr cap on seat
         .down => {
             // If we were in down mode, we need pass along the release event
-            _ = self.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
+            _ = self.seat.wlr_seat.pointerNotifyButton(event.?.time_msec, event.?.button, event.?.state);
         },
         .move => {},
         .resize => |resize| resize.view.setResizing(false),
     }
 
     self.mode = .passthrough;
-    self.passthrough(event.time_msec);
+    // this is only a temporary solution. a fake event has to be created if
+    // there is none
+    if (event != null) self.passthrough(event.?.time_msec);
 }
 
 fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64, delta_y: f64, unaccel_dx: f64, unaccel_dy: f64) void {
+    self.auto_hide_timer.timerUpdate(5000) catch {};
     server.input_manager.relative_pointer_manager.sendRelativeMotion(
         self.seat.wlr_seat,
         @as(u64, time) * 1000,
@@ -793,6 +855,7 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
         }
     }
     switch (self.mode) {
+        .disabled => unreachable,
         .passthrough => {
             self.wlr_cursor.move(device, dx, dy);
             self.checkFocusFollowsCursor();
@@ -855,6 +918,7 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
 pub fn checkFocusFollowsCursor(self: *Self) void {
     // Don't do focus-follows-cursor if a drag is in progress as focus change can't occur
     if (self.seat.pointer_drag) return;
+    if (self.mode == .disabled) return;
     if (server.config.focus_follows_cursor == .disabled) return;
     if (self.surfaceAt()) |result| {
         if (self.seat.wlr_seat.pointer_state.focused_surface != result.surface) {
@@ -895,6 +959,7 @@ fn shouldPassthrough(self: Self) bool {
             // target view.
             return true;
         },
+        .disabled => return false,
         .down => {
             // TODO: It's hard to determine from the target surface alone whether
             // the surface is visible or not currently. Switching to the wlroots
