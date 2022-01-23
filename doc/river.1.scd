@@ -48,7 +48,7 @@ river will send SIGTERM to this process group.
 
 Usually this executable is a shell script invoking *riverctl*(1) to create
 mappings, start programs such as a layout generator or status bar, and
-preform other configuration.
+perform other configuration.
 
 # ENVIRONMENT
 
