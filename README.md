@@ -66,7 +66,7 @@ if such an executable exists. If `$XDG_CONFIG_HOME` is not set,
 
 Usually this executable is a shell script invoking *riverctl*(1) to create
 mappings, start programs such as a layout generator or status bar, and
-preform other configuration.
+perform other configuration.
 
 An example init script with sane defaults is provided [here](example/init)
 in the example directory.
