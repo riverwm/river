@@ -96,6 +96,8 @@ pub fn destroy(xdg_popup: *XdgPopup) void {
     xdg_popup.new_popup.link.remove();
     xdg_popup.new_subsurface.link.remove();
 
+    if (xdg_popup.wlr_xdg_popup.base.mapped) xdg_popup.commit.link.remove();
+
     Subsurface.destroySubsurfaces(xdg_popup.wlr_xdg_popup.base.surface);
     XdgPopup.destroyPopups(xdg_popup.wlr_xdg_popup.base);
 
