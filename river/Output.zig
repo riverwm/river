@@ -319,18 +319,19 @@ fn arrangeLayer(
             layer_surface.wlr_layer_surface.destroy();
             return;
         } else if (current_state.desired_width == 0) {
-            std.debug.assert(current_state.anchor.right and current_state.anchor.left);
+            assert(current_state.anchor.right and current_state.anchor.left);
             new_box.x = bounds.x + @intCast(i32, current_state.margin.left);
             new_box.width = bounds.width - (current_state.margin.left + current_state.margin.right);
+        } else if (current_state.anchor.left == current_state.anchor.right) {
+            new_box.x = bounds.x + @intCast(i32, bounds.width / 2 - current_state.desired_width / 2);
+            new_box.width = current_state.desired_width;
         } else if (current_state.anchor.left) {
             new_box.x = bounds.x + @intCast(i32, current_state.margin.left);
             new_box.width = current_state.desired_width;
-        } else if (current_state.anchor.right) {
+        } else {
+            assert(current_state.anchor.right);
             new_box.x = bounds.x + @intCast(i32, bounds.width - current_state.desired_width -
                 current_state.margin.right);
-            new_box.width = current_state.desired_width;
-        } else {
-            new_box.x = bounds.x + @intCast(i32, bounds.width / 2 - current_state.desired_width / 2);
             new_box.width = current_state.desired_width;
         }
 
@@ -346,18 +347,19 @@ fn arrangeLayer(
             // stop this attempt early.
             return;
         } else if (current_state.desired_height == 0) {
-            std.debug.assert(current_state.anchor.top and current_state.anchor.bottom);
+            assert(current_state.anchor.top and current_state.anchor.bottom);
             new_box.y = bounds.y + @intCast(i32, current_state.margin.top);
             new_box.height = bounds.height - (current_state.margin.top + current_state.margin.bottom);
+        } else if (current_state.anchor.top == current_state.anchor.bottom) {
+            new_box.y = bounds.y + @intCast(i32, bounds.height / 2 - current_state.desired_height / 2);
+            new_box.height = current_state.desired_height;
         } else if (current_state.anchor.top) {
             new_box.y = bounds.y + @intCast(i32, current_state.margin.top);
             new_box.height = current_state.desired_height;
-        } else if (current_state.anchor.bottom) {
+        } else {
+            assert(current_state.anchor.bottom);
             new_box.y = bounds.y + @intCast(i32, bounds.height - current_state.desired_height -
                 current_state.margin.bottom);
-            new_box.height = current_state.desired_height;
-        } else {
-            new_box.y = bounds.y + @intCast(i32, bounds.height / 2 - current_state.desired_height / 2);
             new_box.height = current_state.desired_height;
         }
 
