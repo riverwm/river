@@ -217,7 +217,8 @@ pub fn arrangeViews(self: *Self) void {
 
 const ArrangeLayersTarget = enum { mapped, unmapped };
 
-/// Arrange all layer surfaces of this output and adjust the usable area
+/// Arrange all layer surfaces of this output and adjust the usable area.
+/// Will arrange views as well if the usable area changes.
 /// If target is unmapped, this function is pure aside from the
 /// wlr.LayerSurfaceV1.configure() calls made on umapped layer surfaces.
 pub fn arrangeLayers(self: *Self, target: ArrangeLayersTarget) void {
