@@ -411,7 +411,7 @@ fn commitTransaction(self: *Self) void {
 fn handleLayoutChange(listener: *wl.Listener(*wlr.OutputLayout), _: *wlr.OutputLayout) void {
     const self = @fieldParentPtr(Self, "layout_change", listener);
 
-    const config = self.outputConfigFromCurrent() catch {
+    const config = self.currentOutputConfig() catch {
         std.log.scoped(.output_manager).err("out of memory", .{});
         return;
     };
@@ -425,14 +425,10 @@ fn handleManagerApply(
     const self = @fieldParentPtr(Self, "manager_apply", listener);
     defer config.destroy();
 
-    if (self.applyOutputConfig(config)) {
-        config.sendSucceeded();
-    } else {
-        config.sendFailed();
-    }
+    self.processOutputConfig(config, .apply);
 
     // Send the config that was actually applied
-    const applied_config = self.outputConfigFromCurrent() catch {
+    const applied_config = self.currentOutputConfig() catch {
         std.log.scoped(.output_manager).err("out of memory", .{});
         return;
     };
@@ -440,115 +436,95 @@ fn handleManagerApply(
 }
 
 fn handleManagerTest(
-    _: *wl.Listener(*wlr.OutputConfigurationV1),
+    listener: *wl.Listener(*wlr.OutputConfigurationV1),
     config: *wlr.OutputConfigurationV1,
 ) void {
+    const self = @fieldParentPtr(Self, "manager_test", listener);
     defer config.destroy();
 
-    if (testOutputConfig(config, true)) {
+    self.processOutputConfig(config, .test_only);
+}
+
+fn processOutputConfig(
+    self: *Self,
+    config: *wlr.OutputConfigurationV1,
+    action: enum { test_only, apply },
+) void {
+    // Ignore layout change events this function generates while applying the config
+    self.layout_change.link.remove();
+    defer self.output_layout.events.change.add(&self.layout_change);
+
+    var success = true;
+
+    var it = config.heads.iterator(.forward);
+    while (it.next()) |head| {
+        const wlr_output = head.state.output;
+        const output = @intToPtr(*Output, wlr_output.data);
+
+        if (head.state.enabled) {
+            wlr_output.enable(true);
+
+            if (head.state.mode) |mode| {
+                wlr_output.setMode(mode);
+            } else {
+                const custom_mode = &head.state.custom_mode;
+                wlr_output.setCustomMode(custom_mode.width, custom_mode.height, custom_mode.refresh);
+            }
+            wlr_output.setScale(head.state.scale);
+            wlr_output.setTransform(head.state.transform);
+
+            switch (action) {
+                .test_only => {
+                    if (!output.wlr_output.testCommit()) success = false;
+                    output.wlr_output.rollback();
+                },
+                .apply => {
+                    if (output.wlr_output.commit()) {
+                        // Just updates the output's position if it is already in the layout
+                        self.output_layout.add(output.wlr_output, head.state.x, head.state.y);
+                        output.arrangeLayers(.mapped);
+                    } else |_| {
+                        std.log.scoped(.output_manager).err("failed to apply config to output {s}", .{output.wlr_output.name});
+                        success = false;
+                    }
+                },
+            }
+        } else {
+            // The output is already disabled, so there's nothing to do
+            if (!wlr_output.enabled) continue;
+
+            wlr_output.enable(false);
+
+            switch (action) {
+                .test_only => {
+                    if (!output.wlr_output.testCommit()) success = false;
+                    output.wlr_output.rollback();
+                },
+                .apply => {
+                    if (output.wlr_output.commit()) {
+                        self.removeOutput(output);
+                        self.output_layout.remove(output.wlr_output);
+                    } else |_| {
+                        std.log.scoped(.output_manager).err("failed to apply config to output {s}", .{
+                            output.wlr_output.name,
+                        });
+                        success = false;
+                    }
+                },
+            }
+        }
+    }
+
+    if (action == .apply) self.startTransaction();
+
+    if (success) {
         config.sendSucceeded();
     } else {
         config.sendFailed();
     }
 }
 
-/// Apply the given config, return false on faliure
-fn applyOutputConfig(self: *Self, config: *wlr.OutputConfigurationV1) bool {
-    // Ignore layout change events while applying the config
-    self.layout_change.link.remove();
-    defer self.output_layout.events.change.add(&self.layout_change);
-
-    // Test if the config should apply cleanly
-    if (!testOutputConfig(config, false)) return false;
-
-    var it = config.heads.iterator(.forward);
-    while (it.next()) |head| {
-        const output = @intToPtr(*Output, head.state.output.data);
-        const disable = output.wlr_output.enabled and !head.state.enabled;
-
-        // Since we have done a successful test commit, this will only fail
-        // due to error in the output's backend implementation.
-        output.wlr_output.commit() catch
-            std.log.scoped(.output_manager).err("output commit failed for {s}", .{output.wlr_output.name});
-
-        if (output.wlr_output.enabled) {
-            // Moves the output if it is already in the layout
-            self.output_layout.add(output.wlr_output, head.state.x, head.state.y);
-        }
-
-        if (disable) {
-            self.removeOutput(output);
-            self.output_layout.remove(output.wlr_output);
-        }
-
-        // Arrange layers to adjust the usable_box
-        // We dont need to call arrangeViews() since arrangeLayers() will call
-        // it for us because the usable_box changed
-        output.arrangeLayers(.mapped);
-        self.startTransaction();
-    }
-
-    return true;
-}
-
-/// Tests the output configuration.
-/// If rollback is false all changes are applied to the pending state of the affected outputs.
-fn testOutputConfig(config: *wlr.OutputConfigurationV1, rollback: bool) bool {
-    var ok = true;
-    var it = config.heads.iterator(.forward);
-    while (it.next()) |head| {
-        const wlr_output = head.state.output;
-
-        const width = if (head.state.mode) |m| m.width else head.state.custom_mode.width;
-        const height = if (head.state.mode) |m| m.height else head.state.custom_mode.height;
-        const scale = head.state.scale;
-
-        const too_small = (@intToFloat(f32, width) / scale < min_size) or
-            (@intToFloat(f32, height) / scale < min_size);
-
-        if (too_small) {
-            std.log.scoped(.output_manager).info(
-                "The requested output resolution {}x{} scaled with {} for {s} would be too small.",
-                .{ width, height, scale, wlr_output.name },
-            );
-        }
-
-        applyHeadToOutput(head, wlr_output);
-        ok = ok and !too_small and wlr_output.testCommit();
-    }
-
-    if (rollback or !ok) {
-        // Rollback all changes
-        it = config.heads.iterator(.forward);
-        while (it.next()) |head| head.state.output.rollback();
-    }
-
-    return ok;
-}
-
-fn applyHeadToOutput(head: *wlr.OutputConfigurationV1.Head, wlr_output: *wlr.Output) void {
-    wlr_output.enable(head.state.enabled);
-    // The output must be enabled for the following properties to apply
-    if (head.state.enabled) {
-        // TODO(wlroots) Somehow on the drm backend setting the mode causes
-        // the commit in the rendering loop to fail. The commit that
-        // applies the mode works fine.
-        // We can just ignore this because nothing bad happens but it
-        // should be fixed in the future
-        // See https://github.com/swaywm/wlroots/issues/2492
-        if (head.state.mode) |mode| {
-            wlr_output.setMode(mode);
-        } else {
-            const custom_mode = &head.state.custom_mode;
-            wlr_output.setCustomMode(custom_mode.width, custom_mode.height, custom_mode.refresh);
-        }
-        wlr_output.setScale(head.state.scale);
-        wlr_output.setTransform(head.state.transform);
-    }
-}
-
-/// Create the config describing the current configuration
-fn outputConfigFromCurrent(self: *Self) !*wlr.OutputConfigurationV1 {
+fn currentOutputConfig(self: *Self) !*wlr.OutputConfigurationV1 {
     // TODO there no real reason this needs to allocate memory every time it is called.
     // consider improving this wlroots api or reimplementing in zig-wlroots/river.
     const config = try wlr.OutputConfigurationV1.create();
@@ -556,20 +532,19 @@ fn outputConfigFromCurrent(self: *Self) !*wlr.OutputConfigurationV1 {
     errdefer config.destroy();
 
     var it = self.all_outputs.first;
-    while (it) |node| : (it = node.next) try self.createHead(node.data, config);
+    while (it) |node| : (it = node.next) {
+        const output = node.data;
+        const head = try wlr.OutputConfigurationV1.Head.create(config, output.wlr_output);
+
+        // If the output is not part of the layout (and thus disabled) we dont care
+        // about the position
+        if (self.output_layout.getBox(output.wlr_output)) |box| {
+            head.state.x = box.x;
+            head.state.y = box.y;
+        }
+    }
 
     return config;
-}
-
-fn createHead(self: *Self, output: *Output, config: *wlr.OutputConfigurationV1) !void {
-    const head = try wlr.OutputConfigurationV1.Head.create(config, output.wlr_output);
-
-    // If the output is not part of the layout (and thus disabled) we dont care
-    // about the position
-    if (self.output_layout.getBox(output.wlr_output)) |box| {
-        head.state.x = box.x;
-        head.state.y = box.y;
-    }
 }
 
 fn handlePowerManagerSetMode(
