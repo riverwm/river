@@ -188,7 +188,8 @@ pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
     }
 
     // If this cursor belongs to the default seat, set the xcursor environment
-    // variables and the xwayland cursor theme.
+    // variables as well as the xwayland cursor theme and update the cursor
+    // image if necessary.
     if (self.seat == server.input_manager.defaultSeat()) {
         const size_str = try std.fmt.allocPrintZ(util.gpa, "{}", .{size});
         defer util.gpa.free(size_str);
@@ -210,6 +211,10 @@ pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
                 @intCast(i32, image.hotspot_x),
                 @intCast(i32, image.hotspot_y),
             );
+        }
+
+        if (self.image != .unknown) {
+            self.xcursor_manager.setCursorImage(@tagName(self.image), self.wlr_cursor);
         }
     }
 }
