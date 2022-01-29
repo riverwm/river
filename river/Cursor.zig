@@ -267,7 +267,7 @@ pub fn setImage(self: *Self, image: Image) void {
 }
 
 fn clearFocus(self: *Self) void {
-    self.setImage(.left_ptr);
+    if (self.image != .none) self.setImage(.left_ptr);
     self.seat.wlr_seat.pointerNotifyClearFocus();
 }
 
@@ -293,7 +293,7 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
     if (self.mode == .disabled) return; // actually, should move this further down
 
     self.seat.handleActivity();
-    self.auto_hide_timer.timerUpdate(5000) catch {};
+    self.auto_hide_timer.timerUpdate(server.config.cursor_auto_hide_delay) catch {};
 
     if (event.state == .released) {
         assert(self.pressed_count > 0);
@@ -362,7 +362,7 @@ fn handlePinchBegin(
 ) void {
     const self = @fieldParentPtr(Self, "pinch_begin", listener);
     if (self.mode == .disabled) return;
-    self.auto_hide_timer.timerUpdate(5000) catch {};
+    self.auto_hide_timer.timerUpdate(server.config.cursor_auto_hide_delay) catch {};
     self.pointer_gestures.sendPinchBegin(
         self.seat.wlr_seat,
         event.time_msec,
@@ -376,7 +376,7 @@ fn handlePinchUpdate(
 ) void {
     const self = @fieldParentPtr(Self, "pinch_update", listener);
     if (self.mode == .disabled) return;
-    self.auto_hide_timer.timerUpdate(5000) catch {};
+    self.auto_hide_timer.timerUpdate(server.config.cursor_auto_hide_delay) catch {};
     self.pointer_gestures.sendPinchUpdate(
         self.seat.wlr_seat,
         event.time_msec,
@@ -393,7 +393,7 @@ fn handlePinchEnd(
 ) void {
     const self = @fieldParentPtr(Self, "pinch_end", listener);
     if (self.mode == .disabled) return;
-    self.auto_hide_timer.timerUpdate(5000) catch {};
+    self.auto_hide_timer.timerUpdate(server.config.cursor_auto_hide_delay) catch {};
     self.pointer_gestures.sendPinchEnd(
         self.seat.wlr_seat,
         event.time_msec,
@@ -407,7 +407,7 @@ fn handleSwipeBegin(
 ) void {
     const self = @fieldParentPtr(Self, "swipe_begin", listener);
     if (self.mode == .disabled) return;
-    self.auto_hide_timer.timerUpdate(5000) catch {};
+    self.auto_hide_timer.timerUpdate(server.config.cursor_auto_hide_delay) catch {};
     self.pointer_gestures.sendSwipeBegin(
         self.seat.wlr_seat,
         event.time_msec,
@@ -435,7 +435,7 @@ fn handleSwipeEnd(
 ) void {
     const self = @fieldParentPtr(Self, "swipe_end", listener);
     if (self.mode == .disabled) return;
-    self.auto_hide_timer.timerUpdate(5000) catch {};
+    self.auto_hide_timer.timerUpdate(server.config.cursor_auto_hide_delay) catch {};
     self.pointer_gestures.sendSwipeEnd(
         self.seat.wlr_seat,
         event.time_msec,
@@ -823,7 +823,7 @@ pub fn leaveMode(self: *Self, event: ?*wlr.Pointer.event.Button) void {
 }
 
 fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64, delta_y: f64, unaccel_dx: f64, unaccel_dy: f64) void {
-    self.auto_hide_timer.timerUpdate(5000) catch {};
+    self.auto_hide_timer.timerUpdate(server.config.cursor_auto_hide_delay) catch {};
     server.input_manager.relative_pointer_manager.sendRelativeMotion(
         self.seat.wlr_seat,
         @as(u64, time) * 1000,
@@ -941,6 +941,7 @@ pub fn checkFocusFollowsCursor(self: *Self) void {
 /// the target view of a cursor operation potentially being moved to a non-visible tag,
 /// becoming fullscreen, etc.
 pub fn updateState(self: *Self) void {
+    // shouldn't show/notify if it's hidden
     if (self.shouldPassthrough()) {
         self.mode = .passthrough;
         var now: os.timespec = undefined;

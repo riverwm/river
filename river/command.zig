@@ -71,6 +71,8 @@ const command_impls = std.ComptimeStringMap(
         .{ "send-to-output",            @import("command/output.zig").sendToOutput },
         .{ "send-to-previous-tags",     @import("command/tags.zig").sendToPreviousTags },
         .{ "set-cursor-state",          @import("command/config.zig").setCursorState },
+        // too long name, should fix that
+        .{ "set-cursor-auto-hide-delay",@import("command/config.zig").setCursorAutoHideDelay },
         .{ "set-cursor-warp",           @import("command/config.zig").setCursorWarp },
         .{ "set-focused-tags",          @import("command/tags.zig").setFocusedTags },
         .{ "set-repeat",                @import("command/set_repeat.zig").setRepeat },

@@ -126,6 +126,19 @@ pub fn setCursorState(
     }
 }
 
+pub fn setCursorAutoHideDelay(
+    _: std.mem.Allocator,
+    seat: *Seat,
+    args: []const [:0]const u8,
+    _: *?[]const u8,
+) Error!void {
+    if (args.len < 2) return Error.NotEnoughArguments;
+    if (args.len > 2) return Error.TooManyArguments;
+    const delay = try fmt.parseInt(u31, args[1], 10);
+    server.config.cursor_auto_hide_delay = delay;
+    seat.cursor.auto_hide_timer.timerUpdate(delay) catch {}; // shirley? but def show it if it's hidden
+}
+
 pub fn setCursorWarp(
     _: *Seat,
     args: []const [:0]const u8,
