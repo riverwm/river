@@ -79,6 +79,7 @@ const Mode = union(enum) {
 const Image = enum {
     /// The current image of the cursor is unknown, perhaps because it was set by a client.
     unknown,
+    /// The cursor is hidden (and shouldn't have focus)
     none,
     left_ptr,
     move,
@@ -224,7 +225,7 @@ pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
             );
         }
 
-        if (self.image != .unknown) {
+        if (self.image != .unknown and self.image != .none) {
             self.xcursor_manager.setCursorImage(@tagName(self.image), self.wlr_cursor);
         }
     }
@@ -242,11 +243,25 @@ pub fn handleViewUnmap(self: *Self, view: *View) void {
 }
 
 fn handleAutoHide(self: *Self) callconv(.C) c_int {
-    // TODO: auto-show on activity
+    if (self.mode != .passthrough) return 0;
+
     self.setImage(.none);
     self.auto_hidden = true;
 
     return 0;
+}
+
+/// Show the cursor if it's hidden, restore focus, reset the auto-hide timer.
+fn resumeFromAutoHide(self: *Self) void {
+    if (self.auto_hidden) {
+        assert(self.image == .none);
+        // TODO: show the cursor again
+        // TODO: restore focus
+    }
+
+    if (server.config.cursor_auto_hide_delay == 0) return;
+    self.auto_hide_timer.timerUpdate(server.config.cursor_auto_hide_delay) catch
+        log.err("failed to update timer", .{});
 }
 
 /// It seems that setCursorImage is actually fairly expensive to call repeatedly
@@ -258,7 +273,6 @@ pub fn setImage(self: *Self, image: Image) void {
     if (image == self.image) return;
     if (self.image == .none and !self.auto_hidden) return;
     self.image = image;
-    // TODO: this is apparently not the only place where we gotta interrupt setting it
     if (image == .none) {
         self.wlr_cursor.setImage(null, 0, 0, 0, 0, 0, 0);
     } else {
@@ -293,7 +307,7 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
     if (self.mode == .disabled) return; // actually, should move this further down
 
     self.seat.handleActivity();
-    self.auto_hide_timer.timerUpdate(server.config.cursor_auto_hide_delay) catch {};
+    self.resumeFromAutoHide();
 
     if (event.state == .released) {
         assert(self.pressed_count > 0);
@@ -362,7 +376,7 @@ fn handlePinchBegin(
 ) void {
     const self = @fieldParentPtr(Self, "pinch_begin", listener);
     if (self.mode == .disabled) return;
-    self.auto_hide_timer.timerUpdate(server.config.cursor_auto_hide_delay) catch {};
+    self.resumeFromAutoHide();
     self.pointer_gestures.sendPinchBegin(
         self.seat.wlr_seat,
         event.time_msec,
@@ -376,7 +390,7 @@ fn handlePinchUpdate(
 ) void {
     const self = @fieldParentPtr(Self, "pinch_update", listener);
     if (self.mode == .disabled) return;
-    self.auto_hide_timer.timerUpdate(server.config.cursor_auto_hide_delay) catch {};
+    self.resumeFromAutoHide();
     self.pointer_gestures.sendPinchUpdate(
         self.seat.wlr_seat,
         event.time_msec,
@@ -393,7 +407,7 @@ fn handlePinchEnd(
 ) void {
     const self = @fieldParentPtr(Self, "pinch_end", listener);
     if (self.mode == .disabled) return;
-    self.auto_hide_timer.timerUpdate(server.config.cursor_auto_hide_delay) catch {};
+    self.resumeFromAutoHide();
     self.pointer_gestures.sendPinchEnd(
         self.seat.wlr_seat,
         event.time_msec,
@@ -407,7 +421,7 @@ fn handleSwipeBegin(
 ) void {
     const self = @fieldParentPtr(Self, "swipe_begin", listener);
     if (self.mode == .disabled) return;
-    self.auto_hide_timer.timerUpdate(server.config.cursor_auto_hide_delay) catch {};
+    self.resumeFromAutoHide();
     self.pointer_gestures.sendSwipeBegin(
         self.seat.wlr_seat,
         event.time_msec,
@@ -435,7 +449,7 @@ fn handleSwipeEnd(
 ) void {
     const self = @fieldParentPtr(Self, "swipe_end", listener);
     if (self.mode == .disabled) return;
-    self.auto_hide_timer.timerUpdate(server.config.cursor_auto_hide_delay) catch {};
+    self.resumeFromAutoHide();
     self.pointer_gestures.sendSwipeEnd(
         self.seat.wlr_seat,
         event.time_msec,
@@ -760,7 +774,7 @@ pub fn enterMode(self: *Self, mode: enum { disabled, move, resize }, _view: ?*Vi
         self.mode = .disabled;
         self.seat.wlr_seat.pointerNotifyClearFocus();
         self.setImage(.none);
-        // TODO: remove pointer capability on seat
+        // TODO: remove pointer capability on seat?
         return;
     }
 
@@ -807,7 +821,7 @@ pub fn leaveMode(self: *Self, event: ?*wlr.Pointer.event.Button) void {
 
     switch (self.mode) {
         .passthrough => unreachable,
-        .disabled => {}, // TODO: what now? reset the image? prolly that + restore ptr cap on seat
+        .disabled => {}, // TODO: what now? reset the image? prolly that + restore ptr capability on seat
         .down => {
             // If we were in down mode, we need pass along the release event
             _ = self.seat.wlr_seat.pointerNotifyButton(event.?.time_msec, event.?.button, event.?.state);
@@ -818,12 +832,12 @@ pub fn leaveMode(self: *Self, event: ?*wlr.Pointer.event.Button) void {
 
     self.mode = .passthrough;
     // this is only a temporary solution. a fake event has to be created if
-    // there is none
+    // there is none (TODO)
     if (event != null) self.passthrough(event.?.time_msec);
 }
 
 fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64, delta_y: f64, unaccel_dx: f64, unaccel_dy: f64) void {
-    self.auto_hide_timer.timerUpdate(server.config.cursor_auto_hide_delay) catch {};
+    self.resumeFromAutoHide();
     server.input_manager.relative_pointer_manager.sendRelativeMotion(
         self.seat.wlr_seat,
         @as(u64, time) * 1000,
@@ -941,7 +955,6 @@ pub fn checkFocusFollowsCursor(self: *Self) void {
 /// the target view of a cursor operation potentially being moved to a non-visible tag,
 /// becoming fullscreen, etc.
 pub fn updateState(self: *Self) void {
-    // shouldn't show/notify if it's hidden
     if (self.shouldPassthrough()) {
         self.mode = .passthrough;
         var now: os.timespec = undefined;
@@ -953,6 +966,8 @@ pub fn updateState(self: *Self) void {
 }
 
 fn shouldPassthrough(self: Self) bool {
+    if (self.image == .none) return false;
+
     switch (self.mode) {
         .passthrough => {
             // If we are not currently in down/resize/move mode, we *always* need to passthrough()
