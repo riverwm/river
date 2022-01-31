@@ -76,8 +76,7 @@ For complete documentation see the `river(1)`, `riverctl(1)`, and
 
 ## Licensing
 
-river is released under the GNU General Public License version 3, or (at your
-option) any later version.
+River is released under the GNU General Public License v3.0 only.
 
 The protocols in the `protocol` directory are released under various licenses by
 various parties. You should refer to the copyright block of each protocol for
