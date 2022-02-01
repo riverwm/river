@@ -235,7 +235,6 @@ fn handleNewInput(listener: *wl.Listener(*wlr.InputDevice), device: *wlr.InputDe
     for (self.input_configs.items) |*input_config| {
         if (mem.eql(u8, input_config.identifier, input_device_node.data.identifier)) {
             input_config.apply(&input_device_node.data);
-            break; // There will only ever be one InputConfig for any unique identifier;
         }
     }
 }
