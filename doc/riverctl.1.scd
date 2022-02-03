@@ -293,6 +293,8 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 
 The _input_ command can be used to create a configuration rule for an input
 device identified by its _name_.
+The _name_ of an input device consists of its type, its numerical vendor id,
+its numerical product id and finally its self-advertised name, separated by -.
 
 A list of all device properties that can be configured maybe found below.
 However note that not every input device supports every property.

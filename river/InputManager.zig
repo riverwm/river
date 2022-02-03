@@ -46,11 +46,15 @@ pub const InputDevice = struct {
     identifier: []const u8,
 
     pub fn init(self: *InputDevice, device: *wlr.InputDevice) !void {
-        // The identifier is formatted exactly as in Sway
         const identifier = try std.fmt.allocPrint(
             util.gpa,
-            "{}:{}:{s}",
-            .{ device.vendor, device.product, mem.trim(u8, mem.span(device.name), &ascii.spaces) },
+            "{s}-{}-{}-{s}",
+            .{
+                @tagName(device.type),
+                device.vendor,
+                device.product,
+                mem.trim(u8, mem.span(device.name), &ascii.spaces),
+            },
         );
         for (identifier) |*char| {
             if (char.* == ' ' or !std.ascii.isPrint(char.*)) {
