@@ -171,26 +171,16 @@ pub fn destroy(self: *Self) void {
 
 /// Handle changes to pending state and start a transaction to apply them
 pub fn applyPending(self: *Self) void {
-    var arrange_output = false;
-
-    if (self.current.tags != self.pending.tags) arrange_output = true;
-
-    // If switching from float -> layout or layout -> float arrange the output
-    // to get assigned a new size or fill the hole in the layout left behind.
-    if (self.current.float != self.pending.float) {
-        assert(!self.pending.fullscreen); // float state modifed while in fullscreen
-        arrange_output = true;
+    if (self.current.float and !self.pending.float) {
+        // If switching from float to non-float, save the dimensions.
+        self.float_box = self.current.box;
+    } else if (!self.current.float and self.pending.float) {
+        // If switching from non-float to float, apply the saved float dimensions.
+        self.pending.box = self.float_box;
     }
 
-    // If switching from float to non-float, save the dimensions.
-    if (self.current.float and !self.pending.float) self.float_box = self.current.box;
-
-    // If switching from non-float to float, apply the saved float dimensions.
-    if (!self.current.float and self.pending.float) self.pending.box = self.float_box;
-
-    // If switching to fullscreen, set the dimensions to the full area of the output
-    // Since no other views will be visible, we can skip arranging the output.
     if (!self.current.fullscreen and self.pending.fullscreen) {
+        // If switching to fullscreen, set the dimensions to the full area of the output
         self.setFullscreen(true);
         self.post_fullscreen_box = self.current.box;
         const dimensions = self.output.getEffectiveResolution();
@@ -200,16 +190,17 @@ pub fn applyPending(self: *Self) void {
             .width = dimensions.width,
             .height = dimensions.height,
         };
-    }
-
-    if (self.current.fullscreen and !self.pending.fullscreen) {
+    } else if (self.current.fullscreen and !self.pending.fullscreen) {
         self.setFullscreen(false);
         self.pending.box = self.post_fullscreen_box;
-        // If switching from fullscreen to layout, we need to arrange the output.
-        if (!self.pending.float) arrange_output = true;
     }
 
-    if (arrange_output) self.output.arrangeViews();
+    // We always need to arrange the output, as there could already be a
+    // transaction in progress. If we were able to check against the state
+    // that was pending when that transaction was started, we could in some
+    // cases avoid the arrangeViews() call here, but we don't store that
+    // information and it's simpler to always arrange anyways.
+    self.output.arrangeViews();
 
     server.root.startTransaction();
 }

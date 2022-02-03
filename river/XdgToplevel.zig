@@ -329,8 +329,10 @@ fn handleRequestFullscreen(
     event: *wlr.XdgToplevel.event.SetFullscreen,
 ) void {
     const self = @fieldParentPtr(Self, "request_fullscreen", listener);
-    self.view.pending.fullscreen = event.fullscreen;
-    self.view.applyPending();
+    if (self.view.pending.fullscreen != event.fullscreen) {
+        self.view.pending.fullscreen = event.fullscreen;
+        self.view.applyPending();
+    }
 }
 
 /// Called when the client asks to be moved via the cursor, for example when the

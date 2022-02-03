@@ -273,8 +273,10 @@ fn handleSetClass(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.Xwayland
 
 fn handleRequestFullscreen(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "request_fullscreen", listener);
-    self.view.pending.fullscreen = xwayland_surface.fullscreen;
-    self.view.applyPending();
+    if (self.view.pending.fullscreen != xwayland_surface.fullscreen) {
+        self.view.pending.fullscreen = xwayland_surface.fullscreen;
+        self.view.applyPending();
+    }
 }
 
 /// Some X11 clients will minimize themselves regardless of how we respond.
