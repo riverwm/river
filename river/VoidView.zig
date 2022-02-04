@@ -30,6 +30,10 @@ pub fn configure(_: Self) void {
     unreachable;
 }
 
+pub fn lastSetFullscreenState(_: Self) bool {
+    unreachable;
+}
+
 pub fn setActivated(_: Self, _: bool) void {
     unreachable;
 }

@@ -179,7 +179,7 @@ pub fn applyPending(self: *Self) void {
         self.pending.box = self.float_box;
     }
 
-    if (!self.current.fullscreen and self.pending.fullscreen) {
+    if (!self.lastSetFullscreenState() and self.pending.fullscreen) {
         // If switching to fullscreen, set the dimensions to the full area of the output
         self.setFullscreen(true);
         self.post_fullscreen_box = self.current.box;
@@ -190,7 +190,7 @@ pub fn applyPending(self: *Self) void {
             .width = dimensions.width,
             .height = dimensions.height,
         };
-    } else if (self.current.fullscreen and !self.pending.fullscreen) {
+    } else if (self.lastSetFullscreenState() and !self.pending.fullscreen) {
         self.setFullscreen(false);
         self.pending.box = self.post_fullscreen_box;
     }
@@ -217,6 +217,13 @@ pub fn configure(self: *Self) void {
         .xdg_toplevel => |*xdg_toplevel| xdg_toplevel.configure(),
         .xwayland_view => |*xwayland_view| xwayland_view.configure(),
     }
+}
+
+fn lastSetFullscreenState(self: Self) bool {
+    return switch (self.impl) {
+        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.lastSetFullscreenState(),
+        .xwayland_view => |xwayland_view| xwayland_view.lastSetFullscreenState(),
+    };
 }
 
 pub fn sendFrameDone(self: Self) void {
@@ -330,11 +337,11 @@ pub fn setActivated(self: Self, activated: bool) void {
     }
 }
 
-fn setFullscreen(self: Self, fullscreen: bool) void {
+fn setFullscreen(self: *Self, fullscreen: bool) void {
     if (self.foreign_toplevel_handle) |handle| handle.setFullscreen(fullscreen);
     switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.setFullscreen(fullscreen),
-        .xwayland_view => |xwayland_view| xwayland_view.setFullscreen(fullscreen),
+        .xwayland_view => |*xwayland_view| xwayland_view.setFullscreen(fullscreen),
     }
 }
 

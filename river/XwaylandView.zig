@@ -34,6 +34,11 @@ view: *View,
 /// The corresponding wlroots object
 xwayland_surface: *wlr.XwaylandSurface,
 
+/// The wlroots Xwayland implementation overwrites xwayland_surface.fullscreen
+/// immediately when the client requests it, so we track this state here to be
+/// able to match the XdgToplevel API.
+last_set_fullscreen_state: bool,
+
 // Listeners that are always active over the view's lifetime
 destroy: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleDestroy),
 map: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleMap),
@@ -51,7 +56,11 @@ request_minimize: wl.Listener(*wlr.XwaylandSurface.event.Minimize) =
     wl.Listener(*wlr.XwaylandSurface.event.Minimize).init(handleRequestMinimize),
 
 pub fn init(self: *Self, view: *View, xwayland_surface: *wlr.XwaylandSurface) void {
-    self.* = .{ .view = view, .xwayland_surface = xwayland_surface };
+    self.* = .{
+        .view = view,
+        .xwayland_surface = xwayland_surface,
+        .last_set_fullscreen_state = xwayland_surface.fullscreen,
+    };
     xwayland_surface.data = @ptrToInt(self);
 
     // Add listeners that are active over the view's entire lifetime
@@ -85,6 +94,10 @@ pub fn configure(self: Self) void {
     );
 }
 
+pub fn lastSetFullscreenState(self: Self) bool {
+    return self.last_set_fullscreen_state;
+}
+
 /// Close the view. This will lead to the unmap and destroy events being sent
 pub fn close(self: Self) void {
     self.xwayland_surface.close();
@@ -99,7 +112,8 @@ pub fn setActivated(self: Self, activated: bool) void {
     self.xwayland_surface.restack(null, .above);
 }
 
-pub fn setFullscreen(self: Self, fullscreen: bool) void {
+pub fn setFullscreen(self: *Self, fullscreen: bool) void {
+    self.last_set_fullscreen_state = fullscreen;
     self.xwayland_surface.setFullscreen(fullscreen);
 }
 
