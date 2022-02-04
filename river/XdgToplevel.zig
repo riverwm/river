@@ -96,6 +96,10 @@ pub fn configure(self: *Self) void {
     self.acked_pending_serial = false;
 }
 
+pub fn lastSetFullscreenState(self: Self) bool {
+    return self.xdg_surface.role_data.toplevel.scheduled.fullscreen;
+}
+
 /// Close the view. This will lead to the unmap and destroy events being sent
 pub fn close(self: Self) void {
     self.xdg_surface.role_data.toplevel.sendClose();
