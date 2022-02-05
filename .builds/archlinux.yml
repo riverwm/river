@@ -1,0 +1,57 @@
+image: archlinux
+packages:
+  - libinput
+  - libxkbcommon
+  - mesa
+  - meson
+  - pixman
+  - wayland
+  - wayland-protocols
+  - xcb-util-errors
+  - xcb-util-image
+  - xcb-util-renderutil
+  - xcb-util-wm
+  - xorg-xwayland
+  - seatd
+  - tar
+  - wget
+  - xz
+sources:
+  - https://gitlab.freedesktop.org/wayland/wayland.git
+  - https://gitlab.freedesktop.org/wlroots/wlroots.git
+  - https://github.com/riverwm/river.git
+tasks:
+  - install_deps: |
+      cd wayland
+      git checkout 1.20.0
+      meson build -Ddocumentation=false -Dtests=false --prefix /usr
+      sudo ninja -C build install
+      cd ..
+
+      cd wlroots
+      git checkout 0.15.1
+      meson build --auto-features=enabled -Drenderers=gles2 -Dexamples=false \
+            -Dwerror=false -Db_ndebug=false --prefix /usr
+      sudo ninja -C build/ install
+      cd ..
+
+      wget https://ziglang.org/download/0.9.0/zig-linux-x86_64-0.9.0.tar.xz
+      # Remove a lot of useless lines from tar output.
+      tar -xvf zig-linux-x86_64-0.9.0.tar.xz 1>/dev/null
+      sudo mv zig-linux-x86_64-0.9.0/zig /usr/bin/
+      sudo mv zig-linux-x86_64-0.9.0/lib /usr/lib/zig
+  - build: |
+      cd river
+      zig build
+  - build_xwayland: |
+      cd river
+      zig build -Dxwayland
+  - xwayland_test: |
+      cd river
+      zig build -Dxwayland test
+  - fmt: |
+      cd river
+      zig fmt --check river/
+      zig fmt --check riverctl/
+      zig fmt --check rivertile/
+      zig fmt --check build.zig

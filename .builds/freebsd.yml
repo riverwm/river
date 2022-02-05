@@ -1,0 +1,61 @@
+image: freebsd/latest
+packages:
+  - devel/evdev-proto
+  - devel/libepoll-shim
+  - devel/libudev-devd
+  - devel/meson
+  - devel/pkgconf
+  - graphics/mesa-libs
+  - graphics/wayland-protocols
+  - x11/libX11
+  - x11/libinput
+  - x11/libxcb
+  - x11/libxkbcommon
+  - x11/pixman
+  - x11/xcb-util-errors
+  - x11/xcb-util-renderutil
+  - x11/xcb-util-wm
+  - x11-servers/xwayland
+  - sysutils/seatd
+  - gmake
+  - scdoc
+  - wget
+sources:
+  - https://gitlab.freedesktop.org/wayland/wayland.git
+  - https://gitlab.freedesktop.org/wlroots/wlroots.git
+  - https://github.com/riverwm/river.git
+tasks:
+  - install_deps: |
+      cd wayland
+      git checkout 1.20.0
+      meson build -Ddocumentation=false -Dtests=false --prefix /usr
+      sudo ninja -C build install
+      cd ..
+
+      cd wlroots
+      git checkout 0.15.1
+      meson build --auto-features=enabled -Drenderers=gles2 -Dexamples=false \
+            -Dwerror=false -Db_ndebug=false --prefix /usr
+      sudo ninja -C build/ install
+      cd ..
+
+      wget https://ziglang.org/download/0.9.0/zig-freebsd-x86_64-0.9.0.tar.xz
+      # Remove a lot of useless lines from tar output.
+      tar -xvf zig-freebsd-x86_64-0.9.0.tar.xz 1>/dev/null
+      sudo mv zig-freebsd-x86_64-0.9.0/zig /usr/bin/
+      sudo mv zig-freebsd-x86_64-0.9.0/lib /usr/lib/zig
+  - build: |
+      cd river
+      zig build
+  - build_xwayland: |
+      cd river
+      zig build -Dxwayland
+  - xwayland_test: |
+      cd river
+      zig build -Dxwayland test
+  - fmt: |
+      cd river
+      zig fmt --check river/
+      zig fmt --check riverctl/
+      zig fmt --check rivertile/
+      zig fmt --check build.zig
