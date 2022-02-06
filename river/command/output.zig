@@ -93,6 +93,13 @@ fn getOutput(seat: *Seat, str: []const u8) !?*Output {
         ) orelse return null;
         return @intToPtr(*Output, wlr_output.data);
     } else {
+        // Check if an output matches by name
+        var it = server.root.outputs.first;
+        while (it) |node| : (it = node.next) {
+            if (std.mem.eql(u8, std.mem.sliceTo(node.data.wlr_output.name, 0), str)) {
+                return &node.data;
+            }
+        }
         return Error.InvalidDirection;
     }
 }
