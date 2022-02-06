@@ -102,6 +102,6 @@ fn getOutput(seat: *Seat, str: []const u8) !?*Output {
                 return &node.data;
             }
         }
-        return Error.InvalidDirection;
+        return Error.InvalidOutputIndicator;
     }
 }
