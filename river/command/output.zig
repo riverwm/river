@@ -98,7 +98,7 @@ fn getOutput(seat: *Seat, str: []const u8) !?*Output {
         // Check if an output matches by name
         var it = server.root.outputs.first;
         while (it) |node| : (it = node.next) {
-            if (std.mem.eql(u8, std.mem.sliceTo(node.data.wlr_output.name, 0), str)) {
+            if (std.mem.eql(u8, std.mem.span(node.data.wlr_output.name), str)) {
                 return &node.data;
             }
         }
