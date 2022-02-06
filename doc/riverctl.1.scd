@@ -50,8 +50,9 @@ over the Wayland protocol.
 	Remove an app-id or title from the float filter list. Note that this
 	affects only new views, not already existing ones.
 
-*focus-output* *next*|*previous*|*up*|*right*|*down*|*left*
-	Focus the next or previous output or the closest output in any direction.
+*focus-output* *next*|*previous*|*up*|*right*|*down*|*left*|_name_
+	Focus the next or previous output, the closest output in any direction
+	or an output by name.
 
 *focus-view* *next*|*previous*
 	Focus the next or previous view in the stack.
@@ -68,9 +69,9 @@ over the Wayland protocol.
 	Snap the focused view to the specified screen edge. The view will
 	be set to floating.
 
-*send-to-output* *next*|*previous*|*up*|*right*|*down*|*left*
-	Send the focused view to the next or previous output or the closest
-	output in any direction.
+*send-to-output* *next*|*previous*|*up*|*right*|*down*|*left*|_name_
+	Send the focused view to the next or previous output, the closest
+	output in any direction or to an output by name.
 
 *spawn* _shell_command_
 	Run _shell_command_ using `/bin/sh -c _shell_command_`. Note that

@@ -63,6 +63,8 @@ pub fn sendToOutput(
 
     if (seat.focused == .view) {
         const destination_output = (try getOutput(seat, args[1])) orelse return;
+        // If the view is already on destination_output, do nothing
+        if (seat.focused.view.output == destination_output) return;
         seat.focused.view.sendToOutput(destination_output);
 
         // Handle the change and focus whatever's next in the focus stack
@@ -93,6 +95,13 @@ fn getOutput(seat: *Seat, str: []const u8) !?*Output {
         ) orelse return null;
         return @intToPtr(*Output, wlr_output.data);
     } else {
-        return Error.InvalidDirection;
+        // Check if an output matches by name
+        var it = server.root.outputs.first;
+        while (it) |node| : (it = node.next) {
+            if (std.mem.eql(u8, std.mem.span(node.data.wlr_output.name), str)) {
+                return &node.data;
+            }
+        }
+        return Error.InvalidOutputIndicator;
     }
 }
