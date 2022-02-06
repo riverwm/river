@@ -63,6 +63,8 @@ pub fn sendToOutput(
 
     if (seat.focused == .view) {
         const destination_output = (try getOutput(seat, args[1])) orelse return;
+        // If the view is already on destination_output, do nothing
+        if (seat.focused.view.output == destination_output) return;
         seat.focused.view.sendToOutput(destination_output);
 
         // Handle the change and focus whatever's next in the focus stack
