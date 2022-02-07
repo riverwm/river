@@ -108,20 +108,18 @@ pub fn setCursorState(
     switch (cursor_state) {
         .normal => {
             if (seat.cursor.mode == .disabled) seat.cursor.leaveMode(null);
-            if (seat.cursor.image == .none and !seat.cursor.auto_hidden) {
-                seat.cursor.auto_hidden = true; // should show it though
-                seat.cursor.auto_hide_timer.timerUpdate(5000) catch {};
-            }
+            seat.cursor.resumeFromAutoHide();
         },
         .hidden => {
             if (seat.cursor.mode == .disabled) seat.cursor.leaveMode(null);
-            seat.cursor.auto_hide_timer.timerUpdate(0) catch {};
+            seat.cursor.auto_hide_timer.timerUpdate(0) catch
+                std.log.scoped(.config).err("failed to stop timer", .{});
             seat.cursor.setImage(.none);
-            seat.cursor.auto_hidden = false;
+            seat.cursor.clearFocus();
+            seat.cursor.auto_hidden = true;
         },
         .disabled => {
             seat.cursor.enterMode(.disabled, null);
-            seat.cursor.auto_hide_timer.timerUpdate(0) catch {};
         },
     }
 }

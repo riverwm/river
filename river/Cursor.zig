@@ -86,6 +86,17 @@ const Image = enum {
     @"se-resize",
 };
 
+/// Last image the cursor had before it was hidden
+const SavedImage = union(enum) {
+    builtin: Image,
+    client: struct {
+        client: *wlr.Seat.Client,
+        surface: ?*wlr.Surface,
+        hotspot_x: i32,
+        hotspot_y: i32,
+    },
+};
+
 const default_size = 24;
 
 const log = std.log.scoped(.cursor);
@@ -99,10 +110,12 @@ pointer_gestures: *wlr.PointerGesturesV1,
 xcursor_manager: *wlr.XcursorManager,
 
 image: Image = .unknown,
+
 auto_hide_timer: *wl.EventSource,
 /// Only ever useful if image == .none to determine whether the cursor has been
 /// hidden automatically, or explicitly
 auto_hidden: bool = false,
+saved_image: SavedImage = .{ .builtin = .left_ptr },
 
 constraint: ?*wlr.PointerConstraintV1 = null,
 
@@ -125,6 +138,8 @@ pinch_end: wl.Listener(*wlr.Pointer.event.PinchEnd) =
     wl.Listener(*wlr.Pointer.event.PinchEnd).init(handlePinchEnd),
 request_set_cursor: wl.Listener(*wlr.Seat.event.RequestSetCursor) =
     wl.Listener(*wlr.Seat.event.RequestSetCursor).init(handleRequestSetCursor),
+//image_surface_destroy: wl.Listener(*wlr.Surface.event.Destroy) =
+//    wl.Listener(*wlr.Surface.event.Destroy).init(handleImageSurfaceDestroy),
 swipe_begin: wl.Listener(*wlr.Pointer.event.SwipeBegin) =
     wl.Listener(*wlr.Pointer.event.SwipeBegin).init(handleSwipeBegin),
 swipe_update: wl.Listener(*wlr.Pointer.event.SwipeUpdate) =
@@ -248,14 +263,32 @@ fn handleAutoHide(self: *Self) callconv(.C) c_int {
     self.setImage(.none);
     self.auto_hidden = true;
 
-    return 0;
+    return 0; // what's wl_event_source_check about?
 }
 
 /// Show the cursor if it's hidden, restore focus, reset the auto-hide timer.
-fn resumeFromAutoHide(self: *Self) void {
+pub fn resumeFromAutoHide(self: *Self) void {
     if (self.auto_hidden) {
         assert(self.image == .none);
-        // TODO: show the cursor again
+        assert(self.mode == .passthrough);
+
+        // Show the cursor again
+        switch (self.saved_image) {
+            .builtin => |image| {
+                assert(image != .unknown and image != .none);
+                self.setImage(image);
+            },
+            .client => |image| {
+                // actually, do we want to restore the possibly-unfocused-client's
+                // cursor?
+                self.image = .unknown;
+                self.wlr_cursor.setSurface(image.surface, image.hotspot_x, image.hotspot_y);
+                //self.setImage(.left_ptr);
+            },
+        }
+
+        self.auto_hidden = false;
+
         // TODO: restore focus
     }
 
@@ -277,10 +310,11 @@ pub fn setImage(self: *Self, image: Image) void {
         self.wlr_cursor.setImage(null, 0, 0, 0, 0, 0, 0);
     } else {
         self.xcursor_manager.setCursorImage(@tagName(image), self.wlr_cursor);
+        self.saved_image = .{ .builtin = image };
     }
 }
 
-fn clearFocus(self: *Self) void {
+pub fn clearFocus(self: *Self) void {
     if (self.image != .none) self.setImage(.left_ptr);
     self.seat.wlr_seat.pointerNotifyClearFocus();
 }
@@ -291,6 +325,7 @@ fn handleAxis(listener: *wl.Listener(*wlr.Pointer.event.Axis), event: *wlr.Point
     if (self.mode == .disabled) return;
 
     self.seat.handleActivity();
+    self.resumeFromAutoHide();
 
     // Notify the client with pointer focus of the axis event.
     self.seat.wlr_seat.pointerNotifyAxis(
@@ -304,7 +339,7 @@ fn handleAxis(listener: *wl.Listener(*wlr.Pointer.event.Axis), event: *wlr.Point
 
 fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.Pointer.event.Button) void {
     const self = @fieldParentPtr(Self, "button", listener);
-    if (self.mode == .disabled) return; // actually, should move this further down
+    if (self.mode == .disabled) return; // actually, should move this further down to count presses/releases
 
     self.seat.handleActivity();
     self.resumeFromAutoHide();
@@ -376,7 +411,6 @@ fn handlePinchBegin(
 ) void {
     const self = @fieldParentPtr(Self, "pinch_begin", listener);
     if (self.mode == .disabled) return;
-    self.resumeFromAutoHide();
     self.pointer_gestures.sendPinchBegin(
         self.seat.wlr_seat,
         event.time_msec,
@@ -390,7 +424,6 @@ fn handlePinchUpdate(
 ) void {
     const self = @fieldParentPtr(Self, "pinch_update", listener);
     if (self.mode == .disabled) return;
-    self.resumeFromAutoHide();
     self.pointer_gestures.sendPinchUpdate(
         self.seat.wlr_seat,
         event.time_msec,
@@ -407,7 +440,6 @@ fn handlePinchEnd(
 ) void {
     const self = @fieldParentPtr(Self, "pinch_end", listener);
     if (self.mode == .disabled) return;
-    self.resumeFromAutoHide();
     self.pointer_gestures.sendPinchEnd(
         self.seat.wlr_seat,
         event.time_msec,
@@ -421,7 +453,6 @@ fn handleSwipeBegin(
 ) void {
     const self = @fieldParentPtr(Self, "swipe_begin", listener);
     if (self.mode == .disabled) return;
-    self.resumeFromAutoHide();
     self.pointer_gestures.sendSwipeBegin(
         self.seat.wlr_seat,
         event.time_msec,
@@ -449,7 +480,6 @@ fn handleSwipeEnd(
 ) void {
     const self = @fieldParentPtr(Self, "swipe_end", listener);
     if (self.mode == .disabled) return;
-    self.resumeFromAutoHide();
     self.pointer_gestures.sendSwipeEnd(
         self.seat.wlr_seat,
         event.time_msec,
@@ -529,11 +559,14 @@ fn handleRequestSetCursor(
 ) void {
     // This event is rasied by the seat when a client provides a cursor image
     const self = @fieldParentPtr(Self, "request_set_cursor", listener);
-    if (self.image == .none) return; // TODO: save the requested image
-
     const focused_client = self.seat.wlr_seat.pointer_state.focused_client;
 
-    // This can be sent by any client, so we check to make sure this one is
+    if (self.image == .none) {
+        assert(focused_client == null);
+        return;
+    }
+
+    // This can be sent by any client, so we check to make sure this one
     // actually has pointer focus first.
     if (focused_client == event.seat_client) {
         // Once we've vetted the client, we can tell the cursor to use the
@@ -542,6 +575,12 @@ fn handleRequestSetCursor(
         // cursor moves between outputs.
         log.debug("focused client set cursor", .{});
         self.wlr_cursor.setSurface(event.surface, event.hotspot_x, event.hotspot_y);
+        self.saved_image = .{ .client = .{
+            .client = event.seat_client,
+            .surface = event.surface,
+            .hotspot_x = event.hotspot_x,
+            .hotspot_y = event.hotspot_y,
+        } };
         self.image = .unknown;
     }
 }
@@ -772,9 +811,10 @@ pub fn enterMode(self: *Self, mode: enum { disabled, move, resize }, _view: ?*Vi
     if (mode == .disabled) {
         self.auto_hidden = false;
         self.mode = .disabled;
-        self.seat.wlr_seat.pointerNotifyClearFocus();
+        self.auto_hide_timer.timerUpdate(0) catch
+            log.err("failed to stop timer", .{});
         self.setImage(.none);
-        // TODO: remove pointer capability on seat?
+        self.clearFocus();
         return;
     }
 
