@@ -22,19 +22,11 @@ const util = @import("util.zig");
 const Mapping = @import("Mapping.zig");
 const PointerMapping = @import("PointerMapping.zig");
 
-// TODO: use unmanaged array lists here to save memory
-mappings: std.ArrayList(Mapping),
-pointer_mappings: std.ArrayList(PointerMapping),
+mappings: std.ArrayListUnmanaged(Mapping) = .{},
+pointer_mappings: std.ArrayListUnmanaged(PointerMapping) = .{},
 
-pub fn init() Self {
-    return .{
-        .mappings = std.ArrayList(Mapping).init(util.gpa),
-        .pointer_mappings = std.ArrayList(PointerMapping).init(util.gpa),
-    };
-}
-
-pub fn deinit(self: Self) void {
+pub fn deinit(self: *Self) void {
     for (self.mappings.items) |m| m.deinit();
-    self.mappings.deinit();
-    self.pointer_mappings.deinit();
+    self.mappings.deinit(util.gpa);
+    self.pointer_mappings.deinit(util.gpa);
 }

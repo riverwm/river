@@ -55,7 +55,7 @@ border_color_urgent: [4]f32 = [_]f32{ 0.86274510, 0.19607843, 0.18431373, 1.0 },
 mode_to_id: std.StringHashMap(usize),
 
 /// All user-defined keymap modes, indexed by mode id
-modes: std.ArrayList(Mode),
+modes: std.ArrayListUnmanaged(Mode),
 
 /// Sets of app_ids and titles which will be started floating
 float_filter_app_ids: std.StringHashMapUnmanaged(void) = .{},
@@ -88,23 +88,22 @@ repeat_delay: u31 = 600,
 pub fn init() !Self {
     var self = Self{
         .mode_to_id = std.StringHashMap(usize).init(util.gpa),
-        .modes = std.ArrayList(Mode).init(util.gpa),
+        .modes = try std.ArrayListUnmanaged(Mode).initCapacity(util.gpa, 2),
     };
     errdefer self.deinit();
 
     // Start with two empty modes, "normal" and "locked"
-    try self.modes.ensureTotalCapacity(2);
     {
         // Normal mode, id 0
         const owned_slice = try util.gpa.dupe(u8, "normal");
         try self.mode_to_id.putNoClobber(owned_slice, 0);
-        self.modes.appendAssumeCapacity(Mode.init());
+        self.modes.appendAssumeCapacity(.{});
     }
     {
         // Locked mode, id 1
         const owned_slice = try util.gpa.dupe(u8, "locked");
         try self.mode_to_id.putNoClobber(owned_slice, 1);
-        self.modes.appendAssumeCapacity(Mode.init());
+        self.modes.appendAssumeCapacity(.{});
     }
 
     return self;
@@ -117,8 +116,8 @@ pub fn deinit(self: *Self) void {
         self.mode_to_id.deinit();
     }
 
-    for (self.modes.items) |mode| mode.deinit();
-    self.modes.deinit();
+    for (self.modes.items) |*mode| mode.deinit();
+    self.modes.deinit(util.gpa);
 
     {
         var it = self.float_filter_app_ids.keyIterator();

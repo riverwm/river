@@ -39,9 +39,9 @@ pub fn declareMode(
 
     if (config.mode_to_id.get(new_mode_name) != null) return;
 
-    try config.modes.ensureUnusedCapacity(1);
+    try config.modes.ensureUnusedCapacity(util.gpa, 1);
     const owned_name = try util.gpa.dupe(u8, new_mode_name);
     errdefer util.gpa.free(owned_name);
     try config.mode_to_id.putNoClobber(owned_name, config.modes.items.len);
-    config.modes.appendAssumeCapacity(Mode.init());
+    config.modes.appendAssumeCapacity(.{});
 }

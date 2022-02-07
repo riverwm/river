@@ -73,7 +73,7 @@ pub fn map(
         // possible crash if the Mapping ArrayList is reallocated, stop any
         // currently repeating mappings.
         seat.clearRepeatingMapping();
-        try mode_mappings.append(new);
+        try mode_mappings.append(util.gpa, new);
     }
 }
 
@@ -117,7 +117,7 @@ pub fn mapPointer(
     if (pointerMappingExists(mode_pointer_mappings, modifiers, event_code)) |current| {
         mode_pointer_mappings.items[current] = new;
     } else {
-        try mode_pointer_mappings.append(new);
+        try mode_pointer_mappings.append(util.gpa, new);
     }
 }
 
@@ -135,7 +135,7 @@ fn modeNameToId(allocator: std.mem.Allocator, mode_name: []const u8, out: *?[]co
 
 /// Returns the index of the Mapping with matching modifiers, keysym and release, if any.
 fn mappingExists(
-    mappings: *std.ArrayList(Mapping),
+    mappings: *std.ArrayListUnmanaged(Mapping),
     modifiers: wlr.Keyboard.ModifierMask,
     keysym: xkb.Keysym,
     release: bool,
@@ -151,7 +151,7 @@ fn mappingExists(
 
 /// Returns the index of the PointerMapping with matching modifiers and event code, if any.
 fn pointerMappingExists(
-    pointer_mappings: *std.ArrayList(PointerMapping),
+    pointer_mappings: *std.ArrayListUnmanaged(PointerMapping),
     modifiers: wlr.Keyboard.ModifierMask,
     event_code: u32,
 ) ?usize {
