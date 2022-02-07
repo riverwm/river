@@ -15,6 +15,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
+const math = std.math;
 
 const server = &@import("../main.zig").server;
 
@@ -100,11 +101,11 @@ pub fn resize(
             } else {
                 // Prevent underflow
                 view.pending.box.width -=
-                    std.math.min(view.pending.box.width, @intCast(u32, -1 * delta));
+                    math.min(view.pending.box.width, @intCast(u32, -1 * delta));
             }
             view.applyConstraints();
             // Do not grow bigger than the output
-            view.pending.box.width = std.math.min(
+            view.pending.box.width = math.min(
                 view.pending.box.width,
                 output_box.width - @intCast(u32, 2 * border_width),
             );
@@ -118,11 +119,11 @@ pub fn resize(
             } else {
                 // Prevent underflow
                 view.pending.box.height -=
-                    std.math.min(view.pending.box.height, @intCast(u32, -1 * delta));
+                    math.min(view.pending.box.height, @intCast(u32, -1 * delta));
             }
             view.applyConstraints();
             // Do not grow bigger than the output
-            view.pending.box.height = std.math.min(
+            view.pending.box.height = math.min(
                 view.pending.box.height,
                 output_box.height - @intCast(u32, 2 * border_width),
             );

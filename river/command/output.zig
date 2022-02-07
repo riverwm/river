@@ -15,6 +15,8 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
+const assert = std.debug.assert;
+const mem = std.mem;
 
 const wlr = @import("wlroots");
 
@@ -27,7 +29,7 @@ const Output = @import("../Output.zig");
 const Seat = @import("../Seat.zig");
 
 pub fn focusOutput(
-    _: std.mem.Allocator,
+    _: mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,
@@ -37,7 +39,7 @@ pub fn focusOutput(
 
     // If the noop output is focused, there are no other outputs to switch to
     if (seat.focused_output == &server.root.noop_output) {
-        std.debug.assert(server.root.outputs.len == 0);
+        assert(server.root.outputs.len == 0);
         return;
     }
 
@@ -47,7 +49,7 @@ pub fn focusOutput(
 }
 
 pub fn sendToOutput(
-    _: std.mem.Allocator,
+    _: mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,
@@ -57,7 +59,7 @@ pub fn sendToOutput(
 
     // If the noop output is focused, there is nowhere to send the view
     if (seat.focused_output == &server.root.noop_output) {
-        std.debug.assert(server.root.outputs.len == 0);
+        assert(server.root.outputs.len == 0);
         return;
     }
 
@@ -98,7 +100,7 @@ fn getOutput(seat: *Seat, str: []const u8) !?*Output {
         // Check if an output matches by name
         var it = server.root.outputs.first;
         while (it) |node| : (it = node.next) {
-            if (std.mem.eql(u8, std.mem.span(node.data.wlr_output.name), str)) {
+            if (mem.eql(u8, mem.span(node.data.wlr_output.name), str)) {
                 return &node.data;
             }
         }

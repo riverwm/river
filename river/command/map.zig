@@ -15,6 +15,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
+const fmt = std.fmt;
 const mem = std.mem;
 const wlr = @import("wlroots");
 const xkb = @import("xkbcommon");
@@ -33,7 +34,7 @@ const Seat = @import("../Seat.zig");
 /// Example:
 /// map normal Mod4+Shift Return spawn foot
 pub fn map(
-    allocator: std.mem.Allocator,
+    allocator: mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
@@ -63,7 +64,7 @@ pub fn map(
         mode_mappings.items[current] = new;
         // Warn user if they overwrote an existing keybinding using riverctl.
         const opts = if (optionals.release) "-release " else "";
-        out.* = try std.fmt.allocPrint(
+        out.* = try fmt.allocPrint(
             allocator,
             "overwrote an existing keybinding: {s} {s}{s} {s}",
             .{ mode_raw, opts, modifiers_raw, keysym_raw },
@@ -82,7 +83,7 @@ pub fn map(
 /// Example:
 /// map-pointer normal Mod4 BTN_LEFT move-view
 pub fn mapPointer(
-    allocator: std.mem.Allocator,
+    allocator: mem.Allocator,
     _: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
@@ -94,12 +95,12 @@ pub fn mapPointer(
     const modifiers = try parseModifiers(allocator, args[2], out);
     const event_code = try parseEventCode(allocator, args[3], out);
 
-    const action = if (std.mem.eql(u8, args[4], "move-view"))
+    const action = if (mem.eql(u8, args[4], "move-view"))
         PointerMapping.Action.move
-    else if (std.mem.eql(u8, args[4], "resize-view"))
+    else if (mem.eql(u8, args[4], "resize-view"))
         PointerMapping.Action.resize
     else {
-        out.* = try std.fmt.allocPrint(
+        out.* = try fmt.allocPrint(
             allocator,
             "invalid pointer action {s}, must be move-view or resize-view",
             .{args[4]},
@@ -121,10 +122,10 @@ pub fn mapPointer(
     }
 }
 
-fn modeNameToId(allocator: std.mem.Allocator, mode_name: []const u8, out: *?[]const u8) !usize {
+fn modeNameToId(allocator: mem.Allocator, mode_name: []const u8, out: *?[]const u8) !usize {
     const config = &server.config;
     return config.mode_to_id.get(mode_name) orelse {
-        out.* = try std.fmt.allocPrint(
+        out.* = try fmt.allocPrint(
             allocator,
             "cannot add/remove mapping to/from non-existant mode '{s}'",
             .{mode_name},
@@ -164,31 +165,31 @@ fn pointerMappingExists(
     return null;
 }
 
-fn parseEventCode(allocator: std.mem.Allocator, name: [:0]const u8, out: *?[]const u8) !u32 {
+fn parseEventCode(allocator: mem.Allocator, name: [:0]const u8, out: *?[]const u8) !u32 {
     const event_code = c.libevdev_event_code_from_name(c.EV_KEY, name);
     if (event_code < 1) {
-        out.* = try std.fmt.allocPrint(allocator, "unknown button {s}", .{name});
+        out.* = try fmt.allocPrint(allocator, "unknown button {s}", .{name});
         return Error.Other;
     }
 
     return @intCast(u32, event_code);
 }
 
-fn parseKeysym(allocator: std.mem.Allocator, name: [:0]const u8, out: *?[]const u8) !xkb.Keysym {
+fn parseKeysym(allocator: mem.Allocator, name: [:0]const u8, out: *?[]const u8) !xkb.Keysym {
     const keysym = xkb.Keysym.fromName(name, .case_insensitive);
     if (keysym == .NoSymbol) {
-        out.* = try std.fmt.allocPrint(allocator, "invalid keysym '{s}'", .{name});
+        out.* = try fmt.allocPrint(allocator, "invalid keysym '{s}'", .{name});
         return Error.Other;
     }
     return keysym;
 }
 
 fn parseModifiers(
-    allocator: std.mem.Allocator,
+    allocator: mem.Allocator,
     modifiers_str: []const u8,
     out: *?[]const u8,
 ) !wlr.Keyboard.ModifierMask {
-    var it = std.mem.split(u8, modifiers_str, "+");
+    var it = mem.split(u8, modifiers_str, "+");
     var modifiers = wlr.Keyboard.ModifierMask{};
     outer: while (it.next()) |mod_name| {
         if (mem.eql(u8, mod_name, "None")) continue;
@@ -204,12 +205,12 @@ fn parseModifiers(
             .{ .name = "Super", .field_name = "logo" },
             .{ .name = "Mod5", .field_name = "mod5" },
         }) |def| {
-            if (std.mem.eql(u8, def.name, mod_name)) {
+            if (mem.eql(u8, def.name, mod_name)) {
                 @field(modifiers, def.field_name) = true;
                 continue :outer;
             }
         }
-        out.* = try std.fmt.allocPrint(allocator, "invalid modifier '{s}'", .{mod_name});
+        out.* = try fmt.allocPrint(allocator, "invalid modifier '{s}'", .{mod_name});
         return Error.Other;
     }
     return modifiers;
@@ -236,10 +237,10 @@ fn parseOptionalArgs(args: []const []const u8) OptionalArgsContainer {
 
     var i: usize = 0;
     for (args) |arg| {
-        if (std.mem.eql(u8, arg, "-release")) {
+        if (mem.eql(u8, arg, "-release")) {
             parsed.release = true;
             i += 1;
-        } else if (std.mem.eql(u8, arg, "-repeat")) {
+        } else if (mem.eql(u8, arg, "-repeat")) {
             parsed.repeat = true;
             i += 1;
         } else {
@@ -257,7 +258,7 @@ fn parseOptionalArgs(args: []const []const u8) OptionalArgsContainer {
 /// Example:
 /// unmap normal Mod4+Shift Return
 pub fn unmap(
-    allocator: std.mem.Allocator,
+    allocator: mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
@@ -288,7 +289,7 @@ pub fn unmap(
 /// Example:
 /// unmap-pointer normal Mod4 BTN_LEFT
 pub fn unmapPointer(
-    allocator: std.mem.Allocator,
+    allocator: mem.Allocator,
     _: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,

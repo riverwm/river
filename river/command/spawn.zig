@@ -15,6 +15,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
+const os = std.os;
 
 const c = @import("../c.zig");
 
@@ -33,7 +34,7 @@ pub fn spawn(
 
     const child_args = [_:null]?[*:0]const u8{ "/bin/sh", "-c", args[1], null };
 
-    const pid = std.os.fork() catch {
+    const pid = os.fork() catch {
         out.* = try std.fmt.allocPrint(allocator, "fork/execve failed", .{});
         return Error.Other;
     };
@@ -41,18 +42,18 @@ pub fn spawn(
     if (pid == 0) {
         // Clean things up for the child in an intermediate fork
         if (c.setsid() < 0) unreachable;
-        if (std.os.system.sigprocmask(std.os.SIG.SETMASK, &std.os.empty_sigset, null) < 0) unreachable;
+        if (os.system.sigprocmask(os.SIG.SETMASK, &os.empty_sigset, null) < 0) unreachable;
 
-        const pid2 = std.os.fork() catch c._exit(1);
-        if (pid2 == 0) std.os.execveZ("/bin/sh", &child_args, std.c.environ) catch c._exit(1);
+        const pid2 = os.fork() catch c._exit(1);
+        if (pid2 == 0) os.execveZ("/bin/sh", &child_args, std.c.environ) catch c._exit(1);
 
         c._exit(0);
     }
 
     // Wait the intermediate child.
-    const ret = std.os.waitpid(pid, 0);
-    if (!std.os.W.IFEXITED(ret.status) or
-        (std.os.W.IFEXITED(ret.status) and std.os.W.EXITSTATUS(ret.status) != 0))
+    const ret = os.waitpid(pid, 0);
+    if (!os.W.IFEXITED(ret.status) or
+        (os.W.IFEXITED(ret.status) and os.W.EXITSTATUS(ret.status) != 0))
     {
         out.* = try std.fmt.allocPrint(allocator, "fork/execve failed", .{});
         return Error.Other;

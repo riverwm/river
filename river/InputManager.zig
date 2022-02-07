@@ -57,7 +57,7 @@ pub const InputDevice = struct {
             },
         );
         for (identifier) |*char| {
-            if (char.* == ' ' or !std.ascii.isPrint(char.*)) {
+            if (char.* == ' ' or !ascii.isPrint(char.*)) {
                 char.* = '_';
             }
         }

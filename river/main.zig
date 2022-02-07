@@ -167,7 +167,7 @@ pub fn log(
 
     const scope_prefix = if (scope == .default) ": " else "(" ++ @tagName(scope) ++ "): ";
 
-    const stderr = std.io.getStdErr().writer();
+    const stderr = io.getStdErr().writer();
     stderr.print(level.asText() ++ scope_prefix ++ format ++ "\n", args) catch {};
 }
 

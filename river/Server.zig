@@ -18,7 +18,6 @@ const Self = @This();
 
 const build_options = @import("build_options");
 const std = @import("std");
-const mem = std.mem;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 

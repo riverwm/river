@@ -18,7 +18,6 @@ const Self = @This();
 
 const std = @import("std");
 const assert = std.debug.assert;
-const mem = std.mem;
 const wlr = @import("wlroots");
 const wayland = @import("wayland");
 const wl = wayland.server.wl;

@@ -36,6 +36,7 @@
 // +-----------------------+------------+
 
 const std = @import("std");
+const fmt = std.fmt;
 const mem = std.mem;
 const math = std.math;
 const os = std.os;
@@ -164,7 +165,7 @@ const Output = struct {
                         };
                     },
                     .@"main-count" => {
-                        const arg = std.fmt.parseInt(i32, raw_arg, 10) catch |err| {
+                        const arg = fmt.parseInt(i32, raw_arg, 10) catch |err| {
                             std.log.err("failed to parse argument: {}", .{err});
                             return;
                         };
@@ -178,7 +179,7 @@ const Output = struct {
                         }
                     },
                     .@"main-ratio" => {
-                        const arg = std.fmt.parseFloat(f64, raw_arg) catch |err| {
+                        const arg = fmt.parseFloat(f64, raw_arg) catch |err| {
                             std.log.err("failed to parse argument: {}", .{err});
                             return;
                         };
@@ -331,11 +332,11 @@ pub fn main() !void {
         os.exit(0);
     }
     if (result.argFlag("-view-padding")) |raw| {
-        view_padding = std.fmt.parseUnsigned(u32, raw, 10) catch
+        view_padding = fmt.parseUnsigned(u32, raw, 10) catch
             fatalPrintUsage("invalid value '{s}' provided to -view-padding", .{raw});
     }
     if (result.argFlag("-outer-padding")) |raw| {
-        outer_padding = std.fmt.parseUnsigned(u32, raw, 10) catch
+        outer_padding = fmt.parseUnsigned(u32, raw, 10) catch
             fatalPrintUsage("invalid value '{s}' provided to -outer-padding", .{raw});
     }
     if (result.argFlag("-main-location")) |raw| {
@@ -343,11 +344,11 @@ pub fn main() !void {
             fatalPrintUsage("invalid value '{s}' provided to -main-location", .{raw});
     }
     if (result.argFlag("-main-count")) |raw| {
-        default_main_count = std.fmt.parseUnsigned(u32, raw, 10) catch
+        default_main_count = fmt.parseUnsigned(u32, raw, 10) catch
             fatalPrintUsage("invalid value '{s}' provided to -main-count", .{raw});
     }
     if (result.argFlag("-main-ratio")) |raw| {
-        default_main_ratio = std.fmt.parseFloat(f64, raw) catch
+        default_main_ratio = fmt.parseFloat(f64, raw) catch
             fatalPrintUsage("invalid value '{s}' provided to -main-ratio", .{raw});
     }
 

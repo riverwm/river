@@ -15,6 +15,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
+const assert = std.debug.assert;
 
 const Seat = @import("Seat.zig");
 
@@ -122,7 +123,7 @@ pub fn run(
     args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
-    std.debug.assert(out.* == null);
+    assert(out.* == null);
     if (args.len == 0) return Error.NoCommand;
     const impl_fn = command_impls.get(args[0]) orelse return Error.UnknownCommand;
     try impl_fn(allocator, seat, args, out);

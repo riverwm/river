@@ -17,7 +17,7 @@
 const Self = @This();
 
 const std = @import("std");
-const mem = std.mem;
+const math = std.math;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
@@ -143,10 +143,10 @@ pub fn getAppId(self: Self) ?[*:0]const u8 {
 pub fn getConstraints(self: Self) View.Constraints {
     const state = &self.xdg_surface.role_data.toplevel.current;
     return .{
-        .min_width = std.math.max(state.min_width, View.min_size),
-        .max_width = if (state.max_width > 0) state.max_width else std.math.maxInt(u32),
-        .min_height = std.math.max(state.min_height, View.min_size),
-        .max_height = if (state.max_height > 0) state.max_height else std.math.maxInt(u32),
+        .min_width = math.max(state.min_width, View.min_size),
+        .max_width = if (state.max_width > 0) state.max_width else math.maxInt(u32),
+        .min_height = math.max(state.min_height, View.min_size),
+        .max_height = if (state.max_height > 0) state.max_height else math.maxInt(u32),
     };
 }
 
@@ -186,9 +186,9 @@ fn handleMap(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurfa
     self.xdg_surface.getGeometry(&initial_box);
     view.float_box.width = @intCast(u32, initial_box.width);
     view.float_box.height = @intCast(u32, initial_box.height);
-    view.float_box.x = std.math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.width) -
+    view.float_box.x = math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.width) -
         @intCast(i32, view.float_box.width), 2));
-    view.float_box.y = std.math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.height) -
+    view.float_box.y = math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.height) -
         @intCast(i32, view.float_box.height), 2));
 
     // We initialize these to avoid special-casing newly mapped views in
