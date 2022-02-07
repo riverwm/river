@@ -31,6 +31,7 @@ const DragIcon = @import("DragIcon.zig");
 const Cursor = @import("Cursor.zig");
 const InputManager = @import("InputManager.zig");
 const Keyboard = @import("Keyboard.zig");
+const Switch = @import("Switch.zig");
 const Mapping = @import("Mapping.zig");
 const LayerSurface = @import("LayerSurface.zig");
 const Output = @import("Output.zig");
@@ -54,6 +55,9 @@ cursor: Cursor = undefined,
 
 /// Mulitple keyboards are handled separately
 keyboards: std.TailQueue(Keyboard) = .{},
+
+/// There are two kind of switches: lid switches and tablet mode switches
+switches: std.TailQueue(Switch) = .{},
 
 /// ID of the current keymap mode
 mode_id: usize = 0,
@@ -119,6 +123,11 @@ pub fn deinit(self: *Self) void {
     self.mapping_repeat_timer.remove();
 
     while (self.keyboards.pop()) |node| {
+        node.data.deinit();
+        util.gpa.destroy(node);
+    }
+
+    while (self.switches.pop()) |node| {
         node.data.deinit();
         util.gpa.destroy(node);
     }
@@ -350,17 +359,30 @@ pub fn handleMapping(
                     log.err("failed to update mapping repeat timer", .{});
                 };
             }
-            self.runMappedCommand(mapping);
+            self.runCommand(mapping.command_args);
             return true;
         }
     }
     return false;
 }
 
-fn runMappedCommand(self: *Self, mapping: *const Mapping) void {
+/// Handle any user-defined mapping for switches
+pub fn handleSwitchMapping(
+    self: *Self,
+    switch_type: Switch.Type,
+    switch_state: Switch.State,
+) void {
+    const modes = &server.config.modes;
+    for (modes.items[self.mode_id].switch_mappings.items) |mapping| {
+        if (std.meta.eql(mapping.switch_type, switch_type) and std.meta.eql(mapping.switch_state, switch_state)) {
+            self.runCommand(mapping.command_args);
+        }
+    }
+}
+
+fn runCommand(self: *Self, args: []const [:0]const u8) void {
     var out: ?[]const u8 = null;
     defer if (out) |s| util.gpa.free(s);
-    const args = mapping.command_args;
     command.run(self, args, &out) catch |err| {
         const failure_message = switch (err) {
             command.Error.Other => out.?,
@@ -392,7 +414,7 @@ fn handleMappingRepeatTimeout(self: *Self) callconv(.C) c_int {
         self.mapping_repeat_timer.timerUpdate(ms_delay) catch {
             log.err("failed to update mapping repeat timer", .{});
         };
-        self.runMappedCommand(mapping);
+        self.runCommand(mapping.command_args);
     }
     return 0;
 }
@@ -403,6 +425,7 @@ pub fn addDevice(self: *Self, device: *wlr.InputDevice) void {
     switch (device.type) {
         .keyboard => self.addKeyboard(device) catch return,
         .pointer => self.addPointer(device),
+        .switch_device => self.addSwitch(device) catch return,
         else => return,
     }
 
@@ -436,6 +459,12 @@ fn addPointer(self: Self, device: *wlr.InputDevice) void {
     // opportunity to do libinput configuration on the device to set
     // acceleration, etc.
     self.cursor.wlr_cursor.attachInputDevice(device);
+}
+
+fn addSwitch(self: *Self, device: *wlr.InputDevice) !void {
+    const node = try util.gpa.create(std.TailQueue(Switch).Node);
+    node.data.init(self, device);
+    self.switches.append(node);
 }
 
 fn handleRequestSetSelection(

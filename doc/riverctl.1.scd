@@ -218,6 +218,20 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 		- move-view
 		- resize-view
 
+*map-switch* _mode_ *lid*|*tablet* _state_ _command_
+	Run _command_ when river receives a certain switch event.
+
+	- _mode_: name of the mode for which to create the mapping
+	- _lid_|_tablet_: 'lid switch' and 'tablet mode switch' are supported
+	- _state_:
+		- possible states for _lid_:
+			- close
+			- open
+		- possible states for _tablet_:
+			- on
+			- off
+	- _command_: any command that may be run with riverctl
+
 *unmap* [_-release_] _mode_ _modifiers_ _key_
 	Remove the mapping defined by the arguments:
 
@@ -234,6 +248,13 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 	- _modifiers_: one or more of the modifiers listed above, separated
 	  by a plus sign (+).
 	- _button_: the name of a linux input event code as described above
+
+*unmap-switch* _mode_ *lid*|*tablet* _state_
+	Remove the switch mapping defined by the arguments:
+
+	- _mode_: name of the mode for which to remove the mapping
+	- _lid_|_tablet_: the switch for which to remove the mapping
+	- _state_: a state as listed above
 
 ## CONFIGURATION
 

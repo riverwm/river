@@ -27,6 +27,8 @@ const util = @import("../util.zig");
 const Error = @import("../command.zig").Error;
 const Mapping = @import("../Mapping.zig");
 const PointerMapping = @import("../PointerMapping.zig");
+const SwitchMapping = @import("../SwitchMapping.zig");
+const Switch = @import("../Switch.zig");
 const Seat = @import("../Seat.zig");
 
 /// Create a new mapping for a given mode
@@ -73,6 +75,40 @@ pub fn map(
         // possible crash if the Mapping ArrayList is reallocated, stop any
         // currently repeating mappings.
         seat.clearRepeatingMapping();
+        try mode_mappings.append(util.gpa, new);
+    }
+}
+
+/// Create a new switch mapping for a given mode
+///
+/// Example:
+/// map-switch normal lid close spawn "wlr-randr --output eDP-1 --off"
+pub fn mapSwitch(
+    _: *Seat,
+    args: []const [:0]const u8,
+    out: *?[]const u8,
+) Error!void {
+    if (args.len < 5) return Error.NotEnoughArguments;
+
+    const mode_id = try modeNameToId(args[1], out);
+    const switch_type = try parseSwitchType(args[2], out);
+    const switch_state = try parseSwitchState(switch_type, args[3], out);
+
+    const new = try SwitchMapping.init(switch_type, switch_state, args[4..]);
+    errdefer new.deinit();
+
+    const mode_mappings = &server.config.modes.items[mode_id].switch_mappings;
+
+    if (switchMappingExists(mode_mappings, switch_type, switch_state)) |current| {
+        mode_mappings.items[current].deinit();
+        mode_mappings.items[current] = new;
+        // Warn user if they overwrote an existing keybinding using riverctl.
+        out.* = try std.fmt.allocPrint(
+            util.gpa,
+            "overwrote an existing keybinding: map-switch {s} {s} {s}",
+            .{ args[1], args[2], args[3] },
+        );
+    } else {
         try mode_mappings.append(util.gpa, new);
     }
 }
@@ -148,6 +184,21 @@ fn mappingExists(
     return null;
 }
 
+/// Returns the index of the SwitchMapping with matching switch_type and switch_state, if any.
+fn switchMappingExists(
+    switch_mappings: *std.ArrayListUnmanaged(SwitchMapping),
+    switch_type: Switch.Type,
+    switch_state: Switch.State,
+) ?usize {
+    for (switch_mappings.items) |mapping, i| {
+        if (mapping.switch_type == switch_type and std.meta.eql(mapping.switch_state, switch_state)) {
+            return i;
+        }
+    }
+
+    return null;
+}
+
 /// Returns the index of the PointerMapping with matching modifiers and event code, if any.
 fn pointerMappingExists(
     pointer_mappings: *std.ArrayListUnmanaged(PointerMapping),
@@ -210,6 +261,57 @@ fn parseModifiers(modifiers_str: []const u8, out: *?[]const u8) !wlr.Keyboard.Mo
     return modifiers;
 }
 
+fn parseSwitchType(
+    switch_type_str: []const u8,
+    out: *?[]const u8,
+) !Switch.Type {
+    return std.meta.stringToEnum(Switch.Type, switch_type_str) orelse {
+        out.* = try std.fmt.allocPrint(
+            util.gpa,
+            "invalid switch '{s}', must be 'lid' or 'tablet'",
+            .{switch_type_str},
+        );
+        return Error.Other;
+    };
+}
+
+fn parseSwitchState(
+    switch_type: Switch.Type,
+    switch_state_str: []const u8,
+    out: *?[]const u8,
+) !Switch.State {
+    switch (switch_type) {
+        .lid => {
+            const lid_state = std.meta.stringToEnum(
+                Switch.LidState,
+                switch_state_str,
+            ) orelse {
+                out.* = try std.fmt.allocPrint(
+                    util.gpa,
+                    "invalid lid state '{s}', must be 'close' or 'open'",
+                    .{switch_state_str},
+                );
+                return Error.Other;
+            };
+            return Switch.State{ .lid = lid_state };
+        },
+        .tablet => {
+            const tablet_state = std.meta.stringToEnum(
+                Switch.TabletState,
+                switch_state_str,
+            ) orelse {
+                out.* = try std.fmt.allocPrint(
+                    util.gpa,
+                    "invalid tablet state '{s}', must be 'on' or 'off'",
+                    .{switch_state_str},
+                );
+                return Error.Other;
+            };
+            return Switch.State{ .tablet = tablet_state };
+        },
+    }
+}
+
 const OptionalArgsContainer = struct {
     i: usize,
     release: bool,
@@ -268,6 +370,28 @@ pub fn unmap(seat: *Seat, args: []const [:0]const u8, out: *?[]const u8) Error!v
     // crash if the Mapping ArrayList is reallocated, stop any currently
     // repeating mappings.
     seat.clearRepeatingMapping();
+
+    var mapping = mode_mappings.swapRemove(mapping_idx);
+    mapping.deinit();
+}
+
+/// Remove a switch mapping from a given mode
+///
+/// Example:
+/// unmap-switch normal tablet on
+pub fn unmapSwitch(
+    _: *Seat,
+    args: []const [:0]const u8,
+    out: *?[]const u8,
+) Error!void {
+    if (args.len < 4) return Error.NotEnoughArguments;
+
+    const mode_id = try modeNameToId(args[1], out);
+    const switch_type = try parseSwitchType(args[2], out);
+    const switch_state = try parseSwitchState(switch_type, args[3], out);
+
+    const mode_mappings = &server.config.modes.items[mode_id].switch_mappings;
+    const mapping_idx = switchMappingExists(mode_mappings, switch_type, switch_state) orelse return;
 
     var mapping = mode_mappings.swapRemove(mapping_idx);
     mapping.deinit();

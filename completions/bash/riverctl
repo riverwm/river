@@ -34,8 +34,10 @@ function __riverctl_completion ()
 			enter-mode \
 			map \
 			map-pointer \
+			map-switch \
 			unmap \
 			unmap-pointer \
+			unmap-switch \
 			attach-mode \
 			background-color \
 			border-color-focused \
