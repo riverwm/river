@@ -138,7 +138,7 @@ pub fn build(b: *zbs.Builder) !void {
 
     {
         const file = try fs.path.join(b.allocator, &[_][]const u8{ b.cache_root, "river-protocols.pc" });
-        const pkgconfig_file = try std.fs.cwd().createFile(file, .{});
+        const pkgconfig_file = try fs.cwd().createFile(file, .{});
 
         const writer = pkgconfig_file.writer();
         try writer.print(

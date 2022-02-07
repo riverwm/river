@@ -267,7 +267,7 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
     self.seat.handleActivity();
 
     if (event.state == .released) {
-        std.debug.assert(self.pressed_count > 0);
+        assert(self.pressed_count > 0);
         self.pressed_count -= 1;
         if (self.pressed_count == 0 and self.mode != .passthrough) {
             self.leaveMode(event);

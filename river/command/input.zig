@@ -16,6 +16,7 @@
 
 const std = @import("std");
 const mem = std.mem;
+const meta = std.meta;
 
 const server = &@import("../main.zig").server;
 const util = @import("../util.zig");
@@ -156,37 +157,37 @@ pub fn input(
     }
 
     if (mem.eql(u8, "events", args[2])) {
-        input_config.event_state = std.meta.stringToEnum(InputConfig.EventState, args[3]) orelse
+        input_config.event_state = meta.stringToEnum(InputConfig.EventState, args[3]) orelse
             return Error.UnknownOption;
     } else if (mem.eql(u8, "accel-profile", args[2])) {
-        input_config.accel_profile = std.meta.stringToEnum(InputConfig.AccelProfile, args[3]) orelse
+        input_config.accel_profile = meta.stringToEnum(InputConfig.AccelProfile, args[3]) orelse
             return Error.UnknownOption;
     } else if (mem.eql(u8, "click-method", args[2])) {
-        input_config.click_method = std.meta.stringToEnum(InputConfig.ClickMethod, args[3]) orelse
+        input_config.click_method = meta.stringToEnum(InputConfig.ClickMethod, args[3]) orelse
             return Error.UnknownOption;
     } else if (mem.eql(u8, "drag", args[2])) {
-        input_config.drag_state = std.meta.stringToEnum(InputConfig.DragState, args[3]) orelse
+        input_config.drag_state = meta.stringToEnum(InputConfig.DragState, args[3]) orelse
             return Error.UnknownOption;
     } else if (mem.eql(u8, "drag-lock", args[2])) {
-        input_config.drag_lock = std.meta.stringToEnum(InputConfig.DragLock, args[3]) orelse
+        input_config.drag_lock = meta.stringToEnum(InputConfig.DragLock, args[3]) orelse
             return Error.UnknownOption;
     } else if (mem.eql(u8, "disable-while-typing", args[2])) {
-        input_config.dwt_state = std.meta.stringToEnum(InputConfig.DwtState, args[3]) orelse
+        input_config.dwt_state = meta.stringToEnum(InputConfig.DwtState, args[3]) orelse
             return Error.UnknownOption;
     } else if (mem.eql(u8, "middle-emulation", args[2])) {
-        input_config.middle_emulation = std.meta.stringToEnum(InputConfig.MiddleEmulation, args[3]) orelse
+        input_config.middle_emulation = meta.stringToEnum(InputConfig.MiddleEmulation, args[3]) orelse
             return Error.UnknownOption;
     } else if (mem.eql(u8, "natural-scroll", args[2])) {
-        input_config.natural_scroll = std.meta.stringToEnum(InputConfig.NaturalScroll, args[3]) orelse
+        input_config.natural_scroll = meta.stringToEnum(InputConfig.NaturalScroll, args[3]) orelse
             return Error.UnknownOption;
     } else if (mem.eql(u8, "left-handed", args[2])) {
-        input_config.left_handed = std.meta.stringToEnum(InputConfig.LeftHanded, args[3]) orelse
+        input_config.left_handed = meta.stringToEnum(InputConfig.LeftHanded, args[3]) orelse
             return Error.UnknownOption;
     } else if (mem.eql(u8, "tap", args[2])) {
-        input_config.tap_state = std.meta.stringToEnum(InputConfig.TapState, args[3]) orelse
+        input_config.tap_state = meta.stringToEnum(InputConfig.TapState, args[3]) orelse
             return Error.UnknownOption;
     } else if (mem.eql(u8, "tap-button-map", args[2])) {
-        input_config.tap_button_map = std.meta.stringToEnum(InputConfig.TapButtonMap, args[3]) orelse
+        input_config.tap_button_map = meta.stringToEnum(InputConfig.TapButtonMap, args[3]) orelse
             return Error.UnknownOption;
     } else if (mem.eql(u8, "pointer-accel", args[2])) {
         input_config.pointer_accel = InputConfig.PointerAccel{
@@ -197,7 +198,7 @@ pub fn input(
             ),
         };
     } else if (mem.eql(u8, "scroll-method", args[2])) {
-        input_config.scroll_method = std.meta.stringToEnum(InputConfig.ScrollMethod, args[3]) orelse
+        input_config.scroll_method = meta.stringToEnum(InputConfig.ScrollMethod, args[3]) orelse
             return Error.UnknownOption;
     } else if (mem.eql(u8, "scroll-button", args[2])) {
         const ret = c.libevdev_event_code_from_name(c.EV_KEY, args[3]);

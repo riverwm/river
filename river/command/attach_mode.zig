@@ -15,6 +15,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
+const mem = std.mem;
 
 const util = @import("../util.zig");
 
@@ -24,7 +25,7 @@ const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
 pub fn attachMode(
-    _: std.mem.Allocator,
+    _: mem.Allocator,
     _: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,
@@ -32,9 +33,9 @@ pub fn attachMode(
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
 
-    if (std.mem.eql(u8, "top", args[1])) {
+    if (mem.eql(u8, "top", args[1])) {
         server.config.attach_mode = .top;
-    } else if (std.mem.eql(u8, "bottom", args[1])) {
+    } else if (mem.eql(u8, "bottom", args[1])) {
         server.config.attach_mode = .bottom;
     } else {
         return Error.UnknownOption;

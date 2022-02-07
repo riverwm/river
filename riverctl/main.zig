@@ -119,7 +119,7 @@ fn callbackListener(_: *zriver.CommandCallbackV1, event: zriver.CommandCallbackV
     switch (event) {
         .success => |success| {
             if (mem.len(success.output) > 0) {
-                const stdout = std.io.getStdOut().writer();
+                const stdout = io.getStdOut().writer();
                 stdout.print("{s}\n", .{success.output}) catch @panic("failed to write to stdout");
             }
             os.exit(0);
@@ -138,5 +138,5 @@ fn callbackListener(_: *zriver.CommandCallbackV1, event: zriver.CommandCallbackV
 
 fn fatal(comptime format: []const u8, args: anytype) noreturn {
     std.log.err(format, args);
-    std.os.exit(1);
+    os.exit(1);
 }

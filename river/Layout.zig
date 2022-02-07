@@ -17,6 +17,7 @@
 const Self = @This();
 
 const std = @import("std");
+const assert = std.debug.assert;
 const mem = std.mem;
 const wlr = @import("wlroots");
 const wayland = @import("wayland");
@@ -102,7 +103,7 @@ pub fn startLayoutDemand(self: *Self, views: u32) void {
         .{ self.namespace, self.output.wlr_output.name },
     );
 
-    std.debug.assert(self.output.layout_demand == null);
+    assert(self.output.layout_demand == null);
     self.output.layout_demand = LayoutDemand.init(self, views) catch {
         log.err("failed starting layout demand", .{});
         return;
