@@ -38,7 +38,7 @@ pub const Orientation = enum {
 
 // zig fmt: off
 const command_impls = std.ComptimeStringMap(
-    fn (std.mem.Allocator, *Seat, []const [:0]const u8, *?[]const u8) Error!void,
+    fn (*Seat, []const [:0]const u8, *?[]const u8) Error!void,
     .{
         .{ "attach-mode",               @import("command/attach_mode.zig").attachMode },
         .{ "background-color",          @import("command/config.zig").backgroundColor },
@@ -118,7 +118,6 @@ pub const Error = error{
 /// The caller is then responsible for freeing that slice, which will be
 /// allocated using the provided allocator.
 pub fn run(
-    allocator: std.mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
@@ -126,7 +125,7 @@ pub fn run(
     assert(out.* == null);
     if (args.len == 0) return Error.NoCommand;
     const impl_fn = command_impls.get(args[0]) orelse return Error.UnknownCommand;
-    try impl_fn(allocator, seat, args, out);
+    try impl_fn(seat, args, out);
 }
 
 /// Return a short error message for the given error. Passing Error.Other is UB

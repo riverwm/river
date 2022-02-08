@@ -17,13 +17,13 @@
 const std = @import("std");
 
 const server = &@import("../main.zig").server;
+const util = @import("../util.zig");
 
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
 /// Switch to the given mode
 pub fn enterMode(
-    allocator: std.mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
@@ -33,7 +33,7 @@ pub fn enterMode(
 
     if (seat.mode_id == 1) {
         out.* = try std.fmt.allocPrint(
-            allocator,
+            util.gpa,
             "manually exiting mode 'locked' is not allowed",
             .{},
         );
@@ -43,7 +43,7 @@ pub fn enterMode(
     const target_mode = args[1];
     const mode_id = server.config.mode_to_id.get(target_mode) orelse {
         out.* = try std.fmt.allocPrint(
-            allocator,
+            util.gpa,
             "cannot enter non-existant mode '{s}'",
             .{target_mode},
         );
@@ -52,7 +52,7 @@ pub fn enterMode(
 
     if (mode_id == 1) {
         out.* = try std.fmt.allocPrint(
-            allocator,
+            util.gpa,
             "manually entering mode 'locked' is not allowed",
             .{},
         );

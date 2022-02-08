@@ -31,7 +31,6 @@ const FilterKind = enum {
 };
 
 pub fn floatFilterAdd(
-    _: mem.Allocator,
     _: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,
@@ -53,7 +52,6 @@ pub fn floatFilterAdd(
 }
 
 pub fn floatFilterRemove(
-    _: mem.Allocator,
     _: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,
@@ -72,7 +70,6 @@ pub fn floatFilterRemove(
 }
 
 pub fn csdFilterAdd(
-    _: mem.Allocator,
     _: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,
@@ -96,7 +93,6 @@ pub fn csdFilterAdd(
 }
 
 pub fn csdFilterRemove(
-    _: mem.Allocator,
     _: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,

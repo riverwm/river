@@ -361,7 +361,7 @@ fn runMappedCommand(self: *Self, mapping: *const Mapping) void {
     var out: ?[]const u8 = null;
     defer if (out) |s| util.gpa.free(s);
     const args = mapping.command_args;
-    command.run(util.gpa, self, args, &out) catch |err| {
+    command.run(self, args, &out) catch |err| {
         const failure_message = switch (err) {
             command.Error.Other => out.?,
             else => command.errToMsg(err),

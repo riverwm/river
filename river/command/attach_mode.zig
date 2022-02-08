@@ -17,15 +17,12 @@
 const std = @import("std");
 const mem = std.mem;
 
-const util = @import("../util.zig");
-
 const server = &@import("../main.zig").server;
 
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
 pub fn attachMode(
-    _: mem.Allocator,
     _: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,

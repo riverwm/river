@@ -29,7 +29,6 @@ const Output = @import("../Output.zig");
 const Seat = @import("../Seat.zig");
 
 pub fn focusOutput(
-    _: mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,
@@ -49,7 +48,6 @@ pub fn focusOutput(
 }
 
 pub fn sendToOutput(
-    _: mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,

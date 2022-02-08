@@ -21,7 +21,6 @@ const Seat = @import("../Seat.zig");
 
 /// Close the focused view, if any.
 pub fn close(
-    _: std.mem.Allocator,
     seat: *Seat,
     _: []const [:0]const u8,
     _: *?[]const u8,

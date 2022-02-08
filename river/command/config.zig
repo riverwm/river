@@ -25,7 +25,6 @@ const Seat = @import("../Seat.zig");
 const Config = @import("../Config.zig");
 
 pub fn borderWidth(
-    _: mem.Allocator,
     _: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,
@@ -39,7 +38,6 @@ pub fn borderWidth(
 }
 
 pub fn backgroundColor(
-    _: mem.Allocator,
     _: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,
@@ -54,7 +52,6 @@ pub fn backgroundColor(
 }
 
 pub fn borderColorFocused(
-    _: mem.Allocator,
     _: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,
@@ -69,7 +66,6 @@ pub fn borderColorFocused(
 }
 
 pub fn borderColorUnfocused(
-    _: mem.Allocator,
     _: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,
@@ -84,7 +80,6 @@ pub fn borderColorUnfocused(
 }
 
 pub fn borderColorUrgent(
-    _: mem.Allocator,
     _: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,
@@ -99,7 +94,6 @@ pub fn borderColorUrgent(
 }
 
 pub fn setCursorWarp(
-    _: mem.Allocator,
     _: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,

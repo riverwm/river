@@ -34,7 +34,6 @@ const Seat = @import("../Seat.zig");
 /// Example:
 /// map normal Mod4+Shift Return spawn foot
 pub fn map(
-    allocator: mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
@@ -50,9 +49,9 @@ pub fn map(
     const modifiers_raw = args[2 + offset];
     const keysym_raw = args[3 + offset];
 
-    const mode_id = try modeNameToId(allocator, mode_raw, out);
-    const modifiers = try parseModifiers(allocator, modifiers_raw, out);
-    const keysym = try parseKeysym(allocator, keysym_raw, out);
+    const mode_id = try modeNameToId(mode_raw, out);
+    const modifiers = try parseModifiers(modifiers_raw, out);
+    const keysym = try parseKeysym(keysym_raw, out);
 
     const mode_mappings = &server.config.modes.items[mode_id].mappings;
 
@@ -65,7 +64,7 @@ pub fn map(
         // Warn user if they overwrote an existing keybinding using riverctl.
         const opts = if (optionals.release) "-release " else "";
         out.* = try fmt.allocPrint(
-            allocator,
+            util.gpa,
             "overwrote an existing keybinding: {s} {s}{s} {s}",
             .{ mode_raw, opts, modifiers_raw, keysym_raw },
         );
@@ -83,7 +82,6 @@ pub fn map(
 /// Example:
 /// map-pointer normal Mod4 BTN_LEFT move-view
 pub fn mapPointer(
-    allocator: mem.Allocator,
     _: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
@@ -91,9 +89,9 @@ pub fn mapPointer(
     if (args.len < 5) return Error.NotEnoughArguments;
     if (args.len > 5) return Error.TooManyArguments;
 
-    const mode_id = try modeNameToId(allocator, args[1], out);
-    const modifiers = try parseModifiers(allocator, args[2], out);
-    const event_code = try parseEventCode(allocator, args[3], out);
+    const mode_id = try modeNameToId(args[1], out);
+    const modifiers = try parseModifiers(args[2], out);
+    const event_code = try parseEventCode(args[3], out);
 
     const action = if (mem.eql(u8, args[4], "move-view"))
         PointerMapping.Action.move
@@ -101,7 +99,7 @@ pub fn mapPointer(
         PointerMapping.Action.resize
     else {
         out.* = try fmt.allocPrint(
-            allocator,
+            util.gpa,
             "invalid pointer action {s}, must be move-view or resize-view",
             .{args[4]},
         );
@@ -122,11 +120,11 @@ pub fn mapPointer(
     }
 }
 
-fn modeNameToId(allocator: mem.Allocator, mode_name: []const u8, out: *?[]const u8) !usize {
+fn modeNameToId(mode_name: []const u8, out: *?[]const u8) !usize {
     const config = &server.config;
     return config.mode_to_id.get(mode_name) orelse {
         out.* = try fmt.allocPrint(
-            allocator,
+            util.gpa,
             "cannot add/remove mapping to/from non-existant mode '{s}'",
             .{mode_name},
         );
@@ -165,30 +163,26 @@ fn pointerMappingExists(
     return null;
 }
 
-fn parseEventCode(allocator: mem.Allocator, name: [:0]const u8, out: *?[]const u8) !u32 {
+fn parseEventCode(name: [:0]const u8, out: *?[]const u8) !u32 {
     const event_code = c.libevdev_event_code_from_name(c.EV_KEY, name);
     if (event_code < 1) {
-        out.* = try fmt.allocPrint(allocator, "unknown button {s}", .{name});
+        out.* = try fmt.allocPrint(util.gpa, "unknown button {s}", .{name});
         return Error.Other;
     }
 
     return @intCast(u32, event_code);
 }
 
-fn parseKeysym(allocator: mem.Allocator, name: [:0]const u8, out: *?[]const u8) !xkb.Keysym {
+fn parseKeysym(name: [:0]const u8, out: *?[]const u8) !xkb.Keysym {
     const keysym = xkb.Keysym.fromName(name, .case_insensitive);
     if (keysym == .NoSymbol) {
-        out.* = try fmt.allocPrint(allocator, "invalid keysym '{s}'", .{name});
+        out.* = try fmt.allocPrint(util.gpa, "invalid keysym '{s}'", .{name});
         return Error.Other;
     }
     return keysym;
 }
 
-fn parseModifiers(
-    allocator: mem.Allocator,
-    modifiers_str: []const u8,
-    out: *?[]const u8,
-) !wlr.Keyboard.ModifierMask {
+fn parseModifiers(modifiers_str: []const u8, out: *?[]const u8) !wlr.Keyboard.ModifierMask {
     var it = mem.split(u8, modifiers_str, "+");
     var modifiers = wlr.Keyboard.ModifierMask{};
     outer: while (it.next()) |mod_name| {
@@ -210,7 +204,7 @@ fn parseModifiers(
                 continue :outer;
             }
         }
-        out.* = try fmt.allocPrint(allocator, "invalid modifier '{s}'", .{mod_name});
+        out.* = try fmt.allocPrint(util.gpa, "invalid modifier '{s}'", .{mod_name});
         return Error.Other;
     }
     return modifiers;
@@ -257,20 +251,15 @@ fn parseOptionalArgs(args: []const []const u8) OptionalArgsContainer {
 ///
 /// Example:
 /// unmap normal Mod4+Shift Return
-pub fn unmap(
-    allocator: mem.Allocator,
-    seat: *Seat,
-    args: []const [:0]const u8,
-    out: *?[]const u8,
-) Error!void {
+pub fn unmap(seat: *Seat, args: []const [:0]const u8, out: *?[]const u8) Error!void {
     const optionals = parseOptionalArgs(args[1..]);
     // offset caused by optional arguments
     const offset = optionals.i;
     if (args.len - offset < 4) return Error.NotEnoughArguments;
 
-    const mode_id = try modeNameToId(allocator, args[1 + offset], out);
-    const modifiers = try parseModifiers(allocator, args[2 + offset], out);
-    const keysym = try parseKeysym(allocator, args[3 + offset], out);
+    const mode_id = try modeNameToId(args[1 + offset], out);
+    const modifiers = try parseModifiers(args[2 + offset], out);
+    const keysym = try parseKeysym(args[3 + offset], out);
 
     const mode_mappings = &server.config.modes.items[mode_id].mappings;
     const mapping_idx = mappingExists(mode_mappings, modifiers, keysym, optionals.release) orelse return;
@@ -288,18 +277,13 @@ pub fn unmap(
 ///
 /// Example:
 /// unmap-pointer normal Mod4 BTN_LEFT
-pub fn unmapPointer(
-    allocator: mem.Allocator,
-    _: *Seat,
-    args: []const [:0]const u8,
-    out: *?[]const u8,
-) Error!void {
+pub fn unmapPointer(_: *Seat, args: []const [:0]const u8, out: *?[]const u8) Error!void {
     if (args.len < 4) return Error.NotEnoughArguments;
     if (args.len > 4) return Error.TooManyArguments;
 
-    const mode_id = try modeNameToId(allocator, args[1], out);
-    const modifiers = try parseModifiers(allocator, args[2], out);
-    const event_code = try parseEventCode(allocator, args[3], out);
+    const mode_id = try modeNameToId(args[1], out);
+    const modifiers = try parseModifiers(args[2], out);
+    const event_code = try parseEventCode(args[3], out);
 
     const mode_pointer_mappings = &server.config.modes.items[mode_id].pointer_mappings;
     const mapping_idx = pointerMappingExists(mode_pointer_mappings, modifiers, event_code) orelse return;

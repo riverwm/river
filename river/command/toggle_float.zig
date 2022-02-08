@@ -24,7 +24,6 @@ const Seat = @import("../Seat.zig");
 /// Make the focused view float or stop floating, depending on its current
 /// state.
 pub fn toggleFloat(
-    _: std.mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,

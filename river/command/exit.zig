@@ -23,7 +23,6 @@ const Seat = @import("../Seat.zig");
 
 /// Exit the compositor, terminating the wayland session.
 pub fn exit(
-    _: std.mem.Allocator,
     _: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,

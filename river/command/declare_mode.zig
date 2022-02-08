@@ -26,7 +26,6 @@ const Seat = @import("../Seat.zig");
 
 /// Declare a new keymap mode
 pub fn declareMode(
-    _: std.mem.Allocator,
     _: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,

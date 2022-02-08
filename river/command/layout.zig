@@ -25,7 +25,6 @@ const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
 pub fn outputLayout(
-    _: mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,
@@ -39,7 +38,6 @@ pub fn outputLayout(
 }
 
 pub fn defaultLayout(
-    _: mem.Allocator,
     _: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,
@@ -62,7 +60,6 @@ pub fn defaultLayout(
 /// riverctl send-layout-cmd rivertile "mod-main-factor -0.1"
 /// riverctl send-layout-cmd rivertile "main-location top"
 pub fn sendLayoutCmd(
-    _: mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,
