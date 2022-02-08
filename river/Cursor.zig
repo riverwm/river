@@ -289,7 +289,7 @@ pub fn resumeFromAutoHide(self: *Self) void {
 
         self.auto_hidden = false;
 
-        // TODO: restore focus
+        self.updateState();
     }
 
     if (server.config.cursor_auto_hide_delay == 0) return;
@@ -861,7 +861,10 @@ pub fn leaveMode(self: *Self, event: ?*wlr.Pointer.event.Button) void {
 
     switch (self.mode) {
         .passthrough => unreachable,
-        .disabled => {}, // TODO: what now? reset the image? prolly that + restore ptr capability on seat
+        .disabled => {
+            // TODO: what now? reset the image? prolly that + restore ptr capability on seat
+            self.auto_hidden = true;
+        },
         .down => {
             // If we were in down mode, we need pass along the release event
             _ = self.seat.wlr_seat.pointerNotifyButton(event.?.time_msec, event.?.button, event.?.state);
