@@ -28,14 +28,13 @@ const InputConfig = @import("../InputConfig.zig");
 const InputManager = @import("../InputManager.zig");
 
 pub fn listInputs(
-    allocator: mem.Allocator,
     _: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     if (args.len > 1) return error.TooManyArguments;
 
-    var input_list = std.ArrayList(u8).init(allocator);
+    var input_list = std.ArrayList(u8).init(util.gpa);
     const writer = input_list.writer();
     var prev = false;
 
@@ -61,14 +60,13 @@ pub fn listInputs(
 }
 
 pub fn listInputConfigs(
-    allocator: mem.Allocator,
     _: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     if (args.len > 1) return error.TooManyArguments;
 
-    var input_list = std.ArrayList(u8).init(allocator);
+    var input_list = std.ArrayList(u8).init(util.gpa);
     const writer = input_list.writer();
 
     for (server.input_manager.input_configs.items) |*input_config, i| {
@@ -126,7 +124,6 @@ pub fn listInputConfigs(
 }
 
 pub fn input(
-    _: mem.Allocator,
     _: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,
@@ -140,8 +137,6 @@ pub fn input(
     const input_config = for (server.input_manager.input_configs.items) |*input_config| {
         if (mem.eql(u8, input_config.identifier, args[1])) break input_config;
     } else blk: {
-        // Use util.gpa instead of allocator to assure the identifier is
-        // allocated by the same allocator as the ArrayList.
         try server.input_manager.input_configs.ensureUnusedCapacity(1);
         server.input_manager.input_configs.appendAssumeCapacity(.{
             .identifier = try util.gpa.dupe(u8, args[1]),

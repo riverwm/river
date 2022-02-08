@@ -27,7 +27,6 @@ const View = @import("../View.zig");
 const Box = @import("../Box.zig");
 
 pub fn move(
-    _: std.mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,
@@ -51,7 +50,6 @@ pub fn move(
 }
 
 pub fn snap(
-    _: std.mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,
@@ -78,7 +76,6 @@ pub fn snap(
 }
 
 pub fn resize(
-    _: std.mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,

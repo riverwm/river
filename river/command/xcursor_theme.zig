@@ -20,7 +20,6 @@ const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
 pub fn xcursorTheme(
-    _: std.mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,

@@ -17,14 +17,12 @@
 const std = @import("std");
 
 const server = &@import("../main.zig").server;
-const util = @import("../util.zig");
 
 const Config = @import("../Config.zig");
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
 pub fn focusFollowsCursor(
-    _: std.mem.Allocator,
     _: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,

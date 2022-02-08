@@ -18,18 +18,18 @@ const std = @import("std");
 const mem = std.mem;
 
 const server = &@import("../main.zig").server;
+const util = @import("../util.zig");
 
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
 /// Switch focus to the passed tags.
 pub fn setFocusedTags(
-    allocator: mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
-    const tags = try parseTags(allocator, args, out);
+    const tags = try parseTags(args, out);
     if (seat.focused_output.pending.tags != tags) {
         seat.focused_output.previous_tags = seat.focused_output.pending.tags;
         seat.focused_output.pending.tags = tags;
@@ -41,23 +41,21 @@ pub fn setFocusedTags(
 
 /// Set the spawn tagmask
 pub fn spawnTagmask(
-    allocator: mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
-    const tags = try parseTags(allocator, args, out);
+    const tags = try parseTags(args, out);
     seat.focused_output.spawn_tagmask = tags;
 }
 
 /// Set the tags of the focused view.
 pub fn setViewTags(
-    allocator: mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
-    const tags = try parseTags(allocator, args, out);
+    const tags = try parseTags(args, out);
     if (seat.focused == .view) {
         const view = seat.focused.view;
         view.pending.tags = tags;
@@ -68,12 +66,11 @@ pub fn setViewTags(
 
 /// Toggle focus of the passsed tags.
 pub fn toggleFocusedTags(
-    allocator: mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
-    const tags = try parseTags(allocator, args, out);
+    const tags = try parseTags(args, out);
     const output = seat.focused_output;
     const new_focused_tags = output.pending.tags ^ tags;
     if (new_focused_tags != 0) {
@@ -87,12 +84,11 @@ pub fn toggleFocusedTags(
 
 /// Toggle the passed tags of the focused view
 pub fn toggleViewTags(
-    allocator: mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
-    const tags = try parseTags(allocator, args, out);
+    const tags = try parseTags(args, out);
     if (seat.focused == .view) {
         const new_tags = seat.focused.view.pending.tags ^ tags;
         if (new_tags != 0) {
@@ -106,7 +102,6 @@ pub fn toggleViewTags(
 
 /// Switch focus to tags that were selected previously
 pub fn focusPreviousTags(
-    _: mem.Allocator,
     seat: *Seat,
     args: []const []const u8,
     _: *?[]const u8,
@@ -124,7 +119,6 @@ pub fn focusPreviousTags(
 
 /// Set the tags of the focused view to the tags that were selected previously
 pub fn sendToPreviousTags(
-    _: mem.Allocator,
     seat: *Seat,
     args: []const []const u8,
     _: *?[]const u8,
@@ -140,7 +134,6 @@ pub fn sendToPreviousTags(
 }
 
 fn parseTags(
-    allocator: mem.Allocator,
     args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!u32 {
@@ -150,7 +143,7 @@ fn parseTags(
     const tags = try std.fmt.parseInt(u32, args[1], 10);
 
     if (tags == 0) {
-        out.* = try std.fmt.allocPrint(allocator, "tags may not be 0", .{});
+        out.* = try std.fmt.allocPrint(util.gpa, "tags may not be 0", .{});
         return Error.Other;
     }
 

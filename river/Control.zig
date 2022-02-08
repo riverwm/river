@@ -103,7 +103,7 @@ fn handleRequest(control: *zriver.ControlV1, request: zriver.ControlV1.Request, 
 
             var out: ?[]const u8 = null;
             defer if (out) |s| util.gpa.free(s);
-            command.run(util.gpa, seat, args.items, &out) catch |err| {
+            command.run(seat, args.items, &out) catch |err| {
                 const failure_message = switch (err) {
                     command.Error.OutOfMemory => {
                         callback.getClient().postNoMemory();

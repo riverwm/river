@@ -26,7 +26,6 @@ const ViewStack = @import("../view_stack.zig").ViewStack;
 
 /// Swap the currently focused view with either the view higher or lower in the visible stack
 pub fn swap(
-    _: std.mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,

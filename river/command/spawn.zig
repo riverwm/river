@@ -18,13 +18,13 @@ const std = @import("std");
 const os = std.os;
 
 const c = @import("../c.zig");
+const util = @import("../util.zig");
 
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
 /// Spawn a program.
 pub fn spawn(
-    allocator: std.mem.Allocator,
     _: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
@@ -35,7 +35,7 @@ pub fn spawn(
     const child_args = [_:null]?[*:0]const u8{ "/bin/sh", "-c", args[1], null };
 
     const pid = os.fork() catch {
-        out.* = try std.fmt.allocPrint(allocator, "fork/execve failed", .{});
+        out.* = try std.fmt.allocPrint(util.gpa, "fork/execve failed", .{});
         return Error.Other;
     };
 
@@ -55,7 +55,7 @@ pub fn spawn(
     if (!os.W.IFEXITED(ret.status) or
         (os.W.IFEXITED(ret.status) and os.W.EXITSTATUS(ret.status) != 0))
     {
-        out.* = try std.fmt.allocPrint(allocator, "fork/execve failed", .{});
+        out.* = try std.fmt.allocPrint(util.gpa, "fork/execve failed", .{});
         return Error.Other;
     }
 }
