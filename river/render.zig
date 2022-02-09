@@ -53,7 +53,7 @@ pub fn renderOutput(output: *Output) void {
     var damage_region: pixman.Region32 = undefined;
     damage_region.init();
     defer damage_region.deinit();
-    output.damage.attachRender(&needs_frame, &damage_region) catch {
+    output.damage.?.attachRender(&needs_frame, &damage_region) catch {
         log.err("failed to attach renderer", .{});
         return;
     };

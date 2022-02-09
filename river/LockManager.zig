@@ -120,5 +120,5 @@ fn handleSurface(
     assert(manager.locked);
     assert(manager.lock != null);
 
-    LockSurface.create(wlr_lock_surface);
+    LockSurface.create(wlr_lock_surface, manager.lock.?);
 }

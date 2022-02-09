@@ -288,7 +288,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
                 // before some change occured that caused shouldTrackConfigure() to return false.
                 view.dropSavedBuffers();
 
-                view.output.damage.addWhole();
+                view.output.damage.?.addWhole();
                 server.input_manager.updateCursorState();
             }
         } else {
@@ -299,7 +299,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
             view.sendFrameDone();
         }
     } else {
-        view.output.damage.addWhole();
+        view.output.damage.?.addWhole();
         const size_changed = !std.meta.eql(view.surface_box, new_box);
         view.surface_box = new_box;
         // If the client has decided to resize itself and the view is floating,

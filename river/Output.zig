@@ -55,7 +55,7 @@ const State = struct {
 };
 
 wlr_output: *wlr.Output,
-damage: *wlr.OutputDamage,
+damage: ?*wlr.OutputDamage,
 
 /// All layer surfaces on the output, indexed by the layer enum.
 layers: [4]std.TailQueue(LayerSurface) = [1]std.TailQueue(LayerSurface){.{}} ** 4,
@@ -127,8 +127,8 @@ pub fn init(self: *Self, wlr_output: *wlr.Output) !void {
     wlr_output.events.enable.add(&self.enable);
     wlr_output.events.mode.add(&self.mode);
 
-    self.damage.events.frame.add(&self.frame);
-    self.damage.events.destroy.add(&self.damage_destroy);
+    self.damage.?.events.frame.add(&self.frame);
+    self.damage.?.events.destroy.add(&self.damage_destroy);
 
     // Ensure that a cursor image at the output's scale factor is loaded
     // for each seat.
@@ -435,6 +435,8 @@ fn handleDamageDestroy(listener: *wl.Listener(*wlr.OutputDamage), _: *wlr.Output
     self.frame.link.remove();
     // Ensure that it is safe to call remove() again in handleDestroy()
     self.frame.link = .{ .prev = &self.frame.link, .next = &self.frame.link };
+
+    self.damage = null;
 }
 
 fn handleDestroy(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
@@ -455,6 +457,8 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
             break;
         }
     }
+
+    if (self.lock_surface) |surface| surface.destroy();
 
     // Remove all listeners
     self.destroy.link.remove();

@@ -251,7 +251,7 @@ fn handleRequestConfigure(
 fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) void {
     const self = @fieldParentPtr(Self, "commit", listener);
 
-    self.view.output.damage.addWhole();
+    self.view.output.damage.?.addWhole();
 
     self.view.surface_box = .{
         .x = 0,

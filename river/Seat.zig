@@ -42,7 +42,7 @@ const ViewStack = @import("view_stack.zig").ViewStack;
 const log = std.log.scoped(.seat);
 const PointerConstraint = @import("PointerConstraint.zig");
 
-const FocusTarget = union(enum) {
+pub const FocusTarget = union(enum) {
     view: *View,
     layer: *LayerSurface,
     lock_surface: *LockSurface,
