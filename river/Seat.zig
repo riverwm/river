@@ -47,7 +47,7 @@ const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 const log = std.log.scoped(.seat);
 const PointerConstraint = @import("PointerConstraint.zig");
 
-const FocusTarget = union(enum) {
+pub const FocusTarget = union(enum) {
     view: *View,
     xwayland_override_redirect: *XwaylandOverrideRedirect,
     layer: *LayerSurface,

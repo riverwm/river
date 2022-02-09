@@ -37,12 +37,12 @@ pub const Parent = union(enum) {
 
     pub fn damageWholeOutput(parent: Parent) void {
         switch (parent) {
-            .xdg_toplevel => |xdg_toplevel| xdg_toplevel.view.output.damage.addWhole(),
-            .layer_surface => |layer_surface| layer_surface.output.damage.addWhole(),
-            .lock_surface => |lock_surface| lock_surface.output().damage.addWhole(),
+            .xdg_toplevel => |xdg_toplevel| xdg_toplevel.view.output.damage.?.addWhole(),
+            .layer_surface => |layer_surface| layer_surface.output.damage.?.addWhole(),
+            .lock_surface => |lock_surface| lock_surface.output().damage.?.addWhole(),
             .drag_icon => |_| {
                 var it = server.root.outputs.first;
-                while (it) |node| : (it = node.next) node.data.damage.addWhole();
+                while (it) |node| : (it = node.next) node.data.damage.?.addWhole();
             },
         }
     }

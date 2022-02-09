@@ -164,7 +164,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
         server.root.startTransaction();
     }
 
-    self.output.damage.addWhole();
+    self.output.damage.?.addWhole();
 }
 
 fn handleNewPopup(listener: *wl.Listener(*wlr.XdgPopup), wlr_xdg_popup: *wlr.XdgPopup) void {

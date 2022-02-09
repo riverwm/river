@@ -48,7 +48,7 @@ pub fn backgroundColor(
     server.config.background_color = try parseRgba(args[1]);
 
     var it = server.root.outputs.first;
-    while (it) |node| : (it = node.next) node.data.damage.addWhole();
+    while (it) |node| : (it = node.next) node.data.damage.?.addWhole();
 }
 
 pub fn borderColorFocused(
@@ -62,7 +62,7 @@ pub fn borderColorFocused(
     server.config.border_color_focused = try parseRgba(args[1]);
 
     var it = server.root.outputs.first;
-    while (it) |node| : (it = node.next) node.data.damage.addWhole();
+    while (it) |node| : (it = node.next) node.data.damage.?.addWhole();
 }
 
 pub fn borderColorUnfocused(
@@ -76,7 +76,7 @@ pub fn borderColorUnfocused(
     server.config.border_color_unfocused = try parseRgba(args[1]);
 
     var it = server.root.outputs.first;
-    while (it) |node| : (it = node.next) node.data.damage.addWhole();
+    while (it) |node| : (it = node.next) node.data.damage.?.addWhole();
 }
 
 pub fn borderColorUrgent(
@@ -90,7 +90,7 @@ pub fn borderColorUrgent(
     server.config.border_color_urgent = try parseRgba(args[1]);
 
     var it = server.root.outputs.first;
-    while (it) |node| : (it = node.next) node.data.damage.addWhole();
+    while (it) |node| : (it = node.next) node.data.damage.?.addWhole();
 }
 
 pub fn setCursorWarp(

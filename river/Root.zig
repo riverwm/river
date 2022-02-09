@@ -392,7 +392,7 @@ fn commitTransaction(self: *Self) void {
         if (view_tags_changed) output.sendViewTags();
         if (urgent_tags_dirty) output.sendUrgentTags();
 
-        output.damage.addWhole();
+        output.damage.?.addWhole();
     }
     server.input_manager.updateCursorState();
     server.idle_inhibitor_manager.idleInhibitCheckActive();

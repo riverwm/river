@@ -72,7 +72,7 @@ fn handleMap(listener: *wl.Listener(*wlr.Drag.Icon), wlr_drag_icon: *wlr.Drag.Ic
 
     wlr_drag_icon.surface.events.commit.add(&drag_icon.commit);
     var it = server.root.outputs.first;
-    while (it) |node| : (it = node.next) node.data.damage.addWhole();
+    while (it) |node| : (it = node.next) node.data.damage.?.addWhole();
 }
 
 fn handleUnmap(listener: *wl.Listener(*wlr.Drag.Icon), _: *wlr.Drag.Icon) void {
@@ -80,12 +80,12 @@ fn handleUnmap(listener: *wl.Listener(*wlr.Drag.Icon), _: *wlr.Drag.Icon) void {
 
     drag_icon.commit.link.remove();
     var it = server.root.outputs.first;
-    while (it) |node| : (it = node.next) node.data.damage.addWhole();
+    while (it) |node| : (it = node.next) node.data.damage.?.addWhole();
 }
 
 fn handleCommit(_: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     var it = server.root.outputs.first;
-    while (it) |node| : (it = node.next) node.data.damage.addWhole();
+    while (it) |node| : (it = node.next) node.data.damage.?.addWhole();
 }
 
 fn handleNewSubsurface(listener: *wl.Listener(*wlr.Subsurface), wlr_subsurface: *wlr.Subsurface) void {

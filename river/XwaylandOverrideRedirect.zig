@@ -130,7 +130,7 @@ fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSur
 
 fn handleCommit(_: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     var it = server.root.outputs.first;
-    while (it) |node| : (it = node.next) node.data.damage.addWhole();
+    while (it) |node| : (it = node.next) node.data.damage.?.addWhole();
 }
 
 fn handleSetOverrideRedirect(
