@@ -201,12 +201,12 @@ const Output = struct {
                     0;
 
                 const usable_width = switch (output.main_location) {
-                    .left, .right => ev.usable_width - 2 * outer_padding,
-                    .top, .bottom => ev.usable_height - 2 * outer_padding,
+                    .left, .right => ev.usable_width -| (2 *| outer_padding),
+                    .top, .bottom => ev.usable_height -| (2 *| outer_padding),
                 };
                 const usable_height = switch (output.main_location) {
-                    .left, .right => ev.usable_height - 2 * outer_padding,
-                    .top, .bottom => ev.usable_width - 2 * outer_padding,
+                    .left, .right => ev.usable_height -| (2 *| outer_padding),
+                    .top, .bottom => ev.usable_width -| (2 *| outer_padding),
                 };
 
                 // to make things pixel-perfect, we make the first main and first secondary
@@ -258,10 +258,10 @@ const Output = struct {
                         height = secondary_height + if (i == main_count) secondary_height_rem else 0;
                     }
 
-                    x += @intCast(i32, view_padding);
-                    y += @intCast(i32, view_padding);
-                    width -= 2 * view_padding;
-                    height -= 2 * view_padding;
+                    x +|= @intCast(i32, view_padding);
+                    y +|= @intCast(i32, view_padding);
+                    width -|= 2 *| view_padding;
+                    height -|= 2 *| view_padding;
 
                     switch (output.main_location) {
                         .left => layout.pushViewDimensions(
@@ -272,22 +272,22 @@ const Output = struct {
                             ev.serial,
                         ),
                         .right => layout.pushViewDimensions(
-                            @intCast(i32, usable_width - width) - x + @intCast(i32, outer_padding),
-                            y + @intCast(i32, outer_padding),
+                            @intCast(i32, usable_width - width) - x +| @intCast(i32, outer_padding),
+                            y +| @intCast(i32, outer_padding),
                             width,
                             height,
                             ev.serial,
                         ),
                         .top => layout.pushViewDimensions(
-                            y + @intCast(i32, outer_padding),
-                            x + @intCast(i32, outer_padding),
+                            y +| @intCast(i32, outer_padding),
+                            x +| @intCast(i32, outer_padding),
                             height,
                             width,
                             ev.serial,
                         ),
                         .bottom => layout.pushViewDimensions(
-                            y + @intCast(i32, outer_padding),
-                            @intCast(i32, usable_width - width) - x + @intCast(i32, outer_padding),
+                            y +| @intCast(i32, outer_padding),
+                            @intCast(i32, usable_width - width) - x +| @intCast(i32, outer_padding),
                             height,
                             width,
                             ev.serial,
