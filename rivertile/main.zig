@@ -347,8 +347,12 @@ pub fn main() !void {
             fatalPrintUsage("invalid value '{s}' provided to -main-count", .{raw});
     }
     if (result.argFlag("-main-ratio")) |raw| {
-        default_main_ratio = std.fmt.parseFloat(f64, raw) catch
+        default_main_ratio = std.fmt.parseFloat(f64, raw) catch {
             fatalPrintUsage("invalid value '{s}' provided to -main-ratio", .{raw});
+        };
+        if (default_main_ratio < 0.1 or default_main_ratio > 0.9) {
+            fatalPrintUsage("invalid value '{s}' provided to -main-ratio", .{raw});
+        }
     }
 
     const display = wl.Display.connect(null) catch {
