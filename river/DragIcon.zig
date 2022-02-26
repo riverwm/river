@@ -46,6 +46,8 @@ pub fn init(drag_icon: *DragIcon, seat: *Seat, wlr_drag_icon: *wlr.Drag.Icon) vo
     wlr_drag_icon.events.unmap.add(&drag_icon.unmap);
     wlr_drag_icon.surface.events.new_subsurface.add(&drag_icon.new_subsurface);
 
+    if (wlr_drag_icon.mapped) handleMap(&drag_icon.map, wlr_drag_icon);
+
     Subsurface.handleExisting(wlr_drag_icon.surface, .{ .drag_icon = drag_icon });
 }
 
