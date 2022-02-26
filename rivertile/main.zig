@@ -79,10 +79,10 @@ const Location = enum {
 };
 
 // Configured through command line options
-var view_padding: u32 = 6;
-var outer_padding: u32 = 6;
+var view_padding: u31 = 6;
+var outer_padding: u31 = 6;
 var default_main_location: Location = .left;
-var default_main_count: u32 = 1;
+var default_main_count: u31 = 1;
 var default_main_ratio: f64 = 0.6;
 
 /// We don't free resources on exit, only when output globals are removed.
@@ -108,7 +108,7 @@ const Output = struct {
     name: u32,
 
     main_location: Location,
-    main_count: u32,
+    main_count: u31,
     main_ratio: f64,
 
     layout: *river.LayoutV3 = undefined,
@@ -170,12 +170,12 @@ const Output = struct {
                             return;
                         };
                         switch (raw_arg[0]) {
-                            '+' => output.main_count +|= @intCast(u32, arg),
+                            '+' => output.main_count +|= @intCast(u31, arg),
                             '-' => {
-                                const result = @as(i33, output.main_count) + arg;
-                                if (result >= 0) output.main_count = @intCast(u32, result);
+                                const result = output.main_count +| arg;
+                                if (result >= 0) output.main_count = @intCast(u31, result);
                             },
-                            else => output.main_count = @intCast(u32, arg),
+                            else => output.main_count = @intCast(u31, arg),
                         }
                     },
                     .@"main-ratio" => {
@@ -194,33 +194,30 @@ const Output = struct {
             },
 
             .layout_demand => |ev| {
-                const main_count = math.clamp(output.main_count, 1, ev.view_count);
-                const secondary_count = if (ev.view_count > main_count)
-                    ev.view_count - main_count
-                else
-                    0;
+                const main_count = math.clamp(output.main_count, 1, @truncate(u31, ev.view_count));
+                const secondary_count = @truncate(u31, ev.view_count) -| main_count;
 
                 const usable_width = switch (output.main_location) {
-                    .left, .right => ev.usable_width -| (2 *| outer_padding),
-                    .top, .bottom => ev.usable_height -| (2 *| outer_padding),
+                    .left, .right => @truncate(u31, ev.usable_width) -| (2 *| outer_padding),
+                    .top, .bottom => @truncate(u31, ev.usable_height) -| (2 *| outer_padding),
                 };
                 const usable_height = switch (output.main_location) {
-                    .left, .right => ev.usable_height -| (2 *| outer_padding),
-                    .top, .bottom => ev.usable_width -| (2 *| outer_padding),
+                    .left, .right => @truncate(u31, ev.usable_height) -| (2 *| outer_padding),
+                    .top, .bottom => @truncate(u31, ev.usable_width) -| (2 *| outer_padding),
                 };
 
                 // to make things pixel-perfect, we make the first main and first secondary
                 // view slightly larger if the height is not evenly divisible
-                var main_width: u32 = undefined;
-                var main_height: u32 = undefined;
-                var main_height_rem: u32 = undefined;
+                var main_width: u31 = undefined;
+                var main_height: u31 = undefined;
+                var main_height_rem: u31 = undefined;
 
-                var secondary_width: u32 = undefined;
-                var secondary_height: u32 = undefined;
-                var secondary_height_rem: u32 = undefined;
+                var secondary_width: u31 = undefined;
+                var secondary_height: u31 = undefined;
+                var secondary_height_rem: u31 = undefined;
 
                 if (main_count > 0 and secondary_count > 0) {
-                    main_width = @floatToInt(u32, output.main_ratio * @intToFloat(f64, usable_width));
+                    main_width = @floatToInt(u31, output.main_ratio * @intToFloat(f64, usable_width));
                     main_height = usable_height / main_count;
                     main_height_rem = usable_height % main_count;
 
@@ -238,56 +235,55 @@ const Output = struct {
                     secondary_height_rem = usable_height % secondary_count;
                 }
 
-                var i: u32 = 0;
+                var i: u31 = 0;
                 while (i < ev.view_count) : (i += 1) {
                     var x: i32 = undefined;
                     var y: i32 = undefined;
-                    var width: u32 = undefined;
-                    var height: u32 = undefined;
+                    var width: u31 = undefined;
+                    var height: u31 = undefined;
 
                     if (i < main_count) {
                         x = 0;
-                        y = @intCast(i32, (i * main_height) + if (i > 0) main_height_rem else 0);
+                        y = (i * main_height) + if (i > 0) main_height_rem else 0;
                         width = main_width;
                         height = main_height + if (i == 0) main_height_rem else 0;
                     } else {
-                        x = @intCast(i32, main_width);
-                        y = @intCast(i32, (i - main_count) * secondary_height +
-                            if (i > main_count) secondary_height_rem else 0);
+                        x = main_width;
+                        y = (i - main_count) * secondary_height + if (i > main_count) secondary_height_rem else 0;
                         width = secondary_width;
                         height = secondary_height + if (i == main_count) secondary_height_rem else 0;
                     }
 
-                    x +|= @intCast(i32, view_padding);
-                    y +|= @intCast(i32, view_padding);
+                    x +|= view_padding;
+                    y +|= view_padding;
                     width -|= 2 *| view_padding;
                     height -|= 2 *| view_padding;
 
                     switch (output.main_location) {
                         .left => layout.pushViewDimensions(
-                            x + @intCast(i32, outer_padding),
-                            y + @intCast(i32, outer_padding),
+                            x +| outer_padding,
+                            y +| outer_padding,
                             width,
                             height,
                             ev.serial,
                         ),
                         .right => layout.pushViewDimensions(
-                            @intCast(i32, usable_width - width) - x +| @intCast(i32, outer_padding),
-                            y +| @intCast(i32, outer_padding),
+                            usable_width - width - x +| outer_padding,
+                            y +| outer_padding,
                             width,
                             height,
                             ev.serial,
                         ),
                         .top => layout.pushViewDimensions(
-                            y +| @intCast(i32, outer_padding),
-                            x +| @intCast(i32, outer_padding),
+                            y +| outer_padding,
+                            x +| outer_padding,
                             height,
                             width,
                             ev.serial,
                         ),
                         .bottom => layout.pushViewDimensions(
-                            y +| @intCast(i32, outer_padding),
-                            @intCast(i32, usable_width - width) - x +| @intCast(i32, outer_padding),
+                            y +| outer_padding,
+                            usable_width - width - x +| outer_padding,
                             height,
                             width,
                             ev.serial,
@@ -332,11 +328,11 @@ pub fn main() !void {
         os.exit(0);
     }
     if (result.argFlag("-view-padding")) |raw| {
-        view_padding = fmt.parseUnsigned(u32, raw, 10) catch
+        view_padding = fmt.parseUnsigned(u31, raw, 10) catch
             fatalPrintUsage("invalid value '{s}' provided to -view-padding", .{raw});
     }
     if (result.argFlag("-outer-padding")) |raw| {
-        outer_padding = fmt.parseUnsigned(u32, raw, 10) catch
+        outer_padding = fmt.parseUnsigned(u31, raw, 10) catch
             fatalPrintUsage("invalid value '{s}' provided to -outer-padding", .{raw});
     }
     if (result.argFlag("-main-location")) |raw| {
@@ -344,7 +340,7 @@ pub fn main() !void {
             fatalPrintUsage("invalid value '{s}' provided to -main-location", .{raw});
     }
     if (result.argFlag("-main-count")) |raw| {
-        default_main_count = fmt.parseUnsigned(u32, raw, 10) catch
+        default_main_count = fmt.parseUnsigned(u31, raw, 10) catch
             fatalPrintUsage("invalid value '{s}' provided to -main-count", .{raw});
     }
     if (result.argFlag("-main-ratio")) |raw| {
