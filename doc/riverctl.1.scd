@@ -267,15 +267,11 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 	If the view to be focused is on an output that does not have focus,
 	focus is switched to that output.
 
-*set-cursor-auto-hide-delay* _msec_
-	Set the cursor auto-hide delay. Setting this to zero never
-	automatically hides the cursor.
-
-*set-cursor-state* *normal*|*hidden*|*disabled*
-	_normal_ makes the cursor behave as one would most likely expect.
-	_hidden_ hides the cursor (and clears cursor focus) until it is
-	interacted with, e.g. moved. _disabled_ keeps the cursor hidden
-	and unusable until this setting is changed again.
+*set-cursor-state* *shown*|*hidden*|*auto-hide* _msec_
+	_shown_ keeps the cursor permanently visible unless an application hides it.
+	_hidden_ hides the cursor (and clears cursor focus) until it is interacted
+	with, e.g. moved. _auto-hide_ hides the cursor after _msec_ milliseconds of
+	inactivity.
 
 *set-cursor-warp* *disabled*|*on-output-change*
 	Set the cursor warp mode. There are two available modes:

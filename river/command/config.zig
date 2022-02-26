@@ -94,47 +94,40 @@ pub fn borderColorUrgent(
 }
 
 pub fn setCursorState(
-    _: std.mem.Allocator,
     seat: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
-    if (args.len > 2) return Error.TooManyArguments;
 
-    const cursor_state = std.meta.stringToEnum(enum { normal, hidden, disabled }, args[1]) orelse
+    const new_state = std.meta.stringToEnum(enum { shown, hidden, @"auto-hide" }, args[1]) orelse
         return Error.UnknownOption;
 
-    switch (cursor_state) {
-        .normal => {
-            if (seat.cursor.mode == .disabled) seat.cursor.leaveMode(null);
+    if (new_state != .@"auto-hide" and args.len > 2) return Error.TooManyArguments;
+
+    switch (new_state) {
+        .shown => {
+            server.config.cursor_auto_hide_delay = 0;
             seat.cursor.resumeFromAutoHide();
         },
         .hidden => {
-            if (seat.cursor.mode == .disabled) seat.cursor.leaveMode(null);
+            // TODO: leave mode (or is it handled somewhere else?)
+            server.config.cursor_auto_hide_delay = 0;
             seat.cursor.auto_hide_timer.timerUpdate(0) catch
                 std.log.scoped(.config).err("failed to stop timer", .{});
             seat.cursor.setImage(.none);
             seat.cursor.clearFocus();
-            seat.cursor.auto_hidden = true;
         },
-        .disabled => {
-            seat.cursor.enterMode(.disabled, null);
+        .@"auto-hide" => {
+            if (args.len < 3) return Error.NotEnoughArguments;
+            if (args.len > 3) return Error.TooManyArguments;
+
+            const delay = try fmt.parseInt(u31, args[2], 10);
+            server.config.cursor_auto_hide_delay = delay;
+            if (seat.cursor.image != .none) seat.cursor.resumeFromAutoHide();
+            //seat.cursor.auto_hide_timer.timerUpdate(delay) catch {}; // shirley?
         },
     }
-}
-
-pub fn setCursorAutoHideDelay(
-    _: std.mem.Allocator,
-    seat: *Seat,
-    args: []const [:0]const u8,
-    _: *?[]const u8,
-) Error!void {
-    if (args.len < 2) return Error.NotEnoughArguments;
-    if (args.len > 2) return Error.TooManyArguments;
-    const delay = try fmt.parseInt(u31, args[1], 10);
-    server.config.cursor_auto_hide_delay = delay;
-    seat.cursor.auto_hide_timer.timerUpdate(delay) catch {}; // shirley? but def show it if it's hidden
 }
 
 pub fn setCursorWarp(
