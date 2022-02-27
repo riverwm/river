@@ -111,8 +111,9 @@ pub fn setCursorState(
             seat.cursor.resumeFromAutoHide();
         },
         .hidden => {
-            // TODO: leave mode (or is it handled somewhere else?)
             server.config.cursor_auto_hide_delay = 0;
+            if (seat.cursor.mode != .passthrough) return;
+
             seat.cursor.auto_hide_timer.timerUpdate(0) catch
                 std.log.scoped(.config).err("failed to stop timer", .{});
             seat.cursor.setImage(.none);
@@ -124,8 +125,8 @@ pub fn setCursorState(
 
             const delay = try fmt.parseInt(u31, args[2], 10);
             server.config.cursor_auto_hide_delay = delay;
+            // Update the timer
             if (seat.cursor.image != .none) seat.cursor.resumeFromAutoHide();
-            //seat.cursor.auto_hide_timer.timerUpdate(delay) catch {}; // shirley?
         },
     }
 }

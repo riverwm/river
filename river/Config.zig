@@ -68,7 +68,7 @@ csd_filter_titles: std.StringHashMapUnmanaged(void) = .{},
 /// The selected focus_follows_cursor mode
 focus_follows_cursor: FocusFollowsCursorMode = .disabled,
 
-/// In milliseconds. If 0, keep the cursor visible.
+/// In milliseconds. If 0, auto-hiding is disabled.
 cursor_auto_hide_delay: u31 = 0,
 
 /// If true, the cursor warps to the center of the focused output

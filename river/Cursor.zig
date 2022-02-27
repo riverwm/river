@@ -110,7 +110,6 @@ xcursor_manager: *wlr.XcursorManager,
 image: Image = .unknown,
 
 auto_hide_timer: *wl.EventSource,
-/// Last image the cursor had before it was hidden
 saved_image: SavedImage = .{ .builtin = .left_ptr },
 
 constraint: ?*wlr.PointerConstraintV1 = null,
@@ -134,9 +133,8 @@ pinch_end: wl.Listener(*wlr.Pointer.event.PinchEnd) =
     wl.Listener(*wlr.Pointer.event.PinchEnd).init(handlePinchEnd),
 request_set_cursor: wl.Listener(*wlr.Seat.event.RequestSetCursor) =
     wl.Listener(*wlr.Seat.event.RequestSetCursor).init(handleRequestSetCursor),
-// TODO: use this
-//saved_image_surface_destroy: wl.Listener(*wlr.Surface.event.Destroy) =
-//    wl.Listener(*wlr.Surface.event.Destroy).init(handleImageSurfaceDestroy),
+saved_image_surface_destroy: wl.Listener(*wlr.Surface) =
+    wl.Listener(*wlr.Surface).init(handleSavedImageSurfaceDestroy),
 swipe_begin: wl.Listener(*wlr.Pointer.event.SwipeBegin) =
     wl.Listener(*wlr.Pointer.event.SwipeBegin).init(handleSwipeBegin),
 swipe_update: wl.Listener(*wlr.Pointer.event.SwipeUpdate) =
@@ -186,10 +184,16 @@ pub fn init(self: *Self, seat: *Seat) !void {
     wlr_cursor.events.pinch_update.add(&self.pinch_update);
     wlr_cursor.events.pinch_end.add(&self.pinch_end);
     seat.wlr_seat.events.request_set_cursor.add(&self.request_set_cursor);
+    // Ensure that it is safe to call remove()
+    self.saved_image_surface_destroy.link = .{
+        .prev = &self.saved_image_surface_destroy.link,
+        .next = &self.saved_image_surface_destroy.link,
+    };
 }
 
 pub fn deinit(self: *Self) void {
     self.auto_hide_timer.remove();
+    // why are no listeners removed?
     self.xcursor_manager.destroy();
     self.wlr_cursor.destroy();
 }
@@ -258,11 +262,12 @@ fn handleAutoHide(self: *Self) callconv(.C) c_int {
     if (self.mode != .passthrough) return 0;
 
     self.setImage(.none);
+    self.clearFocus();
 
-    return 0; // what's wl_event_source_check about?
+    return 0;
 }
 
-/// Show the cursor if it's hidden, restore focus, reset the auto-hide timer.
+/// Show the cursor if it's hidden, restore focus, reset the auto-hide timer
 pub fn resumeFromAutoHide(self: *Self) void {
     if (self.image == .none) {
         assert(self.mode == .passthrough);
@@ -274,21 +279,18 @@ pub fn resumeFromAutoHide(self: *Self) void {
                 self.setImage(image);
             },
             .client => |image| {
-                // actually, do we want to restore the possibly-unfocused-client's
-                // cursor?
                 self.image = .unknown;
                 self.wlr_cursor.setSurface(image.surface, image.hotspot_x, image.hotspot_y);
-                //self.setImage(.left_ptr);
             },
         }
 
         self.updateState();
     }
 
-    if (server.config.cursor_auto_hide_delay != 0) {
-        self.auto_hide_timer.timerUpdate(server.config.cursor_auto_hide_delay) catch
-            log.err("failed to update timer", .{});
-    }
+    self.auto_hide_timer.timerUpdate(if (self.mode == .passthrough)
+        server.config.cursor_auto_hide_delay
+    else
+        0) catch log.err("failed to update timer", .{});
 }
 
 /// It seems that setCursorImage is actually fairly expensive to call repeatedly
@@ -298,8 +300,14 @@ pub fn setImage(self: *Self, image: Image) void {
     assert(image != .unknown);
 
     if (image == self.image) return;
-    // is this thing needed?
-    //if (self.image == .none) return;
+
+    self.saved_image_surface_destroy.link.remove();
+    // Ensure that it is safe to call remove() again
+    self.saved_image_surface_destroy.link = .{
+        .prev = &self.saved_image_surface_destroy.link,
+        .next = &self.saved_image_surface_destroy.link,
+    };
+
     self.image = image;
     if (image == .none) {
         self.wlr_cursor.setImage(null, 0, 0, 0, 0, 0, 0);
@@ -566,6 +574,33 @@ fn handleRequestSetCursor(
             .hotspot_y = event.hotspot_y,
         } };
         self.image = .unknown;
+
+        self.saved_image_surface_destroy.link.remove();
+        if (event.surface) |surface| {
+            surface.events.destroy.add(&self.saved_image_surface_destroy);
+        } else {
+            // Ensure that it is safe to call remove() again
+            self.saved_image_surface_destroy.link = .{
+                .prev = &self.saved_image_surface_destroy.link,
+                .next = &self.saved_image_surface_destroy.link,
+            };
+        }
+    }
+}
+
+fn handleSavedImageSurfaceDestroy(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
+    const self = @fieldParentPtr(Self, "saved_image_surface_destroy", listener);
+
+    if (self.image == .none) {
+        listener.link.remove();
+        // Ensure that it is safe to call remove() again
+        listener.link = .{ .prev = &listener.link, .next = &listener.link };
+        self.saved_image = .{ .builtin = .left_ptr };
+    } else {
+        // This listener is only active with a client cursor
+        assert(self.image == .unknown);
+        // Fall back to something and remove this listener
+        self.setImage(.left_ptr);
     }
 }
 
@@ -822,6 +857,9 @@ pub fn enterMode(self: *Self, mode: enum { move, resize }, view: *View) void {
     // Clear cursor focus, so that the surface does not receive events
     self.seat.wlr_seat.pointerNotifyClearFocus();
 
+    // Stop the auto-hide timer
+    self.resumeFromAutoHide();
+
     self.setImage(if (mode == .move) .move else .@"se-resize");
 }
 
@@ -840,6 +878,7 @@ pub fn leaveMode(self: *Self, event: *wlr.Pointer.event.Button) void {
     }
 
     self.mode = .passthrough;
+    self.resumeFromAutoHide(); // Restart the auto-hide timer
     self.passthrough(event.time_msec);
 }
 
@@ -971,6 +1010,7 @@ pub fn updateState(self: *Self) void {
 }
 
 fn shouldPassthrough(self: Self) bool {
+    // Hidden cursor shouldn't have focus or otherwise interact with the client
     if (self.image == .none) return false;
 
     switch (self.mode) {
