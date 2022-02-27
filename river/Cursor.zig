@@ -864,7 +864,7 @@ pub fn enterMode(self: *Self, mode: enum { move, resize }, view: *View) void {
 }
 
 /// Return from down/move/resize to passthrough
-pub fn leaveMode(self: *Self, event: *wlr.Pointer.event.Button) void {
+fn leaveMode(self: *Self, event: *wlr.Pointer.event.Button) void {
     log.debug("leave {s} mode", .{@tagName(self.mode)});
 
     switch (self.mode) {
