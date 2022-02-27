@@ -288,6 +288,15 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 	If the view to be focused is on an output that does not have focus,
 	focus is switched to that output.
 
+*hide-cursor* *timeout* _timeout_
+	Hide the cursor if it wasn't moved in the last _timeout_ milliseconds
+	until it is moved again. The default value is 0, which disables
+	automatically hiding the cursor. Show the cursor again on any movement.
+
+*hide-cursor* *when-typing* *enabled*|*disabled*
+	Hide the cursor when pressing any non-modifier key. Show the cursor
+	again on any movement.
+
 *set-cursor-warp* *disabled*|*on-output-change*
 	Set the cursor warp mode. There are two available modes:
 

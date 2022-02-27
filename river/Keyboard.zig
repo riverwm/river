@@ -91,8 +91,12 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
 
     var handled = false;
 
+    var non_modifier_pressed = false;
+
     // First check translated keysyms as xkb reports them
     for (wlr_keyboard.xkb_state.?.keyGetSyms(keycode)) |sym| {
+        if (!released and !isModifier(sym)) non_modifier_pressed = true;
+
         // Handle builtin mapping only when keys are pressed
         if (!released and handleBuiltinMapping(sym)) {
             handled = true;
@@ -125,6 +129,14 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
         wlr_seat.setKeyboard(self.input_device);
         wlr_seat.keyboardNotifyKey(event.time_msec, event.keycode, event.state);
     }
+
+    if (non_modifier_pressed and server.config.cursor_hide_when_typing == .enabled) {
+        self.seat.cursor.hide();
+    }
+}
+
+fn isModifier(keysym: xkb.Keysym) bool {
+    return @enumToInt(keysym) >= xkb.Keysym.Shift_L and @enumToInt(keysym) <= xkb.Keysym.Hyper_R;
 }
 
 /// Simply pass modifiers along to the client

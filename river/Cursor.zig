@@ -102,6 +102,10 @@ constraint: ?*wlr.PointerConstraintV1 = null,
 /// Number of distinct buttons currently pressed
 pressed_count: u32 = 0,
 
+hide_cursor_timer: *wl.EventSource,
+
+hidden: bool = false,
+
 axis: wl.Listener(*wlr.Pointer.event.Axis) = wl.Listener(*wlr.Pointer.event.Axis).init(handleAxis),
 frame: wl.Listener(*wlr.Cursor) = wl.Listener(*wlr.Cursor).init(handleFrame),
 button: wl.Listener(*wlr.Pointer.event.Button) =
@@ -136,12 +140,16 @@ pub fn init(self: *Self, seat: *Seat) !void {
     const xcursor_manager = try wlr.XcursorManager.create(null, default_size);
     errdefer xcursor_manager.destroy();
 
+    const event_loop = server.wl_server.getEventLoop();
     self.* = .{
         .seat = seat,
         .wlr_cursor = wlr_cursor,
         .pointer_gestures = try wlr.PointerGesturesV1.create(server.wl_server),
         .xcursor_manager = xcursor_manager,
+        .hide_cursor_timer = try event_loop.addTimer(*Self, handleHideCursorTimeout, self),
     };
+    errdefer self.hide_cursor_timer.remove();
+    try self.hide_cursor_timer.timerUpdate(server.config.cursor_hide_timeout);
     try self.setTheme(null, null);
 
     // wlr_cursor *only* displays an image on screen. It does not move around
@@ -165,6 +173,7 @@ pub fn init(self: *Self, seat: *Seat) !void {
 }
 
 pub fn deinit(self: *Self) void {
+    self.hide_cursor_timer.remove();
     self.xcursor_manager.destroy();
     self.wlr_cursor.destroy();
 }
@@ -250,6 +259,7 @@ fn handleAxis(listener: *wl.Listener(*wlr.Pointer.event.Axis), event: *wlr.Point
     const self = @fieldParentPtr(Self, "axis", listener);
 
     self.seat.handleActivity();
+    self.unhide();
 
     // Notify the client with pointer focus of the axis event.
     self.seat.wlr_seat.pointerNotifyAxis(
@@ -265,6 +275,7 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
     const self = @fieldParentPtr(Self, "button", listener);
 
     self.seat.handleActivity();
+    self.unhide();
 
     if (event.state == .released) {
         assert(self.pressed_count > 0);
@@ -485,6 +496,32 @@ fn handleRequestSetCursor(
         self.wlr_cursor.setSurface(event.surface, event.hotspot_x, event.hotspot_y);
         self.image = .unknown;
     }
+}
+
+pub fn hide(self: *Self) void {
+    if (self.pressed_count > 0) return;
+    self.hidden = true;
+    self.wlr_cursor.setImage(null, 0, 0, 0, 0, 0, 0);
+    self.image = .unknown;
+    self.seat.wlr_seat.pointerNotifyClearFocus();
+    self.hide_cursor_timer.timerUpdate(0) catch {
+        log.err("failed to update cursor hide timeout", .{});
+    };
+}
+
+pub fn unhide(self: *Self) void {
+    self.hide_cursor_timer.timerUpdate(server.config.cursor_hide_timeout) catch {
+        log.err("failed to update cursor hide timeout", .{});
+    };
+    if (!self.hidden) return;
+    self.hidden = false;
+    self.updateState();
+}
+
+fn handleHideCursorTimeout(self: *Self) callconv(.C) c_int {
+    log.debug("hide cursor timeout", .{});
+    self.hide();
+    return 0;
 }
 
 const SurfaceAtResult = struct {
@@ -762,6 +799,8 @@ fn leaveMode(self: *Self, event: *wlr.Pointer.event.Button) void {
 }
 
 fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64, delta_y: f64, unaccel_dx: f64, unaccel_dy: f64) void {
+    self.unhide();
+
     server.input_manager.relative_pointer_manager.sendRelativeMotion(
         self.seat.wlr_seat,
         @as(u64, time) * 1000,
