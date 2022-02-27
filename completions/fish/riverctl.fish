@@ -56,6 +56,7 @@ complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'border-color-urg
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'border-width'           -d 'Set the border width to pixels'
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'focus-follows-cursor'   -d 'Configure the focus behavior when moving cursor'
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'set-repeat'             -d 'Set the keyboard repeat rate and repeat delay'
+complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'set-cursor-state'       -d 'Show or (auto)hide the cursor'
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'set-cursor-warp'        -d 'Set the cursor warp mode.'
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'xcursor-theme'          -d 'Set the xcursor theme'
 
@@ -71,6 +72,7 @@ complete -c riverctl -x -n '__fish_seen_subcommand_from map'                  -a
 complete -c riverctl -x -n '__fish_seen_subcommand_from unmap'                -a '-release'
 complete -c riverctl -x -n '__fish_seen_subcommand_from attach-mode'          -a 'top bottom'
 complete -c riverctl -x -n '__fish_seen_subcommand_from focus-follows-cursor' -a 'disabled normal'
+complete -c riverctl -x -n '__fish_seen_subcommand_from set-cursor-state'     -a 'shown hidden auto-hide'
 complete -c riverctl -x -n '__fish_seen_subcommand_from set-cursor-warp'      -a 'disabled on-output-change'
 
 # Subcommands for 'input'

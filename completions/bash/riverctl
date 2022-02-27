@@ -44,6 +44,7 @@ function __riverctl_completion ()
 			border-width \
 			focus-follows-cursor \
 			set-repeat \
+			set-cursor-state \
 			set-cursor-warp \
 			xcursor-theme"
 		COMPREPLY=($(compgen -W "${OPTS}" -- "${COMP_WORDS[1]}"))
@@ -57,6 +58,7 @@ function __riverctl_completion ()
 			"unmap") OPTS="-release" ;;
 			"attach-mode") OPTS="top bottom" ;;
 			"focus-follows-cursor") OPTS="disabled normal" ;;
+			"set-cursor-state") OPTS="shown hidden auto-hide" ;;
 			"set-cursor-warp") OPTS="disabled on-output-change" ;;
 			*) return ;;
 		esac
