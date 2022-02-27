@@ -31,7 +31,7 @@ utility may be used to communicate with river over these protocols.
 	_shell_command_ will be run with _/bin/sh -c_. See the *CONFIGURATION*
 	section for more details.
 
-*-log-level* [*error*|*warn*|*info*|*debug*]
+*-log-level* [*error*|*warning*|*info*|*debug*]
 	Set the log level of river. At the *error* log level, only errors
 	are logged.  At the *debug* log level, everything is logged including
 	verbose debug messages.
