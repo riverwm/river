@@ -41,6 +41,25 @@ strict limit. Note that inserting a trailing comma after the last parameter in
 function calls, struct declarations, etc. will cause `zig fmt` to wrap those
 lines. I highly recommend configuring your editor to run `zig fmt` on write.
 
+The single additional style rule is to avoid writing `if` statements and
+similar across multiple lines without braces:
+
+```zig
+test {
+    // avoid this
+    if (foo)
+        bar();
+
+    // prefer this
+    if (foo) bar();
+
+    // or this
+    if (foo) {
+        bar();
+    }
+}
+```
+
 On a higher level, prioritize simplicity of code over nearly everything else.
 Performance is only a valid reason for code complexity if there are profiling
 results to back it up which demonstrate a significant benefit.
