@@ -141,22 +141,22 @@ pub fn getAppId(self: Self) ?[*:0]const u8 {
 /// Return bounds on the dimensions of the view
 pub fn getConstraints(self: Self) View.Constraints {
     const hints = self.xwayland_surface.size_hints orelse return .{
-        .min_width = View.min_size,
-        .min_height = View.min_size,
+        .min_width = 1,
+        .min_height = 1,
         .max_width = math.maxInt(u32),
         .max_height = math.maxInt(u32),
     };
     return .{
-        .min_width = @intCast(u32, math.max(hints.min_width, View.min_size)),
-        .min_height = @intCast(u32, math.max(hints.min_height, View.min_size)),
+        .min_width = @intCast(u32, math.max(hints.min_width, 1)),
+        .min_height = @intCast(u32, math.max(hints.min_height, 1)),
 
         .max_width = if (hints.max_width > 0)
-            math.max(@intCast(u32, hints.max_width), View.min_size)
+            @intCast(u32, hints.max_width)
         else
             math.maxInt(u32),
 
         .max_height = if (hints.max_height > 0)
-            math.max(@intCast(u32, hints.max_height), View.min_size)
+            @intCast(u32, hints.max_height)
         else
             math.maxInt(u32),
     };

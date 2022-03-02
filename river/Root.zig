@@ -31,14 +31,6 @@ const ViewStack = @import("view_stack.zig").ViewStack;
 const XwaylandUnmanaged = @import("XwaylandUnmanaged.zig");
 const DragIcon = @import("DragIcon.zig");
 
-// Minimum effective width/height for outputs.
-// This is needed, to prevent integer overflows caused by the output effective
-// resolution beeing too small to fit clients that can't get scaled more and
-// thus will be bigger than the output resolution.
-// The value is totally arbitrary and low enough, that it should never be
-// encountered during normal usage.
-const min_size = 50;
-
 new_output: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleNewOutput),
 
 output_layout: *wlr.OutputLayout,

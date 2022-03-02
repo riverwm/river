@@ -43,14 +43,6 @@ pub const Constraints = struct {
     max_height: u32,
 };
 
-// Minimum width/height for surfaces.
-// This is needed, because external layouts and large padding and border sizes
-// may cause surfaces so small, that bugs in client applications are encountered,
-// or even surfaces of zero or negative size,which are a protocol error and would
-// likely cause river to crash. The value is totally arbitrary and low enough,
-// that it should never be encountered during normal usage.
-pub const min_size = 50;
-
 const Impl = union(enum) {
     xdg_toplevel: XdgToplevel,
     xwayland_view: XwaylandView,
