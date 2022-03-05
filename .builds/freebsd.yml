@@ -21,9 +21,9 @@ packages:
   - scdoc
   - wget
 sources:
+  - https://github.com/riverwm/river
   - https://gitlab.freedesktop.org/wayland/wayland.git
   - https://gitlab.freedesktop.org/wlroots/wlroots.git
-  - https://github.com/riverwm/river.git
 tasks:
   - install_deps: |
       cd wayland
