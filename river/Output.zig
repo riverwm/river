@@ -308,17 +308,7 @@ fn arrangeLayer(
         var new_box: Box = undefined;
 
         // Horizontal alignment
-        const horizontal_margin_size = current_state.margin.left + current_state.margin.right;
-        if (horizontal_margin_size + current_state.desired_width > bounds.width) {
-            std.log.scoped(.layer_shell).warn(
-                "margins of layer surface '{s}' are too large to be reasonably handled. Closing.",
-                .{layer_surface.wlr_layer_surface.namespace},
-            );
-            // This will cause the output to be rearranged, so it's fine to
-            // stop this attempt early.
-            layer_surface.wlr_layer_surface.destroy();
-            return;
-        } else if (current_state.desired_width == 0) {
+        if (current_state.desired_width == 0) {
             assert(current_state.anchor.right and current_state.anchor.left);
             new_box.x = bounds.x + @intCast(i32, current_state.margin.left);
             new_box.width = bounds.width - (current_state.margin.left + current_state.margin.right);
@@ -336,17 +326,7 @@ fn arrangeLayer(
         }
 
         // Vertical alignment
-        const vertical_margin_size = current_state.margin.bottom + current_state.margin.top;
-        if (vertical_margin_size + current_state.desired_height > bounds.height) {
-            std.log.scoped(.layer_shell).warn(
-                "margins of layer surface '{s}' are too large to be reasonably handled. Closing.",
-                .{layer_surface.wlr_layer_surface.namespace},
-            );
-            layer_surface.wlr_layer_surface.destroy();
-            // This will cause the output to be rearranged, so it's fine to
-            // stop this attempt early.
-            return;
-        } else if (current_state.desired_height == 0) {
+        if (current_state.desired_height == 0) {
             assert(current_state.anchor.top and current_state.anchor.bottom);
             new_box.y = bounds.y + @intCast(i32, current_state.margin.top);
             new_box.height = bounds.height - (current_state.margin.top + current_state.margin.bottom);
