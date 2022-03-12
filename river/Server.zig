@@ -36,6 +36,7 @@ const StatusManager = @import("StatusManager.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const XwaylandUnmanaged = @import("XwaylandUnmanaged.zig");
+const IdleInhibitorManager = @import("IdleInhibitorManager.zig");
 
 const log = std.log.scoped(.server);
 
@@ -69,6 +70,7 @@ config: Config,
 control: Control,
 status_manager: StatusManager,
 layout_manager: LayoutManager,
+idle_inhibitor_manager: IdleInhibitorManager,
 
 pub fn init(self: *Self) !void {
     self.wl_server = try wl.Server.create();
@@ -123,6 +125,7 @@ pub fn init(self: *Self) !void {
     try self.control.init();
     try self.status_manager.init();
     try self.layout_manager.init();
+    try self.idle_inhibitor_manager.init();
 
     // These all free themselves when the wl_server is destroyed
     _ = try wlr.DataDeviceManager.create(self.wl_server);
@@ -148,6 +151,7 @@ pub fn deinit(self: *Self) void {
 
     self.root.deinit();
     self.input_manager.deinit();
+    self.idle_inhibitor_manager.deinit();
 
     self.wl_server.destroy();
 
