@@ -24,6 +24,8 @@ const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Box = @import("Box.zig");
+const Seat = @import("Seat.zig");
+const View = @import("View.zig");
 
 /// The corresponding wlroots object
 xwayland_surface: *wlr.XwaylandSurface,
@@ -78,8 +80,11 @@ fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wl
 
     xwayland_surface.surface.?.events.commit.add(&self.commit);
 
-    // TODO: handle keyboard focus
-    // if (wlr_xwayland_or_surface_wants_focus(self.xwayland_surface)) { ...
+    if (wlr.XwaylandSurface.overrideRedirectWantsFocus(self.xwayland_surface)) {
+        const xwayland_view = View.fromWlrSurface(xwayland_surface.surface.?);
+        var seat = server.input_manager.seats.first.?.data;
+        seat.focus(xwayland_view);
+    }
 }
 
 /// Called when the surface is unmapped and will no longer be displayed.
