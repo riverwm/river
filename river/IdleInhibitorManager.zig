@@ -38,8 +38,8 @@ pub fn idleInhibitCheckActive(self: *Self) void {
             break;
         }
         // If view is visible,
-        if (node.data.view.?.pending.tags & node.data.view.?.output.pending.tags != 0) {
-            inhibited = true; 
+        if (node.data.view.?.current.tags & node.data.view.?.output.current.tags != 0) {
+            inhibited = true;
             break;
         }
     }

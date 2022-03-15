@@ -22,7 +22,6 @@ pub fn init(self: *Self, inhibitor: *wlr.IdleInhibitorV1, inhibitor_manager: *Id
     self.destroy.setNotify(handleDestroy);
     inhibitor.events.destroy.add(&self.destroy);
 
-
     inhibitor_manager.idleInhibitCheckActive();
 }
 
