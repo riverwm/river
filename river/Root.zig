@@ -395,6 +395,7 @@ fn commitTransaction(self: *Self) void {
         output.damage.addWhole();
     }
     server.input_manager.updateCursorState();
+    server.idle_inhibitor_manager.idleInhibitCheckActive();
 }
 
 /// Send the new output configuration to all wlr-output-manager clients

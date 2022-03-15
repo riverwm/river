@@ -12,9 +12,11 @@ const IdleInhibitor = @import("IdleInhibitor.zig");
 idle_inhibit_manager: *wlr.IdleInhibitManagerV1,
 new_idle_inhibitor: wl.Listener(*wlr.IdleInhibitorV1),
 inhibitors: std.TailQueue(IdleInhibitor) = .{},
+idle: *wlr.Idle,
 
-pub fn init(self: *Self) !void {
+pub fn init(self: *Self, idle: *wlr.Idle) !void {
     self.idle_inhibit_manager = try wlr.IdleInhibitManagerV1.create(server.wl_server);
+    self.idle = idle;
     self.new_idle_inhibitor.setNotify(handleNewIdleInhibitor);
     self.idle_inhibit_manager.events.new_inhibitor.add(&self.new_idle_inhibitor);
 }
@@ -26,8 +28,23 @@ pub fn deinit(self: *Self) void {
 }
 
 pub fn idleInhibitCheckActive(self: *Self) void {
-    const inhibited = self.inhibitors.len != 0;
-    server.input_manager.idle.setEnabled(null, !inhibited);
+    var inhibited = false;
+    var it = self.inhibitors.first;
+    while (it) |node| : (it = node.next) {
+        // If for whatever reason the inhibitor does not have a view, then
+        // assume it is visible.
+        if (node.data.view == null) {
+            inhibited = true;
+            break;
+        }
+        // If view is visible,
+        if (node.data.view.?.pending.tags & node.data.view.?.output.pending.tags != 0) {
+            inhibited = true; 
+            break;
+        }
+    }
+
+    self.idle.setEnabled(null, !inhibited);
 }
 
 fn handleNewIdleInhibitor(listener: *wl.Listener(*wlr.IdleInhibitorV1), inhibitor: *wlr.IdleInhibitorV1) void {
