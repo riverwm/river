@@ -320,8 +320,10 @@ fn arrangeLayer(
             new_box.width = current_state.desired_width;
         } else {
             assert(current_state.anchor.right);
-            new_box.x = bounds.x + @intCast(i32, bounds.width - current_state.desired_width -
-                current_state.margin.right);
+            new_box.x = bounds.x + @intCast(i32, bounds.width) -
+                @intCast(i32, current_state.desired_width) -
+                // TODO(wlroots) this type has been corrected to i32 for the next release
+                @intCast(i32, current_state.margin.right);
             new_box.width = current_state.desired_width;
         }
 
@@ -338,8 +340,10 @@ fn arrangeLayer(
             new_box.height = current_state.desired_height;
         } else {
             assert(current_state.anchor.bottom);
-            new_box.y = bounds.y + @intCast(i32, bounds.height - current_state.desired_height -
-                current_state.margin.bottom);
+            new_box.y = bounds.y + @intCast(i32, bounds.height) -
+                @intCast(i32, current_state.desired_height) -
+                // TODO(wlroots) this type has been corrected to i32 for the next release
+                @intCast(i32, current_state.margin.bottom);
             new_box.height = current_state.desired_height;
         }
 
