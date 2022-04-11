@@ -304,6 +304,13 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 	- _on-output-change_: When a different output is focused, the cursor will be
 	  warped to its center.
 
+*smart-borders* *disabled*|*enabled*
+	Set the smart borders mode. There are two available modes:
+
+	- _disabled_: Borders are set on all views. This is the default.
+	- _enabled_: When a stacked view fills the usable space, it will not have
+	  borders.
+
 *set-repeat* _rate_ _delay_
 	Set the keyboard repeat rate to _rate_ key repeats per second and
 	repeat delay to _delay_ milliseconds.

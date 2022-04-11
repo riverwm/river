@@ -53,6 +53,7 @@ _riverctl_subcommands()
         'focus-follows-cursor:Configure the focus behavior when moving cursor'
         'set-repeat:Set the keyboard repeat rate and repeat delay'
         'set-cursor-warp:Set the cursor warp mode.'
+        'smart-borders:Set the smart borders mode.'
         'xcursor-theme:Set the xcursor theme'
         # Input
         'input:Configure input devices'

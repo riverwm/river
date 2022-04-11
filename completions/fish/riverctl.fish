@@ -59,6 +59,7 @@ complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'border-width'   
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'focus-follows-cursor'   -d 'Configure the focus behavior when moving cursor'
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'set-repeat'             -d 'Set the keyboard repeat rate and repeat delay'
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'set-cursor-warp'        -d 'Set the cursor warp mode.'
+complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'smart-borders'          -d 'Set the smart borders mode.'
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'xcursor-theme'          -d 'Set the xcursor theme'
 
 # Subcommands
@@ -74,6 +75,7 @@ complete -c riverctl -x -n '__fish_seen_subcommand_from unmap'                -a
 complete -c riverctl -x -n '__fish_seen_subcommand_from attach-mode'          -a 'top bottom'
 complete -c riverctl -x -n '__fish_seen_subcommand_from focus-follows-cursor' -a 'disabled normal'
 complete -c riverctl -x -n '__fish_seen_subcommand_from set-cursor-warp'      -a 'disabled on-output-change'
+complete -c riverctl -x -n '__fish_seen_subcommand_from smart-borders'        -a 'disabled enabled'
 
 # Subcommands for 'input'
 complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 2' -a "(__riverctl_list_input_devices)"

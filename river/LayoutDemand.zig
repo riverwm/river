@@ -85,15 +85,20 @@ pub fn pushViewDimensions(self: *Self, output: *Output, x: i32, y: i32, width: u
     // The client pushed too many dimensions
     if (self.views < 0) return;
 
-    // Here we apply the offset to align the coords with the origin of the
-    // usable area and shrink the dimensions to accomodate the border size.
-    const border_width = server.config.border_width;
-    self.view_boxen[self.view_boxen.len - @intCast(usize, self.views)] = .{
-        .x = x + output.usable_box.x + @intCast(i32, border_width),
-        .y = y + output.usable_box.y + @intCast(i32, border_width),
-        .width = if (width > 2 * border_width) width - 2 * border_width else width,
-        .height = if (height > 2 * border_width) height - 2 * border_width else height,
-    };
+    if (server.config.smart_borders == .enabled and width == output.usable_box.width and height == output.usable_box.height) {
+        // If the dimensions fills the useable area, we don't add any borders
+        self.view_boxen[self.view_boxen.len - @intCast(usize, self.views)] = output.usable_box;
+    } else {
+        // Here we apply the offset to align the coords with the origin of the
+        // usable area and shrink the dimensions to accomodate the border size.
+        const border_width = server.config.border_width;
+        self.view_boxen[self.view_boxen.len - @intCast(usize, self.views)] = .{
+            .x = x + output.usable_box.x + @intCast(i32, border_width),
+            .y = y + output.usable_box.y + @intCast(i32, border_width),
+            .width = if (width > 2 * border_width) width - 2 * border_width else width,
+            .height = if (height > 2 * border_width) height - 2 * border_width else height,
+        };
+    }
 
     self.views -= 1;
 }

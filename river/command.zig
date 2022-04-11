@@ -76,6 +76,7 @@ const command_impls = std.ComptimeStringMap(
         .{ "set-focused-tags",          @import("command/tags.zig").setFocusedTags },
         .{ "set-repeat",                @import("command/set_repeat.zig").setRepeat },
         .{ "set-view-tags",             @import("command/tags.zig").setViewTags },
+        .{ "smart-borders",             @import("command/config.zig").smartBorders },
         .{ "snap",                      @import("command/move.zig").snap },
         .{ "spawn",                     @import("command/spawn.zig").spawn },
         .{ "spawn-tagmask",             @import("command/tags.zig").spawnTagmask },

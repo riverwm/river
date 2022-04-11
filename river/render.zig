@@ -89,7 +89,7 @@ pub fn renderOutput(output: *Output) void {
         it = ViewStack(View).iter(output.views.last, .reverse, output.current.tags, renderFilter);
         while (it.next()) |view| {
             if (view.current.focus != 0 or view.current.float) continue;
-            if (view.draw_borders) renderBorders(output, view);
+            if (view.draw_borders and !(server.config.smart_borders == .enabled and std.meta.eql(view.current.box, output.usable_box))) renderBorders(output, view);
             renderView(output, view, &now);
         }
 
@@ -97,7 +97,7 @@ pub fn renderOutput(output: *Output) void {
         it = ViewStack(View).iter(output.views.last, .reverse, output.current.tags, renderFilter);
         while (it.next()) |view| {
             if (view.current.focus == 0 or view.current.float) continue;
-            if (view.draw_borders) renderBorders(output, view);
+            if (view.draw_borders and !(server.config.smart_borders == .enabled and std.meta.eql(view.current.box, output.usable_box))) renderBorders(output, view);
             renderView(output, view, &now);
         }
 
