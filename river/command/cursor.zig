@@ -30,6 +30,7 @@ pub fn cursor(
     args: []const [:0]const u8,
     _: *?[]const u8,
 ) Error!void {
+    if (args.len < 2) return Error.NotEnoughArguments;
     if (std.mem.eql(u8, "timeout", args[1])) {
         if (args.len < 3) return Error.NotEnoughArguments;
         if (args.len > 3) return Error.TooManyArguments;
