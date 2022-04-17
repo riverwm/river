@@ -244,7 +244,7 @@ pub fn handleViewUnmap(self: *Self, view: *View) void {
 fn setImage(self: *Self, image: Image) void {
     assert(image != .unknown);
 
-    if (image == self.image) return;
+    if (self.hidden or image == self.image) return;
     self.image = image;
     self.xcursor_manager.setCursorImage(@tagName(image), self.wlr_cursor);
 }
@@ -487,7 +487,7 @@ fn handleRequestSetCursor(
 
     // This can be sent by any client, so we check to make sure this one is
     // actually has pointer focus first.
-    if (focused_client == event.seat_client) {
+    if (!self.hidden and focused_client == event.seat_client) {
         // Once we've vetted the client, we can tell the cursor to use the
         // provided surface as the cursor image. It will set the hardware cursor
         // on the output that it's currently on and continue to do so as the
@@ -539,6 +539,8 @@ const SurfaceAtResult = struct {
 /// surface and the cursor's position in surface local coords.
 /// This function must be kept in sync with the rendering order in render.zig.
 pub fn surfaceAt(self: Self) ?SurfaceAtResult {
+    if (self.hidden)
+        return null;
     const lx = self.wlr_cursor.x;
     const ly = self.wlr_cursor.y;
     const wlr_output = server.root.output_layout.outputAt(lx, ly) orelse return null;
