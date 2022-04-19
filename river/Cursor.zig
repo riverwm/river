@@ -927,6 +927,10 @@ pub fn updateState(self: *Self) void {
 }
 
 fn shouldPassthrough(self: Self) bool {
+    // We clear focus on hiding the cursor and should not re-focus until the cursor is moved
+    // and shown again.
+    if (self.hidden) return false;
+
     switch (self.mode) {
         .passthrough => {
             // If we are not currently in down/resize/move mode, we *always* need to passthrough()
