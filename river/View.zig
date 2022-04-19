@@ -79,6 +79,9 @@ impl: Impl = undefined,
 /// The output this view is currently associated with
 output: *Output,
 
+/// The opacity of this view
+opacity: f32 = 1.0,
+
 /// This is non-null exactly when the view is mapped
 surface: ?*wlr.Surface = null,
 

@@ -35,6 +35,7 @@ const log = std.log.scoped(.render);
 
 const SurfaceRenderData = struct {
     output: *const Output,
+    opacity: f32 = 1.0,
 
     /// In output layout coordinates relative to the output
     output_x: i32,
@@ -206,6 +207,7 @@ fn renderView(output: *const Output, view: *View, now: *os.timespec) void {
                 },
                 &saved_buffer.source_box,
                 saved_buffer.transform,
+                view.opacity,
             );
         }
     } else {
@@ -216,6 +218,7 @@ fn renderView(output: *const Output, view: *View, now: *os.timespec) void {
             .output = output,
             .output_x = view.current.box.x - view.surface_box.x,
             .output_y = view.current.box.y - view.surface_box.y,
+            .opacity = view.opacity,
             .when = now,
         };
         view.forEachSurface(*SurfaceRenderData, renderSurfaceIterator, &rdata);
@@ -282,6 +285,7 @@ fn renderSurfaceIterator(
         },
         &source_box,
         surface.current.transform,
+        rdata.opacity,
     );
 
     surface.sendFrameDone(rdata.when);
@@ -295,6 +299,7 @@ fn renderTexture(
     dest_box: wlr.Box,
     source_box: *const wlr.FBox,
     transform: wl.Output.Transform,
+    opacity: f32,
 ) void {
     var box = dest_box;
 
@@ -311,7 +316,7 @@ fn renderTexture(
 
     // This takes our matrix, the texture, and an alpha, and performs the actual
     // rendering on the GPU.
-    server.renderer.renderSubtextureWithMatrix(texture, source_box, &matrix, 1.0) catch return;
+    server.renderer.renderSubtextureWithMatrix(texture, source_box, &matrix, opacity) catch return;
 }
 
 fn renderBorders(output: *const Output, view: *View) void {

@@ -93,6 +93,34 @@ pub fn borderColorUrgent(
     while (it) |node| : (it = node.next) node.data.damage.addWhole();
 }
 
+pub fn maxOpacity(
+    _: *Seat,
+    args: []const [:0]const u8,
+    _: *?[]const u8,
+) Error!void {
+    if (args.len < 2) return Error.NotEnoughArguments;
+    if (args.len > 2) return Error.TooManyArguments;
+
+    server.config.max_opacity = try std.fmt.parseFloat(f32, args[1]);
+
+    var it = server.root.outputs.first;
+    while (it) |node| : (it = node.next) node.data.damage.addWhole();
+}
+
+pub fn minOpacity(
+    _: *Seat,
+    args: []const [:0]const u8,
+    _: *?[]const u8,
+) Error!void {
+    if (args.len < 2) return Error.NotEnoughArguments;
+    if (args.len > 2) return Error.TooManyArguments;
+
+    server.config.min_opacity = try std.fmt.parseFloat(f32, args[1]);
+
+    var it = server.root.outputs.first;
+    while (it) |node| : (it = node.next) node.data.damage.addWhole();
+}
+
 pub fn setCursorWarp(
     _: *Seat,
     args: []const [:0]const u8,

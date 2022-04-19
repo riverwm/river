@@ -62,6 +62,10 @@ mode_to_id: std.StringHashMap(usize),
 /// All user-defined keymap modes, indexed by mode id
 modes: std.ArrayListUnmanaged(Mode),
 
+/// Cap the opactity that can be set by set-opacity
+max_opacity: f32 = 1.0,
+min_opacity: f32 = 0.1,
+
 /// Sets of app_ids and titles which will be started floating
 float_filter_app_ids: std.StringHashMapUnmanaged(void) = .{},
 float_filter_titles: std.StringHashMapUnmanaged(void) = .{},

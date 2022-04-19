@@ -57,6 +57,12 @@ over the Wayland protocol.
 *focus-view* *next*|*previous*
 	Focus the next or previous view in the stack.
 
+*max-opacity* _opacity_
+	Set the maximal opacity of a view.
+
+*min-opacity* _opacity_
+	Set the minimal opacity of a view.
+
 *move* *up*|*down*|*left*|*right* _delta_
 	Move the focused view in the specified direction by _delta_ logical
 	pixels. The view will be set to floating.
@@ -72,6 +78,10 @@ over the Wayland protocol.
 *send-to-output* *next*|*previous*|*up*|*right*|*down*|*left*|_name_
 	Send the focused view to the next or previous output, the closest
 	output in any direction or to an output by name.
+
+*set-opacity* _absolute_|_delta_
+	Set the opacity of the current view. Values starting with '+' or
+	'-' are relative to the current opacity.
 
 *spawn* _shell_command_
 	Run _shell_command_ using `/bin/sh -c _shell_command_`. Note that
