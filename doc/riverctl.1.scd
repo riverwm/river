@@ -193,13 +193,19 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 *enter-mode* _name_
 	Switch to given mode if it exists.
 
-*map* [_-release_|_-repeat_] _mode_ _modifiers_ _key_ _command_
+*map* [_-release_|_-repeat_|_-layout_ _index_] _mode_ _modifiers_ _key_ _command_
 	Run _command_ when _key_ is pressed while _modifiers_ are held down
 	and in the specified _mode_.
 
 	- _-release_: if passed activate on key release instead of key press
 	- _-repeat_: if passed activate repeatedly until key release; may not
 	  be used with -release
+	- _-layout_: if passed, a specific layout is pinned to the mapping.
+	  When the mapping is checked against a pressed key, this layout is
+	  used to translate the key independent of the active layout
+	- _index_: zero-based index of a layout set with the environment variable
+	  *XKB_DEFAULT_LAYOUT*; see *river*(1) for an example; if the index is
+	  out of range, the _-layout_ option will have no effect
 	- _mode_: name of the mode for which to create the mapping
 	- _modifiers_: one or more of the modifiers listed above, separated
 	  by a plus sign (+).

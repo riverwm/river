@@ -85,53 +85,39 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
     // Translate libinput keycode -> xkbcommon
     const keycode = event.keycode + 8;
 
-    // TODO: These modifiers aren't properly handled, see sway's code
     const modifiers = wlr_keyboard.getModifiers();
     const released = event.state == .released;
 
-    var handled = false;
+    const xkb_state = wlr_keyboard.xkb_state orelse return;
+    const keysyms = xkb_state.keyGetSyms(keycode);
 
-    var non_modifier_pressed = false;
-
-    // First check translated keysyms as xkb reports them
-    for (wlr_keyboard.xkb_state.?.keyGetSyms(keycode)) |sym| {
-        if (!released and !isModifier(sym)) non_modifier_pressed = true;
-
-        // Handle builtin mapping only when keys are pressed
-        if (!released and handleBuiltinMapping(sym)) {
-            handled = true;
-            break;
-        } else if (self.seat.handleMapping(sym, modifiers, released)) {
-            handled = true;
+    // Hide cursor when typing
+    for (keysyms) |sym| {
+        if (server.config.cursor_hide_when_typing == .enabled and
+            !released and
+            !isModifier(sym))
+        {
+            self.seat.cursor.hide();
             break;
         }
     }
 
-    // If not yet handled, check keysyms ignoring modifiers (e.g. 1 instead of !)
-    // Important for mappings like Mod+Shift+1
-    if (!handled) {
-        const layout_index = wlr_keyboard.xkb_state.?.keyGetLayout(keycode);
-        for (wlr_keyboard.keymap.?.keyGetSymsByLevel(keycode, layout_index, 0)) |sym| {
-            // Handle builtin mapping only when keys are pressed
-            if (!released and handleBuiltinMapping(sym)) {
-                handled = true;
-                break;
-            } else if (self.seat.handleMapping(sym, modifiers, released)) {
-                handled = true;
-                break;
-            }
-        }
+    // Handle builtin mapping, only when keys are pressed
+    for (keysyms) |sym| {
+        if (!released and handleBuiltinMapping(sym)) return;
     }
 
-    if (!handled) {
-        // Otherwise, we pass it along to the client.
+    // Handle user-defined mapping
+    if (!self.seat.handleMapping(
+        keycode,
+        modifiers,
+        released,
+        xkb_state,
+    )) {
+        // If key was not handled, we pass it along to the client.
         const wlr_seat = self.seat.wlr_seat;
         wlr_seat.setKeyboard(self.input_device);
         wlr_seat.keyboardNotifyKey(event.time_msec, event.keycode, event.state);
-    }
-
-    if (non_modifier_pressed and server.config.cursor_hide_when_typing == .enabled) {
-        self.seat.cursor.hide();
     }
 }
 
