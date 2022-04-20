@@ -40,7 +40,7 @@ pub fn map(
     args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
-    const optionals = parseOptionalArgs(args[1..]);
+    const optionals = try parseOptionalArgs(args[1..]);
     // offset caused by optional arguments
     const offset = optionals.i;
     if (args.len - offset < 5) return Error.NotEnoughArguments;
@@ -57,7 +57,14 @@ pub fn map(
 
     const mode_mappings = &server.config.modes.items[mode_id].mappings;
 
-    const new = try Mapping.init(keysym, modifiers, optionals.release, optionals.repeat, args[4 + offset ..]);
+    const new = try Mapping.init(
+        keysym,
+        modifiers,
+        optionals.release,
+        optionals.repeat,
+        optionals.layout_index,
+        args[4 + offset ..],
+    );
     errdefer new.deinit();
 
     if (mappingExists(mode_mappings, modifiers, keysym, optionals.release)) |current| {
@@ -316,32 +323,41 @@ const OptionalArgsContainer = struct {
     i: usize,
     release: bool,
     repeat: bool,
+    layout_index: ?u32,
 };
 
 /// Parses optional args (such as -release) and return the index of the first argument that is
 /// not an optional argument
 /// Returns an OptionalArgsContainer with the settings set according to the args
-/// Errors cant occur because it returns as soon as it gets an unknown argument
-fn parseOptionalArgs(args: []const []const u8) OptionalArgsContainer {
+fn parseOptionalArgs(args: []const []const u8) !OptionalArgsContainer {
     // Set to defaults
     var parsed = OptionalArgsContainer{
         // i is the number of arguments consumed
         .i = 0,
         .release = false,
         .repeat = false,
+        .layout_index = null,
     };
 
-    var i: usize = 0;
-    for (args) |arg| {
-        if (mem.eql(u8, arg, "-release")) {
+    var j: usize = 0;
+    while (j < args.len) : (j += 1) {
+        if (mem.eql(u8, args[j], "-release")) {
             parsed.release = true;
-            i += 1;
-        } else if (mem.eql(u8, arg, "-repeat")) {
+            parsed.i += 1;
+        } else if (mem.eql(u8, args[j], "-repeat")) {
             parsed.repeat = true;
-            i += 1;
+            parsed.i += 1;
+        } else if (mem.eql(u8, args[j], "-layout")) {
+            j += 1;
+            if (j == args.len) return Error.NotEnoughArguments;
+            // To keep things simple here, we do not check if the layout index
+            // is out of range. We rely on xkbcommon to handle this case:
+            // xkbcommon will simply use the active layout instead, leaving
+            // this option without effect
+            parsed.layout_index = try std.fmt.parseInt(u32, args[j], 10);
+            parsed.i += 2;
         } else {
             // Break if the arg is not an option
-            parsed.i = i;
             break;
         }
     }
@@ -354,7 +370,7 @@ fn parseOptionalArgs(args: []const []const u8) OptionalArgsContainer {
 /// Example:
 /// unmap normal Mod4+Shift Return
 pub fn unmap(seat: *Seat, args: []const [:0]const u8, out: *?[]const u8) Error!void {
-    const optionals = parseOptionalArgs(args[1..]);
+    const optionals = try parseOptionalArgs(args[1..]);
     // offset caused by optional arguments
     const offset = optionals.i;
     if (args.len - offset < 4) return Error.NotEnoughArguments;

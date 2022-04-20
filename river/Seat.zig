@@ -342,17 +342,20 @@ pub fn handleViewUnmap(self: *Self, view: *View) void {
     if (self.focused == .view and self.focused.view == view) self.focus(null);
 }
 
-/// Handle any user-defined mapping for the passed keysym and modifiers
+/// Handle any user-defined mapping for passed keycode, modifiers and keyboard state
 /// Returns true if the key was handled
 pub fn handleMapping(
     self: *Self,
-    keysym: xkb.Keysym,
+    keycode: xkb.Keycode,
     modifiers: wlr.Keyboard.ModifierMask,
     released: bool,
+    xkb_state: *xkb.State,
 ) bool {
     const modes = &server.config.modes;
+    // In case more than on mapping matches, all of them are activated
+    var handled = false;
     for (modes.items[self.mode_id].mappings.items) |*mapping| {
-        if (std.meta.eql(modifiers, mapping.modifiers) and keysym == mapping.keysym and released == mapping.release) {
+        if (mapping.match(keycode, modifiers, released, xkb_state)) {
             if (mapping.repeat) {
                 self.repeating_mapping = mapping;
                 self.mapping_repeat_timer.timerUpdate(server.config.repeat_delay) catch {
@@ -360,10 +363,10 @@ pub fn handleMapping(
                 };
             }
             self.runCommand(mapping.command_args);
-            return true;
+            handled = true;
         }
     }
-    return false;
+    return handled;
 }
 
 /// Handle any user-defined mapping for switches
