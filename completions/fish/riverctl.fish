@@ -57,6 +57,7 @@ complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'border-color-unf
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'border-color-urgent'    -d 'Set the border color of urgent views'
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'border-width'           -d 'Set the border width to pixels'
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'focus-follows-cursor'   -d 'Configure the focus behavior when moving cursor'
+complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'hide-cursor'            -d 'Hide cursor when typing or after inactivity'
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'set-repeat'             -d 'Set the keyboard repeat rate and repeat delay'
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'set-cursor-warp'        -d 'Set the cursor warp mode.'
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'xcursor-theme'          -d 'Set the xcursor theme'
@@ -102,3 +103,10 @@ complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverc
 complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 4; and __fish_seen_subcommand_from scroll-method'  -a 'two-finger' -d 'Scroll by swiping with two fingers simultaneously'
 complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 4; and __fish_seen_subcommand_from scroll-method'  -a 'edge'       -d 'Scroll by swiping along the edge'
 complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 4; and __fish_seen_subcommand_from scroll-method'  -a 'button'     -d 'Scroll with pointer movement while holding down a button'
+
+# Subcommands for 'hide-cursor'
+complete -c riverctl -x -n '__fish_seen_subcommand_from hide-cursor; and __fish_riverctl_complete_arg 2' -a 'timeout'     -d 'Hide cursor if it wasn\'t moved in the last X millisecond, until it is moved again'
+complete -c riverctl -x -n '__fish_seen_subcommand_from hide-cursor; and __fish_riverctl_complete_arg 2' -a 'when-typing' -d 'Enable or disable whether the cursor should be hidden when pressing any non-modifier key'
+
+# Subcommands for the subcommands of ‘hide-cursor’
+complete -c riverctl -x -n '__fish_seen_subcommand_from hide-cursor; and __fish_riverctl_complete_arg 3; and __fish_seen_subcommand_from when-typing' -a 'enabled disabled'
