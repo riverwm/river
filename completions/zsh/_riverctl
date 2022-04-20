@@ -51,6 +51,7 @@ _riverctl_subcommands()
         'border-color-urgent:Set the border color of urgent views'
         'border-width:Set the border width to pixels'
         'focus-follows-cursor:Configure the focus behavior when moving cursor'
+        'hide-cursor:Hide cursor when typing or after inactivity'
         'set-repeat:Set the keyboard repeat rate and repeat delay'
         'set-cursor-warp:Set the cursor warp mode.'
         'xcursor-theme:Set the xcursor theme'
@@ -117,6 +118,37 @@ _riverctl_input()
     esac
 }
 
+_riverctl_hide_cursor_subcommands()
+{
+    local -a hide_cursor_subcommands
+
+    hide_cursor_subcommands=(
+        "timeout:Hide cursor if it wasn\'t moved in the last X millisecond, until it is moved again"
+        'when-typing:Enable or disable whether the cursor should be hidden when pressing any non-modifier key'
+    )
+
+    _describe -t command 'command' hide_cursor_subcommands
+}
+
+_riverctl_hide_cursor()
+{
+    local state
+
+    _arguments \
+        '1: :->commands' \
+        '*:: :->args'
+
+    case $state in
+        commands) _alternative 'common-commands:common:_riverctl_hide_cursor_subcommands' ;;
+        args)
+            case "$words[1]" in
+                when-typing) _alternative 'hide-cursor-cmds:args:(enabled disabled)' ;;
+                *) return 0 ;;
+            esac
+        ;;
+    esac
+}
+
 _riverctl()
 {
     local state
@@ -142,6 +174,7 @@ _riverctl()
                 attach-mode) _alternative 'arguments:args:(top bottom)' ;;
                 focus-follows-cursor) _alternative 'arguments:args:(disabled normal)' ;;
                 set-cursor-warp) _alternative 'arguments:args:(disabled on-output-change)' ;;
+                hide-cursor) _riverctl_hide_cursor ;;
                 *) return 0 ;;
             esac
         ;;
