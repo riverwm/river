@@ -437,9 +437,10 @@ pub fn fromWlrSurface(surface: *wlr.Surface) ?*Self {
         }
     }
     if (surface.isSubsurface()) {
-        const subsurface = wlr.Subsurface.fromWlrSurface(surface);
-        if (subsurface.parent) |s| {
-            return fromWlrSurface(s);
+        if (wlr.Subsurface.fromWlrSurface(surface)) |ss| {
+            if (ss.parent) |s| {
+                return fromWlrSurface(s);
+            }
         }
     }
     return null;
