@@ -41,12 +41,12 @@ pub fn setFocusedTags(
 
 /// Set the spawn tagmask
 pub fn spawnTagmask(
-    seat: *Seat,
+    _: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     const tags = try parseTags(args, out);
-    seat.focused_output.spawn_tagmask = tags;
+    server.config.spawn_tagmask = tags;
 }
 
 /// Set the tags of the focused view.
