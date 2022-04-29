@@ -7,6 +7,7 @@ const wl = @import("wayland").server.wl;
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
+const View = @import("View.zig");
 const IdleInhibitor = @import("IdleInhibitor.zig");
 
 idle_inhibit_manager: *wlr.IdleInhibitManagerV1,
@@ -31,14 +32,16 @@ pub fn idleInhibitCheckActive(self: *Self) void {
     var inhibited = false;
     var it = self.inhibitors.first;
     while (it) |node| : (it = node.next) {
-        // If for whatever reason the inhibitor does not have a view, then
-        // assume it is visible.
-        if (node.data.view == null) {
-            inhibited = true;
-            break;
-        }
-        // If view is visible,
-        if (node.data.view.?.current.tags & node.data.view.?.output.current.tags != 0) {
+        var view = View.fromWlrSurface(node.data.inhibitor.surface);
+        if (view) |v| {
+            // If view is visible,
+            if (v.current.tags & v.output.current.tags != 0) {
+                inhibited = true;
+                break;
+            }
+        } else {
+            // If for whatever reason the inhibitor does not have a view, then
+            // assume it is visible.
             inhibited = true;
             break;
         }
