@@ -51,7 +51,7 @@ seat: *Seat,
 input_device: *wlr.InputDevice,
 
 switch_device: wl.Listener(*wlr.Switch.event.Toggle) = wl.Listener(*wlr.Switch.event.Toggle).init(handleToggle),
-destroy: wl.Listener(*wlr.Switch) = wl.Listener(*wlr.Switch).init(handleDestroy),
+destroy: wl.Listener(*wlr.InputDevice) = wl.Listener(*wlr.InputDevice).init(handleDestroy),
 
 pub fn init(self: *Self, seat: *Seat, input_device: *wlr.InputDevice) void {
     self.* = .{
@@ -62,6 +62,7 @@ pub fn init(self: *Self, seat: *Seat, input_device: *wlr.InputDevice) void {
     const wlr_switch = self.input_device.device.switch_device;
 
     wlr_switch.events.toggle.add(&self.switch_device);
+    self.input_device.events.destroy.add(&self.destroy);
 }
 
 pub fn deinit(self: *Self) void {
@@ -98,7 +99,7 @@ fn handleToggle(listener: *wl.Listener(*wlr.Switch.event.Toggle), event: *wlr.Sw
     self.seat.handleSwitchMapping(switch_type, switch_state);
 }
 
-fn handleDestroy(listener: *wl.Listener(*wlr.Switch), _: *wlr.Switch) void {
+fn handleDestroy(listener: *wl.Listener(*wlr.InputDevice), _: *wlr.InputDevice) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
 
