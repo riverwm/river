@@ -96,7 +96,7 @@ pub fn listInputConfigs(
             try writer.print("\tmiddle-emulation: {s}\n", .{@tagName(middle_emulation)});
         }
         if (input_config.natural_scroll) |natural_scroll| {
-            try writer.print("\tnatual-scroll: {s}\n", .{@tagName(natural_scroll)});
+            try writer.print("\tnatural-scroll: {s}\n", .{@tagName(natural_scroll)});
         }
         if (input_config.left_handed) |left_handed| {
             try writer.print("\tleft-handed: {s}\n", .{@tagName(left_handed)});
