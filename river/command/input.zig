@@ -199,6 +199,9 @@ pub fn input(
         const ret = c.libevdev_event_code_from_name(c.EV_KEY, args[3]);
         if (ret < 1) return Error.InvalidButton;
         input_config.scroll_button = InputConfig.ScrollButton{ .button = @intCast(u32, ret) };
+    } else if (mem.eql(u8, "numlock", args[2])) {
+        input_config.numlock_state = meta.stringToEnum(InputConfig.NumlockState, args[3]) orelse
+            return Error.UnknownOption;
     } else {
         return Error.UnknownCommand;
     }

@@ -19,6 +19,7 @@ const Self = @This();
 const build_options = @import("build_options");
 const std = @import("std");
 const wlr = @import("wlroots");
+const xkb = @import("xkbcommon");
 
 const log = std.log.scoped(.input_config);
 
@@ -264,6 +265,44 @@ pub const ScrollButton = struct {
     }
 };
 
+pub const NumlockState = enum {
+    disabled,
+    enabled,
+
+    pub fn apply(numlock_state: NumlockState, wlr_keyboard: *wlr.Keyboard) void {
+        const keymap = wlr_keyboard.keymap orelse return;
+        const xkb_state = wlr_keyboard.xkb_state orelse return;
+
+        const numlock_index = keymap.modGetIndex(xkb.names.mod.num);
+        if (numlock_index == xkb.mod_invalid) return;
+
+        const numlock_mask = @as(u32, 1) << @intCast(u5, numlock_index);
+
+        // Currently locked modifiers
+        const locked = xkb_state.serializeMods(@intToEnum(
+            xkb.State.Component,
+            xkb.State.Component.mods_locked,
+        ));
+
+        // Current numlock state
+        const current_state = @intToEnum(
+            NumlockState,
+            @boolToInt(locked & numlock_mask > 0),
+        );
+
+        // If current numlock state differs from the desired state,
+        // flip the repsective bit and update keyboard state
+        if (current_state != numlock_state) {
+            wlr_keyboard.notifyModifiers(wlr.Keyboard.Modifiers{
+                .depressed = 0,
+                .latched = 0,
+                .locked = locked ^ numlock_mask,
+                .group = 0,
+            });
+        }
+    }
+};
+
 identifier: []const u8,
 
 event_state: ?EventState = null,
@@ -280,29 +319,38 @@ tap_button_map: ?TapButtonMap = null,
 pointer_accel: ?PointerAccel = null,
 scroll_method: ?ScrollMethod = null,
 scroll_button: ?ScrollButton = null,
+numlock_state: ?NumlockState = null,
 
 pub fn deinit(self: *Self) void {
     util.gpa.free(self.identifier);
 }
 
 pub fn apply(self: *Self, device: *InputDevice) void {
-    const libinput_device = @ptrCast(
-        *c.libinput_device,
-        device.device.getLibinputDevice() orelse return,
-    );
-    log.debug("applying input configuration to device: {s}", .{device.identifier});
-    if (self.event_state) |setting| setting.apply(libinput_device);
-    if (self.accel_profile) |setting| setting.apply(libinput_device);
-    if (self.click_method) |setting| setting.apply(libinput_device);
-    if (self.drag_state) |setting| setting.apply(libinput_device);
-    if (self.drag_lock) |setting| setting.apply(libinput_device);
-    if (self.dwt_state) |setting| setting.apply(libinput_device);
-    if (self.middle_emulation) |setting| setting.apply(libinput_device);
-    if (self.natural_scroll) |setting| setting.apply(libinput_device);
-    if (self.left_handed) |setting| setting.apply(libinput_device);
-    if (self.pointer_accel) |setting| setting.apply(libinput_device);
-    if (self.scroll_button) |setting| setting.apply(libinput_device);
-    if (self.scroll_method) |setting| setting.apply(libinput_device);
-    if (self.tap_state) |setting| setting.apply(libinput_device);
-    if (self.tap_button_map) |setting| setting.apply(libinput_device);
+    switch (device.device.type) {
+        .keyboard => {
+            log.debug("applying input configuration to device: {s}", .{device.identifier});
+            if (self.numlock_state) |setting| setting.apply(device.device.device.keyboard);
+        },
+        else => {
+            const libinput_device = @ptrCast(
+                *c.libinput_device,
+                device.device.getLibinputDevice() orelse return,
+            );
+            log.debug("applying input configuration to device: {s}", .{device.identifier});
+            if (self.event_state) |setting| setting.apply(libinput_device);
+            if (self.accel_profile) |setting| setting.apply(libinput_device);
+            if (self.click_method) |setting| setting.apply(libinput_device);
+            if (self.drag_state) |setting| setting.apply(libinput_device);
+            if (self.drag_lock) |setting| setting.apply(libinput_device);
+            if (self.dwt_state) |setting| setting.apply(libinput_device);
+            if (self.middle_emulation) |setting| setting.apply(libinput_device);
+            if (self.natural_scroll) |setting| setting.apply(libinput_device);
+            if (self.left_handed) |setting| setting.apply(libinput_device);
+            if (self.pointer_accel) |setting| setting.apply(libinput_device);
+            if (self.scroll_button) |setting| setting.apply(libinput_device);
+            if (self.scroll_method) |setting| setting.apply(libinput_device);
+            if (self.tap_state) |setting| setting.apply(libinput_device);
+            if (self.tap_button_map) |setting| setting.apply(libinput_device);
+        },
+    }
 }
