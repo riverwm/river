@@ -43,7 +43,7 @@ jobs:
             -Dwerror=false -Db_ndebug=false --prefix /usr
           ninja -C build install
 
-          wget https://ziglang.org/download/0.9.1/zig-linux-x86_64-0.9.1.tar.xz
+          wget -nv https://ziglang.org/download/0.9.1/zig-linux-x86_64-0.9.1.tar.xz
           tar -xvf zig-linux-x86_64-0.9.1.tar.xz
           mv zig-linux-x86_64-0.9.1/zig /usr/bin/
           mv zig-linux-x86_64-0.9.1/lib /usr/lib/zig

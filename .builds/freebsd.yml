@@ -39,7 +39,7 @@ tasks:
       sudo ninja -C build/ install
       cd ..
 
-      wget https://ziglang.org/download/0.9.1/zig-freebsd-x86_64-0.9.1.tar.xz
+      wget -nv https://ziglang.org/download/0.9.1/zig-freebsd-x86_64-0.9.1.tar.xz
       # Remove a lot of useless lines from tar output.
       tar -xvf zig-freebsd-x86_64-0.9.1.tar.xz 1>/dev/null
       sudo mv zig-freebsd-x86_64-0.9.1/zig /usr/bin/
