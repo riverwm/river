@@ -87,7 +87,7 @@ fn _main() !void {
     var globals = Globals{};
 
     registry.setListener(*Globals, registryListener, &globals);
-    _ = try display.roundtrip();
+    if (display.roundtrip() != .SUCCESS) fatal("initial roundtrip failed", .{});
 
     const control = globals.control orelse return error.RiverControlNotAdvertised;
     const seat = globals.seat orelse return error.SeatNotAdverstised;
@@ -98,7 +98,9 @@ fn _main() !void {
     callback.setListener(?*anyopaque, callbackListener, null);
 
     // Loop until our callback is called and we exit.
-    while (true) _ = try display.dispatch();
+    while (true) {
+        if (display.dispatch() != .SUCCESS) fatal("failed to dispatch wayland events", .{});
+    }
 }
 
 fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, globals: *Globals) void {

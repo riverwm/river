@@ -85,6 +85,27 @@ pub fn build(b: *zbs.Builder) !void {
     scanner.addProtocolPath("protocol/wlr-layer-shell-unstable-v1.xml");
     scanner.addProtocolPath("protocol/wlr-output-power-management-unstable-v1.xml");
 
+    // These must be manually kept in sync with the versions wlroots supports
+    // until wlroots gives us the option request a specific version.
+    scanner.generate("wl_compositor", 4);
+    scanner.generate("wl_subcompositor", 1);
+    scanner.generate("wl_shm", 1);
+    scanner.generate("wl_output", 4);
+    scanner.generate("wl_seat", 7);
+    scanner.generate("wl_data_device_manager", 3);
+
+    scanner.generate("xdg_wm_base", 2);
+    scanner.generate("zwp_pointer_gestures_v1", 3);
+    scanner.generate("zxdg_output_manager_v1", 3);
+    scanner.generate("zwp_pointer_constraints_v1", 1);
+
+    scanner.generate("zriver_control_v1", 1);
+    scanner.generate("zriver_status_manager_v1", 2);
+    scanner.generate("river_layout_manager_v3", 1);
+
+    scanner.generate("zwlr_layer_shell_v1", 4);
+    scanner.generate("zwlr_output_power_manager_v1", 1);
+
     {
         const river = b.addExecutable("river", "river/main.zig");
         river.setTarget(target);

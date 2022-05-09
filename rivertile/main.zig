@@ -362,7 +362,7 @@ pub fn main() !void {
 
     const registry = try display.getRegistry();
     registry.setListener(*Context, registryListener, &context);
-    _ = try display.roundtrip();
+    if (display.roundtrip() != .SUCCESS) fatal("initial roundtrip failed", .{});
 
     if (context.layout_manager == null) {
         fatal("wayland compositor does not support river-layout-v3.\n", .{});
@@ -376,7 +376,9 @@ pub fn main() !void {
         try output.getLayout(&context);
     }
 
-    while (true) _ = try display.dispatch();
+    while (true) {
+        if (display.dispatch() != .SUCCESS) fatal("failed to dispatch wayland events", .{});
+    }
 }
 
 fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, context: *Context) void {
