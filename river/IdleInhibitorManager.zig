@@ -24,16 +24,17 @@ pub fn init(self: *Self, idle: *wlr.Idle) !void {
 
 pub fn deinit(self: *Self) void {
     while (self.inhibitors.pop()) |inhibitor| {
+        inhibitor.data.destroy.link.remove();
         util.gpa.destroy(inhibitor);
     }
+    self.new_idle_inhibitor.link.remove();
 }
 
 pub fn idleInhibitCheckActive(self: *Self) void {
     var inhibited = false;
     var it = self.inhibitors.first;
     while (it) |node| : (it = node.next) {
-        var view = View.fromWlrSurface(node.data.inhibitor.surface);
-        if (view) |v| {
+        if (View.fromWlrSurface(node.data.inhibitor.surface)) |v| {
             // If view is visible,
             if (v.current.tags & v.output.current.tags != 0) {
                 inhibited = true;
