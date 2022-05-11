@@ -436,6 +436,13 @@ pub fn fromWlrSurface(surface: *wlr.Surface) ?*Self {
             return @intToPtr(*Self, xwayland_surface.data);
         }
     }
+    if (surface.isSubsurface()) {
+        if (wlr.Subsurface.fromWlrSurface(surface)) |ss| {
+            if (ss.parent) |s| {
+                return fromWlrSurface(s);
+            }
+        }
+    }
     return null;
 }
 
