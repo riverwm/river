@@ -69,7 +69,7 @@ pub fn deinit(self: Self) void {
 pub fn match(
     self: Self,
     keycode: xkb.Keycode,
-    modifiers_raw: wlr.Keyboard.ModifierMask,
+    modifiers: wlr.Keyboard.ModifierMask,
     released: bool,
     xkb_state: *xkb.State,
 ) bool {
@@ -82,43 +82,28 @@ pub fn match(
     // will fall back to the active layout if so.
     const layout_index = self.layout_index orelse xkb_state.keyGetLayout(keycode);
 
-    // Raw keysyms and modifiers as if modifiers didn't change keysyms.
+    // Get keysyms from the base layer, as if modifiers didn't change keysyms.
     // E.g. pressing `Super+Shift 1` does not translate to `Super Exclam`.
-    const keysyms_raw = keymap.keyGetSymsByLevel(
+    const keysyms = keymap.keyGetSymsByLevel(
         keycode,
         layout_index,
         0,
     );
 
-    if (std.meta.eql(modifiers_raw, self.modifiers)) {
-        for (keysyms_raw) |sym| {
+    if (std.meta.eql(modifiers, self.modifiers)) {
+        for (keysyms) |sym| {
             if (sym == self.keysym) {
                 return true;
             }
         }
     }
 
-    // Keysyms and modifiers as translated by xkb.
-    // Modifiers used to translate the key are consumed.
-    // E.g. pressing `Super+Shift 1` translates to `Super Exclam`.
-    const keysyms_translated = keymap.keyGetSymsByLevel(
-        keycode,
-        layout_index,
-        xkb_state.keyGetLevel(keycode, layout_index),
-    );
+    // We deliberately choose not to translate keysyms and modifiers with xkb,
+    // because of strange behavior that xkb shows for some layouts and keys.
+    // When pressing `Shift Space` on some layouts (Swedish among others),
+    // xkb reports `Shift` as consumed. This leads to the case that we cannot
+    // distinguish between `Space` and `Shift Space` presses when doing a
+    // correct translation with xkb.
 
-    const consumed = xkb_state.keyGetConsumedMods2(keycode, xkb.ConsumedMode.xkb);
-    const modifiers_translated = @bitCast(
-        wlr.Keyboard.ModifierMask,
-        @bitCast(u32, modifiers_raw) & ~consumed,
-    );
-
-    if (std.meta.eql(modifiers_translated, self.modifiers)) {
-        for (keysyms_translated) |sym| {
-            if (sym == self.keysym) {
-                return true;
-            }
-        }
-    }
     return false;
 }
