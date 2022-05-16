@@ -55,15 +55,24 @@ pub fn build(b: *zbs.Builder) !void {
     const full_version = blk: {
         if (mem.endsWith(u8, version, "-dev")) {
             var ret: u8 = undefined;
-            const git_dir = try fs.path.join(b.allocator, &[_][]const u8{ b.build_root, ".git" });
-            const git_commit_hash = b.execAllowFail(
-                &[_][]const u8{ "git", "--git-dir", git_dir, "--work-tree", b.build_root, "rev-parse", "--short", "HEAD" },
+
+            const git_describe_long = b.execAllowFail(
+                &[_][]const u8{ "git", "-C", b.build_root, "describe", "--long" },
                 &ret,
                 .Inherit,
             ) catch break :blk version;
-            break :blk try std.fmt.allocPrintZ(b.allocator, "{s}-{s}", .{
-                version,
-                mem.trim(u8, git_commit_hash, &std.ascii.spaces),
+
+            var it = mem.split(u8, mem.trim(u8, git_describe_long, &std.ascii.spaces), "-");
+            _ = it.next().?; // previous tag
+            const commit_count = it.next().?;
+            const commit_hash = it.next().?;
+            assert(it.next() == null);
+            assert(commit_hash[0] == 'g');
+
+            // Follow semantic versioning, e.g. 0.2.0-dev.42+d1cf95b
+            break :blk try std.fmt.allocPrintZ(b.allocator, version ++ ".{s}+{s}", .{
+                commit_count,
+                commit_hash[1..],
             });
         } else {
             break :blk version;
