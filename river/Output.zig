@@ -98,8 +98,6 @@ frame: wl.Listener(*wlr.OutputDamage) = wl.Listener(*wlr.OutputDamage).init(hand
 damage_destroy: wl.Listener(*wlr.OutputDamage) = wl.Listener(*wlr.OutputDamage).init(handleDamageDestroy),
 
 pub fn init(self: *Self, wlr_output: *wlr.Output) !void {
-    assert(!wlr_output.isHeadless());
-
     if (!wlr_output.initRender(server.allocator, server.renderer)) return;
 
     // Some backends don't have modes. DRM+KMS does, and we need to set a mode
