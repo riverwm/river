@@ -26,6 +26,8 @@ const util = @import("util.zig");
 
 const LockSurface = @import("LockSurface.zig");
 
+const log = std.log.scoped(.session_lock);
+
 locked: bool = false,
 lock: ?*wlr.SessionLockV1 = null,
 
@@ -52,6 +54,7 @@ fn handleLock(listener: *wl.Listener(*wlr.SessionLockV1), lock: *wlr.SessionLock
     const manager = @fieldParentPtr(LockManager, "new_lock", listener);
 
     if (manager.lock != null) {
+        log.info("denying new session lock client, an active one already exists", .{});
         lock.destroy();
         return;
     }
@@ -72,6 +75,10 @@ fn handleLock(listener: *wl.Listener(*wlr.SessionLockV1), lock: *wlr.SessionLock
             seat.prev_mode_id = seat.mode_id;
             seat.enterMode(1);
         }
+
+        log.info("session locked", .{});
+    } else {
+        log.info("new session lock client given control of already locked session", .{});
     }
 
     lock.events.new_surface.add(&manager.new_surface);
@@ -84,6 +91,8 @@ fn handleUnlock(listener: *wl.Listener(void)) void {
 
     assert(manager.locked);
     manager.locked = false;
+
+    log.info("session unlocked", .{});
 
     {
         var it = server.input_manager.seats.first;
@@ -104,6 +113,8 @@ fn handleUnlock(listener: *wl.Listener(void)) void {
 fn handleDestroy(listener: *wl.Listener(void)) void {
     const manager = @fieldParentPtr(LockManager, "destroy", listener);
 
+    log.debug("ext_session_lock_v1 destroyed", .{});
+
     manager.new_surface.link.remove();
     manager.unlock.link.remove();
     manager.destroy.link.remove();
@@ -116,6 +127,8 @@ fn handleSurface(
     wlr_lock_surface: *wlr.SessionLockSurfaceV1,
 ) void {
     const manager = @fieldParentPtr(LockManager, "new_surface", listener);
+
+    log.debug("new ext_session_lock_surface_v1 created", .{});
 
     assert(manager.locked);
     assert(manager.lock != null);
