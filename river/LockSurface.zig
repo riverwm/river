@@ -107,6 +107,8 @@ fn handleOutputMode(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
 fn handleMap(listener: *wl.Listener(void)) void {
     const lock_surface = @fieldParentPtr(LockSurface, "map", listener);
 
+    lock_surface.output().lock_surface = lock_surface;
+
     {
         var it = server.input_manager.seats.first;
         while (it) |node| : (it = node.next) {
@@ -114,10 +116,9 @@ fn handleMap(listener: *wl.Listener(void)) void {
             if (seat.focused != .lock_surface) {
                 seat.setFocusRaw(.{ .lock_surface = lock_surface });
             }
+            seat.cursor.updateState();
         }
     }
-
-    lock_surface.output().lock_surface = lock_surface;
 }
 
 fn handleDestroy(listener: *wl.Listener(void)) void {
