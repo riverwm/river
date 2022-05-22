@@ -55,6 +55,9 @@ zig build -Drelease-safe --prefix ~/.local install
 ```
 To enable experimental Xwayland support pass the `-Dxwayland` option as well.
 
+If you are packaging river for distribution, see also
+[PACKAGING.md](PACKAGING.md).
+
 ## Usage
 
 River can either be run nested in an X11/Wayland session or directly
