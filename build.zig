@@ -16,6 +16,9 @@ pub fn build(b: *zbs.Builder) !void {
     const target = b.standardTargetOptions(.{});
     const mode = b.standardReleaseOptions();
 
+    const strip = b.option(bool, "strip", "Omit debug information") orelse false;
+    const pie = b.option(bool, "pie", "Build a Position Independent Executable") orelse false;
+
     const man_pages = b.option(
         bool,
         "man-pages",
@@ -123,6 +126,8 @@ pub fn build(b: *zbs.Builder) !void {
 
         addServerDeps(river, scanner);
 
+        river.strip = strip;
+        river.pie = pie;
         river.install();
     }
 
@@ -143,6 +148,8 @@ pub fn build(b: *zbs.Builder) !void {
 
         scanner.addCSource(riverctl);
 
+        riverctl.strip = strip;
+        riverctl.pie = pie;
         riverctl.install();
     }
 
@@ -163,6 +170,8 @@ pub fn build(b: *zbs.Builder) !void {
 
         scanner.addCSource(rivertile);
 
+        rivertile.strip = strip;
+        rivertile.pie = pie;
         rivertile.install();
     }
 
