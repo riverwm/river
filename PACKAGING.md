@@ -37,7 +37,17 @@ at a minimum must be passed.
 
 Here are a few other options that are particularly relevant to packagers:
 
-- `-Dcpu=baseline`: Target the baseline CPU, or any other set of CPU features.
+- `-Dcpu=baseline`: Build for the "baseline" CPU of the target architecture,
+or any other CPU/feature set (e.g. `-Dcpu=x86_64_v2`).
+
+  - Individual features can be added/removed with `+`/`-`
+  (e.g. `-Dcpu=x86_64+avx2-cmov`).
+
+  - For a list of CPUs see for example `zig targets | jq '.cpus.x86_64 |
+  keys'`.
+
+  - For a list of features see for example `zig targets | jq
+  '.cpusFeatures.x86_64'`.
 
 - `-Dtarget=x86_64-linux-gnu`: Target architecture, OS, and ABI triple. See
 the output of `zig targets` for an exhaustive list of targets and CPU features,
