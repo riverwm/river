@@ -78,19 +78,32 @@ fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wl
 
     xwayland_surface.surface.?.events.commit.add(&self.commit);
 
-    // TODO: handle keyboard focus
-    // if (wlr_xwayland_or_surface_wants_focus(self.xwayland_surface)) { ...
+    if (self.xwayland_surface.overrideRedirectWantsFocus()) {
+        server.input_manager.defaultSeat().setFocusRaw(.{ .xwayland_unmanaged = self });
+    }
 }
 
 /// Called when the surface is unmapped and will no longer be displayed.
 fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "unmap", listener);
 
-    // Remove self from the list of unmanged views in the root
+    // Remove self from the list of unmanaged views in the root
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
     server.root.xwayland_unmanaged_views.remove(node);
 
     self.commit.link.remove();
+
+    // If the unmapped surface is currently focused, reset focus to the most
+    // appropriate view.
+    var seat_it = server.input_manager.seats.first;
+    while (seat_it) |seat_node| : (seat_it = seat_node.next) {
+        const seat = &seat_node.data;
+        if (seat.focused == .xwayland_unmanaged and seat.focused.xwayland_unmanaged == self) {
+            seat.focus(null);
+        }
+    }
+
+    server.root.startTransaction();
 }
 
 fn handleCommit(_: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {

@@ -38,12 +38,14 @@ const Output = @import("Output.zig");
 const SeatStatus = @import("SeatStatus.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
+const XwaylandUnmanaged = @import("XwaylandUnmanaged.zig");
 
 const log = std.log.scoped(.seat);
 const PointerConstraint = @import("PointerConstraint.zig");
 
 const FocusTarget = union(enum) {
     view: *View,
+    xwayland_unmanaged: *XwaylandUnmanaged,
     layer: *LayerSurface,
     none: void,
 };
@@ -206,7 +208,8 @@ fn pendingFilter(view: *View, filter_tags: u32) bool {
 }
 
 /// Switch focus to the target, handling unfocus and input inhibition
-/// properly. This should only be called directly if dealing with layers.
+/// properly. This should only be called directly if dealing with layers or
+/// unmanaged xwayland views.
 pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
     // If the target is already focused, do nothing
     if (std.meta.eql(new_focus, self.focused)) return;
@@ -214,6 +217,10 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
     // Obtain the target surface
     const target_surface = switch (new_focus) {
         .view => |target_view| target_view.surface.?,
+        .xwayland_unmanaged => |target_xwayland_unmanaged| blk: {
+            assert(build_options.xwayland);
+            break :blk target_xwayland_unmanaged.xwayland_surface.surface;
+        },
         .layer => |target_layer| target_layer.wlr_layer_surface.surface,
         .none => null,
     };
@@ -228,7 +235,7 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
                 view.pending.focus -= 1;
                 if (view.pending.focus == 0) view.setActivated(false);
             },
-            .layer, .none => {},
+            .xwayland_unmanaged, .layer, .none => {},
         }
 
         // Set the new focus
@@ -240,7 +247,7 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
                 target_view.pending.urgent = false;
             },
             .layer => |target_layer| assert(self.focused_output == target_layer.output),
-            .none => {},
+            .xwayland_unmanaged, .none => {},
         }
         self.focused = new_focus;
 
