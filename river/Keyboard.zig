@@ -24,12 +24,16 @@ const xkb = @import("xkbcommon");
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
+const KeycodeSet = @import("KeycodeSet.zig");
 const Seat = @import("Seat.zig");
 
 const log = std.log.scoped(.keyboard);
 
 seat: *Seat,
 input_device: *wlr.InputDevice,
+
+/// Pressed keys for which a mapping was triggered on press
+eaten_keycodes: KeycodeSet = .{},
 
 key: wl.Listener(*wlr.Keyboard.event.Key) = wl.Listener(*wlr.Keyboard.event.Key).init(handleKey),
 modifiers: wl.Listener(*wlr.Keyboard) = wl.Listener(*wlr.Keyboard).init(handleModifiers),
@@ -108,12 +112,12 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
     }
 
     // Handle user-defined mapping
-    if (!self.seat.handleMapping(
-        keycode,
-        modifiers,
-        released,
-        xkb_state,
-    )) {
+    const mapped = self.seat.handleMapping(keycode, modifiers, released, xkb_state);
+    if (mapped and !released) self.eaten_keycodes.add(event.keycode);
+
+    const eaten = if (released) self.eaten_keycodes.remove(event.keycode) else mapped;
+
+    if (!eaten) {
         // If key was not handled, we pass it along to the client.
         const wlr_seat = self.seat.wlr_seat;
         wlr_seat.setKeyboard(self.input_device);
