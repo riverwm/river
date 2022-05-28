@@ -315,7 +315,13 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
                     self.seat.focus(null);
                 }
             },
-            .xwayland_unmanaged => assert(build_options.xwayland),
+            .xwayland_unmanaged => |xwayland_unmanaged| {
+                if (build_options.xwayland) {
+                    self.seat.setFocusRaw(.{ .xwayland_unmanaged = xwayland_unmanaged });
+                } else {
+                    unreachable;
+                }
+            },
         }
         _ = self.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
 
