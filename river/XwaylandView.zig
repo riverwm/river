@@ -45,6 +45,8 @@ map: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(
 unmap: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleUnmap),
 request_configure: wl.Listener(*wlr.XwaylandSurface.event.Configure) =
     wl.Listener(*wlr.XwaylandSurface.event.Configure).init(handleRequestConfigure),
+set_override_redirect: wl.Listener(*wlr.XwaylandSurface) =
+    wl.Listener(*wlr.XwaylandSurface).init(handleSetOverrideRedirect),
 
 // Listeners that are only active while the view is mapped
 commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
@@ -68,6 +70,7 @@ pub fn init(self: *Self, view: *View, xwayland_surface: *wlr.XwaylandSurface) vo
     xwayland_surface.events.map.add(&self.map);
     xwayland_surface.events.unmap.add(&self.unmap);
     xwayland_surface.events.request_configure.add(&self.request_configure);
+    xwayland_surface.events.set_override_redirect.add(&self.set_override_redirect);
 }
 
 pub fn needsConfigure(self: Self) bool {
@@ -162,22 +165,7 @@ pub fn getConstraints(self: Self) View.Constraints {
     };
 }
 
-/// Called when the xwayland surface is destroyed
-fn handleDestroy(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
-    const self = @fieldParentPtr(Self, "destroy", listener);
-
-    // Remove listeners that are active for the entire lifetime of the view
-    self.destroy.link.remove();
-    self.map.link.remove();
-    self.unmap.link.remove();
-    self.request_configure.link.remove();
-
-    self.view.destroy();
-}
-
-/// Called when the xwayland surface is mapped, or ready to display on-screen.
-fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
-    const self = @fieldParentPtr(Self, "map", listener);
+pub fn doMap(self: *Self, xwayland_surface: *wlr.XwaylandSurface) void {
     const view = self.view;
 
     // Add listeners that are only active while mapped
@@ -228,10 +216,7 @@ fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wl
     };
 }
 
-/// Called when the surface is unmapped and will no longer be displayed.
-fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
-    const self = @fieldParentPtr(Self, "unmap", listener);
-
+fn doUnmap(self: *Self) void {
     // Remove listeners that are only active while mapped
     self.commit.link.remove();
     self.set_title.link.remove();
@@ -240,6 +225,38 @@ fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSur
     self.request_minimize.link.remove();
 
     self.view.unmap();
+}
+
+fn doDestroy(self: *Self) void {
+    // Remove listeners that are active for the entire lifetime of the view
+    self.destroy.link.remove();
+    self.map.link.remove();
+    self.unmap.link.remove();
+    self.request_configure.link.remove();
+    self.set_override_redirect.link.remove();
+
+    self.view.destroy();
+}
+
+/// Called when the xwayland surface is destroyed
+fn handleDestroy(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
+    const self = @fieldParentPtr(Self, "destroy", listener);
+
+    self.doDestroy();
+}
+
+/// Called when the xwayland surface is mapped, or ready to display on-screen.
+fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
+    const self = @fieldParentPtr(Self, "map", listener);
+
+    self.doMap(xwayland_surface);
+}
+
+/// Called when the surface is unmapped and will no longer be displayed.
+fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
+    const self = @fieldParentPtr(Self, "unmap", listener);
+
+    self.doUnmap();
 }
 
 fn handleRequestConfigure(
@@ -260,6 +277,19 @@ fn handleRequestConfigure(
         self.view.pending.box.height = event.height;
     }
     self.configure();
+}
+
+fn handleSetOverrideRedirect(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
+    const self = @fieldParentPtr(Self, "set_override_redirect", listener);
+
+    const mapped = xwayland_surface.mapped;
+    if (mapped) self.doUnmap();
+
+    self.doDestroy();
+
+    if (server.createXwaylandUnmanaged(xwayland_surface)) |xwayland_unmanaged| {
+        if (mapped) xwayland_unmanaged.doMap(xwayland_surface);
+    }
 }
 
 fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) void {

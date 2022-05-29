@@ -35,6 +35,7 @@ const Root = @import("Root.zig");
 const StatusManager = @import("StatusManager.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
+const XwaylandView = @import("XwaylandView.zig");
 const XwaylandUnmanaged = @import("XwaylandUnmanaged.zig");
 const IdleInhibitorManager = @import("IdleInhibitorManager.zig");
 
@@ -170,6 +171,28 @@ pub fn start(self: Self) !void {
     }
 }
 
+pub fn createXwaylandView(self: *Self, wlr_xwayland_surface: *wlr.XwaylandSurface) ?*XwaylandView {
+    log.debug(
+        "new xwayland surface: title '{s}', class '{s}'",
+        .{ wlr_xwayland_surface.title, wlr_xwayland_surface.class },
+    );
+
+    // The View will add itself to the output's view stack on map
+    const output = self.input_manager.defaultSeat().focused_output;
+    const node = util.gpa.create(ViewStack(View).Node) catch return null;
+    node.view.init(output, getNewViewTags(output), wlr_xwayland_surface);
+    return &node.view.impl.xwayland_view;
+}
+
+pub fn createXwaylandUnmanaged(_: *Self, wlr_xwayland_surface: *wlr.XwaylandSurface) ?*XwaylandUnmanaged {
+    log.debug("new unmanaged xwayland surface", .{});
+    // The unmanaged surface will add itself to the list of unmanaged views
+    // in Root when it is mapped.
+    const node = util.gpa.create(std.TailQueue(XwaylandUnmanaged).Node) catch return null;
+    node.data.init(wlr_xwayland_surface);
+    return &node.data;
+}
+
 /// Handle SIGINT and SIGTERM by gracefully stopping the server
 fn terminate(signal: c_int, wl_server: *wl.Server) callconv(.C) c_int {
     _ = signal;
@@ -243,23 +266,11 @@ fn handleNewXwaylandSurface(listener: *wl.Listener(*wlr.XwaylandSurface), wlr_xw
     const self = @fieldParentPtr(Self, "new_xwayland_surface", listener);
 
     if (wlr_xwayland_surface.override_redirect) {
-        log.debug("new unmanaged xwayland surface", .{});
-        // The unmanged surface will add itself to the list of unmanaged views
-        // in Root when it is mapped.
-        const node = util.gpa.create(std.TailQueue(XwaylandUnmanaged).Node) catch return;
-        node.data.init(wlr_xwayland_surface);
+        _ = self.createXwaylandUnmanaged(wlr_xwayland_surface);
         return;
     }
 
-    log.debug(
-        "new xwayland surface: title '{s}', class '{s}'",
-        .{ wlr_xwayland_surface.title, wlr_xwayland_surface.class },
-    );
-
-    // The View will add itself to the output's view stack on map
-    const output = self.input_manager.defaultSeat().focused_output;
-    const node = util.gpa.create(ViewStack(View).Node) catch return;
-    node.view.init(output, getNewViewTags(output), wlr_xwayland_surface);
+    _ = self.createXwaylandView(wlr_xwayland_surface);
 }
 
 fn getNewViewTags(output: *Output) u32 {

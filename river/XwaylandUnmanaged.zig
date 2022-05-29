@@ -34,6 +34,10 @@ request_configure: wl.Listener(*wlr.XwaylandSurface.event.Configure) =
 destroy: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleDestroy),
 map: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleMap),
 unmap: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleUnmap),
+set_override_redirect: wl.Listener(*wlr.XwaylandSurface) =
+    wl.Listener(*wlr.XwaylandSurface).init(handleSetOverrideRedirect),
+
+// Listener that is only active when mapped
 commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
 
 pub fn init(self: *Self, xwayland_surface: *wlr.XwaylandSurface) void {
@@ -44,6 +48,39 @@ pub fn init(self: *Self, xwayland_surface: *wlr.XwaylandSurface) void {
     xwayland_surface.events.destroy.add(&self.destroy);
     xwayland_surface.events.map.add(&self.map);
     xwayland_surface.events.unmap.add(&self.unmap);
+    xwayland_surface.events.set_override_redirect.add(&self.set_override_redirect);
+}
+
+pub fn doMap(self: *Self, xwayland_surface: *wlr.XwaylandSurface) void {
+    // Add self to the list of unmanaged views in the root
+    const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
+    server.root.xwayland_unmanaged_views.prepend(node);
+
+    xwayland_surface.surface.?.events.commit.add(&self.commit);
+
+    // TODO: handle keyboard focus
+    // if (wlr_xwayland_or_surface_wants_focus(self.xwayland_surface)) { ...
+}
+
+fn doUnmap(self: *Self) void {
+    // Remove self from the list of unmanged views in the root
+    const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
+    server.root.xwayland_unmanaged_views.remove(node);
+
+    self.commit.link.remove();
+}
+
+fn doDestroy(self: *Self) void {
+    // Remove listeners that are active for the entire lifetime
+    self.request_configure.link.remove();
+    self.destroy.link.remove();
+    self.map.link.remove();
+    self.unmap.link.remove();
+    self.set_override_redirect.link.remove();
+
+    // Deallocate the node
+    const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
+    util.gpa.destroy(node);
 }
 
 fn handleRequestConfigure(
@@ -57,40 +94,35 @@ fn handleRequestConfigure(
 fn handleDestroy(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
 
-    // Remove listeners that are active for the entire lifetime
-    self.request_configure.link.remove();
-    self.destroy.link.remove();
-    self.map.link.remove();
-    self.unmap.link.remove();
-
-    // Deallocate the node
-    const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-    util.gpa.destroy(node);
+    self.doDestroy();
 }
 
 /// Called when the xwayland surface is mapped, or ready to display on-screen.
 fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "map", listener);
 
-    // Add self to the list of unmanaged views in the root
-    const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-    server.root.xwayland_unmanaged_views.prepend(node);
-
-    xwayland_surface.surface.?.events.commit.add(&self.commit);
-
-    // TODO: handle keyboard focus
-    // if (wlr_xwayland_or_surface_wants_focus(self.xwayland_surface)) { ...
+    self.doMap(xwayland_surface);
 }
 
 /// Called when the surface is unmapped and will no longer be displayed.
 fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "unmap", listener);
 
-    // Remove self from the list of unmanged views in the root
-    const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-    server.root.xwayland_unmanaged_views.remove(node);
+    self.doUnmap();
+}
 
-    self.commit.link.remove();
+/// Called when the Xwayland surface's override redirect setting is changed.
+fn handleSetOverrideRedirect(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
+    const self = @fieldParentPtr(Self, "set_override_redirect", listener);
+
+    const mapped = xwayland_surface.mapped;
+    if (mapped) self.doUnmap();
+
+    self.doDestroy();
+
+    if (server.createXwaylandView(xwayland_surface)) |xwayland_view| {
+        if (mapped) xwayland_view.doMap(xwayland_surface);
+    }
 }
 
 fn handleCommit(_: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
