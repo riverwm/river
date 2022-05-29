@@ -83,6 +83,7 @@ pub fn create(output: *Output, xwayland_surface: *wlr.XwaylandSurface) error{Out
     xwayland_surface.events.map.add(&self.map);
     xwayland_surface.events.unmap.add(&self.unmap);
     xwayland_surface.events.request_configure.add(&self.request_configure);
+    xwayland_surface.events.set_override_redirect.add(&self.set_override_redirect);
 
     return self;
 }
@@ -188,6 +189,7 @@ fn handleDestroy(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandS
     self.map.link.remove();
     self.unmap.link.remove();
     self.request_configure.link.remove();
+    self.set_override_redirect.link.remove();
 
     self.view.destroy();
 }
