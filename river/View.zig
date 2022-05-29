@@ -74,7 +74,7 @@ const SavedBuffer = struct {
 };
 
 /// The implementation of this view
-impl: Impl = undefined,
+impl: Impl,
 
 /// The output this view is currently associated with
 output: *Output,
@@ -102,7 +102,7 @@ surface_box: Box = undefined,
 saved_surface_box: Box = undefined,
 
 /// These are what we render while a transaction is in progress
-saved_buffers: std.ArrayList(SavedBuffer),
+saved_buffers: std.ArrayListUnmanaged(SavedBuffer) = .{},
 
 /// The floating dimensions the view, saved so that they can be restored if the
 /// view returns to floating mode.
@@ -126,26 +126,18 @@ foreign_close: wl.Listener(*wlr.ForeignToplevelHandleV1) =
 request_activate: wl.Listener(*wlr.XdgActivationV1.event.RequestActivate) =
     wl.Listener(*wlr.XdgActivationV1.event.RequestActivate).init(handleRequestActivate),
 
-pub fn init(self: *Self, output: *Output, surface: anytype) void {
+pub fn init(self: *Self, output: *Output, impl: Impl) void {
     const initial_tags = blk: {
         const tags = output.current.tags & output.spawn_tagmask;
         break :blk if (tags != 0) tags else output.current.tags;
     };
 
     self.* = .{
+        .impl = impl,
         .output = output,
         .current = .{ .tags = initial_tags },
         .pending = .{ .tags = initial_tags },
-        .saved_buffers = std.ArrayList(SavedBuffer).init(util.gpa),
     };
-
-    if (@TypeOf(surface) == *wlr.XdgSurface) {
-        self.impl = .{ .xdg_toplevel = undefined };
-        self.impl.xdg_toplevel.init(self, surface);
-    } else if (build_options.xwayland and @TypeOf(surface) == *wlr.XwaylandSurface) {
-        self.impl = .{ .xwayland_view = undefined };
-        self.impl.xwayland_view.init(self, surface);
-    } else unreachable;
 }
 
 /// If saved buffers of the view are currently in use by a transaction,
@@ -159,7 +151,7 @@ pub fn destroy(self: *Self) void {
     // around until the current transaction completes. This function will be
     // called again in Root.commitTransaction()
     if (self.saved_buffers.items.len == 0) {
-        self.saved_buffers.deinit();
+        self.saved_buffers.deinit(util.gpa);
 
         const node = @fieldParentPtr(ViewStack(Self).Node, "view", self);
         util.gpa.destroy(node);
@@ -237,19 +229,19 @@ pub fn dropSavedBuffers(self: *Self) void {
 pub fn saveBuffers(self: *Self) void {
     assert(self.saved_buffers.items.len == 0);
     self.saved_surface_box = self.surface_box;
-    self.forEachSurface(*std.ArrayList(SavedBuffer), saveBuffersIterator, &self.saved_buffers);
+    self.forEachSurface(*std.ArrayListUnmanaged(SavedBuffer), saveBuffersIterator, &self.saved_buffers);
 }
 
 fn saveBuffersIterator(
     surface: *wlr.Surface,
     surface_x: c_int,
     surface_y: c_int,
-    saved_buffers: *std.ArrayList(SavedBuffer),
+    saved_buffers: *std.ArrayListUnmanaged(SavedBuffer),
 ) callconv(.C) void {
     if (surface.buffer) |buffer| {
         var source_box: wlr.FBox = undefined;
         surface.getBufferSourceBox(&source_box);
-        saved_buffers.append(.{
+        saved_buffers.append(util.gpa, .{
             .client_buffer = buffer,
             .surface_box = .{
                 .x = surface_x,

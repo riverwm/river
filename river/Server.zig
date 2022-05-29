@@ -33,9 +33,9 @@ const LayoutManager = @import("LayoutManager.zig");
 const Output = @import("Output.zig");
 const Root = @import("Root.zig");
 const StatusManager = @import("StatusManager.zig");
-const View = @import("View.zig");
-const ViewStack = @import("view_stack.zig").ViewStack;
+const XdgToplevel = @import("XdgToplevel.zig");
 const XwaylandUnmanaged = @import("XwaylandUnmanaged.zig");
+const XwaylandView = @import("XwaylandView.zig");
 const IdleInhibitorManager = @import("IdleInhibitorManager.zig");
 
 const log = std.log.scoped(.server);
@@ -187,13 +187,12 @@ fn handleNewXdgSurface(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wl
 
     log.debug("new xdg_toplevel", .{});
 
-    // The View will add itself to the output's view stack on map
     const output = self.input_manager.defaultSeat().focused_output;
-    const node = util.gpa.create(ViewStack(View).Node) catch {
+    XdgToplevel.create(output, xdg_surface) catch {
+        log.err("out of memory", .{});
         xdg_surface.resource.postNoMemory();
         return;
     };
-    node.view.init(output, xdg_surface);
 }
 
 /// This event is raised when the layer_shell recieves a new surface from a client.
@@ -239,25 +238,24 @@ fn handleNewLayerSurface(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_
     node.data.init(output, wlr_layer_surface);
 }
 
-fn handleNewXwaylandSurface(listener: *wl.Listener(*wlr.XwaylandSurface), wlr_xwayland_surface: *wlr.XwaylandSurface) void {
+fn handleNewXwaylandSurface(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "new_xwayland_surface", listener);
 
-    if (wlr_xwayland_surface.override_redirect) {
-        log.debug("new unmanaged xwayland surface", .{});
-        // The unmanged surface will add itself to the list of unmanaged views
-        // in Root when it is mapped.
-        const node = util.gpa.create(std.TailQueue(XwaylandUnmanaged).Node) catch return;
-        node.data.init(wlr_xwayland_surface);
-        return;
-    }
-
     log.debug(
-        "new xwayland surface: title '{s}', class '{s}'",
-        .{ wlr_xwayland_surface.title, wlr_xwayland_surface.class },
+        "new xwayland surface: title='{s}', class='{s}', override redirect={}",
+        .{ xwayland_surface.title, xwayland_surface.class, xwayland_surface.override_redirect },
     );
 
-    // The View will add itself to the output's view stack on map
-    const output = self.input_manager.defaultSeat().focused_output;
-    const node = util.gpa.create(ViewStack(View).Node) catch return;
-    node.view.init(output, wlr_xwayland_surface);
+    if (xwayland_surface.override_redirect) {
+        _ = XwaylandUnmanaged.create(xwayland_surface) catch {
+            log.err("out of memory", .{});
+            return;
+        };
+    } else {
+        const output = self.input_manager.defaultSeat().focused_output;
+        _ = XwaylandView.create(output, xwayland_surface) catch {
+            log.err("out of memory", .{});
+            return;
+        };
+    }
 }

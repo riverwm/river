@@ -25,6 +25,7 @@ const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Box = @import("Box.zig");
+const Output = @import("Output.zig");
 const Seat = @import("Seat.zig");
 const Subsurface = @import("Subsurface.zig");
 const View = @import("View.zig");
@@ -62,8 +63,17 @@ request_resize: wl.Listener(*wlr.XdgToplevel.event.Resize) =
 set_title: wl.Listener(*wlr.XdgSurface) = wl.Listener(*wlr.XdgSurface).init(handleSetTitle),
 set_app_id: wl.Listener(*wlr.XdgSurface) = wl.Listener(*wlr.XdgSurface).init(handleSetAppId),
 
-pub fn init(self: *Self, view: *View, xdg_surface: *wlr.XdgSurface) void {
-    self.* = .{ .view = view, .xdg_surface = xdg_surface };
+/// The View will add itself to the output's view stack on map
+pub fn create(output: *Output, xdg_surface: *wlr.XdgSurface) error{OutOfMemory}!void {
+    const node = try util.gpa.create(ViewStack(View).Node);
+    const view = &node.view;
+
+    view.init(output, .{ .xdg_toplevel = .{
+        .view = view,
+        .xdg_surface = xdg_surface,
+    } });
+
+    const self = &node.view.impl.xdg_toplevel;
     xdg_surface.data = @ptrToInt(self);
 
     // Add listeners that are active over the view's entire lifetime

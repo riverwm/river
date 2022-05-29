@@ -27,6 +27,7 @@ const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Box = @import("Box.zig");
+const Output = @import("Output.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const XdgPopup = @import("XdgPopup.zig");
@@ -63,12 +64,18 @@ request_fullscreen: wl.Listener(*wlr.XwaylandSurface) =
 request_minimize: wl.Listener(*wlr.XwaylandSurface.event.Minimize) =
     wl.Listener(*wlr.XwaylandSurface.event.Minimize).init(handleRequestMinimize),
 
-pub fn init(self: *Self, view: *View, xwayland_surface: *wlr.XwaylandSurface) void {
-    self.* = .{
+/// The View will add itself to the output's view stack on map
+pub fn create(output: *Output, xwayland_surface: *wlr.XwaylandSurface) error{OutOfMemory}!*Self {
+    const node = try util.gpa.create(ViewStack(View).Node);
+    const view = &node.view;
+
+    view.init(output, .{ .xwayland_view = .{
         .view = view,
         .xwayland_surface = xwayland_surface,
         .last_set_fullscreen_state = xwayland_surface.fullscreen,
-    };
+    } });
+
+    const self = &node.view.impl.xwayland_view;
     xwayland_surface.data = @ptrToInt(self);
 
     // Add listeners that are active over the view's entire lifetime
@@ -76,6 +83,8 @@ pub fn init(self: *Self, view: *View, xwayland_surface: *wlr.XwaylandSurface) vo
     xwayland_surface.events.map.add(&self.map);
     xwayland_surface.events.unmap.add(&self.unmap);
     xwayland_surface.events.request_configure.add(&self.request_configure);
+
+    return self;
 }
 
 pub fn needsConfigure(self: Self) bool {
@@ -283,16 +292,13 @@ fn handleSetOverrideRedirect(
     if (xwayland_surface.mapped) handleUnmap(&self.unmap, xwayland_surface);
     handleDestroy(&self.destroy, xwayland_surface);
 
-    // The unmanged surface will add itself to the list of unmanaged views
-    // in Root when it is mapped.
-    const node = util.gpa.create(std.TailQueue(XwaylandUnmanaged).Node) catch {
+    const unmanaged = XwaylandUnmanaged.create(xwayland_surface) catch {
         log.err("out of memory", .{});
         return;
     };
-    node.data.init(xwayland_surface);
 
     if (xwayland_surface.mapped) {
-        XwaylandUnmanaged.handleMap(&node.data.map, xwayland_surface);
+        XwaylandUnmanaged.handleMap(&unmanaged.map, xwayland_surface);
     }
 }
 

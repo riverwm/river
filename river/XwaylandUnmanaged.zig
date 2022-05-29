@@ -47,7 +47,12 @@ set_override_redirect: wl.Listener(*wlr.XwaylandSurface) =
 // Listeners that are only active while mapped
 commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
 
-pub fn init(self: *Self, xwayland_surface: *wlr.XwaylandSurface) void {
+/// The unmanged surface will add itself to the list of unmanaged views
+/// in Root when it is mapped.
+pub fn create(xwayland_surface: *wlr.XwaylandSurface) error{OutOfMemory}!*Self {
+    const node = try util.gpa.create(std.TailQueue(Self).Node);
+    const self = &node.data;
+
     self.* = .{ .xwayland_surface = xwayland_surface };
 
     // Add listeners that are active over the the entire lifetime
@@ -55,6 +60,8 @@ pub fn init(self: *Self, xwayland_surface: *wlr.XwaylandSurface) void {
     xwayland_surface.events.destroy.add(&self.destroy);
     xwayland_surface.events.map.add(&self.map);
     xwayland_surface.events.unmap.add(&self.unmap);
+
+    return self;
 }
 
 fn handleRequestConfigure(
@@ -135,15 +142,13 @@ fn handleSetOverrideRedirect(
     if (xwayland_surface.mapped) handleUnmap(&self.unmap, xwayland_surface);
     handleDestroy(&self.destroy, xwayland_surface);
 
-    // The View will add itself to the output's view stack on map
     const output = server.input_manager.defaultSeat().focused_output;
-    const node = util.gpa.create(ViewStack(View).Node) catch {
+    const xwayland_view = XwaylandView.create(output, xwayland_surface) catch {
         log.err("out of memory", .{});
         return;
     };
-    node.view.init(output, xwayland_surface);
 
     if (xwayland_surface.mapped) {
-        XwaylandView.handleMap(&node.view.impl.xwayland_view.map, xwayland_surface);
+        XwaylandView.handleMap(&xwayland_view.map, xwayland_surface);
     }
 }
