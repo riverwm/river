@@ -50,3 +50,8 @@ pub fn remove(self: *Self, old: u32) bool {
 
     return false;
 }
+
+/// Removes other's contents from self (if present)
+pub fn subtract(self: *Self, other: Self) void {
+    for (other.items[0..other.len]) |item| _ = self.remove(item);
+}

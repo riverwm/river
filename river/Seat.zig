@@ -31,6 +31,7 @@ const DragIcon = @import("DragIcon.zig");
 const Cursor = @import("Cursor.zig");
 const InputManager = @import("InputManager.zig");
 const Keyboard = @import("Keyboard.zig");
+const KeycodeSet = @import("KeycodeSet.zig");
 const Switch = @import("Switch.zig");
 const Mapping = @import("Mapping.zig");
 const LayerSurface = @import("LayerSurface.zig");
@@ -253,12 +254,20 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
 
         // Send keyboard enter/leave events and handle pointer constraints
         if (target_surface) |wlr_surface| {
-            if (self.wlr_seat.getKeyboard()) |keyboard| {
+            if (self.wlr_seat.getKeyboard()) |wlr_keyboard| {
+                var keycodes = KeycodeSet{
+                    .items = wlr_keyboard.keycodes,
+                    .len = wlr_keyboard.num_keycodes,
+                };
+
+                const keyboard = @intToPtr(*Keyboard, wlr_keyboard.data);
+                keycodes.subtract(keyboard.eaten_keycodes);
+
                 self.wlr_seat.keyboardNotifyEnter(
                     wlr_surface,
-                    &keyboard.keycodes,
-                    keyboard.num_keycodes,
-                    &keyboard.modifiers,
+                    &keycodes.items,
+                    keycodes.len,
+                    &wlr_keyboard.modifiers,
                 );
             } else {
                 self.wlr_seat.keyboardNotifyEnter(wlr_surface, null, 0, null);
@@ -349,8 +358,25 @@ pub fn handleViewUnmap(self: *Self, view: *View) void {
     if (self.focused == .view and self.focused.view == view) self.focus(null);
 }
 
+/// Is there a user-defined mapping for passed keycode, modifiers and keyboard state?
+pub fn hasMapping(
+    self: *Self,
+    keycode: xkb.Keycode,
+    modifiers: wlr.Keyboard.ModifierMask,
+    released: bool,
+    xkb_state: *xkb.State,
+) bool {
+    const modes = &server.config.modes;
+    for (modes.items[self.mode_id].mappings.items) |*mapping| {
+        if (mapping.match(keycode, modifiers, released, xkb_state)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /// Handle any user-defined mapping for passed keycode, modifiers and keyboard state
-/// Returns true if the key was handled
+/// Returns true if at least one mapping was run
 pub fn handleMapping(
     self: *Self,
     keycode: xkb.Keycode,
@@ -359,7 +385,7 @@ pub fn handleMapping(
     xkb_state: *xkb.State,
 ) bool {
     const modes = &server.config.modes;
-    // In case more than on mapping matches, all of them are activated
+    // In case more than one mapping matches, all of them are activated
     var handled = false;
     for (modes.items[self.mode_id].mappings.items) |*mapping| {
         if (mapping.match(keycode, modifiers, released, xkb_state)) {
