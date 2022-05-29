@@ -75,7 +75,7 @@ pub fn renderOutput(output: *Output) void {
         // Always clear with solid black for fullscreen
         server.renderer.clear(&[_]f32{ 0, 0, 0, 1 });
         renderView(output, view, &now);
-        if (build_options.xwayland) renderXwaylandUnmanaged(output, &now);
+        if (build_options.xwayland) renderXwaylandOverrideRedirect(output, &now);
     } else {
         // No fullscreen view, so render normal layers/views
         server.renderer.clear(&server.config.background_color);
@@ -117,7 +117,7 @@ pub fn renderOutput(output: *Output) void {
             renderView(output, view, &now);
         }
 
-        if (build_options.xwayland) renderXwaylandUnmanaged(output, &now);
+        if (build_options.xwayland) renderXwaylandOverrideRedirect(output, &now);
 
         renderLayer(output, output.getLayer(.top).*, &now, .toplevels);
 
@@ -241,11 +241,11 @@ fn renderDragIcons(output: *const Output, now: *os.timespec) void {
     }
 }
 
-/// Render all xwayland unmanaged windows that appear on the output
-fn renderXwaylandUnmanaged(output: *const Output, now: *os.timespec) void {
+/// Render all override redirect xwayland windows that appear on the output
+fn renderXwaylandOverrideRedirect(output: *const Output, now: *os.timespec) void {
     const output_box = server.root.output_layout.getBox(output.wlr_output).?;
 
-    var it = server.root.xwayland_unmanaged_views.last;
+    var it = server.root.xwayland_override_redirect_views.last;
     while (it) |node| : (it = node.prev) {
         const xwayland_surface = node.data.xwayland_surface;
 

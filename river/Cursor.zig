@@ -37,7 +37,7 @@ const Output = @import("Output.zig");
 const Seat = @import("Seat.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
-const XwaylandUnmanaged = @import("XwaylandUnmanaged.zig");
+const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
 const Mode = union(enum) {
     passthrough: void,
@@ -315,9 +315,9 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
                     self.seat.focus(null);
                 }
             },
-            .xwayland_unmanaged => |xwayland_unmanaged| {
+            .xwayland_override_redirect => |override_redirect| {
                 if (build_options.xwayland) {
-                    self.seat.setFocusRaw(.{ .xwayland_unmanaged = xwayland_unmanaged });
+                    self.seat.setFocusRaw(.{ .xwayland_override_redirect = override_redirect });
                 } else {
                     unreachable;
                 }
@@ -537,7 +537,7 @@ const SurfaceAtResult = struct {
     parent: union(enum) {
         view: *View,
         layer_surface: *LayerSurface,
-        xwayland_unmanaged: if (build_options.xwayland) *XwaylandUnmanaged else void,
+        xwayland_override_redirect: if (build_options.xwayland) *XwaylandOverrideRedirect else void,
     },
 };
 
@@ -565,21 +565,21 @@ pub fn surfaceAt(self: Self) ?SurfaceAtResult {
     //
     // fullscreen:
     //  1. overlay layer toplevels and popups
-    //  2. xwayland unmanaged stuff
+    //  2. xwayland override redirect windows
     //  3. fullscreen view toplevels and popups
     //
     // non-fullscreen:
     //  1. overlay layer toplevels and popups
     //  2. top, bottom, background layer popups
     //  3. top layer toplevels
-    //  4. xwayland unmanaged stuff
+    //  4. xwayland override redirect windows
     //  5. view toplevels and popups
     //  6. bottom, background layer toplevels
 
     if (layerSurfaceAt(output.getLayer(.overlay).*, ox, oy)) |s| return s;
 
     if (fullscreen_view) |view| {
-        if (build_options.xwayland) if (xwaylandUnmanagedSurfaceAt(lx, ly)) |s| return s;
+        if (build_options.xwayland) if (xwaylandOverrideRedirectSurfaceAt(lx, ly)) |s| return s;
         var sx: f64 = undefined;
         var sy: f64 = undefined;
         if (view.surfaceAt(ox, oy, &sx, &sy)) |found| {
@@ -597,7 +597,7 @@ pub fn surfaceAt(self: Self) ?SurfaceAtResult {
 
         if (layerSurfaceAt(output.getLayer(.top).*, ox, oy)) |s| return s;
 
-        if (build_options.xwayland) if (xwaylandUnmanagedSurfaceAt(lx, ly)) |s| return s;
+        if (build_options.xwayland) if (xwaylandOverrideRedirectSurfaceAt(lx, ly)) |s| return s;
 
         if (viewSurfaceAt(output, ox, oy)) |s| return s;
 
@@ -721,8 +721,8 @@ fn viewSurfaceAt(output: *const Output, ox: f64, oy: f64) ?SurfaceAtResult {
     return null;
 }
 
-fn xwaylandUnmanagedSurfaceAt(lx: f64, ly: f64) ?SurfaceAtResult {
-    var it = server.root.xwayland_unmanaged_views.first;
+fn xwaylandOverrideRedirectSurfaceAt(lx: f64, ly: f64) ?SurfaceAtResult {
+    var it = server.root.xwayland_override_redirect_views.first;
     while (it) |node| : (it = node.next) {
         const xwayland_surface = node.data.xwayland_surface;
         var sx: f64 = undefined;
@@ -737,7 +737,7 @@ fn xwaylandUnmanagedSurfaceAt(lx: f64, ly: f64) ?SurfaceAtResult {
                 .surface = found,
                 .sx = sx,
                 .sy = sy,
-                .parent = .{ .xwayland_unmanaged = &node.data },
+                .parent = .{ .xwayland_override_redirect = &node.data },
             };
         }
     }
@@ -912,7 +912,7 @@ pub fn checkFocusFollowsCursor(self: *Self) void {
                     }
                 },
                 .layer_surface => {},
-                .xwayland_unmanaged => assert(build_options.xwayland),
+                .xwayland_override_redirect => assert(build_options.xwayland),
             }
         }
     }

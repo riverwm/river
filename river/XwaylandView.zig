@@ -31,7 +31,7 @@ const Output = @import("Output.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const XdgPopup = @import("XdgPopup.zig");
-const XwaylandUnmanaged = @import("XwaylandUnmanaged.zig");
+const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
 const log = std.log.scoped(.xwayland);
 
@@ -287,20 +287,20 @@ fn handleSetOverrideRedirect(
 ) void {
     const self = @fieldParentPtr(Self, "set_override_redirect", listener);
 
-    log.debug("xwayland surface set override redirect, switching to unmanaged", .{});
+    log.debug("xwayland surface set override redirect", .{});
 
     assert(xwayland_surface.override_redirect);
 
     if (xwayland_surface.mapped) handleUnmap(&self.unmap, xwayland_surface);
     handleDestroy(&self.destroy, xwayland_surface);
 
-    const unmanaged = XwaylandUnmanaged.create(xwayland_surface) catch {
+    const override_redirect = XwaylandOverrideRedirect.create(xwayland_surface) catch {
         log.err("out of memory", .{});
         return;
     };
 
     if (xwayland_surface.mapped) {
-        XwaylandUnmanaged.handleMap(&unmanaged.map, xwayland_surface);
+        XwaylandOverrideRedirect.handleMap(&override_redirect.map, xwayland_surface);
     }
 }
 

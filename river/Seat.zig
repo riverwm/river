@@ -39,14 +39,14 @@ const Output = @import("Output.zig");
 const SeatStatus = @import("SeatStatus.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
-const XwaylandUnmanaged = @import("XwaylandUnmanaged.zig");
+const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
 const log = std.log.scoped(.seat);
 const PointerConstraint = @import("PointerConstraint.zig");
 
 const FocusTarget = union(enum) {
     view: *View,
-    xwayland_unmanaged: *XwaylandUnmanaged,
+    xwayland_override_redirect: *XwaylandOverrideRedirect,
     layer: *LayerSurface,
     none: void,
 };
@@ -210,7 +210,7 @@ fn pendingFilter(view: *View, filter_tags: u32) bool {
 
 /// Switch focus to the target, handling unfocus and input inhibition
 /// properly. This should only be called directly if dealing with layers or
-/// unmanaged xwayland views.
+/// override redirect xwayland views.
 pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
     // If the target is already focused, do nothing
     if (std.meta.eql(new_focus, self.focused)) return;
@@ -218,9 +218,9 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
     // Obtain the target surface
     const target_surface = switch (new_focus) {
         .view => |target_view| target_view.surface.?,
-        .xwayland_unmanaged => |target_xwayland_unmanaged| blk: {
+        .xwayland_override_redirect => |target_override_redirect| blk: {
             assert(build_options.xwayland);
-            break :blk target_xwayland_unmanaged.xwayland_surface.surface;
+            break :blk target_override_redirect.xwayland_surface.surface;
         },
         .layer => |target_layer| target_layer.wlr_layer_surface.surface,
         .none => null,
@@ -236,7 +236,7 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
                 view.pending.focus -= 1;
                 if (view.pending.focus == 0) view.setActivated(false);
             },
-            .xwayland_unmanaged, .layer, .none => {},
+            .xwayland_override_redirect, .layer, .none => {},
         }
 
         // Set the new focus
@@ -248,7 +248,7 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
                 target_view.pending.urgent = false;
             },
             .layer => |target_layer| assert(self.focused_output == target_layer.output),
-            .xwayland_unmanaged, .none => {},
+            .xwayland_override_redirect, .none => {},
         }
         self.focused = new_focus;
 

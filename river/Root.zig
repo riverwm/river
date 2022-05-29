@@ -28,7 +28,7 @@ const util = @import("util.zig");
 const Output = @import("Output.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
-const XwaylandUnmanaged = @import("XwaylandUnmanaged.zig");
+const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 const DragIcon = @import("DragIcon.zig");
 
 new_output: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleNewOutput),
@@ -58,10 +58,10 @@ noop_output: Output = undefined,
 
 drag_icons: std.SinglyLinkedList(DragIcon) = .{},
 
-/// This list stores all unmanaged Xwayland windows. This needs to be in root
-/// since X is like the wild west and who knows where these things will go.
-xwayland_unmanaged_views: if (build_options.xwayland)
-    std.TailQueue(XwaylandUnmanaged)
+/// This list stores all "override redirect" Xwayland windows. This needs to be in root
+/// since X is like the wild west and who knows where these things will place themselves.
+xwayland_override_redirect_views: if (build_options.xwayland)
+    std.TailQueue(XwaylandOverrideRedirect)
 else
     void = if (build_options.xwayland)
 .{},

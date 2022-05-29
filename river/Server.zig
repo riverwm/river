@@ -34,7 +34,7 @@ const Output = @import("Output.zig");
 const Root = @import("Root.zig");
 const StatusManager = @import("StatusManager.zig");
 const XdgToplevel = @import("XdgToplevel.zig");
-const XwaylandUnmanaged = @import("XwaylandUnmanaged.zig");
+const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 const XwaylandView = @import("XwaylandView.zig");
 const IdleInhibitorManager = @import("IdleInhibitorManager.zig");
 
@@ -247,7 +247,7 @@ fn handleNewXwaylandSurface(listener: *wl.Listener(*wlr.XwaylandSurface), xwayla
     );
 
     if (xwayland_surface.override_redirect) {
-        _ = XwaylandUnmanaged.create(xwayland_surface) catch {
+        _ = XwaylandOverrideRedirect.create(xwayland_surface) catch {
             log.err("out of memory", .{});
             return;
         };

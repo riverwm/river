@@ -47,8 +47,7 @@ set_override_redirect: wl.Listener(*wlr.XwaylandSurface) =
 // Listeners that are only active while mapped
 commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
 
-/// The unmanged surface will add itself to the list of unmanaged views
-/// in Root when it is mapped.
+/// The override redirect surface will add itself to the list in Root when it is mapped.
 pub fn create(xwayland_surface: *wlr.XwaylandSurface) error{OutOfMemory}!*Self {
     const node = try util.gpa.create(std.TailQueue(Self).Node);
     const self = &node.data;
@@ -92,14 +91,13 @@ fn handleDestroy(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandS
 pub fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "map", listener);
 
-    // Add self to the list of unmanaged views in the root
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-    server.root.xwayland_unmanaged_views.prepend(node);
+    server.root.xwayland_override_redirect_views.prepend(node);
 
     xwayland_surface.surface.?.events.commit.add(&self.commit);
 
     if (self.xwayland_surface.overrideRedirectWantsFocus()) {
-        server.input_manager.defaultSeat().setFocusRaw(.{ .xwayland_unmanaged = self });
+        server.input_manager.defaultSeat().setFocusRaw(.{ .xwayland_override_redirect = self });
     }
 }
 
@@ -107,9 +105,8 @@ pub fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface:
 fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "unmap", listener);
 
-    // Remove self from the list of unmanaged views in the root
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-    server.root.xwayland_unmanaged_views.remove(node);
+    server.root.xwayland_override_redirect_views.remove(node);
 
     self.commit.link.remove();
 
@@ -118,7 +115,9 @@ fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSur
     var seat_it = server.input_manager.seats.first;
     while (seat_it) |seat_node| : (seat_it = seat_node.next) {
         const seat = &seat_node.data;
-        if (seat.focused == .xwayland_unmanaged and seat.focused.xwayland_unmanaged == self) {
+        if (seat.focused == .xwayland_override_redirect and
+            seat.focused.xwayland_override_redirect == self)
+        {
             seat.focus(null);
         }
     }
@@ -137,7 +136,7 @@ fn handleSetOverrideRedirect(
 ) void {
     const self = @fieldParentPtr(Self, "set_override_redirect", listener);
 
-    log.debug("xwayland surface unset override redirect, switching to managed", .{});
+    log.debug("xwayland surface unset override redirect", .{});
 
     assert(!xwayland_surface.override_redirect);
 
