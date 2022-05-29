@@ -20,7 +20,7 @@ jobs:
       - name: install deps
         run: |
           xbps-install -Sy xbps
-          xbps-install -uy
+          xbps-install -Suy
           # wayland/wlroots dependencies as well as we build from source
           xbps-install -y MesaLib-devel libseat-devel eudev-libudev-devel libdrm-devel \
             libinput-devel libxkbcommon-devel pixman-devel expat-devel libxml2-devel \
