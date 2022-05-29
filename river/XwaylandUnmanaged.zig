@@ -60,6 +60,7 @@ pub fn create(xwayland_surface: *wlr.XwaylandSurface) error{OutOfMemory}!*Self {
     xwayland_surface.events.destroy.add(&self.destroy);
     xwayland_surface.events.map.add(&self.map);
     xwayland_surface.events.unmap.add(&self.unmap);
+    xwayland_surface.events.set_override_redirect.add(&self.set_override_redirect);
 
     return self;
 }
@@ -80,6 +81,7 @@ fn handleDestroy(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandS
     self.destroy.link.remove();
     self.map.link.remove();
     self.unmap.link.remove();
+    self.set_override_redirect.link.remove();
 
     // Deallocate the node
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
