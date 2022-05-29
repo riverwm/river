@@ -126,11 +126,16 @@ foreign_close: wl.Listener(*wlr.ForeignToplevelHandleV1) =
 request_activate: wl.Listener(*wlr.XdgActivationV1.event.RequestActivate) =
     wl.Listener(*wlr.XdgActivationV1.event.RequestActivate).init(handleRequestActivate),
 
-pub fn init(self: *Self, output: *Output, tags: u32, surface: anytype) void {
+pub fn init(self: *Self, output: *Output, surface: anytype) void {
+    const initial_tags = blk: {
+        const tags = output.current.tags & output.spawn_tagmask;
+        break :blk if (tags != 0) tags else output.current.tags;
+    };
+
     self.* = .{
         .output = output,
-        .current = .{ .tags = tags },
-        .pending = .{ .tags = tags },
+        .current = .{ .tags = initial_tags },
+        .pending = .{ .tags = initial_tags },
         .saved_buffers = std.ArrayList(SavedBuffer).init(util.gpa),
     };
 

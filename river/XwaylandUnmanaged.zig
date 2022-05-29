@@ -17,6 +17,8 @@
 const Self = @This();
 
 const std = @import("std");
+const assert = std.debug.assert;
+
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
@@ -24,6 +26,11 @@ const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Box = @import("Box.zig");
+const View = @import("View.zig");
+const XwaylandView = @import("XwaylandView.zig");
+const ViewStack = @import("view_stack.zig").ViewStack;
+
+const log = std.log.scoped(.xwayland);
 
 /// The corresponding wlroots object
 xwayland_surface: *wlr.XwaylandSurface,
@@ -34,6 +41,10 @@ request_configure: wl.Listener(*wlr.XwaylandSurface.event.Configure) =
 destroy: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleDestroy),
 map: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleMap),
 unmap: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleUnmap),
+set_override_redirect: wl.Listener(*wlr.XwaylandSurface) =
+    wl.Listener(*wlr.XwaylandSurface).init(handleSetOverrideRedirect),
+
+// Listeners that are only active while mapped
 commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
 
 pub fn init(self: *Self, xwayland_surface: *wlr.XwaylandSurface) void {
@@ -69,7 +80,7 @@ fn handleDestroy(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandS
 }
 
 /// Called when the xwayland surface is mapped, or ready to display on-screen.
-fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
+pub fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "map", listener);
 
     // Add self to the list of unmanaged views in the root
@@ -109,4 +120,30 @@ fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSur
 fn handleCommit(_: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     var it = server.root.outputs.first;
     while (it) |node| : (it = node.next) node.data.damage.addWhole();
+}
+
+fn handleSetOverrideRedirect(
+    listener: *wl.Listener(*wlr.XwaylandSurface),
+    xwayland_surface: *wlr.XwaylandSurface,
+) void {
+    const self = @fieldParentPtr(Self, "set_override_redirect", listener);
+
+    log.debug("xwayland surface unset override redirect, switching to managed", .{});
+
+    assert(!xwayland_surface.override_redirect);
+
+    if (xwayland_surface.mapped) handleUnmap(&self.unmap, xwayland_surface);
+    handleDestroy(&self.destroy, xwayland_surface);
+
+    // The View will add itself to the output's view stack on map
+    const output = server.input_manager.defaultSeat().focused_output;
+    const node = util.gpa.create(ViewStack(View).Node) catch {
+        log.err("out of memory", .{});
+        return;
+    };
+    node.view.init(output, xwayland_surface);
+
+    if (xwayland_surface.mapped) {
+        XwaylandView.handleMap(&node.view.impl.xwayland_view.map, xwayland_surface);
+    }
 }
