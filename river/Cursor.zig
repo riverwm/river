@@ -579,7 +579,7 @@ pub fn surfaceAt(self: Self) ?SurfaceAtResult {
     if (layerSurfaceAt(output.getLayer(.overlay).*, ox, oy)) |s| return s;
 
     if (fullscreen_view) |view| {
-        if (build_options.xwayland) if (xwaylandUnmanagedSurfaceAt(ly, lx)) |s| return s;
+        if (build_options.xwayland) if (xwaylandUnmanagedSurfaceAt(lx, ly)) |s| return s;
         var sx: f64 = undefined;
         var sy: f64 = undefined;
         if (view.surfaceAt(ox, oy, &sx, &sy)) |found| {
