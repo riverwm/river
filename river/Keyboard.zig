@@ -17,6 +17,7 @@
 const Self = @This();
 
 const std = @import("std");
+const assert = std.debug.assert;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 const xkb = @import("xkbcommon");
@@ -61,6 +62,7 @@ pub fn init(self: *Self, seat: *Seat, input_device: *wlr.InputDevice) !void {
     defer keymap.unref();
 
     const wlr_keyboard = self.input_device.device.keyboard;
+    wlr_keyboard.data = @ptrToInt(self);
 
     if (!wlr_keyboard.setKeymap(keymap)) return error.SetKeymapFailed;
 
@@ -111,9 +113,14 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
         if (!released and handleBuiltinMapping(sym)) return;
     }
 
-    // Handle user-defined mapping
-    const mapped = self.seat.handleMapping(keycode, modifiers, released, xkb_state);
-    if (mapped and !released) self.eaten_keycodes.add(event.keycode);
+    // Handle user-defined mappings
+    const mapped = self.seat.hasMapping(keycode, modifiers, released, xkb_state);
+    if (mapped) {
+        if (!released) self.eaten_keycodes.add(event.keycode);
+
+        const handled = self.seat.handleMapping(keycode, modifiers, released, xkb_state);
+        assert(handled);
+    }
 
     const eaten = if (released) self.eaten_keycodes.remove(event.keycode) else mapped;
 
