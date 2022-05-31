@@ -63,10 +63,10 @@ keyboards: std.TailQueue(Keyboard) = .{},
 switches: std.TailQueue(Switch) = .{},
 
 /// ID of the current keymap mode
-mode_id: usize = 0,
+mode_id: u32 = 0,
 
 /// ID of previous keymap mode, used when returning from "locked" mode
-prev_mode_id: usize = 0,
+prev_mode_id: u32 = 0,
 
 /// Timer for repeating keyboard mappings
 mapping_repeat_timer: *wl.EventSource,
@@ -356,6 +356,16 @@ pub fn handleViewUnmap(self: *Self, view: *View) void {
 
     // If the unmapped view is focused, choose a new focus
     if (self.focused == .view and self.focused.view == view) self.focus(null);
+}
+
+pub fn enterMode(self: *Self, mode_id: u32) void {
+    self.mode_id = mode_id;
+
+    var it = self.status_trackers.first;
+    while (it) |node| : (it = node.next) {
+        const seat_status = node.data.seat_status;
+        seat_status.sendMode(server.config.modes.items[mode_id].name);
+    }
 }
 
 /// Is there a user-defined mapping for passed keycode, modifiers and keyboard state?

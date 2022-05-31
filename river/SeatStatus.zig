@@ -21,6 +21,7 @@ const wayland = @import("wayland");
 const wl = wayland.server.wl;
 const zriver = wayland.server.zriver;
 
+const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Seat = @import("Seat.zig");
@@ -35,7 +36,8 @@ pub fn init(self: *Self, seat: *Seat, seat_status: *zriver.SeatStatusV1) void {
 
     seat_status.setHandler(*Self, handleRequest, handleDestroy, self);
 
-    // Send focused output/view once on bind
+    // Send all info once on bind
+    seat_status.sendMode(server.config.modes.items[seat.mode_id].name);
     self.sendOutput(.focused);
     self.sendFocusedView();
 }

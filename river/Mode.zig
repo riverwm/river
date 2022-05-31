@@ -23,11 +23,13 @@ const Mapping = @import("Mapping.zig");
 const PointerMapping = @import("PointerMapping.zig");
 const SwitchMapping = @import("SwitchMapping.zig");
 
+name: [:0]const u8,
 mappings: std.ArrayListUnmanaged(Mapping) = .{},
 pointer_mappings: std.ArrayListUnmanaged(PointerMapping) = .{},
 switch_mappings: std.ArrayListUnmanaged(SwitchMapping) = .{},
 
 pub fn deinit(self: *Self) void {
+    util.gpa.free(self.name);
     for (self.mappings.items) |m| m.deinit();
     self.mappings.deinit(util.gpa);
     self.pointer_mappings.deinit(util.gpa);

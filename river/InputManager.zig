@@ -188,7 +188,7 @@ fn handleInhibitActivate(
 
         // Enter locked mode
         seat_node.data.prev_mode_id = seat_node.data.mode_id;
-        seat_node.data.mode_id = 1;
+        seat_node.data.enterMode(1);
     }
 
     self.exclusive_client = self.input_inhibit_manager.active_client;
@@ -215,8 +215,9 @@ fn handleInhibitDeactivate(
     // have each Seat handle focus and enter their previous mode.
     var seat_it = self.seats.first;
     while (seat_it) |seat_node| : (seat_it = seat_node.next) {
-        seat_node.data.focus(null);
-        seat_node.data.mode_id = seat_node.data.prev_mode_id;
+        const seat = &seat_node.data;
+        seat.enterMode(seat.prev_mode_id);
+        seat.focus(null);
     }
 
     server.root.startTransaction();

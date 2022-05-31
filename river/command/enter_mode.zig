@@ -59,5 +59,5 @@ pub fn enterMode(
         return Error.Other;
     }
 
-    seat.mode_id = mode_id;
+    seat.enterMode(mode_id);
 }

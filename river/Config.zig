@@ -57,7 +57,8 @@ border_color_unfocused: [4]f32 = [_]f32{ 0.34509804, 0.43137255, 0.45882353, 1.0
 border_color_urgent: [4]f32 = [_]f32{ 0.86274510, 0.19607843, 0.18431373, 1.0 }, // Solarized red
 
 /// Map of keymap mode name to mode id
-mode_to_id: std.StringHashMap(usize),
+/// Does not own the string keys. They are owned by the corresponding Mode struct.
+mode_to_id: std.StringHashMap(u32),
 
 /// All user-defined keymap modes, indexed by mode id
 modes: std.ArrayListUnmanaged(Mode),
@@ -98,7 +99,7 @@ cursor_hide_when_typing: HideCursorWhenTypingMode = .disabled,
 
 pub fn init() !Self {
     var self = Self{
-        .mode_to_id = std.StringHashMap(usize).init(util.gpa),
+        .mode_to_id = std.StringHashMap(u32).init(util.gpa),
         .modes = try std.ArrayListUnmanaged(Mode).initCapacity(util.gpa, 2),
     };
     errdefer self.deinit();
@@ -106,27 +107,22 @@ pub fn init() !Self {
     // Start with two empty modes, "normal" and "locked"
     {
         // Normal mode, id 0
-        const owned_slice = try util.gpa.dupe(u8, "normal");
+        const owned_slice = try util.gpa.dupeZ(u8, "normal");
         try self.mode_to_id.putNoClobber(owned_slice, 0);
-        self.modes.appendAssumeCapacity(.{});
+        self.modes.appendAssumeCapacity(.{ .name = owned_slice });
     }
     {
         // Locked mode, id 1
-        const owned_slice = try util.gpa.dupe(u8, "locked");
+        const owned_slice = try util.gpa.dupeZ(u8, "locked");
         try self.mode_to_id.putNoClobber(owned_slice, 1);
-        self.modes.appendAssumeCapacity(.{});
+        self.modes.appendAssumeCapacity(.{ .name = owned_slice });
     }
 
     return self;
 }
 
 pub fn deinit(self: *Self) void {
-    {
-        var it = self.mode_to_id.keyIterator();
-        while (it.next()) |key| util.gpa.free(key.*);
-        self.mode_to_id.deinit();
-    }
-
+    self.mode_to_id.deinit();
     for (self.modes.items) |*mode| mode.deinit();
     self.modes.deinit(util.gpa);
 
