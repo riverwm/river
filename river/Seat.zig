@@ -363,8 +363,7 @@ pub fn enterMode(self: *Self, mode_id: u32) void {
 
     var it = self.status_trackers.first;
     while (it) |node| : (it = node.next) {
-        const seat_status = node.data.seat_status;
-        seat_status.sendMode(server.config.modes.items[mode_id].name);
+        node.data.sendMode(server.config.modes.items[mode_id].name);
     }
 }
 

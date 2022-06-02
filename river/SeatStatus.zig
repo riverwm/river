@@ -37,7 +37,7 @@ pub fn init(self: *Self, seat: *Seat, seat_status: *zriver.SeatStatusV1) void {
     seat_status.setHandler(*Self, handleRequest, handleDestroy, self);
 
     // Send all info once on bind
-    seat_status.sendMode(server.config.modes.items[seat.mode_id].name);
+    self.sendMode(server.config.modes.items[seat.mode_id].name);
     self.sendOutput(.focused);
     self.sendFocusedView();
 }
@@ -71,4 +71,10 @@ pub fn sendFocusedView(self: Self) void {
     else
         "";
     self.seat_status.sendFocusedView(title);
+}
+
+pub fn sendMode(self: Self, mode: [*:0]const u8) void {
+    if (self.seat_status.getVersion() >= 3) {
+        self.seat_status.sendMode(mode);
+    }
 }
