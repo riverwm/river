@@ -59,7 +59,7 @@ function __riverctl_completion ()
 			"map") OPTS="-release -repeat -layout" ;;
 			"unmap") OPTS="-release" ;;
 			"attach-mode") OPTS="top bottom" ;;
-			"focus-follows-cursor") OPTS="disabled normal" ;;
+			"focus-follows-cursor") OPTS="disabled normal always" ;;
 			"set-cursor-warp") OPTS="disabled on-output-change" ;;
 			"hide-cursor") OPTS="timeout when-typing" ;;
 			*) return ;;

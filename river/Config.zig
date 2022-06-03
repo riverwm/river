@@ -29,6 +29,8 @@ pub const FocusFollowsCursorMode = enum {
     disabled,
     /// Only change focus on entering a surface
     normal,
+    /// Change focus on any cursor movement
+    always,
 };
 
 pub const WarpCursorMode = enum {

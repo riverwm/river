@@ -282,14 +282,16 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 *border-width* _pixels_
 	Set the border width to _pixels_.
 
-*focus-follows-cursor* *disabled*|*normal*
-	There are two available modes:
+*focus-follows-cursor* *disabled*|*normal*|*always*
+	There are three available modes:
 
 	- _disabled_: Moving the cursor does not affect focus. This is
 	  the default.
 	- _normal_: Moving the cursor over a view will focus that view.
 	  Moving the cursor within a view will not re-focus that view if
 	  focus has moved elsewhere.
+	- _always_: Moving the cursor will always focus whatever view is
+	  under the cursor.
 
 	If the view to be focused is on an output that does not have focus,
 	focus is switched to that output.

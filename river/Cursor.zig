@@ -902,7 +902,9 @@ pub fn checkFocusFollowsCursor(self: *Self) void {
     if (self.seat.pointer_drag) return;
     if (server.config.focus_follows_cursor == .disabled) return;
     if (self.surfaceAt()) |result| {
-        if (self.seat.wlr_seat.pointer_state.focused_surface != result.surface) {
+        if (server.config.focus_follows_cursor == .always or
+            self.seat.wlr_seat.pointer_state.focused_surface != result.surface)
+        {
             switch (result.parent) {
                 .view => |view| {
                     if (self.seat.focused != .view or self.seat.focused.view != view) {

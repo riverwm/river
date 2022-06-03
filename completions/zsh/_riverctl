@@ -172,7 +172,7 @@ _riverctl()
                 map) _alternative 'arguments:optional:(-release -repeat -layout)' ;;
                 unmap) _alternative 'arguments:optional:(-release)' ;;
                 attach-mode) _alternative 'arguments:args:(top bottom)' ;;
-                focus-follows-cursor) _alternative 'arguments:args:(disabled normal)' ;;
+                focus-follows-cursor) _alternative 'arguments:args:(disabled normal always)' ;;
                 set-cursor-warp) _alternative 'arguments:args:(disabled on-output-change)' ;;
                 hide-cursor) _riverctl_hide_cursor ;;
                 *) return 0 ;;
