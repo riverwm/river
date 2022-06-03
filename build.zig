@@ -89,7 +89,6 @@ pub fn build(b: *zbs.Builder) !void {
     const scanner = ScanProtocolsStep.create(b);
     scanner.addSystemProtocol("stable/xdg-shell/xdg-shell.xml");
     scanner.addSystemProtocol("unstable/pointer-gestures/pointer-gestures-unstable-v1.xml");
-    scanner.addSystemProtocol("unstable/xdg-output/xdg-output-unstable-v1.xml");
     scanner.addSystemProtocol("unstable/pointer-constraints/pointer-constraints-unstable-v1.xml");
     scanner.addProtocolPath("protocol/river-control-unstable-v1.xml");
     scanner.addProtocolPath("protocol/river-status-unstable-v1.xml");
@@ -98,7 +97,7 @@ pub fn build(b: *zbs.Builder) !void {
     scanner.addProtocolPath("protocol/wlr-output-power-management-unstable-v1.xml");
 
     // These must be manually kept in sync with the versions wlroots supports
-    // until wlroots gives us the option request a specific version.
+    // until wlroots gives the option to request a specific version.
     scanner.generate("wl_compositor", 4);
     scanner.generate("wl_subcompositor", 1);
     scanner.generate("wl_shm", 1);
@@ -108,7 +107,6 @@ pub fn build(b: *zbs.Builder) !void {
 
     scanner.generate("xdg_wm_base", 2);
     scanner.generate("zwp_pointer_gestures_v1", 3);
-    scanner.generate("zxdg_output_manager_v1", 3);
     scanner.generate("zwp_pointer_constraints_v1", 1);
 
     scanner.generate("zriver_control_v1", 1);
