@@ -140,6 +140,12 @@ fn defaultInitPath() !?[:0]const u8 {
     };
 
     os.accessZ(path, os.X_OK) catch |err| {
+        if (err == error.PermissionDenied) {
+            if (os.accessZ(path, os.R_OK)) {
+                std.log.err("failed to run init executable {s}: the file is not executable", .{path});
+                os.exit(1);
+            } else |_| {}
+        }
         std.log.err("failed to run init executable {s}: {s}", .{ path, @errorName(err) });
         util.gpa.free(path);
         return null;
