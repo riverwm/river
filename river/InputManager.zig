@@ -19,7 +19,6 @@ const Self = @This();
 const build_options = @import("build_options");
 const std = @import("std");
 const mem = std.mem;
-const ascii = std.ascii;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
@@ -27,63 +26,13 @@ const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const InputConfig = @import("InputConfig.zig");
+const InputDevice = @import("InputDevice.zig");
 const Seat = @import("Seat.zig");
-const Server = @import("Server.zig");
-const View = @import("View.zig");
 const PointerConstraint = @import("PointerConstraint.zig");
 
 const default_seat_name = "default";
 
 const log = std.log.scoped(.input_manager);
-
-pub const InputDevice = struct {
-    device: *wlr.InputDevice,
-    destroy: wl.Listener(*wlr.InputDevice) = wl.Listener(*wlr.InputDevice).init(handleDestroy),
-
-    /// Careful: The identifier is not unique! A physical input device may have
-    /// multiple logical input devices with the exact same vendor id, product id
-    /// and name. However identifiers of InputConfigs are unique.
-    identifier: []const u8,
-
-    pub fn init(self: *InputDevice, device: *wlr.InputDevice) !void {
-        const identifier = try std.fmt.allocPrint(
-            util.gpa,
-            "{s}-{}-{}-{s}",
-            .{
-                @tagName(device.type),
-                device.vendor,
-                device.product,
-                mem.trim(u8, mem.span(device.name), &ascii.spaces),
-            },
-        );
-        for (identifier) |*char| {
-            if (char.* == ' ' or !ascii.isPrint(char.*)) {
-                char.* = '_';
-            }
-        }
-        self.* = .{
-            .device = device,
-            .identifier = identifier,
-        };
-        log.debug("new input device: {s}", .{self.identifier});
-        device.events.destroy.add(&self.destroy);
-    }
-
-    pub fn deinit(self: *InputDevice) void {
-        util.gpa.free(self.identifier);
-        self.destroy.link.remove();
-    }
-
-    fn handleDestroy(listener: *wl.Listener(*wlr.InputDevice), _: *wlr.InputDevice) void {
-        const self = @fieldParentPtr(InputDevice, "destroy", listener);
-        log.debug("removed input device: {s}", .{self.identifier});
-        self.deinit();
-
-        const node = @fieldParentPtr(std.TailQueue(InputDevice).Node, "data", self);
-        server.input_manager.input_devices.remove(node);
-        util.gpa.destroy(node);
-    }
-};
 
 new_input: wl.Listener(*wlr.InputDevice) = wl.Listener(*wlr.InputDevice).init(handleNewInput),
 

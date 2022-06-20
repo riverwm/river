@@ -27,7 +27,7 @@ const c = @import("c.zig");
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
-const InputDevice = @import("InputManager.zig").InputDevice;
+const InputDevice = @import("InputDevice.zig");
 
 // TODO - keyboards
 //      - mapping to output / region
