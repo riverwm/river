@@ -36,18 +36,23 @@ destroy: wl.Listener(*wlr.InputDevice) = wl.Listener(*wlr.InputDevice).init(hand
 identifier: []const u8,
 
 pub fn init(self: *InputDevice, device: *wlr.InputDevice) !void {
+    const device_type: []const u8 = switch (device.type) {
+        .switch_device => "switch",
+        else => @tagName(device.type),
+    };
+
     const identifier = try std.fmt.allocPrint(
         util.gpa,
         "{s}-{}-{}-{s}",
         .{
-            @tagName(device.type),
+            device_type,
             device.vendor,
             device.product,
             mem.trim(u8, mem.span(device.name), &ascii.spaces),
         },
     );
     for (identifier) |*char| {
-        if (char.* == ' ' or !ascii.isPrint(char.*)) {
+        if (!ascii.isGraph(char.*)) {
             char.* = '_';
         }
     }
