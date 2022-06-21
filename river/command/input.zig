@@ -38,10 +38,10 @@ pub fn listInputs(
     const writer = input_list.writer();
     var prev = false;
 
-    var it = server.input_manager.input_devices.first;
-    while (it) |node| : (it = node.next) {
-        const configured = for (server.input_manager.input_configs.items) |*input_config| {
-            if (mem.eql(u8, input_config.identifier, node.data.identifier)) {
+    var it = server.input_manager.devices.iterator(.forward);
+    while (it.next()) |device| {
+        const configured = for (server.input_manager.configs.items) |*input_config| {
+            if (mem.eql(u8, input_config.identifier, device.identifier)) {
                 break true;
             }
         } else false;
@@ -49,9 +49,8 @@ pub fn listInputs(
         if (prev) try input_list.appendSlice("\n");
         prev = true;
 
-        try writer.print("{s}\n\ttype: {s}\n\tconfigured: {s}\n", .{
-            node.data.identifier,
-            @tagName(node.data.device.type),
+        try writer.print("{s}\n\tconfigured: {s}\n", .{
+            device.identifier,
             configured,
         });
     }
@@ -69,7 +68,7 @@ pub fn listInputConfigs(
     var input_list = std.ArrayList(u8).init(util.gpa);
     const writer = input_list.writer();
 
-    for (server.input_manager.input_configs.items) |*input_config, i| {
+    for (server.input_manager.configs.items) |*input_config, i| {
         if (i > 0) try input_list.appendSlice("\n");
 
         try writer.print("{s}\n", .{input_config.identifier});
@@ -134,19 +133,19 @@ pub fn input(
     // Try to find an existing InputConfig with matching identifier, or create
     // a new one if none was found.
     var new = false;
-    const input_config = for (server.input_manager.input_configs.items) |*input_config| {
+    const input_config = for (server.input_manager.configs.items) |*input_config| {
         if (mem.eql(u8, input_config.identifier, args[1])) break input_config;
     } else blk: {
-        try server.input_manager.input_configs.ensureUnusedCapacity(1);
-        server.input_manager.input_configs.appendAssumeCapacity(.{
+        try server.input_manager.configs.ensureUnusedCapacity(1);
+        server.input_manager.configs.appendAssumeCapacity(.{
             .identifier = try util.gpa.dupe(u8, args[1]),
         });
         new = true;
-        break :blk &server.input_manager.input_configs.items[server.input_manager.input_configs.items.len - 1];
+        break :blk &server.input_manager.configs.items[server.input_manager.configs.items.len - 1];
     };
     errdefer {
         if (new) {
-            var cfg = server.input_manager.input_configs.pop();
+            var cfg = server.input_manager.configs.pop();
             cfg.deinit();
         }
     }
@@ -204,10 +203,10 @@ pub fn input(
     }
 
     // Update matching existing input devices.
-    var it = server.input_manager.input_devices.first;
-    while (it) |device_node| : (it = device_node.next) {
-        if (mem.eql(u8, device_node.data.identifier, args[1])) {
-            input_config.apply(&device_node.data);
+    var it = server.input_manager.devices.iterator(.forward);
+    while (it.next()) |device| {
+        if (mem.eql(u8, device.identifier, args[1])) {
+            input_config.apply(device);
             // We don't break here because it is common to have multiple input
             // devices with the same identifier.
         }

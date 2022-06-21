@@ -288,7 +288,7 @@ pub fn deinit(self: *Self) void {
 pub fn apply(self: *Self, device: *InputDevice) void {
     const libinput_device = @ptrCast(
         *c.libinput_device,
-        device.device.getLibinputDevice() orelse return,
+        device.wlr_device.getLibinputDevice() orelse return,
     );
     log.debug("applying input configuration to device: {s}", .{device.identifier});
     if (self.event_state) |setting| setting.apply(libinput_device);

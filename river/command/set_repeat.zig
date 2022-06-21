@@ -23,7 +23,7 @@ const Seat = @import("../Seat.zig");
 
 /// Set the repeat rate and delay for all keyboards.
 pub fn setRepeat(
-    seat: *Seat,
+    _: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,
 ) Error!void {
@@ -36,8 +36,10 @@ pub fn setRepeat(
     server.config.repeat_rate = rate;
     server.config.repeat_delay = delay;
 
-    var it = seat.keyboards.first;
-    while (it) |node| : (it = node.next) {
-        node.data.input_device.device.keyboard.setRepeatInfo(rate, delay);
+    var it = server.input_manager.devices.iterator(.forward);
+    while (it.next()) |device| {
+        if (device.wlr_device.type == .keyboard) {
+            device.wlr_device.device.keyboard.setRepeatInfo(rate, delay);
+        }
     }
 }

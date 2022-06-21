@@ -24,6 +24,7 @@ const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Seat = @import("Seat.zig");
+const InputDevice = @import("InputDevice.zig");
 
 const log = std.log.scoped(.switch_device);
 
@@ -47,33 +48,32 @@ pub const TabletState = enum {
     on,
 };
 
-seat: *Seat,
-input_device: *wlr.InputDevice,
+device: InputDevice,
 
-switch_device: wl.Listener(*wlr.Switch.event.Toggle) = wl.Listener(*wlr.Switch.event.Toggle).init(handleToggle),
-destroy: wl.Listener(*wlr.InputDevice) = wl.Listener(*wlr.InputDevice).init(handleDestroy),
+toggle: wl.Listener(*wlr.Switch.event.Toggle) = wl.Listener(*wlr.Switch.event.Toggle).init(handleToggle),
 
-pub fn init(self: *Self, seat: *Seat, input_device: *wlr.InputDevice) void {
+pub fn init(self: *Self, seat: *Seat, wlr_device: *wlr.InputDevice) !void {
     self.* = .{
-        .seat = seat,
-        .input_device = input_device,
+        .device = undefined,
     };
+    try self.device.init(seat, wlr_device);
+    errdefer self.device.deinit();
 
-    const wlr_switch = self.input_device.device.switch_device;
-
-    wlr_switch.events.toggle.add(&self.switch_device);
-    self.input_device.events.destroy.add(&self.destroy);
+    wlr_device.device.switch_device.events.toggle.add(&self.toggle);
 }
 
 pub fn deinit(self: *Self) void {
-    self.destroy.link.remove();
+    self.toggle.link.remove();
+
+    self.device.deinit();
+
+    self.* = undefined;
 }
 
 fn handleToggle(listener: *wl.Listener(*wlr.Switch.event.Toggle), event: *wlr.Switch.event.Toggle) void {
-    // This event is raised when the lid witch or the tablet mode switch is toggled.
-    const self = @fieldParentPtr(Self, "switch_device", listener);
+    const self = @fieldParentPtr(Self, "toggle", listener);
 
-    self.seat.handleActivity();
+    self.device.seat.handleActivity();
 
     var switch_type: Type = undefined;
     var switch_state: State = undefined;
@@ -96,14 +96,5 @@ fn handleToggle(listener: *wl.Listener(*wlr.Switch.event.Toggle), event: *wlr.Sw
         },
     }
 
-    self.seat.handleSwitchMapping(switch_type, switch_state);
-}
-
-fn handleDestroy(listener: *wl.Listener(*wlr.InputDevice), _: *wlr.InputDevice) void {
-    const self = @fieldParentPtr(Self, "destroy", listener);
-    const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-
-    self.seat.switches.remove(node);
-    self.deinit();
-    util.gpa.destroy(node);
+    self.device.seat.handleSwitchMapping(switch_type, switch_state);
 }

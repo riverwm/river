@@ -25,9 +25,15 @@ const wl = @import("wayland").server.wl;
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
+const Seat = @import("Seat.zig");
+const Keyboard = @import("Keyboard.zig");
+const Switch = @import("Switch.zig");
+
 const log = std.log.scoped(.input_manager);
 
-device: *wlr.InputDevice,
+seat: *Seat,
+wlr_device: *wlr.InputDevice,
+
 destroy: wl.Listener(*wlr.InputDevice) = wl.Listener(*wlr.InputDevice).init(handleDestroy),
 
 /// Careful: The identifier is not unique! A physical input device may have
@@ -35,10 +41,13 @@ destroy: wl.Listener(*wlr.InputDevice) = wl.Listener(*wlr.InputDevice).init(hand
 /// and name. However identifiers of InputConfigs are unique.
 identifier: []const u8,
 
-pub fn init(self: *InputDevice, device: *wlr.InputDevice) !void {
-    const device_type: []const u8 = switch (device.type) {
+/// InputManager.devices
+link: wl.list.Link,
+
+pub fn init(device: *InputDevice, seat: *Seat, wlr_device: *wlr.InputDevice) !void {
+    const device_type: []const u8 = switch (wlr_device.type) {
         .switch_device => "switch",
-        else => @tagName(device.type),
+        else => @tagName(wlr_device.type),
     };
 
     const identifier = try std.fmt.allocPrint(
@@ -46,35 +55,72 @@ pub fn init(self: *InputDevice, device: *wlr.InputDevice) !void {
         "{s}-{}-{}-{s}",
         .{
             device_type,
-            device.vendor,
-            device.product,
-            mem.trim(u8, mem.span(device.name), &ascii.spaces),
+            wlr_device.vendor,
+            wlr_device.product,
+            mem.trim(u8, mem.span(wlr_device.name), &ascii.spaces),
         },
     );
+    errdefer util.gpa.free(identifier);
+
     for (identifier) |*char| {
         if (!ascii.isGraph(char.*)) {
             char.* = '_';
         }
     }
-    self.* = .{
-        .device = device,
+
+    device.* = .{
+        .seat = seat,
+        .wlr_device = wlr_device,
         .identifier = identifier,
+        .link = undefined,
     };
-    log.debug("new input device: {s}", .{self.identifier});
-    device.events.destroy.add(&self.destroy);
+
+    wlr_device.events.destroy.add(&device.destroy);
+
+    // Apply any matching input device configuration.
+    for (server.input_manager.configs.items) |*input_config| {
+        if (mem.eql(u8, input_config.identifier, identifier)) {
+            input_config.apply(device);
+        }
+    }
+
+    server.input_manager.devices.append(device);
+    seat.updateCapabilities();
+
+    log.debug("new input device: {s}", .{identifier});
 }
 
-pub fn deinit(self: *InputDevice) void {
-    util.gpa.free(self.identifier);
-    self.destroy.link.remove();
+pub fn deinit(device: *InputDevice) void {
+    device.destroy.link.remove();
+
+    util.gpa.free(device.identifier);
+
+    device.link.remove();
+    device.seat.updateCapabilities();
+
+    device.* = undefined;
 }
 
 fn handleDestroy(listener: *wl.Listener(*wlr.InputDevice), _: *wlr.InputDevice) void {
-    const self = @fieldParentPtr(InputDevice, "destroy", listener);
-    log.debug("removed input device: {s}", .{self.identifier});
-    self.deinit();
+    const device = @fieldParentPtr(InputDevice, "destroy", listener);
 
-    const node = @fieldParentPtr(std.TailQueue(InputDevice).Node, "data", self);
-    server.input_manager.input_devices.remove(node);
-    util.gpa.destroy(node);
+    log.debug("removed input device: {s}", .{device.identifier});
+
+    switch (device.wlr_device.type) {
+        .keyboard => {
+            const keyboard = @fieldParentPtr(Keyboard, "device", device);
+            keyboard.deinit();
+            util.gpa.destroy(keyboard);
+        },
+        .pointer => {
+            device.deinit();
+            util.gpa.destroy(device);
+        },
+        .switch_device => {
+            const switch_device = @fieldParentPtr(Switch, "device", device);
+            switch_device.deinit();
+            util.gpa.destroy(switch_device);
+        },
+        .touch, .tablet_tool, .tablet_pad => unreachable,
+    }
 }

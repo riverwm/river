@@ -27,16 +27,17 @@ const command = @import("command.zig");
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
-const DragIcon = @import("DragIcon.zig");
 const Cursor = @import("Cursor.zig");
+const DragIcon = @import("DragIcon.zig");
+const InputDevice = @import("InputDevice.zig");
 const InputManager = @import("InputManager.zig");
 const Keyboard = @import("Keyboard.zig");
 const KeycodeSet = @import("KeycodeSet.zig");
-const Switch = @import("Switch.zig");
-const Mapping = @import("Mapping.zig");
 const LayerSurface = @import("LayerSurface.zig");
+const Mapping = @import("Mapping.zig");
 const Output = @import("Output.zig");
 const SeatStatus = @import("SeatStatus.zig");
+const Switch = @import("Switch.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
@@ -55,12 +56,6 @@ wlr_seat: *wlr.Seat,
 
 /// Multiple mice are handled by the same Cursor
 cursor: Cursor = undefined,
-
-/// Mulitple keyboards are handled separately
-keyboards: std.TailQueue(Keyboard) = .{},
-
-/// There are two kind of switches: lid switches and tablet mode switches
-switches: std.TailQueue(Switch) = .{},
 
 /// ID of the current keymap mode
 mode_id: u32 = 0,
@@ -122,18 +117,13 @@ pub fn init(self: *Self, name: [*:0]const u8) !void {
 }
 
 pub fn deinit(self: *Self) void {
+    {
+        var it = server.input_manager.devices.iterator(.forward);
+        while (it.next()) |device| assert(device.seat != self);
+    }
+
     self.cursor.deinit();
     self.mapping_repeat_timer.remove();
-
-    while (self.keyboards.pop()) |node| {
-        node.data.deinit();
-        util.gpa.destroy(node);
-    }
-
-    while (self.switches.pop()) |node| {
-        node.data.deinit();
-        util.gpa.destroy(node);
-    }
 
     while (self.focus_stack.first) |node| {
         self.focus_stack.remove(node);
@@ -464,52 +454,60 @@ fn handleMappingRepeatTimeout(self: *Self) callconv(.C) c_int {
     return 0;
 }
 
-/// Add a newly created input device to the seat and update the reported
-/// capabilities.
-pub fn addDevice(self: *Self, device: *wlr.InputDevice) void {
-    switch (device.type) {
-        .keyboard => self.addKeyboard(device) catch return,
-        .pointer => self.addPointer(device),
-        .switch_device => self.addSwitch(device) catch return,
-        else => return,
+pub fn addDevice(self: *Self, wlr_device: *wlr.InputDevice) void {
+    self.tryAddDevice(wlr_device) catch |err| switch (err) {
+        error.OutOfMemory => log.err("out of memory", .{}),
+        error.XkbContextFailed => log.err("failed to create xkbcommon context", .{}),
+        error.XkbKeymapFailed => log.err("failed to create xkbcommon keymap", .{}),
+        error.SetKeymapFailed => log.err("failed to set wlroots keymap", .{}),
+    };
+}
+
+fn tryAddDevice(self: *Self, wlr_device: *wlr.InputDevice) !void {
+    switch (wlr_device.type) {
+        .keyboard => {
+            const keyboard = try util.gpa.create(Keyboard);
+            errdefer util.gpa.destroy(keyboard);
+
+            try keyboard.init(self, wlr_device);
+        },
+        .pointer => {
+            const device = try util.gpa.create(InputDevice);
+            errdefer util.gpa.destroy(device);
+
+            try device.init(self, wlr_device);
+
+            self.cursor.wlr_cursor.attachInputDevice(wlr_device);
+        },
+        .switch_device => {
+            const switch_device = try util.gpa.create(Switch);
+            errdefer util.gpa.destroy(switch_device);
+
+            try switch_device.init(self, wlr_device);
+        },
+
+        // TODO Support these types of input devices.
+        .touch, .tablet_tool, .tablet_pad => return,
+    }
+}
+
+pub fn updateCapabilities(self: *Self) void {
+    // Currently a cursor is always drawn even if there are no pointer input devices.
+    // TODO Don't draw a cursor if there are no input devices.
+    var capabilities: wl.Seat.Capability = .{ .pointer = true };
+
+    var it = server.input_manager.devices.iterator(.forward);
+    while (it.next()) |device| {
+        if (device.seat == self) {
+            switch (device.wlr_device.type) {
+                .keyboard => capabilities.keyboard = true,
+                .pointer, .switch_device => {},
+                .touch, .tablet_tool, .tablet_pad => unreachable,
+            }
+        }
     }
 
-    // We need to let the wlr_seat know what our capabilities are, which is
-    // communiciated to the client. We always have a cursor, even if
-    // there are no pointer devices, so we always include that capability.
-    self.wlr_seat.setCapabilities(.{
-        .pointer = true,
-        .keyboard = self.keyboards.len > 0,
-    });
-}
-
-fn addKeyboard(self: *Self, device: *wlr.InputDevice) !void {
-    const node = try util.gpa.create(std.TailQueue(Keyboard).Node);
-    node.data.init(self, device) catch |err| {
-        const log_keyboard = std.log.scoped(.keyboard);
-        switch (err) {
-            error.XkbContextFailed => log_keyboard.err("Failed to create XKB context", .{}),
-            error.XkbKeymapFailed => log_keyboard.err("Failed to create XKB keymap", .{}),
-            error.SetKeymapFailed => log_keyboard.err("Failed to set wlr keyboard keymap", .{}),
-        }
-        return;
-    };
-    self.keyboards.append(node);
-    self.wlr_seat.setKeyboard(device);
-}
-
-fn addPointer(self: Self, device: *wlr.InputDevice) void {
-    // We don't do anything special with pointers. All of our pointer handling
-    // is proxied through wlr_cursor. On another compositor, you might take this
-    // opportunity to do libinput configuration on the device to set
-    // acceleration, etc.
-    self.cursor.wlr_cursor.attachInputDevice(device);
-}
-
-fn addSwitch(self: *Self, device: *wlr.InputDevice) !void {
-    const node = try util.gpa.create(std.TailQueue(Switch).Node);
-    node.data.init(self, device);
-    self.switches.append(node);
+    self.wlr_seat.setCapabilities(capabilities);
 }
 
 fn handleRequestSetSelection(

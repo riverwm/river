@@ -18,6 +18,7 @@ const Self = @This();
 
 const build_options = @import("build_options");
 const std = @import("std");
+const assert = std.debug.assert;
 const mem = std.mem;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
@@ -27,8 +28,10 @@ const util = @import("util.zig");
 
 const InputConfig = @import("InputConfig.zig");
 const InputDevice = @import("InputDevice.zig");
-const Seat = @import("Seat.zig");
+const Keyboard = @import("Keyboard.zig");
 const PointerConstraint = @import("PointerConstraint.zig");
+const Seat = @import("Seat.zig");
+const Switch = @import("Switch.zig");
 
 const default_seat_name = "default";
 
@@ -43,8 +46,8 @@ relative_pointer_manager: *wlr.RelativePointerManagerV1,
 virtual_pointer_manager: *wlr.VirtualPointerManagerV1,
 virtual_keyboard_manager: *wlr.VirtualKeyboardManagerV1,
 
-input_configs: std.ArrayList(InputConfig),
-input_devices: std.TailQueue(InputDevice) = .{},
+configs: std.ArrayList(InputConfig),
+devices: wl.list.Head(InputDevice, "link"),
 seats: std.TailQueue(Seat) = .{},
 
 exclusive_client: ?*wl.Client = null,
@@ -72,8 +75,11 @@ pub fn init(self: *Self) !void {
         .relative_pointer_manager = try wlr.RelativePointerManagerV1.create(server.wl_server),
         .virtual_pointer_manager = try wlr.VirtualPointerManagerV1.create(server.wl_server),
         .virtual_keyboard_manager = try wlr.VirtualKeyboardManagerV1.create(server.wl_server),
-        .input_configs = std.ArrayList(InputConfig).init(util.gpa),
+        .configs = std.ArrayList(InputConfig).init(util.gpa),
+
+        .devices = undefined,
     };
+    self.devices.init();
 
     self.seats.prepend(seat_node);
     try seat_node.data.init(default_seat_name);
@@ -89,20 +95,18 @@ pub fn init(self: *Self) !void {
 }
 
 pub fn deinit(self: *Self) void {
+    // This function must be called after the backend has been destroyed
+    assert(self.devices.empty());
+
     while (self.seats.pop()) |seat_node| {
         seat_node.data.deinit();
         util.gpa.destroy(seat_node);
     }
 
-    while (self.input_devices.pop()) |input_device_node| {
-        input_device_node.data.deinit();
-        util.gpa.destroy(input_device_node);
+    for (self.configs.items) |*config| {
+        config.deinit();
     }
-
-    for (self.input_configs.items) |*input_config| {
-        input_config.deinit();
-    }
-    self.input_configs.deinit();
+    self.configs.deinit();
 }
 
 pub fn defaultSeat(self: Self) *Seat {
@@ -172,25 +176,10 @@ fn handleInhibitDeactivate(
     server.root.startTransaction();
 }
 
-/// This event is raised by the backend when a new input device becomes available.
-fn handleNewInput(listener: *wl.Listener(*wlr.InputDevice), device: *wlr.InputDevice) void {
+fn handleNewInput(listener: *wl.Listener(*wlr.InputDevice), wlr_device: *wlr.InputDevice) void {
     const self = @fieldParentPtr(Self, "new_input", listener);
-    // TODO: support multiple seats
 
-    const input_device_node = util.gpa.create(std.TailQueue(InputDevice).Node) catch return;
-    input_device_node.data.init(device) catch {
-        util.gpa.destroy(input_device_node);
-        return;
-    };
-    self.input_devices.append(input_device_node);
-    self.defaultSeat().addDevice(device);
-
-    // Apply matching input device configuration, if exists.
-    for (self.input_configs.items) |*input_config| {
-        if (mem.eql(u8, input_config.identifier, input_device_node.data.identifier)) {
-            input_config.apply(&input_device_node.data);
-        }
-    }
+    self.defaultSeat().addDevice(wlr_device);
 }
 
 fn handleNewPointerConstraint(

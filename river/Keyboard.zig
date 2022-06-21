@@ -27,41 +27,34 @@ const util = @import("util.zig");
 
 const KeycodeSet = @import("KeycodeSet.zig");
 const Seat = @import("Seat.zig");
+const InputDevice = @import("InputDevice.zig");
 
 const log = std.log.scoped(.keyboard);
 
-seat: *Seat,
-input_device: *wlr.InputDevice,
+device: InputDevice,
 
 /// Pressed keys for which a mapping was triggered on press
 eaten_keycodes: KeycodeSet = .{},
 
 key: wl.Listener(*wlr.Keyboard.event.Key) = wl.Listener(*wlr.Keyboard.event.Key).init(handleKey),
 modifiers: wl.Listener(*wlr.Keyboard) = wl.Listener(*wlr.Keyboard).init(handleModifiers),
-destroy: wl.Listener(*wlr.Keyboard) = wl.Listener(*wlr.Keyboard).init(handleDestroy),
 
-pub fn init(self: *Self, seat: *Seat, input_device: *wlr.InputDevice) !void {
+pub fn init(self: *Self, seat: *Seat, wlr_device: *wlr.InputDevice) !void {
     self.* = .{
-        .seat = seat,
-        .input_device = input_device,
+        .device = undefined,
     };
+    try self.device.init(seat, wlr_device);
+    errdefer self.device.deinit();
 
-    // We need to prepare an XKB keymap and assign it to the keyboard. This
-    // assumes the defaults (e.g. layout = "us").
-    const rules = xkb.RuleNames{
-        .rules = null,
-        .model = null,
-        .layout = null,
-        .variant = null,
-        .options = null,
-    };
     const context = xkb.Context.new(.no_flags) orelse return error.XkbContextFailed;
     defer context.unref();
 
-    const keymap = xkb.Keymap.newFromNames(context, &rules, .no_flags) orelse return error.XkbKeymapFailed;
+    // Passing null here indicates that defaults from libxkbcommon and
+    // its XKB_DEFAULT_LAYOUT, XKB_DEFAULT_OPTIONS, etc. should be used.
+    const keymap = xkb.Keymap.newFromNames(context, null, .no_flags) orelse return error.XkbKeymapFailed;
     defer keymap.unref();
 
-    const wlr_keyboard = self.input_device.device.keyboard;
+    const wlr_keyboard = self.device.wlr_device.device.keyboard;
     wlr_keyboard.data = @ptrToInt(self);
 
     if (!wlr_keyboard.setKeymap(keymap)) return error.SetKeymapFailed;
@@ -70,23 +63,25 @@ pub fn init(self: *Self, seat: *Seat, input_device: *wlr.InputDevice) !void {
 
     wlr_keyboard.events.key.add(&self.key);
     wlr_keyboard.events.modifiers.add(&self.modifiers);
-    wlr_keyboard.events.destroy.add(&self.destroy);
 }
 
 pub fn deinit(self: *Self) void {
     self.key.link.remove();
     self.modifiers.link.remove();
-    self.destroy.link.remove();
+
+    self.device.deinit();
+
+    self.* = undefined;
 }
 
 fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboard.event.Key) void {
     // This event is raised when a key is pressed or released.
     const self = @fieldParentPtr(Self, "key", listener);
-    const wlr_keyboard = self.input_device.device.keyboard;
+    const wlr_keyboard = self.device.wlr_device.device.keyboard;
 
-    self.seat.handleActivity();
+    self.device.seat.handleActivity();
 
-    self.seat.clearRepeatingMapping();
+    self.device.seat.clearRepeatingMapping();
 
     // Translate libinput keycode -> xkbcommon
     const keycode = event.keycode + 8;
@@ -103,7 +98,7 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
             !released and
             !isModifier(sym))
         {
-            self.seat.cursor.hide();
+            self.device.seat.cursor.hide();
             break;
         }
     }
@@ -114,11 +109,11 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
     }
 
     // Handle user-defined mappings
-    const mapped = self.seat.hasMapping(keycode, modifiers, released, xkb_state);
+    const mapped = self.device.seat.hasMapping(keycode, modifiers, released, xkb_state);
     if (mapped) {
         if (!released) self.eaten_keycodes.add(event.keycode);
 
-        const handled = self.seat.handleMapping(keycode, modifiers, released, xkb_state);
+        const handled = self.device.seat.handleMapping(keycode, modifiers, released, xkb_state);
         assert(handled);
     }
 
@@ -126,8 +121,8 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
 
     if (!eaten) {
         // If key was not handled, we pass it along to the client.
-        const wlr_seat = self.seat.wlr_seat;
-        wlr_seat.setKeyboard(self.input_device);
+        const wlr_seat = self.device.seat.wlr_seat;
+        wlr_seat.setKeyboard(self.device.wlr_device);
         wlr_seat.keyboardNotifyKey(event.time_msec, event.keycode, event.state);
     }
 }
@@ -140,17 +135,8 @@ fn isModifier(keysym: xkb.Keysym) bool {
 fn handleModifiers(listener: *wl.Listener(*wlr.Keyboard), _: *wlr.Keyboard) void {
     const self = @fieldParentPtr(Self, "modifiers", listener);
 
-    self.seat.wlr_seat.setKeyboard(self.input_device);
-    self.seat.wlr_seat.keyboardNotifyModifiers(&self.input_device.device.keyboard.modifiers);
-}
-
-fn handleDestroy(listener: *wl.Listener(*wlr.Keyboard), _: *wlr.Keyboard) void {
-    const self = @fieldParentPtr(Self, "destroy", listener);
-    const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-
-    self.seat.keyboards.remove(node);
-    self.deinit();
-    util.gpa.destroy(node);
+    self.device.seat.wlr_seat.setKeyboard(self.device.wlr_device);
+    self.device.seat.wlr_seat.keyboardNotifyModifiers(&self.device.wlr_device.device.keyboard.modifiers);
 }
 
 /// Handle any builtin, harcoded compsitor mappings such as VT switching.
