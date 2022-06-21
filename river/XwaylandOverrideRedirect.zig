@@ -96,7 +96,9 @@ pub fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface:
 
     xwayland_surface.surface.?.events.commit.add(&self.commit);
 
-    if (self.xwayland_surface.overrideRedirectWantsFocus()) {
+    if (self.xwayland_surface.overrideRedirectWantsFocus() and
+        self.xwayland_surface.icccmInputModel() != .none)
+    {
         server.input_manager.defaultSeat().setFocusRaw(.{ .xwayland_override_redirect = self });
     }
 }

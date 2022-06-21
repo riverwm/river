@@ -317,7 +317,9 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
             },
             .xwayland_override_redirect => |override_redirect| {
                 if (!build_options.xwayland) unreachable;
-                if (override_redirect.xwayland_surface.overrideRedirectWantsFocus()) {
+                if (override_redirect.xwayland_surface.overrideRedirectWantsFocus() and
+                    override_redirect.xwayland_surface.icccmInputModel() != .none)
+                {
                     self.seat.setFocusRaw(.{ .xwayland_override_redirect = override_redirect });
                 }
             },
