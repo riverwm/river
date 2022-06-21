@@ -129,6 +129,14 @@ swipe_update: wl.Listener(*wlr.Pointer.event.SwipeUpdate) =
 swipe_end: wl.Listener(*wlr.Pointer.event.SwipeEnd) =
     wl.Listener(*wlr.Pointer.event.SwipeEnd).init(handleSwipeEnd),
 
+touch_up: wl.Listener(*wlr.Touch.event.Up) =
+    wl.Listener(*wlr.Touch.event.Up).init(handleTouchUp),
+touch_down: wl.Listener(*wlr.Touch.event.Down) =
+    wl.Listener(*wlr.Touch.event.Down).init(handleTouchDown),
+touch_motion: wl.Listener(*wlr.Touch.event.Motion) =
+    wl.Listener(*wlr.Touch.event.Motion).init(handleTouchMotion),
+touch_frame: wl.Listener(void) = wl.Listener(void).init(handleTouchFrame),
+
 pub fn init(self: *Self, seat: *Seat) !void {
     const wlr_cursor = try wlr.Cursor.create();
     errdefer wlr_cursor.destroy();
@@ -170,6 +178,12 @@ pub fn init(self: *Self, seat: *Seat) !void {
     wlr_cursor.events.pinch_update.add(&self.pinch_update);
     wlr_cursor.events.pinch_end.add(&self.pinch_end);
     seat.wlr_seat.events.request_set_cursor.add(&self.request_set_cursor);
+
+    // TODO(wlroots) handle the cancel event, blocked on wlroots 0.16.0
+    wlr_cursor.events.touch_up.add(&self.touch_up);
+    wlr_cursor.events.touch_down.add(&self.touch_down);
+    wlr_cursor.events.touch_motion.add(&self.touch_motion);
+    wlr_cursor.events.touch_frame.add(&self.touch_frame);
 }
 
 pub fn deinit(self: *Self) void {
@@ -297,33 +311,13 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
     }
 
     if (self.surfaceAt()) |result| {
-        switch (result.parent) {
-            .view => |view| {
-                // If there is an active mapping for this button which is
-                // handled we are done here
-                if (self.handlePointerMapping(event, view)) return;
-                // Otherwise focus the view
-                self.seat.focus(view);
-            },
-            .layer_surface => |layer_surface| {
-                self.seat.focusOutput(layer_surface.output);
-                // If a keyboard inteactive layer surface has been clicked on,
-                // give it keyboard focus.
-                if (layer_surface.wlr_layer_surface.current.keyboard_interactive == .exclusive) {
-                    self.seat.setFocusRaw(.{ .layer = layer_surface });
-                } else {
-                    self.seat.focus(null);
-                }
-            },
-            .xwayland_override_redirect => |override_redirect| {
-                if (!build_options.xwayland) unreachable;
-                if (override_redirect.xwayland_surface.overrideRedirectWantsFocus() and
-                    override_redirect.xwayland_surface.icccmInputModel() != .none)
-                {
-                    self.seat.setFocusRaw(.{ .xwayland_override_redirect = override_redirect });
-                }
-            },
+        if (result.parent == .view and self.handlePointerMapping(event, result.parent.view)) {
+            // If a mapping is triggered don't send events to clients.
+            return;
         }
+
+        self.updateKeyboardFocus(result);
+
         _ = self.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
 
         self.mode = .{
@@ -334,14 +328,46 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
                 .sy = result.sy,
             },
         };
+    } else {
+        self.updateOutputFocus(self.wlr_cursor.x, self.wlr_cursor.y);
+    }
 
-        server.root.startTransaction();
-    } else if (server.root.output_layout.outputAt(self.wlr_cursor.x, self.wlr_cursor.y)) |wlr_output| {
-        // If the user clicked on empty space of an output, focus it.
+    server.root.startTransaction();
+}
+
+fn updateKeyboardFocus(self: Self, result: SurfaceAtResult) void {
+    switch (result.parent) {
+        .view => |view| {
+            // Otherwise focus the view
+            self.seat.focus(view);
+        },
+        .layer_surface => |layer_surface| {
+            self.seat.focusOutput(layer_surface.output);
+            // If a keyboard inteactive layer surface has been clicked on,
+            // give it keyboard focus.
+            if (layer_surface.wlr_layer_surface.current.keyboard_interactive == .exclusive) {
+                self.seat.setFocusRaw(.{ .layer = layer_surface });
+            } else {
+                self.seat.focus(null);
+            }
+        },
+        .xwayland_override_redirect => |override_redirect| {
+            if (!build_options.xwayland) unreachable;
+            if (override_redirect.xwayland_surface.overrideRedirectWantsFocus() and
+                override_redirect.xwayland_surface.icccmInputModel() != .none)
+            {
+                self.seat.setFocusRaw(.{ .xwayland_override_redirect = override_redirect });
+            }
+        },
+    }
+}
+
+/// Focus the output at the given layout coordinates, if any
+fn updateOutputFocus(self: Self, lx: f64, ly: f64) void {
+    if (server.root.output_layout.outputAt(lx, ly)) |wlr_output| {
         const output = @intToPtr(*Output, wlr_output.data);
         self.seat.focusOutput(output);
         self.seat.focus(null);
-        server.root.startTransaction();
     }
 }
 
@@ -419,6 +445,71 @@ fn handleSwipeEnd(
         event.time_msec,
         event.cancelled,
     );
+}
+
+fn handleTouchUp(
+    listener: *wl.Listener(*wlr.Touch.event.Up),
+    event: *wlr.Touch.event.Up,
+) void {
+    const self = @fieldParentPtr(Self, "touch_up", listener);
+
+    self.seat.handleActivity();
+
+    self.seat.wlr_seat.touchNotifyUp(event.time_msec, event.touch_id);
+}
+
+fn handleTouchDown(
+    listener: *wl.Listener(*wlr.Touch.event.Down),
+    event: *wlr.Touch.event.Down,
+) void {
+    const self = @fieldParentPtr(Self, "touch_down", listener);
+
+    self.seat.handleActivity();
+
+    var lx: f64 = undefined;
+    var ly: f64 = undefined;
+    self.wlr_cursor.absoluteToLayoutCoords(event.device, event.x, event.y, &lx, &ly);
+
+    if (surfaceAtCoords(lx, ly)) |result| {
+        self.updateKeyboardFocus(result);
+
+        _ = self.seat.wlr_seat.touchNotifyDown(
+            result.surface,
+            event.time_msec,
+            event.touch_id,
+            result.sx,
+            result.sy,
+        );
+    } else {
+        self.updateOutputFocus(lx, ly);
+    }
+
+    server.root.startTransaction();
+}
+
+fn handleTouchMotion(
+    listener: *wl.Listener(*wlr.Touch.event.Motion),
+    event: *wlr.Touch.event.Motion,
+) void {
+    const self = @fieldParentPtr(Self, "touch_motion", listener);
+
+    self.seat.handleActivity();
+
+    var lx: f64 = undefined;
+    var ly: f64 = undefined;
+    self.wlr_cursor.absoluteToLayoutCoords(event.device, event.x, event.y, &lx, &ly);
+
+    if (surfaceAtCoords(lx, ly)) |result| {
+        self.seat.wlr_seat.touchNotifyMotion(event.time_msec, event.touch_id, result.sx, result.sy);
+    }
+}
+
+fn handleTouchFrame(listener: *wl.Listener(void)) void {
+    const self = @fieldParentPtr(Self, "touch_frame", listener);
+
+    self.seat.handleActivity();
+
+    self.seat.wlr_seat.touchNotifyFrame();
 }
 
 /// Handle the mapping for the passed button if any. Returns true if there
@@ -544,10 +635,14 @@ const SurfaceAtResult = struct {
 
 /// Find the surface under the cursor if any, and return information about that
 /// surface and the cursor's position in surface local coords.
-/// This function must be kept in sync with the rendering order in render.zig.
 pub fn surfaceAt(self: Self) ?SurfaceAtResult {
-    const lx = self.wlr_cursor.x;
-    const ly = self.wlr_cursor.y;
+    return surfaceAtCoords(self.wlr_cursor.x, self.wlr_cursor.y);
+}
+
+/// Find the surface at the given layout coords if any, and return information about that
+/// surface and the surface local coords.
+/// This function must be kept in sync with the rendering order in render.zig.
+fn surfaceAtCoords(lx: f64, ly: f64) ?SurfaceAtResult {
     const wlr_output = server.root.output_layout.outputAt(lx, ly) orelse return null;
     const output = @intToPtr(*Output, wlr_output.data);
 

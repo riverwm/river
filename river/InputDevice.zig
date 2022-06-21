@@ -112,7 +112,7 @@ fn handleDestroy(listener: *wl.Listener(*wlr.InputDevice), _: *wlr.InputDevice) 
             keyboard.deinit();
             util.gpa.destroy(keyboard);
         },
-        .pointer => {
+        .pointer, .touch => {
             device.deinit();
             util.gpa.destroy(device);
         },
@@ -121,6 +121,6 @@ fn handleDestroy(listener: *wl.Listener(*wlr.InputDevice), _: *wlr.InputDevice) 
             switch_device.deinit();
             util.gpa.destroy(switch_device);
         },
-        .touch, .tablet_tool, .tablet_pad => unreachable,
+        .tablet_tool, .tablet_pad => unreachable,
     }
 }
