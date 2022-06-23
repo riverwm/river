@@ -84,7 +84,7 @@ pub fn init(self: *Self) !void {
     const transaction_timer = try event_loop.addTimer(*Self, handleTransactionTimeout, self);
     errdefer transaction_timer.remove();
 
-    const noop_wlr_output = try server.headless_backend.headlessAddOutput();
+    const noop_wlr_output = try server.headless_backend.headlessAddOutput(1920, 1080);
     self.* = .{
         .output_layout = output_layout,
         .output_manager = try wlr.OutputManagerV1.create(server.wl_server),
