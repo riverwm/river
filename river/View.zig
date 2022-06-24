@@ -430,7 +430,7 @@ pub fn fromWlrSurface(surface: *wlr.Surface) ?*Self {
     if (build_options.xwayland) {
         if (surface.isXWaylandSurface()) {
             const xwayland_surface = wlr.XwaylandSurface.fromWlrSurface(surface);
-            return @intToPtr(*Self, xwayland_surface.data);
+            return @intToPtr(?*Self, xwayland_surface.data);
         }
     }
     if (surface.isSubsurface()) {

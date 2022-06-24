@@ -53,6 +53,8 @@ pub fn create(xwayland_surface: *wlr.XwaylandSurface) error{OutOfMemory}!*Self {
     const self = &node.data;
 
     self.* = .{ .xwayland_surface = xwayland_surface };
+    // This must be set to 0 for usage in View.fromWlrSurface()
+    xwayland_surface.data = 0;
 
     // Add listeners that are active over the the entire lifetime
     xwayland_surface.events.request_configure.add(&self.request_configure);
