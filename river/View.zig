@@ -422,16 +422,14 @@ pub fn move(self: *Self, delta_x: i32, delta_y: i32) void {
 /// Find and return the view corresponding to a given surface, if any
 pub fn fromWlrSurface(surface: *wlr.Surface) ?*Self {
     if (surface.isXdgSurface()) {
-        const xdg_surface = wlr.XdgSurface.fromWlrSurface(surface);
+        const xdg_surface = wlr.XdgSurface.fromWlrSurface(surface) orelse return null;
         if (xdg_surface.role == .toplevel) {
             return @intToPtr(*Self, xdg_surface.data);
         }
     }
-    if (build_options.xwayland) {
-        if (surface.isXWaylandSurface()) {
-            const xwayland_surface = wlr.XwaylandSurface.fromWlrSurface(surface);
-            return @intToPtr(?*Self, xwayland_surface.data);
-        }
+    if (build_options.xwayland and surface.isXWaylandSurface()) {
+        const xwayland_surface = wlr.XwaylandSurface.fromWlrSurface(surface) orelse return null;
+        return @intToPtr(?*Self, xwayland_surface.data);
     }
     if (surface.isSubsurface()) {
         if (wlr.Subsurface.fromWlrSurface(surface)) |ss| {
