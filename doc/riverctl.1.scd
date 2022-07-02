@@ -203,9 +203,9 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 	- _-layout_: if passed, a specific layout is pinned to the mapping.
 	  When the mapping is checked against a pressed key, this layout is
 	  used to translate the key independent of the active layout
-	- _index_: zero-based index of a layout set with the environment variable
-	  *XKB_DEFAULT_LAYOUT*; see *river*(1) for an example; if the index is
-	  out of range, the _-layout_ option will have no effect
+		- _index_: zero-based index of a layout set with the environment
+		  variable *XKB_DEFAULT_LAYOUT*; see *river*(1) for an example; if
+		  the index is out of range, the _-layout_ option will have no effect
 	- _mode_: name of the mode for which to create the mapping
 	- _modifiers_: one or more of the modifiers listed above, separated
 	  by a plus sign (+).
