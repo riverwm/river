@@ -1,5 +1,6 @@
 image: archlinux
 packages:
+  - libevdev
   - libinput
   - libxkbcommon
   - mesa

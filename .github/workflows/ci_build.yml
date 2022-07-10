@@ -27,7 +27,8 @@ jobs:
             libffi-devel wayland-protocols xcb-util-errors-devel xcb-util-wm-devel \
             xcb-util-renderutil-devel libxcb-devel xcb-util-cursor-devel xcb-util-devel \
             xcb-util-image-devel xcb-util-keysyms-devel xcb-util-xrm-devel \
-            xorg-server-xwayland pkg-config meson git gcc pkgconf scdoc wget tar xz
+            xorg-server-xwayland pkg-config meson git gcc pkgconf scdoc wget tar xz \
+            libevdev-devel
 
           git clone https://gitlab.freedesktop.org/wayland/wayland.git
           cd wayland

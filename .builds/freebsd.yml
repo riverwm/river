@@ -1,6 +1,7 @@
 image: freebsd/latest
 packages:
   - devel/evdev-proto
+  - devel/libevdev
   - devel/libepoll-shim
   - devel/libudev-devd
   - devel/meson
