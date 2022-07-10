@@ -105,10 +105,21 @@ pub fn init(self: *Self, wlr_output: *wlr.Output) !void {
     // refresh rate), and each monitor supports only a specific set of modes. We
     // just pick the monitor's preferred mode, a more sophisticated compositor
     // would let the user configure it.
-    if (wlr_output.preferredMode()) |mode| {
-        wlr_output.setMode(mode);
+    if (wlr_output.preferredMode()) |preferred_mode| {
+        wlr_output.setMode(preferred_mode);
         wlr_output.enable(true);
-        try wlr_output.commit();
+        wlr_output.commit() catch |err| {
+            var it = wlr_output.modes.iterator(.forward);
+            while (it.next()) |mode| {
+                if (mode == preferred_mode) continue;
+                wlr_output.setMode(mode);
+                wlr_output.commit() catch continue;
+                // This mode works, use it
+                break;
+            } else {
+                return err;
+            }
+        };
     }
 
     self.* = .{
