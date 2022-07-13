@@ -203,6 +203,35 @@ const Output = struct {
                             else => output.main_ratio = math.clamp(arg, 0.1, 0.9),
                         }
                     },
+                    .@"padding" => {
+                        const toggle = std.meta.stringToEnum(Toggle, raw_arg) orelse {
+                            std.log.err("unknown toggle: {s}", .{raw_arg});
+                            return;
+                        };
+                        switch (toggle) {
+                            .@"on" => {
+                                output.padding = true;
+                                view_padding = output.init_view_padding;
+                                outer_padding = output.init_outer_padding;
+                            },
+                            .@"off" => {
+                                output.padding = false;
+                                view_padding = 0;
+                                outer_padding = 0;
+                            },
+                            .@"toggle" => {
+                                if (output.padding) {
+                                    output.padding = false;
+                                    view_padding = 0;
+                                    outer_padding = 0;
+                                } else {
+                                    output.padding = true;
+                                    view_padding = output.init_view_padding;
+                                    outer_padding = output.init_outer_padding;
+                                }
+                            },
+                        }
+                    },
                 }
             },
 
