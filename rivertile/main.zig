@@ -117,6 +117,9 @@ const Output = struct {
     main_location: Location,
     main_count: u31,
     main_ratio: f64,
+    init_view_padding: u31,
+    init_outer_padding: u31,
+    padding: bool,
 
     layout: *river.LayoutV3 = undefined,
 
@@ -127,6 +130,9 @@ const Output = struct {
             .main_location = default_main_location,
             .main_count = default_main_count,
             .main_ratio = default_main_ratio,
+            .init_view_padding = view_padding,
+            .init_outer_padding = outer_padding,
+            .padding = true,
         };
         if (context.initialized) try output.getLayout(context);
     }
