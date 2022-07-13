@@ -69,6 +69,7 @@ const Command = enum {
     @"main-location",
     @"main-count",
     @"main-ratio",
+    @"padding",
 };
 
 const Location = enum {
@@ -76,6 +77,12 @@ const Location = enum {
     right,
     bottom,
     left,
+};
+
+const Toggle = enum {
+    @"on",
+    @"off",
+    @"toggle",
 };
 
 // Configured through command line options
