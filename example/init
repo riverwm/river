@@ -47,6 +47,9 @@ riverctl map normal Super L send-layout-cmd rivertile "main-ratio +0.05"
 riverctl map normal Super+Shift H send-layout-cmd rivertile "main-count +1"
 riverctl map normal Super+Shift L send-layout-cmd rivertile "main-count -1"
 
+# Super + G will toggle padding on and off
+riverctl map normal Super G send-layout-cmd rivertile "padding toggle"
+
 # Super+Alt+{H,J,K,L} to move views
 riverctl map normal Super+Alt H move left 100
 riverctl map normal Super+Alt J move down 100
