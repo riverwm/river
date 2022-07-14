@@ -283,8 +283,33 @@ pub fn sendToOutput(self: *Self, destination_output: *Output) void {
         self.foreign_toplevel_handle.?.outputEnter(destination_output.wlr_output);
     }
 
+    self.output = destination_output;
+    const dimensions = destination_output.getEffectiveResolution();
+
+    if (self.pending.float) {
+        // Adapt dimensions of view to new output. Only necessary when floating,
+        // because for tiled views the output will be rearranged, taking care
+        // of this.
+        if (self.pending.fullscreen) self.pending.box = self.post_fullscreen_box;
+        const border_width = if (self.draw_borders) @intCast(i32, server.config.border_width) else 0;
+        self.pending.box.width = math.min(
+            self.pending.box.width,
+            @intCast(i32, dimensions.width) - (2 * border_width),
+        );
+        self.pending.box.height = math.min(
+            self.pending.box.height,
+            @intCast(i32, dimensions.height) - (2 * border_width),
+        );
+
+        // Adjust position of view so that it is fully inside the target output.
+        self.move(0, 0);
+    }
+
     if (self.pending.fullscreen) {
-        const dimensions = destination_output.getEffectiveResolution();
+        // If the view is floating, we need to set the post_fullscreen_box, as
+        // that is still set for the previous output.
+        if (self.pending.float) self.post_fullscreen_box = self.pending.box;
+
         self.pending.box = .{
             .x = 0,
             .y = 0,
@@ -292,7 +317,6 @@ pub fn sendToOutput(self: *Self, destination_output: *Output) void {
             .height = dimensions.height,
         };
     }
-    self.output = destination_output;
 }
 
 fn sendEnter(self: *Self, output: *Output) void {
