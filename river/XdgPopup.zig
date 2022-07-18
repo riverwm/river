@@ -69,8 +69,8 @@ pub fn create(wlr_xdg_popup: *wlr.XdgPopup, parent: Parent) void {
             const output_dimensions = layer_surface.output.getEffectiveResolution();
             // The output box relative to the parent of the xdg_popup
             var box = wlr.Box{
-                .x = layer_surface.box.x,
-                .y = layer_surface.box.y,
+                .x = -layer_surface.box.x,
+                .y = -layer_surface.box.y,
                 .width = @intCast(c_int, output_dimensions.width),
                 .height = @intCast(c_int, output_dimensions.height),
             };
