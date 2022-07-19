@@ -83,7 +83,10 @@ fn handleTimeout(layout: *Layout) callconv(.C) c_int {
 /// Push a set of proposed view dimensions and position to the list
 pub fn pushViewDimensions(self: *Self, output: *Output, x: i32, y: i32, width: u32, height: u32) void {
     // The client pushed too many dimensions
-    if (self.views < 0) return;
+    if (self.views <= 0) {
+        self.views -= 1;
+        return;
+    }
 
     // Here we apply the offset to align the coords with the origin of the
     // usable area and shrink the dimensions to accomodate the border size.
