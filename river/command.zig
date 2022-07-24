@@ -49,6 +49,7 @@ const command_impls = std.ComptimeStringMap(
         .{ "close",                     @import("command/close.zig").close },
         .{ "csd-filter-add",            @import("command/filter.zig").csdFilterAdd },
         .{ "csd-filter-remove",         @import("command/filter.zig").csdFilterRemove },
+        .{ "cursor-follows-focus",      @import("command/cursor_follows_focus.zig").cursorFollowsFocus },
         .{ "declare-mode",              @import("command/declare_mode.zig").declareMode },
         .{ "default-layout",            @import("command/layout.zig").defaultLayout },
         .{ "enter-mode",                @import("command/enter_mode.zig").enterMode },

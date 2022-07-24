@@ -52,6 +52,13 @@ pub fn focusView(
         _ = it.next();
         // Focus the next visible node if there is one
         if (it.next()) |view| {
+            switch (server.config.cursor_follows_focus) {
+                .disabled => {},
+                .enabled => {
+                    seat.cursor.wlr_cursor.x = @intToFloat(f64, view.pending.box.x) + @intToFloat(f64, view.pending.box.width) / 2.0;
+                    seat.cursor.wlr_cursor.y = @intToFloat(f64, view.pending.box.y) + @intToFloat(f64, view.pending.box.height) / 2.0;
+                }
+            }
             seat.focus(view);
             server.root.startTransaction();
             return;
@@ -65,7 +72,16 @@ pub fn focusView(
         .previous => ViewStack(View).iter(output.views.last, .reverse, output.pending.tags, filter),
     };
 
-    seat.focus(it.next());
+    if (it.next()) |view| {
+        switch (server.config.cursor_follows_focus) {
+            .disabled => {},
+            .enabled => {
+                seat.cursor.wlr_cursor.x = @intToFloat(f64, view.pending.box.x) + @intToFloat(f64, view.pending.box.width) / 2.0;
+                seat.cursor.wlr_cursor.y = @intToFloat(f64, view.pending.box.y) + @intToFloat(f64, view.pending.box.height) / 2.0;
+            }
+        }
+        seat.focus(view);
+    }
     server.root.startTransaction();
 }
 

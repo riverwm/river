@@ -33,6 +33,11 @@ pub const FocusFollowsCursorMode = enum {
     always,
 };
 
+pub const CursorFollowsFocusMode = enum {
+    disabled,
+    enabled,
+};
+
 pub const WarpCursorMode = enum {
     disabled,
     @"on-output-change",
@@ -75,6 +80,9 @@ csd_filter_titles: std.StringHashMapUnmanaged(void) = .{},
 
 /// The selected focus_follows_cursor mode
 focus_follows_cursor: FocusFollowsCursorMode = .disabled,
+
+/// The selected cursor_follows_focus mode
+cursor_follows_focus: CursorFollowsFocusMode = .disabled,
 
 /// If true, the cursor warps to the center of the focused output
 warp_cursor: WarpCursorMode = .disabled,
