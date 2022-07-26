@@ -57,7 +57,7 @@ pub fn focusView(
                 .enabled => {
                     seat.cursor.wlr_cursor.x = @intToFloat(f64, view.pending.box.x) + @intToFloat(f64, view.pending.box.width) / 2.0;
                     seat.cursor.wlr_cursor.y = @intToFloat(f64, view.pending.box.y) + @intToFloat(f64, view.pending.box.height) / 2.0;
-                }
+                },
             }
             seat.focus(view);
             server.root.startTransaction();
@@ -78,7 +78,7 @@ pub fn focusView(
             .enabled => {
                 seat.cursor.wlr_cursor.x = @intToFloat(f64, view.pending.box.x) + @intToFloat(f64, view.pending.box.width) / 2.0;
                 seat.cursor.wlr_cursor.y = @intToFloat(f64, view.pending.box.y) + @intToFloat(f64, view.pending.box.height) / 2.0;
-            }
+            },
         }
         seat.focus(view);
     }
