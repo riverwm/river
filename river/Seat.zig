@@ -244,24 +244,7 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
 
         // Send keyboard enter/leave events and handle pointer constraints
         if (target_surface) |wlr_surface| {
-            if (self.wlr_seat.getKeyboard()) |wlr_keyboard| {
-                var keycodes = KeycodeSet{
-                    .items = wlr_keyboard.keycodes,
-                    .len = wlr_keyboard.num_keycodes,
-                };
-
-                const keyboard = @intToPtr(*Keyboard, wlr_keyboard.data);
-                keycodes.subtract(keyboard.eaten_keycodes);
-
-                self.wlr_seat.keyboardNotifyEnter(
-                    wlr_surface,
-                    &keycodes.items,
-                    keycodes.len,
-                    &wlr_keyboard.modifiers,
-                );
-            } else {
-                self.wlr_seat.keyboardNotifyEnter(wlr_surface, null, 0, null);
-            }
+            self.keyboardNotifyEnter(wlr_surface);
 
             if (server.input_manager.pointer_constraints.constraintForSurface(wlr_surface, self.wlr_seat)) |constraint| {
                 @intToPtr(*PointerConstraint, constraint.data).setAsActive();
@@ -284,6 +267,27 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
     // Inform any clients tracking status of the change
     var it = self.status_trackers.first;
     while (it) |node| : (it = node.next) node.data.sendFocusedView();
+}
+
+fn keyboardNotifyEnter(self: *Self, wlr_surface: *wlr.Surface) void {
+    if (self.wlr_seat.getKeyboard()) |wlr_keyboard| {
+        var keycodes = KeycodeSet{
+            .items = wlr_keyboard.keycodes,
+            .len = wlr_keyboard.num_keycodes,
+        };
+
+        const keyboard = @intToPtr(*Keyboard, wlr_keyboard.data);
+        keycodes.subtract(keyboard.eaten_keycodes);
+
+        self.wlr_seat.keyboardNotifyEnter(
+            wlr_surface,
+            &keycodes.items,
+            keycodes.len,
+            &wlr_keyboard.modifiers,
+        );
+    } else {
+        self.wlr_seat.keyboardNotifyEnter(wlr_surface, null, 0, null);
+    }
 }
 
 /// Focus the given output, notifying any listening clients of the change.
@@ -470,6 +474,12 @@ fn tryAddDevice(self: *Self, wlr_device: *wlr.InputDevice) !void {
             errdefer util.gpa.destroy(keyboard);
 
             try keyboard.init(self, wlr_device);
+
+            self.wlr_seat.setKeyboard(keyboard.device.wlr_device);
+            if (self.wlr_seat.keyboard_state.focused_surface) |wlr_surface| {
+                self.wlr_seat.keyboardNotifyClearFocus();
+                self.keyboardNotifyEnter(wlr_surface);
+            }
         },
         .pointer, .touch => {
             const device = try util.gpa.create(InputDevice);
