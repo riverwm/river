@@ -22,11 +22,15 @@ low cognitive load.
 - Scriptable configuration and control through a custom Wayland protocol and
 separate `riverctl` binary implementing it.
 
-## Building
+
+## Installation
 
 <a href="https://repology.org/project/river/versions">
     <img src="https://repology.org/badge/vertical-allrepos/river.svg" alt="Packaging status" align="right">
 </a>
+
+
+## Building
 
 On cloning the repository, you must init and update the submodules as well
 with e.g.
