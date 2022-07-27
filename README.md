@@ -29,6 +29,31 @@ separate `riverctl` binary implementing it.
     <img src="https://repology.org/badge/vertical-allrepos/river.svg" alt="Packaging status" align="right">
 </a>
 
+### Alpine Linux
+### Arch Linux
+### Fedora
+
+```
+sudo dnf copr enable alebastr/river
+sudo dnf install river
+```
+
+### FreeBSD
+
+```
+sudo pkg install x11-wm/river 
+sudo pkg install river
+```
+
+### Gentoo
+
+```
+sudo emerge --ask gui-wm/river
+```
+
+### NixOS
+### SlackBuilds
+### Void Linux
 
 ## Building
 
