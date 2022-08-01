@@ -41,7 +41,18 @@ const usage: []const u8 =
 
 pub var server: Server = undefined;
 
+fn sa_handler(_: c_int) callconv(.C) void {}
+
 pub fn main() anyerror!void {
+    // ignore SIGPIPE so we don't get killed when socket unexpectedly closes (thanks xwayland)
+    // use our own handler instead of SIG_IGN so we don't leak this when execve()
+    const act = os.Sigaction{
+        .handler = .{ .handler = sa_handler },
+        .mask = os.empty_sigset,
+        .flags = 0,
+    };
+    os.sigaction(os.SIG.PIPE, &act, null);
+
     // This line is here because of https://github.com/ziglang/zig/issues/7807
     const argv: [][*:0]const u8 = os.argv;
     const result = flags.parse(argv[1..], &[_]flags.Flag{
