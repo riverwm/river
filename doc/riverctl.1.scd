@@ -307,11 +307,13 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 	Hide the cursor when pressing any non-modifier key. Show the cursor
 	again on any movement.
 
-*set-cursor-warp* *disabled*|*on-output-change*
+*set-cursor-warp* *disabled*|*on-output-change*|*on-focus-change*
 	Set the cursor warp mode. There are two available modes:
 
 	- _disabled_: Cursor will not be warped. This is the default.
 	- _on-output-change_: When a different output is focused, the cursor will be
+	  warped to its center.
+	- _on-focus-change_: When a different view/output is focused, the cursor will be
 	  warped to its center.
 
 *set-repeat* _rate_ _delay_

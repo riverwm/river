@@ -79,7 +79,7 @@ complete -c riverctl -x -n '__fish_seen_subcommand_from map'                  -a
 complete -c riverctl -x -n '__fish_seen_subcommand_from unmap'                -a '-release'
 complete -c riverctl -x -n '__fish_seen_subcommand_from attach-mode'          -a 'top bottom'
 complete -c riverctl -x -n '__fish_seen_subcommand_from focus-follows-cursor' -a 'disabled normal always'
-complete -c riverctl -x -n '__fish_seen_subcommand_from set-cursor-warp'      -a 'disabled on-output-change'
+complete -c riverctl -x -n '__fish_seen_subcommand_from set-cursor-warp'      -a 'disabled on-output-change on-focus-change'
 
 # Subcommands for 'input'
 complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 2' -a "(__riverctl_list_input_devices)"

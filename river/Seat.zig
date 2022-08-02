@@ -265,6 +265,10 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
             PointerConstraint.warpToHint(&self.cursor);
             constraint.sendDeactivated();
             self.cursor.constraint = null;
+        } else {
+            // Depending on configuration and cursor position, changing keyboard focus
+            // may cause the cursor to be warped.
+            self.cursor.may_need_warp = true;
         }
     } else {
         self.wlr_seat.keyboardClearFocus();
@@ -273,6 +277,10 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
             PointerConstraint.warpToHint(&self.cursor);
             constraint.sendDeactivated();
             self.cursor.constraint = null;
+        } else {
+            // Depending on configuration and cursor position, changing keyboard focus
+            // may cause the cursor to be warped.
+            self.cursor.may_need_warp = true;
         }
     }
 
@@ -313,28 +321,6 @@ pub fn focusOutput(self: *Self, output: *Output) void {
 
     it = self.status_trackers.first;
     while (it) |node| : (it = node.next) node.data.sendOutput(.focused);
-
-    if (self.focused_output == &server.root.noop_output) return;
-
-    // Warp pointer to center of newly focused output (In layout coordinates),
-    // but only if cursor is not already on the output and this feature is enabled.
-    switch (server.config.warp_cursor) {
-        .disabled => {},
-        .@"on-output-change" => {
-            var layout_box: wlr.Box = undefined;
-            server.root.output_layout.getBox(output.wlr_output, &layout_box);
-            if (!layout_box.containsPoint(self.cursor.wlr_cursor.x, self.cursor.wlr_cursor.y)) {
-                var output_width: i32 = undefined;
-                var output_height: i32 = undefined;
-                output.wlr_output.effectiveResolution(&output_width, &output_height);
-                const lx = @intToFloat(f64, layout_box.x + @divTrunc(output_width, 2));
-                const ly = @intToFloat(f64, layout_box.y + @divTrunc(output_height, 2));
-                if (!self.cursor.wlr_cursor.warp(null, lx, ly)) {
-                    log.err("failed to warp cursor on output change", .{});
-                }
-            }
-        },
-    }
 }
 
 pub fn handleActivity(self: Self) void {

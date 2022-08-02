@@ -105,6 +105,7 @@ pressed_count: u32 = 0,
 hide_cursor_timer: *wl.EventSource,
 
 hidden: bool = false,
+may_need_warp: bool = false,
 
 axis: wl.Listener(*wlr.Pointer.event.Axis) = wl.Listener(*wlr.Pointer.event.Axis).init(handleAxis),
 frame: wl.Listener(*wlr.Cursor) = wl.Listener(*wlr.Cursor).init(handleFrame),
@@ -1050,6 +1051,9 @@ pub fn checkFocusFollowsCursor(self: *Self) void {
 /// the target view of a cursor operation potentially being moved to a non-visible tag,
 /// becoming fullscreen, etc.
 pub fn updateState(self: *Self) void {
+    if (self.may_need_warp) {
+        self.warp();
+    }
     if (self.shouldPassthrough()) {
         self.mode = .passthrough;
         var now: os.timespec = undefined;
@@ -1101,5 +1105,51 @@ fn passthrough(self: *Self, time: u32) void {
         // There is either no surface under the cursor or input is disallowed
         // Reset the cursor image to the default and clear focus.
         self.clearFocus();
+    }
+}
+
+fn warp(self: *Self) void {
+    self.may_need_warp = false;
+    if (self.seat.focused_output == &server.root.noop_output) return;
+    // Warp pointer to center of the focused view/output (In layout coordinates) if enabled.
+    var output_layout_box: wlr.Box = undefined;
+    server.root.output_layout.getBox(self.seat.focused_output.wlr_output, &output_layout_box);
+    const target_box = switch (server.config.warp_cursor) {
+        .disabled => return,
+        .@"on-output-change" => output_layout_box,
+        .@"on-focus-change" => switch (self.seat.focused) {
+            .layer, .lock_surface, .none => output_layout_box,
+            .view => |view| wlr.Box{
+                .x = output_layout_box.x + view.current.box.x,
+                .y = output_layout_box.y + view.current.box.y,
+                .width = view.current.box.width,
+                .height = view.current.box.height,
+            },
+            .xwayland_override_redirect => |or_window| wlr.Box{
+                .x = or_window.xwayland_surface.x,
+                .y = or_window.xwayland_surface.y,
+                .width = or_window.xwayland_surface.width,
+                .height = or_window.xwayland_surface.height,
+            },
+        },
+    };
+    // Checking against the usable box here gives much better UX when, for example,
+    // a status bar allows using the pointer to change tag/view focus.
+    const usable_box = self.seat.focused_output.usable_box;
+    const usable_layout_box = wlr.Box{
+        .x = output_layout_box.x + usable_box.x,
+        .y = output_layout_box.y + usable_box.y,
+        .width = usable_box.width,
+        .height = usable_box.height,
+    };
+    if (!output_layout_box.containsPoint(self.wlr_cursor.x, self.wlr_cursor.y) or
+        (usable_layout_box.containsPoint(self.wlr_cursor.x, self.wlr_cursor.y) and
+        !target_box.containsPoint(self.wlr_cursor.x, self.wlr_cursor.y)))
+    {
+        const lx = @intToFloat(f64, target_box.x + @divTrunc(target_box.width, 2));
+        const ly = @intToFloat(f64, target_box.y + @divTrunc(target_box.height, 2));
+        if (!self.wlr_cursor.warp(null, lx, ly)) {
+            log.err("failed to warp cursor on focus change", .{});
+        }
     }
 }

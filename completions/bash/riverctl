@@ -64,7 +64,7 @@ function __riverctl_completion ()
 			"unmap") OPTS="-release" ;;
 			"attach-mode") OPTS="top bottom" ;;
 			"focus-follows-cursor") OPTS="disabled normal always" ;;
-			"set-cursor-warp") OPTS="disabled on-output-change" ;;
+			"set-cursor-warp") OPTS="disabled on-output-change on-focus-change" ;;
 			"hide-cursor") OPTS="timeout when-typing" ;;
 			*) return ;;
 		esac

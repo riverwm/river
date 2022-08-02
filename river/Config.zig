@@ -36,6 +36,7 @@ pub const FocusFollowsCursorMode = enum {
 pub const WarpCursorMode = enum {
     disabled,
     @"on-output-change",
+    @"on-focus-change",
 };
 
 pub const HideCursorWhenTypingMode = enum {
