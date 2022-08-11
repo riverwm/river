@@ -1,6 +1,6 @@
 // This file is part of river, a dynamic tiling wayland compositor.
 //
-// Copyright 2020 The River Developers
+// Copyright 2022 The River Developers
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,6 +15,21 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
+const os = std.os;
+
+const c = @import("c.zig");
 
 /// The global general-purpose allocator used throughout river's code
 pub const gpa = std.heap.c_allocator;
+
+pub fn post_fork_pre_execve() void {
+    if (c.setsid() < 0) unreachable;
+    if (os.system.sigprocmask(os.SIG.SETMASK, &os.empty_sigset, null) < 0) unreachable;
+    const sig_dfl = os.Sigaction{
+        // TODO(zig): Remove this casting after https://github.com/ziglang/zig/pull/12410
+        .handler = .{ .handler = @intToPtr(?os.Sigaction.handler_fn, @ptrToInt(os.SIG.DFL)) },
+        .mask = os.empty_sigset,
+        .flags = 0,
+    };
+    os.sigaction(os.SIG.PIPE, &sig_dfl, null);
+}

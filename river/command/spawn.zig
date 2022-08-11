@@ -40,10 +40,7 @@ pub fn spawn(
     };
 
     if (pid == 0) {
-        // Clean things up for the child in an intermediate fork
-        if (c.setsid() < 0) unreachable;
-        if (os.system.sigprocmask(os.SIG.SETMASK, &os.empty_sigset, null) < 0) unreachable;
-
+        util.post_fork_pre_execve();
         const pid2 = os.fork() catch c._exit(1);
         if (pid2 == 0) os.execveZ("/bin/sh", &child_args, std.c.environ) catch c._exit(1);
 

@@ -41,18 +41,7 @@ const usage: []const u8 =
 
 pub var server: Server = undefined;
 
-fn sa_handler(_: c_int) callconv(.C) void {}
-
 pub fn main() anyerror!void {
-    // ignore SIGPIPE so we don't get killed when socket unexpectedly closes (thanks xwayland)
-    // use our own handler instead of SIG_IGN so we don't leak this when execve()
-    const act = os.Sigaction{
-        .handler = .{ .handler = sa_handler },
-        .mask = os.empty_sigset,
-        .flags = 0,
-    };
-    os.sigaction(os.SIG.PIPE, &act, null);
-
     // This line is here because of https://github.com/ziglang/zig/issues/7807
     const argv: [][*:0]const u8 = os.argv;
     const result = flags.parse(argv[1..], &[_]flags.Flag{
@@ -107,6 +96,16 @@ pub fn main() anyerror!void {
         .warn, .err => .err,
     });
 
+    // Ignore SIGPIPE so we don't get killed when writing to a socket that
+    // has had its read end closed by another process.
+    const sig_ign = os.Sigaction{
+        // TODO(zig): Remove this casting after https://github.com/ziglang/zig/pull/12410
+        .handler = .{ .handler = @intToPtr(os.Sigaction.handler_fn, @ptrToInt(os.SIG.IGN)) },
+        .mask = os.empty_sigset,
+        .flags = 0,
+    };
+    os.sigaction(os.SIG.PIPE, &sig_ign, null);
+
     std.log.info("initializing server", .{});
     try server.init();
     defer server.deinit();
@@ -120,8 +119,7 @@ pub fn main() anyerror!void {
         const child_args = [_:null]?[*:0]const u8{ "/bin/sh", "-c", cmd, null };
         const pid = try os.fork();
         if (pid == 0) {
-            if (c.setsid() < 0) unreachable;
-            if (os.system.sigprocmask(os.SIG.SETMASK, &os.empty_sigset, null) < 0) unreachable;
+            util.post_fork_pre_execve();
             os.execveZ("/bin/sh", &child_args, std.c.environ) catch c._exit(1);
         }
         util.gpa.free(cmd);
