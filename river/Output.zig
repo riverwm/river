@@ -88,6 +88,9 @@ layouts: std.TailQueue(Layout) = .{},
 /// Call handleLayoutNamespaceChange() after setting this.
 layout_namespace: ?[]const u8 = null,
 
+/// The last set layout name.
+layout_name: ?[:0]const u8 = null,
+
 /// Bitmask that whitelists tags for newly spawned views
 spawn_tagmask: u32 = math.maxInt(u32),
 
@@ -178,6 +181,18 @@ pub fn sendUrgentTags(self: Self) void {
 
     var it = self.status_trackers.first;
     while (it) |node| : (it = node.next) node.data.sendUrgentTags(urgent_tags);
+}
+
+pub fn sendLayoutName(self: Self) void {
+    std.debug.assert(self.layout_name != null);
+    var it = self.status_trackers.first;
+    while (it) |node| : (it = node.next) node.data.sendLayoutName(self.layout_name.?);
+}
+
+pub fn sendLayoutNameClear(self: Self) void {
+    std.debug.assert(self.layout_name == null);
+    var it = self.status_trackers.first;
+    while (it) |node| : (it = node.next) node.data.sendLayoutNameClear();
 }
 
 pub fn arrangeFilter(view: *View, filter_tags: u32) bool {

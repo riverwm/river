@@ -47,6 +47,10 @@ pub fn init(self: *Self, output: *Output, output_status: *zriver.OutputStatusV1)
         if (node.view.current.urgent) urgent_tags |= node.view.current.tags;
     }
     self.sendUrgentTags(urgent_tags);
+
+    if (output.layout_name) |name| {
+        self.sendLayoutName(name);
+    }
 }
 
 pub fn destroy(self: *Self) void {
@@ -92,5 +96,17 @@ pub fn sendFocusedTags(self: Self, tags: u32) void {
 pub fn sendUrgentTags(self: Self, tags: u32) void {
     if (self.output_status.getVersion() >= 2) {
         self.output_status.sendUrgentTags(tags);
+    }
+}
+
+pub fn sendLayoutName(self: Self, name: [:0]const u8) void {
+    if (self.output_status.getVersion() >= 4) {
+        self.output_status.sendLayoutName(name);
+    }
+}
+
+pub fn sendLayoutNameClear(self: Self) void {
+    if (self.output_status.getVersion() >= 4) {
+        self.output_status.sendLayoutNameClear();
     }
 }

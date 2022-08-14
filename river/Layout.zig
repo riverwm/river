@@ -161,6 +161,12 @@ fn handleRequest(layout: *river.LayoutV3, request: river.LayoutV3.Request, self:
                 // Therefore, simply ignore requests with old/wrong serials.
                 if (layout_demand.serial == req.serial) layout_demand.apply(self);
             }
+
+            if (self.output.layout_name) |name| {
+                util.gpa.free(name);
+            }
+            self.output.layout_name = util.gpa.dupeZ(u8, mem.span(req.layout_name)) catch null;
+            self.output.sendLayoutName();
         },
     }
 }
@@ -186,6 +192,12 @@ pub fn destroy(self: *Self) void {
             layout_demand.deinit();
             self.output.layout_demand = null;
             server.root.notifyLayoutDemandDone();
+        }
+
+        if (self.output.layout_name) |name| {
+            util.gpa.free(name);
+            self.output.layout_name = null;
+            self.output.sendLayoutNameClear();
         }
     }
 
