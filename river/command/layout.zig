@@ -76,6 +76,9 @@ pub fn sendLayoutCmd(
         if (mem.eql(u8, layout.namespace, target_namespace)) break layout;
     } else return;
 
+    if (layout.layout.getVersion() >= 2) {
+        layout.layout.sendUserCommandTags(output.pending.tags);
+    }
     layout.layout.sendUserCommand(args[2]);
     if (layout == output.current.layout) output.arrangeViews();
 }

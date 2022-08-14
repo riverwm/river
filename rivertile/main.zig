@@ -298,6 +298,7 @@ const Output = struct {
                     .bottom => layout.commit("rivertile - bottom", ev.serial),
                 }
             },
+            .user_command_tags => {},
         }
     }
 };

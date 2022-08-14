@@ -38,7 +38,7 @@
     can only be done by creating a new major version of the extension.
   </description>
 
-  <interface name="river_layout_manager_v3" version="1">
+  <interface name="river_layout_manager_v3" version="2">
     <description summary="manage river layout objects">
       A global factory for river_layout_v3 objects.
     </description>
@@ -71,7 +71,7 @@
     </request>
   </interface>
 
-  <interface name="river_layout_v3" version="1">
+  <interface name="river_layout_v3" version="2">
     <description summary="receive and respond to layout demands">
       This interface allows clients to receive layout demands from the
       compositor for a specific output and subsequently propose positions and
@@ -174,8 +174,23 @@
 
         A layout_demand will be sent after this event if the compositor is
         currently using this layout object to arrange the output.
+
+        If version 2 or higher of the river_layout_v3 object is bound, the
+        user_command_tags event is guaranteed to be sent directly before the
+        user_command event.
       </description>
       <arg name="command" type="string"/>
+    </event>
+
+    <event name="user_command_tags" since="2">
+      <description summary="a command sent by the user">
+        If version 2 or higher of the river_layout_v3 object is bound, this
+        event will be sent directly before every user_command event. This allows
+        layout generators to be aware of the active tags when a user command is
+        sent. This is necessary for generators wanting to keep settings on a
+        per-tag basis.
+      </description>
+      <arg name="tags" type="uint" summary="tags of the output, 32-bit bitfield"/>
     </event>
   </interface>
 </protocol>
