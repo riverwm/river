@@ -77,5 +77,5 @@ pub fn sendLayoutCmd(
     } else return;
 
     layout.layout.sendUserCommand(args[2]);
-    output.arrangeViews();
+    if (layout == output.current.layout) output.arrangeViews();
 }
