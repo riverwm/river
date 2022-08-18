@@ -37,7 +37,7 @@ server_destroy: wl.Listener(*wl.Server) = wl.Listener(*wl.Server).init(handleSer
 
 pub fn init(self: *Self) !void {
     self.* = .{
-        .global = try wl.Global.create(server.wl_server, river.LayoutManagerV3, 1, ?*anyopaque, null, bind),
+        .global = try wl.Global.create(server.wl_server, river.LayoutManagerV3, 2, ?*anyopaque, null, bind),
     };
 
     server.wl_server.addDestroyListener(&self.server_destroy);
