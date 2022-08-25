@@ -102,6 +102,7 @@ fn handleMap(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wl
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
     self.output.getLayer(self.layer).append(node);
     self.output.arrangeLayers(.mapped);
+    server.root.startTransaction();
 }
 
 fn handleUnmap(listener: *wl.Listener(*wlr.LayerSurfaceV1), _: *wlr.LayerSurfaceV1) void {
