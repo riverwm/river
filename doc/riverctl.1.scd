@@ -32,7 +32,8 @@ over the Wayland protocol.
 	Add _pattern_ to the CSD filter list. Views with this _pattern_ are told to
 	use client side decoration instead of the default server side decoration.
 	Note that this affects new views as well as already existing ones. Title
-	updates are not taken into account.
+	updates are not taken into account. app-id may be determined by running
+	river with *-log-level debug* and looking at "info(view)".
 
 *csd-filter-remove* *app-id*|*title* _pattern_
 	Remove _pattern_ from the CSD filter list. Note that this affects new views

@@ -480,7 +480,7 @@ pub fn shouldTrackConfigure(self: Self) bool {
 
 /// Called by the impl when the surface is ready to be displayed
 pub fn map(self: *Self) !void {
-    log.debug("view '{s}' mapped", .{self.getTitle()});
+    log.debug("view app-id='{s}' title='{s}' mapped", .{self.getAppId(), self.getTitle()});
 
     {
         assert(self.foreign_toplevel_handle == null);
@@ -518,7 +518,7 @@ pub fn map(self: *Self) !void {
 
 /// Called by the impl when the surface will no longer be displayed
 pub fn unmap(self: *Self) void {
-    log.debug("view '{s}' unmapped", .{self.getTitle()});
+    log.debug("view app-id='{s}' title='{s}' unmapped", .{self.getAppId(), self.getTitle()});
 
     if (self.saved_buffers.items.len == 0) self.saveBuffers();
 
