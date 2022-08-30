@@ -3,6 +3,9 @@ function __riverctl_completion ()
 	if [ "${COMP_CWORD}" -eq 1 ]
 	then
 		OPTS=" \
+			keyboard-group-create \
+			keyboard-group-destroy \
+			keyboard-group-add-keyboard \
 			csd-filter-add \
 			exit \
 			float-filter-add \

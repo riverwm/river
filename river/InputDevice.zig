@@ -108,7 +108,7 @@ fn handleDestroy(listener: *wl.Listener(*wlr.InputDevice), _: *wlr.InputDevice) 
 
     switch (device.wlr_device.type) {
         .keyboard => {
-            const keyboard = @fieldParentPtr(Keyboard, "device", device);
+            const keyboard = @fieldParentPtr(Keyboard, "provider", @ptrCast(*Keyboard.Provider, device));
             keyboard.deinit();
             util.gpa.destroy(keyboard);
         },

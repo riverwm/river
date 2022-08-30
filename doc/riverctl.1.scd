@@ -330,6 +330,20 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 *list-input-configs*
 	List all input configurations.
 
+*keyboard-group-create* _keyboard_group_name_
+	Create a keyboard group. A keyboard group collects multiple keyboards in
+	a single logical keyboard. This means that all state, like the active
+	modifiers, is shared between the keyboards in a group.
+
+*keyboard-group-destroy* _keyboard_group_name_
+	Destroy the keyboard group of the given name. All attached keyboards
+	will be released, making them act as seperate devices again.
+
+*keyboard-group-add-keyboard* _keyboard_group_name_ _input_device_identifier_
+	Add a keyboard to a keyboard group, identified by the keyboards input
+	device identifier. Any currently connected and future keyboards matching
+	the identifier will be added to the group.
+
 The _input_ command can be used to create a configuration rule for an input
 device identified by its _name_.
 The _name_ of an input device consists of its type, its numerical vendor id,
