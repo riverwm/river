@@ -494,6 +494,9 @@ pub fn map(self: *Self) !void {
         if (self.getTitle()) |s| handle.setTitle(s);
         if (self.getAppId()) |s| handle.setAppId(s);
 
+        self.pending.tags = server.config.getSpawnTagsFilter(self);
+        self.applyPending();
+
         handle.outputEnter(self.output.wlr_output);
     }
 

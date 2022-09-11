@@ -137,6 +137,29 @@ fn csdFilterUpdateViews(kind: FilterKind, pattern: []const u8, operation: enum {
     }
 }
 
+pub fn spawnTagsFilter(
+    _: *Seat,
+    args: []const [:0]const u8,
+    _: *?[]const u8,
+) Error!void {
+    if (args.len < 4) return Error.NotEnoughArguments;
+    if (args.len > 4) return Error.TooManyArguments;
+
+    const kind = std.meta.stringToEnum(FilterKind, args[1]) orelse return Error.UnknownOption;
+    const map = switch (kind) {
+        .@"app-id" => &server.config.spawn_tags_app_ids,
+        .title => &server.config.spawn_tags_titles,
+    };
+
+    const key = args[2];
+    const tags = try std.fmt.parseInt(u32, args[3], 10);
+    if (tags == 0) return Error.InvalidValue;
+
+    const gop = try map.getOrPut(util.gpa, key);
+    gop.key_ptr.* = try util.gpa.dupe(u8, key);
+    gop.value_ptr.* = tags;
+}
+
 fn viewMatchesPattern(kind: FilterKind, pattern: []const u8, view: *View) bool {
     const p = switch (kind) {
         .@"app-id" => mem.span(view.getAppId()),
