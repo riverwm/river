@@ -212,6 +212,16 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 	- _key_: an XKB keysym name as described above
 	- _command_: any command that may be run with riverctl
 
+*map-button* _mode_ _modifiers_ _button_ _command_
+	Run _command_ when _button_ is pressed while _modifiers_ are held down
+	and in the specified _mode_.
+
+	- _mode_: name of the mode for which to create the mapping
+	- _modifiers_: one or more of the modifiers listed above, separated
+	  by a plus sign (+).
+	- _button_: the name of a linux input event code as described above
+	- _command_: any command that may be run with riverctl
+
 *map-pointer* _mode_ _modifiers_ _button_ _action_
 	Move or resize views when _button_ and _modifiers_ are held down
 	while in the specified _mode_.
@@ -246,6 +256,14 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 	- _modifiers_: one or more of the modifiers listed above, separated
 	  by a plus sign (+).
 	- _key_: an XKB keysym name as described above
+
+*unmap-button* _mode_ _modifiers_ _button_
+	Remove the mapping defined by the arguments:
+
+	- _mode_: name of the mode for which to remove the mapping
+	- _modifiers_: one or more of the modifiers listed above, separated
+	  by a plus sign (+).
+	- _button_: the name of a linux input event code as described above
 
 *unmap-pointer* _mode_ _modifiers_ _button_
 	Remove the pointer mapping defined by the arguments:

@@ -405,7 +405,7 @@ pub fn handleMapping(
     return handled;
 }
 
-/// Handle any user-defined mapping for passed button, modifiers and keyboard state.
+/// Handle any user-defined mapping for passed button and modifiers.
 /// Returns true if there was a mapping.
 pub fn handleButtonMapping(
     self: *Self,

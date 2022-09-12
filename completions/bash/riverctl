@@ -33,9 +33,11 @@ function __riverctl_completion ()
 			declare-mode \
 			enter-mode \
 			map \
+			map-button \
 			map-pointer \
 			map-switch \
 			unmap \
+			unmap-button \
 			unmap-pointer \
 			unmap-switch \
 			attach-mode \

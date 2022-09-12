@@ -38,9 +38,11 @@ _riverctl_subcommands()
         'declare-mode:Create a new mode'
         'enter-mode:Switch to given mode if it exists'
         'map:Run command when key is pressed while modifiers are held down and in the specified mode'
+        'map-button:Run command when button is pressed while modifiers are held down and in the specified mode'
         'map-pointer:Move or resize views when button and modifiers are held down while in the specified mode'
         'map-switch:Run command when river receives a switch event in the specified mode'
         'unmap:Remove the mapping defined by the arguments'
+        'unmap-button:Remove the button mapping defined by the arguments'
         'unmap-pointer:Remove the pointer mapping defined by the arguments'
         'unmap-switch:Remove the switch mapping defined by the arguments'
         # Configuration

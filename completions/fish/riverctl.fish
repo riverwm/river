@@ -44,9 +44,11 @@ complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'send-to-previous
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'declare-mode'           -d 'Create a new mode'
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'enter-mode'             -d 'Switch to given mode if it exists'
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'map'                    -d 'Run command when key is pressed while modifiers are held down and in the specified mode'
+complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'map-button'             -d 'Run command when button is pressed while modifiers are held down and in the specified mode'
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'map-pointer'            -d 'Move or resize views when button and modifers are held down while in the specified mode'
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'map-switch '            -d 'Run command when river receives a switch event in the specified mode'
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'unmap'                  -d 'Remove the mapping defined by the arguments'
+complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'unmap-button'           -d 'Remove the mapping defined by the arguments'
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'unmap-pointer'          -d 'Remove the pointer mapping defined by the arguments'
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'unmap-switch'           -d 'Remove the switch mapping defined by the arguments'
 # Configuration

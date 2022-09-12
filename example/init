@@ -65,6 +65,9 @@ riverctl map normal Super+Alt+Shift J resize vertical 100
 riverctl map normal Super+Alt+Shift K resize vertical -100
 riverctl map normal Super+Alt+Shift L resize horizontal 100
 
+# Super + Middle Mouse Button to toggle floating
+riverctl map-button normal Super BTN_MIDDLE toggle-float
+
 # Super + Left Mouse Button to move views
 riverctl map-pointer normal Super BTN_LEFT move-view
 
