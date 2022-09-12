@@ -214,7 +214,7 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 
 *map-button* _mode_ _modifiers_ _button_ _command_
 	Run _command_ when _button_ is pressed while _modifiers_ are held down
-	and in the specified _mode_.
+	and in the specified _mode_. Overrides map-pointer.
 
 	- _mode_: name of the mode for which to create the mapping
 	- _modifiers_: one or more of the modifiers listed above, separated
@@ -224,7 +224,7 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 
 *map-pointer* _mode_ _modifiers_ _button_ _action_
 	Move or resize views when _button_ and _modifiers_ are held down
-	while in the specified _mode_.
+	while in the specified _mode_. Overridden by map-button.
 
 	- _mode_: name of the mode for which to create the mapping
 	- _modifiers_: one or more of the modifiers listed above, separated
