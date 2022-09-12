@@ -310,7 +310,10 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
         return;
     }
 
-    if (self.surfaceAt()) |result| {
+    if (self.handleButtonMapping(event)) {
+        // TODO eaten_event_codes
+        return;
+    } else if (self.surfaceAt()) |result| {
         if (result.parent == .view and self.handlePointerMapping(event, result.parent.view)) {
             // If a mapping is triggered don't send events to clients.
             return;
@@ -512,7 +515,7 @@ fn handleTouchFrame(listener: *wl.Listener(void)) void {
     self.seat.wlr_seat.touchNotifyFrame();
 }
 
-/// Handle the mapping for the passed button if any. Returns true if there
+/// Handle the pointer mapping for the passed button if any. Returns true if there
 /// was a mapping and the button was handled.
 fn handlePointerMapping(self: *Self, event: *wlr.Pointer.event.Button, view: *View) bool {
     const wlr_keyboard = self.seat.wlr_seat.getKeyboard() orelse return false;
@@ -529,6 +532,15 @@ fn handlePointerMapping(self: *Self, event: *wlr.Pointer.event.Button, view: *Vi
             break true;
         }
     } else false;
+}
+
+/// Handle the button mapping for the passed button if any. Returns true if there
+/// was a mapping.
+fn handleButtonMapping(self: *Self, event: *wlr.Pointer.event.Button) bool {
+    const wlr_keyboard = self.seat.wlr_seat.getKeyboard() orelse return false;
+    const modifiers = wlr_keyboard.getModifiers();
+
+    return self.seat.handleButtonMapping(event.button, modifiers, event.state == .released);
 }
 
 /// Frame events are sent after regular pointer events to group multiple

@@ -64,6 +64,7 @@ const command_impls = std.ComptimeStringMap(
         .{ "list-input-configs",        @import("command/input.zig").listInputConfigs},
         .{ "list-inputs",               @import("command/input.zig").listInputs },
         .{ "map",                       @import("command/map.zig").map },
+        .{ "map-button",                @import("command/map.zig").mapButton },
         .{ "map-pointer",               @import("command/map.zig").mapPointer },
         .{ "map-switch",                @import("command/map.zig").mapSwitch },
         .{ "move",                      @import("command/move.zig").move },
@@ -85,6 +86,7 @@ const command_impls = std.ComptimeStringMap(
         .{ "toggle-fullscreen",         @import("command/toggle_fullscreen.zig").toggleFullscreen },
         .{ "toggle-view-tags",          @import("command/tags.zig").toggleViewTags },
         .{ "unmap",                     @import("command/map.zig").unmap },
+        // TODO AMC unmap-button
         .{ "unmap-pointer",             @import("command/map.zig").unmapPointer },
         .{ "unmap-switch",              @import("command/map.zig").unmapSwitch },
         .{ "xcursor-theme",             @import("command/xcursor_theme.zig").xcursorTheme },

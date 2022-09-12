@@ -26,6 +26,7 @@ const util = @import("../util.zig");
 
 const Error = @import("../command.zig").Error;
 const Mapping = @import("../Mapping.zig");
+const ButtonMapping = @import("../ButtonMapping.zig");
 const PointerMapping = @import("../PointerMapping.zig");
 const SwitchMapping = @import("../SwitchMapping.zig");
 const Switch = @import("../Switch.zig");
@@ -82,6 +83,56 @@ pub fn map(
         // possible crash if the Mapping ArrayList is reallocated, stop any
         // currently repeating mappings.
         seat.clearRepeatingMapping();
+        try mode_mappings.append(util.gpa, new);
+    }
+}
+
+/// Create a new button mapping for a given mode
+///
+/// Example:
+/// map-button normal Mod4 BTN_MIDDLE toggle-float
+pub fn mapButton(
+    // seat: *Seat,
+    _: *Seat,
+    args: []const [:0]const u8,
+    out: *?[]const u8,
+) Error!void {
+    const optionals = try parseOptionalArgs(args[1..]);
+    // offset caused by optional arguments
+    const offset = optionals.i;
+    if (args.len - offset < 5) return Error.NotEnoughArguments;
+
+    if (optionals.release and optionals.repeat) return Error.ConflictingOptions;
+
+    const mode_raw = args[1 + offset];
+    const modifiers_raw = args[2 + offset];
+    const event_code_raw = args[3 + offset];
+
+    const mode_id = try modeNameToId(mode_raw, out);
+    const modifiers = try parseModifiers(modifiers_raw, out);
+    const event_code = try parseEventCode(event_code_raw, out);
+
+    const mode_mappings = &server.config.modes.items[mode_id].button_mappings;
+
+    const new = try ButtonMapping.init(
+        event_code,
+        modifiers,
+        optionals.release,
+        args[4 + offset ..],
+    );
+    errdefer new.deinit();
+
+    if (buttonMappingExists(mode_mappings, modifiers, event_code, optionals.release)) |current| {
+        mode_mappings.items[current].deinit();
+        mode_mappings.items[current] = new;
+        // Warn user if they overwrote an existing button mapping using riverctl.
+        const opts = if (optionals.release) "-release " else "";
+        out.* = try fmt.allocPrint(
+            util.gpa,
+            "overwrote an existing button mapping: {s} {s}{s} {s}",
+            .{ mode_raw, opts, modifiers_raw, event_code_raw },
+        );
+    } else {
         try mode_mappings.append(util.gpa, new);
     }
 }
@@ -184,6 +235,22 @@ fn mappingExists(
 ) ?usize {
     for (mappings.items) |mapping, i| {
         if (std.meta.eql(mapping.modifiers, modifiers) and mapping.keysym == keysym and mapping.release == release) {
+            return i;
+        }
+    }
+
+    return null;
+}
+
+/// Returns the index of the ButtonMapping with matching modifiers, event code and release, if any.
+fn buttonMappingExists(
+    mappings: *std.ArrayListUnmanaged(ButtonMapping),
+    modifiers: wlr.Keyboard.ModifierMask,
+    event_code: u32,
+    release: bool,
+) ?usize {
+    for (mappings.items) |mapping, i| {
+        if (std.meta.eql(mapping.modifiers, modifiers) and mapping.event_code == event_code and mapping.release == release) {
             return i;
         }
     }

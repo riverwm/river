@@ -405,6 +405,26 @@ pub fn handleMapping(
     return handled;
 }
 
+/// Handle any user-defined mapping for passed button, modifiers and keyboard state.
+/// Returns true if there was a mapping.
+pub fn handleButtonMapping(
+    self: *Self,
+    event_code: u32,
+    modifiers: wlr.Keyboard.ModifierMask,
+    released: bool,
+) bool {
+    const modes = &server.config.modes;
+    for (modes.items[self.mode_id].button_mappings.items) |*mapping| {
+        if (mapping.event_code == event_code and std.meta.eql(mapping.modifiers, modifiers)) {
+            if (mapping.release == released) {
+                self.runCommand(mapping.command_args);
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
 /// Handle any user-defined mapping for switches
 pub fn handleSwitchMapping(
     self: *Self,
