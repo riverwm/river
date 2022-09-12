@@ -411,14 +411,11 @@ pub fn handleButtonMapping(
     self: *Self,
     event_code: u32,
     modifiers: wlr.Keyboard.ModifierMask,
-    released: bool,
 ) bool {
     const modes = &server.config.modes;
     for (modes.items[self.mode_id].button_mappings.items) |*mapping| {
-        if (mapping.event_code == event_code and std.meta.eql(mapping.modifiers, modifiers)) {
-            if (mapping.release == released) {
-                self.runCommand(mapping.command_args);
-            }
+        if (mapping.match(event_code, modifiers)) {
+            self.runCommand(mapping.command_args);
             return true;
         }
     }

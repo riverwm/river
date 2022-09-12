@@ -311,7 +311,6 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
     }
 
     if (self.handleButtonMapping(event)) {
-        // TODO eaten_event_codes
         return;
     } else if (self.surfaceAt()) |result| {
         if (result.parent == .view and self.handlePointerMapping(event, result.parent.view)) {
@@ -540,7 +539,7 @@ fn handleButtonMapping(self: *Self, event: *wlr.Pointer.event.Button) bool {
     const wlr_keyboard = self.seat.wlr_seat.getKeyboard() orelse return false;
     const modifiers = wlr_keyboard.getModifiers();
 
-    return self.seat.handleButtonMapping(event.button, modifiers, event.state == .released);
+    return self.seat.handleButtonMapping(event.button, modifiers);
 }
 
 /// Frame events are sent after regular pointer events to group multiple

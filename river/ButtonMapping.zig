@@ -26,13 +26,9 @@ event_code: u32,
 modifiers: wlr.Keyboard.ModifierMask,
 command_args: []const [:0]const u8,
 
-/// When set to true the mapping will be executed on button release rather than on press
-release: bool,
-
 pub fn init(
     event_code: u32,
     modifiers: wlr.Keyboard.ModifierMask,
-    release: bool,
     command_args: []const []const u8,
 ) !Self {
     const owned_args = try util.gpa.alloc([:0]u8, command_args.len);
@@ -44,7 +40,6 @@ pub fn init(
     return Self{
         .event_code = event_code,
         .modifiers = modifiers,
-        .release = release,
         .command_args = owned_args,
     };
 }
@@ -54,12 +49,11 @@ pub fn deinit(self: Self) void {
     util.gpa.free(self.command_args);
 }
 
-/// Compare mapping with given event code, modifiers and keyboard state
+/// Compare mapping with given event code and modifiers
 pub fn match(
     self: Self,
     event_code: u32,
     modifiers: wlr.Keyboard.ModifierMask,
-    release: bool,
 ) bool {
-    return event_code == self.event_code and std.meta.eql(modifiers, self.modifiers) and release == self.release;
+    return event_code == self.event_code and std.meta.eql(modifiers, self.modifiers);
 }

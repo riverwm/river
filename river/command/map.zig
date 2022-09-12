@@ -92,45 +92,33 @@ pub fn map(
 /// Example:
 /// map-button normal Mod4 BTN_MIDDLE toggle-float
 pub fn mapButton(
-    // seat: *Seat,
     _: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
-    const optionals = try parseOptionalArgs(args[1..]);
-    // offset caused by optional arguments
-    const offset = optionals.i;
-    if (args.len - offset < 5) return Error.NotEnoughArguments;
+    if (args.len < 5) return Error.NotEnoughArguments;
 
-    if (optionals.release and optionals.repeat) return Error.ConflictingOptions;
-
-    const mode_raw = args[1 + offset];
-    const modifiers_raw = args[2 + offset];
-    const event_code_raw = args[3 + offset];
-
-    const mode_id = try modeNameToId(mode_raw, out);
-    const modifiers = try parseModifiers(modifiers_raw, out);
-    const event_code = try parseEventCode(event_code_raw, out);
+    const mode_id = try modeNameToId(args[1], out);
+    const modifiers = try parseModifiers(args[2], out);
+    const event_code = try parseEventCode(args[3], out);
 
     const mode_mappings = &server.config.modes.items[mode_id].button_mappings;
 
     const new = try ButtonMapping.init(
         event_code,
         modifiers,
-        optionals.release,
-        args[4 + offset ..],
+        args[4..],
     );
     errdefer new.deinit();
 
-    if (buttonMappingExists(mode_mappings, modifiers, event_code, optionals.release)) |current| {
+    if (buttonMappingExists(mode_mappings, modifiers, event_code)) |current| {
         mode_mappings.items[current].deinit();
         mode_mappings.items[current] = new;
         // Warn user if they overwrote an existing button mapping using riverctl.
-        const opts = if (optionals.release) "-release " else "";
         out.* = try fmt.allocPrint(
             util.gpa,
-            "overwrote an existing button mapping: {s} {s}{s} {s}",
-            .{ mode_raw, opts, modifiers_raw, event_code_raw },
+            "overwrote an existing button mapping: {s} {s} {s}",
+            .{ args[1], args[2], args[3] },
         );
     } else {
         try mode_mappings.append(util.gpa, new);
@@ -247,10 +235,9 @@ fn buttonMappingExists(
     mappings: *std.ArrayListUnmanaged(ButtonMapping),
     modifiers: wlr.Keyboard.ModifierMask,
     event_code: u32,
-    release: bool,
 ) ?usize {
     for (mappings.items) |mapping, i| {
-        if (std.meta.eql(mapping.modifiers, modifiers) and mapping.event_code == event_code and mapping.release == release) {
+        if (mapping.match(event_code, modifiers)) {
             return i;
         }
     }
@@ -453,6 +440,25 @@ pub fn unmap(seat: *Seat, args: []const [:0]const u8, out: *?[]const u8) Error!v
     // crash if the Mapping ArrayList is reallocated, stop any currently
     // repeating mappings.
     seat.clearRepeatingMapping();
+
+    var mapping = mode_mappings.swapRemove(mapping_idx);
+    mapping.deinit();
+}
+
+/// Remove a button mapping from a given mode
+///
+/// Example:
+/// unmap-button normal Mod4 BTN_MIDDLE
+pub fn unmapButton(_: *Seat, args: []const [:0]const u8, out: *?[]const u8) Error!void {
+    if (args.len < 4) return Error.NotEnoughArguments;
+    if (args.len > 4) return Error.TooManyArguments;
+
+    const mode_id = try modeNameToId(args[1], out);
+    const modifiers = try parseModifiers(args[2], out);
+    const event_code = try parseEventCode(args[3], out);
+
+    const mode_mappings = &server.config.modes.items[mode_id].button_mappings;
+    const mapping_idx = buttonMappingExists(mode_mappings, modifiers, event_code) orelse return;
 
     var mapping = mode_mappings.swapRemove(mapping_idx);
     mapping.deinit();

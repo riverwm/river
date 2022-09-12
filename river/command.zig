@@ -86,7 +86,7 @@ const command_impls = std.ComptimeStringMap(
         .{ "toggle-fullscreen",         @import("command/toggle_fullscreen.zig").toggleFullscreen },
         .{ "toggle-view-tags",          @import("command/tags.zig").toggleViewTags },
         .{ "unmap",                     @import("command/map.zig").unmap },
-        // TODO AMC unmap-button
+        .{ "unmap-button",              @import("command/map.zig").unmapButton },
         .{ "unmap-pointer",             @import("command/map.zig").unmapPointer },
         .{ "unmap-switch",              @import("command/map.zig").unmapSwitch },
         .{ "xcursor-theme",             @import("command/xcursor_theme.zig").xcursorTheme },
