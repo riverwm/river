@@ -71,6 +71,9 @@ riverctl map-pointer normal Super BTN_LEFT move-view
 # Super + Right Mouse Button to resize views
 riverctl map-pointer normal Super BTN_RIGHT resize-view
 
+# Super + Middle Mouse Button to toggle float
+riverctl map-pointer normal Super BTN_MIDDLE toggle-float
+
 for i in $(seq 1 9)
 do
     tags=$((1 << ($i - 1)))

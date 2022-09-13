@@ -212,9 +212,10 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 	- _key_: an XKB keysym name as described above
 	- _command_: any command that may be run with riverctl
 
-*map-pointer* _mode_ _modifiers_ _button_ _action_
-	Move or resize views when _button_ and _modifiers_ are held down
-	while in the specified _mode_.
+*map-pointer* _mode_ _modifiers_ _button_ _action_|_command_
+	Move or resize views or run _command_ when _button_ and _modifiers_ are held
+	down while in the specified _mode_. The view under the cursor will be
+	focused.
 
 	- _mode_: name of the mode for which to create the mapping
 	- _modifiers_: one or more of the modifiers listed above, separated
@@ -223,6 +224,7 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 	- _action_: one of the following values:
 		- move-view
 		- resize-view
+	- _command_: any command that may be run with riverctl
 
 *map-switch* _mode_ *lid*|*tablet* _state_ _command_
 	Run _command_ when river receives a certain switch event.

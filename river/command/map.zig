@@ -130,33 +130,31 @@ pub fn mapPointer(
     out: *?[]const u8,
 ) Error!void {
     if (args.len < 5) return Error.NotEnoughArguments;
-    if (args.len > 5) return Error.TooManyArguments;
 
     const mode_id = try modeNameToId(args[1], out);
     const modifiers = try parseModifiers(args[2], out);
     const event_code = try parseEventCode(args[3], out);
 
     const action = if (mem.eql(u8, args[4], "move-view"))
-        PointerMapping.Action.move
+        PointerMapping.ActionType.move
     else if (mem.eql(u8, args[4], "resize-view"))
-        PointerMapping.Action.resize
-    else {
-        out.* = try fmt.allocPrint(
-            util.gpa,
-            "invalid pointer action {s}, must be move-view or resize-view",
-            .{args[4]},
-        );
-        return Error.Other;
-    };
+        PointerMapping.ActionType.resize
+    else
+        PointerMapping.ActionType.command;
 
-    const new = PointerMapping{
-        .event_code = event_code,
-        .modifiers = modifiers,
-        .action = action,
-    };
+    if (action != PointerMapping.ActionType.command and args.len > 5) return Error.TooManyArguments;
+
+    var new = try PointerMapping.init(
+        event_code,
+        modifiers,
+        action,
+        args[4..],
+    );
+    errdefer new.deinit();
 
     const mode_pointer_mappings = &server.config.modes.items[mode_id].pointer_mappings;
     if (pointerMappingExists(mode_pointer_mappings, modifiers, event_code)) |current| {
+        mode_pointer_mappings.items[current].deinit();
         mode_pointer_mappings.items[current] = new;
     } else {
         try mode_pointer_mappings.append(util.gpa, new);
@@ -428,5 +426,6 @@ pub fn unmapPointer(_: *Seat, args: []const [:0]const u8, out: *?[]const u8) Err
     const mode_pointer_mappings = &server.config.modes.items[mode_id].pointer_mappings;
     const mapping_idx = pointerMappingExists(mode_pointer_mappings, modifiers, event_code) orelse return;
 
-    _ = mode_pointer_mappings.swapRemove(mapping_idx);
+    var mapping = mode_pointer_mappings.swapRemove(mapping_idx);
+    mapping.deinit();
 }

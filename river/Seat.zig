@@ -434,7 +434,7 @@ pub fn handleSwitchMapping(
     }
 }
 
-fn runCommand(self: *Self, args: []const [:0]const u8) void {
+pub fn runCommand(self: *Self, args: []const [:0]const u8) void {
     var out: ?[]const u8 = null;
     defer if (out) |s| util.gpa.free(s);
     command.run(self, args, &out) catch |err| {
@@ -442,7 +442,12 @@ fn runCommand(self: *Self, args: []const [:0]const u8) void {
             command.Error.Other => out.?,
             else => command.errToMsg(err),
         };
-        std.log.scoped(.command).err("{s}: {s}", .{ args[0], failure_message });
+
+        if (args.len == 0) {
+            std.log.scoped(.command).err("{s}", .{failure_message});
+        } else {
+            std.log.scoped(.command).err("{s}: {s}", .{ args[0], failure_message });
+        }
         return;
     };
     if (out) |s| {

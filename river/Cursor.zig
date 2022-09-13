@@ -528,6 +528,10 @@ fn handlePointerMapping(self: *Self, event: *wlr.Pointer.event.Button, view: *Vi
             switch (mapping.action) {
                 .move => if (!fullscreen) self.enterMode(.move, view),
                 .resize => if (!fullscreen) self.enterMode(.resize, view),
+                .command => |args| {
+                    self.seat.focus(view);
+                    self.seat.runCommand(args);
+                },
             }
             break true;
         }
