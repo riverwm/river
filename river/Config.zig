@@ -179,18 +179,19 @@ pub fn getSpawnTagsFilter(self: Self, view: *View) u32 {
     const tags_curr = view.output.current.tags;
     const tags_mask = view.output.spawn_tagmask;
     const tags = tags_curr & tags_mask;
-    
+
     if (view.getAppId()) |app_id| {
-        if(self.spawn_tags_app_ids.contains(std.mem.span(app_id))) {
+        if (self.spawn_tags_app_ids.contains(std.mem.span(app_id))) {
             return self.spawn_tags_app_ids.get(std.mem.span(app_id)) orelse tags;
         }
     }
 
     if (view.getTitle()) |title| {
-        if(self.spawn_tags_titles.contains(std.mem.span(title))) {
+        if (self.spawn_tags_titles.contains(std.mem.span(title))) {
             return self.spawn_tags_titles.get(std.mem.span(title)) orelse tags;
         }
     }
+
     if (tags != 0) {
         return tags;
     } else {
