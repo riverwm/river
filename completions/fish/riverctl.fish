@@ -62,9 +62,10 @@ complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'set-repeat'     
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'set-cursor-warp'        -d 'Set the cursor warp mode.'
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'xcursor-theme'          -d 'Set the xcursor theme'
 # Keyboardgroups
-complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'keyboard-group-create'       -d 'Create a keyboard group.'
-complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'keyboard-group-destroy'      -d 'Destroy a keyboard group.'
-complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'keyboard-group-add-keyboard' -d 'Add a keyboard to a keyboard group.'
+complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'keyboard-group-create'  -d 'Create a keyboard group.'
+complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'keyboard-group-destroy' -d 'Destroy a keyboard group.'
+complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'keyboard-group-add'     -d 'Add a keyboard to a keyboard group.'
+complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'keyboard-group-remove'  -d 'Remove a keyboard from a keyboard group.'
 
 # Subcommands
 complete -c riverctl -x -n '__fish_seen_subcommand_from focus-output'         -a 'next previous'

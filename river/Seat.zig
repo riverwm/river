@@ -32,6 +32,7 @@ const DragIcon = @import("DragIcon.zig");
 const InputDevice = @import("InputDevice.zig");
 const InputManager = @import("InputManager.zig");
 const Keyboard = @import("Keyboard.zig");
+const KeyboardGroup = @import("KeyboardGroup.zig");
 const KeycodeSet = @import("KeycodeSet.zig");
 const LayerSurface = @import("LayerSurface.zig");
 const Mapping = @import("Mapping.zig");
@@ -41,7 +42,6 @@ const Switch = @import("Switch.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
-const KeyboardGroup = @import("KeyboardGroup.zig");
 
 const log = std.log.scoped(.seat);
 const PointerConstraint = @import("PointerConstraint.zig");
@@ -127,6 +127,10 @@ pub fn deinit(self: *Self) void {
 
     self.cursor.deinit();
     self.mapping_repeat_timer.remove();
+
+    while (self.keyboard_groups.first) |node| {
+        node.data.destroy();
+    }
 
     while (self.focus_stack.first) |node| {
         self.focus_stack.remove(node);
@@ -478,18 +482,7 @@ fn tryAddDevice(self: *Self, wlr_device: *wlr.InputDevice) !void {
 
             try keyboard.init(self, wlr_device);
 
-            // Add this keyboard to a keyboard group, if the group contains a
-            // matching identifier and if the keyboard isn't a group itself.
-            if (keyboard.provider == .device) {
-                var it = self.keyboard_groups.first;
-                while (it) |node| : (it = node.next) {
-                    if (node.data.containsIdentifier(keyboard.provider.device.identifier)) {
-                        try node.data.addKeyboard(keyboard);
-                        break;
-                    }
-                }
-            }
-
+            self.wlr_seat.setKeyboard(keyboard.device.wlr_device);
             if (self.wlr_seat.keyboard_state.focused_surface) |wlr_surface| {
                 self.wlr_seat.keyboardNotifyClearFocus();
                 self.keyboardNotifyEnter(wlr_surface);
@@ -522,7 +515,6 @@ pub fn updateCapabilities(self: *Self) void {
 
     var it = server.input_manager.devices.iterator(.forward);
     while (it.next()) |device| {
-        log.debug(">>>> '{s}'", .{device.identifier});
         if (device.seat == self) {
             switch (device.wlr_device.type) {
                 .keyboard => capabilities.keyboard = true,

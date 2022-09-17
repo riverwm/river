@@ -89,9 +89,10 @@ const command_impls = std.ComptimeStringMap(
         .{ "unmap-switch",              @import("command/map.zig").unmapSwitch },
         .{ "xcursor-theme",             @import("command/xcursor_theme.zig").xcursorTheme },
         .{ "zoom",                      @import("command/zoom.zig").zoom },
-        .{ "keyboard-group-create",     @import("command/keyboard_group.zig").keyboardGroupCreate},
-        .{ "keyboard-group-destroy",    @import("command/keyboard_group.zig").keyboardGroupDestroy},
-        .{ "keyboard-group-add-keyboard", @import("command/keyboard_group.zig").keyboardGroupAddIdentifier},
+        .{ "keyboard-group-create",     @import("command/keyboard_group.zig").keyboardGroupCreate },
+        .{ "keyboard-group-destroy",    @import("command/keyboard_group.zig").keyboardGroupDestroy },
+        .{ "keyboard-group-add",        @import("command/keyboard_group.zig").keyboardGroupAdd },
+        .{ "keyboard-group-remove",     @import("command/keyboard_group.zig").keyboardGroupRemove },
     },
 );
 // zig fmt: on

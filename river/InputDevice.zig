@@ -50,6 +50,12 @@ pub fn init(device: *InputDevice, seat: *Seat, wlr_device: *wlr.InputDevice) !vo
         else => @tagName(wlr_device.type),
     };
 
+    // wlroots 0.15 leaves wlr_input_device->name NULL for keyboard groups.
+    // This wart has been cleaned up in 0.16, so just work around it until that is released.
+    // TODO(wlroots): Remove this hack
+
+    const name = if (isKeyboardGroup(wlr_device)) "wlr_keyboard_group" else wlr_device.name;
+
     const identifier = try std.fmt.allocPrint(
         util.gpa,
         "{s}-{}-{}-{s}",
@@ -57,7 +63,7 @@ pub fn init(device: *InputDevice, seat: *Seat, wlr_device: *wlr.InputDevice) !vo
             device_type,
             wlr_device.vendor,
             wlr_device.product,
-            mem.trim(u8, mem.span(wlr_device.name), &ascii.spaces),
+            mem.trim(u8, mem.span(name), &ascii.spaces),
         },
     );
     errdefer util.gpa.free(identifier);
@@ -77,15 +83,19 @@ pub fn init(device: *InputDevice, seat: *Seat, wlr_device: *wlr.InputDevice) !vo
 
     wlr_device.events.destroy.add(&device.destroy);
 
-    // Apply any matching input device configuration.
-    for (server.input_manager.configs.items) |*input_config| {
-        if (mem.eql(u8, input_config.identifier, identifier)) {
-            input_config.apply(device);
+    // Keyboard groups are implemented as "virtual" input devices which we don't want to expose
+    // in riverctl list-inputs as they can't be configured.
+    if (!isKeyboardGroup(wlr_device)) {
+        // Apply any matching input device configuration.
+        for (server.input_manager.configs.items) |*input_config| {
+            if (mem.eql(u8, input_config.identifier, identifier)) {
+                input_config.apply(device);
+            }
         }
-    }
 
-    server.input_manager.devices.append(device);
-    seat.updateCapabilities();
+        server.input_manager.devices.append(device);
+        seat.updateCapabilities();
+    }
 
     log.debug("new input device: {s}", .{identifier});
 }
@@ -95,10 +105,17 @@ pub fn deinit(device: *InputDevice) void {
 
     util.gpa.free(device.identifier);
 
-    device.link.remove();
-    device.seat.updateCapabilities();
+    if (!isKeyboardGroup(device.wlr_device)) {
+        device.link.remove();
+        device.seat.updateCapabilities();
+    }
 
     device.* = undefined;
+}
+
+fn isKeyboardGroup(wlr_device: *wlr.InputDevice) bool {
+    return wlr_device.type == .keyboard and
+        wlr.KeyboardGroup.fromKeyboard(wlr_device.device.keyboard) != null;
 }
 
 fn handleDestroy(listener: *wl.Listener(*wlr.InputDevice), _: *wlr.InputDevice) void {
@@ -108,7 +125,7 @@ fn handleDestroy(listener: *wl.Listener(*wlr.InputDevice), _: *wlr.InputDevice) 
 
     switch (device.wlr_device.type) {
         .keyboard => {
-            const keyboard = @fieldParentPtr(Keyboard, "provider", @ptrCast(*Keyboard.Provider, device));
+            const keyboard = @fieldParentPtr(Keyboard, "device", device);
             keyboard.deinit();
             util.gpa.destroy(keyboard);
         },

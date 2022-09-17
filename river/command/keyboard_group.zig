@@ -32,19 +32,13 @@ pub fn keyboardGroupCreate(
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
 
-    var it = seat.keyboard_groups.first;
-    while (it) |node| : (it = node.next) {
-        if (mem.eql(u8, node.data.name, args[1])) {
-            const msg = try util.gpa.dupe(u8, "error: failed to create keybaord group: group of same name already exists\n");
-            out.* = msg;
-            return;
-        }
+    if (keyboardGroupFromName(seat, args[1]) != null) {
+        const msg = try util.gpa.dupe(u8, "error: failed to create keybaord group: group of same name already exists\n");
+        out.* = msg;
+        return;
     }
 
-    const node = try util.gpa.create(std.TailQueue(KeyboardGroup).Node);
-    errdefer util.gpa.destroy(node);
-    try node.data.init(seat, args[1]);
-    seat.keyboard_groups.append(node);
+    try KeyboardGroup.create(seat, args[1]);
 }
 
 pub fn keyboardGroupDestroy(
@@ -54,18 +48,15 @@ pub fn keyboardGroupDestroy(
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
-    const kg = keyboardGroupFromName(seat, args[1]) orelse {
+    const group = keyboardGroupFromName(seat, args[1]) orelse {
         const msg = try util.gpa.dupe(u8, "error: no keyboard group with that name exists\n");
         out.* = msg;
         return;
     };
-    kg.deinit();
-    const node = @fieldParentPtr(std.TailQueue(KeyboardGroup).Node, "data", kg);
-    seat.keyboard_groups.remove(node);
-    util.gpa.destroy(node);
+    group.destroy();
 }
 
-pub fn keyboardGroupAddIdentifier(
+pub fn keyboardGroupAdd(
     seat: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
@@ -73,12 +64,28 @@ pub fn keyboardGroupAddIdentifier(
     if (args.len < 3) return Error.NotEnoughArguments;
     if (args.len > 3) return Error.TooManyArguments;
 
-    const kg = keyboardGroupFromName(seat, args[1]) orelse {
+    const group = keyboardGroupFromName(seat, args[1]) orelse {
         const msg = try util.gpa.dupe(u8, "error: no keyboard group with that name exists\n");
         out.* = msg;
         return;
     };
-    try kg.addKeyboardIdentifier(args[2]);
+    try group.addIdentifier(args[2]);
+}
+
+pub fn keyboardGroupRemove(
+    seat: *Seat,
+    args: []const [:0]const u8,
+    out: *?[]const u8,
+) Error!void {
+    if (args.len < 3) return Error.NotEnoughArguments;
+    if (args.len > 3) return Error.TooManyArguments;
+
+    const group = keyboardGroupFromName(seat, args[1]) orelse {
+        const msg = try util.gpa.dupe(u8, "error: no keyboard group with that name exists\n");
+        out.* = msg;
+        return;
+    };
+    try group.removeIdentifier(args[2]);
 }
 
 fn keyboardGroupFromName(seat: *Seat, name: []const u8) ?*KeyboardGroup {

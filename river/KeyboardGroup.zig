@@ -14,12 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const Self = @This();
+const KeyboardGroup = @This();
 
 const std = @import("std");
-const heap = std.heap;
+const assert = std.debug.assert;
 const mem = std.mem;
-const debug = std.debug;
+
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 const xkb = @import("xkbcommon");
@@ -33,81 +33,95 @@ const Seat = @import("Seat.zig");
 const Keyboard = @import("Keyboard.zig");
 
 seat: *Seat,
-group: *wlr.KeyboardGroup,
+wlr_group: *wlr.KeyboardGroup,
 name: []const u8,
-keyboard_identifiers: std.ArrayListUnmanaged([]const u8) = .{},
+identifiers: std.StringHashMapUnmanaged(void) = .{},
 
-pub fn init(self: *Self, seat: *Seat, _name: []const u8) !void {
-    log.debug("new keyboard group: '{s}'", .{_name});
+pub fn create(seat: *Seat, name: []const u8) !void {
+    log.debug("new keyboard group: '{s}'", .{name});
 
-    const group = try wlr.KeyboardGroup.create();
-    errdefer group.destroy();
-    group.data = @ptrToInt(self);
+    const node = try util.gpa.create(std.TailQueue(KeyboardGroup).Node);
+    errdefer util.gpa.destroy(node);
 
-    const name = try util.gpa.dupe(u8, _name);
-    errdefer util.gpa.free(name);
+    const wlr_group = try wlr.KeyboardGroup.create();
+    errdefer wlr_group.destroy();
 
-    self.* = .{
-        .group = group,
-        .name = name,
+    const owned_name = try util.gpa.dupe(u8, name);
+    errdefer util.gpa.free(owned_name);
+
+    node.data = .{
+        .wlr_group = wlr_group,
+        .name = owned_name,
         .seat = seat,
     };
 
-    seat.addDevice(self.group.input_device);
-    seat.wlr_seat.setKeyboard(self.group.input_device);
+    seat.addDevice(wlr_group.input_device);
+    seat.keyboard_groups.append(node);
 }
 
-pub fn deinit(self: *Self) void {
-    log.debug("removing keyboard group: '{s}'", .{self.name});
+pub fn destroy(group: *KeyboardGroup) void {
+    log.debug("destroying keyboard group: '{s}'", .{group.name});
 
-    util.gpa.free(self.name);
-    for (self.keyboard_identifiers.items) |id| util.gpa.free(id);
-    self.keyboard_identifiers.deinit(util.gpa);
+    util.gpa.free(group.name);
+    {
+        var it = group.identifiers.keyIterator();
+        while (it.next()) |id| util.gpa.free(id.*);
+    }
+    group.identifiers.deinit(util.gpa);
 
-    // wlroots automatically removes all keyboards from the group.
-    self.group.destroy();
+    group.wlr_group.destroy();
+
+    const node = @fieldParentPtr(std.TailQueue(KeyboardGroup).Node, "data", group);
+    group.seat.keyboard_groups.remove(node);
+    util.gpa.destroy(node);
 }
 
-pub fn addKeyboardIdentifier(self: *Self, _id: []const u8) !void {
-    if (containsIdentifier(self, _id)) return;
-    log.debug("keyboard group '{s}' adding identifier: '{s}'", .{ self.name, _id });
+pub fn addIdentifier(group: *KeyboardGroup, new_id: []const u8) !void {
+    if (group.identifiers.contains(new_id)) return;
 
-    const id = try util.gpa.dupe(u8, _id);
-    errdefer util.gpa.free(id);
-    try self.keyboard_identifiers.append(util.gpa, id);
+    log.debug("keyboard group '{s}' adding identifier: '{s}'", .{ group.name, new_id });
 
-    // Add any existing matching keyboard to group.
+    const owned_id = try util.gpa.dupe(u8, new_id);
+    errdefer util.gpa.free(owned_id);
+
+    try group.identifiers.put(util.gpa, owned_id, {});
+
+    // Add any existing matching keyboards to the group.
     var it = server.input_manager.devices.iterator(.forward);
     while (it.next()) |device| {
-        if (device.seat != self.seat) continue;
+        if (device.seat != group.seat) continue;
         if (device.wlr_device.type != .keyboard) continue;
 
-        if (mem.eql(u8, _id, device.identifier)) {
+        if (mem.eql(u8, new_id, device.identifier)) {
             log.debug("found existing matching keyboard; adding to group", .{});
 
             const wlr_keyboard = device.wlr_device.device.keyboard;
-            if (!self.group.addKeyboard(wlr_keyboard)) continue; // wlroots logs its own errors.
+            if (!group.wlr_group.addKeyboard(wlr_keyboard)) {
+                // wlroots logs an error message to explain why this failed.
+                continue;
+            }
         }
 
         // Continue, because we may have more than one device with the exact
-        // same identifier. That is in fact the reason for the keyboard group
+        // same identifier. That is in fact one reason for the keyboard group
         // feature to exist in the first place.
     }
 }
 
-pub fn containsIdentifier(self: *Self, id: []const u8) bool {
-    for (self.keyboard_identifiers.items) |ki| {
-        if (mem.eql(u8, ki, id)) return true;
+pub fn removeIdentifier(group: *KeyboardGroup, id: []const u8) !void {
+    if (group.identifiers.fetchRemove(id)) |kv| {
+        util.gpa.free(kv.key);
     }
-    return false;
-}
 
-pub fn addKeyboard(self: *Self, keyboard: *Keyboard) !void {
-    debug.assert(keyboard.provider != .group);
-    const wlr_keyboard = keyboard.provider.device.wlr_device.device.keyboard;
-    log.debug("keyboard group '{s}' adding keyboard: '{s}'", .{ self.name, keyboard.provider.device.identifier });
-    if (!self.group.addKeyboard(wlr_keyboard)) {
-        log.err("failed to add keyboard to group", .{});
-        return error.OutOfMemory;
+    var it = server.input_manager.devices.iterator(.forward);
+    while (it.next()) |device| {
+        if (device.seat != group.seat) continue;
+        if (device.wlr_device.type != .keyboard) continue;
+
+        if (mem.eql(u8, device.identifier, id)) {
+            const wlr_keyboard = device.wlr_device.device.keyboard;
+            assert(wlr_keyboard.group == group.wlr_group);
+            group.wlr_group.removeKeyboard(wlr_keyboard);
+        }
     }
 }

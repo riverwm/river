@@ -5,7 +5,8 @@ function __riverctl_completion ()
 		OPTS=" \
 			keyboard-group-create \
 			keyboard-group-destroy \
-			keyboard-group-add-keyboard \
+			keyboard-group-add \
+			keyboard-group-remove \
 			csd-filter-add \
 			exit \
 			float-filter-add \
