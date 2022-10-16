@@ -89,6 +89,7 @@ const command_impls = std.ComptimeStringMap(
         .{ "unmap-switch",              @import("command/map.zig").unmapSwitch },
         .{ "xcursor-theme",             @import("command/xcursor_theme.zig").xcursorTheme },
         .{ "zoom",                      @import("command/zoom.zig").zoom },
+        .{ "keyboard-layout",           @import("command/keyboard.zig").keyboardLayout },
         .{ "keyboard-group-create",     @import("command/keyboard_group.zig").keyboardGroupCreate },
         .{ "keyboard-group-destroy",    @import("command/keyboard_group.zig").keyboardGroupDestroy },
         .{ "keyboard-group-add",        @import("command/keyboard_group.zig").keyboardGroupAdd },

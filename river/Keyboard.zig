@@ -51,7 +51,8 @@ pub fn init(self: *Self, seat: *Seat, wlr_device: *wlr.InputDevice) !void {
 
     // Passing null here indicates that defaults from libxkbcommon and
     // its XKB_DEFAULT_LAYOUT, XKB_DEFAULT_OPTIONS, etc. should be used.
-    const keymap = xkb.Keymap.newFromNames(context, null, .no_flags) orelse return error.XkbKeymapFailed;
+    const layout_config = if (server.config.keyboard_layout) |kl| &kl else null;
+    const keymap = xkb.Keymap.newFromNames(context, layout_config, .no_flags) orelse return error.XkbKeymapFailed;
     defer keymap.unref();
 
     const wlr_keyboard = self.device.wlr_device.toKeyboard();

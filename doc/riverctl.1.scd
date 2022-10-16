@@ -334,6 +334,11 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 *list-input-configs*
 	List all input configurations.
 
+*keyboard-layout* _layout_ [-variant _variant_] [-model _model_] [-options _options_] [-rules _rules_]
+	Set the XKB layout for all keyboards. All values other than the layout
+	name are optional. XKB will fill in unspecified values based on
+	heuristics and the environment. Duplicate flags are not allowed.
+
 *keyboard-group-create* _group_name_
 	Create a keyboard group. A keyboard group collects multiple keyboards in
 	a single logical keyboard. This means that all state, like the active

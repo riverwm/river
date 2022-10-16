@@ -17,6 +17,8 @@
 const Self = @This();
 
 const std = @import("std");
+const mem = std.mem;
+const xkb = @import("xkbcommon");
 
 const util = @import("util.zig");
 
@@ -100,6 +102,9 @@ cursor_hide_timeout: u31 = 0,
 /// Hide the cursor while typing
 cursor_hide_when_typing: HideCursorWhenTypingMode = .disabled,
 
+/// Keyboard layout configuration
+keyboard_layout: ?xkb.RuleNames = null,
+
 pub fn init() !Self {
     var self = Self{
         .mode_to_id = std.StringHashMap(u32).init(util.gpa),
@@ -128,6 +133,14 @@ pub fn deinit(self: *Self) void {
     self.mode_to_id.deinit();
     for (self.modes.items) |*mode| mode.deinit();
     self.modes.deinit(util.gpa);
+
+    if (self.keyboard_layout) |kl| {
+        if (kl.rules) |s| util.gpa.free(mem.span(s));
+        if (kl.model) |s| util.gpa.free(mem.span(s));
+        if (kl.layout) |s| util.gpa.free(mem.span(s));
+        if (kl.variant) |s| util.gpa.free(mem.span(s));
+        if (kl.options) |s| util.gpa.free(mem.span(s));
+    }
 
     {
         var it = self.float_filter_app_ids.keyIterator();
