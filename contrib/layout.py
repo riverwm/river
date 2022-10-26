@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# Fibonacci sprial layout for river, implemented in simple python. Reading this
+# Fibonacci spiral layout for river, implemented in simple python. Reading this
 # code should help you get a basic understanding of how to use river-layout to
 # create a basic layout generator.
 #
@@ -10,6 +10,10 @@
 # A: For simple layouts, you really only need to care about what's in the
 #    layout_handle_layout_demand() function. And the rest isn't as complicated
 #    as it looks.
+#
+# Q: The script runs but nothing happens! How can I see this layout?
+# A: Once started, to set this layout as default use the command:
+#    riverctl default-layout layout.py
 
 import mmap
 import time
