@@ -318,7 +318,7 @@ pub fn startTransaction(self: *Self) void {
     }
 }
 
-fn handleTransactionTimeout(self: *Self) callconv(.C) c_int {
+fn handleTransactionTimeout(self: *Self) c_int {
     std.log.scoped(.transaction).err("timeout occurred, some imperfect frames may be shown", .{});
 
     self.pending_configures = 0;

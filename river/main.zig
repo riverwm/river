@@ -99,12 +99,11 @@ pub fn main() anyerror!void {
     // Ignore SIGPIPE so we don't get killed when writing to a socket that
     // has had its read end closed by another process.
     const sig_ign = os.Sigaction{
-        // TODO(zig): Remove this casting after https://github.com/ziglang/zig/pull/12410
-        .handler = .{ .handler = @intToPtr(os.Sigaction.handler_fn, @ptrToInt(os.SIG.IGN)) },
+        .handler = .{ .handler = os.SIG.IGN },
         .mask = os.empty_sigset,
         .flags = 0,
     };
-    os.sigaction(os.SIG.PIPE, &sig_ign, null);
+    try os.sigaction(os.SIG.PIPE, &sig_ign, null);
 
     std.log.info("initializing server", .{});
     try server.init();

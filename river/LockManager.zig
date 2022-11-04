@@ -122,7 +122,7 @@ fn handleLock(listener: *wl.Listener(*wlr.SessionLockV1), lock: *wlr.SessionLock
     lock.events.destroy.add(&manager.destroy);
 }
 
-fn handleLockSurfacesTimeout(manager: *LockManager) callconv(.C) c_int {
+fn handleLockSurfacesTimeout(manager: *LockManager) c_int {
     log.err("waiting for lock surfaces timed out, imperfect frames may be shown", .{});
 
     assert(manager.state == .waiting_for_lock_surfaces);

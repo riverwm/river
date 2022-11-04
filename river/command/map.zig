@@ -242,7 +242,7 @@ fn pointerMappingExists(
 }
 
 fn parseEventCode(name: [:0]const u8, out: *?[]const u8) !u32 {
-    const event_code = c.libevdev_event_code_from_name(c.EV_KEY, name);
+    const event_code = c.libevdev_event_code_from_name(c.EV_KEY, name.ptr);
     if (event_code < 1) {
         out.* = try fmt.allocPrint(util.gpa, "unknown button {s}", .{name});
         return Error.Other;

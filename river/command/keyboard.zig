@@ -44,7 +44,7 @@ pub fn keyboardLayout(
 
     const rule_names = xkb.RuleNames{
         .layout = result.args[0],
-        // TODO(zig) these should coerce without this hack with the selfhosted compiler.
+        // TODO(zig) these should eventually coerce without this hack.
         .rules = if (result.flags.rules) |s| s else null,
         .model = if (result.flags.model) |s| s else null,
         .variant = if (result.flags.variant) |s| s else null,

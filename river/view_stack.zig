@@ -161,7 +161,7 @@ pub fn ViewStack(comptime T: type) type {
                 it: ?*Node,
                 dir: Direction,
                 context: Context,
-                filter: fn (*View, Context) bool,
+                filter: *const fn (*View, Context) bool,
 
                 /// Returns the next node in iteration order which passes the
                 /// filter, or null if done.
@@ -184,7 +184,7 @@ pub fn ViewStack(comptime T: type) type {
             start: ?*Node,
             dir: Direction,
             context: anytype,
-            filter: fn (*View, @TypeOf(context)) bool,
+            filter: *const fn (*View, @TypeOf(context)) bool,
         ) Iter(@TypeOf(context)) {
             return .{ .it = start, .dir = dir, .context = context, .filter = filter };
         }

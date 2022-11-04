@@ -170,15 +170,14 @@ pub fn start(self: Self) !void {
     const socket = try self.wl_server.addSocketAuto(&buf);
     try self.backend.start();
     // TODO: don't use libc's setenv
-    if (c.setenv("WAYLAND_DISPLAY", socket, 1) < 0) return error.SetenvError;
+    if (c.setenv("WAYLAND_DISPLAY", socket.ptr, 1) < 0) return error.SetenvError;
     if (build_options.xwayland) {
         if (c.setenv("DISPLAY", self.xwayland.display_name, 1) < 0) return error.SetenvError;
     }
 }
 
 /// Handle SIGINT and SIGTERM by gracefully stopping the server
-fn terminate(signal: c_int, wl_server: *wl.Server) callconv(.C) c_int {
-    _ = signal;
+fn terminate(_: c_int, wl_server: *wl.Server) c_int {
     wl_server.terminate();
     return 0;
 }
@@ -248,7 +247,7 @@ fn handleNewXwaylandSurface(listener: *wl.Listener(*wlr.XwaylandSurface), xwayla
     const self = @fieldParentPtr(Self, "new_xwayland_surface", listener);
 
     log.debug(
-        "new xwayland surface: title='{s}', class='{s}', override redirect={}",
+        "new xwayland surface: title='{?s}', class='{?s}', override redirect={}",
         .{ xwayland_surface.title, xwayland_surface.class, xwayland_surface.override_redirect },
     );
 

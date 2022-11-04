@@ -141,7 +141,7 @@ pub fn build(b: *zbs.Builder) !void {
         riverctl.addPackagePath("flags", "common/flags.zig");
         riverctl.addPackage(.{
             .name = "wayland",
-            .path = .{ .generated = &scanner.result },
+            .source = .{ .generated = &scanner.result },
         });
         riverctl.linkLibC();
         riverctl.linkSystemLibrary("wayland-client");
@@ -163,7 +163,7 @@ pub fn build(b: *zbs.Builder) !void {
         rivertile.addPackagePath("flags", "common/flags.zig");
         rivertile.addPackage(.{
             .name = "wayland",
-            .path = .{ .generated = &scanner.result },
+            .source = .{ .generated = &scanner.result },
         });
         rivertile.linkLibC();
         rivertile.linkSystemLibrary("wayland-client");
@@ -229,19 +229,19 @@ pub fn build(b: *zbs.Builder) !void {
 fn addServerDeps(exe: *zbs.LibExeObjStep, scanner: *ScanProtocolsStep) void {
     const wayland = zbs.Pkg{
         .name = "wayland",
-        .path = .{ .generated = &scanner.result },
+        .source = .{ .generated = &scanner.result },
     };
     const xkbcommon = zbs.Pkg{
         .name = "xkbcommon",
-        .path = .{ .path = "deps/zig-xkbcommon/src/xkbcommon.zig" },
+        .source = .{ .path = "deps/zig-xkbcommon/src/xkbcommon.zig" },
     };
     const pixman = zbs.Pkg{
         .name = "pixman",
-        .path = .{ .path = "deps/zig-pixman/pixman.zig" },
+        .source = .{ .path = "deps/zig-pixman/pixman.zig" },
     };
     const wlroots = zbs.Pkg{
         .name = "wlroots",
-        .path = .{ .path = "deps/zig-wlroots/src/wlroots.zig" },
+        .source = .{ .path = "deps/zig-wlroots/src/wlroots.zig" },
         .dependencies = &[_]zbs.Pkg{ wayland, xkbcommon, pixman },
     };
 

@@ -50,7 +50,7 @@ fn handleServerDestroy(listener: *wl.Listener(*wl.Server), _: *wl.Server) void {
     self.global.destroy();
 }
 
-fn bind(client: *wl.Client, _: ?*anyopaque, version: u32, id: u32) callconv(.C) void {
+fn bind(client: *wl.Client, _: ?*anyopaque, version: u32, id: u32) void {
     const status_manager = zriver.StatusManagerV1.create(client, version, id) catch {
         client.postNoMemory();
         log.err("out of memory", .{});

@@ -31,7 +31,7 @@ const Output = @import("Output.zig");
 const Seat = @import("Seat.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const XdgToplevel = @import("XdgToplevel.zig");
-const XwaylandView = if (build_options.xwayland) @import("XwaylandView.zig") else @import("VoidView.zig");
+const XwaylandView = @import("XwaylandView.zig");
 
 const log = std.log.scoped(.view);
 
@@ -44,7 +44,7 @@ pub const Constraints = struct {
 
 const Impl = union(enum) {
     xdg_toplevel: XdgToplevel,
-    xwayland_view: XwaylandView,
+    xwayland_view: if (build_options.xwayland) XwaylandView else noreturn,
 };
 
 const State = struct {
@@ -204,7 +204,11 @@ pub fn needsConfigure(self: Self) bool {
 pub fn configure(self: *Self) void {
     switch (self.impl) {
         .xdg_toplevel => |*xdg_toplevel| xdg_toplevel.configure(),
-        .xwayland_view => |*xwayland_view| xwayland_view.configure(),
+        .xwayland_view => |*xwayland_view| {
+            // TODO(zig): remove this uneeded if statement
+            // https://github.com/ziglang/zig/issues/13655
+            if (build_options.xwayland) xwayland_view.configure();
+        },
     }
 }
 
@@ -237,7 +241,7 @@ fn saveBuffersIterator(
     surface_x: c_int,
     surface_y: c_int,
     saved_buffers: *std.ArrayListUnmanaged(SavedBuffer),
-) callconv(.C) void {
+) void {
     if (surface.buffer) |buffer| {
         var source_box: wlr.FBox = undefined;
         surface.getBufferSourceBox(&source_box);
@@ -320,7 +324,7 @@ fn sendEnter(self: *Self, output: *Output) void {
     self.forEachSurface(*wlr.Output, sendEnterIterator, output.wlr_output);
 }
 
-fn sendEnterIterator(surface: *wlr.Surface, _: c_int, _: c_int, wlr_output: *wlr.Output) callconv(.C) void {
+fn sendEnterIterator(surface: *wlr.Surface, _: c_int, _: c_int, wlr_output: *wlr.Output) void {
     surface.sendEnter(wlr_output);
 }
 
@@ -328,7 +332,7 @@ fn sendLeave(self: *Self, output: *Output) void {
     self.forEachSurface(*wlr.Output, sendLeaveIterator, output.wlr_output);
 }
 
-fn sendLeaveIterator(surface: *wlr.Surface, _: c_int, _: c_int, wlr_output: *wlr.Output) callconv(.C) void {
+fn sendLeaveIterator(surface: *wlr.Surface, _: c_int, _: c_int, wlr_output: *wlr.Output) void {
     surface.sendLeave(wlr_output);
 }
 
@@ -351,7 +355,11 @@ fn setFullscreen(self: *Self, fullscreen: bool) void {
     if (self.foreign_toplevel_handle) |handle| handle.setFullscreen(fullscreen);
     switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.setFullscreen(fullscreen),
-        .xwayland_view => |*xwayland_view| xwayland_view.setFullscreen(fullscreen),
+        .xwayland_view => |*xwayland_view| {
+            // TODO(zig): remove this uneeded if statement
+            // https://github.com/ziglang/zig/issues/13655
+            if (build_options.xwayland) xwayland_view.setFullscreen(fullscreen);
+        },
     }
 }
 
@@ -366,7 +374,7 @@ pub fn setResizing(self: Self, resizing: bool) void {
 pub inline fn forEachSurface(
     self: Self,
     comptime T: type,
-    iterator: fn (surface: *wlr.Surface, sx: c_int, sy: c_int, data: T) callconv(.C) void,
+    comptime iterator: fn (surface: *wlr.Surface, sx: c_int, sy: c_int, data: T) void,
     user_data: T,
 ) void {
     switch (self.impl) {
@@ -479,7 +487,7 @@ pub fn shouldTrackConfigure(self: Self) bool {
 
 /// Called by the impl when the surface is ready to be displayed
 pub fn map(self: *Self) !void {
-    log.debug("view '{s}' mapped", .{self.getTitle()});
+    log.debug("view '{?s}' mapped", .{self.getTitle()});
 
     {
         assert(self.foreign_toplevel_handle == null);
@@ -515,7 +523,7 @@ pub fn map(self: *Self) !void {
 
 /// Called by the impl when the surface will no longer be displayed
 pub fn unmap(self: *Self) void {
-    log.debug("view '{s}' unmapped", .{self.getTitle()});
+    log.debug("view '{?s}' unmapped", .{self.getTitle()});
 
     if (self.saved_buffers.items.len == 0) self.saveBuffers();
 

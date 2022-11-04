@@ -151,7 +151,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
         return;
     }
 
-    if (self.wlr_layer_surface.current.committed != 0) {
+    if (@bitCast(u32, self.wlr_layer_surface.current.committed) != 0) {
         // If the layer changed, move the LayerSurface to the proper list
         if (self.wlr_layer_surface.current.layer != self.layer) {
             const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);

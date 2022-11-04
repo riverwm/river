@@ -49,7 +49,7 @@ pub fn listInputs(
         if (prev) try input_list.appendSlice("\n");
         prev = true;
 
-        try writer.print("{s}\n\tconfigured: {s}\n", .{
+        try writer.print("{s}\n\tconfigured: {}\n", .{
             device.identifier,
             configured,
         });
@@ -110,7 +110,7 @@ pub fn listInputConfigs(
             try writer.print("\tpointer-accel: {d}\n", .{pointer_accel.value});
         }
         if (input_config.scroll_method) |scroll_method| {
-            try writer.print("\tscroll-method: {s}\n", .{scroll_method});
+            try writer.print("\tscroll-method: {s}\n", .{@tagName(scroll_method)});
         }
         if (input_config.scroll_button) |scroll_button| {
             try writer.print("\tscroll-button: {s}\n", .{
@@ -195,7 +195,7 @@ pub fn input(
         input_config.scroll_method = meta.stringToEnum(InputConfig.ScrollMethod, args[3]) orelse
             return Error.UnknownOption;
     } else if (mem.eql(u8, "scroll-button", args[2])) {
-        const ret = c.libevdev_event_code_from_name(c.EV_KEY, args[3]);
+        const ret = c.libevdev_event_code_from_name(c.EV_KEY, args[3].ptr);
         if (ret < 1) return Error.InvalidButton;
         input_config.scroll_button = InputConfig.ScrollButton{ .button = @intCast(u32, ret) };
     } else {

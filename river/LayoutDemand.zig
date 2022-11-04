@@ -66,7 +66,7 @@ pub fn deinit(self: *const Self) void {
 
 /// Destroy the LayoutDemand on timeout.
 /// All further responses to the event will simply be ignored.
-fn handleTimeout(layout: *Layout) callconv(.C) c_int {
+fn handleTimeout(layout: *Layout) c_int {
     log.info(
         "layout demand for layout '{s}' on output '{s}' timed out",
         .{ layout.namespace, layout.output.wlr_output.name },

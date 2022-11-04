@@ -37,11 +37,11 @@ tasks:
       sudo ninja -C build/ install
       cd ..
 
-      wget -nv https://ziglang.org/download/0.9.1/zig-linux-x86_64-0.9.1.tar.xz
+      wget -nv https://ziglang.org/download/0.10.0/zig-linux-x86_64-0.10.0.tar.xz
       # Remove a lot of useless lines from tar output.
-      tar -xvf zig-linux-x86_64-0.9.1.tar.xz 1>/dev/null
-      sudo mv zig-linux-x86_64-0.9.1/zig /usr/bin/
-      sudo mv zig-linux-x86_64-0.9.1/lib /usr/lib/zig
+      tar -xvf zig-linux-x86_64-0.10.0.tar.xz 1>/dev/null
+      sudo mv zig-linux-x86_64-0.10.0/zig /usr/bin/
+      sudo mv zig-linux-x86_64-0.10.0/lib /usr/lib/zig
   - build: |
       cd river
       zig build
