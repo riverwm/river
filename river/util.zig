@@ -28,10 +28,9 @@ pub fn post_fork_pre_execve() void {
     if (c.setsid() < 0) unreachable;
     if (os.system.sigprocmask(os.SIG.SETMASK, &os.empty_sigset, null) < 0) unreachable;
     const sig_dfl = os.Sigaction{
-        // TODO(zig): Remove this casting after https://github.com/ziglang/zig/pull/12410
-        .handler = .{ .handler = @intToPtr(?os.Sigaction.handler_fn, @ptrToInt(os.SIG.DFL)) },
+        .handler = .{ .handler = os.SIG.DFL },
         .mask = os.empty_sigset,
         .flags = 0,
     };
-    os.sigaction(os.SIG.PIPE, &sig_dfl, null);
+    os.sigaction(os.SIG.PIPE, &sig_dfl, null) catch @panic("sigaction before fork failed");
 }

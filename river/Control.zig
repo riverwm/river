@@ -54,7 +54,7 @@ fn handleServerDestroy(listener: *wl.Listener(*wl.Server), _: *wl.Server) void {
 }
 
 /// Called when a client binds our global
-fn bind(client: *wl.Client, self: *Self, version: u32, id: u32) callconv(.C) void {
+fn bind(client: *wl.Client, self: *Self, version: u32, id: u32) void {
     const control = zriver.ControlV1.create(client, version, id) catch {
         client.postNoMemory();
         return;

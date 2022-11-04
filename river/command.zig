@@ -38,7 +38,7 @@ pub const Orientation = enum {
 
 // zig fmt: off
 const command_impls = std.ComptimeStringMap(
-    fn (*Seat, []const [:0]const u8, *?[]const u8) Error!void,
+    *const fn (*Seat, []const [:0]const u8, *?[]const u8) Error!void,
     .{
         .{ "attach-mode",               @import("command/attach_mode.zig").attachMode },
         .{ "background-color",          @import("command/config.zig").backgroundColor },

@@ -36,25 +36,25 @@ pub fn parser(comptime Arg: type, comptime flags: []const Flag) type {
             flags: Flags,
 
             pub const Flags = flags_type: {
-                var fields: []const std.builtin.TypeInfo.StructField = &.{};
+                var fields: []const std.builtin.Type.StructField = &.{};
                 inline for (flags) |flag| {
-                    const field: std.builtin.TypeInfo.StructField = switch (flag.kind) {
+                    const field: std.builtin.Type.StructField = switch (flag.kind) {
                         .boolean => .{
                             .name = flag.name,
                             .field_type = bool,
-                            .default_value = false,
+                            .default_value = &false,
                             .is_comptime = false,
                             .alignment = @alignOf(bool),
                         },
                         .arg => .{
                             .name = flag.name,
                             .field_type = ?[:0]const u8,
-                            .default_value = @as(??[:0]const u8, @as(?[:0]const u8, null)),
+                            .default_value = &@as(?[:0]const u8, null),
                             .is_comptime = false,
                             .alignment = @alignOf(?[:0]const u8),
                         },
                     };
-                    fields = fields ++ [_]std.builtin.TypeInfo.StructField{field};
+                    fields = fields ++ [_]std.builtin.Type.StructField{field};
                 }
                 break :flags_type @Type(.{ .Struct = .{
                     .layout = .Auto,
