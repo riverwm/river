@@ -25,7 +25,6 @@ const wl = @import("wayland").server.wl;
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
-const Box = @import("Box.zig");
 const View = @import("View.zig");
 const XwaylandView = @import("XwaylandView.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;

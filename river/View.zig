@@ -27,7 +27,6 @@ const wl = @import("wayland").server.wl;
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
-const Box = @import("Box.zig");
 const Output = @import("Output.zig");
 const Seat = @import("Seat.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
@@ -37,10 +36,10 @@ const XwaylandView = if (build_options.xwayland) @import("XwaylandView.zig") els
 const log = std.log.scoped(.view);
 
 pub const Constraints = struct {
-    min_width: u32,
-    max_width: u32,
-    min_height: u32,
-    max_height: u32,
+    min_width: u31,
+    max_width: u31,
+    min_height: u31,
+    max_height: u31,
 };
 
 const Impl = union(enum) {
@@ -52,7 +51,7 @@ const State = struct {
     /// The output-relative effective coordinates and effective dimensions of the view. The
     /// surface itself may have other dimensions which are stored in the
     /// surface_box member.
-    box: Box = Box{ .x = 0, .y = 0, .width = 0, .height = 0 },
+    box: wlr.Box = wlr.Box{ .x = 0, .y = 0, .width = 0, .height = 0 },
 
     /// The tags of the view, as a bitmask
     tags: u32,
@@ -68,7 +67,7 @@ const State = struct {
 const SavedBuffer = struct {
     client_buffer: *wlr.ClientBuffer,
     /// x/y relative to the root surface in the surface tree.
-    surface_box: Box,
+    surface_box: wlr.Box,
     source_box: wlr.FBox,
     transform: wl.Output.Transform,
 };
@@ -95,22 +94,22 @@ pending_serial: ?u32 = null,
 
 /// The currently commited geometry of the surface. The x/y may be negative if
 /// for example the client has decided to draw CSD shadows a la GTK.
-surface_box: Box = undefined,
+surface_box: wlr.Box = undefined,
 
 /// The geometry the view's surface had when the transaction started and
 /// buffers were saved.
-saved_surface_box: Box = undefined,
+saved_surface_box: wlr.Box = undefined,
 
 /// These are what we render while a transaction is in progress
 saved_buffers: std.ArrayListUnmanaged(SavedBuffer) = .{},
 
 /// The floating dimensions the view, saved so that they can be restored if the
 /// view returns to floating mode.
-float_box: Box = undefined,
+float_box: wlr.Box = undefined,
 
 /// This state exists purely to allow for more intuitive behavior when
 /// exiting fullscreen if there is no active layout.
-post_fullscreen_box: Box = undefined,
+post_fullscreen_box: wlr.Box = undefined,
 
 draw_borders: bool = true,
 
@@ -172,13 +171,14 @@ pub fn applyPending(self: *Self) void {
         // If switching to fullscreen, set the dimensions to the full area of the output
         self.setFullscreen(true);
         self.post_fullscreen_box = self.current.box;
-        const dimensions = self.output.getEffectiveResolution();
+
         self.pending.box = .{
             .x = 0,
             .y = 0,
-            .width = dimensions.width,
-            .height = dimensions.height,
+            .width = undefined,
+            .height = undefined,
         };
+        self.output.wlr_output.effectiveResolution(&self.pending.box.width, &self.pending.box.height);
     } else if (self.lastSetFullscreenState() and !self.pending.fullscreen) {
         self.setFullscreen(false);
         self.pending.box = self.post_fullscreen_box;
@@ -246,8 +246,8 @@ fn saveBuffersIterator(
             .surface_box = .{
                 .x = surface_x,
                 .y = surface_y,
-                .width = @intCast(u32, surface.current.width),
-                .height = @intCast(u32, surface.current.height),
+                .width = surface.current.width,
+                .height = surface.current.height,
             },
             .source_box = source_box,
             .transform = surface.current.transform,
@@ -284,22 +284,19 @@ pub fn sendToOutput(self: *Self, destination_output: *Output) void {
     }
 
     self.output = destination_output;
-    const dimensions = destination_output.getEffectiveResolution();
+
+    var output_width: i32 = undefined;
+    var output_height: i32 = undefined;
+    destination_output.wlr_output.effectiveResolution(&output_width, &output_height);
 
     if (self.pending.float) {
         // Adapt dimensions of view to new output. Only necessary when floating,
         // because for tiled views the output will be rearranged, taking care
         // of this.
         if (self.pending.fullscreen) self.pending.box = self.post_fullscreen_box;
-        const border_width = if (self.draw_borders) @intCast(i32, server.config.border_width) else 0;
-        self.pending.box.width = math.min(
-            self.pending.box.width,
-            @intCast(i32, dimensions.width) - (2 * border_width),
-        );
-        self.pending.box.height = math.min(
-            self.pending.box.height,
-            @intCast(i32, dimensions.height) - (2 * border_width),
-        );
+        const border_width = if (self.draw_borders) server.config.border_width else 0;
+        self.pending.box.width = math.min(self.pending.box.width, output_width - (2 * border_width));
+        self.pending.box.height = math.min(self.pending.box.height, output_height - (2 * border_width));
 
         // Adjust position of view so that it is fully inside the target output.
         self.move(0, 0);
@@ -313,8 +310,8 @@ pub fn sendToOutput(self: *Self, destination_output: *Output) void {
         self.pending.box = .{
             .x = 0,
             .y = 0,
-            .width = dimensions.width,
-            .height = dimensions.height,
+            .width = output_width,
+            .height = output_height,
         };
     }
 }
@@ -374,7 +371,7 @@ pub inline fn forEachSurface(
 ) void {
     switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| {
-            xdg_toplevel.xdg_surface.forEachSurface(T, iterator, user_data);
+            xdg_toplevel.xdg_toplevel.base.forEachSurface(T, iterator, user_data);
         },
         .xwayland_view => {
             assert(build_options.xwayland);
@@ -427,16 +424,18 @@ pub fn getConstraints(self: Self) Constraints {
 /// Modify the pending x/y of the view by the given deltas, clamping to the
 /// bounds of the output.
 pub fn move(self: *Self, delta_x: i32, delta_y: i32) void {
-    const border_width = if (self.draw_borders) @intCast(i32, server.config.border_width) else 0;
-    const output_resolution = self.output.getEffectiveResolution();
+    const border_width = if (self.draw_borders) server.config.border_width else 0;
+    var output_width: i32 = undefined;
+    var output_height: i32 = undefined;
+    self.output.wlr_output.effectiveResolution(&output_width, &output_height);
 
-    const max_x = @intCast(i32, output_resolution.width) - @intCast(i32, self.pending.box.width) - border_width;
+    const max_x = output_width - self.pending.box.width - border_width;
     self.pending.box.x += delta_x;
     self.pending.box.x = math.max(self.pending.box.x, border_width);
     self.pending.box.x = math.min(self.pending.box.x, max_x);
     self.pending.box.x = math.max(self.pending.box.x, 0);
 
-    const max_y = @intCast(i32, output_resolution.height) - @intCast(i32, self.pending.box.height) - border_width;
+    const max_y = output_height - self.pending.box.height - border_width;
     self.pending.box.y += delta_y;
     self.pending.box.y = math.max(self.pending.box.y, border_width);
     self.pending.box.y = math.min(self.pending.box.y, max_y);

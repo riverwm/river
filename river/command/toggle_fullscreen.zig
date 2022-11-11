@@ -18,7 +18,6 @@ const std = @import("std");
 
 const server = &@import("../main.zig").server;
 
-const Box = @import("../Box.zig");
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 

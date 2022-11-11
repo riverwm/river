@@ -24,7 +24,6 @@ const PhysicalDirection = @import("../command.zig").PhysicalDirection;
 const Orientation = @import("../command.zig").Orientation;
 const Seat = @import("../Seat.zig");
 const View = @import("../View.zig");
-const Box = @import("../Box.zig");
 
 pub fn move(
     seat: *Seat,
@@ -61,15 +60,15 @@ pub fn snap(
         return Error.InvalidPhysicalDirection;
 
     const view = getView(seat) orelse return;
-    const border_width = @intCast(i32, server.config.border_width);
-    const output_box = view.output.getEffectiveResolution();
+    const border_width = server.config.border_width;
+    var output_width: i32 = undefined;
+    var output_height: i32 = undefined;
+    view.output.wlr_output.effectiveResolution(&output_width, &output_height);
     switch (direction) {
         .up => view.pending.box.y = border_width,
-        .down => view.pending.box.y =
-            @intCast(i32, output_box.height - view.pending.box.height) - border_width,
+        .down => view.pending.box.y = output_width - view.pending.box.height - border_width,
         .left => view.pending.box.x = border_width,
-        .right => view.pending.box.x =
-            @intCast(i32, output_box.width - view.pending.box.width) - border_width,
+        .right => view.pending.box.x = output_height - view.pending.box.width - border_width,
     }
 
     apply(view);
@@ -88,44 +87,27 @@ pub fn resize(
         return Error.InvalidOrientation;
 
     const view = getView(seat) orelse return;
-    const border_width = @intCast(i32, server.config.border_width);
-    const output_box = view.output.getEffectiveResolution();
+    var output_width: i32 = undefined;
+    var output_height: i32 = undefined;
+    view.output.wlr_output.effectiveResolution(&output_width, &output_height);
     switch (orientation) {
         .horizontal => {
-            var real_delta: i32 = @intCast(i32, view.pending.box.width);
-            if (delta > 0) {
-                view.pending.box.width += @intCast(u32, delta);
-            } else {
-                // Prevent underflow
-                view.pending.box.width -=
-                    math.min(view.pending.box.width, @intCast(u32, -1 * delta));
-            }
+            view.pending.box.width += delta;
             view.applyConstraints();
             // Do not grow bigger than the output
             view.pending.box.width = math.min(
                 view.pending.box.width,
-                output_box.width - @intCast(u32, 2 * border_width),
+                output_width - 2 * server.config.border_width,
             );
-            real_delta -= @intCast(i32, view.pending.box.width);
-            view.move(@divFloor(real_delta, 2), 0);
         },
         .vertical => {
-            var real_delta: i32 = @intCast(i32, view.pending.box.height);
-            if (delta > 0) {
-                view.pending.box.height += @intCast(u32, delta);
-            } else {
-                // Prevent underflow
-                view.pending.box.height -=
-                    math.min(view.pending.box.height, @intCast(u32, -1 * delta));
-            }
+            view.pending.box.height += delta;
             view.applyConstraints();
             // Do not grow bigger than the output
             view.pending.box.height = math.min(
                 view.pending.box.height,
-                output_box.height - @intCast(u32, 2 * border_width),
+                output_height - 2 * server.config.border_width,
             );
-            real_delta -= @intCast(i32, view.pending.box.height);
-            view.move(0, @divFloor(real_delta, 2));
         },
     }
 

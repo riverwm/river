@@ -316,11 +316,14 @@ pub fn focusOutput(self: *Self, output: *Output) void {
     switch (server.config.warp_cursor) {
         .disabled => {},
         .@"on-output-change" => {
-            const layout_box = server.root.output_layout.getBox(output.wlr_output).?;
+            var layout_box: wlr.Box = undefined;
+            server.root.output_layout.getBox(output.wlr_output, &layout_box);
             if (!layout_box.containsPoint(self.cursor.wlr_cursor.x, self.cursor.wlr_cursor.y)) {
-                const eff_res = output.getEffectiveResolution();
-                const lx = @intToFloat(f32, layout_box.x + @intCast(i32, eff_res.width / 2));
-                const ly = @intToFloat(f32, layout_box.y + @intCast(i32, eff_res.height / 2));
+                var output_width: i32 = undefined;
+                var output_height: i32 = undefined;
+                output.wlr_output.effectiveResolution(&output_width, &output_height);
+                const lx = @intToFloat(f64, layout_box.x + @divTrunc(output_width, 2));
+                const ly = @intToFloat(f64, layout_box.y + @divTrunc(output_height, 2));
                 if (!self.cursor.wlr_cursor.warp(null, lx, ly)) {
                     log.err("failed to warp cursor on output change", .{});
                 }
@@ -482,7 +485,7 @@ fn tryAddDevice(self: *Self, wlr_device: *wlr.InputDevice) !void {
 
             try keyboard.init(self, wlr_device);
 
-            self.wlr_seat.setKeyboard(keyboard.device.wlr_device);
+            self.wlr_seat.setKeyboard(keyboard.device.wlr_device.toKeyboard());
             if (self.wlr_seat.keyboard_state.focused_surface) |wlr_surface| {
                 self.wlr_seat.keyboardNotifyClearFocus();
                 self.keyboardNotifyEnter(wlr_surface);

@@ -47,7 +47,7 @@ pub const HideCursorWhenTypingMode = enum {
 background_color: [4]f32 = [_]f32{ 0.0, 0.16862745, 0.21176471, 1.0 }, // Solarized base03
 
 /// Width of borders in pixels
-border_width: u32 = 2,
+border_width: u31 = 2,
 
 /// Color of border of focused window in RGBA
 border_color_focused: [4]f32 = [_]f32{ 0.57647059, 0.63137255, 0.63137255, 1.0 }, // Solarized base1

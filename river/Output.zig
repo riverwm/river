@@ -18,6 +18,7 @@ const Self = @This();
 
 const std = @import("std");
 const assert = std.debug.assert;
+const math = std.math;
 const mem = std.mem;
 const fmt = std.fmt;
 const wlr = @import("wlroots");
@@ -29,7 +30,6 @@ const render = @import("render.zig");
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
-const Box = @import("Box.zig");
 const LayerSurface = @import("LayerSurface.zig");
 const Layout = @import("Layout.zig");
 const LayoutDemand = @import("LayoutDemand.zig");
@@ -62,7 +62,7 @@ layers: [4]std.TailQueue(LayerSurface) = [1]std.TailQueue(LayerSurface){.{}} ** 
 /// The area left for views and other layer surfaces after applying the
 /// exclusive zones of exclusive layer surfaces.
 /// TODO: this should be part of the output's State
-usable_box: Box,
+usable_box: wlr.Box,
 
 /// The top of the stack is the "most important" view.
 views: ViewStack(View) = .{},
@@ -86,7 +86,7 @@ layouts: std.TailQueue(Layout) = .{},
 layout_namespace: ?[]const u8 = null,
 
 /// Bitmask that whitelists tags for newly spawned views
-spawn_tagmask: u32 = std.math.maxInt(u32),
+spawn_tagmask: u32 = math.maxInt(u32),
 
 /// List of status tracking objects relaying changes to this output to clients.
 status_trackers: std.SinglyLinkedList(OutputStatus) = .{},
@@ -145,13 +145,13 @@ pub fn init(self: *Self, wlr_output: *wlr.Output) !void {
             std.log.scoped(.cursor).err("failed to load xcursor theme at scale {}", .{wlr_output.scale});
     }
 
-    const effective_resolution = self.getEffectiveResolution();
     self.usable_box = .{
         .x = 0,
         .y = 0,
-        .width = effective_resolution.width,
-        .height = effective_resolution.height,
+        .width = undefined,
+        .height = undefined,
     };
+    self.wlr_output.effectiveResolution(&self.usable_box.width, &self.usable_box.height);
 
     self.setTitle();
 }
@@ -230,13 +230,13 @@ const ArrangeLayersTarget = enum { mapped, unmapped };
 /// If target is unmapped, this function is pure aside from the
 /// wlr.LayerSurfaceV1.configure() calls made on umapped layer surfaces.
 pub fn arrangeLayers(self: *Self, target: ArrangeLayersTarget) void {
-    const effective_resolution = self.getEffectiveResolution();
-    const full_box: Box = .{
+    var full_box: wlr.Box = .{
         .x = 0,
         .y = 0,
-        .width = effective_resolution.width,
-        .height = effective_resolution.height,
+        .width = undefined,
+        .height = undefined,
     };
+    self.wlr_output.effectiveResolution(&full_box.width, &full_box.height);
 
     // This box is modified as exclusive zones are applied
     var usable_box = full_box;
@@ -296,8 +296,8 @@ pub fn arrangeLayers(self: *Self, target: ArrangeLayersTarget) void {
 /// Arrange the layer surfaces of a given layer
 fn arrangeLayer(
     layer: std.TailQueue(LayerSurface),
-    full_box: Box,
-    usable_box: *Box,
+    full_box: wlr.Box,
+    usable_box: *wlr.Box,
     exclusive: bool,
     target: ArrangeLayersTarget,
 ) void {
@@ -305,6 +305,9 @@ fn arrangeLayer(
     while (it) |node| : (it = node.next) {
         const layer_surface = &node.data;
         const current_state = layer_surface.wlr_layer_surface.current;
+
+        const desired_width = @intCast(u31, math.min(math.maxInt(u31), current_state.desired_width));
+        const desired_height = @intCast(u31, math.min(math.maxInt(u31), current_state.desired_height));
 
         // If the value of exclusive_zone is greater than zero, then it exclusivly
         // occupies some area of the screen.
@@ -314,46 +317,40 @@ fn arrangeLayer(
         // to ignore any exclusive zones and use the full area of the output.
         const bounds = if (current_state.exclusive_zone == -1) &full_box else usable_box;
 
-        var new_box: Box = undefined;
+        var new_box: wlr.Box = undefined;
 
         // Horizontal alignment
-        if (current_state.desired_width == 0) {
+        if (desired_width == 0) {
             assert(current_state.anchor.right and current_state.anchor.left);
-            new_box.x = bounds.x + @intCast(i32, current_state.margin.left);
+            new_box.x = bounds.x + current_state.margin.left;
             new_box.width = bounds.width - (current_state.margin.left + current_state.margin.right);
         } else if (current_state.anchor.left == current_state.anchor.right) {
-            new_box.x = bounds.x + @intCast(i32, bounds.width / 2 -| current_state.desired_width / 2);
-            new_box.width = current_state.desired_width;
+            new_box.x = bounds.x + @divTrunc(bounds.width, 2) - desired_width / 2;
+            new_box.width = desired_width;
         } else if (current_state.anchor.left) {
-            new_box.x = bounds.x + @intCast(i32, current_state.margin.left);
-            new_box.width = current_state.desired_width;
+            new_box.x = bounds.x + current_state.margin.left;
+            new_box.width = desired_width;
         } else {
             assert(current_state.anchor.right);
-            new_box.x = bounds.x + @intCast(i32, bounds.width) -
-                @intCast(i32, current_state.desired_width) -
-                // TODO(wlroots) this type has been corrected to i32 for the next release
-                @intCast(i32, current_state.margin.right);
-            new_box.width = current_state.desired_width;
+            new_box.x = bounds.x + bounds.width - desired_width - current_state.margin.right;
+            new_box.width = desired_width;
         }
 
         // Vertical alignment
-        if (current_state.desired_height == 0) {
+        if (desired_height == 0) {
             assert(current_state.anchor.top and current_state.anchor.bottom);
-            new_box.y = bounds.y + @intCast(i32, current_state.margin.top);
+            new_box.y = bounds.y + current_state.margin.top;
             new_box.height = bounds.height - (current_state.margin.top + current_state.margin.bottom);
         } else if (current_state.anchor.top == current_state.anchor.bottom) {
-            new_box.y = bounds.y + @intCast(i32, bounds.height / 2 -| current_state.desired_height / 2);
-            new_box.height = current_state.desired_height;
+            new_box.y = bounds.y + @divTrunc(bounds.height, 2) - desired_height / 2;
+            new_box.height = desired_height;
         } else if (current_state.anchor.top) {
-            new_box.y = bounds.y + @intCast(i32, current_state.margin.top);
-            new_box.height = current_state.desired_height;
+            new_box.y = bounds.y + current_state.margin.top;
+            new_box.height = desired_height;
         } else {
             assert(current_state.anchor.bottom);
-            new_box.y = bounds.y + @intCast(i32, bounds.height) -
-                @intCast(i32, current_state.desired_height) -
-                // TODO(wlroots) this type has been corrected to i32 for the next release
-                @intCast(i32, current_state.margin.bottom);
-            new_box.height = current_state.desired_height;
+            new_box.y = bounds.y + bounds.height - desired_height - current_state.margin.bottom;
+            new_box.height = desired_height;
         }
 
         // Apply the exclusive zone to the current bounds
@@ -361,8 +358,8 @@ fn arrangeLayer(
             single: zwlr.LayerSurfaceV1.Anchor,
             triple: zwlr.LayerSurfaceV1.Anchor,
             to_increase: ?*i32,
-            to_decrease: *u32,
-            margin: u32,
+            to_decrease: *i32,
+            margin: i32,
         }{
             .{
                 .single = .{ .top = true },
@@ -396,11 +393,11 @@ fn arrangeLayer(
 
         for (edges) |edge| {
             if ((std.meta.eql(current_state.anchor, edge.single) or std.meta.eql(current_state.anchor, edge.triple)) and
-                current_state.exclusive_zone + @intCast(i32, edge.margin) > 0)
+                current_state.exclusive_zone + edge.margin > 0)
             {
-                const delta = current_state.exclusive_zone + @intCast(i32, edge.margin);
+                const delta = current_state.exclusive_zone + edge.margin;
                 if (edge.to_increase) |value| value.* += delta;
-                edge.to_decrease.* -= @intCast(u32, delta);
+                edge.to_decrease.* -= delta;
                 break;
             }
         }
@@ -409,10 +406,16 @@ fn arrangeLayer(
             .mapped => {
                 assert(layer_surface.wlr_layer_surface.mapped);
                 layer_surface.box = new_box;
-                _ = layer_surface.wlr_layer_surface.configure(new_box.width, new_box.height);
+                _ = layer_surface.wlr_layer_surface.configure(
+                    @intCast(u32, new_box.width),
+                    @intCast(u32, new_box.height),
+                );
             },
             .unmapped => if (!layer_surface.wlr_layer_surface.mapped) {
-                _ = layer_surface.wlr_layer_surface.configure(new_box.width, new_box.height);
+                _ = layer_surface.wlr_layer_surface.configure(
+                    @intCast(u32, new_box.width),
+                    @intCast(u32, new_box.height),
+                );
             },
         }
     }
@@ -482,16 +485,6 @@ fn handleMode(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
     self.arrangeLayers(.mapped);
     self.arrangeViews();
     server.root.startTransaction();
-}
-
-pub fn getEffectiveResolution(self: *Self) struct { width: u32, height: u32 } {
-    var width: c_int = undefined;
-    var height: c_int = undefined;
-    self.wlr_output.effectiveResolution(&width, &height);
-    return .{
-        .width = @intCast(u32, width),
-        .height = @intCast(u32, height),
-    };
 }
 
 fn setTitle(self: Self) void {

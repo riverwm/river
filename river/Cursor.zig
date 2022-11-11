@@ -30,7 +30,6 @@ const c = @import("c.zig");
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
-const Box = @import("Box.zig");
 const Config = @import("Config.zig");
 const LayerSurface = @import("LayerSurface.zig");
 const Output = @import("Output.zig");
@@ -855,8 +854,8 @@ pub fn enterMode(self: *Self, mode: enum { move, resize }, view: *View) void {
             const cur_box = &view.current.box;
             self.mode = .{ .resize = .{
                 .view = view,
-                .offset_x = cur_box.x + @intCast(i32, cur_box.width) - @floatToInt(i32, self.wlr_cursor.x),
-                .offset_y = cur_box.y + @intCast(i32, cur_box.height) - @floatToInt(i32, self.wlr_cursor.y),
+                .offset_x = cur_box.x + cur_box.width - @floatToInt(i32, self.wlr_cursor.x),
+                .offset_y = cur_box.y + cur_box.height - @floatToInt(i32, self.wlr_cursor.y),
             } };
             view.setResizing(true);
         },
@@ -971,23 +970,25 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
             const border_width = if (data.view.draw_borders) server.config.border_width else 0;
 
             // Set width/height of view, clamp to view size constraints and output dimensions
-            const box = &data.view.pending.box;
-            box.width = @intCast(u32, math.max(0, @intCast(i32, box.width) + @floatToInt(i32, dx)));
-            box.height = @intCast(u32, math.max(0, @intCast(i32, box.height) + @floatToInt(i32, dy)));
-
+            data.view.pending.box.width += @floatToInt(i32, dx);
+            data.view.pending.box.height += @floatToInt(i32, dy);
             data.view.applyConstraints();
 
-            const output_resolution = data.view.output.getEffectiveResolution();
-            box.width = math.min(box.width, output_resolution.width - border_width - @intCast(u32, box.x));
-            box.height = math.min(box.height, output_resolution.height - border_width - @intCast(u32, box.y));
+            var output_width: i32 = undefined;
+            var output_height: i32 = undefined;
+            data.view.output.wlr_output.effectiveResolution(&output_width, &output_height);
+
+            const box = &data.view.pending.box;
+            box.width = math.min(box.width, output_width - border_width - box.x);
+            box.height = math.min(box.height, output_height - border_width - box.y);
 
             data.view.applyPending();
 
             // Keep cursor locked to the original offset from the bottom right corner
             self.wlr_cursor.warpClosest(
                 device,
-                @intToFloat(f64, box.x + @intCast(i32, box.width) - data.offset_x),
-                @intToFloat(f64, box.y + @intCast(i32, box.height) - data.offset_y),
+                @intToFloat(f64, box.x + box.width - data.offset_x),
+                @intToFloat(f64, box.y + box.height - data.offset_y),
             );
         },
     }
@@ -1025,7 +1026,7 @@ pub fn updateState(self: *Self) void {
         var now: os.timespec = undefined;
         os.clock_gettime(os.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
         const msec = @intCast(u32, now.tv_sec * std.time.ms_per_s +
-            @divFloor(now.tv_nsec, std.time.ns_per_ms));
+            @divTrunc(now.tv_nsec, std.time.ns_per_ms));
         self.passthrough(msec);
     }
 }

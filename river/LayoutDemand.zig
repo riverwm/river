@@ -26,7 +26,6 @@ const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Layout = @import("Layout.zig");
-const Box = @import("Box.zig");
 const Server = @import("Server.zig");
 const Output = @import("Output.zig");
 const View = @import("View.zig");
@@ -43,7 +42,7 @@ serial: u32,
 /// This will go negative if the client pushes too many dimensions.
 views: i32,
 /// Proposed view dimensions
-view_boxen: []Box,
+view_boxen: []wlr.Box,
 timeout_timer: *wl.EventSource,
 
 pub fn init(layout: *Layout, views: u32) !Self {
@@ -55,7 +54,7 @@ pub fn init(layout: *Layout, views: u32) !Self {
     return Self{
         .serial = server.wl_server.nextSerial(),
         .views = @intCast(i32, views),
-        .view_boxen = try util.gpa.alloc(Box, views),
+        .view_boxen = try util.gpa.alloc(wlr.Box, views),
         .timeout_timer = timeout_timer,
     };
 }
@@ -81,7 +80,7 @@ fn handleTimeout(layout: *Layout) callconv(.C) c_int {
 }
 
 /// Push a set of proposed view dimensions and position to the list
-pub fn pushViewDimensions(self: *Self, output: *Output, x: i32, y: i32, width: u32, height: u32) void {
+pub fn pushViewDimensions(self: *Self, output: *Output, x: i32, y: i32, width: u31, height: u31) void {
     // The client pushed too many dimensions
     if (self.views <= 0) {
         self.views -= 1;
@@ -92,8 +91,8 @@ pub fn pushViewDimensions(self: *Self, output: *Output, x: i32, y: i32, width: u
     // usable area and shrink the dimensions to accomodate the border size.
     const border_width = server.config.border_width;
     self.view_boxen[self.view_boxen.len - @intCast(usize, self.views)] = .{
-        .x = x + output.usable_box.x + @intCast(i32, border_width),
-        .y = y + output.usable_box.y + @intCast(i32, border_width),
+        .x = x + output.usable_box.x + border_width,
+        .y = y + output.usable_box.y + border_width,
         .width = if (width > 2 * border_width) width - 2 * border_width else width,
         .height = if (height > 2 * border_width) height - 2 * border_width else height,
     };

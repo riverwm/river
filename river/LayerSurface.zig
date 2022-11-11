@@ -25,7 +25,6 @@ const zwlr = @import("wayland").server.zwlr;
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
-const Box = @import("Box.zig");
 const Output = @import("Output.zig");
 const Subsurface = @import("Subsurface.zig");
 const XdgPopup = @import("XdgPopup.zig");
@@ -35,7 +34,7 @@ const log = std.log.scoped(.layer_shell);
 output: *Output,
 wlr_layer_surface: *wlr.LayerSurfaceV1,
 
-box: Box = undefined,
+box: wlr.Box = undefined,
 layer: zwlr.LayerShellV1.Layer,
 
 destroy: wl.Listener(*wlr.LayerSurfaceV1) = wl.Listener(*wlr.LayerSurfaceV1).init(handleDestroy),

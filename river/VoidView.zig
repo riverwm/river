@@ -19,7 +19,6 @@ const Self = @This();
 const std = @import("std");
 const wlr = @import("wlroots");
 
-const Box = @import("Box.zig");
 const View = @import("View.zig");
 
 pub fn needsConfigure(_: Self) bool {

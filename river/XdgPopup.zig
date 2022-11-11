@@ -31,9 +31,9 @@ parent: Parent,
 wlr_xdg_popup: *wlr.XdgPopup,
 
 // Always active
-surface_destroy: wl.Listener(*wlr.XdgSurface) = wl.Listener(*wlr.XdgSurface).init(handleDestroy),
-map: wl.Listener(*wlr.XdgSurface) = wl.Listener(*wlr.XdgSurface).init(handleMap),
-unmap: wl.Listener(*wlr.XdgSurface) = wl.Listener(*wlr.XdgSurface).init(handleUnmap),
+surface_destroy: wl.Listener(void) = wl.Listener(void).init(handleDestroy),
+map: wl.Listener(void) = wl.Listener(void).init(handleMap),
+unmap: wl.Listener(void) = wl.Listener(void).init(handleUnmap),
 new_popup: wl.Listener(*wlr.XdgPopup) = wl.Listener(*wlr.XdgPopup).init(handleNewPopup),
 new_subsurface: wl.Listener(*wlr.Subsurface) = wl.Listener(*wlr.Subsurface).init(handleNewSubsurface),
 
@@ -55,25 +55,25 @@ pub fn create(wlr_xdg_popup: *wlr.XdgPopup, parent: Parent) void {
 
     switch (parent) {
         .xdg_toplevel => |xdg_toplevel| {
-            const output_dimensions = xdg_toplevel.view.output.getEffectiveResolution();
             // The output box relative to the parent of the xdg_popup
             var box = wlr.Box{
                 .x = xdg_toplevel.view.surface_box.x - xdg_toplevel.view.pending.box.x,
                 .y = xdg_toplevel.view.surface_box.y - xdg_toplevel.view.pending.box.y,
-                .width = @intCast(c_int, output_dimensions.width),
-                .height = @intCast(c_int, output_dimensions.height),
+                .width = undefined,
+                .height = undefined,
             };
+            xdg_toplevel.view.output.wlr_output.effectiveResolution(&box.width, &box.height);
             wlr_xdg_popup.unconstrainFromBox(&box);
         },
         .layer_surface => |layer_surface| {
-            const output_dimensions = layer_surface.output.getEffectiveResolution();
             // The output box relative to the parent of the xdg_popup
             var box = wlr.Box{
                 .x = -layer_surface.box.x,
                 .y = -layer_surface.box.y,
-                .width = @intCast(c_int, output_dimensions.width),
-                .height = @intCast(c_int, output_dimensions.height),
+                .width = undefined,
+                .height = undefined,
             };
+            layer_surface.output.wlr_output.effectiveResolution(&box.width, &box.height);
             wlr_xdg_popup.unconstrainFromBox(&box);
         },
         .drag_icon => unreachable,
@@ -111,19 +111,19 @@ pub fn destroyPopups(wlr_xdg_surface: *wlr.XdgSurface) void {
     }
 }
 
-fn handleDestroy(listener: *wl.Listener(*wlr.XdgSurface), _: *wlr.XdgSurface) void {
+fn handleDestroy(listener: *wl.Listener(void)) void {
     const xdg_popup = @fieldParentPtr(XdgPopup, "surface_destroy", listener);
     xdg_popup.destroy();
 }
 
-fn handleMap(listener: *wl.Listener(*wlr.XdgSurface), _: *wlr.XdgSurface) void {
+fn handleMap(listener: *wl.Listener(void)) void {
     const xdg_popup = @fieldParentPtr(XdgPopup, "map", listener);
 
     xdg_popup.wlr_xdg_popup.base.surface.events.commit.add(&xdg_popup.commit);
     xdg_popup.parent.damageWholeOutput();
 }
 
-fn handleUnmap(listener: *wl.Listener(*wlr.XdgSurface), _: *wlr.XdgSurface) void {
+fn handleUnmap(listener: *wl.Listener(void)) void {
     const xdg_popup = @fieldParentPtr(XdgPopup, "unmap", listener);
 
     xdg_popup.commit.link.remove();

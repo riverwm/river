@@ -54,7 +54,7 @@ pub fn init(self: *Self, seat: *Seat, wlr_device: *wlr.InputDevice) !void {
     const keymap = xkb.Keymap.newFromNames(context, null, .no_flags) orelse return error.XkbKeymapFailed;
     defer keymap.unref();
 
-    const wlr_keyboard = self.device.wlr_device.device.keyboard;
+    const wlr_keyboard = self.device.wlr_device.toKeyboard();
     wlr_keyboard.data = @ptrToInt(self);
 
     if (!wlr_keyboard.setKeymap(keymap)) return error.SetKeymapFailed;
@@ -77,7 +77,7 @@ pub fn deinit(self: *Self) void {
 fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboard.event.Key) void {
     // This event is raised when a key is pressed or released.
     const self = @fieldParentPtr(Self, "key", listener);
-    const wlr_keyboard = self.device.wlr_device.device.keyboard;
+    const wlr_keyboard = self.device.wlr_device.toKeyboard();
 
     // If the keyboard is in a group, this event will be handled by the group's Keyboard instance.
     if (wlr_keyboard.group != null) return;
@@ -125,7 +125,7 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
     if (!eaten) {
         // If key was not handled, we pass it along to the client.
         const wlr_seat = self.device.seat.wlr_seat;
-        wlr_seat.setKeyboard(self.device.wlr_device);
+        wlr_seat.setKeyboard(self.device.wlr_device.toKeyboard());
         wlr_seat.keyboardNotifyKey(event.time_msec, event.keycode, event.state);
     }
 }
@@ -136,12 +136,12 @@ fn isModifier(keysym: xkb.Keysym) bool {
 
 fn handleModifiers(listener: *wl.Listener(*wlr.Keyboard), _: *wlr.Keyboard) void {
     const self = @fieldParentPtr(Self, "modifiers", listener);
-    const wlr_keyboard = self.device.wlr_device.device.keyboard;
+    const wlr_keyboard = self.device.wlr_device.toKeyboard();
 
     // If the keyboard is in a group, this event will be handled by the group's Keyboard instance.
     if (wlr_keyboard.group != null) return;
 
-    self.device.seat.wlr_seat.setKeyboard(self.device.wlr_device);
+    self.device.seat.wlr_seat.setKeyboard(self.device.wlr_device.toKeyboard());
     self.device.seat.wlr_seat.keyboardNotifyModifiers(&wlr_keyboard.modifiers);
 }
 

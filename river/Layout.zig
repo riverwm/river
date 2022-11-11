@@ -18,6 +18,7 @@ const Self = @This();
 
 const std = @import("std");
 const assert = std.debug.assert;
+const math = std.math;
 const mem = std.mem;
 const wlr = @import("wlroots");
 const wayland = @import("wayland");
@@ -27,7 +28,6 @@ const river = wayland.server.river;
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
-const Box = @import("Box.zig");
 const Server = @import("Server.zig");
 const Output = @import("Output.zig");
 const View = @import("View.zig");
@@ -111,8 +111,8 @@ pub fn startLayoutDemand(self: *Self, views: u32) void {
 
     self.layout.sendLayoutDemand(
         views,
-        self.output.usable_box.width,
-        self.output.usable_box.height,
+        @intCast(u32, self.output.usable_box.width),
+        @intCast(u32, self.output.usable_box.height),
         self.output.pending.tags,
         self.output.layout_demand.?.serial,
     );
@@ -137,7 +137,13 @@ fn handleRequest(layout: *river.LayoutV3, request: river.LayoutV3.Request, self:
                 // because we do not keep track of old serials server-side.
                 // Therefore, simply ignore requests with old/wrong serials.
                 if (layout_demand.serial != req.serial) return;
-                layout_demand.pushViewDimensions(self.output, req.x, req.y, req.width, req.height);
+                layout_demand.pushViewDimensions(
+                    self.output,
+                    req.x,
+                    req.y,
+                    @intCast(u31, math.min(math.maxInt(u31), req.width)),
+                    @intCast(u31, math.min(math.maxInt(u31), req.height)),
+                );
             }
         },
 

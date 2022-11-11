@@ -55,7 +55,7 @@ pub fn create(seat: *Seat, name: []const u8) !void {
         .seat = seat,
     };
 
-    seat.addDevice(wlr_group.input_device);
+    seat.addDevice(&wlr_group.keyboard.base);
     seat.keyboard_groups.append(node);
 }
 
@@ -95,8 +95,7 @@ pub fn addIdentifier(group: *KeyboardGroup, new_id: []const u8) !void {
         if (mem.eql(u8, new_id, device.identifier)) {
             log.debug("found existing matching keyboard; adding to group", .{});
 
-            const wlr_keyboard = device.wlr_device.device.keyboard;
-            if (!group.wlr_group.addKeyboard(wlr_keyboard)) {
+            if (!group.wlr_group.addKeyboard(device.wlr_device.toKeyboard())) {
                 // wlroots logs an error message to explain why this failed.
                 continue;
             }
@@ -119,7 +118,7 @@ pub fn removeIdentifier(group: *KeyboardGroup, id: []const u8) !void {
         if (device.wlr_device.type != .keyboard) continue;
 
         if (mem.eql(u8, device.identifier, id)) {
-            const wlr_keyboard = device.wlr_device.device.keyboard;
+            const wlr_keyboard = device.wlr_device.toKeyboard();
             assert(wlr_keyboard.group == group.wlr_group);
             group.wlr_group.removeKeyboard(wlr_keyboard);
         }

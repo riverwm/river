@@ -97,8 +97,9 @@ pub fn init(self: *Self) !void {
     errdefer self.allocator.destroy();
 
     const compositor = try wlr.Compositor.create(self.wl_server, self.renderer);
+    _ = try wlr.Subcompositor.create(self.wl_server);
 
-    self.xdg_shell = try wlr.XdgShell.create(self.wl_server);
+    self.xdg_shell = try wlr.XdgShell.create(self.wl_server, 2);
     self.new_xdg_surface.setNotify(handleNewXdgSurface);
     self.xdg_shell.events.new_surface.add(&self.new_xdg_surface);
 
@@ -188,7 +189,7 @@ fn handleNewXdgSurface(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wl
     log.debug("new xdg_toplevel", .{});
 
     const output = self.input_manager.defaultSeat().focused_output;
-    XdgToplevel.create(output, xdg_surface) catch {
+    XdgToplevel.create(output, xdg_surface.role_data.toplevel) catch {
         log.err("out of memory", .{});
         xdg_surface.resource.postNoMemory();
         return;

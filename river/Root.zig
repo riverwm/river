@@ -527,12 +527,12 @@ fn currentOutputConfig(self: *Self) !*wlr.OutputConfigurationV1 {
         const output = node.data;
         const head = try wlr.OutputConfigurationV1.Head.create(config, output.wlr_output);
 
-        // If the output is not part of the layout (and thus disabled) we dont care
-        // about the position
-        if (self.output_layout.getBox(output.wlr_output)) |box| {
-            head.state.x = box.x;
-            head.state.y = box.y;
-        }
+        // If the output is not part of the layout (and thus disabled)
+        // the box will be zeroed out.
+        var box: wlr.Box = undefined;
+        self.output_layout.getBox(output.wlr_output, &box);
+        head.state.x = box.x;
+        head.state.y = box.y;
     }
 
     return config;

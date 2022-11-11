@@ -42,7 +42,7 @@ distribution.
 - [zig](https://ziglang.org/download/) 0.9
 - wayland
 - wayland-protocols
-- [wlroots](https://gitlab.freedesktop.org/wlroots/wlroots) 0.15
+- [wlroots](https://gitlab.freedesktop.org/wlroots/wlroots) 0.16
 - xkbcommon
 - libevdev
 - pixman

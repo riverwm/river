@@ -39,7 +39,7 @@ pub fn setRepeat(
     var it = server.input_manager.devices.iterator(.forward);
     while (it.next()) |device| {
         if (device.wlr_device.type == .keyboard) {
-            device.wlr_device.device.keyboard.setRepeatInfo(rate, delay);
+            device.wlr_device.toKeyboard().setRepeatInfo(rate, delay);
         }
     }
 }

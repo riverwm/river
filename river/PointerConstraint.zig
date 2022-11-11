@@ -80,7 +80,8 @@ fn constrainToRegion(self: *Self) void {
     if (self.cursor.constraint != self.constraint) return;
     if (View.fromWlrSurface(self.constraint.surface)) |view| {
         const output = view.output;
-        const output_box = server.root.output_layout.getBox(output.wlr_output).?;
+        var output_box: wlr.Box = undefined;
+        server.root.output_layout.getBox(output.wlr_output, &output_box);
 
         const surface_lx = @intToFloat(f64, output_box.x + view.current.box.x - view.surface_box.x);
         const surface_ly = @intToFloat(f64, output_box.y + view.current.box.y - view.surface_box.y);
@@ -126,7 +127,8 @@ pub fn warpToHint(cursor: *Cursor) void {
         if (constraint.current.committed.cursor_hint) {
             if (View.fromWlrSurface(constraint.surface)) |view| {
                 const output = view.output;
-                const output_box = server.root.output_layout.getBox(output.wlr_output).?;
+                var output_box: wlr.Box = undefined;
+                server.root.output_layout.getBox(output.wlr_output, &output_box);
 
                 const surface_lx = @intToFloat(f64, output_box.x + view.current.box.x - view.surface_box.x);
                 const surface_ly = @intToFloat(f64, output_box.y + view.current.box.y - view.surface_box.y);

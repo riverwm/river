@@ -210,7 +210,7 @@ fn handleNewVirtualPointer(
         log.debug("Ignoring output suggestion from virtual pointer", .{});
     }
 
-    self.defaultSeat().addDevice(&event.new_pointer.input_device);
+    self.defaultSeat().addDevice(&event.new_pointer.pointer.base);
 }
 
 fn handleNewVirtualKeyboard(
@@ -218,5 +218,5 @@ fn handleNewVirtualKeyboard(
     virtual_keyboard: *wlr.VirtualKeyboardV1,
 ) void {
     const seat = @intToPtr(*Seat, virtual_keyboard.seat.data);
-    seat.addDevice(&virtual_keyboard.input_device);
+    seat.addDevice(&virtual_keyboard.keyboard.base);
 }

@@ -86,12 +86,15 @@ fn getOutput(seat: *Seat, str: []const u8) !?*Output {
             .previous => if (focused_node.prev) |node| &node.data else &server.root.outputs.last.?.data,
         };
     } else if (std.meta.stringToEnum(wlr.OutputLayout.Direction, str)) |direction| { // Spacial direction
-        const focus_box = server.root.output_layout.getBox(seat.focused_output.wlr_output) orelse return null;
+        var focus_box: wlr.Box = undefined;
+        server.root.output_layout.getBox(seat.focused_output.wlr_output, &focus_box);
+        if (focus_box.empty()) return null;
+
         const wlr_output = server.root.output_layout.adjacentOutput(
             direction,
             seat.focused_output.wlr_output,
-            @intToFloat(f64, focus_box.x + @divFloor(focus_box.width, 2)),
-            @intToFloat(f64, focus_box.y + @divFloor(focus_box.height, 2)),
+            @intToFloat(f64, focus_box.x + @divTrunc(focus_box.width, 2)),
+            @intToFloat(f64, focus_box.y + @divTrunc(focus_box.height, 2)),
         ) orelse return null;
         return @intToPtr(*Output, wlr_output.data);
     } else {

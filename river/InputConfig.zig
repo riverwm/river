@@ -40,14 +40,14 @@ pub const EventState = enum {
     @"disabled-on-external-mouse",
 
     pub fn apply(event_state: EventState, device: *c.libinput_device) void {
-        const want = switch (event_state) {
+        const want: u32 = switch (event_state) {
             .enabled => c.LIBINPUT_CONFIG_SEND_EVENTS_ENABLED,
             .disabled => c.LIBINPUT_CONFIG_SEND_EVENTS_DISABLED,
             .@"disabled-on-external-mouse" => c.LIBINPUT_CONFIG_SEND_EVENTS_DISABLED_ON_EXTERNAL_MOUSE,
         };
         const current = c.libinput_device_config_send_events_get_mode(device);
         if (want != current) {
-            _ = c.libinput_device_config_send_events_set_mode(device, @intCast(u32, want));
+            _ = c.libinput_device_config_send_events_set_mode(device, want);
         }
     }
 };
@@ -259,7 +259,7 @@ pub const ScrollButton = struct {
 
     pub fn apply(scroll_button: ScrollButton, device: *c.libinput_device) void {
         const supports = c.libinput_device_config_scroll_get_methods(device);
-        if (supports & ~@intCast(u32, c.LIBINPUT_CONFIG_SCROLL_NO_SCROLL) == 0) return;
+        if (supports & ~@as(u32, c.LIBINPUT_CONFIG_SCROLL_NO_SCROLL) == 0) return;
         _ = c.libinput_device_config_scroll_set_button(device, scroll_button.button);
     }
 };

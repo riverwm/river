@@ -50,12 +50,6 @@ pub fn init(device: *InputDevice, seat: *Seat, wlr_device: *wlr.InputDevice) !vo
         else => @tagName(wlr_device.type),
     };
 
-    // wlroots 0.15 leaves wlr_input_device->name NULL for keyboard groups.
-    // This wart has been cleaned up in 0.16, so just work around it until that is released.
-    // TODO(wlroots): Remove this hack
-
-    const name = if (isKeyboardGroup(wlr_device)) "wlr_keyboard_group" else wlr_device.name;
-
     const identifier = try std.fmt.allocPrint(
         util.gpa,
         "{s}-{}-{}-{s}",
@@ -63,7 +57,7 @@ pub fn init(device: *InputDevice, seat: *Seat, wlr_device: *wlr.InputDevice) !vo
             device_type,
             wlr_device.vendor,
             wlr_device.product,
-            mem.trim(u8, mem.span(name), &ascii.spaces),
+            mem.trim(u8, mem.span(wlr_device.name), &ascii.spaces),
         },
     );
     errdefer util.gpa.free(identifier);
@@ -115,7 +109,7 @@ pub fn deinit(device: *InputDevice) void {
 
 fn isKeyboardGroup(wlr_device: *wlr.InputDevice) bool {
     return wlr_device.type == .keyboard and
-        wlr.KeyboardGroup.fromKeyboard(wlr_device.device.keyboard) != null;
+        wlr.KeyboardGroup.fromKeyboard(wlr_device.toKeyboard()) != null;
 }
 
 fn handleDestroy(listener: *wl.Listener(*wlr.InputDevice), _: *wlr.InputDevice) void {

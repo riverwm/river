@@ -24,7 +24,6 @@ const pixman = @import("pixman");
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
-const Box = @import("Box.zig");
 const LayerSurface = @import("LayerSurface.zig");
 const Output = @import("Output.zig");
 const Server = @import("Server.zig");
@@ -201,8 +200,8 @@ fn renderView(output: *const Output, view: *View, now: *os.timespec) void {
                 .{
                     .x = saved_buffer.surface_box.x + view.current.box.x - view.saved_surface_box.x,
                     .y = saved_buffer.surface_box.y + view.current.box.y - view.saved_surface_box.y,
-                    .width = @intCast(c_int, saved_buffer.surface_box.width),
-                    .height = @intCast(c_int, saved_buffer.surface_box.height),
+                    .width = saved_buffer.surface_box.width,
+                    .height = saved_buffer.surface_box.height,
                 },
                 &saved_buffer.source_box,
                 saved_buffer.transform,
@@ -223,7 +222,8 @@ fn renderView(output: *const Output, view: *View, now: *os.timespec) void {
 }
 
 fn renderDragIcons(output: *const Output, now: *os.timespec) void {
-    const output_box = server.root.output_layout.getBox(output.wlr_output).?;
+    var output_box: wlr.Box = undefined;
+    server.root.output_layout.getBox(output.wlr_output, &output_box);
 
     var it = server.root.drag_icons.first;
     while (it) |node| : (it = node.next) {
@@ -243,7 +243,8 @@ fn renderDragIcons(output: *const Output, now: *os.timespec) void {
 
 /// Render all override redirect xwayland windows that appear on the output
 fn renderXwaylandOverrideRedirect(output: *const Output, now: *os.timespec) void {
-    const output_box = server.root.output_layout.getBox(output.wlr_output).?;
+    var output_box: wlr.Box = undefined;
+    server.root.output_layout.getBox(output.wlr_output, &output_box);
 
     var it = server.root.xwayland_override_redirect_views.last;
     while (it) |node| : (it = node.prev) {
@@ -321,42 +322,41 @@ fn renderBorders(output: *const Output, view: *View) void {
         if (view.current.focus != 0) break :blk &config.border_color_focused;
         break :blk &config.border_color_unfocused;
     };
-    const border_width = config.border_width;
     const actual_box = if (view.saved_buffers.items.len != 0) view.saved_surface_box else view.surface_box;
 
-    var border: Box = undefined;
+    var border: wlr.Box = undefined;
 
     // left and right, covering the corners as well
-    border.y = view.current.box.y - @intCast(i32, border_width);
-    border.width = border_width;
-    border.height = actual_box.height + border_width * 2;
+    border.y = view.current.box.y - config.border_width;
+    border.width = config.border_width;
+    border.height = actual_box.height + config.border_width * 2;
 
     // left
-    border.x = view.current.box.x - @intCast(i32, border_width);
+    border.x = view.current.box.x - config.border_width;
     renderRect(output, border, color);
 
     // right
-    border.x = view.current.box.x + @intCast(i32, actual_box.width);
+    border.x = view.current.box.x + actual_box.width;
     renderRect(output, border, color);
 
     // top and bottom
     border.x = view.current.box.x;
     border.width = actual_box.width;
-    border.height = border_width;
+    border.height = config.border_width;
 
     // top
-    border.y = view.current.box.y - @intCast(i32, border_width);
+    border.y = view.current.box.y - config.border_width;
     renderRect(output, border, color);
 
     // bottom border
-    border.y = view.current.box.y + @intCast(i32, actual_box.height);
+    border.y = view.current.box.y + actual_box.height;
     renderRect(output, border, color);
 }
 
-fn renderRect(output: *const Output, box: Box, color: *const [4]f32) void {
-    var wlr_box = box.toWlrBox();
-    scaleBox(&wlr_box, output.wlr_output.scale);
-    server.renderer.renderRect(&wlr_box, color, &output.wlr_output.transform_matrix);
+fn renderRect(output: *const Output, box: wlr.Box, color: *const [4]f32) void {
+    var scaled = box;
+    scaleBox(&scaled, output.wlr_output.scale);
+    server.renderer.renderRect(&scaled, color, &output.wlr_output.transform_matrix);
 }
 
 /// Scale a wlr_box, taking the possibility of fractional scaling into account.

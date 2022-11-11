@@ -59,7 +59,7 @@ pub fn init(self: *Self, seat: *Seat, wlr_device: *wlr.InputDevice) !void {
     try self.device.init(seat, wlr_device);
     errdefer self.device.deinit();
 
-    wlr_device.device.switch_device.events.toggle.add(&self.toggle);
+    wlr_device.toSwitch().events.toggle.add(&self.toggle);
 }
 
 pub fn deinit(self: *Self) void {
@@ -83,7 +83,6 @@ fn handleToggle(listener: *wl.Listener(*wlr.Switch.event.Toggle), event: *wlr.Sw
             switch_state = switch (event.switch_state) {
                 .off => .{ .lid = .open },
                 .on => .{ .lid = .close },
-                .toggle => unreachable,
             };
         },
         .tablet_mode => {
@@ -91,7 +90,6 @@ fn handleToggle(listener: *wl.Listener(*wlr.Switch.event.Toggle), event: *wlr.Sw
             switch_state = switch (event.switch_state) {
                 .off => .{ .tablet = .off },
                 .on => .{ .tablet = .on },
-                .toggle => unreachable,
             };
         },
     }

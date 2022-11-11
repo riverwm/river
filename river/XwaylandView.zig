@@ -26,7 +26,6 @@ const wl = @import("wayland").server.wl;
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
-const Box = @import("Box.zig");
 const Output = @import("Output.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
@@ -90,7 +89,8 @@ pub fn create(output: *Output, xwayland_surface: *wlr.XwaylandSurface) error{Out
 
 pub fn needsConfigure(self: Self) bool {
     const output = self.view.output;
-    const output_box = server.root.output_layout.getBox(output.wlr_output).?;
+    var output_box: wlr.Box = undefined;
+    server.root.output_layout.getBox(output.wlr_output, &output_box);
     return self.xwayland_surface.x != self.view.pending.box.x + output_box.x or
         self.xwayland_surface.y != self.view.pending.box.y + output_box.y or
         self.xwayland_surface.width != self.view.pending.box.width or
@@ -101,7 +101,8 @@ pub fn needsConfigure(self: Self) bool {
 /// shouldTrackConfigure() is always false for xwayland views.
 pub fn configure(self: Self) void {
     const output = self.view.output;
-    const output_box = server.root.output_layout.getBox(output.wlr_output).?;
+    var output_box: wlr.Box = undefined;
+    server.root.output_layout.getBox(output.wlr_output, &output_box);
 
     const state = &self.view.pending;
     self.xwayland_surface.configure(
@@ -161,22 +162,14 @@ pub fn getConstraints(self: Self) View.Constraints {
     const hints = self.xwayland_surface.size_hints orelse return .{
         .min_width = 1,
         .min_height = 1,
-        .max_width = math.maxInt(u32),
-        .max_height = math.maxInt(u32),
+        .max_width = math.maxInt(u31),
+        .max_height = math.maxInt(u31),
     };
     return .{
-        .min_width = @intCast(u32, math.max(hints.min_width, 1)),
-        .min_height = @intCast(u32, math.max(hints.min_height, 1)),
-
-        .max_width = if (hints.max_width > 0)
-            @intCast(u32, hints.max_width)
-        else
-            math.maxInt(u32),
-
-        .max_height = if (hints.max_height > 0)
-            @intCast(u32, hints.max_height)
-        else
-            math.maxInt(u32),
+        .min_width = @intCast(u31, math.max(hints.min_width, 1)),
+        .min_height = @intCast(u31, math.max(hints.min_height, 1)),
+        .max_width = if (hints.max_width > 0) @intCast(u31, hints.max_width) else math.maxInt(u31),
+        .max_height = if (hints.max_height > 0) @intCast(u31, hints.max_height) else math.maxInt(u31),
     };
 }
 
@@ -211,18 +204,18 @@ pub fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface:
     self.view.surface_box = .{
         .x = 0,
         .y = 0,
-        .width = @intCast(u32, surface.current.width),
-        .height = @intCast(u32, surface.current.height),
+        .width = surface.current.width,
+        .height = surface.current.height,
     };
 
     // Use the view's "natural" size centered on the output as the default
     // floating dimensions
-    view.float_box.width = self.xwayland_surface.width;
-    view.float_box.height = self.xwayland_surface.height;
-    view.float_box.x = math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.width) -
-        @intCast(i32, view.float_box.width), 2));
-    view.float_box.y = math.max(0, @divTrunc(@intCast(i32, view.output.usable_box.height) -
-        @intCast(i32, view.float_box.height), 2));
+    view.float_box = .{
+        .x = @divTrunc(math.max(0, view.output.usable_box.width - self.xwayland_surface.width), 2),
+        .y = @divTrunc(math.max(0, view.output.usable_box.height - self.xwayland_surface.height), 2),
+        .width = self.xwayland_surface.width,
+        .height = self.xwayland_surface.height,
+    };
 
     const has_fixed_size = if (self.xwayland_surface.size_hints) |size_hints|
         size_hints.min_width != 0 and size_hints.min_height != 0 and
@@ -312,8 +305,8 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) voi
     self.view.surface_box = .{
         .x = 0,
         .y = 0,
-        .width = @intCast(u32, surface.current.width),
-        .height = @intCast(u32, surface.current.height),
+        .width = surface.current.width,
+        .height = surface.current.height,
     };
 }
 
