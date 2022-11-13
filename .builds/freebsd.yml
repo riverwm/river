@@ -8,6 +8,7 @@ packages:
   - devel/pkgconf
   - graphics/mesa-libs
   - graphics/wayland-protocols
+  - misc/hwdata
   - x11/libX11
   - x11/libinput
   - x11/libxcb
@@ -28,13 +29,13 @@ sources:
 tasks:
   - install_deps: |
       cd wayland
-      git checkout 1.20.0
+      git checkout 1.21.0
       meson build -Ddocumentation=false -Dtests=false --prefix /usr
       sudo ninja -C build install
       cd ..
 
       cd wlroots
-      git checkout 0.15.1
+      git checkout 0.16.0
       meson build --auto-features=enabled -Drenderers=gles2 -Dexamples=false \
             -Dwerror=false -Db_ndebug=false --prefix /usr
       sudo ninja -C build/ install
