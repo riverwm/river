@@ -1,6 +1,6 @@
 ## Contributing to river
 
-Contributing is a simple as opening a pull request on github. You'll
+Contributing is as simple as opening a pull request on github. You'll
 likely have more success with your contribution if you visit
 [#river](https://web.libera.chat/?channels=#river) on irc.libera.chat to
 discuss your plans first.
