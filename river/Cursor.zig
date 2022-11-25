@@ -531,6 +531,10 @@ fn handlePointerMapping(self: *Self, event: *wlr.Pointer.event.Button, view: *Vi
                 .command => |args| {
                     self.seat.focus(view);
                     self.seat.runCommand(args);
+                    // This is mildly inefficient as running the command may have already
+                    // started a transaction. However we need to start one after the Seat.focus()
+                    // call in the case where it didn't.
+                    server.root.startTransaction();
                 },
             }
             break true;

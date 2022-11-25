@@ -17,6 +17,7 @@
 const std = @import("std");
 const fmt = std.fmt;
 const mem = std.mem;
+const meta = std.meta;
 const wlr = @import("wlroots");
 const xkb = @import("xkbcommon");
 
@@ -135,14 +136,17 @@ pub fn mapPointer(
     const modifiers = try parseModifiers(args[2], out);
     const event_code = try parseEventCode(args[3], out);
 
-    const action = if (mem.eql(u8, args[4], "move-view"))
-        PointerMapping.ActionType.move
-    else if (mem.eql(u8, args[4], "resize-view"))
-        PointerMapping.ActionType.resize
-    else
-        PointerMapping.ActionType.command;
+    const action: meta.Tag(PointerMapping.Action) = blk: {
+        if (mem.eql(u8, args[4], "move-view")) {
+            break :blk .move;
+        } else if (mem.eql(u8, args[4], "resize-view")) {
+            break :blk .resize;
+        } else {
+            break :blk .command;
+        }
+    };
 
-    if (action != PointerMapping.ActionType.command and args.len > 5) return Error.TooManyArguments;
+    if (action != .command and args.len > 5) return Error.TooManyArguments;
 
     var new = try PointerMapping.init(
         event_code,
@@ -181,7 +185,7 @@ fn mappingExists(
     release: bool,
 ) ?usize {
     for (mappings.items) |mapping, i| {
-        if (std.meta.eql(mapping.modifiers, modifiers) and mapping.keysym == keysym and mapping.release == release) {
+        if (meta.eql(mapping.modifiers, modifiers) and mapping.keysym == keysym and mapping.release == release) {
             return i;
         }
     }
@@ -196,7 +200,7 @@ fn switchMappingExists(
     switch_state: Switch.State,
 ) ?usize {
     for (switch_mappings.items) |mapping, i| {
-        if (mapping.switch_type == switch_type and std.meta.eql(mapping.switch_state, switch_state)) {
+        if (mapping.switch_type == switch_type and meta.eql(mapping.switch_state, switch_state)) {
             return i;
         }
     }
@@ -211,7 +215,7 @@ fn pointerMappingExists(
     event_code: u32,
 ) ?usize {
     for (pointer_mappings.items) |mapping, i| {
-        if (std.meta.eql(mapping.modifiers, modifiers) and mapping.event_code == event_code) {
+        if (meta.eql(mapping.modifiers, modifiers) and mapping.event_code == event_code) {
             return i;
         }
     }
@@ -270,7 +274,7 @@ fn parseSwitchType(
     switch_type_str: []const u8,
     out: *?[]const u8,
 ) !Switch.Type {
-    return std.meta.stringToEnum(Switch.Type, switch_type_str) orelse {
+    return meta.stringToEnum(Switch.Type, switch_type_str) orelse {
         out.* = try std.fmt.allocPrint(
             util.gpa,
             "invalid switch '{s}', must be 'lid' or 'tablet'",
@@ -287,7 +291,7 @@ fn parseSwitchState(
 ) !Switch.State {
     switch (switch_type) {
         .lid => {
-            const lid_state = std.meta.stringToEnum(
+            const lid_state = meta.stringToEnum(
                 Switch.LidState,
                 switch_state_str,
             ) orelse {
@@ -301,7 +305,7 @@ fn parseSwitchState(
             return Switch.State{ .lid = lid_state };
         },
         .tablet => {
-            const tablet_state = std.meta.stringToEnum(
+            const tablet_state = meta.stringToEnum(
                 Switch.TabletState,
                 switch_state_str,
             ) orelse {

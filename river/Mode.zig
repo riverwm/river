@@ -32,6 +32,7 @@ pub fn deinit(self: *Self) void {
     util.gpa.free(self.name);
     for (self.mappings.items) |m| m.deinit();
     self.mappings.deinit(util.gpa);
+    for (self.pointer_mappings.items) |*m| m.deinit();
     self.pointer_mappings.deinit(util.gpa);
     self.switch_mappings.deinit(util.gpa);
 }

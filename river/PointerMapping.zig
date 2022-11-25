@@ -17,17 +17,12 @@
 const Self = @This();
 
 const std = @import("std");
+const assert = std.debug.assert;
 const wlr = @import("wlroots");
 
 const util = @import("util.zig");
 
-pub const ActionType = enum {
-    move,
-    resize,
-    command,
-};
-
-pub const Action = union(ActionType) {
+pub const Action = union(enum) {
     move: void,
     resize: void,
     command: []const [:0]const u8,
@@ -36,31 +31,32 @@ pub const Action = union(ActionType) {
 event_code: u32,
 modifiers: wlr.Keyboard.ModifierMask,
 action: Action,
-arena: std.heap.ArenaAllocator,
+/// Owns the memory backing the arguments if action is a command.
+arena_state: std.heap.ArenaAllocator.State,
 
 pub fn init(
     event_code: u32,
     modifiers: wlr.Keyboard.ModifierMask,
-    action_type: ActionType,
+    action_type: std.meta.Tag(Action),
     command_args: []const [:0]const u8,
 ) !Self {
-    var arena: std.heap.ArenaAllocator = std.heap.ArenaAllocator.init(util.gpa);
+    assert(action_type == .command or command_args.len == 1);
+
+    var arena = std.heap.ArenaAllocator.init(util.gpa);
     errdefer arena.deinit();
 
     const action: Action = switch (action_type) {
-        ActionType.move => Action.move,
-        ActionType.resize => Action.resize,
-        ActionType.command => blk: {
-            const allocator: std.mem.Allocator = arena.allocator();
+        .move => .move,
+        .resize => .resize,
+        .command => blk: {
+            const arena_allocator = arena.allocator();
 
-            var owned_args = try std.ArrayListUnmanaged([:0]const u8).initCapacity(allocator, command_args.len);
-
-            for (command_args) |arg| {
-                const owned = try allocator.dupeZ(u8, arg);
-                owned_args.appendAssumeCapacity(owned);
+            const owned_args = try arena_allocator.alloc([:0]const u8, command_args.len);
+            for (command_args) |arg, i| {
+                owned_args[i] = try arena_allocator.dupeZ(u8, arg);
             }
 
-            break :blk Action{ .command = owned_args.toOwnedSlice(allocator) };
+            break :blk .{ .command = owned_args };
         },
     };
 
@@ -68,10 +64,11 @@ pub fn init(
         .event_code = event_code,
         .modifiers = modifiers,
         .action = action,
-        .arena = arena,
+        .arena_state = arena.state,
     };
 }
 
 pub fn deinit(self: *Self) void {
-    self.arena.deinit();
+    self.arena_state.promote(util.gpa).deinit();
+    self.* = undefined;
 }

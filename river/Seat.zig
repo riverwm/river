@@ -442,12 +442,7 @@ pub fn runCommand(self: *Self, args: []const [:0]const u8) void {
             command.Error.Other => out.?,
             else => command.errToMsg(err),
         };
-
-        if (args.len == 0) {
-            std.log.scoped(.command).err("{s}", .{failure_message});
-        } else {
-            std.log.scoped(.command).err("{s}: {s}", .{ args[0], failure_message });
-        }
+        std.log.scoped(.command).err("{s}: {s}", .{ args[0], failure_message });
         return;
     };
     if (out) |s| {
