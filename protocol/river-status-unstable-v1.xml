@@ -95,7 +95,7 @@
     <event name="layout_name_clear" since="4">
       <description summary="name of the layout">
         Sent when the current layout name has been removed without a new one
-        being set, for example whent the active layout generator disconnects.
+        being set, for example when the active layout generator disconnects.
       </description>
     </event>
   </interface>
