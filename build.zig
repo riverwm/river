@@ -112,7 +112,7 @@ pub fn build(b: *zbs.Builder) !void {
     scanner.generate("ext_session_lock_manager_v1", 1);
 
     scanner.generate("zriver_control_v1", 1);
-    scanner.generate("zriver_status_manager_v1", 3);
+    scanner.generate("zriver_status_manager_v1", 4);
     scanner.generate("river_layout_manager_v3", 2);
 
     scanner.generate("zwlr_layer_shell_v1", 4);
