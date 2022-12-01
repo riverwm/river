@@ -84,7 +84,7 @@
       <arg name="tags" type="uint" summary="32-bit bitfield"/>
     </event>
 
-    <event name="layout_name" since="3">
+    <event name="layout_name" since="4">
       <description summary="name of the layout">
         Sent once on binding the interface should a layout name exist and again
         whenever the name changes.
@@ -92,7 +92,7 @@
       <arg name="name" type="string" summary="layout name"/>
     </event>
 
-    <event name="layout_name_clear" since="3">
+    <event name="layout_name_clear" since="4">
       <description summary="name of the layout">
         Sent when the current layout name has been removed without a new one
         being set, for example whent the active layout generator disconnects.
