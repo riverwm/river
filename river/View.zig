@@ -127,7 +127,7 @@ request_activate: wl.Listener(*wlr.XdgActivationV1.event.RequestActivate) =
 
 pub fn init(self: *Self, output: *Output, impl: Impl) void {
     const initial_tags = blk: {
-        const tags = output.current.tags & server.config.spawn_tagmask;
+        const tags = output.current.tags & server.config.spawn_tagmask & output.spawn_tagmask;
         break :blk if (tags != 0) tags else output.current.tags;
     };
 

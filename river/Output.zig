@@ -91,6 +91,9 @@ layout_namespace: ?[]const u8 = null,
 /// The last set layout name.
 layout_name: ?[:0]const u8 = null,
 
+/// Bitmask that whitelists tags for newly spawned views
+spawn_tagmask: u32 = math.maxInt(u32),
+
 /// List of status tracking objects relaying changes to this output to clients.
 status_trackers: std.SinglyLinkedList(OutputStatus) = .{},
 

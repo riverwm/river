@@ -79,6 +79,7 @@ const command_impls = std.ComptimeStringMap(
         .{ "snap",                      @import("command/move.zig").snap },
         .{ "spawn",                     @import("command/spawn.zig").spawn },
         .{ "spawn-tagmask",             @import("command/tags.zig").spawnTagmask },
+        .{ "global-spawn-tagmask",      @import("command/tags.zig").spawnTagmaskGlobal },
         .{ "swap",                      @import("command/swap.zig").swap},
         .{ "toggle-float",              @import("command/toggle_float.zig").toggleFloat },
         .{ "toggle-focused-tags",       @import("command/tags.zig").toggleFocusedTags },
