@@ -149,6 +149,14 @@ touch_motion: wl.Listener(*wlr.Touch.event.Motion) =
     wl.Listener(*wlr.Touch.event.Motion).init(handleTouchMotion),
 touch_frame: wl.Listener(void) = wl.Listener(void).init(handleTouchFrame),
 
+tablet_tool_axis: wl.Listener(*wlr.Tablet.event.Axis) =
+    wl.Listener(*wlr.Tablet.event.Axis).init(handleTabletToolAxis),
+tablet_tool_tip: wl.Listener(*wlr.Tablet.event.Tip) =
+    wl.Listener(*wlr.Tablet.event.Tip).init(handleTabletToolTip),
+// TODO:
+// tablet_tool_proximity: wl.Signal(*wlr.Tablet.event.Proximity),
+// tablet_tool_button: wl.Signal(*wlr.Tablet.event.Button),
+
 pub fn init(self: *Self, seat: *Seat) !void {
     const wlr_cursor = try wlr.Cursor.create();
     errdefer wlr_cursor.destroy();
@@ -196,6 +204,9 @@ pub fn init(self: *Self, seat: *Seat) !void {
     wlr_cursor.events.touch_down.add(&self.touch_down);
     wlr_cursor.events.touch_motion.add(&self.touch_motion);
     wlr_cursor.events.touch_frame.add(&self.touch_frame);
+
+    wlr_cursor.events.tablet_tool_axis.add(&self.tablet_tool_axis);
+    wlr_cursor.events.tablet_tool_tip.add(&self.tablet_tool_tip);
 }
 
 pub fn deinit(self: *Self) void {
@@ -297,40 +308,38 @@ fn handleAxis(listener: *wl.Listener(*wlr.Pointer.event.Axis), event: *wlr.Point
     );
 }
 
-fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.Pointer.event.Button) void {
-    const self = @fieldParentPtr(Self, "button", listener);
-
+fn handleButtonImpl(self: *Self, time_msec: u32, button: u32, state: wl.Pointer.ButtonState) void {
     self.seat.handleActivity();
     self.unhide();
 
-    if (event.state == .released) {
+    if (state == .released) {
         assert(self.pressed_count > 0);
         self.pressed_count -= 1;
         if (self.pressed_count == 0 and self.mode != .passthrough) {
-            self.leaveMode(event);
+            self.leaveMode(time_msec, button, state);
         } else {
-            _ = self.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
+            _ = self.seat.wlr_seat.pointerNotifyButton(time_msec, button, state);
         }
         return;
     }
 
-    assert(event.state == .pressed);
+    assert(state == .pressed);
     self.pressed_count += 1;
 
     if (self.pressed_count > 1) {
-        _ = self.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
+        _ = self.seat.wlr_seat.pointerNotifyButton(time_msec, button, state);
         return;
     }
 
     if (self.surfaceAt()) |result| {
-        if (result.parent == .view and self.handlePointerMapping(event, result.parent.view)) {
+        if (result.parent == .view and self.handlePointerMapping(button, result.parent.view)) {
             // If a mapping is triggered don't send events to clients.
             return;
         }
 
         self.updateKeyboardFocus(result);
 
-        _ = self.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
+        _ = self.seat.wlr_seat.pointerNotifyButton(time_msec, button, state);
 
         self.mode = .{
             .down = .{
@@ -345,6 +354,11 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
     }
 
     server.root.startTransaction();
+}
+
+fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.Pointer.event.Button) void {
+    const self = @fieldParentPtr(Self, "button", listener);
+    self.handleButtonImpl(event.time_msec, event.button, event.state);
 }
 
 fn updateKeyboardFocus(self: Self, result: SurfaceAtResult) void {
@@ -535,14 +549,14 @@ fn handleTouchFrame(listener: *wl.Listener(void)) void {
 
 /// Handle the mapping for the passed button if any. Returns true if there
 /// was a mapping and the button was handled.
-fn handlePointerMapping(self: *Self, event: *wlr.Pointer.event.Button, view: *View) bool {
+fn handlePointerMapping(self: *Self, button: u32, view: *View) bool {
     const wlr_keyboard = self.seat.wlr_seat.getKeyboard() orelse return false;
     const modifiers = wlr_keyboard.getModifiers();
 
     const fullscreen = view.current.fullscreen or view.pending.fullscreen;
 
     return for (server.config.modes.items[self.seat.mode_id].pointer_mappings.items) |mapping| {
-        if (event.button == mapping.event_code and std.meta.eql(modifiers, mapping.modifiers)) {
+        if (button == mapping.event_code and std.meta.eql(modifiers, mapping.modifiers)) {
             switch (mapping.action) {
                 .move => if (!fullscreen) self.enterMode(.move, view),
                 .resize => if (!fullscreen) self.enterMode(.resize, view),
@@ -929,21 +943,21 @@ pub fn enterMode(self: *Self, mode: enum { move, resize }, view: *View) void {
 }
 
 /// Return from down/move/resize to passthrough
-fn leaveMode(self: *Self, event: *wlr.Pointer.event.Button) void {
+fn leaveMode(self: *Self, time_msec: u32, button: u32, state: wl.Pointer.ButtonState) void {
     log.debug("leave {s} mode", .{@tagName(self.mode)});
 
     switch (self.mode) {
         .passthrough => unreachable,
         .down => {
             // If we were in down mode, we need pass along the release event
-            _ = self.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
+            _ = self.seat.wlr_seat.pointerNotifyButton(time_msec, button, state);
         },
         .move => {},
         .resize => |resize| resize.view.setResizing(false),
     }
 
     self.mode = .passthrough;
-    self.passthrough(event.time_msec);
+    self.passthrough(time_msec);
 }
 
 fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64, delta_y: f64, unaccel_dx: f64, unaccel_dy: f64) void {
@@ -1182,4 +1196,41 @@ fn warp(self: *Self) void {
             log.err("failed to warp cursor on focus change", .{});
         }
     }
+}
+
+fn handleTabletToolAxis(listener: *wl.Listener(*wlr.Tablet.event.Axis), event: *wlr.Tablet.event.Axis) void {
+    const self = @fieldParentPtr(Self, "tablet_tool_axis", listener);
+
+    self.seat.handleActivity();
+
+    var lx: f64 = undefined;
+    var ly: f64 = undefined;
+    self.wlr_cursor.absoluteToLayoutCoords(event.device, event.x, event.y, &lx, &ly);
+
+    var dx = lx - self.wlr_cursor.x;
+    var dy = ly - self.wlr_cursor.y;
+    if (!event.updated_axes.x)
+        dx = 0;
+    if (!event.updated_axes.y) {
+        dy = 0;
+    }
+
+    self.processMotion(event.device, event.time_msec, dx, dy, dx, dy);
+    self.seat.wlr_seat.pointerNotifyFrame();
+}
+
+fn handleTabletToolTip(listener: *wl.Listener(*wlr.Tablet.event.Tip), event: *wlr.Tablet.event.Tip) void {
+    const self = @fieldParentPtr(Self, "tablet_tool_tip", listener);
+
+    var state: wl.Pointer.ButtonState = undefined;
+    if (event.state == .up) {
+        state = .released;
+    } else {
+        assert(event.state == .down);
+        state = .pressed;
+    }
+
+    self.handleButtonImpl(event.time_msec, 0x110, state); // 0x110 is BTN_LEFT
+
+    self.seat.wlr_seat.pointerNotifyFrame();
 }

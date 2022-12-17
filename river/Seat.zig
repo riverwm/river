@@ -487,7 +487,7 @@ fn tryAddDevice(self: *Self, wlr_device: *wlr.InputDevice) !void {
                 self.keyboardNotifyEnter(wlr_surface);
             }
         },
-        .pointer, .touch => {
+        .pointer, .touch, .tablet_tool => {
             const device = try util.gpa.create(InputDevice);
             errdefer util.gpa.destroy(device);
 
@@ -501,9 +501,7 @@ fn tryAddDevice(self: *Self, wlr_device: *wlr.InputDevice) !void {
 
             try switch_device.init(self, wlr_device);
         },
-
-        // TODO Support these types of input devices.
-        .tablet_tool, .tablet_pad => return,
+        .tablet_pad => {}, // TODO: implement
     }
 }
 
@@ -518,8 +516,8 @@ pub fn updateCapabilities(self: *Self) void {
             switch (device.wlr_device.type) {
                 .keyboard => capabilities.keyboard = true,
                 .touch => capabilities.touch = true,
-                .pointer, .switch_device => {},
-                .tablet_tool, .tablet_pad => unreachable,
+                .pointer, .tablet_tool => {}, // Pointer capability is already set
+                .switch_device, .tablet_pad => {},
             }
         }
     }
