@@ -151,7 +151,7 @@ pub fn focus(self: *Self, _target: ?*View) void {
     var target = _target;
 
     // Views may not recieve focus while locked.
-    if (server.lock_manager.locked) return;
+    if (server.lock_manager.state != .unlocked) return;
 
     // While a layer surface is focused, views may not recieve focus
     if (self.focused == .layer) return;
@@ -242,17 +242,17 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
     // Set the new focus
     switch (new_focus) {
         .view => |target_view| {
-            assert(!server.lock_manager.locked);
+            assert(server.lock_manager.state == .unlocked);
             assert(self.focused_output == target_view.output);
             if (target_view.pending.focus == 0) target_view.setActivated(true);
             target_view.pending.focus += 1;
             target_view.pending.urgent = false;
         },
         .layer => |target_layer| {
-            assert(!server.lock_manager.locked);
+            assert(server.lock_manager.state == .unlocked);
             assert(self.focused_output == target_layer.output);
         },
-        .lock_surface => assert(server.lock_manager.locked),
+        .lock_surface => assert(server.lock_manager.state != .unlocked),
         .xwayland_override_redirect, .none => {},
     }
     self.focused = new_focus;

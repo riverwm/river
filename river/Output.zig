@@ -69,6 +69,11 @@ usable_box: wlr.Box,
 views: ViewStack(View) = .{},
 
 lock_surface: ?*LockSurface = null,
+lock_render_state: enum {
+    unlocked,
+    blanked,
+    lock_surface,
+} = .unlocked,
 
 /// The double-buffered state of the output.
 current: State = State{ .tags = 1 << 0 },

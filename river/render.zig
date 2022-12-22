@@ -63,7 +63,13 @@ pub fn renderOutput(output: *Output) void {
 
     server.renderer.begin(@intCast(u32, output.wlr_output.width), @intCast(u32, output.wlr_output.height));
 
-    if (server.lock_manager.locked) {
+    // In order to avoid flashing a blank black screen as the session is locked
+    // continue to render the unlocked session until either a lock surface is
+    // created or waiting for lock surfaces times out.
+    if (server.lock_manager.state == .locked or
+        (server.lock_manager.state == .waiting_for_lock_surfaces and output.lock_surface != null) or
+        server.lock_manager.state == .waiting_for_blank)
+    {
         server.renderer.clear(&[_]f32{ 0, 0, 0, 1 }); // solid black
 
         // TODO: this isn't frame-perfect if the output mode is changed. We
@@ -87,10 +93,19 @@ pub fn renderOutput(output: *Output) void {
 
         output.wlr_output.renderSoftwareCursors(null);
         server.renderer.end();
-        output.wlr_output.commit() catch
+        output.wlr_output.commit() catch {
             log.err("output commit failed for {s}", .{output.wlr_output.name});
+            return;
+        };
+
+        output.lock_render_state = if (output.lock_surface != null) .lock_surface else .blanked;
+        if (server.lock_manager.state != .locked) {
+            server.lock_manager.maybeLock();
+        }
+
         return;
     }
+    output.lock_render_state = .unlocked;
 
     // Find the first visible fullscreen view in the stack if there is one
     var it = ViewStack(View).iter(output.views.first, .forward, output.current.tags, renderFilter);

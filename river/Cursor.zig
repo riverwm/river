@@ -352,7 +352,7 @@ fn updateKeyboardFocus(self: Self, result: SurfaceAtResult) void {
             }
         },
         .lock_surface => |lock_surface| {
-            assert(server.lock_manager.locked);
+            assert(server.lock_manager.state != .unlocked);
             self.seat.setFocusRaw(.{ .lock_surface = lock_surface });
         },
         .xwayland_override_redirect => |override_redirect| {
@@ -664,7 +664,7 @@ fn surfaceAtCoords(lx: f64, ly: f64) ?SurfaceAtResult {
     var oy = ly;
     server.root.output_layout.outputCoords(wlr_output, &ox, &oy);
 
-    if (server.lock_manager.locked) {
+    if (server.lock_manager.state != .unlocked) {
         if (output.lock_surface) |lock_surface| {
             var sx: f64 = undefined;
             var sy: f64 = undefined;
@@ -1083,7 +1083,7 @@ fn shouldPassthrough(self: Self) bool {
             return false;
         },
         .resize, .move => {
-            assert(!server.lock_manager.locked);
+            assert(server.lock_manager.state == .unlocked);
             const target = if (self.mode == .resize) self.mode.resize.view else self.mode.move.view;
             // The target view is no longer visible, is part of the layout, or is fullscreen.
             return target.current.tags & target.output.current.tags == 0 or
@@ -1098,7 +1098,7 @@ fn passthrough(self: *Self, time: u32) void {
     assert(self.mode == .passthrough);
 
     if (self.surfaceAt()) |result| {
-        assert((result.parent == .lock_surface) == server.lock_manager.locked);
+        assert((result.parent == .lock_surface) == (server.lock_manager.state != .unlocked));
         self.seat.wlr_seat.pointerNotifyEnter(result.surface, result.sx, result.sy);
         self.seat.wlr_seat.pointerNotifyMotion(time, result.sx, result.sy);
     } else {

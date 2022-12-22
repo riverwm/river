@@ -28,8 +28,27 @@ const LockSurface = @import("LockSurface.zig");
 
 const log = std.log.scoped(.session_lock);
 
-locked: bool = false,
+state: enum {
+    /// No lock request has been made and the session is unlocked.
+    unlocked,
+    /// A lock request has been made and river is waiting for all outputs to have
+    /// rendered a lock surface before sending the locked event.
+    waiting_for_lock_surfaces,
+    /// A lock request has been made but waiting for a lock surface to be rendered
+    /// on all outputs timed out. Now river is waiting only for all outputs to at
+    /// least be blanked before sending the locked event.
+    waiting_for_blank,
+    /// All outputs are either blanked or have a lock surface rendered and the
+    /// locked event has been sent.
+    locked,
+} = .unlocked,
 lock: ?*wlr.SessionLockV1 = null,
+
+/// Limit on how long the locked event will be delayed to wait for
+/// lock surfaces to be created and rendered. If this times out, then
+/// the locked event will be sent immediately after all outputs have
+/// been blanked.
+lock_surfaces_timer: *wl.EventSource,
 
 new_lock: wl.Listener(*wlr.SessionLockV1) = wl.Listener(*wlr.SessionLockV1).init(handleLock),
 unlock: wl.Listener(void) = wl.Listener(void).init(handleUnlock),
@@ -38,7 +57,14 @@ new_surface: wl.Listener(*wlr.SessionLockSurfaceV1) =
     wl.Listener(*wlr.SessionLockSurfaceV1).init(handleSurface),
 
 pub fn init(manager: *LockManager) !void {
-    manager.* = .{};
+    const event_loop = server.wl_server.getEventLoop();
+    const timer = try event_loop.addTimer(*LockManager, handleLockSurfacesTimeout, manager);
+    errdefer timer.remove();
+
+    manager.* = .{
+        .lock_surfaces_timer = timer,
+    };
+
     const wlr_manager = try wlr.SessionLockManagerV1.create(server.wl_server);
     wlr_manager.events.new_lock.add(&manager.new_lock);
 }
@@ -46,6 +72,8 @@ pub fn init(manager: *LockManager) !void {
 pub fn deinit(manager: *LockManager) void {
     // deinit() should only be called after wl.Server.destroyClients()
     assert(manager.lock == null);
+
+    manager.lock_surfaces_timer.remove();
 
     manager.new_lock.link.remove();
 }
@@ -60,24 +88,32 @@ fn handleLock(listener: *wl.Listener(*wlr.SessionLockV1), lock: *wlr.SessionLock
     }
 
     manager.lock = lock;
-    lock.sendLocked();
 
-    if (!manager.locked) {
-        manager.locked = true;
+    if (manager.state == .unlocked) {
+        manager.state = .waiting_for_lock_surfaces;
 
-        var it = server.input_manager.seats.first;
-        while (it) |node| : (it = node.next) {
-            const seat = &node.data;
-            seat.setFocusRaw(.none);
-            seat.cursor.updateState();
+        manager.lock_surfaces_timer.timerUpdate(200) catch {
+            log.err("error setting lock surfaces timer, imperfect frames may be shown", .{});
+            manager.state = .waiting_for_blank;
+        };
 
-            // Enter locked mode
-            seat.prev_mode_id = seat.mode_id;
-            seat.enterMode(1);
+        {
+            var it = server.input_manager.seats.first;
+            while (it) |node| : (it = node.next) {
+                const seat = &node.data;
+                seat.setFocusRaw(.none);
+                seat.cursor.updateState();
+
+                // Enter locked mode
+                seat.prev_mode_id = seat.mode_id;
+                seat.enterMode(1);
+            }
+        }
+    } else {
+        if (manager.state == .locked) {
+            lock.sendLocked();
         }
 
-        log.info("session locked", .{});
-    } else {
         log.info("new session lock client given control of already locked session", .{});
     }
 
@@ -86,11 +122,71 @@ fn handleLock(listener: *wl.Listener(*wlr.SessionLockV1), lock: *wlr.SessionLock
     lock.events.destroy.add(&manager.destroy);
 }
 
+fn handleLockSurfacesTimeout(manager: *LockManager) callconv(.C) c_int {
+    log.err("waiting for lock surfaces timed out, imperfect frames may be shown", .{});
+
+    assert(manager.state == .waiting_for_lock_surfaces);
+    manager.state = .waiting_for_blank;
+
+    {
+        var it = server.root.outputs.first;
+        while (it) |node| : (it = node.next) {
+            const output = &node.data;
+            if (output.lock_render_state == .unlocked) {
+                output.damage.?.addWhole();
+            }
+        }
+    }
+
+    return 0;
+}
+
+pub fn maybeLock(manager: *LockManager) void {
+    var all_outputs_blanked = true;
+    var all_outputs_rendered_lock_surface = true;
+    {
+        var it = server.root.outputs.first;
+        while (it) |node| : (it = node.next) {
+            const output = &node.data;
+            switch (output.lock_render_state) {
+                .unlocked => {
+                    all_outputs_blanked = false;
+                    all_outputs_rendered_lock_surface = false;
+                },
+                .blanked => {
+                    all_outputs_rendered_lock_surface = false;
+                },
+                .lock_surface => {},
+            }
+        }
+    }
+
+    switch (manager.state) {
+        .waiting_for_lock_surfaces => if (all_outputs_rendered_lock_surface) {
+            log.info("session locked", .{});
+            manager.lock.?.sendLocked();
+            manager.state = .locked;
+            manager.lock_surfaces_timer.timerUpdate(0) catch {};
+        },
+        .waiting_for_blank => if (all_outputs_blanked) {
+            log.info("session locked", .{});
+            manager.lock.?.sendLocked();
+            manager.state = .locked;
+        },
+        .unlocked, .locked => unreachable,
+    }
+}
+
 fn handleUnlock(listener: *wl.Listener(void)) void {
     const manager = @fieldParentPtr(LockManager, "unlock", listener);
 
-    assert(manager.locked);
-    manager.locked = false;
+    // TODO(wlroots): this will soon be handled by the wlroots session lock implementation
+    if (manager.state != .locked) {
+        manager.lock.?.resource.postError(.invalid_unlock, "the locked event was never sent");
+        return;
+    }
+
+    manager.state = .unlocked;
 
     log.info("session unlocked", .{});
 
@@ -120,6 +216,10 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
     manager.destroy.link.remove();
 
     manager.lock = null;
+    if (manager.state == .waiting_for_lock_surfaces) {
+        manager.state = .waiting_for_blank;
+        manager.lock_surfaces_timer.timerUpdate(0) catch {};
+    }
 }
 
 fn handleSurface(
@@ -130,7 +230,7 @@ fn handleSurface(
 
     log.debug("new ext_session_lock_surface_v1 created", .{});
 
-    assert(manager.locked);
+    assert(manager.state != .unlocked);
     assert(manager.lock != null);
 
     LockSurface.create(wlr_lock_surface, manager.lock.?);
