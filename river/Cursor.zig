@@ -1125,11 +1125,16 @@ fn warp(self: *Self) void {
                 .width = view.current.box.width,
                 .height = view.current.box.height,
             },
-            .xwayland_override_redirect => |or_window| wlr.Box{
-                .x = or_window.xwayland_surface.x,
-                .y = or_window.xwayland_surface.y,
-                .width = or_window.xwayland_surface.width,
-                .height = or_window.xwayland_surface.height,
+            .xwayland_override_redirect => |or_window| blk: {
+                assert(build_options.xwayland);
+                // TODO(zig): remove this line when updating to the self hosted compiler.
+                if (!build_options.xwayland) return;
+                break :blk wlr.Box{
+                    .x = or_window.xwayland_surface.x,
+                    .y = or_window.xwayland_surface.y,
+                    .width = or_window.xwayland_surface.width,
+                    .height = or_window.xwayland_surface.height,
+                };
             },
         },
     };

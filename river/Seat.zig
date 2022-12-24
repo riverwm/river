@@ -49,7 +49,7 @@ const PointerConstraint = @import("PointerConstraint.zig");
 
 pub const FocusTarget = union(enum) {
     view: *View,
-    xwayland_override_redirect: *XwaylandOverrideRedirect,
+    xwayland_override_redirect: if (build_options.xwayland) *XwaylandOverrideRedirect else void,
     layer: *LayerSurface,
     lock_surface: *LockSurface,
     none: void,
@@ -221,6 +221,8 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
         .view => |target_view| target_view.surface.?,
         .xwayland_override_redirect => |target_override_redirect| blk: {
             assert(build_options.xwayland);
+            // TODO(zig): remove this line when updating to the self hosted compiler.
+            if (!build_options.xwayland) return;
             break :blk target_override_redirect.xwayland_surface.surface;
         },
         .layer => |target_layer| target_layer.wlr_layer_surface.surface,
