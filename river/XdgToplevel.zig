@@ -216,14 +216,12 @@ fn handleMap(listener: *wl.Listener(void)) void {
 
     if (self.xdg_toplevel.parent != null or has_fixed_size) {
         // If the self.xdg_toplevel has a parent or has a fixed size make it float
-        view.current.float = true;
         view.pending.float = true;
-        view.pending.box = view.float_box;
     } else if (server.config.shouldFloat(view)) {
-        view.current.float = true;
         view.pending.float = true;
-        view.pending.box = view.float_box;
     }
+
+    self.view.pending.fullscreen = self.xdg_toplevel.requested.fullscreen;
 
     // If the view has an app_id or title which is not configured to use client
     // side decorations, inform it that it is tiled.

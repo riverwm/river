@@ -43,7 +43,7 @@ xwayland_surface: *wlr.XwaylandSurface,
 /// The wlroots Xwayland implementation overwrites xwayland_surface.fullscreen
 /// immediately when the client requests it, so we track this state here to be
 /// able to match the XdgToplevel API.
-last_set_fullscreen_state: bool,
+last_set_fullscreen_state: bool = false,
 
 // Listeners that are always active over the view's lifetime
 destroy: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleDestroy),
@@ -71,7 +71,6 @@ pub fn create(output: *Output, xwayland_surface: *wlr.XwaylandSurface) error{Out
     view.init(output, .{ .xwayland_view = .{
         .view = view,
         .xwayland_surface = xwayland_surface,
-        .last_set_fullscreen_state = xwayland_surface.fullscreen,
     } });
 
     const self = &node.view.impl.xwayland_view;
@@ -225,14 +224,12 @@ pub fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface:
 
     if (self.xwayland_surface.parent != null or has_fixed_size) {
         // If the toplevel has a parent or has a fixed size make it float
-        view.current.float = true;
         view.pending.float = true;
-        view.pending.box = view.float_box;
     } else if (server.config.shouldFloat(view)) {
-        view.current.float = true;
         view.pending.float = true;
-        view.pending.box = view.float_box;
     }
+
+    view.pending.fullscreen = xwayland_surface.fullscreen;
 
     view.map() catch {
         log.err("out of memory", .{});

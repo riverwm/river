@@ -510,9 +510,7 @@ pub fn map(self: *Self) !void {
 
     self.output.sendViewTags();
 
-    if (!self.current.float) self.output.arrangeViews();
-
-    server.root.startTransaction();
+    self.applyPending();
 }
 
 /// Called by the impl when the surface will no longer be displayed
