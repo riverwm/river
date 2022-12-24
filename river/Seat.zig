@@ -326,7 +326,7 @@ pub fn focusOutput(self: *Self, output: *Output) void {
 }
 
 pub fn handleActivity(self: Self) void {
-    server.input_manager.idle.notifyActivity(self.wlr_seat);
+    server.input_manager.idle_notifier.notifyActivity(self.wlr_seat);
 }
 
 pub fn handleViewMap(self: *Self, view: *View) !void {

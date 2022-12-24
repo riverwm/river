@@ -128,7 +128,7 @@ pub fn init(self: *Self) !void {
     try self.control.init();
     try self.status_manager.init();
     try self.layout_manager.init();
-    try self.idle_inhibitor_manager.init(self.input_manager.idle);
+    try self.idle_inhibitor_manager.init();
     try self.lock_manager.init();
 
     // These all free themselves when the wl_server is destroyed

@@ -39,7 +39,7 @@ const log = std.log.scoped(.input_manager);
 
 new_input: wl.Listener(*wlr.InputDevice) = wl.Listener(*wlr.InputDevice).init(handleNewInput),
 
-idle: *wlr.Idle,
+idle_notifier: *wlr.IdleNotifierV1,
 pointer_constraints: *wlr.PointerConstraintsV1,
 relative_pointer_manager: *wlr.RelativePointerManagerV1,
 virtual_pointer_manager: *wlr.VirtualPointerManagerV1,
@@ -64,7 +64,7 @@ pub fn init(self: *Self) !void {
 
     self.* = .{
         // These are automatically freed when the display is destroyed
-        .idle = try wlr.Idle.create(server.wl_server),
+        .idle_notifier = try wlr.IdleNotifierV1.create(server.wl_server),
         .pointer_constraints = try wlr.PointerConstraintsV1.create(server.wl_server),
         .relative_pointer_manager = try wlr.RelativePointerManagerV1.create(server.wl_server),
         .virtual_pointer_manager = try wlr.VirtualPointerManagerV1.create(server.wl_server),

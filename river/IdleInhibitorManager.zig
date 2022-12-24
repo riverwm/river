@@ -13,11 +13,9 @@ const IdleInhibitor = @import("IdleInhibitor.zig");
 idle_inhibit_manager: *wlr.IdleInhibitManagerV1,
 new_idle_inhibitor: wl.Listener(*wlr.IdleInhibitorV1),
 inhibitors: std.TailQueue(IdleInhibitor) = .{},
-idle: *wlr.Idle,
 
-pub fn init(self: *Self, idle: *wlr.Idle) !void {
+pub fn init(self: *Self) !void {
     self.idle_inhibit_manager = try wlr.IdleInhibitManagerV1.create(server.wl_server);
-    self.idle = idle;
     self.new_idle_inhibitor.setNotify(handleNewIdleInhibitor);
     self.idle_inhibit_manager.events.new_inhibitor.add(&self.new_idle_inhibitor);
 }
@@ -48,7 +46,7 @@ pub fn idleInhibitCheckActive(self: *Self) void {
         }
     }
 
-    self.idle.setEnabled(null, !inhibited);
+    server.input_manager.idle_notifier.setInhibited(inhibited);
 }
 
 fn handleNewIdleInhibitor(listener: *wl.Listener(*wlr.IdleInhibitorV1), inhibitor: *wlr.IdleInhibitorV1) void {
