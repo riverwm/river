@@ -25,24 +25,23 @@ const util = @import("util.zig");
 keysym: xkb.Keysym,
 modifiers: wlr.Keyboard.ModifierMask,
 command_args: []const [:0]const u8,
+options: Options,
 
-// This is set for mappings with layout-pinning
-// If set, the layout with this index is always used to translate the given keycode
-layout_index: ?u32,
-
-/// When set to true the mapping will be executed on key release rather than on press
-release: bool,
-
-/// When set to true the mapping will be executed repeatedly while key is pressed
-repeat: bool,
+pub const Options = struct {
+    /// When set to true the mapping will be executed on key release rather than on press
+    release: bool,
+    /// When set to true the mapping will be executed repeatedly while key is pressed
+    repeat: bool,
+    // This is set for mappings with layout-pinning
+    // If set, the layout with this index is always used to translate the given keycode
+    layout_index: ?u32,
+};
 
 pub fn init(
     keysym: xkb.Keysym,
     modifiers: wlr.Keyboard.ModifierMask,
-    release: bool,
-    repeat: bool,
-    layout_index: ?u32,
     command_args: []const []const u8,
+    options: Options,
 ) !Self {
     const owned_args = try util.gpa.alloc([:0]u8, command_args.len);
     errdefer util.gpa.free(owned_args);
@@ -53,10 +52,8 @@ pub fn init(
     return Self{
         .keysym = keysym,
         .modifiers = modifiers,
-        .release = release,
-        .repeat = repeat,
-        .layout_index = layout_index,
         .command_args = owned_args,
+        .options = options,
     };
 }
 
@@ -73,14 +70,14 @@ pub fn match(
     released: bool,
     xkb_state: *xkb.State,
 ) bool {
-    if (released != self.release) return false;
+    if (released != self.options.release) return false;
 
     const keymap = xkb_state.getKeymap();
 
     // If the mapping has no pinned layout, use the active layout.
     // It doesn't matter if the index is out of range, since xkbcommon
     // will fall back to the active layout if so.
-    const layout_index = self.layout_index orelse xkb_state.keyGetLayout(keycode);
+    const layout_index = self.options.layout_index orelse xkb_state.keyGetLayout(keycode);
 
     // Get keysyms from the base layer, as if modifiers didn't change keysyms.
     // E.g. pressing `Super+Shift 1` does not translate to `Super Exclam`.

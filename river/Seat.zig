@@ -395,7 +395,7 @@ pub fn handleMapping(
     var handled = false;
     for (modes.items[self.mode_id].mappings.items) |*mapping| {
         if (mapping.match(keycode, modifiers, released, xkb_state)) {
-            if (mapping.repeat) {
+            if (mapping.options.repeat) {
                 self.repeating_mapping = mapping;
                 self.mapping_repeat_timer.timerUpdate(server.config.repeat_delay) catch {
                     log.err("failed to update mapping repeat timer", .{});

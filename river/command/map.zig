@@ -20,6 +20,7 @@ const mem = std.mem;
 const meta = std.meta;
 const wlr = @import("wlroots");
 const xkb = @import("xkbcommon");
+const flags = @import("flags");
 
 const c = @import("../c.zig");
 const server = &@import("../main.zig").server;
@@ -41,16 +42,29 @@ pub fn map(
     args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
-    const optionals = try parseOptionalArgs(args[1..]);
-    // offset caused by optional arguments
-    const offset = optionals.i;
-    if (args.len - offset < 5) return Error.NotEnoughArguments;
+    const result = flags.parser([:0]const u8, &.{
+        .{ .name = "-release", .kind = .boolean },
+        .{ .name = "-repeat", .kind = .boolean },
+        .{ .name = "-layout", .kind = .arg },
+    }).parse(args[1..]) catch {
+        return error.InvalidValue;
+    };
+    if (result.args.len < 4) return Error.NotEnoughArguments;
 
-    if (optionals.release and optionals.repeat) return Error.ConflictingOptions;
+    if (result.flags.@"-release" and result.flags.@"-repeat") return Error.ConflictingOptions;
 
-    const mode_raw = args[1 + offset];
-    const modifiers_raw = args[2 + offset];
-    const keysym_raw = args[3 + offset];
+    const layout_index = blk: {
+        if (result.flags.@"-layout") |layout_raw| {
+            break :blk try fmt.parseInt(u32, layout_raw, 10);
+        } else {
+            break :blk null;
+        }
+    };
+
+    const mode_raw = result.args[0];
+    const modifiers_raw = result.args[1];
+    const keysym_raw = result.args[2];
+    const command = result.args[3..];
 
     const mode_id = try modeNameToId(mode_raw, out);
     const modifiers = try parseModifiers(modifiers_raw, out);
@@ -61,18 +75,20 @@ pub fn map(
     const new = try Mapping.init(
         keysym,
         modifiers,
-        optionals.release,
-        optionals.repeat,
-        optionals.layout_index,
-        args[4 + offset ..],
+        command,
+        .{
+            .release = result.flags.@"-release",
+            .repeat = result.flags.@"-repeat",
+            .layout_index = layout_index,
+        },
     );
     errdefer new.deinit();
 
-    if (mappingExists(mode_mappings, modifiers, keysym, optionals.release)) |current| {
+    if (mappingExists(mode_mappings, modifiers, keysym, result.flags.@"-release")) |current| {
         mode_mappings.items[current].deinit();
         mode_mappings.items[current] = new;
         // Warn user if they overwrote an existing keybinding using riverctl.
-        const opts = if (optionals.release) "-release " else "";
+        const opts = if (result.flags.@"-release") "-release " else "";
         out.* = try fmt.allocPrint(
             util.gpa,
             "overwrote an existing keybinding: {s} {s}{s} {s}",
@@ -185,7 +201,9 @@ fn mappingExists(
     release: bool,
 ) ?usize {
     for (mappings.items) |mapping, i| {
-        if (meta.eql(mapping.modifiers, modifiers) and mapping.keysym == keysym and mapping.release == release) {
+        if (meta.eql(mapping.modifiers, modifiers) and
+            mapping.keysym == keysym and mapping.options.release == release)
+        {
             return i;
         }
     }
@@ -321,68 +339,30 @@ fn parseSwitchState(
     }
 }
 
-const OptionalArgsContainer = struct {
-    i: usize,
-    release: bool,
-    repeat: bool,
-    layout_index: ?u32,
-};
-
-/// Parses optional args (such as -release) and return the index of the first argument that is
-/// not an optional argument
-/// Returns an OptionalArgsContainer with the settings set according to the args
-fn parseOptionalArgs(args: []const []const u8) !OptionalArgsContainer {
-    // Set to defaults
-    var parsed = OptionalArgsContainer{
-        // i is the number of arguments consumed
-        .i = 0,
-        .release = false,
-        .repeat = false,
-        .layout_index = null,
-    };
-
-    var j: usize = 0;
-    while (j < args.len) : (j += 1) {
-        if (mem.eql(u8, args[j], "-release")) {
-            parsed.release = true;
-            parsed.i += 1;
-        } else if (mem.eql(u8, args[j], "-repeat")) {
-            parsed.repeat = true;
-            parsed.i += 1;
-        } else if (mem.eql(u8, args[j], "-layout")) {
-            j += 1;
-            if (j == args.len) return Error.NotEnoughArguments;
-            // To keep things simple here, we do not check if the layout index
-            // is out of range. We rely on xkbcommon to handle this case:
-            // xkbcommon will simply use the active layout instead, leaving
-            // this option without effect
-            parsed.layout_index = try std.fmt.parseInt(u32, args[j], 10);
-            parsed.i += 2;
-        } else {
-            // Break if the arg is not an option
-            break;
-        }
-    }
-
-    return parsed;
-}
-
 /// Remove a mapping from a given mode
 ///
 /// Example:
 /// unmap normal Mod4+Shift Return
 pub fn unmap(seat: *Seat, args: []const [:0]const u8, out: *?[]const u8) Error!void {
-    const optionals = try parseOptionalArgs(args[1..]);
-    // offset caused by optional arguments
-    const offset = optionals.i;
-    if (args.len - offset < 4) return Error.NotEnoughArguments;
+    const result = flags.parser([:0]const u8, &.{
+        .{ .name = "-release", .kind = .boolean },
+    }).parse(args[1..]) catch {
+        return error.InvalidValue;
+    };
+    if (result.args.len < 3) return Error.NotEnoughArguments;
+    if (result.args.len > 3) return Error.TooManyArguments;
 
-    const mode_id = try modeNameToId(args[1 + offset], out);
-    const modifiers = try parseModifiers(args[2 + offset], out);
-    const keysym = try parseKeysym(args[3 + offset], out);
+    const mode_id = try modeNameToId(result.args[0], out);
+    const modifiers = try parseModifiers(result.args[1], out);
+    const keysym = try parseKeysym(result.args[2], out);
 
     const mode_mappings = &server.config.modes.items[mode_id].mappings;
-    const mapping_idx = mappingExists(mode_mappings, modifiers, keysym, optionals.release) orelse return;
+    const mapping_idx = mappingExists(
+        mode_mappings,
+        modifiers,
+        keysym,
+        result.flags.@"-release",
+    ) orelse return;
 
     // Repeating mappings borrow the Mapping directly. To prevent a possible
     // crash if the Mapping ArrayList is reallocated, stop any currently
