@@ -306,7 +306,7 @@ const Output = struct {
 pub fn main() !void {
     // https://github.com/ziglang/zig/issues/7807
     const argv: [][*:0]const u8 = os.argv;
-    const result = flags.parse(argv[1..], &[_]flags.Flag{
+    const result = flags.parser([*:0]const u8, &[_]flags.Flag{
         .{ .name = "-h", .kind = .boolean },
         .{ .name = "-version", .kind = .boolean },
         .{ .name = "-view-padding", .kind = .arg },
@@ -314,37 +314,37 @@ pub fn main() !void {
         .{ .name = "-main-location", .kind = .arg },
         .{ .name = "-main-count", .kind = .arg },
         .{ .name = "-main-ratio", .kind = .arg },
-    }) catch {
+    }).parse(argv[1..]) catch {
         try std.io.getStdErr().writeAll(usage);
         os.exit(1);
     };
-    if (result.boolFlag("-h")) {
+    if (result.flags.@"-h") {
         try std.io.getStdOut().writeAll(usage);
         os.exit(0);
     }
     if (result.args.len != 0) fatalPrintUsage("unknown option '{s}'", .{result.args[0]});
 
-    if (result.boolFlag("-version")) {
+    if (result.flags.@"-version") {
         try std.io.getStdOut().writeAll(@import("build_options").version ++ "\n");
         os.exit(0);
     }
-    if (result.argFlag("-view-padding")) |raw| {
+    if (result.flags.@"-view-padding") |raw| {
         view_padding = fmt.parseUnsigned(u31, raw, 10) catch
             fatalPrintUsage("invalid value '{s}' provided to -view-padding", .{raw});
     }
-    if (result.argFlag("-outer-padding")) |raw| {
+    if (result.flags.@"-outer-padding") |raw| {
         outer_padding = fmt.parseUnsigned(u31, raw, 10) catch
             fatalPrintUsage("invalid value '{s}' provided to -outer-padding", .{raw});
     }
-    if (result.argFlag("-main-location")) |raw| {
+    if (result.flags.@"-main-location") |raw| {
         default_main_location = std.meta.stringToEnum(Location, raw) orelse
             fatalPrintUsage("invalid value '{s}' provided to -main-location", .{raw});
     }
-    if (result.argFlag("-main-count")) |raw| {
+    if (result.flags.@"-main-count") |raw| {
         default_main_count = fmt.parseUnsigned(u31, raw, 10) catch
             fatalPrintUsage("invalid value '{s}' provided to -main-count", .{raw});
     }
-    if (result.argFlag("-main-ratio")) |raw| {
+    if (result.flags.@"-main-ratio") |raw| {
         default_main_ratio = fmt.parseFloat(f64, raw) catch {
             fatalPrintUsage("invalid value '{s}' provided to -main-ratio", .{raw});
         };

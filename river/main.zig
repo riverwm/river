@@ -44,16 +44,16 @@ pub var server: Server = undefined;
 pub fn main() anyerror!void {
     // This line is here because of https://github.com/ziglang/zig/issues/7807
     const argv: [][*:0]const u8 = os.argv;
-    const result = flags.parse(argv[1..], &[_]flags.Flag{
+    const result = flags.parser([*:0]const u8, &.{
         .{ .name = "-h", .kind = .boolean },
         .{ .name = "-version", .kind = .boolean },
         .{ .name = "-c", .kind = .arg },
         .{ .name = "-log-level", .kind = .arg },
-    }) catch {
+    }).parse(argv[1..]) catch {
         try io.getStdErr().writeAll(usage);
         os.exit(1);
     };
-    if (result.boolFlag("-h")) {
+    if (result.flags.@"-h") {
         try io.getStdOut().writeAll(usage);
         os.exit(0);
     }
@@ -63,11 +63,11 @@ pub fn main() anyerror!void {
         os.exit(1);
     }
 
-    if (result.boolFlag("-version")) {
+    if (result.flags.@"-version") {
         try io.getStdOut().writeAll(build_options.version ++ "\n");
         os.exit(0);
     }
-    if (result.argFlag("-log-level")) |level| {
+    if (result.flags.@"-log-level") |level| {
         if (mem.eql(u8, level, std.log.Level.err.asText())) {
             runtime_log_level = .err;
         } else if (mem.eql(u8, level, std.log.Level.warn.asText())) {
@@ -83,7 +83,7 @@ pub fn main() anyerror!void {
         }
     }
     const startup_command = blk: {
-        if (result.argFlag("-c")) |command| {
+        if (result.flags.@"-c") |command| {
             break :blk try util.gpa.dupeZ(u8, command);
         } else {
             break :blk try defaultInitPath();
