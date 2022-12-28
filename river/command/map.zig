@@ -43,18 +43,18 @@ pub fn map(
     out: *?[]const u8,
 ) Error!void {
     const result = flags.parser([:0]const u8, &.{
-        .{ .name = "-release", .kind = .boolean },
-        .{ .name = "-repeat", .kind = .boolean },
-        .{ .name = "-layout", .kind = .arg },
+        .{ .name = "release", .kind = .boolean },
+        .{ .name = "repeat", .kind = .boolean },
+        .{ .name = "layout", .kind = .arg },
     }).parse(args[1..]) catch {
         return error.InvalidValue;
     };
     if (result.args.len < 4) return Error.NotEnoughArguments;
 
-    if (result.flags.@"-release" and result.flags.@"-repeat") return Error.ConflictingOptions;
+    if (result.flags.release and result.flags.repeat) return Error.ConflictingOptions;
 
     const layout_index = blk: {
-        if (result.flags.@"-layout") |layout_raw| {
+        if (result.flags.layout) |layout_raw| {
             break :blk try fmt.parseInt(u32, layout_raw, 10);
         } else {
             break :blk null;
@@ -77,18 +77,18 @@ pub fn map(
         modifiers,
         command,
         .{
-            .release = result.flags.@"-release",
-            .repeat = result.flags.@"-repeat",
+            .release = result.flags.release,
+            .repeat = result.flags.repeat,
             .layout_index = layout_index,
         },
     );
     errdefer new.deinit();
 
-    if (mappingExists(mode_mappings, modifiers, keysym, result.flags.@"-release")) |current| {
+    if (mappingExists(mode_mappings, modifiers, keysym, result.flags.release)) |current| {
         mode_mappings.items[current].deinit();
         mode_mappings.items[current] = new;
         // Warn user if they overwrote an existing keybinding using riverctl.
-        const opts = if (result.flags.@"-release") "-release " else "";
+        const opts = if (result.flags.release) "-release " else "";
         out.* = try fmt.allocPrint(
             util.gpa,
             "overwrote an existing keybinding: {s} {s}{s} {s}",
@@ -345,7 +345,7 @@ fn parseSwitchState(
 /// unmap normal Mod4+Shift Return
 pub fn unmap(seat: *Seat, args: []const [:0]const u8, out: *?[]const u8) Error!void {
     const result = flags.parser([:0]const u8, &.{
-        .{ .name = "-release", .kind = .boolean },
+        .{ .name = "release", .kind = .boolean },
     }).parse(args[1..]) catch {
         return error.InvalidValue;
     };
@@ -361,7 +361,7 @@ pub fn unmap(seat: *Seat, args: []const [:0]const u8, out: *?[]const u8) Error!v
         mode_mappings,
         modifiers,
         keysym,
-        result.flags.@"-release",
+        result.flags.release,
     ) orelse return;
 
     // Repeating mappings borrow the Mapping directly. To prevent a possible

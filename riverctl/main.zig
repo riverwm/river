@@ -66,17 +66,17 @@ fn _main() !void {
     // This line is here because of https://github.com/ziglang/zig/issues/7807
     const argv: [][*:0]const u8 = os.argv;
     const result = flags.parser([*:0]const u8, &.{
-        .{ .name = "-h", .kind = .boolean },
-        .{ .name = "-version", .kind = .boolean },
+        .{ .name = "h", .kind = .boolean },
+        .{ .name = "version", .kind = .boolean },
     }).parse(argv[1..]) catch {
         try io.getStdErr().writeAll(usage);
         os.exit(1);
     };
-    if (result.flags.@"-h") {
+    if (result.flags.h) {
         try io.getStdOut().writeAll(usage);
         os.exit(0);
     }
-    if (result.flags.@"-version") {
+    if (result.flags.version) {
         try io.getStdOut().writeAll(@import("build_options").version ++ "\n");
         os.exit(0);
     }

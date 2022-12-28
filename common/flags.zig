@@ -72,13 +72,13 @@ pub fn parser(comptime Arg: type, comptime flags: []const Flag) type {
             while (i < args.len) : (i += 1) {
                 var parsed_flag = false;
                 inline for (flags) |flag| {
-                    if (mem.eql(u8, flag.name, mem.span(args[i]))) {
+                    if (mem.eql(u8, "-" ++ flag.name, mem.span(args[i]))) {
                         switch (flag.kind) {
                             .boolean => @field(result_flags, flag.name) = true,
                             .arg => {
                                 i += 1;
                                 if (i == args.len) {
-                                    std.log.err("option '" ++ flag.name ++
+                                    std.log.err("option '-" ++ flag.name ++
                                         "' requires an argument but none was provided!", .{});
                                     return error.MissingFlagArgument;
                                 }

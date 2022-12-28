@@ -32,10 +32,10 @@ pub fn keyboardLayout(
     _: *?[]const u8,
 ) Error!void {
     const result = flags.parser([:0]const u8, &.{
-        .{ .name = "-rules", .kind = .arg },
-        .{ .name = "-model", .kind = .arg },
-        .{ .name = "-variant", .kind = .arg },
-        .{ .name = "-options", .kind = .arg },
+        .{ .name = "rules", .kind = .arg },
+        .{ .name = "model", .kind = .arg },
+        .{ .name = "variant", .kind = .arg },
+        .{ .name = "options", .kind = .arg },
     }).parse(args[1..]) catch {
         return error.InvalidValue;
     };
@@ -44,10 +44,10 @@ pub fn keyboardLayout(
 
     const new_layout = xkb.RuleNames{
         .layout = try util.gpa.dupeZ(u8, result.args[0]),
-        .rules = if (result.flags.@"-rules") |s| try util.gpa.dupeZ(u8, s) else null,
-        .model = if (result.flags.@"-model") |s| try util.gpa.dupeZ(u8, s) else null,
-        .variant = if (result.flags.@"-variant") |s| try util.gpa.dupeZ(u8, s) else null,
-        .options = if (result.flags.@"-options") |s| try util.gpa.dupeZ(u8, s) else null,
+        .rules = if (result.flags.rules) |s| try util.gpa.dupeZ(u8, s) else null,
+        .model = if (result.flags.model) |s| try util.gpa.dupeZ(u8, s) else null,
+        .variant = if (result.flags.variant) |s| try util.gpa.dupeZ(u8, s) else null,
+        .options = if (result.flags.options) |s| try util.gpa.dupeZ(u8, s) else null,
     };
     errdefer util.free_xkb_rule_names(new_layout);
 
