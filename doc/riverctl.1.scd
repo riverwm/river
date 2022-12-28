@@ -203,9 +203,9 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 	- _-layout_: if passed, a specific layout is pinned to the mapping.
 	  When the mapping is checked against a pressed key, this layout is
 	  used to translate the key independent of the active layout
-		- _index_: zero-based index of a layout set with the environment
-		  variable *XKB_DEFAULT_LAYOUT*; see *river*(1) for an example; if
-		  the index is out of range, the _-layout_ option will have no effect
+		- _index_: zero-based index of a layout set with the *keyboard-layout*
+		  command. If the index is out of range, the _-layout_ option will
+		  have no effect
 	- _mode_: name of the mode for which to create the mapping
 	- _modifiers_: one or more of the modifiers listed above, separated
 	  by a plus sign (+).
@@ -336,9 +336,12 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 
 *keyboard-layout* [-rules _rules_] [-model _model_] [-variant _variant_] \
 [-options _options_] _layout_
-	Set the XKB layout for all keyboards. Defaults from libxkbcommon are used
-	for everything left unspecified. See *xkeyboard-config*(7) for
-	possible values and more information.
+	Set the XKB layout for all keyboards. Defaults from libxkbcommon are used for
+	everything left unspecified. Note that *layout* may be a comma separated list
+	of layouts (e.g. "us,de") which may be switched between using various key
+	combinations configured through the options argument (e.g. -options
+	"grp:ctrl_space_toggle"). See *xkeyboard-config*(7) for possible values and
+	more information.
 
 *keyboard-group-create* _group_name_
 	Create a keyboard group. A keyboard group collects multiple keyboards in

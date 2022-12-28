@@ -50,23 +50,6 @@ Usually this executable is a shell script invoking *riverctl*(1) to create
 mappings, start programs such as a layout generator or status bar, and
 perform other configuration.
 
-# ENVIRONMENT
-
-The following environment variables are used to configure the keyboard. See
-*xkeyboard-config*(7) for possible values.
-
-- XKB_DEFAULT_MODEL
-- XKB_DEFAULT_LAYOUT
-- XKB_DEFAULT_VARIANT
-- XKB_DEFAULT_OPTIONS
-- XKB_DEFAULT_RULES
-
-# EXAMPLES
-
-Set the keyboard layout to colemak:
-
-	XKB_DEFAULT_LAYOUT="us(colemak)" river
-
 # AUTHORS
 
 Maintained by Isaac Freund <mail@isaacfreund.com> who is assisted by open
