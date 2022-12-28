@@ -18,6 +18,7 @@ const std = @import("std");
 const mem = std.mem;
 
 const xkb = @import("xkbcommon");
+const flags = @import("flags");
 
 const server = &@import("../main.zig").server;
 const util = @import("../util.zig");
@@ -30,54 +31,37 @@ pub fn keyboardLayout(
     args: []const [:0]const u8,
     _: *?[]const u8,
 ) Error!void {
-    if (args.len < 2) return Error.NotEnoughArguments;
-    if (args.len % 2 != 0) return Error.InvalidValue;
-
-    // Do not carry over any previous keyboard layout configuration, always
-    // start fresh.
-    if (server.config.keyboard_layout) |kl| {
-        if (kl.rules) |s| util.gpa.free(mem.span(s));
-        if (kl.model) |s| util.gpa.free(mem.span(s));
-        if (kl.layout) |s| util.gpa.free(mem.span(s));
-        if (kl.variant) |s| util.gpa.free(mem.span(s));
-        if (kl.options) |s| util.gpa.free(mem.span(s));
-    }
-
-    server.config.keyboard_layout = xkb.RuleNames{
-        .layout = try util.gpa.dupeZ(u8, args[1]),
-        .rules = null,
-        .model = null,
-        .variant = null,
-        .options = null,
+    const result = flags.parser([:0]const u8, &.{
+        .{ .name = "-rules", .kind = .arg },
+        .{ .name = "-model", .kind = .arg },
+        .{ .name = "-variant", .kind = .arg },
+        .{ .name = "-options", .kind = .arg },
+    }).parse(args[1..]) catch {
+        return error.InvalidValue;
     };
+    if (result.args.len < 1) return Error.NotEnoughArguments;
+    if (result.args.len > 1) return Error.TooManyArguments;
 
-    // TODO[zig]: this can be solved more elegantly with an inline for loop, but
-    //            on version 0.9.1 that crashes the compiler.
-    var i: usize = 2;
-    while (i < args.len - 1) : (i += 2) {
-        if (mem.eql(u8, args[i], "-variant")) {
-            // Do not allow duplicate flags.
-            if (server.config.keyboard_layout.?.variant != null) return error.InvalidValue;
-            server.config.keyboard_layout.?.variant = try util.gpa.dupeZ(u8, args[i + 1]);
-        } else if (mem.eql(u8, args[i], "-model")) {
-            if (server.config.keyboard_layout.?.model != null) return error.InvalidValue;
-            server.config.keyboard_layout.?.model = try util.gpa.dupeZ(u8, args[i + 1]);
-        } else if (mem.eql(u8, args[i], "-options")) {
-            if (server.config.keyboard_layout.?.options != null) return error.InvalidValue;
-            server.config.keyboard_layout.?.options = try util.gpa.dupeZ(u8, args[i + 1]);
-        } else if (mem.eql(u8, args[i], "-rules")) {
-            if (server.config.keyboard_layout.?.rules != null) return error.InvalidValue;
-            server.config.keyboard_layout.?.rules = try util.gpa.dupeZ(u8, args[i + 1]);
-        } else {
-            return error.InvalidValue;
-        }
-    }
+    const new_layout = xkb.RuleNames{
+        .layout = try util.gpa.dupeZ(u8, result.args[0]),
+        .rules = if (result.flags.@"-rules") |s| try util.gpa.dupeZ(u8, s) else null,
+        .model = if (result.flags.@"-model") |s| try util.gpa.dupeZ(u8, s) else null,
+        .variant = if (result.flags.@"-variant") |s| try util.gpa.dupeZ(u8, s) else null,
+        .options = if (result.flags.@"-options") |s| try util.gpa.dupeZ(u8, s) else null,
+    };
+    errdefer util.free_xkb_rule_names(new_layout);
 
     const context = xkb.Context.new(.no_flags) orelse return error.OutOfMemory;
     defer context.unref();
 
-    const keymap = xkb.Keymap.newFromNames(context, &server.config.keyboard_layout.?, .no_flags) orelse return error.InvalidValue;
+    const keymap = xkb.Keymap.newFromNames(context, &new_layout, .no_flags) orelse return error.InvalidValue;
     defer keymap.unref();
+
+    // Wait until after successfully creating the keymap to save the new layout options.
+    // Otherwise we may store invalid layout options which could cause keyboards to become
+    // unusable.
+    if (server.config.keyboard_layout) |old_layout| util.free_xkb_rule_names(old_layout);
+    server.config.keyboard_layout = new_layout;
 
     var it = server.input_manager.devices.iterator(.forward);
     while (it.next()) |device| {

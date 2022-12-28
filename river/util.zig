@@ -17,6 +17,8 @@
 const std = @import("std");
 const os = std.os;
 
+const xkb = @import("xkbcommon");
+
 const c = @import("c.zig");
 
 /// The global general-purpose allocator used throughout river's code
@@ -32,4 +34,10 @@ pub fn post_fork_pre_execve() void {
         .flags = 0,
     };
     os.sigaction(os.SIG.PIPE, &sig_dfl, null);
+}
+
+pub fn free_xkb_rule_names(rule_names: xkb.RuleNames) void {
+    inline for (std.meta.fields(xkb.RuleNames)) |field| {
+        if (@field(rule_names, field.name)) |s| gpa.free(std.mem.span(s));
+    }
 }

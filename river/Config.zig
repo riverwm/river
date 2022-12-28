@@ -135,11 +135,7 @@ pub fn deinit(self: *Self) void {
     self.modes.deinit(util.gpa);
 
     if (self.keyboard_layout) |kl| {
-        if (kl.rules) |s| util.gpa.free(mem.span(s));
-        if (kl.model) |s| util.gpa.free(mem.span(s));
-        if (kl.layout) |s| util.gpa.free(mem.span(s));
-        if (kl.variant) |s| util.gpa.free(mem.span(s));
-        if (kl.options) |s| util.gpa.free(mem.span(s));
+        util.free_xkb_rule_names(kl);
     }
 
     {
