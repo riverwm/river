@@ -92,22 +92,32 @@ pub fn resize(
     view.output.wlr_output.effectiveResolution(&output_width, &output_height);
     switch (orientation) {
         .horizontal => {
+            const prev_width = view.pending.box.width;
             view.pending.box.width += delta;
             view.applyConstraints();
+            // Get width difference after applying view constraints, so that the
+            // move reflects the actual size difference, but before applying the
+            // output size constraints, to allow growing a view even if it is
+            // up against an output edge.
+            const diff_width = prev_width - view.pending.box.width;
             // Do not grow bigger than the output
             view.pending.box.width = math.min(
                 view.pending.box.width,
                 output_width - 2 * server.config.border_width,
             );
+            view.move(@divFloor(diff_width, 2), 0);
         },
         .vertical => {
+            const prev_height = view.pending.box.height;
             view.pending.box.height += delta;
             view.applyConstraints();
+            const diff_height = prev_height - view.pending.box.height;
             // Do not grow bigger than the output
             view.pending.box.height = math.min(
                 view.pending.box.height,
                 output_height - 2 * server.config.border_width,
             );
+            view.move(0, @divFloor(diff_height, 2));
         },
     }
 
