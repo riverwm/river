@@ -85,6 +85,11 @@ const Image = enum {
 
 const default_size = 24;
 
+const LayoutPoint = struct {
+    lx: f64,
+    ly: f64,
+};
+
 const log = std.log.scoped(.cursor);
 
 /// Current cursor mode as well as any state needed to implement that mode
@@ -106,6 +111,10 @@ hide_cursor_timer: *wl.EventSource,
 
 hidden: bool = false,
 may_need_warp: bool = false,
+
+/// Keeps track of the last known location of all touch points in layout coordinates.
+/// This information is necessary for proper touch dnd support if there are multiple touch points.
+touch_points: std.AutoHashMapUnmanaged(i32, LayoutPoint) = .{},
 
 axis: wl.Listener(*wlr.Pointer.event.Axis) = wl.Listener(*wlr.Pointer.event.Axis).init(handleAxis),
 frame: wl.Listener(*wlr.Cursor) = wl.Listener(*wlr.Cursor).init(handleFrame),
@@ -459,6 +468,8 @@ fn handleTouchUp(
 
     self.seat.handleActivity();
 
+    _ = self.touch_points.remove(event.touch_id);
+
     self.seat.wlr_seat.touchNotifyUp(event.time_msec, event.touch_id);
 }
 
@@ -473,6 +484,10 @@ fn handleTouchDown(
     var lx: f64 = undefined;
     var ly: f64 = undefined;
     self.wlr_cursor.absoluteToLayoutCoords(event.device, event.x, event.y, &lx, &ly);
+
+    self.touch_points.putNoClobber(util.gpa, event.touch_id, .{ .lx = lx, .ly = ly }) catch {
+        log.err("out of memory", .{});
+    };
 
     if (surfaceAtCoords(lx, ly)) |result| {
         self.updateKeyboardFocus(result);
@@ -502,6 +517,10 @@ fn handleTouchMotion(
     var lx: f64 = undefined;
     var ly: f64 = undefined;
     self.wlr_cursor.absoluteToLayoutCoords(event.device, event.x, event.y, &lx, &ly);
+
+    self.touch_points.put(util.gpa, event.touch_id, .{ .lx = lx, .ly = ly }) catch {
+        log.err("out of memory", .{});
+    };
 
     if (surfaceAtCoords(lx, ly)) |result| {
         self.seat.wlr_seat.touchNotifyMotion(event.time_msec, event.touch_id, result.sx, result.sy);
@@ -1025,8 +1044,9 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
 }
 
 pub fn checkFocusFollowsCursor(self: *Self) void {
-    // Don't do focus-follows-cursor if a drag is in progress as focus change can't occur
-    if (self.seat.pointer_drag) return;
+    // Don't do focus-follows-cursor if a pointer drag is in progress as focus
+    // change can't occur.
+    if (self.seat.drag == .pointer) return;
     if (server.config.focus_follows_cursor == .disabled) return;
     if (self.surfaceAt()) |result| {
         if (server.config.focus_follows_cursor == .always or

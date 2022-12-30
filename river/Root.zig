@@ -56,8 +56,6 @@ outputs: std.TailQueue(Output) = .{},
 /// It is not advertised to clients.
 noop_output: Output = undefined,
 
-drag_icons: std.SinglyLinkedList(DragIcon) = .{},
-
 /// This list stores all "override redirect" Xwayland windows. This needs to be in root
 /// since X is like the wild west and who knows where these things will place themselves.
 xwayland_override_redirect_views: if (build_options.xwayland)

@@ -260,19 +260,33 @@ fn renderDragIcons(output: *const Output, now: *os.timespec) void {
     var output_box: wlr.Box = undefined;
     server.root.output_layout.getBox(output.wlr_output, &output_box);
 
-    var it = server.root.drag_icons.first;
+    var it = server.input_manager.seats.first;
     while (it) |node| : (it = node.next) {
-        const drag_icon = &node.data;
+        const icon = node.data.drag_icon orelse continue;
+
+        var lx: f64 = undefined;
+        var ly: f64 = undefined;
+        switch (icon.wlr_drag_icon.drag.grab_type) {
+            .keyboard_pointer => {
+                lx = icon.seat.cursor.wlr_cursor.x;
+                ly = icon.seat.cursor.wlr_cursor.y;
+            },
+            .keyboard_touch => {
+                const touch_id = icon.wlr_drag_icon.drag.touch_id;
+                const point = icon.seat.cursor.touch_points.get(touch_id) orelse continue;
+                lx = point.lx;
+                ly = point.ly;
+            },
+            .keyboard => unreachable,
+        }
 
         var rdata = SurfaceRenderData{
             .output = output,
-            .output_x = @floatToInt(i32, drag_icon.seat.cursor.wlr_cursor.x) +
-                drag_icon.wlr_drag_icon.surface.sx - output_box.x,
-            .output_y = @floatToInt(i32, drag_icon.seat.cursor.wlr_cursor.y) +
-                drag_icon.wlr_drag_icon.surface.sy - output_box.y,
+            .output_x = @floatToInt(i32, lx) + icon.sx - output_box.x,
+            .output_y = @floatToInt(i32, ly) + icon.sy - output_box.y,
             .when = now,
         };
-        drag_icon.wlr_drag_icon.surface.forEachSurface(*SurfaceRenderData, renderSurfaceIterator, &rdata);
+        icon.wlr_drag_icon.surface.forEachSurface(*SurfaceRenderData, renderSurfaceIterator, &rdata);
     }
 }
 
