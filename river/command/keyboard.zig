@@ -42,31 +42,31 @@ pub fn keyboardLayout(
     if (result.args.len < 1) return Error.NotEnoughArguments;
     if (result.args.len > 1) return Error.TooManyArguments;
 
-    const new_layout = xkb.RuleNames{
-        .layout = try util.gpa.dupeZ(u8, result.args[0]),
-        .rules = if (result.flags.rules) |s| try util.gpa.dupeZ(u8, s) else null,
-        .model = if (result.flags.model) |s| try util.gpa.dupeZ(u8, s) else null,
-        .variant = if (result.flags.variant) |s| try util.gpa.dupeZ(u8, s) else null,
-        .options = if (result.flags.options) |s| try util.gpa.dupeZ(u8, s) else null,
+    const rule_names = xkb.RuleNames{
+        .layout = result.args[0],
+        // TODO(zig) these should coerce without this hack with the selfhosted compiler.
+        .rules = if (result.flags.rules) |s| s else null,
+        .model = if (result.flags.model) |s| s else null,
+        .variant = if (result.flags.variant) |s| s else null,
+        .options = if (result.flags.options) |s| s else null,
     };
-    errdefer util.free_xkb_rule_names(new_layout);
 
-    const context = xkb.Context.new(.no_flags) orelse return error.OutOfMemory;
-    defer context.unref();
+    const new_keymap = xkb.Keymap.newFromNames(
+        server.config.xkb_context,
+        &rule_names,
+        .no_flags,
+    ) orelse return error.InvalidValue;
+    defer new_keymap.unref();
 
-    const keymap = xkb.Keymap.newFromNames(context, &new_layout, .no_flags) orelse return error.InvalidValue;
-    defer keymap.unref();
-
-    // Wait until after successfully creating the keymap to save the new layout options.
-    // Otherwise we may store invalid layout options which could cause keyboards to become
-    // unusable.
-    if (server.config.keyboard_layout) |old_layout| util.free_xkb_rule_names(old_layout);
-    server.config.keyboard_layout = new_layout;
+    server.config.keymap.unref();
+    server.config.keymap = new_keymap.ref();
 
     var it = server.input_manager.devices.iterator(.forward);
     while (it.next()) |device| {
         if (device.wlr_device.type != .keyboard) continue;
         const wlr_keyboard = device.wlr_device.toKeyboard();
-        if (!wlr_keyboard.setKeymap(keymap)) return error.OutOfMemory;
+        // wlroots will log an error if this fails and there's unfortunately
+        // nothing we can really do in the case of failure.
+        _ = wlr_keyboard.setKeymap(new_keymap);
     }
 }

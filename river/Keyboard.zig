@@ -46,19 +46,11 @@ pub fn init(self: *Self, seat: *Seat, wlr_device: *wlr.InputDevice) !void {
     try self.device.init(seat, wlr_device);
     errdefer self.device.deinit();
 
-    const context = xkb.Context.new(.no_flags) orelse return error.XkbContextFailed;
-    defer context.unref();
-
-    // Passing null here indicates that defaults from libxkbcommon and
-    // its XKB_DEFAULT_LAYOUT, XKB_DEFAULT_OPTIONS, etc. should be used.
-    const layout_config = if (server.config.keyboard_layout) |kl| &kl else null;
-    const keymap = xkb.Keymap.newFromNames(context, layout_config, .no_flags) orelse return error.XkbKeymapFailed;
-    defer keymap.unref();
-
     const wlr_keyboard = self.device.wlr_device.toKeyboard();
     wlr_keyboard.data = @ptrToInt(self);
 
-    if (!wlr_keyboard.setKeymap(keymap)) return error.SetKeymapFailed;
+    // wlroots will log a more detailed error if this fails.
+    if (!wlr_keyboard.setKeymap(server.config.keymap)) return error.OutOfMemory;
 
     wlr_keyboard.setRepeatInfo(server.config.repeat_rate, server.config.repeat_delay);
 

@@ -102,13 +102,24 @@ cursor_hide_timeout: u31 = 0,
 /// Hide the cursor while typing
 cursor_hide_when_typing: HideCursorWhenTypingMode = .disabled,
 
-/// Keyboard layout configuration
-keyboard_layout: ?xkb.RuleNames = null,
+xkb_context: *xkb.Context,
+/// The xkb keymap used for all keyboards
+keymap: *xkb.Keymap,
 
 pub fn init() !Self {
+    const xkb_context = xkb.Context.new(.no_flags) orelse return error.XkbContextFailed;
+    defer xkb_context.unref();
+
+    // Passing null here indicates that defaults from libxkbcommon and
+    // its XKB_DEFAULT_LAYOUT, XKB_DEFAULT_OPTIONS, etc. should be used.
+    const keymap = xkb.Keymap.newFromNames(xkb_context, null, .no_flags) orelse return error.XkbKeymapFailed;
+    defer keymap.unref();
+
     var self = Self{
         .mode_to_id = std.StringHashMap(u32).init(util.gpa),
         .modes = try std.ArrayListUnmanaged(Mode).initCapacity(util.gpa, 2),
+        .xkb_context = xkb_context.ref(),
+        .keymap = keymap.ref(),
     };
     errdefer self.deinit();
 
@@ -133,10 +144,6 @@ pub fn deinit(self: *Self) void {
     self.mode_to_id.deinit();
     for (self.modes.items) |*mode| mode.deinit();
     self.modes.deinit(util.gpa);
-
-    if (self.keyboard_layout) |kl| {
-        util.free_xkb_rule_names(kl);
-    }
 
     {
         var it = self.float_filter_app_ids.keyIterator();
@@ -163,6 +170,9 @@ pub fn deinit(self: *Self) void {
     }
 
     util.gpa.free(self.default_layout_namespace);
+
+    self.keymap.unref();
+    self.xkb_context.unref();
 }
 
 pub fn shouldFloat(self: Self, view: *View) bool {

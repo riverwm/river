@@ -464,9 +464,6 @@ fn handleMappingRepeatTimeout(self: *Self) callconv(.C) c_int {
 pub fn addDevice(self: *Self, wlr_device: *wlr.InputDevice) void {
     self.tryAddDevice(wlr_device) catch |err| switch (err) {
         error.OutOfMemory => log.err("out of memory", .{}),
-        error.XkbContextFailed => log.err("failed to create xkbcommon context", .{}),
-        error.XkbKeymapFailed => log.err("failed to create xkbcommon keymap", .{}),
-        error.SetKeymapFailed => log.err("failed to set wlroots keymap", .{}),
     };
 }
 
