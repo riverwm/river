@@ -63,7 +63,7 @@
       by the compositor after one of the events is sent.
     </description>
 
-    <event name="success">
+    <event name="success" type="destructor">
       <description summary="command successful">
         Sent when the command has been successfully received and executed by
         the compositor. Some commands may produce output, in which case the
@@ -72,7 +72,7 @@
       <arg name="output" type="string" summary="the output of the command"/>
     </event>
 
-    <event name="failure">
+    <event name="failure" type="destructor">
       <description summary="command failed">
         Sent when the command could not be carried out. This could be due to
         sending a non-existent command, no command, not enough arguments, too
