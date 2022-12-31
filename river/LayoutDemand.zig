@@ -88,13 +88,12 @@ pub fn pushViewDimensions(self: *Self, output: *Output, x: i32, y: i32, width: u
     }
 
     // Here we apply the offset to align the coords with the origin of the
-    // usable area and shrink the dimensions to accomodate the border size.
-    const border_width = server.config.border_width;
+    // usable area.
     self.view_boxen[self.view_boxen.len - @intCast(usize, self.views)] = .{
-        .x = x + output.usable_box.x + border_width,
-        .y = y + output.usable_box.y + border_width,
-        .width = if (width > 2 * border_width) width - 2 * border_width else width,
-        .height = if (height > 2 * border_width) height - 2 * border_width else height,
+        .x = x + output.usable_box.x,
+        .y = y + output.usable_box.y,
+        .width = width,
+        .height = height,
     };
 
     self.views -= 1;
@@ -129,7 +128,18 @@ pub fn apply(self: *Self, layout: *Layout) void {
     var it = ViewStack(View).iter(output.views.first, .forward, output.pending.tags, Output.arrangeFilter);
     var i: u32 = 0;
     while (it.next()) |view| : (i += 1) {
-        view.pending.box = self.view_boxen[i];
+        if (view.draw_borders) {
+            const border_width = server.config.border_width;
+            const box = self.view_boxen[i];
+            view.pending.box = .{
+                .x = box.x + border_width,
+                .y = box.y + border_width,
+                .width = if (box.width > 2 * border_width) box.width - 2 * border_width else box.width,
+                .height = if (box.height > 2 * border_width) box.height - 2 * border_width else box.height,
+            };
+        } else {
+            view.pending.box = self.view_boxen[i];
+        }
         view.applyConstraints();
     }
     assert(i == self.view_boxen.len);
