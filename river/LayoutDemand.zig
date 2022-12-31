@@ -80,21 +80,18 @@ fn handleTimeout(layout: *Layout) callconv(.C) c_int {
 }
 
 /// Push a set of proposed view dimensions and position to the list
-pub fn pushViewDimensions(self: *Self, output: *Output, x: i32, y: i32, width: u31, height: u31) void {
+pub fn pushViewDimensions(self: *Self, x: i32, y: i32, width: u31, height: u31) void {
     // The client pushed too many dimensions
     if (self.views <= 0) {
         self.views -= 1;
         return;
     }
 
-    // Here we apply the offset to align the coords with the origin of the
-    // usable area and shrink the dimensions to accomodate the border size.
-    const border_width = server.config.border_width;
     self.view_boxen[self.view_boxen.len - @intCast(usize, self.views)] = .{
-        .x = x + output.usable_box.x + border_width,
-        .y = y + output.usable_box.y + border_width,
-        .width = if (width > 2 * border_width) width - 2 * border_width else width,
-        .height = if (height > 2 * border_width) height - 2 * border_width else height,
+        .x = x,
+        .y = y,
+        .width = width,
+        .height = height,
     };
 
     self.views -= 1;
@@ -129,7 +126,18 @@ pub fn apply(self: *Self, layout: *Layout) void {
     var it = ViewStack(View).iter(output.views.first, .forward, output.pending.tags, Output.arrangeFilter);
     var i: u32 = 0;
     while (it.next()) |view| : (i += 1) {
-        view.pending.box = self.view_boxen[i];
+        const proposed = &self.view_boxen[i];
+
+        // Here we apply the offset to align the coords with the origin of the
+        // usable area and shrink the dimensions to accomodate the border size.
+        const border_width = if (view.draw_borders) server.config.border_width else 0;
+        view.pending.box = .{
+            .x = proposed.x + output.usable_box.x + border_width,
+            .y = proposed.y + output.usable_box.y + border_width,
+            .width = proposed.width - 2 * border_width,
+            .height = proposed.height - 2 * border_width,
+        };
+
         view.applyConstraints();
     }
     assert(i == self.view_boxen.len);

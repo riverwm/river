@@ -138,7 +138,6 @@ fn handleRequest(layout: *river.LayoutV3, request: river.LayoutV3.Request, self:
                 // Therefore, simply ignore requests with old/wrong serials.
                 if (layout_demand.serial != req.serial) return;
                 layout_demand.pushViewDimensions(
-                    self.output,
                     req.x,
                     req.y,
                     @intCast(u31, math.min(math.maxInt(u31), req.width)),
