@@ -116,7 +116,7 @@ fn handleRequest(control: *zriver.ControlV1, request: zriver.ControlV1.Request, 
                     else => command.errToMsg(err),
                 };
                 defer if (err == command.Error.Other) util.gpa.free(failure_message);
-                callback.sendFailure(failure_message);
+                callback.destroySendFailure(failure_message);
                 return;
             };
 
@@ -128,7 +128,7 @@ fn handleRequest(control: *zriver.ControlV1, request: zriver.ControlV1.Request, 
             else
                 "";
             defer if (out != null) util.gpa.free(success_message);
-            callback.sendSuccess(success_message);
+            callback.destroySendSuccess(success_message);
         },
     }
 }
