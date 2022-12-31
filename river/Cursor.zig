@@ -112,6 +112,8 @@ hide_cursor_timer: *wl.EventSource,
 hidden: bool = false,
 may_need_warp: bool = false,
 
+last_focus_follows_cursor_target: ?*View = null,
+
 /// Keeps track of the last known location of all touch points in layout coordinates.
 /// This information is necessary for proper touch dnd support if there are multiple touch points.
 touch_points: std.AutoHashMapUnmanaged(i32, LayoutPoint) = .{},
@@ -1049,21 +1051,33 @@ pub fn checkFocusFollowsCursor(self: *Self) void {
     if (self.seat.drag == .pointer) return;
     if (server.config.focus_follows_cursor == .disabled) return;
     if (self.surfaceAt()) |result| {
-        if (server.config.focus_follows_cursor == .always or
-            self.seat.wlr_seat.pointer_state.focused_surface != result.surface)
-        {
-            switch (result.parent) {
-                .view => |view| {
-                    if (self.seat.focused != .view or self.seat.focused.view != view) {
-                        self.seat.focusOutput(view.output);
-                        self.seat.focus(view);
-                        server.root.startTransaction();
-                    }
-                },
-                .layer_surface, .lock_surface => {},
-                .xwayland_override_redirect => assert(build_options.xwayland),
-            }
+        switch (result.parent) {
+            .view => |view| {
+                // Don't re-focus the last focused view when the mode is .normal
+                if (server.config.focus_follows_cursor == .normal and
+                    self.last_focus_follows_cursor_target == view) return;
+                // Some windows have a input region bigger than their window
+                // geometry, we only want to move focus when the cursor
+                // properly enters the window (the box that we draw borders around)
+                var output_layout_box: wlr.Box = undefined;
+                server.root.output_layout.getBox(view.output.wlr_output, &output_layout_box);
+                const cursor_ox = self.wlr_cursor.x - @intToFloat(f64, output_layout_box.x);
+                const cursor_oy = self.wlr_cursor.y - @intToFloat(f64, output_layout_box.y);
+                if ((self.seat.focused != .view or self.seat.focused.view != view) and
+                    view.current.box.containsPoint(cursor_ox, cursor_oy))
+                {
+                    self.seat.focusOutput(view.output);
+                    self.seat.focus(view);
+                    self.last_focus_follows_cursor_target = view;
+                    server.root.startTransaction();
+                }
+            },
+            .layer_surface, .lock_surface => {},
+            .xwayland_override_redirect => assert(build_options.xwayland),
         }
+    } else {
+        // The cursor is not above any view, so clear the last followed check
+        self.last_focus_follows_cursor_target = null;
     }
 }
 
