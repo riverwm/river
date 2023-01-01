@@ -79,12 +79,15 @@ device: InputDevice,
 /// Pressed keys along with where their press event has been sent
 pressed: Pressed = .{},
 
+effective_layout: u32,
+
 key: wl.Listener(*wlr.Keyboard.event.Key) = wl.Listener(*wlr.Keyboard.event.Key).init(handleKey),
 modifiers: wl.Listener(*wlr.Keyboard) = wl.Listener(*wlr.Keyboard).init(handleModifiers),
 
 pub fn init(keyboard: *Keyboard, seat: *Seat, wlr_device: *wlr.InputDevice) !void {
     keyboard.* = .{
         .device = undefined,
+        .effective_layout = undefined,
     };
     try keyboard.device.init(seat, wlr_device);
     errdefer keyboard.device.deinit();
@@ -106,6 +109,8 @@ pub fn init(keyboard: *Keyboard, seat: *Seat, wlr_device: *wlr.InputDevice) !voi
             }
         }
     }
+
+    keyboard.effective_layout = wlr_keyboard.modifiers.group;
 
     wlr_keyboard.setRepeatInfo(server.config.repeat_rate, server.config.repeat_delay);
 
@@ -235,15 +240,35 @@ fn handleModifiers(listener: *wl.Listener(*wlr.Keyboard), _: *wlr.Keyboard) void
     const wlr_keyboard = keyboard.device.wlr_device.toKeyboard();
 
     // If the keyboard is in a group, this event will be handled by the group's Keyboard instance.
-    if (wlr_keyboard.group != null) return;
-
-    if (keyboard.getInputMethodGrab()) |keyboard_grab| {
-        keyboard_grab.setKeyboard(keyboard_grab.keyboard);
-        keyboard_grab.sendModifiers(&wlr_keyboard.modifiers);
-    } else {
-        keyboard.device.seat.wlr_seat.setKeyboard(keyboard.device.wlr_device.toKeyboard());
-        keyboard.device.seat.wlr_seat.keyboardNotifyModifiers(&wlr_keyboard.modifiers);
+    if (wlr_keyboard.group == null) {
+        if (keyboard.getInputMethodGrab()) |keyboard_grab| {
+            keyboard_grab.setKeyboard(keyboard_grab.keyboard);
+            keyboard_grab.sendModifiers(&wlr_keyboard.modifiers);
+        } else {
+            keyboard.device.seat.wlr_seat.setKeyboard(keyboard.device.wlr_device.toKeyboard());
+            keyboard.device.seat.wlr_seat.keyboardNotifyModifiers(&wlr_keyboard.modifiers);
+        }
     }
+
+    if (wlr_keyboard.modifiers.group != keyboard.effective_layout) {
+        keyboard.effective_layout = wlr_keyboard.modifiers.group;
+        keyboard.device.notifyKbdLayoutChanged();
+    }
+}
+
+pub fn getActiveLayoutName(wlr_keyboard: *wlr.Keyboard) ?[*:0]const u8 {
+    const keymap = wlr_keyboard.keymap orelse return null;
+    const num_layouts = keymap.numLayouts();
+
+    var index: u32 = 0;
+    while (index < num_layouts) : (index += 1) {
+        const xkb_state = wlr_keyboard.xkb_state orelse continue;
+        if (xkb_state.layoutIndexIsActive(index, @enumFromInt(xkb.State.Component.layout_effective)) != 0) {
+            return keymap.layoutGetName(index);
+        }
+    }
+
+    return null;
 }
 
 /// Handle any builtin, harcoded compsitor mappings such as VT switching.

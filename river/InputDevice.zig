@@ -15,6 +15,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 const InputDevice = @This();
+const Self = @This();
 
 const std = @import("std");
 const mem = std.mem;
@@ -42,7 +43,7 @@ destroy: wl.Listener(*wlr.InputDevice) = wl.Listener(*wlr.InputDevice).init(hand
 /// Careful: The identifier is not unique! A physical input device may have
 /// multiple logical input devices with the exact same vendor id, product id
 /// and name. However identifiers of InputConfigs are unique.
-identifier: []const u8,
+identifier: [:0]const u8,
 
 /// InputManager.devices
 link: wl.list.Link,
@@ -54,7 +55,7 @@ pub fn init(device: *InputDevice, seat: *Seat, wlr_device: *wlr.InputDevice) !vo
         else => @tagName(wlr_device.type),
     };
 
-    const identifier = try std.fmt.allocPrint(
+    const identifier = try std.fmt.allocPrintZ(
         util.gpa,
         "{s}-{}-{}-{s}",
         .{
@@ -146,4 +147,13 @@ fn handleDestroy(listener: *wl.Listener(*wlr.InputDevice), _: *wlr.InputDevice) 
         },
         .tablet_pad => unreachable,
     }
+}
+
+pub fn notifyKbdLayoutChanged(self: *Self) void {
+    std.debug.assert(self.wlr_device.type == .keyboard);
+    const wlr_keyboard = self.wlr_device.toKeyboard();
+    const layout = Keyboard.getActiveLayoutName(wlr_keyboard);
+
+    var it = self.seat.status_trackers.first;
+    while (it) |node| : (it = node.next) node.data.sendKeyboardLayout(self, layout);
 }

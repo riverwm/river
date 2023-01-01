@@ -39,7 +39,7 @@ server_destroy: wl.Listener(*wl.Server) = wl.Listener(*wl.Server).init(handleSer
 
 pub fn init(status_manager: *StatusManager) !void {
     status_manager.* = .{
-        .global = try wl.Global.create(server.wl_server, zriver.StatusManagerV1, 4, ?*anyopaque, null, bind),
+        .global = try wl.Global.create(server.wl_server, zriver.StatusManagerV1, 5, ?*anyopaque, null, bind),
     };
 
     server.wl_server.addDestroyListener(&status_manager.server_destroy);

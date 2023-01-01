@@ -104,5 +104,7 @@ fn applyLayout(new_keymap: *xkb.Keymap) void {
         // wlroots will log an error if this fails and there's unfortunately
         // nothing we can really do in the case of failure.
         _ = wlr_keyboard.setKeymap(new_keymap);
+
+        device.notifyKbdLayoutChanged();
     }
 }
