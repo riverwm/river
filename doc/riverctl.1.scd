@@ -342,6 +342,12 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 	combinations configured through the options argument (e.g. -options
 	"grp:ctrl_space_toggle"). See *xkeyboard-config*(7) for possible values and
 	more information.
+	
+Note: tested on Arch Linux, if the above and other environmental variables fail to
+change the keyboard layout, try adding ```export XKB_DEFAULT_LAYOUT=var``` to 
+~/.bash_profile per user. For example, changing to dvorak keyboard layout is
+```export XKB_DEFAULT_LAYOUT=us"(dvorak)"```. This may work on other operating
+systems but I have tested this only on Arch Linux.
 
 *keyboard-group-create* _group_name_
 	Create a keyboard group. A keyboard group collects multiple keyboards in
