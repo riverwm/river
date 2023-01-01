@@ -137,11 +137,10 @@ are ignored by river.
 	set bits of _tags_.
 
 *spawn-tagmask* _tagmask_
-	Set a _tagmask_ to filter the tags assigned to newly spawned views
-	on the focused output. This mask will be applied to the tags of
-	new views with a bitwise and. If, for example, the tags 000011111
-	are focused on an output with a _tagmask_ of 111110001, a new view
-	will be assigned the tags 000010001. If no tags would remain after
+	Set a _tagmask_ to filter the tags assigned to newly spawned views. This mask
+	will be applied to the tags of new views with a bitwise and. If, for example,
+	the tags 000011111 are focused and the spawn _tagmask_ is 111110001, a
+	new view will be assigned the tags 000010001. If no tags would remain after
 	filtering, the _tagmask_ is ignored.
 
 *focus-previous-tags*

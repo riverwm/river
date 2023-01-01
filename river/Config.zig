@@ -87,6 +87,9 @@ warp_cursor: WarpCursorMode = .disabled,
 /// Output.layout_namespace is null.
 default_layout_namespace: []const u8 = &[0]u8{},
 
+/// Bitmask restricting the tags of newly created views.
+spawn_tagmask: u32 = std.math.maxInt(u32),
+
 /// Determines where new views will be attached to the view stack.
 attach_mode: AttachMode = .top,
 
