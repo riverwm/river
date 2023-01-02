@@ -7,6 +7,7 @@ function __riverctl_completion ()
 			keyboard-group-destroy \
 			keyboard-group-add \
 			keyboard-group-remove \
+			keyboard-layout \
 			csd-filter-add \
 			exit \
 			float-filter-add \
