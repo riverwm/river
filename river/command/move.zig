@@ -66,9 +66,9 @@ pub fn snap(
     view.output.wlr_output.effectiveResolution(&output_width, &output_height);
     switch (direction) {
         .up => view.pending.box.y = border_width,
-        .down => view.pending.box.y = output_width - view.pending.box.height - border_width,
+        .down => view.pending.box.y = output_height - view.pending.box.height - border_width,
         .left => view.pending.box.x = border_width,
-        .right => view.pending.box.x = output_height - view.pending.box.width - border_width,
+        .right => view.pending.box.x = output_width - view.pending.box.width - border_width,
     }
 
     apply(view);
