@@ -60,6 +60,7 @@ _riverctl_subcommands()
         'keyboard-group-destroy:Destroy a keyboard group'
         'keyboard-group-add:Add a keyboard to a keyboard group'
         'keyboard-group-remove:Remove a keyboard from a keyboard group'
+        'keyboard-layout:Set the keyboard layout'
         # Input
         'input:Configure input devices'
         'list-inputs:List all input devices'
