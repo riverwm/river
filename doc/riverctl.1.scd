@@ -491,6 +491,9 @@ However note that not every input device supports every property.
 *input* _name_ *disable-while-typing* *enabled*|*disabled*
 	Enable or disable the disable-while-typing functionality of the input device.
 
+*input* _name_ *disable-while-trackpointing* *enabled*|*disabled*
+	Enable or disable the disable-while-trackpointing functionality of the input device.
+
 *input* _name_ *middle-emulation* *enabled*|*disabled*
 	Enable or disable the middle click emulation functionality of the input device.
 

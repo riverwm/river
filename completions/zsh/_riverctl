@@ -115,6 +115,7 @@ _riverctl()
                                 'drag:Enable or disable the tap-and-drag functionality'
                                 'drag-lock:Enable or disable the drag lock functionality'
                                 'disable-while-typing:Enable or disable the disable-while-typing functionality'
+                                'disable-while-trackpointing:Enable or disable the disable-while-trackpointing functionality'
                                 'middle-emulation:Enable or disable the middle click emulation functionality'
                                 'natural-scroll:Enable or disable the natural scroll functionality'
                                 'left-handed:Enable or disable the left handed mode'
@@ -134,6 +135,7 @@ _riverctl()
                                 drag) _alternative 'input-cmds:args:(enabled disabled)' ;;
                                 drag-lock) _alternative 'input-cmds:args:(enabled disabled)' ;;
                                 disable-while-typing) _alternative 'input-cmds:args:(enabled disabled)' ;;
+                                disable-while-trackpointing) _alternative 'input-cmds:args:(enabled disabled)' ;;
                                 middle-emulation) _alternative 'input-cmds:args:(enabled disabled)' ;;
                                 natural-scroll) _alternative 'input-cmds:args:(enabled disabled)' ;;
                                 left-handed) _alternative 'input-cmds:args:(enabled disabled)' ;;

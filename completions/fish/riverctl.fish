@@ -108,6 +108,7 @@ complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 3' -a 'drag'                 -d 'Enable or disable the tap-and-drag functionality'
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 3' -a 'drag-lock'            -d 'Enable or disable the drag lock functionality'
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 3' -a 'disable-while-typing' -d 'Enable or disable the disable-while-typing functionality'
+complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 3' -a 'disable-while-trackpointing' -d 'Enable or disable the disable-while-trackpointing functionality'
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 3' -a 'middle-emulation'     -d 'Enable or disable the middle-emulation functionality'
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 3' -a 'natural-scroll'       -d 'Enable or disable the natural-scroll functionality'
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 3' -a 'left-handed'          -d 'Enable or disable the left handed mode'
@@ -117,7 +118,7 @@ complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 3' -a 'scroll-button'        -d 'Set the scroll button'
 
 # Subcommands for the subcommands of 'input'
-complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 4; and __fish_seen_subcommand_from drag drag-lock disable-while-typing middle-emulation natural-scroll left-handed tap' -a 'enabled disabled'
+complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 4; and __fish_seen_subcommand_from drag drag-lock disable-while-typing disable-while-trackpointing middle-emulation natural-scroll left-handed tap' -a 'enabled disabled'
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 4; and __fish_seen_subcommand_from events'         -a 'enabled disabled disabled-on-external-mouse'
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 4; and __fish_seen_subcommand_from accel-profile'  -a 'none flat adaptive'
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 4; and __fish_seen_subcommand_from click-method'   -a 'none button-areas clickfinger'

@@ -88,6 +88,7 @@ function __riverctl_completion ()
 				drag \
 				drag-lock \
 				disable-while-typing \
+				disable-while-trackpointing \
 				middle-emulation \
 				natural-scroll \
 				left-handed \

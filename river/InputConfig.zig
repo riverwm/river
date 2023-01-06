@@ -137,6 +137,23 @@ pub const DwtState = enum {
     }
 };
 
+pub const DwtpState = enum {
+    disabled,
+    enabled,
+
+    pub fn apply(dwtp_state: DwtpState, device: *c.libinput_device) void {
+        const want = @as(c_uint, switch (dwtp_state) {
+            .disabled => c.LIBINPUT_CONFIG_DWTP_DISABLED,
+            .enabled => c.LIBINPUT_CONFIG_DWTP_ENABLED,
+        });
+        if (c.libinput_device_config_dwtp_is_available(device) == 0) return;
+        const current = c.libinput_device_config_dwtp_get_enabled(device);
+        if (want != current) {
+            _ = c.libinput_device_config_dwtp_set_enabled(device, want);
+        }
+    }
+};
+
 pub const MiddleEmulation = enum {
     disabled,
     enabled,
@@ -271,6 +288,7 @@ events: ?EventState = null,
 drag: ?DragState = null,
 @"drag-lock": ?DragLock = null,
 @"disable-while-typing": ?DwtState = null,
+@"disable-while-trackpointing": ?DwtpState = null,
 @"middle-emulation": ?MiddleEmulation = null,
 @"natural-scroll": ?NaturalScroll = null,
 @"left-handed": ?LeftHanded = null,
