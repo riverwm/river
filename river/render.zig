@@ -98,9 +98,10 @@ pub fn renderOutput(output: *Output) void {
             return;
         };
 
-        output.lock_render_state = if (output.lock_surface != null) .lock_surface else .blanked;
-        if (server.lock_manager.state != .locked) {
-            server.lock_manager.maybeLock();
+        if (output.lock_surface == null) {
+            output.lock_render_state = .pending_blank;
+        } else {
+            output.lock_render_state = .pending_lock_surface;
         }
 
         return;
