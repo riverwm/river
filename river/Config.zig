@@ -46,19 +46,19 @@ pub const HideCursorWhenTypingMode = enum {
     enabled,
 };
 
-/// Color of background in RGBA (alpha should only affect nested sessions)
+/// Color of background in RGBA with premultiplied alpha (alpha should only affect nested sessions)
 background_color: [4]f32 = [_]f32{ 0.0, 0.16862745, 0.21176471, 1.0 }, // Solarized base03
 
 /// Width of borders in pixels
 border_width: u31 = 2,
 
-/// Color of border of focused window in RGBA
+/// Color of border of focused window in RGBA with premultiplied alpha
 border_color_focused: [4]f32 = [_]f32{ 0.57647059, 0.63137255, 0.63137255, 1.0 }, // Solarized base1
 
-/// Color of border of unfocused window in RGBA
+/// Color of border of unfocused window in RGBA with premultiplied alpha
 border_color_unfocused: [4]f32 = [_]f32{ 0.34509804, 0.43137255, 0.45882353, 1.0 }, // Solarized base01
 
-/// Color of border of urgent window in RGBA
+/// Color of border of urgent window in RGBA with premultiplied alpha
 border_color_urgent: [4]f32 = [_]f32{ 0.86274510, 0.19607843, 0.18431373, 1.0 }, // Solarized red
 
 /// Map of keymap mode name to mode id

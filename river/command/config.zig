@@ -104,7 +104,7 @@ pub fn setCursorWarp(
         return Error.UnknownOption;
 }
 
-/// Parse a color in the format 0xRRGGBB or 0xRRGGBBAA
+/// Parse a color in the format 0xRRGGBB or 0xRRGGBBAA. Returned color has premultiplied alpha.
 fn parseRgba(string: []const u8) ![4]f32 {
     if (string.len != 8 and string.len != 10) return error.InvalidRgba;
     if (string[0] != '0' or string[1] != 'x') return error.InvalidRgba;
@@ -114,10 +114,12 @@ fn parseRgba(string: []const u8) ![4]f32 {
     const b = try fmt.parseInt(u8, string[6..8], 16);
     const a = if (string.len == 10) try fmt.parseInt(u8, string[8..10], 16) else 255;
 
+    const alpha = @intToFloat(f32, a) / 255.0;
+
     return [4]f32{
-        @intToFloat(f32, r) / 255.0,
-        @intToFloat(f32, g) / 255.0,
-        @intToFloat(f32, b) / 255.0,
-        @intToFloat(f32, a) / 255.0,
+        @intToFloat(f32, r) / 255.0 * alpha,
+        @intToFloat(f32, g) / 255.0 * alpha,
+        @intToFloat(f32, b) / 255.0 * alpha,
+        alpha,
     };
 }
