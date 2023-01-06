@@ -149,7 +149,7 @@ pub fn maybeLock(manager: *LockManager) void {
         while (it) |node| : (it = node.next) {
             const output = &node.data;
             switch (output.lock_render_state) {
-                .unlocked => {
+                .unlocked, .pending_blank, .pending_lock_surface => {
                     all_outputs_blanked = false;
                     all_outputs_rendered_lock_surface = false;
                 },

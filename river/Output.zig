@@ -70,8 +70,17 @@ views: ViewStack(View) = .{},
 
 lock_surface: ?*LockSurface = null,
 lock_render_state: enum {
+    /// Normal, "unlocked" content may be visible.
     unlocked,
+    /// Submitted a blank buffer but the buffer has not yet been presented.
+    /// Normal, "unlocked" content may be visible.
+    pending_blank,
+    /// A blank buffer has been presented.
     blanked,
+    /// Submitted the lock surface buffer but the buffer has not yet been presented.
+    /// Normal, "unlocked" content may be visible.
+    pending_lock_surface,
+    /// The lock surface buffer has been presented.
     lock_surface,
 } = .unlocked,
 
@@ -102,6 +111,7 @@ status_trackers: std.SinglyLinkedList(OutputStatus) = .{},
 destroy: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleDestroy),
 enable: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleEnable),
 mode: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleMode),
+present: wl.Listener(*wlr.Output.event.Present) = wl.Listener(*wlr.Output.event.Present).init(handlePresent),
 frame: wl.Listener(*wlr.OutputDamage) = wl.Listener(*wlr.OutputDamage).init(handleFrame),
 damage_destroy: wl.Listener(*wlr.OutputDamage) = wl.Listener(*wlr.OutputDamage).init(handleDamageDestroy),
 
@@ -140,6 +150,7 @@ pub fn init(self: *Self, wlr_output: *wlr.Output) !void {
     wlr_output.events.destroy.add(&self.destroy);
     wlr_output.events.enable.add(&self.enable);
     wlr_output.events.mode.add(&self.mode);
+    wlr_output.events.present.add(&self.present);
 
     self.damage.?.events.frame.add(&self.frame);
     self.damage.?.events.destroy.add(&self.damage_destroy);
@@ -478,6 +489,7 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
     self.enable.link.remove();
     self.frame.link.remove();
     self.mode.link.remove();
+    self.present.link.remove();
 
     // Free all memory and clean up the wlr.Output
     if (self.layout_demand) |demand| demand.deinit();
@@ -509,6 +521,35 @@ fn handleMode(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
     self.arrangeLayers(.mapped);
     self.arrangeViews();
     server.root.startTransaction();
+}
+
+fn handlePresent(
+    listener: *wl.Listener(*wlr.Output.event.Present),
+    event: *wlr.Output.event.Present,
+) void {
+    const self = @fieldParentPtr(Self, "present", listener);
+
+    switch (self.lock_render_state) {
+        .unlocked => return,
+        .pending_blank, .pending_lock_surface => {
+            if (!event.presented) {
+                self.lock_render_state = .unlocked;
+                self.damage.?.addWhole();
+                return;
+            }
+
+            self.lock_render_state = switch (self.lock_render_state) {
+                .pending_blank => .blanked,
+                .pending_lock_surface => .lock_surface,
+                .unlocked, .blanked, .lock_surface => unreachable,
+            };
+
+            if (server.lock_manager.state != .locked) {
+                server.lock_manager.maybeLock();
+            }
+        },
+        .blanked, .lock_surface => unreachable,
+    }
 }
 
 fn setTitle(self: Self) void {
