@@ -173,9 +173,11 @@ const Output = struct {
                             '+' => output.main_count +|= @intCast(u31, arg),
                             '-' => {
                                 const result = output.main_count +| arg;
-                                if (result >= 0) output.main_count = @intCast(u31, result);
+                                if (result >= 1) output.main_count = @intCast(u31, result);
                             },
-                            else => output.main_count = @intCast(u31, arg),
+                            else => {
+                                if (arg >= 1) output.main_count = @intCast(u31, arg);
+                            },
                         }
                     },
                     .@"main-ratio" => {
@@ -194,7 +196,9 @@ const Output = struct {
             },
 
             .layout_demand => |ev| {
-                const main_count = math.clamp(output.main_count, 1, @truncate(u31, ev.view_count));
+                assert(ev.view_count > 0);
+
+                const main_count = math.min(output.main_count, @truncate(u31, ev.view_count));
                 const secondary_count = @truncate(u31, ev.view_count) -| main_count;
 
                 const usable_width = switch (output.main_location) {
@@ -216,7 +220,7 @@ const Output = struct {
                 var secondary_height: u31 = undefined;
                 var secondary_height_rem: u31 = undefined;
 
-                if (main_count > 0 and secondary_count > 0) {
+                if (secondary_count > 0) {
                     main_width = @floatToInt(u31, output.main_ratio * @intToFloat(f64, usable_width));
                     main_height = usable_height / main_count;
                     main_height_rem = usable_height % main_count;
@@ -224,15 +228,10 @@ const Output = struct {
                     secondary_width = usable_width - main_width;
                     secondary_height = usable_height / secondary_count;
                     secondary_height_rem = usable_height % secondary_count;
-                } else if (main_count > 0) {
+                } else {
                     main_width = usable_width;
                     main_height = usable_height / main_count;
                     main_height_rem = usable_height % main_count;
-                } else if (secondary_width > 0) {
-                    main_width = 0;
-                    secondary_width = usable_width;
-                    secondary_height = usable_height / secondary_count;
-                    secondary_height_rem = usable_height % secondary_count;
                 }
 
                 var i: u31 = 0;
