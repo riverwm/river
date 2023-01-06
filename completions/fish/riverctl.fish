@@ -66,6 +66,7 @@ complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'keyboard-group-c
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'keyboard-group-destroy' -d 'Destroy a keyboard group.'
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'keyboard-group-add'     -d 'Add a keyboard to a keyboard group.'
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'keyboard-group-remove'  -d 'Remove a keyboard from a keyboard group.'
+complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'keyboard-layout'        -d 'Set the keyboard layout.'
 
 # Subcommands
 complete -c riverctl -x -n '__fish_seen_subcommand_from focus-output'         -a 'next previous'
