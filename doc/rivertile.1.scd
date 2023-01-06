@@ -54,6 +54,7 @@ These commands may be sent to rivertile at runtime with the help of
 	Set or modify the number of views in the main area of the layout. If
 	_value_ is prefixed by a +/- sign, _value_ is added/subtracted from the
 	current count. If there is no sign, the main count is set to _value_.
+	Note that the main count cannot be decreased below 1.
 
 *main-ratio* _value_
 	Set or modify the ratio of the main area to total layout area. If
