@@ -381,39 +381,56 @@ fn renderBorders(output: *const Output, view: *View) void {
     };
     const actual_box = if (view.saved_buffers.items.len != 0) view.saved_surface_box else view.surface_box;
 
+    var view_box: wlr.Box = .{
+        .x = view.current.box.x,
+        .y = view.current.box.y,
+        .width = actual_box.width,
+        .height = actual_box.height,
+    };
+
+    var box_with_borders: wlr.Box = .{
+        .x = view_box.x - config.border_width,
+        .y = view_box.y - config.border_width,
+        .width = view_box.width + config.border_width * 2,
+        .height = view_box.height + config.border_width * 2,
+    };
+
+    scaleBox(&view_box, output.wlr_output.scale);
+    scaleBox(&box_with_borders, output.wlr_output.scale);
+
     var border: wlr.Box = undefined;
 
-    // left and right, covering the corners as well
-    border.y = view.current.box.y - config.border_width;
-    border.width = config.border_width;
-    border.height = actual_box.height + config.border_width * 2;
-
     // left
-    border.x = view.current.box.x - config.border_width;
-    renderRect(output, border, color);
+    border.x = box_with_borders.x;
+    border.y = box_with_borders.y;
+    border.width = view_box.x - box_with_borders.x;
+    border.height = box_with_borders.height;
+    renderRectUnscaled(output, border, color);
 
     // right
-    border.x = view.current.box.x + actual_box.width;
-    renderRect(output, border, color);
-
-    // top and bottom
-    border.x = view.current.box.x;
-    border.width = actual_box.width;
-    border.height = config.border_width;
+    border.x = view_box.x + view_box.width;
+    border.y = box_with_borders.y;
+    border.width = box_with_borders.x + box_with_borders.width - view_box.x - view_box.width;
+    border.height = box_with_borders.height;
+    renderRectUnscaled(output, border, color);
 
     // top
-    border.y = view.current.box.y - config.border_width;
-    renderRect(output, border, color);
+    border.x = view_box.x;
+    border.y = box_with_borders.y;
+    border.width = view_box.width;
+    border.height = view_box.y - box_with_borders.y;
+    renderRectUnscaled(output, border, color);
 
     // bottom border
-    border.y = view.current.box.y + actual_box.height;
-    renderRect(output, border, color);
+    border.x = view_box.x;
+    border.y = view_box.y + view_box.height;
+    border.width = view_box.width;
+    border.height = box_with_borders.y + box_with_borders.height - view_box.y - view_box.height;
+    renderRectUnscaled(output, border, color);
 }
 
-fn renderRect(output: *const Output, box: wlr.Box, color: *const [4]f32) void {
-    var scaled = box;
-    scaleBox(&scaled, output.wlr_output.scale);
-    server.renderer.renderRect(&scaled, color, &output.wlr_output.transform_matrix);
+fn renderRectUnscaled(output: *const Output, box: wlr.Box, color: *const [4]f32) void {
+    server.renderer.renderRect(&box, color, &output.wlr_output.transform_matrix);
 }
 
 /// Scale a wlr_box, taking the possibility of fractional scaling into account.
