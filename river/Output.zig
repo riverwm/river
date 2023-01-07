@@ -530,7 +530,7 @@ fn handlePresent(
     const self = @fieldParentPtr(Self, "present", listener);
 
     switch (self.lock_render_state) {
-        .unlocked => return,
+        .unlocked => assert(server.lock_manager.state != .locked),
         .pending_blank, .pending_lock_surface => {
             if (!event.presented) {
                 self.lock_render_state = .unlocked;
@@ -548,7 +548,7 @@ fn handlePresent(
                 server.lock_manager.maybeLock();
             }
         },
-        .blanked, .lock_surface => unreachable,
+        .blanked, .lock_surface => {},
     }
 }
 

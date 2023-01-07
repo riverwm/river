@@ -98,10 +98,17 @@ pub fn renderOutput(output: *Output) void {
             return;
         };
 
-        if (output.lock_surface == null) {
-            output.lock_render_state = .pending_blank;
+        if (server.lock_manager.state == .locked) {
+            switch (output.lock_render_state) {
+                .unlocked, .pending_blank, .pending_lock_surface => unreachable,
+                .blanked, .lock_surface => {},
+            }
         } else {
-            output.lock_render_state = .pending_lock_surface;
+            if (output.lock_surface == null) {
+                output.lock_render_state = .pending_blank;
+            } else {
+                output.lock_render_state = .pending_lock_surface;
+            }
         }
 
         return;
