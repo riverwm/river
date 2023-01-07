@@ -164,13 +164,15 @@ pub fn maybeLock(manager: *LockManager) void {
     switch (manager.state) {
         .waiting_for_lock_surfaces => if (all_outputs_rendered_lock_surface) {
             log.info("session locked", .{});
-            manager.lock.?.sendLocked();
+            // The lock client may have been destroyed, for example due to a protocol error.
+            if (manager.lock) |lock| lock.sendLocked();
             manager.state = .locked;
             manager.lock_surfaces_timer.timerUpdate(0) catch {};
         },
         .waiting_for_blank => if (all_outputs_blanked) {
             log.info("session locked", .{});
-            manager.lock.?.sendLocked();
+            // The lock client may have been destroyed, for example due to a protocol error.
+            if (manager.lock) |lock| lock.sendLocked();
             manager.state = .locked;
         },
         .unlocked, .locked => unreachable,
