@@ -42,14 +42,12 @@ const usage: []const u8 =
 pub var server: Server = undefined;
 
 pub fn main() anyerror!void {
-    // This line is here because of https://github.com/ziglang/zig/issues/7807
-    const argv: [][*:0]const u8 = os.argv;
     const result = flags.parser([*:0]const u8, &.{
         .{ .name = "h", .kind = .boolean },
         .{ .name = "version", .kind = .boolean },
         .{ .name = "c", .kind = .arg },
         .{ .name = "log-level", .kind = .arg },
-    }).parse(argv[1..]) catch {
+    }).parse(os.argv[1..]) catch {
         try io.getStdErr().writeAll(usage);
         os.exit(1);
     };
