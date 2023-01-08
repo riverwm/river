@@ -418,10 +418,10 @@ fn renderRect(output: *const Output, box: wlr.Box, color: *const [4]f32) void {
 
 /// Scale a wlr_box, taking the possibility of fractional scaling into account.
 fn scaleBox(box: *wlr.Box, scale: f64) void {
+    box.width = scaleLength(box.width, box.x, scale);
+    box.height = scaleLength(box.height, box.y, scale);
     box.x = @floatToInt(c_int, @round(@intToFloat(f64, box.x) * scale));
     box.y = @floatToInt(c_int, @round(@intToFloat(f64, box.y) * scale));
-    box.width = scaleLength(box.width, box.x, scale);
-    box.height = scaleLength(box.height, box.x, scale);
 }
 
 /// Scales a width/height.
