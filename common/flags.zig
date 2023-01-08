@@ -69,8 +69,7 @@ pub fn parser(comptime Arg: type, comptime flags: []const Flag) type {
             var result_flags: Result.Flags = .{};
 
             var i: usize = 0;
-            while (i < args.len) : (i += 1) {
-                var parsed_flag = false;
+            outer: while (i < args.len) : (i += 1) {
                 inline for (flags) |flag| {
                     if (mem.eql(u8, "-" ++ flag.name, mem.span(args[i]))) {
                         switch (flag.kind) {
@@ -85,10 +84,10 @@ pub fn parser(comptime Arg: type, comptime flags: []const Flag) type {
                                 @field(result_flags, flag.name) = mem.span(args[i]);
                             },
                         }
-                        parsed_flag = true;
+                        continue :outer;
                     }
                 }
-                if (!parsed_flag) break;
+                break;
             }
 
             return Result{

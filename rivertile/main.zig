@@ -303,8 +303,6 @@ const Output = struct {
 };
 
 pub fn main() !void {
-    // https://github.com/ziglang/zig/issues/7807
-    const argv: [][*:0]const u8 = os.argv;
     const result = flags.parser([*:0]const u8, &[_]flags.Flag{
         .{ .name = "h", .kind = .boolean },
         .{ .name = "version", .kind = .boolean },
@@ -313,7 +311,7 @@ pub fn main() !void {
         .{ .name = "main-location", .kind = .arg },
         .{ .name = "main-count", .kind = .arg },
         .{ .name = "main-ratio", .kind = .arg },
-    }).parse(argv[1..]) catch {
+    }).parse(os.argv[1..]) catch {
         try std.io.getStdErr().writeAll(usage);
         os.exit(1);
     };
