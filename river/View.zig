@@ -551,14 +551,14 @@ pub fn unmap(self: *Self) void {
     server.root.startTransaction();
 }
 
-pub fn notifyTitle(self: Self) void {
+pub fn notifyTitle(self: *const Self) void {
     if (self.foreign_toplevel_handle) |handle| {
         if (self.getTitle()) |s| handle.setTitle(s);
     }
     // Send title to all status listeners attached to a seat which focuses this view
     var seat_it = server.input_manager.seats.first;
     while (seat_it) |seat_node| : (seat_it = seat_node.next) {
-        if (seat_node.data.focused == .view and seat_node.data.focused.view == &self) {
+        if (seat_node.data.focused == .view and seat_node.data.focused.view == self) {
             var client_it = seat_node.data.status_trackers.first;
             while (client_it) |client_node| : (client_it = client_node.next) {
                 client_node.data.sendFocusedView();
