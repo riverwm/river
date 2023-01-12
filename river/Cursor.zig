@@ -367,7 +367,7 @@ fn updateKeyboardFocus(self: Self, result: SurfaceAtResult) void {
             self.seat.setFocusRaw(.{ .lock_surface = lock_surface });
         },
         .xwayland_override_redirect => |override_redirect| {
-            assert(server.lock_manager.state != .unlocked);
+            assert(server.lock_manager.state == .unlocked);
             override_redirect.focusIfDesired();
         },
     }
