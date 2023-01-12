@@ -80,9 +80,6 @@ focused_output: *Output,
 
 focused: FocusTarget = .none,
 
-/// Currently activated Xwayland view (used to handle override redirect menus)
-activated_xwayland_view: if (build_options.xwayland) ?*View else void = if (build_options.xwayland) null else {},
-
 /// Stack of views in most recently focused order
 /// If there is a currently focused view, it is on top.
 focus_stack: ViewStack(*View) = .{},
@@ -233,36 +230,11 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
         .none => null,
     };
 
-    if (build_options.xwayland) {
-        // Keep the parent top-level Xwayland view of any override redirect surface
-        // activated while that override redirect surface is focused. This ensures
-        // override redirect menus do not disappear as a result of deactivating
-        // their parent window.
-        if (new_focus == .xwayland_override_redirect and
-            self.focused == .view and
-            self.focused.view.impl == .xwayland_view and
-            self.focused.view.impl.xwayland_view.xwayland_surface.pid == new_focus.xwayland_override_redirect.xwayland_surface.pid)
-        {
-            self.activated_xwayland_view = self.focused.view;
-        } else if (self.activated_xwayland_view) |active_view| {
-            if (!(new_focus == .view and new_focus.view == active_view) and
-                !(new_focus == .xwayland_override_redirect and new_focus.xwayland_override_redirect.xwayland_surface.pid == active_view.impl.xwayland_view.xwayland_surface.pid))
-            {
-                if (active_view.pending.focus == 0) active_view.setActivated(false);
-                self.activated_xwayland_view = null;
-            }
-        }
-    }
-
     // First clear the current focus
     switch (self.focused) {
         .view => |view| {
             view.pending.focus -= 1;
-            if (view.pending.focus == 0 and
-                (!build_options.xwayland or view != self.activated_xwayland_view))
-            {
-                view.setActivated(false);
-            }
+            if (view.pending.focus == 0) view.setActivated(false);
         },
         .xwayland_override_redirect, .layer, .lock_surface, .none => {},
     }
@@ -272,11 +244,7 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
         .view => |target_view| {
             assert(server.lock_manager.state == .unlocked);
             assert(self.focused_output == target_view.output);
-            if (target_view.pending.focus == 0 and
-                (!build_options.xwayland or target_view != self.activated_xwayland_view))
-            {
-                target_view.setActivated(true);
-            }
+            if (target_view.pending.focus == 0) target_view.setActivated(true);
             target_view.pending.focus += 1;
             target_view.pending.urgent = false;
         },
@@ -289,7 +257,17 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
     }
     self.focused = new_focus;
 
-    // Send keyboard enter/leave events and handle pointer constraints
+    self.keyboardEnterOrLeave(target_surface);
+
+    // Inform any clients tracking status of the change
+    var it = self.status_trackers.first;
+    while (it) |node| : (it = node.next) node.data.sendFocusedView();
+}
+
+/// Send keyboard enter/leave events and handle pointer constraints
+/// This should never normally be called from outside of setFocusRaw(), but we make an exception for
+/// XwaylandOverrideRedirect surfaces as they don't conform to the Wayland focus model.
+pub fn keyboardEnterOrLeave(self: *Self, target_surface: ?*wlr.Surface) void {
     if (target_surface) |wlr_surface| {
         self.keyboardNotifyEnter(wlr_surface);
 
@@ -317,10 +295,6 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
             self.cursor.may_need_warp = true;
         }
     }
-
-    // Inform any clients tracking status of the change
-    var it = self.status_trackers.first;
-    while (it) |node| : (it = node.next) node.data.sendFocusedView();
 }
 
 fn keyboardNotifyEnter(self: *Self, wlr_surface: *wlr.Surface) void {

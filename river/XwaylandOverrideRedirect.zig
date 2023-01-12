@@ -97,10 +97,26 @@ pub fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface:
 
     xwayland_surface.surface.?.events.commit.add(&self.commit);
 
+    self.focusIfDesired();
+}
+
+pub fn focusIfDesired(self: *Self) void {
     if (self.xwayland_surface.overrideRedirectWantsFocus() and
         self.xwayland_surface.icccmInputModel() != .none)
     {
-        server.input_manager.defaultSeat().setFocusRaw(.{ .xwayland_override_redirect = self });
+        const seat = server.input_manager.defaultSeat();
+        // Keep the parent top-level Xwayland view of any override redirect surface
+        // activated while that override redirect surface is focused. This ensures
+        // override redirect menus do not disappear as a result of deactivating
+        // their parent window.
+        if (seat.focused == .view and
+            seat.focused.view.impl == .xwayland_view and
+            seat.focused.view.impl.xwayland_view.xwayland_surface.pid == self.xwayland_surface.pid)
+        {
+            seat.keyboardEnterOrLeave(self.xwayland_surface.surface);
+        } else {
+            seat.setFocusRaw(.{ .xwayland_override_redirect = self });
+        }
     }
 }
 
@@ -113,15 +129,20 @@ fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSur
 
     self.commit.link.remove();
 
-    // If the unmapped surface is currently focused, reset focus to the most
-    // appropriate view.
+    // If the unmapped surface is currently focused, pass keyboard focus
+    // to the most appropriate surface.
     var seat_it = server.input_manager.seats.first;
     while (seat_it) |seat_node| : (seat_it = seat_node.next) {
         const seat = &seat_node.data;
-        if (seat.focused == .xwayland_override_redirect and
-            seat.focused.xwayland_override_redirect == self)
-        {
-            seat.focus(null);
+        switch (seat.focused) {
+            .view => |focused| if (focused.impl == .xwayland_view and
+                focused.impl.xwayland_view.xwayland_surface.pid == self.xwayland_surface.pid and
+                seat.wlr_seat.keyboard_state.focused_surface == self.xwayland_surface.surface)
+            {
+                seat.keyboardEnterOrLeave(focused.surface.?);
+            },
+            .xwayland_override_redirect => |focused| if (focused == self) seat.focus(null),
+            .layer, .lock_surface, .none => {},
         }
     }
 
