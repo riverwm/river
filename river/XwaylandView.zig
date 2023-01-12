@@ -175,16 +175,6 @@ pub fn getConstraints(self: Self) View.Constraints {
 /// Called when the xwayland surface is destroyed
 fn handleDestroy(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
-    const view = self.view;
-
-    // Ensure no seat will attempt to access this view after it is destroyed.
-    var seat_it = server.input_manager.seats.first;
-    while (seat_it) |seat_node| : (seat_it = seat_node.next) {
-        const seat = &seat_node.data;
-        if (seat.activated_xwayland_view == view) {
-            seat.activated_xwayland_view = null;
-        }
-    }
 
     // Remove listeners that are active for the entire lifetime of the view
     self.destroy.link.remove();

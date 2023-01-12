@@ -367,12 +367,8 @@ fn updateKeyboardFocus(self: Self, result: SurfaceAtResult) void {
             self.seat.setFocusRaw(.{ .lock_surface = lock_surface });
         },
         .xwayland_override_redirect => |override_redirect| {
-            if (!build_options.xwayland) unreachable;
-            if (override_redirect.xwayland_surface.overrideRedirectWantsFocus() and
-                override_redirect.xwayland_surface.icccmInputModel() != .none)
-            {
-                self.seat.setFocusRaw(.{ .xwayland_override_redirect = override_redirect });
-            }
+            assert(server.lock_manager.state != .unlocked);
+            override_redirect.focusIfDesired();
         },
     }
 }
@@ -663,7 +659,7 @@ const SurfaceAtResult = struct {
         view: *View,
         layer_surface: *LayerSurface,
         lock_surface: *LockSurface,
-        xwayland_override_redirect: if (build_options.xwayland) *XwaylandOverrideRedirect else void,
+        xwayland_override_redirect: if (build_options.xwayland) *XwaylandOverrideRedirect else noreturn,
     },
 };
 
