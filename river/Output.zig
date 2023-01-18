@@ -507,6 +507,18 @@ fn handleEnable(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) vo
     // Add the output to root.outputs and the output layout if it has not
     // already been added.
     if (wlr_output.enabled) server.root.addOutput(self);
+
+    if (wlr_output.enabled) {
+        switch (server.lock_manager.state) {
+            .unlocked => self.lock_render_state = .unlocked,
+            .waiting_for_lock_surfaces, .waiting_for_blank, .locked => {
+                assert(self.lock_render_state == .blanked);
+            },
+        }
+    } else {
+        // Disabling and re-enabling an output always blanks it.
+        self.lock_render_state = .blanked;
+    }
 }
 
 fn handleFrame(listener: *wl.Listener(*wlr.OutputDamage), _: *wlr.OutputDamage) void {
