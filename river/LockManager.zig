@@ -95,6 +95,8 @@ fn handleLock(listener: *wl.Listener(*wlr.SessionLockV1), lock: *wlr.SessionLock
         manager.lock_surfaces_timer.timerUpdate(200) catch {
             log.err("error setting lock surfaces timer, imperfect frames may be shown", .{});
             manager.state = .waiting_for_blank;
+            // This call is necessary in the case that all outputs in the layout are disabled.
+            manager.maybeLock();
         };
 
         {
@@ -137,6 +139,9 @@ fn handleLockSurfacesTimeout(manager: *LockManager) c_int {
             }
         }
     }
+
+    // This call is necessary in the case that all outputs in the layout are disabled.
+    manager.maybeLock();
 
     return 0;
 }
