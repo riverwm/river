@@ -204,11 +204,7 @@ pub fn needsConfigure(self: Self) bool {
 pub fn configure(self: *Self) void {
     switch (self.impl) {
         .xdg_toplevel => |*xdg_toplevel| xdg_toplevel.configure(),
-        .xwayland_view => |*xwayland_view| {
-            // TODO(zig): remove this uneeded if statement
-            // https://github.com/ziglang/zig/issues/13655
-            if (build_options.xwayland) xwayland_view.configure();
-        },
+        .xwayland_view => |*xwayland_view| xwayland_view.configure(),
     }
 }
 
@@ -355,11 +351,7 @@ fn setFullscreen(self: *Self, fullscreen: bool) void {
     if (self.foreign_toplevel_handle) |handle| handle.setFullscreen(fullscreen);
     switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.setFullscreen(fullscreen),
-        .xwayland_view => |*xwayland_view| {
-            // TODO(zig): remove this uneeded if statement
-            // https://github.com/ziglang/zig/issues/13655
-            if (build_options.xwayland) xwayland_view.setFullscreen(fullscreen);
-        },
+        .xwayland_view => |*xwayland_view| xwayland_view.setFullscreen(fullscreen),
     }
 }
 
