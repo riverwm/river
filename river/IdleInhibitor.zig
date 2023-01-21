@@ -28,7 +28,8 @@ fn handleDestroy(listener: *wl.Listener(*wlr.IdleInhibitorV1), _: *wlr.IdleInhib
 
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
     server.idle_inhibitor_manager.inhibitors.remove(node);
-    util.gpa.destroy(node);
 
     self.inhibitor_manager.idleInhibitCheckActive();
+
+    util.gpa.destroy(node);
 }
