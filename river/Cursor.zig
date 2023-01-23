@@ -102,8 +102,6 @@ xcursor_manager: *wlr.XcursorManager,
 
 image: Image = .unknown,
 
-constraint: ?*wlr.PointerConstraintV1 = null,
-
 /// Number of distinct buttons currently pressed
 pressed_count: u32 = 0,
 
@@ -959,26 +957,6 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
     );
     var dx: f64 = delta_x;
     var dy: f64 = delta_y;
-    if (self.constraint) |constraint| {
-        if (self.mode == .passthrough or self.mode == .down) {
-            if (constraint.type == .locked) return;
-
-            const result = self.surfaceAt() orelse return;
-
-            if (result.surface != constraint.surface) return;
-
-            const sx = result.sx;
-            const sy = result.sy;
-            var sx_con: f64 = undefined;
-            var sy_con: f64 = undefined;
-            if (!wlr.region.confine(&constraint.region, sx, sy, sx + dx, sy + dy, &sx_con, &sy_con)) {
-                return;
-            }
-
-            dx = sx_con - sx;
-            dy = sy_con - sy;
-        }
-    }
     switch (self.mode) {
         .passthrough => {
             self.wlr_cursor.move(device, dx, dy);

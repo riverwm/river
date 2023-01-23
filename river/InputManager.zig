@@ -29,7 +29,6 @@ const util = @import("util.zig");
 const InputConfig = @import("InputConfig.zig");
 const InputDevice = @import("InputDevice.zig");
 const Keyboard = @import("Keyboard.zig");
-const PointerConstraint = @import("PointerConstraint.zig");
 const Seat = @import("Seat.zig");
 const Switch = @import("Switch.zig");
 
@@ -40,7 +39,6 @@ const log = std.log.scoped(.input_manager);
 new_input: wl.Listener(*wlr.InputDevice) = wl.Listener(*wlr.InputDevice).init(handleNewInput),
 
 idle_notifier: *wlr.IdleNotifierV1,
-pointer_constraints: *wlr.PointerConstraintsV1,
 relative_pointer_manager: *wlr.RelativePointerManagerV1,
 virtual_pointer_manager: *wlr.VirtualPointerManagerV1,
 virtual_keyboard_manager: *wlr.VirtualKeyboardManagerV1,
@@ -51,8 +49,6 @@ seats: std.TailQueue(Seat) = .{},
 
 exclusive_client: ?*wl.Client = null,
 
-new_pointer_constraint: wl.Listener(*wlr.PointerConstraintV1) =
-    wl.Listener(*wlr.PointerConstraintV1).init(handleNewPointerConstraint),
 new_virtual_pointer: wl.Listener(*wlr.VirtualPointerManagerV1.event.NewPointer) =
     wl.Listener(*wlr.VirtualPointerManagerV1.event.NewPointer).init(handleNewVirtualPointer),
 new_virtual_keyboard: wl.Listener(*wlr.VirtualKeyboardV1) =
@@ -65,7 +61,6 @@ pub fn init(self: *Self) !void {
     self.* = .{
         // These are automatically freed when the display is destroyed
         .idle_notifier = try wlr.IdleNotifierV1.create(server.wl_server),
-        .pointer_constraints = try wlr.PointerConstraintsV1.create(server.wl_server),
         .relative_pointer_manager = try wlr.RelativePointerManagerV1.create(server.wl_server),
         .virtual_pointer_manager = try wlr.VirtualPointerManagerV1.create(server.wl_server),
         .virtual_keyboard_manager = try wlr.VirtualKeyboardManagerV1.create(server.wl_server),
@@ -81,7 +76,6 @@ pub fn init(self: *Self) !void {
     if (build_options.xwayland) server.xwayland.setSeat(self.defaultSeat().wlr_seat);
 
     server.backend.events.new_input.add(&self.new_input);
-    self.pointer_constraints.events.new_constraint.add(&self.new_pointer_constraint);
     self.virtual_pointer_manager.events.new_virtual_pointer.add(&self.new_virtual_pointer);
     self.virtual_keyboard_manager.events.new_virtual_keyboard.add(&self.new_virtual_keyboard);
 }
@@ -122,19 +116,6 @@ fn handleNewInput(listener: *wl.Listener(*wlr.InputDevice), wlr_device: *wlr.Inp
     const self = @fieldParentPtr(Self, "new_input", listener);
 
     self.defaultSeat().addDevice(wlr_device);
-}
-
-fn handleNewPointerConstraint(
-    _: *wl.Listener(*wlr.PointerConstraintV1),
-    constraint: *wlr.PointerConstraintV1,
-) void {
-    const pointer_constraint = util.gpa.create(PointerConstraint) catch {
-        constraint.resource.getClient().postNoMemory();
-        log.err("out of memory", .{});
-        return;
-    };
-
-    pointer_constraint.init(constraint);
 }
 
 fn handleNewVirtualPointer(

@@ -45,7 +45,6 @@ const ViewStack = @import("view_stack.zig").ViewStack;
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
 const log = std.log.scoped(.seat);
-const PointerConstraint = @import("PointerConstraint.zig");
 
 pub const FocusTarget = union(enum) {
     view: *View,
@@ -271,29 +270,15 @@ pub fn keyboardEnterOrLeave(self: *Self, target_surface: ?*wlr.Surface) void {
     if (target_surface) |wlr_surface| {
         self.keyboardNotifyEnter(wlr_surface);
 
-        if (server.input_manager.pointer_constraints.constraintForSurface(wlr_surface, self.wlr_seat)) |constraint| {
-            @intToPtr(*PointerConstraint, constraint.data).setAsActive();
-        } else if (self.cursor.constraint) |constraint| {
-            PointerConstraint.warpToHint(&self.cursor);
-            constraint.sendDeactivated();
-            self.cursor.constraint = null;
-        } else {
-            // Depending on configuration and cursor position, changing keyboard focus
-            // may cause the cursor to be warped.
-            self.cursor.may_need_warp = true;
-        }
+        // Depending on configuration and cursor position, changing keyboard focus
+        // may cause the cursor to be warped.
+        self.cursor.may_need_warp = true;
     } else {
         self.wlr_seat.keyboardClearFocus();
 
-        if (self.cursor.constraint) |constraint| {
-            PointerConstraint.warpToHint(&self.cursor);
-            constraint.sendDeactivated();
-            self.cursor.constraint = null;
-        } else {
-            // Depending on configuration and cursor position, changing keyboard focus
-            // may cause the cursor to be warped.
-            self.cursor.may_need_warp = true;
-        }
+        // Depending on configuration and cursor position, changing keyboard focus
+        // may cause the cursor to be warped.
+        self.cursor.may_need_warp = true;
     }
 }
 

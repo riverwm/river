@@ -108,7 +108,6 @@ pub fn build(b: *zbs.Builder) !void {
 
     scanner.generate("xdg_wm_base", 2);
     scanner.generate("zwp_pointer_gestures_v1", 3);
-    scanner.generate("zwp_pointer_constraints_v1", 1);
     scanner.generate("ext_session_lock_manager_v1", 1);
 
     scanner.generate("zriver_control_v1", 1);
