@@ -461,6 +461,7 @@ fn processOutputConfig(
             }
             wlr_output.setScale(head.state.scale);
             wlr_output.setTransform(head.state.transform);
+            wlr_output.enableAdaptiveSync(head.state.adaptive_sync_enabled);
 
             switch (action) {
                 .test_only => {
