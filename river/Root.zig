@@ -19,6 +19,7 @@ const Self = @This();
 const build_options = @import("build_options");
 const std = @import("std");
 const assert = std.debug.assert;
+const mem = std.mem;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
@@ -450,58 +451,30 @@ fn processOutputConfig(
         const wlr_output = head.state.output;
         const output = @intToPtr(*Output, wlr_output.data);
 
-        if (head.state.enabled) {
-            wlr_output.enable(true);
+        var proposed_state = wlr.Output.State.init();
+        head.state.apply(&proposed_state);
 
-            if (head.state.mode) |mode| {
-                wlr_output.setMode(mode);
-            } else {
-                const custom_mode = &head.state.custom_mode;
-                wlr_output.setCustomMode(custom_mode.width, custom_mode.height, custom_mode.refresh);
-            }
-            wlr_output.setScale(head.state.scale);
-            wlr_output.setTransform(head.state.transform);
-            wlr_output.enableAdaptiveSync(head.state.adaptive_sync_enabled);
-
-            switch (action) {
-                .test_only => {
-                    if (!output.wlr_output.testCommit()) success = false;
-                    output.wlr_output.rollback();
-                },
-                .apply => {
-                    if (output.wlr_output.commit()) {
+        switch (action) {
+            .test_only => {
+                if (!wlr_output.testState(&proposed_state)) success = false;
+            },
+            .apply => {
+                if (wlr_output.commitState(&proposed_state)) {
+                    if (head.state.enabled) {
                         // Just updates the output's position if it is already in the layout
                         self.output_layout.add(output.wlr_output, head.state.x, head.state.y);
                         output.arrangeLayers(.mapped);
-                    } else |_| {
-                        std.log.scoped(.output_manager).err("failed to apply config to output {s}", .{output.wlr_output.name});
-                        success = false;
-                    }
-                },
-            }
-        } else {
-            // The output is already disabled, so there's nothing to do
-            if (!wlr_output.enabled) continue;
-
-            wlr_output.enable(false);
-
-            switch (action) {
-                .test_only => {
-                    if (!output.wlr_output.testCommit()) success = false;
-                    output.wlr_output.rollback();
-                },
-                .apply => {
-                    if (output.wlr_output.commit()) {
+                    } else {
                         self.removeOutput(output);
                         self.output_layout.remove(output.wlr_output);
-                    } else |_| {
-                        std.log.scoped(.output_manager).err("failed to apply config to output {s}", .{
-                            output.wlr_output.name,
-                        });
-                        success = false;
                     }
-                },
-            }
+                } else |_| {
+                    std.log.scoped(.output_manager).err("failed to apply config to output {s}", .{
+                        output.wlr_output.name,
+                    });
+                    success = false;
+                }
+            },
         }
     }
 
