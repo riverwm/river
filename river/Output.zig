@@ -69,6 +69,10 @@ usable_box: wlr.Box,
 views: ViewStack(View) = .{},
 
 lock_surface: ?*LockSurface = null,
+/// Tracks the currently presented frame on the output as it pertains to ext-session-lock.
+/// The output is initially considered blanked:
+/// If using the DRM backend it will be blanked with the initial modeset.
+/// If using the Wayland or X11 backend nothing will be visible until the first frame is rendered.
 lock_render_state: enum {
     /// Normal, "unlocked" content may be visible.
     unlocked,
@@ -82,7 +86,7 @@ lock_render_state: enum {
     pending_lock_surface,
     /// The lock surface buffer has been presented.
     lock_surface,
-} = .unlocked,
+} = .blanked,
 
 /// The double-buffered state of the output.
 current: State = State{ .tags = 1 << 0 },
