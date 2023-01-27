@@ -130,16 +130,6 @@ fn handleLockSurfacesTimeout(manager: *LockManager) c_int {
     assert(manager.state == .waiting_for_lock_surfaces);
     manager.state = .waiting_for_blank;
 
-    {
-        var it = server.root.outputs.first;
-        while (it) |node| : (it = node.next) {
-            const output = &node.data;
-            if (output.lock_render_state == .unlocked) {
-                output.damage.?.addWhole();
-            }
-        }
-    }
-
     // This call is necessary in the case that all outputs in the layout are disabled.
     manager.maybeLock();
 

@@ -26,10 +26,8 @@ const util = @import("util.zig");
 
 const Output = @import("Output.zig");
 const Seat = @import("Seat.zig");
-const Subsurface = @import("Subsurface.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
-const XdgPopup = @import("XdgPopup.zig");
 
 const log = std.log.scoped(.xdg_shell);
 
@@ -46,8 +44,6 @@ acked_pending_serial: bool = false,
 destroy: wl.Listener(void) = wl.Listener(void).init(handleDestroy),
 map: wl.Listener(void) = wl.Listener(void).init(handleMap),
 unmap: wl.Listener(void) = wl.Listener(void).init(handleUnmap),
-new_popup: wl.Listener(*wlr.XdgPopup) = wl.Listener(*wlr.XdgPopup).init(handleNewPopup),
-new_subsurface: wl.Listener(*wlr.Subsurface) = wl.Listener(*wlr.Subsurface).init(handleNewSubsurface),
 
 // Listeners that are only active while the view is mapped
 ack_configure: wl.Listener(*wlr.XdgSurface.Configure) =
@@ -78,10 +74,6 @@ pub fn create(output: *Output, xdg_toplevel: *wlr.XdgToplevel) error{OutOfMemory
     xdg_toplevel.base.events.destroy.add(&self.destroy);
     xdg_toplevel.base.events.map.add(&self.map);
     xdg_toplevel.base.events.unmap.add(&self.unmap);
-    xdg_toplevel.base.events.new_popup.add(&self.new_popup);
-    xdg_toplevel.base.surface.events.new_subsurface.add(&self.new_subsurface);
-
-    Subsurface.handleExisting(xdg_toplevel.base.surface, .{ .xdg_toplevel = self });
 }
 
 /// Returns true if a configure must be sent to ensure that the pending
@@ -164,11 +156,6 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
     self.destroy.link.remove();
     self.map.link.remove();
     self.unmap.link.remove();
-    self.new_popup.link.remove();
-    self.new_subsurface.link.remove();
-
-    Subsurface.destroySubsurfaces(self.xdg_toplevel.base.surface);
-    XdgPopup.destroyPopups(self.xdg_toplevel.base);
 
     self.view.destroy();
 }
@@ -296,7 +283,6 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
                 // before some change occured that caused shouldTrackConfigure() to return false.
                 view.dropSavedBuffers();
 
-                view.output.damage.?.addWhole();
                 server.input_manager.updateCursorState();
             }
         } else {
@@ -307,7 +293,6 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
             view.sendFrameDone();
         }
     } else {
-        view.output.damage.?.addWhole();
         const size_changed = !std.meta.eql(view.surface_box, new_box);
         view.surface_box = new_box;
         // If the client has decided to resize itself and the view is floating,
@@ -318,16 +303,6 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
             view.applyPending();
         }
     }
-}
-
-fn handleNewPopup(listener: *wl.Listener(*wlr.XdgPopup), wlr_xdg_popup: *wlr.XdgPopup) void {
-    const self = @fieldParentPtr(Self, "new_popup", listener);
-    XdgPopup.create(wlr_xdg_popup, .{ .xdg_toplevel = self });
-}
-
-fn handleNewSubsurface(listener: *wl.Listener(*wlr.Subsurface), new_wlr_subsurface: *wlr.Subsurface) void {
-    const self = @fieldParentPtr(Self, "new_subsurface", listener);
-    Subsurface.create(new_wlr_subsurface, .{ .xdg_toplevel = self });
 }
 
 /// Called when the client asks to be fullscreened. We always honor the request

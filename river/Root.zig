@@ -91,8 +91,6 @@ pub fn init(self: *Self) !void {
         .transaction_timer = transaction_timer,
         .noop_output = .{
             .wlr_output = noop_wlr_output,
-            // TODO: find a good way to not create a wlr.OutputDamage for the noop output
-            .damage = try wlr.OutputDamage.create(noop_wlr_output),
             .usable_box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
         },
     };
@@ -390,8 +388,6 @@ fn commitTransaction(self: *Self) void {
 
         if (view_tags_changed) output.sendViewTags();
         if (urgent_tags_dirty) output.sendUrgentTags();
-
-        output.damage.?.addWhole();
     }
     server.input_manager.updateCursorState();
     server.idle_inhibitor_manager.idleInhibitCheckActive();

@@ -55,7 +55,6 @@ const State = struct {
 };
 
 wlr_output: *wlr.Output,
-damage: ?*wlr.OutputDamage,
 
 /// All layer surfaces on the output, indexed by the layer enum.
 layers: [4]std.TailQueue(LayerSurface) = [1]std.TailQueue(LayerSurface){.{}} ** 4,
@@ -115,9 +114,8 @@ status_trackers: std.SinglyLinkedList(OutputStatus) = .{},
 destroy: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleDestroy),
 enable: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleEnable),
 mode: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleMode),
+frame: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleFrame),
 present: wl.Listener(*wlr.Output.event.Present) = wl.Listener(*wlr.Output.event.Present).init(handlePresent),
-frame: wl.Listener(*wlr.OutputDamage) = wl.Listener(*wlr.OutputDamage).init(handleFrame),
-damage_destroy: wl.Listener(*wlr.OutputDamage) = wl.Listener(*wlr.OutputDamage).init(handleDamageDestroy),
 
 pub fn init(self: *Self, wlr_output: *wlr.Output) !void {
     if (!wlr_output.initRender(server.allocator, server.renderer)) return;
@@ -146,7 +144,6 @@ pub fn init(self: *Self, wlr_output: *wlr.Output) !void {
 
     self.* = .{
         .wlr_output = wlr_output,
-        .damage = try wlr.OutputDamage.create(wlr_output),
         .usable_box = undefined,
     };
     wlr_output.data = @ptrToInt(self);
@@ -154,10 +151,8 @@ pub fn init(self: *Self, wlr_output: *wlr.Output) !void {
     wlr_output.events.destroy.add(&self.destroy);
     wlr_output.events.enable.add(&self.enable);
     wlr_output.events.mode.add(&self.mode);
+    wlr_output.events.frame.add(&self.frame);
     wlr_output.events.present.add(&self.present);
-
-    self.damage.?.events.frame.add(&self.frame);
-    self.damage.?.events.destroy.add(&self.damage_destroy);
 
     // Ensure that a cursor image at the output's scale factor is loaded
     // for each seat.
@@ -458,17 +453,6 @@ fn arrangeLayer(
     }
 }
 
-fn handleDamageDestroy(listener: *wl.Listener(*wlr.OutputDamage), _: *wlr.OutputDamage) void {
-    const self = @fieldParentPtr(Self, "damage_destroy", listener);
-    // The wlr.OutputDamage is only destroyed by wlroots when the output is
-    // destroyed and is never destroyed manually by river.
-    self.frame.link.remove();
-    // Ensure that it is safe to call remove() again in handleDestroy()
-    self.frame.link = .{ .prev = &self.frame.link, .next = &self.frame.link };
-
-    self.damage = null;
-}
-
 fn handleDestroy(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
 
@@ -527,9 +511,7 @@ fn handleEnable(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) vo
     }
 }
 
-fn handleFrame(listener: *wl.Listener(*wlr.OutputDamage), _: *wlr.OutputDamage) void {
-    // This function is called every time an output is ready to display a frame,
-    // generally at the output's refresh rate (e.g. 60Hz).
+fn handleFrame(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
     const self = @fieldParentPtr(Self, "frame", listener);
     render.renderOutput(self);
 }
@@ -552,7 +534,6 @@ fn handlePresent(
         .pending_blank, .pending_lock_surface => {
             if (!event.presented) {
                 self.lock_render_state = .unlocked;
-                self.damage.?.addWhole();
                 return;
             }
 

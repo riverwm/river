@@ -43,9 +43,6 @@ unmap: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).ini
 set_override_redirect: wl.Listener(*wlr.XwaylandSurface) =
     wl.Listener(*wlr.XwaylandSurface).init(handleSetOverrideRedirect),
 
-// Listeners that are only active while mapped
-commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
-
 /// The override redirect surface will add itself to the list in Root when it is mapped.
 pub fn create(xwayland_surface: *wlr.XwaylandSurface) error{OutOfMemory}!*Self {
     const node = try util.gpa.create(std.TailQueue(Self).Node);
@@ -89,13 +86,11 @@ fn handleDestroy(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandS
 }
 
 /// Called when the xwayland surface is mapped, or ready to display on-screen.
-pub fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
+pub fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "map", listener);
 
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
     server.root.xwayland_override_redirect_views.prepend(node);
-
-    xwayland_surface.surface.?.events.commit.add(&self.commit);
 
     self.focusIfDesired();
 }
@@ -129,8 +124,6 @@ fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSur
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
     server.root.xwayland_override_redirect_views.remove(node);
 
-    self.commit.link.remove();
-
     // If the unmapped surface is currently focused, pass keyboard focus
     // to the most appropriate surface.
     var seat_it = server.input_manager.seats.first;
@@ -149,11 +142,6 @@ fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSur
     }
 
     server.root.startTransaction();
-}
-
-fn handleCommit(_: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
-    var it = server.root.outputs.first;
-    while (it) |node| : (it = node.next) node.data.damage.?.addWhole();
 }
 
 fn handleSetOverrideRedirect(

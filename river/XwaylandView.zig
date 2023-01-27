@@ -29,7 +29,6 @@ const util = @import("util.zig");
 const Output = @import("Output.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
-const XdgPopup = @import("XdgPopup.zig");
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
 const log = std.log.scoped(.xwayland);
@@ -296,8 +295,6 @@ fn handleSetOverrideRedirect(
 
 fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) void {
     const self = @fieldParentPtr(Self, "commit", listener);
-
-    self.view.output.damage.?.addWhole();
 
     self.view.surface_box = .{
         .x = 0,
