@@ -78,6 +78,6 @@ pub fn swap(
 }
 
 fn filter(view: *View, filter_tags: u32) bool {
-    return view.surface != null and !view.pending.float and
+    return view.tree.node.enabled and !view.pending.float and
         !view.pending.fullscreen and view.pending.tags & filter_tags != 0;
 }

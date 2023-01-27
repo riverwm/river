@@ -48,9 +48,7 @@ const Impl = union(enum) {
 };
 
 const State = struct {
-    /// The output-relative effective coordinates and effective dimensions of the view. The
-    /// surface itself may have other dimensions which are stored in the
-    /// surface_box member.
+    /// The output-relative coordinates of the view and dimensions requested by river.
     box: wlr.Box = wlr.Box{ .x = 0, .y = 0, .width = 0, .height = 0 },
 
     /// The tags of the view, as a bitmask
@@ -78,8 +76,7 @@ impl: Impl,
 /// The output this view is currently associated with
 output: *Output,
 
-/// This is non-null exactly when the view is mapped
-surface: ?*wlr.Surface = null,
+tree: *wlr.SceneTree,
 
 /// This indicates that the view should be destroyed when the current
 /// transaction completes. See View.destroy()
@@ -116,7 +113,7 @@ draw_borders: bool = true,
 request_activate: wl.Listener(*wlr.XdgActivationV1.event.RequestActivate) =
     wl.Listener(*wlr.XdgActivationV1.event.RequestActivate).init(handleRequestActivate),
 
-pub fn init(self: *Self, output: *Output, impl: Impl) void {
+pub fn init(self: *Self, output: *Output, tree: *wlr.SceneTree, impl: Impl) void {
     const initial_tags = blk: {
         const tags = output.current.tags & server.config.spawn_tagmask;
         break :blk if (tags != 0) tags else output.current.tags;
@@ -125,6 +122,7 @@ pub fn init(self: *Self, output: *Output, impl: Impl) void {
     self.* = .{
         .impl = impl,
         .output = output,
+        .tree = tree,
         .current = .{ .tags = initial_tags },
         .pending = .{ .tags = initial_tags },
     };
@@ -134,7 +132,6 @@ pub fn init(self: *Self, output: *Output, impl: Impl) void {
 /// mark this view for destruction when the transaction completes. Otherwise
 /// destroy immediately.
 pub fn destroy(self: *Self) void {
-    assert(self.surface == null);
     self.destroying = true;
 
     // If there are still saved buffers, then this view needs to be kept
@@ -210,10 +207,19 @@ fn lastSetFullscreenState(self: Self) bool {
     };
 }
 
+pub fn rootSurface(self: Self) *wlr.Surface {
+    assert(!self.destroying);
+    return switch (self.impl) {
+        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.rootSurface(),
+        .xwayland_view => |xwayland_view| xwayland_view.rootSurface(),
+    };
+}
+
 pub fn sendFrameDone(self: Self) void {
+    assert(!self.destroying);
     var now: os.timespec = undefined;
     os.clock_gettime(os.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
-    self.surface.?.sendFrameDone(&now);
+    self.rootSurface().sendFrameDone(&now);
 }
 
 pub fn dropSavedBuffers(self: *Self) void {
@@ -265,12 +271,6 @@ pub fn sendToOutput(self: *Self, destination_output: *Output) void {
     if (self.pending.urgent) {
         self.output.sendUrgentTags();
         destination_output.sendUrgentTags();
-    }
-
-    // if the view is mapped send enter/leave events
-    if (self.surface != null) {
-        self.sendLeave(self.output);
-        self.sendEnter(destination_output);
     }
 
     self.output = destination_output;
@@ -365,9 +365,8 @@ pub inline fn forEachSurface(
         .xdg_toplevel => |xdg_toplevel| {
             xdg_toplevel.xdg_toplevel.base.forEachSurface(T, iterator, user_data);
         },
-        .xwayland_view => {
-            assert(build_options.xwayland);
-            self.surface.?.forEachSurface(T, iterator, user_data);
+        .xwayland_view => |xwayland_view| {
+            xwayland_view.xwayland_surface.surface.?.forEachSurface(T, iterator, user_data);
         },
     }
 }
@@ -488,9 +487,6 @@ pub fn unmap(self: *Self) void {
     log.debug("view '{?s}' unmapped", .{self.getTitle()});
 
     if (self.saved_buffers.items.len == 0) self.saveBuffers();
-
-    assert(self.surface != null);
-    self.surface = null;
 
     // Inform all seats that the view has been unmapped so they can handle focus
     var it = server.input_manager.seats.first;

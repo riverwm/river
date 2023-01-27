@@ -210,7 +210,7 @@ pub fn focus(self: *Self, _target: ?*View) void {
 }
 
 fn pendingFilter(view: *View, filter_tags: u32) bool {
-    return view.surface != null and view.pending.tags & filter_tags != 0;
+    return view.tree.node.enabled and view.pending.tags & filter_tags != 0;
 }
 
 /// Switch focus to the target, handling unfocus and input inhibition
@@ -222,7 +222,7 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
 
     // Obtain the target surface
     const target_surface = switch (new_focus) {
-        .view => |target_view| target_view.surface.?,
+        .view => |target_view| target_view.rootSurface(),
         .xwayland_override_redirect => |target_or| target_or.xwayland_surface.surface,
         .layer => |target_layer| target_layer.wlr_layer_surface.surface,
         .lock_surface => |lock_surface| lock_surface.wlr_lock_surface.surface,

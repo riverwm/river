@@ -62,7 +62,9 @@ pub fn create(output: *Output, xdg_toplevel: *wlr.XdgToplevel) error{OutOfMemory
     const node = try util.gpa.create(ViewStack(View).Node);
     const view = &node.view;
 
-    view.init(output, .{ .xdg_toplevel = .{
+    const tree = try output.tree.createSceneXdgSurface(xdg_toplevel.base);
+
+    view.init(output, tree, .{ .xdg_toplevel = .{
         .view = view,
         .xdg_toplevel = xdg_toplevel,
     } });
@@ -97,6 +99,10 @@ pub fn configure(self: *Self) void {
 
 pub fn lastSetFullscreenState(self: Self) bool {
     return self.xdg_toplevel.scheduled.fullscreen;
+}
+
+pub fn rootSurface(self: Self) *wlr.Surface {
+    return self.xdg_toplevel.base.surface;
 }
 
 /// Close the view. This will lead to the unmap and destroy events being sent
@@ -190,9 +196,6 @@ fn handleMap(listener: *wl.Listener(void)) void {
     self.xdg_toplevel.scheduled.width = initial_box.width;
     self.xdg_toplevel.scheduled.height = initial_box.height;
 
-    view.surface = self.xdg_toplevel.base.surface;
-    view.surface_box = initial_box;
-
     // Also use the view's  "natural" size as the initial regular dimensions,
     // for the case that it does not get arranged by a lyaout.
     view.pending.box = view.float_box;
@@ -275,7 +278,10 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
                 const self_tags_changed = view.pending.tags != view.current.tags;
                 const urgent_tags_dirty = view.pending.urgent != view.current.urgent or
                     (view.pending.urgent and self_tags_changed);
+
                 view.current = view.pending;
+                view.tree.node.setPosition(view.current.box.x, view.current.box.y);
+
                 if (self_tags_changed) view.output.sendViewTags();
                 if (urgent_tags_dirty) view.output.sendUrgentTags();
 

@@ -32,6 +32,8 @@ const ViewStack = @import("view_stack.zig").ViewStack;
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 const DragIcon = @import("DragIcon.zig");
 
+scene: *wlr.Scene,
+
 new_output: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleNewOutput),
 
 output_layout: *wlr.OutputLayout,
@@ -77,6 +79,11 @@ pub fn init(self: *Self) !void {
     const output_layout = try wlr.OutputLayout.create();
     errdefer output_layout.destroy();
 
+    const scene = try wlr.Scene.create();
+    errdefer scene.tree.node.destroy();
+
+    try scene.attachOutputLayout(output_layout);
+
     _ = try wlr.XdgOutputManagerV1.create(server.wl_server, output_layout);
 
     const event_loop = server.wl_server.getEventLoop();
@@ -85,12 +92,14 @@ pub fn init(self: *Self) !void {
 
     const noop_wlr_output = try server.headless_backend.headlessAddOutput(1920, 1080);
     self.* = .{
+        .scene = scene,
         .output_layout = output_layout,
         .output_manager = try wlr.OutputManagerV1.create(server.wl_server),
         .power_manager = try wlr.OutputPowerManagerV1.create(server.wl_server),
         .transaction_timer = transaction_timer,
         .noop_output = .{
             .wlr_output = noop_wlr_output,
+            .tree = try scene.tree.createSceneTree(),
             .usable_box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
         },
     };
@@ -104,6 +113,7 @@ pub fn init(self: *Self) !void {
 }
 
 pub fn deinit(self: *Self) void {
+    self.scene.tree.node.destroy();
     self.output_layout.destroy();
     self.transaction_timer.remove();
 }
@@ -204,7 +214,11 @@ pub fn addOutput(self: *Self, output: *Output) void {
     // This aarranges outputs from left-to-right in the order they appear. The
     // wlr-output-management protocol may be used to modify this arrangement.
     // This also creates a wl_output global which is advertised to clients.
-    self.output_layout.addAuto(node.data.wlr_output);
+    self.output_layout.addAuto(output.wlr_output);
+
+    const layout_output = self.output_layout.get(output.wlr_output).?;
+    output.tree.node.setEnabled(true);
+    output.tree.node.setPosition(layout_output.x, layout_output.y);
 
     // If we previously had no real outputs, move focus from the noop output
     // to the new one.
@@ -271,7 +285,7 @@ pub fn startTransaction(self: *Self) void {
         while (view_it) |view_node| : (view_it = view_node.next) {
             const view = &view_node.view;
 
-            if (view.surface == null) continue;
+            if (!view.tree.node.enabled) continue;
 
             if (view.shouldTrackConfigure()) {
                 // Clear the serial in case this transaction is interrupting a prior one.
@@ -366,7 +380,7 @@ fn commitTransaction(self: *Self) void {
             const view = &view_node.view;
             view_it = view_node.next;
 
-            if (view.surface == null) {
+            if (!view.tree.node.enabled) {
                 view.dropSavedBuffers();
                 view.output.views.remove(view_node);
                 if (view.destroying) view.destroy();
@@ -382,6 +396,8 @@ fn commitTransaction(self: *Self) void {
             if (view.pending.urgent != view.current.urgent) urgent_tags_dirty = true;
             if (view.pending.urgent and view_tags_changed) urgent_tags_dirty = true;
             view.current = view.pending;
+
+            view.tree.node.setPosition(view.current.box.x, view.current.box.y);
 
             view.dropSavedBuffers();
         }
@@ -459,10 +475,13 @@ fn processOutputConfig(
                     if (head.state.enabled) {
                         // Just updates the output's position if it is already in the layout
                         self.output_layout.add(output.wlr_output, head.state.x, head.state.y);
+                        output.tree.node.setEnabled(true);
+                        output.tree.node.setPosition(head.state.x, head.state.y);
                         output.arrangeLayers(.mapped);
                     } else {
                         self.removeOutput(output);
                         self.output_layout.remove(output.wlr_output);
+                        output.tree.node.setEnabled(false);
                     }
                 } else {
                     std.log.scoped(.output_manager).err("failed to apply config to output {s}", .{

@@ -134,7 +134,7 @@ fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSur
                 focused.impl.xwayland_view.xwayland_surface.pid == self.xwayland_surface.pid and
                 seat.wlr_seat.keyboard_state.focused_surface == self.xwayland_surface.surface)
             {
-                seat.keyboardEnterOrLeave(focused.surface.?);
+                seat.keyboardEnterOrLeave(focused.rootSurface());
             },
             .xwayland_override_redirect => |focused| if (focused == self) seat.focus(null),
             .layer, .lock_surface, .none => {},

@@ -64,6 +64,10 @@ layers: [4]std.TailQueue(LayerSurface) = [1]std.TailQueue(LayerSurface){.{}} ** 
 /// TODO: this should be part of the output's State
 usable_box: wlr.Box,
 
+/// Scene node representing the entire output.
+/// Position must be updated when the output is moved in the layout.
+tree: *wlr.SceneTree,
+
 /// The top of the stack is the "most important" view.
 views: ViewStack(View) = .{},
 
@@ -144,6 +148,7 @@ pub fn init(self: *Self, wlr_output: *wlr.Output) !void {
 
     self.* = .{
         .wlr_output = wlr_output,
+        .tree = try server.root.scene.tree.createSceneTree(),
         .usable_box = undefined,
     };
     wlr_output.data = @ptrToInt(self);
@@ -208,7 +213,7 @@ pub fn sendLayoutNameClear(self: Self) void {
 }
 
 pub fn arrangeFilter(view: *View, filter_tags: u32) bool {
-    return view.surface != null and !view.pending.float and !view.pending.fullscreen and
+    return view.tree.node.enabled and !view.pending.float and !view.pending.fullscreen and
         view.pending.tags & filter_tags != 0;
 }
 

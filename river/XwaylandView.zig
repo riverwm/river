@@ -67,7 +67,10 @@ pub fn create(output: *Output, xwayland_surface: *wlr.XwaylandSurface) error{Out
     const node = try util.gpa.create(ViewStack(View).Node);
     const view = &node.view;
 
-    view.init(output, .{ .xwayland_view = .{
+    // TODO actually render xwayland windows, not just an empty tree.
+    const tree = try output.tree.createSceneTree();
+
+    view.init(output, tree, .{ .xwayland_view = .{
         .view = view,
         .xwayland_surface = xwayland_surface,
     } });
@@ -113,6 +116,11 @@ pub fn configure(self: Self) void {
 
 pub fn lastSetFullscreenState(self: Self) bool {
     return self.last_set_fullscreen_state;
+}
+
+pub fn rootSurface(self: Self) *wlr.Surface {
+    // TODO This is probably not OK, understand when xwayland surfaces can be null.
+    return self.xwayland_surface.surface.?;
 }
 
 /// Close the view. This will lead to the unmap and destroy events being sent
@@ -198,14 +206,6 @@ pub fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface:
     xwayland_surface.events.request_fullscreen.add(&self.request_fullscreen);
     xwayland_surface.events.request_minimize.add(&self.request_minimize);
 
-    view.surface = surface;
-    self.view.surface_box = .{
-        .x = 0,
-        .y = 0,
-        .width = surface.current.width,
-        .height = surface.current.height,
-    };
-
     // Use the view's "natural" size centered on the output as the default
     // floating dimensions
     view.float_box = .{
@@ -257,7 +257,7 @@ fn handleRequestConfigure(
     const self = @fieldParentPtr(Self, "request_configure", listener);
 
     // If unmapped, let the client do whatever it wants
-    if (self.view.surface == null) {
+    if (!self.xwayland_surface.mapped) {
         self.xwayland_surface.configure(event.x, event.y, event.width, event.height);
         return;
     }

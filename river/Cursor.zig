@@ -885,7 +885,7 @@ fn xwaylandOverrideRedirectSurfaceAt(lx: f64, ly: f64) ?SurfaceAtResult {
 }
 
 fn surfaceAtFilter(view: *View, filter_tags: u32) bool {
-    return view.surface != null and view.current.tags & filter_tags != 0;
+    return view.tree.node.enabled and view.current.tags & filter_tags != 0;
 }
 
 pub fn enterMode(self: *Self, mode: enum { move, resize }, view: *View) void {
