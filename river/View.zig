@@ -113,15 +113,6 @@ post_fullscreen_box: wlr.Box = undefined,
 
 draw_borders: bool = true,
 
-/// This is created when the view is mapped and destroyed when unmapped
-foreign_toplevel_handle: ?*wlr.ForeignToplevelHandleV1 = null,
-foreign_activate: wl.Listener(*wlr.ForeignToplevelHandleV1.event.Activated) =
-    wl.Listener(*wlr.ForeignToplevelHandleV1.event.Activated).init(handleForeignActivate),
-foreign_fullscreen: wl.Listener(*wlr.ForeignToplevelHandleV1.event.Fullscreen) =
-    wl.Listener(*wlr.ForeignToplevelHandleV1.event.Fullscreen).init(handleForeignFullscreen),
-foreign_close: wl.Listener(*wlr.ForeignToplevelHandleV1) =
-    wl.Listener(*wlr.ForeignToplevelHandleV1).init(handleForeignClose),
-
 request_activate: wl.Listener(*wlr.XdgActivationV1.event.RequestActivate) =
     wl.Listener(*wlr.XdgActivationV1.event.RequestActivate).init(handleRequestActivate),
 
@@ -280,11 +271,6 @@ pub fn sendToOutput(self: *Self, destination_output: *Output) void {
     if (self.surface != null) {
         self.sendLeave(self.output);
         self.sendEnter(destination_output);
-
-        // Must be present if surface is non-null indicating that the view
-        // is mapped.
-        self.foreign_toplevel_handle.?.outputLeave(self.output.wlr_output);
-        self.foreign_toplevel_handle.?.outputEnter(destination_output.wlr_output);
     }
 
     self.output = destination_output;
@@ -344,7 +330,6 @@ pub fn close(self: Self) void {
 }
 
 pub fn setActivated(self: Self, activated: bool) void {
-    if (self.foreign_toplevel_handle) |handle| handle.setActivated(activated);
     switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.setActivated(activated),
         .xwayland_view => |xwayland_view| xwayland_view.setActivated(activated),
@@ -352,7 +337,6 @@ pub fn setActivated(self: Self, activated: bool) void {
 }
 
 fn setFullscreen(self: *Self, fullscreen: bool) void {
-    if (self.foreign_toplevel_handle) |handle| handle.setFullscreen(fullscreen);
     switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.setFullscreen(fullscreen),
         .xwayland_view => |*xwayland_view| {
@@ -482,21 +466,6 @@ pub fn shouldTrackConfigure(self: Self) bool {
 pub fn map(self: *Self) !void {
     log.debug("view '{?s}' mapped", .{self.getTitle()});
 
-    {
-        assert(self.foreign_toplevel_handle == null);
-        const handle = try wlr.ForeignToplevelHandleV1.create(server.foreign_toplevel_manager);
-        self.foreign_toplevel_handle = handle;
-
-        handle.events.request_activate.add(&self.foreign_activate);
-        handle.events.request_fullscreen.add(&self.foreign_fullscreen);
-        handle.events.request_close.add(&self.foreign_close);
-
-        if (self.getTitle()) |s| handle.setTitle(s);
-        if (self.getAppId()) |s| handle.setAppId(s);
-
-        handle.outputEnter(self.output.wlr_output);
-    }
-
     server.xdg_activation.events.request_activate.add(&self.request_activate);
 
     // Add the view to the stack of its output
@@ -527,13 +496,6 @@ pub fn unmap(self: *Self) void {
     var it = server.input_manager.seats.first;
     while (it) |seat_node| : (it = seat_node.next) seat_node.data.handleViewUnmap(self);
 
-    assert(self.foreign_toplevel_handle != null);
-    self.foreign_activate.link.remove();
-    self.foreign_fullscreen.link.remove();
-    self.foreign_close.link.remove();
-    self.foreign_toplevel_handle.?.destroy();
-    self.foreign_toplevel_handle = null;
-
     self.request_activate.link.remove();
 
     self.output.sendViewTags();
@@ -545,9 +507,6 @@ pub fn unmap(self: *Self) void {
 }
 
 pub fn notifyTitle(self: *const Self) void {
-    if (self.foreign_toplevel_handle) |handle| {
-        if (self.getTitle()) |s| handle.setTitle(s);
-    }
     // Send title to all status listeners attached to a seat which focuses this view
     var seat_it = server.input_manager.seats.first;
     while (seat_it) |seat_node| : (seat_it = seat_node.next) {
@@ -560,40 +519,8 @@ pub fn notifyTitle(self: *const Self) void {
     }
 }
 
-pub fn notifyAppId(self: Self) void {
-    if (self.foreign_toplevel_handle) |handle| {
-        if (self.getAppId()) |s| handle.setAppId(s);
-    }
-}
-
-/// Only honors the request if the view is already visible on the seat's
-/// currently focused output. TODO: consider allowing this request to switch
-/// output/tag focus.
-fn handleForeignActivate(
-    listener: *wl.Listener(*wlr.ForeignToplevelHandleV1.event.Activated),
-    event: *wlr.ForeignToplevelHandleV1.event.Activated,
-) void {
-    const self = @fieldParentPtr(Self, "foreign_activate", listener);
-    const seat = @intToPtr(*Seat, event.seat.data);
-    seat.focus(self);
-    server.root.startTransaction();
-}
-
-fn handleForeignFullscreen(
-    listener: *wl.Listener(*wlr.ForeignToplevelHandleV1.event.Fullscreen),
-    event: *wlr.ForeignToplevelHandleV1.event.Fullscreen,
-) void {
-    const self = @fieldParentPtr(Self, "foreign_fullscreen", listener);
-    self.pending.fullscreen = event.fullscreen;
-    self.applyPending();
-}
-
-fn handleForeignClose(
-    listener: *wl.Listener(*wlr.ForeignToplevelHandleV1),
-    _: *wlr.ForeignToplevelHandleV1,
-) void {
-    const self = @fieldParentPtr(Self, "foreign_close", listener);
-    self.close();
+pub fn notifyAppId(_: Self) void {
+    // TODO reimplement foreign-toplevel-management I guess.
 }
 
 fn handleRequestActivate(
