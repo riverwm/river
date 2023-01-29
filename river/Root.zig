@@ -26,11 +26,14 @@ const wl = @import("wayland").server.wl;
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
+const DragIcon = @import("DragIcon.zig");
+const LayerSurface = @import("LayerSurface.zig");
+const LockSurface = @import("LockSurface.zig");
 const Output = @import("Output.zig");
+const SceneNodeData = @import("SceneNodeData.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
-const DragIcon = @import("DragIcon.zig");
 
 scene: *wlr.Scene,
 
@@ -116,6 +119,53 @@ pub fn deinit(self: *Self) void {
     self.scene.tree.node.destroy();
     self.output_layout.destroy();
     self.transaction_timer.remove();
+}
+
+pub const AtResult = struct {
+    surface: ?*wlr.Surface,
+    sx: f64,
+    sy: f64,
+    node: union(enum) {
+        view: *View,
+        layer_surface: *LayerSurface,
+        lock_surface: *LockSurface,
+        xwayland_override_redirect: if (build_options.xwayland) *XwaylandOverrideRedirect else noreturn,
+    },
+};
+
+/// Return information about what is currently rendered at the given layout coordinates.
+pub fn at(self: Self, lx: f64, ly: f64) ?AtResult {
+    var sx: f64 = undefined;
+    var sy: f64 = undefined;
+    const node_at = self.scene.tree.node.at(lx, ly, &sx, &sy) orelse return null;
+
+    const surface: ?*wlr.Surface = blk: {
+        if (node_at.type == .buffer) {
+            const scene_buffer = wlr.SceneBuffer.fromNode(node_at);
+            if (wlr.SceneSurface.fromBuffer(scene_buffer)) |scene_surface| {
+                break :blk scene_surface.surface;
+            }
+        }
+        break :blk null;
+    };
+
+    {
+        var it: ?*wlr.SceneNode = node_at;
+        while (it) |node| : (it = node.parent) {
+            if (@intToPtr(?*SceneNodeData, node.data)) |scene_node_data| {
+                switch (scene_node_data.data) {
+                    .view => |view| return .{
+                        .surface = surface,
+                        .sx = sx,
+                        .sy = sy,
+                        .node = .{ .view = view },
+                    },
+                }
+            }
+        }
+    }
+
+    return null;
 }
 
 fn handleNewOutput(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {

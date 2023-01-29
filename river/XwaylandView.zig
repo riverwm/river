@@ -142,17 +142,6 @@ pub fn setFullscreen(self: *Self, fullscreen: bool) void {
     self.xwayland_surface.setFullscreen(fullscreen);
 }
 
-/// Return the surface at output coordinates ox, oy and set sx, sy to the
-/// corresponding surface-relative coordinates, if there is a surface.
-pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*wlr.Surface {
-    return self.xwayland_surface.surface.?.surfaceAt(
-        ox - @intToFloat(f64, self.view.current.box.x),
-        oy - @intToFloat(f64, self.view.current.box.y),
-        sx,
-        sy,
-    );
-}
-
 /// Get the current title of the xwayland surface if any.
 pub fn getTitle(self: Self) ?[*:0]const u8 {
     return self.xwayland_surface.title;

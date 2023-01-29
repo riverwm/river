@@ -28,6 +28,7 @@ const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Output = @import("Output.zig");
+const SceneNodeData = @import("SceneNodeData.zig");
 const Seat = @import("Seat.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 const XdgToplevel = @import("XdgToplevel.zig");
@@ -113,11 +114,13 @@ draw_borders: bool = true,
 request_activate: wl.Listener(*wlr.XdgActivationV1.event.RequestActivate) =
     wl.Listener(*wlr.XdgActivationV1.event.RequestActivate).init(handleRequestActivate),
 
-pub fn init(self: *Self, output: *Output, tree: *wlr.SceneTree, impl: Impl) void {
+pub fn init(self: *Self, output: *Output, tree: *wlr.SceneTree, impl: Impl) error{OutOfMemory}!void {
     const initial_tags = blk: {
         const tags = output.current.tags & server.config.spawn_tagmask;
         break :blk if (tags != 0) tags else output.current.tags;
     };
+
+    try SceneNodeData.attach(&tree.node, .{ .view = self });
 
     self.* = .{
         .impl = impl,
@@ -369,15 +372,6 @@ pub inline fn forEachSurface(
             xwayland_view.xwayland_surface.surface.?.forEachSurface(T, iterator, user_data);
         },
     }
-}
-
-/// Return the surface at output coordinates ox, oy and set sx, sy to the
-/// corresponding surface-relative coordinates, if there is a surface.
-pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*wlr.Surface {
-    return switch (self.impl) {
-        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.surfaceAt(ox, oy, sx, sy),
-        .xwayland_view => |xwayland_view| xwayland_view.surfaceAt(ox, oy, sx, sy),
-    };
 }
 
 /// Return the current title of the view if any.

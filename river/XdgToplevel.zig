@@ -60,19 +60,21 @@ set_app_id: wl.Listener(void) = wl.Listener(void).init(handleSetAppId),
 /// The View will add itself to the output's view stack on map
 pub fn create(output: *Output, xdg_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
     const node = try util.gpa.create(ViewStack(View).Node);
+    errdefer util.gpa.destroy(node);
     const view = &node.view;
 
     const tree = try output.tree.createSceneXdgSurface(xdg_toplevel.base);
+    errdefer tree.node.destroy();
 
-    view.init(output, tree, .{ .xdg_toplevel = .{
+    try view.init(output, tree, .{ .xdg_toplevel = .{
         .view = view,
         .xdg_toplevel = xdg_toplevel,
     } });
 
-    const self = &node.view.impl.xdg_toplevel;
-    xdg_toplevel.base.data = @ptrToInt(self);
+    xdg_toplevel.base.data = @ptrToInt(view);
 
     // Add listeners that are active over the view's entire lifetime
+    const self = &view.impl.xdg_toplevel;
     xdg_toplevel.base.events.destroy.add(&self.destroy);
     xdg_toplevel.base.events.map.add(&self.map);
     xdg_toplevel.base.events.unmap.add(&self.unmap);
@@ -120,18 +122,6 @@ pub fn setFullscreen(self: Self, fullscreen: bool) void {
 
 pub fn setResizing(self: Self, resizing: bool) void {
     _ = self.xdg_toplevel.setResizing(resizing);
-}
-
-/// Return the surface at output coordinates ox, oy and set sx, sy to the
-/// corresponding surface-relative coordinates, if there is a surface.
-pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*wlr.Surface {
-    const view = self.view;
-    return self.xdg_toplevel.base.surfaceAt(
-        ox - @intToFloat(f64, view.current.box.x - view.surface_box.x),
-        oy - @intToFloat(f64, view.current.box.y - view.surface_box.y),
-        sx,
-        sy,
-    );
 }
 
 /// Return the current title of the toplevel if any.
