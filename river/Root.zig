@@ -468,7 +468,7 @@ fn processOutputConfig(
                         self.removeOutput(output);
                         self.output_layout.remove(output.wlr_output);
                     }
-                } else |_| {
+                } else {
                     std.log.scoped(.output_manager).err("failed to apply config to output {s}", .{
                         output.wlr_output.name,
                     });
