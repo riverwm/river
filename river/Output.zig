@@ -67,11 +67,12 @@ usable_box: wlr.Box,
 /// Scene node representing the entire output.
 /// Position must be updated when the output is moved in the layout.
 tree: *wlr.SceneTree,
+normal_content: *wlr.SceneTree,
+locked_content: *wlr.SceneTree,
 
 /// The top of the stack is the "most important" view.
 views: ViewStack(View) = .{},
 
-lock_surface: ?*LockSurface = null,
 /// Tracks the currently presented frame on the output as it pertains to ext-session-lock.
 /// The output is initially considered blanked:
 /// If using the DRM backend it will be blanked with the initial modeset.
@@ -121,18 +122,17 @@ mode: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleMode),
 frame: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleFrame),
 present: wl.Listener(*wlr.Output.event.Present) = wl.Listener(*wlr.Output.event.Present).init(handlePresent),
 
-pub fn init(self: *Self, wlr_output: *wlr.Output) !void {
-    if (!wlr_output.initRender(server.allocator, server.renderer)) return;
+pub fn create(wlr_output: *wlr.Output) !void {
+    const node = try util.gpa.create(std.TailQueue(Self).Node);
+    errdefer util.gpa.destroy(node);
+    const self = &node.data;
 
-    // Some backends don't have modes. DRM+KMS does, and we need to set a mode
-    // before we can use the output. The mode is a tuple of (width, height,
-    // refresh rate), and each monitor supports only a specific set of modes. We
-    // just pick the monitor's preferred mode, a more sophisticated compositor
-    // would let the user configure it.
+    if (!wlr_output.initRender(server.allocator, server.renderer)) return error.InitRenderFailed;
+
     if (wlr_output.preferredMode()) |preferred_mode| {
         wlr_output.setMode(preferred_mode);
         wlr_output.enable(true);
-        wlr_output.commit() catch |err| {
+        wlr_output.commit() catch {
             var it = wlr_output.modes.iterator(.forward);
             while (it.next()) |mode| {
                 if (mode == preferred_mode) continue;
@@ -140,15 +140,18 @@ pub fn init(self: *Self, wlr_output: *wlr.Output) !void {
                 wlr_output.commit() catch continue;
                 // This mode works, use it
                 break;
-            } else {
-                return err;
             }
+            // If no mode works, then we will just leave the output disabled.
+            // Perhaps the user will want to set a custom mode using wlr-output-management.
         };
     }
 
+    const tree = try server.root.scene.tree.createSceneTree();
     self.* = .{
         .wlr_output = wlr_output,
-        .tree = try server.root.scene.tree.createSceneTree(),
+        .tree = tree,
+        .normal_content = try tree.createSceneTree(),
+        .locked_content = try tree.createSceneTree(),
         .usable_box = undefined,
     };
     wlr_output.data = @ptrToInt(self);
@@ -162,8 +165,8 @@ pub fn init(self: *Self, wlr_output: *wlr.Output) !void {
     // Ensure that a cursor image at the output's scale factor is loaded
     // for each seat.
     var it = server.input_manager.seats.first;
-    while (it) |node| : (it = node.next) {
-        const seat = &node.data;
+    while (it) |seat_node| : (it = seat_node.next) {
+        const seat = &seat_node.data;
         seat.cursor.xcursor_manager.load(wlr_output.scale) catch
             std.log.scoped(.cursor).err("failed to load xcursor theme at scale {}", .{wlr_output.scale});
     }
@@ -177,6 +180,12 @@ pub fn init(self: *Self, wlr_output: *wlr.Output) !void {
     self.wlr_output.effectiveResolution(&self.usable_box.width, &self.usable_box.height);
 
     self.setTitle();
+
+    const ptr_node = try util.gpa.create(std.TailQueue(*Self).Node);
+    ptr_node.data = &node.data;
+    server.root.all_outputs.append(ptr_node);
+
+    handleEnable(&self.enable, self.wlr_output);
 }
 
 pub fn getLayer(self: *Self, layer: zwlr.LayerShellV1.Layer) *std.TailQueue(LayerSurface) {
@@ -477,8 +486,6 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
         }
     }
 
-    if (self.lock_surface) |surface| surface.destroy();
-
     // Remove all listeners
     self.destroy.link.remove();
     self.enable.link.remove();
@@ -503,11 +510,19 @@ fn handleEnable(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) vo
     // already been added.
     if (wlr_output.enabled) server.root.addOutput(self);
 
+    // We can't assert the current state of normal_content/locked_content
+    // here as this output may be newly created.
     if (wlr_output.enabled) {
         switch (server.lock_manager.state) {
-            .unlocked => self.lock_render_state = .unlocked,
+            .unlocked => {
+                self.lock_render_state = .unlocked;
+                self.normal_content.node.setEnabled(true);
+                self.locked_content.node.setEnabled(false);
+            },
             .waiting_for_lock_surfaces, .waiting_for_blank, .locked => {
                 assert(self.lock_render_state == .blanked);
+                self.normal_content.node.setEnabled(false);
+                self.locked_content.node.setEnabled(true);
             },
         }
     } else {

@@ -241,14 +241,14 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
     // Set the new focus
     switch (new_focus) {
         .view => |target_view| {
-            assert(server.lock_manager.state == .unlocked);
+            assert(server.lock_manager.state != .locked);
             assert(self.focused_output == target_view.output);
             if (target_view.pending.focus == 0) target_view.setActivated(true);
             target_view.pending.focus += 1;
             target_view.pending.urgent = false;
         },
         .layer => |target_layer| {
-            assert(server.lock_manager.state == .unlocked);
+            assert(server.lock_manager.state != .locked);
             assert(self.focused_output == target_layer.output);
         },
         .lock_surface => assert(server.lock_manager.state != .unlocked),

@@ -368,7 +368,7 @@ fn updateKeyboardFocus(self: Self, result: Root.AtResult) void {
             self.seat.setFocusRaw(.{ .lock_surface = lock_surface });
         },
         .xwayland_override_redirect => |override_redirect| {
-            assert(server.lock_manager.state == .unlocked);
+            assert(server.lock_manager.state != .locked);
             override_redirect.focusIfDesired();
         },
     }
@@ -857,7 +857,7 @@ fn shouldPassthrough(self: Self) bool {
             return false;
         },
         .resize, .move => {
-            assert(server.lock_manager.state == .unlocked);
+            assert(server.lock_manager.state != .locked);
             const target = if (self.mode == .resize) self.mode.resize.view else self.mode.move.view;
             // The target view is no longer visible, is part of the layout, or is fullscreen.
             return target.current.tags & target.output.current.tags == 0 or
@@ -872,8 +872,12 @@ fn passthrough(self: *Self, time: u32) void {
     assert(self.mode == .passthrough);
 
     if (server.root.at(self.wlr_cursor.x, self.wlr_cursor.y)) |result| {
-        // TODO audit session lock assertions after wlr_scene upgrade
-        assert((result.node == .lock_surface) == (server.lock_manager.state != .unlocked));
+        if (result.node == .lock_surface) {
+            assert(server.lock_manager.state != .unlocked);
+        } else {
+            assert(server.lock_manager.state != .locked);
+        }
+
         if (result.surface) |surface| {
             self.seat.wlr_seat.pointerNotifyEnter(surface, result.sx, result.sy);
             self.seat.wlr_seat.pointerNotifyMotion(time, result.sx, result.sy);

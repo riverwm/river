@@ -22,10 +22,12 @@ const wl = @import("wayland").server.wl;
 
 const util = @import("util.zig");
 
+const LockSurface = @import("LockSurface.zig");
 const View = @import("View.zig");
 
 const Data = union(enum) {
     view: *View,
+    lock_surface: *LockSurface,
 };
 
 node: *wlr.SceneNode,

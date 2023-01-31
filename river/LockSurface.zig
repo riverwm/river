@@ -17,6 +17,7 @@
 const LockSurface = @This();
 
 const std = @import("std");
+const assert = std.debug.assert;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
@@ -25,6 +26,7 @@ const util = @import("util.zig");
 
 const Output = @import("Output.zig");
 const Seat = @import("Seat.zig");
+const SceneNodeData = @import("SceneNodeData.zig");
 
 wlr_lock_surface: *wlr.SessionLockSurfaceV1,
 lock: *wlr.SessionLockV1,
@@ -33,17 +35,18 @@ output_mode: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleOutp
 map: wl.Listener(void) = wl.Listener(void).init(handleMap),
 surface_destroy: wl.Listener(void) = wl.Listener(void).init(handleDestroy),
 
-pub fn create(wlr_lock_surface: *wlr.SessionLockSurfaceV1, lock: *wlr.SessionLockV1) void {
-    const lock_surface = util.gpa.create(LockSurface) catch {
-        wlr_lock_surface.resource.getClient().postNoMemory();
-        return;
-    };
+pub fn create(wlr_lock_surface: *wlr.SessionLockSurfaceV1, lock: *wlr.SessionLockV1) error{OutOfMemory}!void {
+    const lock_surface = try util.gpa.create(LockSurface);
 
     lock_surface.* = .{
         .wlr_lock_surface = wlr_lock_surface,
         .lock = lock,
     };
     wlr_lock_surface.data = @ptrToInt(lock_surface);
+
+    const output = lock_surface.getOutput();
+    const tree = try output.locked_content.createSceneSubsurfaceTree(wlr_lock_surface.surface);
+    try SceneNodeData.attach(&tree.node, .{ .lock_surface = lock_surface });
 
     wlr_lock_surface.output.events.mode.add(&lock_surface.output_mode);
     wlr_lock_surface.events.map.add(&lock_surface.map);
@@ -53,8 +56,6 @@ pub fn create(wlr_lock_surface: *wlr.SessionLockSurfaceV1, lock: *wlr.SessionLoc
 }
 
 pub fn destroy(lock_surface: *LockSurface) void {
-    lock_surface.output().lock_surface = null;
-
     {
         var surface_it = lock_surface.lock.surfaces.iterator(.forward);
         const new_focus: Seat.FocusTarget = while (surface_it.next()) |surface| {
@@ -79,7 +80,7 @@ pub fn destroy(lock_surface: *LockSurface) void {
     util.gpa.destroy(lock_surface);
 }
 
-pub fn output(lock_surface: *LockSurface) *Output {
+fn getOutput(lock_surface: *LockSurface) *Output {
     return @intToPtr(*Output, lock_surface.wlr_lock_surface.output.data);
 }
 
@@ -88,14 +89,19 @@ fn handleOutputMode(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
 
     var output_width: i32 = undefined;
     var output_height: i32 = undefined;
-    lock_surface.output().wlr_output.effectiveResolution(&output_width, &output_height);
+    lock_surface.getOutput().wlr_output.effectiveResolution(&output_width, &output_height);
     _ = lock_surface.wlr_lock_surface.configure(@intCast(u32, output_width), @intCast(u32, output_height));
 }
 
 fn handleMap(listener: *wl.Listener(void)) void {
     const lock_surface = @fieldParentPtr(LockSurface, "map", listener);
 
-    lock_surface.output().lock_surface = lock_surface;
+    const output = lock_surface.getOutput();
+    assert(output.normal_content.node.enabled);
+    output.normal_content.node.setEnabled(false);
+
+    assert(!output.locked_content.node.enabled);
+    output.locked_content.node.setEnabled(true);
 
     {
         var it = server.input_manager.seats.first;

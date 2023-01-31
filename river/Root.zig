@@ -103,6 +103,8 @@ pub fn init(self: *Self) !void {
         .noop_output = .{
             .wlr_output = noop_wlr_output,
             .tree = try scene.tree.createSceneTree(),
+            .normal_content = try scene.tree.createSceneTree(),
+            .locked_content = try scene.tree.createSceneTree(),
             .usable_box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
         },
     };
@@ -153,14 +155,15 @@ pub fn at(self: Self, lx: f64, ly: f64) ?AtResult {
         var it: ?*wlr.SceneNode = node_at;
         while (it) |node| : (it = node.parent) {
             if (@intToPtr(?*SceneNodeData, node.data)) |scene_node_data| {
-                switch (scene_node_data.data) {
-                    .view => |view| return .{
-                        .surface = surface,
-                        .sx = sx,
-                        .sy = sy,
-                        .node = .{ .view = view },
+                return .{
+                    .surface = surface,
+                    .sx = sx,
+                    .sy = sy,
+                    .node = switch (scene_node_data.data) {
+                        .view => |view| .{ .view = view },
+                        .lock_surface => |lock_surface| .{ .lock_surface = lock_surface },
                     },
-                }
+                };
             }
         }
     }
@@ -168,28 +171,18 @@ pub fn at(self: Self, lx: f64, ly: f64) ?AtResult {
     return null;
 }
 
-fn handleNewOutput(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
-    const self = @fieldParentPtr(Self, "new_output", listener);
-    std.log.scoped(.output_manager).debug("new output {s}", .{wlr_output.name});
+fn handleNewOutput(_: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
+    const log = std.log.scoped(.output_manager);
 
-    const node = util.gpa.create(std.TailQueue(Output).Node) catch {
-        wlr_output.destroy();
-        return;
-    };
-    node.data.init(wlr_output) catch {
-        wlr_output.destroy();
-        util.gpa.destroy(node);
-        return;
-    };
-    const ptr_node = util.gpa.create(std.TailQueue(*Output).Node) catch {
-        wlr_output.destroy();
-        util.gpa.destroy(node);
-        return;
-    };
-    ptr_node.data = &node.data;
+    log.debug("new output {s}", .{wlr_output.name});
 
-    self.all_outputs.append(ptr_node);
-    self.addOutput(&node.data);
+    Output.create(wlr_output) catch |err| {
+        switch (err) {
+            error.OutOfMemory => log.err("out of memory", .{}),
+            error.InitRenderFailed => log.err("failed to initialize renderer for output {s}", .{wlr_output.name}),
+        }
+        wlr_output.destroy();
+    };
 }
 
 /// Remove the output from self.outputs and evacuate views if it is a member of

@@ -130,6 +130,24 @@ fn handleLockSurfacesTimeout(manager: *LockManager) c_int {
     assert(manager.state == .waiting_for_lock_surfaces);
     manager.state = .waiting_for_blank;
 
+    {
+        var it = server.root.outputs.first;
+        while (it) |node| : (it = node.next) {
+            const output = &node.data;
+
+            switch (output.lock_render_state) {
+                .unlocked, .pending_lock_surface => {},
+                .pending_blank, .blanked, .lock_surface => {
+                    assert(!output.normal_content.node.enabled);
+                    assert(output.locked_content.node.enabled);
+                },
+            }
+
+            output.normal_content.node.setEnabled(false);
+            output.locked_content.node.setEnabled(true);
+        }
+    }
+
     // This call is necessary in the case that all outputs in the layout are disabled.
     manager.maybeLock();
 
@@ -188,6 +206,19 @@ fn handleUnlock(listener: *wl.Listener(void)) void {
     log.info("session unlocked", .{});
 
     {
+        var it = server.root.outputs.first;
+        while (it) |node| : (it = node.next) {
+            const output = &node.data;
+
+            assert(!output.normal_content.node.enabled);
+            output.normal_content.node.setEnabled(true);
+
+            assert(output.locked_content.node.enabled);
+            output.locked_content.node.setEnabled(false);
+        }
+    }
+
+    {
         var it = server.input_manager.seats.first;
         while (it) |node| : (it = node.next) {
             const seat = &node.data;
@@ -230,5 +261,7 @@ fn handleSurface(
     assert(manager.state != .unlocked);
     assert(manager.lock != null);
 
-    LockSurface.create(wlr_lock_surface, manager.lock.?);
+    LockSurface.create(wlr_lock_surface, manager.lock.?) catch {
+        wlr_lock_surface.resource.postNoMemory();
+    };
 }
