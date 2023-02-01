@@ -67,10 +67,9 @@ pub fn create(output: *Output, xwayland_surface: *wlr.XwaylandSurface) error{Out
     const node = try util.gpa.create(ViewStack(View).Node);
     const view = &node.view;
 
-    // TODO actually render xwayland windows, not just an empty tree.
     const tree = try output.layers.views.createSceneTree();
 
-    view.init(output, tree, .{ .xwayland_view = .{
+    try view.init(output, tree, .{ .xwayland_view = .{
         .view = view,
         .xwayland_surface = xwayland_surface,
     } });
@@ -194,6 +193,13 @@ pub fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface:
     xwayland_surface.events.set_class.add(&self.set_class);
     xwayland_surface.events.request_fullscreen.add(&self.request_fullscreen);
     xwayland_surface.events.request_minimize.add(&self.request_minimize);
+
+    const surface_tree = view.tree.createSceneSubsurfaceTree(surface) catch {
+        log.err("out of memory", .{});
+        surface.resource.getClient().postNoMemory();
+        return;
+    };
+    surface_tree.node.lowerToBottom();
 
     // Use the view's "natural" size centered on the output as the default
     // floating dimensions
