@@ -455,11 +455,8 @@ fn commitTransaction(self: *Self) void {
             if (view.pending.tags != view.current.tags) view_tags_changed = true;
             if (view.pending.urgent != view.current.urgent) urgent_tags_dirty = true;
             if (view.pending.urgent and view_tags_changed) urgent_tags_dirty = true;
-            view.current = view.pending;
 
-            view.tree.node.setPosition(view.current.box.x, view.current.box.y);
-
-            view.dropSavedBuffers();
+            view.updateCurrent();
         }
 
         if (view_tags_changed) output.sendViewTags();

@@ -78,6 +78,12 @@ impl: Impl,
 output: *Output,
 
 tree: *wlr.SceneTree,
+borders: struct {
+    left: *wlr.SceneRect,
+    right: *wlr.SceneRect,
+    top: *wlr.SceneRect,
+    bottom: *wlr.SceneRect,
+},
 
 /// This indicates that the view should be destroyed when the current
 /// transaction completes. See View.destroy()
@@ -126,6 +132,12 @@ pub fn init(self: *Self, output: *Output, tree: *wlr.SceneTree, impl: Impl) erro
         .impl = impl,
         .output = output,
         .tree = tree,
+        .borders = .{
+            .left = try tree.createSceneRect(0, 0, &server.config.border_color_unfocused),
+            .right = try tree.createSceneRect(0, 0, &server.config.border_color_unfocused),
+            .top = try tree.createSceneRect(0, 0, &server.config.border_color_unfocused),
+            .bottom = try tree.createSceneRect(0, 0, &server.config.border_color_unfocused),
+        },
         .current = .{ .tags = initial_tags },
         .pending = .{ .tags = initial_tags },
     };
@@ -183,6 +195,39 @@ pub fn applyPending(self: *Self) void {
     self.output.arrangeViews();
 
     server.root.startTransaction();
+}
+
+pub fn updateCurrent(self: *Self) void {
+    const config = &server.config;
+
+    self.current = self.pending;
+    self.dropSavedBuffers();
+
+    const color = blk: {
+        if (self.current.urgent) break :blk &config.border_color_urgent;
+        if (self.current.focus != 0) break :blk &config.border_color_focused;
+        break :blk &config.border_color_unfocused;
+    };
+
+    const box = &self.current.box;
+    self.tree.node.setPosition(box.x, box.y);
+
+    const border_width: c_int = config.border_width;
+    self.borders.left.node.setPosition(-border_width, -border_width);
+    self.borders.left.setSize(border_width, box.height + 2 * border_width);
+    self.borders.left.setColor(color);
+
+    self.borders.right.node.setPosition(box.width, -border_width);
+    self.borders.right.setSize(border_width, box.height + 2 * border_width);
+    self.borders.right.setColor(color);
+
+    self.borders.top.node.setPosition(0, -border_width);
+    self.borders.top.setSize(box.width, border_width);
+    self.borders.top.setColor(color);
+
+    self.borders.bottom.node.setPosition(0, box.height);
+    self.borders.bottom.setSize(box.width, border_width);
+    self.borders.bottom.setColor(color);
 }
 
 pub fn needsConfigure(self: Self) bool {
@@ -459,6 +504,8 @@ pub fn shouldTrackConfigure(self: Self) bool {
 pub fn map(self: *Self) !void {
     log.debug("view '{?s}' mapped", .{self.getTitle()});
 
+    self.tree.node.setEnabled(true);
+
     server.xdg_activation.events.request_activate.add(&self.request_activate);
 
     // Add the view to the stack of its output
@@ -479,6 +526,8 @@ pub fn map(self: *Self) !void {
 /// Called by the impl when the surface will no longer be displayed
 pub fn unmap(self: *Self) void {
     log.debug("view '{?s}' unmapped", .{self.getTitle()});
+
+    self.tree.node.setEnabled(false);
 
     if (self.saved_buffers.items.len == 0) self.saveBuffers();
 

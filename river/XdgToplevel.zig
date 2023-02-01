@@ -63,8 +63,8 @@ pub fn create(output: *Output, xdg_toplevel: *wlr.XdgToplevel) error{OutOfMemory
     errdefer util.gpa.destroy(node);
     const view = &node.view;
 
-    const tree = try output.layers.views.createSceneXdgSurface(xdg_toplevel.base);
-    errdefer tree.node.destroy();
+    const tree = try output.layers.views.createSceneTree();
+    _ = try tree.createSceneXdgSurface(xdg_toplevel.base);
 
     try view.init(output, tree, .{ .xdg_toplevel = .{
         .view = view,
@@ -269,15 +269,10 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
                 const urgent_tags_dirty = view.pending.urgent != view.current.urgent or
                     (view.pending.urgent and self_tags_changed);
 
-                view.current = view.pending;
-                view.tree.node.setPosition(view.current.box.x, view.current.box.y);
+                view.updateCurrent();
 
                 if (self_tags_changed) view.output.sendViewTags();
                 if (urgent_tags_dirty) view.output.sendUrgentTags();
-
-                // This is necessary if this view was part of a transaction that didn't get completed
-                // before some change occured that caused shouldTrackConfigure() to return false.
-                view.dropSavedBuffers();
 
                 server.input_manager.updateCursorState();
             }
