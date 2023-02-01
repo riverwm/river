@@ -93,7 +93,10 @@ pub fn init(self: *Self) !void {
     const transaction_timer = try event_loop.addTimer(*Self, handleTransactionTimeout, self);
     errdefer transaction_timer.remove();
 
+    // TODO get rid of this hack somehow
     const noop_wlr_output = try server.headless_backend.headlessAddOutput(1920, 1080);
+    const noop_tree = try scene.tree.createSceneTree();
+    noop_tree.node.setEnabled(false);
     self.* = .{
         .scene = scene,
         .output_layout = output_layout,
@@ -102,9 +105,23 @@ pub fn init(self: *Self) !void {
         .transaction_timer = transaction_timer,
         .noop_output = .{
             .wlr_output = noop_wlr_output,
-            .tree = try scene.tree.createSceneTree(),
-            .normal_content = try scene.tree.createSceneTree(),
-            .locked_content = try scene.tree.createSceneTree(),
+            .tree = noop_tree,
+            .normal_content = try noop_tree.createSceneTree(),
+            .locked_content = try noop_tree.createSceneTree(),
+            .layers = .{
+                .background_color_rect = try noop_tree.createSceneRect(
+                    0,
+                    0,
+                    &server.config.background_color,
+                ),
+                .background = try noop_tree.createSceneTree(),
+                .bottom = try noop_tree.createSceneTree(),
+                .views = try noop_tree.createSceneTree(),
+                .top = try noop_tree.createSceneTree(),
+                .fullscreen = try noop_tree.createSceneTree(),
+                .overlay = try noop_tree.createSceneTree(),
+                .popups = try noop_tree.createSceneTree(),
+            },
             .usable_box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
         },
     };
@@ -218,7 +235,7 @@ pub fn removeOutput(self: *Self, output: *Output) void {
     }
 
     // Close all layer surfaces on the removed output
-    for (output.layers) |*layer| {
+    for (output.layer_surfaces) |*layer| {
         // Destroying the layer surface will cause it to be removed from this list.
         while (layer.first) |layer_node| layer_node.data.wlr_layer_surface.destroy();
     }

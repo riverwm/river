@@ -57,7 +57,7 @@ const State = struct {
 wlr_output: *wlr.Output,
 
 /// All layer surfaces on the output, indexed by the layer enum.
-layers: [4]std.TailQueue(LayerSurface) = [1]std.TailQueue(LayerSurface){.{}} ** 4,
+layer_surfaces: [4]std.TailQueue(LayerSurface) = [1]std.TailQueue(LayerSurface){.{}} ** 4,
 
 /// The area left for views and other layer surfaces after applying the
 /// exclusive zones of exclusive layer surfaces.
@@ -69,6 +69,24 @@ usable_box: wlr.Box,
 tree: *wlr.SceneTree,
 normal_content: *wlr.SceneTree,
 locked_content: *wlr.SceneTree,
+
+layers: struct {
+    background_color_rect: *wlr.SceneRect,
+    /// Background layer shell layer
+    background: *wlr.SceneTree,
+    /// Bottom layer shell layer
+    bottom: *wlr.SceneTree,
+    /// Tiled and floating views
+    views: *wlr.SceneTree,
+    /// Top layer shell layer
+    top: *wlr.SceneTree,
+    /// Fullscreen views
+    fullscreen: *wlr.SceneTree,
+    /// Overlay layer shell layer
+    overlay: *wlr.SceneTree,
+    /// Xdg popups, Xwayland override redirect windows
+    popups: *wlr.SceneTree,
+},
 
 /// The top of the stack is the "most important" view.
 views: ViewStack(View) = .{},
@@ -146,15 +164,43 @@ pub fn create(wlr_output: *wlr.Output) !void {
         };
     }
 
+    var width: c_int = undefined;
+    var height: c_int = undefined;
+    wlr_output.effectiveResolution(&width, &height);
+
     const tree = try server.root.scene.tree.createSceneTree();
+    const normal_content = try tree.createSceneTree();
+
     self.* = .{
         .wlr_output = wlr_output,
         .tree = tree,
-        .normal_content = try tree.createSceneTree(),
+        .normal_content = normal_content,
         .locked_content = try tree.createSceneTree(),
-        .usable_box = undefined,
+        .layers = .{
+            .background_color_rect = try normal_content.createSceneRect(
+                width,
+                height,
+                &server.config.background_color,
+            ),
+            .background = try normal_content.createSceneTree(),
+            .bottom = try normal_content.createSceneTree(),
+            .views = try normal_content.createSceneTree(),
+            .top = try normal_content.createSceneTree(),
+            .fullscreen = try normal_content.createSceneTree(),
+            .overlay = try normal_content.createSceneTree(),
+            .popups = try normal_content.createSceneTree(),
+        },
+        .usable_box = .{
+            .x = 0,
+            .y = 0,
+            .width = width,
+            .height = height,
+        },
     };
     wlr_output.data = @ptrToInt(self);
+
+    _ = try self.layers.fullscreen.createSceneRect(width, height, &[_]f32{ 0, 0, 0, 1.0 });
+    self.layers.fullscreen.node.setEnabled(false);
 
     wlr_output.events.destroy.add(&self.destroy);
     wlr_output.events.enable.add(&self.enable);
@@ -171,14 +217,6 @@ pub fn create(wlr_output: *wlr.Output) !void {
             std.log.scoped(.cursor).err("failed to load xcursor theme at scale {}", .{wlr_output.scale});
     }
 
-    self.usable_box = .{
-        .x = 0,
-        .y = 0,
-        .width = undefined,
-        .height = undefined,
-    };
-    self.wlr_output.effectiveResolution(&self.usable_box.width, &self.usable_box.height);
-
     self.setTitle();
 
     const ptr_node = try util.gpa.create(std.TailQueue(*Self).Node);
@@ -189,7 +227,7 @@ pub fn create(wlr_output: *wlr.Output) !void {
 }
 
 pub fn getLayer(self: *Self, layer: zwlr.LayerShellV1.Layer) *std.TailQueue(LayerSurface) {
-    return &self.layers[@intCast(usize, @enumToInt(layer))];
+    return &self.layer_surfaces[@intCast(usize, @enumToInt(layer))];
 }
 
 pub fn sendViewTags(self: Self) void {
@@ -475,7 +513,7 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
     // Remove the destroyed output from root if it wasn't already removed
     server.root.removeOutput(self);
     assert(self.views.first == null and self.views.last == null);
-    for (self.layers) |layer| assert(layer.len == 0);
+    for (self.layer_surfaces) |layer| assert(layer.len == 0);
     assert(self.layouts.len == 0);
 
     var it = server.root.all_outputs.first;
@@ -538,6 +576,18 @@ fn handleFrame(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
 
 fn handleMode(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
     const self = @fieldParentPtr(Self, "mode", listener);
+
+    {
+        var width: c_int = undefined;
+        var height: c_int = undefined;
+        self.wlr_output.effectiveResolution(&width, &height);
+        self.layers.background_color_rect.setSize(width, height);
+
+        var it = self.layers.fullscreen.children.iterator(.forward);
+        const background_color_rect = @fieldParentPtr(wlr.SceneRect, "node", it.next().?);
+        background_color_rect.setSize(width, height);
+    }
+
     self.arrangeLayers(.mapped);
     self.arrangeViews();
     server.root.startTransaction();

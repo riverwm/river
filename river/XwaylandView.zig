@@ -68,7 +68,7 @@ pub fn create(output: *Output, xwayland_surface: *wlr.XwaylandSurface) error{Out
     const view = &node.view;
 
     // TODO actually render xwayland windows, not just an empty tree.
-    const tree = try output.tree.createSceneTree();
+    const tree = try output.layers.views.createSceneTree();
 
     view.init(output, tree, .{ .xwayland_view = .{
         .view = view,

@@ -95,7 +95,7 @@ fn handleUnmap(listener: *wl.Listener(*wlr.LayerSurfaceV1), _: *wlr.LayerSurface
 
     // Remove from the output's list of layer surfaces
     const self_node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-    self.output.layers[@intCast(usize, @enumToInt(self.layer))].remove(self_node);
+    self.output.layer_surfaces[@intCast(usize, @enumToInt(self.layer))].remove(self_node);
 
     // If the unmapped surface is focused, clear focus
     var it = server.input_manager.seats.first;

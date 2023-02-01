@@ -63,7 +63,7 @@ pub fn create(output: *Output, xdg_toplevel: *wlr.XdgToplevel) error{OutOfMemory
     errdefer util.gpa.destroy(node);
     const view = &node.view;
 
-    const tree = try output.normal_content.createSceneXdgSurface(xdg_toplevel.base);
+    const tree = try output.layers.views.createSceneXdgSurface(xdg_toplevel.base);
     errdefer tree.node.destroy();
 
     try view.init(output, tree, .{ .xdg_toplevel = .{

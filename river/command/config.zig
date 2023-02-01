@@ -46,6 +46,11 @@ pub fn backgroundColor(
     if (args.len > 2) return Error.TooManyArguments;
 
     server.config.background_color = try parseRgba(args[1]);
+    var it = server.root.all_outputs.first;
+    while (it) |node| : (it = node.next) {
+        const output = node.data;
+        output.layers.background_color_rect.setColor(&server.config.background_color);
+    }
 }
 
 pub fn borderColorFocused(
