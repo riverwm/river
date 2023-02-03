@@ -177,7 +177,7 @@ a mapping without modifiers
 Keys are specified by their XKB keysym name. See
 _/usr/include/xkbcommon/xkbcommon-keysyms.h_ for the complete list.
 
-Mouse buttons are specified by linux input event code names. The most commonly
+Mouse buttons are specified by Linux input event code names. The most commonly
 used values are:
 
 	- BTN_LEFT - left mouse button
@@ -219,7 +219,7 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 	- _mode_: name of the mode for which to create the mapping
 	- _modifiers_: one or more of the modifiers listed above, separated
 	  by a plus sign (+).
-	- _button_: the name of a linux input event code as described above
+	- _button_: the name of a Linux input event code as described above
 	- _action_: one of the following values:
 		- move-view
 		- resize-view
@@ -254,7 +254,7 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 	- _mode_: name of the mode for which to remove the mapping
 	- _modifiers_: one or more of the modifiers listed above, separated
 	  by a plus sign (+).
-	- _button_: the name of a linux input event code as described above
+	- _button_: the name of a Linux input event code as described above
 
 *unmap-switch* _mode_ *lid*|*tablet* _state_
 	Remove the switch mapping defined by the arguments:
@@ -336,7 +336,7 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 *keyboard-layout* [-rules _rules_] [-model _model_] [-variant _variant_] \
 [-options _options_] _layout_
 	Set the XKB layout for all keyboards. Defaults from libxkbcommon are used for
-	everything left unspecified. Note that *layout* may be a comma separated list
+	everything left unspecified. Note that _layout_ may be a comma separated list
 	of layouts (e.g. "us,de") which may be switched between using various key
 	combinations configured through the options argument (e.g. -options
 	"grp:ctrl_space_toggle"). See *xkeyboard-config*(7) for possible values and
@@ -349,7 +349,7 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 
 *keyboard-group-destroy* _group_name_
 	Destroy the keyboard group with the given name. All attached keyboards
-	will be released, making them act as seperate devices again.
+	will be released, making them act as separate devices again.
 
 *keyboard-group-add* _group_name_ _input_device_name_
 	Add a keyboard to a keyboard group, identified by the keyboard's
@@ -420,7 +420,7 @@ However note that not every input device supports every property.
 	- _button_: Scroll with pointer movement while holding down a button
 
 *input* _name_ *scroll-button* _button_
-	Set the scroll button of an input device. _button_ is the name of a linux
+	Set the scroll button of an input device. _button_ is the name of a Linux
 	input event code.
 
 # EXAMPLES
