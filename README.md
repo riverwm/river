@@ -3,9 +3,9 @@
 River is a dynamic tiling Wayland compositor with flexible runtime
 configuration.
 
-Join us at [#river](https://web.libera.chat/?channels=#river)
-on irc.libera.chat. Read our man pages and our
-[wiki](https://github.com/riverwm/river/wiki).
+Install from your [package manager](https://repology.org/project/river/versions) —
+Join us at [#river](https://web.libera.chat/?channels=#river) on irc.libera.chat —
+Read our man pages and [wiki](https://github.com/riverwm/river/wiki)
 
 *Note: river is currently early in development. Expect breaking
 changes and missing features. Bugs should however be rare at
@@ -23,10 +23,6 @@ low cognitive load.
 separate `riverctl` binary implementing it.
 
 ## Building
-
-<a href="https://repology.org/project/river/versions">
-    <img src="https://repology.org/badge/vertical-allrepos/river.svg" alt="Packaging status" align="right">
-</a>
 
 On cloning the repository, you must init and update the submodules as well
 with e.g.
