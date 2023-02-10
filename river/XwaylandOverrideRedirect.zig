@@ -101,6 +101,8 @@ pub fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface:
 }
 
 pub fn focusIfDesired(self: *Self) void {
+    if (server.lock_manager.state != .unlocked) return;
+
     if (self.xwayland_surface.overrideRedirectWantsFocus() and
         self.xwayland_surface.icccmInputModel() != .none)
     {

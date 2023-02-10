@@ -293,6 +293,8 @@ pub fn arrangeLayers(self: *Self, target: ArrangeLayersTarget) void {
 
     if (target == .unmapped) return;
 
+    if (server.lock_manager.state != .unlocked) return;
+
     // Find the topmost layer surface in the top or overlay layers which
     // requests keyboard interactivity if any.
     const topmost_surface = outer: for (layers[0..2]) |layer| {
