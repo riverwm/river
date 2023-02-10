@@ -354,22 +354,6 @@ pub fn sendToOutput(self: *Self, destination_output: *Output) void {
     }
 }
 
-fn sendEnter(self: *Self, output: *Output) void {
-    self.forEachSurface(*wlr.Output, sendEnterIterator, output.wlr_output);
-}
-
-fn sendEnterIterator(surface: *wlr.Surface, _: c_int, _: c_int, wlr_output: *wlr.Output) void {
-    surface.sendEnter(wlr_output);
-}
-
-fn sendLeave(self: *Self, output: *Output) void {
-    self.forEachSurface(*wlr.Output, sendLeaveIterator, output.wlr_output);
-}
-
-fn sendLeaveIterator(surface: *wlr.Surface, _: c_int, _: c_int, wlr_output: *wlr.Output) void {
-    surface.sendLeave(wlr_output);
-}
-
 pub fn close(self: Self) void {
     switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.close(),
@@ -515,8 +499,6 @@ pub fn map(self: *Self) !void {
     // Inform all seats that the view has been mapped so they can handle focus
     var it = server.input_manager.seats.first;
     while (it) |seat_node| : (it = seat_node.next) try seat_node.data.handleViewMap(self);
-
-    self.sendEnter(self.output);
 
     self.output.sendViewTags();
 
