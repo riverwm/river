@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const Self = @This();
+const LayerSurface = @This();
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -26,125 +26,140 @@ const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Output = @import("Output.zig");
+const SceneNodeData = @import("SceneNodeData.zig");
 
 const log = std.log.scoped(.layer_shell);
 
 output: *Output,
-wlr_layer_surface: *wlr.LayerSurfaceV1,
-
-box: wlr.Box = undefined,
-layer: zwlr.LayerShellV1.Layer,
+scene_layer_surface: *wlr.SceneLayerSurfaceV1,
 
 destroy: wl.Listener(*wlr.LayerSurfaceV1) = wl.Listener(*wlr.LayerSurfaceV1).init(handleDestroy),
 map: wl.Listener(*wlr.LayerSurfaceV1) = wl.Listener(*wlr.LayerSurfaceV1).init(handleMap),
 unmap: wl.Listener(*wlr.LayerSurfaceV1) = wl.Listener(*wlr.LayerSurfaceV1).init(handleUnmap),
 commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
 
-pub fn init(self: *Self, output: *Output, wlr_layer_surface: *wlr.LayerSurfaceV1) void {
-    self.* = .{
-        .output = output,
-        .wlr_layer_surface = wlr_layer_surface,
-        .layer = wlr_layer_surface.current.layer,
-    };
-    wlr_layer_surface.data = @ptrToInt(self);
+pub fn create(wlr_layer_surface: *wlr.LayerSurfaceV1) error{OutOfMemory}!void {
+    const output = @intToPtr(*Output, wlr_layer_surface.output.?.data);
+    const layer_surface = try util.gpa.create(LayerSurface);
+    errdefer util.gpa.destroy(layer_surface);
 
-    // Set up listeners that are active for the entire lifetime of the layer surface
-    wlr_layer_surface.events.destroy.add(&self.destroy);
-    wlr_layer_surface.events.map.add(&self.map);
-    wlr_layer_surface.events.unmap.add(&self.unmap);
-    wlr_layer_surface.surface.events.commit.add(&self.commit);
+    const tree = output.layerSurfaceTree(wlr_layer_surface.current.layer);
+    const scene_layer_surface = try tree.createSceneLayerSurfaceV1(wlr_layer_surface);
+
+    try SceneNodeData.attach(&scene_layer_surface.tree.node, .{ .layer_surface = layer_surface });
+
+    layer_surface.* = .{
+        .output = output,
+        .scene_layer_surface = scene_layer_surface,
+    };
+    wlr_layer_surface.data = @ptrToInt(layer_surface);
+
+    wlr_layer_surface.events.destroy.add(&layer_surface.destroy);
+    wlr_layer_surface.events.map.add(&layer_surface.map);
+    wlr_layer_surface.events.unmap.add(&layer_surface.unmap);
+    wlr_layer_surface.surface.events.commit.add(&layer_surface.commit);
 
     // wlroots only informs us of the new surface after the first commit,
     // so our listener does not get called for this first commit. However,
     // we do want our listener called in order to send the initial configure.
-    handleCommit(&self.commit, wlr_layer_surface.surface);
+    handleCommit(&layer_surface.commit, wlr_layer_surface.surface);
 }
 
-fn handleDestroy(listener: *wl.Listener(*wlr.LayerSurfaceV1), _: *wlr.LayerSurfaceV1) void {
-    const self = @fieldParentPtr(Self, "destroy", listener);
+fn handleDestroy(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wlr.LayerSurfaceV1) void {
+    const layer_surface = @fieldParentPtr(LayerSurface, "destroy", listener);
 
-    log.debug("layer surface '{s}' destroyed", .{self.wlr_layer_surface.namespace});
+    log.debug("layer surface '{s}' destroyed", .{wlr_layer_surface.namespace});
 
-    // Remove listeners active the entire lifetime of the layer surface
-    self.destroy.link.remove();
-    self.map.link.remove();
-    self.unmap.link.remove();
-    self.commit.link.remove();
+    layer_surface.destroy.link.remove();
+    layer_surface.map.link.remove();
+    layer_surface.unmap.link.remove();
+    layer_surface.commit.link.remove();
 
-    const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-    util.gpa.destroy(node);
+    util.gpa.destroy(layer_surface);
 }
 
 fn handleMap(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wlr.LayerSurfaceV1) void {
-    const self = @fieldParentPtr(Self, "map", listener);
+    const layer_surface = @fieldParentPtr(LayerSurface, "map", listener);
 
     log.debug("layer surface '{s}' mapped", .{wlr_layer_surface.namespace});
 
-    wlr_layer_surface.surface.sendEnter(wlr_layer_surface.output.?);
-
-    const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-    self.output.getLayer(self.layer).append(node);
-    self.output.arrangeLayers(.mapped);
+    layer_surface.output.arrangeLayers();
+    handleKeyboardInteractiveExclusive(layer_surface.output);
     server.root.startTransaction();
 }
 
-fn handleUnmap(listener: *wl.Listener(*wlr.LayerSurfaceV1), _: *wlr.LayerSurfaceV1) void {
-    const self = @fieldParentPtr(Self, "unmap", listener);
+fn handleUnmap(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wlr.LayerSurfaceV1) void {
+    const layer_surface = @fieldParentPtr(LayerSurface, "unmap", listener);
 
-    log.debug("layer surface '{s}' unmapped", .{self.wlr_layer_surface.namespace});
+    log.debug("layer surface '{s}' unmapped", .{wlr_layer_surface.namespace});
 
-    // Remove from the output's list of layer surfaces
-    const self_node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-    self.output.layer_surfaces[@intCast(usize, @enumToInt(self.layer))].remove(self_node);
-
-    // If the unmapped surface is focused, clear focus
-    var it = server.input_manager.seats.first;
-    while (it) |node| : (it = node.next) {
-        const seat = &node.data;
-        if (seat.focused == .layer and seat.focused.layer == self)
-            seat.setFocusRaw(.{ .none = {} });
-    }
-
-    // This gives exclusive focus to a keyboard interactive top or overlay layer
-    // surface if there is one.
-    self.output.arrangeLayers(.mapped);
-
-    // Ensure that focus is given to the appropriate view if there is no
-    // other top/overlay layer surface to grab focus.
-    it = server.input_manager.seats.first;
-    while (it) |node| : (it = node.next) {
-        const seat = &node.data;
-        seat.focus(null);
-    }
-
+    layer_surface.output.arrangeLayers();
+    handleKeyboardInteractiveExclusive(layer_surface.output);
     server.root.startTransaction();
 }
 
 fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
-    const self = @fieldParentPtr(Self, "commit", listener);
+    const layer_surface = @fieldParentPtr(LayerSurface, "commit", listener);
+    const wlr_layer_surface = layer_surface.scene_layer_surface.layer_surface;
 
-    assert(self.wlr_layer_surface.output != null);
+    assert(wlr_layer_surface.output != null);
 
-    // If a surface is committed while it is not mapped, we may need to send a configure.
-    if (!self.wlr_layer_surface.mapped) {
-        const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-        self.layer = self.wlr_layer_surface.current.layer;
-        self.output.getLayer(self.layer).append(node);
-        self.output.arrangeLayers(.unmapped);
-        self.output.getLayer(self.layer).remove(node);
-        return;
+    // If the layer was changed, move the LayerSurface to the proper tree.
+    if (wlr_layer_surface.current.committed.layer) {
+        const tree = layer_surface.output.layerSurfaceTree(wlr_layer_surface.current.layer);
+        layer_surface.scene_layer_surface.tree.node.reparent(tree);
     }
 
-    if (@bitCast(u32, self.wlr_layer_surface.current.committed) != 0) {
-        // If the layer changed, move the LayerSurface to the proper list
-        if (self.wlr_layer_surface.current.layer != self.layer) {
-            const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-            self.output.getLayer(self.layer).remove(node);
-            self.layer = self.wlr_layer_surface.current.layer;
-            self.output.getLayer(self.layer).append(node);
-        }
-
-        self.output.arrangeLayers(.mapped);
+    // If a surface is committed while it is not mapped, we must send a configure.
+    if (!wlr_layer_surface.mapped or @bitCast(u32, wlr_layer_surface.current.committed) != 0) {
+        layer_surface.output.arrangeLayers();
+        handleKeyboardInteractiveExclusive(layer_surface.output);
         server.root.startTransaction();
+    }
+}
+
+fn handleKeyboardInteractiveExclusive(output: *Output) void {
+    if (server.lock_manager.state != .unlocked) return;
+
+    // Find the topmost layer surface in the top or overlay layers which
+    // requests keyboard interactivity if any.
+    const topmost_surface = outer: for ([_]zwlr.LayerShellV1.Layer{ .overlay, .top }) |layer| {
+        const tree = output.layerSurfaceTree(layer);
+        // Iterate in reverse to match rendering order.
+        var it = tree.children.iterator(.reverse);
+        while (it.next()) |node| {
+            assert(node.type == .tree);
+            if (@intToPtr(?*SceneNodeData, node.data)) |node_data| {
+                const layer_surface = node_data.data.layer_surface;
+                const wlr_layer_surface = layer_surface.scene_layer_surface.layer_surface;
+                if (wlr_layer_surface.mapped and
+                    wlr_layer_surface.current.keyboard_interactive == .exclusive)
+                {
+                    break :outer layer_surface;
+                }
+            }
+        }
+    } else null;
+
+    var it = server.input_manager.seats.first;
+    while (it) |node| : (it = node.next) {
+        const seat = &node.data;
+
+        // Only grab focus of seats which have the output focused
+        if (seat.focused_output != output) continue;
+
+        if (topmost_surface) |to_focus| {
+            // If we found a surface that requires focus, grab the focus of all
+            // seats.
+            seat.setFocusRaw(.{ .layer = to_focus });
+        } else if (seat.focused == .layer) {
+            const current_focus = seat.focused.layer.scene_layer_surface.layer_surface;
+            // If the seat is currently focusing an unmapped layer surface or one
+            // without keyboard interactivity, stop focusing that layer surface.
+            if (!current_focus.mapped or current_focus.current.keyboard_interactive == .none) {
+                seat.setFocusRaw(.{ .none = {} });
+                seat.focus(null);
+            }
+        }
     }
 }

@@ -22,6 +22,7 @@ const assert = std.debug.assert;
 const mem = std.mem;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
+const zwlr = @import("wayland").server.zwlr;
 
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
@@ -178,6 +179,7 @@ pub fn at(self: Self, lx: f64, ly: f64) ?AtResult {
                     .sy = sy,
                     .node = switch (scene_node_data.data) {
                         .view => |view| .{ .view = view },
+                        .layer_surface => |layer_surface| .{ .layer_surface = layer_surface },
                         .lock_surface => |lock_surface| .{ .lock_surface = lock_surface },
                     },
                 };
@@ -235,9 +237,15 @@ pub fn removeOutput(self: *Self, output: *Output) void {
     }
 
     // Close all layer surfaces on the removed output
-    for (output.layer_surfaces) |*layer| {
-        // Destroying the layer surface will cause it to be removed from this list.
-        while (layer.first) |layer_node| layer_node.data.wlr_layer_surface.destroy();
+    for ([_]zwlr.LayerShellV1.Layer{ .overlay, .top, .bottom, .background }) |layer| {
+        const tree = output.layerSurfaceTree(layer);
+        var it = tree.children.safeIterator(.forward);
+        while (it.next()) |scene_node| {
+            assert(scene_node.type == .tree);
+            if (@intToPtr(?*SceneNodeData, scene_node.data)) |node_data| {
+                node_data.data.layer_surface.scene_layer_surface.layer_surface.destroy();
+            }
+        }
     }
 
     // If any seat has the removed output focused, focus the fallback one
@@ -534,7 +542,7 @@ fn processOutputConfig(
                         self.output_layout.add(output.wlr_output, head.state.x, head.state.y);
                         output.tree.node.setEnabled(true);
                         output.tree.node.setPosition(head.state.x, head.state.y);
-                        output.arrangeLayers(.mapped);
+                        output.arrangeLayers();
                     } else {
                         self.removeOutput(output);
                         self.output_layout.remove(output.wlr_output);

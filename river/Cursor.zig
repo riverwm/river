@@ -357,7 +357,7 @@ fn updateKeyboardFocus(self: Self, result: Root.AtResult) void {
             self.seat.focusOutput(layer_surface.output);
             // If a keyboard inteactive layer surface has been clicked on,
             // give it keyboard focus.
-            if (layer_surface.wlr_layer_surface.current.keyboard_interactive == .exclusive) {
+            if (layer_surface.scene_layer_surface.layer_surface.current.keyboard_interactive != .none) {
                 self.seat.setFocusRaw(.{ .layer = layer_surface });
             } else {
                 self.seat.focus(null);

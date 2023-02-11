@@ -198,7 +198,6 @@ fn handleNewXdgSurface(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wl
     };
 }
 
-/// This event is raised when the layer_shell recieves a new surface from a client.
 fn handleNewLayerSurface(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wlr.LayerSurfaceV1) void {
     const self = @fieldParentPtr(Self, "new_layer_surface", listener);
 
@@ -206,15 +205,15 @@ fn handleNewLayerSurface(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_
         "new layer surface: namespace {s}, layer {s}, anchor {b:0>4}, size {},{}, margin {},{},{},{}, exclusive_zone {}",
         .{
             wlr_layer_surface.namespace,
-            @tagName(wlr_layer_surface.pending.layer),
-            @bitCast(u32, wlr_layer_surface.pending.anchor),
-            wlr_layer_surface.pending.desired_width,
-            wlr_layer_surface.pending.desired_height,
-            wlr_layer_surface.pending.margin.top,
-            wlr_layer_surface.pending.margin.right,
-            wlr_layer_surface.pending.margin.bottom,
-            wlr_layer_surface.pending.margin.left,
-            wlr_layer_surface.pending.exclusive_zone,
+            @tagName(wlr_layer_surface.current.layer),
+            @bitCast(u32, wlr_layer_surface.current.anchor),
+            wlr_layer_surface.current.desired_width,
+            wlr_layer_surface.current.desired_height,
+            wlr_layer_surface.current.margin.top,
+            wlr_layer_surface.current.margin.right,
+            wlr_layer_surface.current.margin.bottom,
+            wlr_layer_surface.current.margin.left,
+            wlr_layer_surface.current.exclusive_zone,
         },
     );
 
@@ -232,13 +231,10 @@ fn handleNewLayerSurface(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_
         wlr_layer_surface.output = output.wlr_output;
     }
 
-    // The layer surface will add itself to the proper list of the output on map
-    const output = @intToPtr(*Output, wlr_layer_surface.output.?.data);
-    const node = util.gpa.create(std.TailQueue(LayerSurface).Node) catch {
+    LayerSurface.create(wlr_layer_surface) catch {
         wlr_layer_surface.resource.postNoMemory();
         return;
     };
-    node.data.init(output, wlr_layer_surface);
 }
 
 fn handleNewXwaylandSurface(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {

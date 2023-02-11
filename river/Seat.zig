@@ -157,8 +157,15 @@ pub fn focus(self: *Self, _target: ?*View) void {
     // Views may not recieve focus while locked.
     if (server.lock_manager.state != .unlocked) return;
 
-    // While a layer surface is focused, views may not recieve focus
-    if (self.focused == .layer) return;
+    // While a layer surface is exclusively focused, views may not recieve focus
+    if (self.focused == .layer) {
+        const wlr_layer_surface = self.focused.layer.scene_layer_surface.layer_surface;
+        if (wlr_layer_surface.current.keyboard_interactive == .exclusive and
+            (wlr_layer_surface.current.layer == .top or wlr_layer_surface.current.layer == .overlay))
+        {
+            return;
+        }
+    }
 
     if (target) |view| {
         // If the view is not currently visible, behave as if null was passed
@@ -224,7 +231,7 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
     const target_surface = switch (new_focus) {
         .view => |target_view| target_view.rootSurface(),
         .xwayland_override_redirect => |target_or| target_or.xwayland_surface.surface,
-        .layer => |target_layer| target_layer.wlr_layer_surface.surface,
+        .layer => |target_layer| target_layer.scene_layer_surface.layer_surface.surface,
         .lock_surface => |lock_surface| lock_surface.wlr_lock_surface.surface,
         .none => null,
     };

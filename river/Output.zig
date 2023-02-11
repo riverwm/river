@@ -34,9 +34,10 @@ const LayerSurface = @import("LayerSurface.zig");
 const Layout = @import("Layout.zig");
 const LayoutDemand = @import("LayoutDemand.zig");
 const LockSurface = @import("LockSurface.zig");
+const OutputStatus = @import("OutputStatus.zig");
+const SceneNodeData = @import("SceneNodeData.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
-const OutputStatus = @import("OutputStatus.zig");
 
 const State = struct {
     /// A bit field of focused tags
@@ -55,9 +56,6 @@ const State = struct {
 };
 
 wlr_output: *wlr.Output,
-
-/// All layer surfaces on the output, indexed by the layer enum.
-layer_surfaces: [4]std.TailQueue(LayerSurface) = [1]std.TailQueue(LayerSurface){.{}} ** 4,
 
 /// The area left for views and other layer surfaces after applying the
 /// exclusive zones of exclusive layer surfaces.
@@ -226,8 +224,14 @@ pub fn create(wlr_output: *wlr.Output) !void {
     handleEnable(&self.enable, self.wlr_output);
 }
 
-pub fn getLayer(self: *Self, layer: zwlr.LayerShellV1.Layer) *std.TailQueue(LayerSurface) {
-    return &self.layer_surfaces[@intCast(usize, @enumToInt(layer))];
+pub fn layerSurfaceTree(self: Self, layer: zwlr.LayerShellV1.Layer) *wlr.SceneTree {
+    const trees = [_]*wlr.SceneTree{
+        self.layers.background,
+        self.layers.bottom,
+        self.layers.top,
+        self.layers.overlay,
+    };
+    return trees[@intCast(usize, @enumToInt(layer))];
 }
 
 pub fn sendViewTags(self: Self) void {
@@ -305,13 +309,9 @@ pub fn arrangeViews(self: *Self) void {
     }
 }
 
-const ArrangeLayersTarget = enum { mapped, unmapped };
-
 /// Arrange all layer surfaces of this output and adjust the usable area.
 /// Will arrange views as well if the usable area changes.
-/// If target is unmapped, this function is pure aside from the
-/// wlr.LayerSurfaceV1.configure() calls made on umapped layer surfaces.
-pub fn arrangeLayers(self: *Self, target: ArrangeLayersTarget) void {
+pub fn arrangeLayers(self: *Self) void {
     var full_box: wlr.Box = .{
         .x = 0,
         .y = 0,
@@ -323,185 +323,21 @@ pub fn arrangeLayers(self: *Self, target: ArrangeLayersTarget) void {
     // This box is modified as exclusive zones are applied
     var usable_box = full_box;
 
-    const layers = [_]zwlr.LayerShellV1.Layer{ .overlay, .top, .bottom, .background };
-
-    // Arrange all layer surfaces with exclusive zones, applying them to the
-    // usable box along the way.
-    for (layers) |layer| arrangeLayer(self.getLayer(layer).*, full_box, &usable_box, true, target);
+    for ([_]zwlr.LayerShellV1.Layer{ .overlay, .top, .bottom, .background }) |layer| {
+        const tree = self.layerSurfaceTree(layer);
+        var it = tree.children.iterator(.forward);
+        while (it.next()) |node| {
+            assert(node.type == .tree);
+            if (@intToPtr(?*SceneNodeData, node.data)) |node_data| {
+                node_data.data.layer_surface.scene_layer_surface.configure(&full_box, &usable_box);
+            }
+        }
+    }
 
     // If the the usable_box has changed, we need to rearrange the output
-    if (target == .mapped and !std.meta.eql(self.usable_box, usable_box)) {
+    if (!std.meta.eql(self.usable_box, usable_box)) {
         self.usable_box = usable_box;
         self.arrangeViews();
-    }
-
-    // Arrange the layers without exclusive zones
-    for (layers) |layer| arrangeLayer(self.getLayer(layer).*, full_box, &usable_box, false, target);
-
-    if (target == .unmapped) return;
-
-    if (server.lock_manager.state != .unlocked) return;
-
-    // Find the topmost layer surface in the top or overlay layers which
-    // requests keyboard interactivity if any.
-    const topmost_surface = outer: for (layers[0..2]) |layer| {
-        // Iterate in reverse order since the last layer is rendered on top
-        var it = self.getLayer(layer).last;
-        while (it) |node| : (it = node.prev) {
-            const layer_surface = &node.data;
-            if (layer_surface.wlr_layer_surface.current.keyboard_interactive == .exclusive) {
-                break :outer layer_surface;
-            }
-        }
-    } else null;
-
-    var it = server.input_manager.seats.first;
-    while (it) |node| : (it = node.next) {
-        const seat = &node.data;
-
-        // Only grab focus of seats which have the output focused
-        if (seat.focused_output != self) continue;
-
-        if (topmost_surface) |to_focus| {
-            // If we found a surface that requires focus, grab the focus of all
-            // seats.
-            seat.setFocusRaw(.{ .layer = to_focus });
-        } else if (seat.focused == .layer) {
-            // If the seat is currently focusing a layer without keyboard
-            // interactivity, stop focusing that layer.
-            if (seat.focused.layer.wlr_layer_surface.current.keyboard_interactive != .exclusive) {
-                seat.setFocusRaw(.{ .none = {} });
-                seat.focus(null);
-            }
-        }
-    }
-}
-
-/// Arrange the layer surfaces of a given layer
-fn arrangeLayer(
-    layer: std.TailQueue(LayerSurface),
-    full_box: wlr.Box,
-    usable_box: *wlr.Box,
-    exclusive: bool,
-    target: ArrangeLayersTarget,
-) void {
-    var it = layer.first;
-    while (it) |node| : (it = node.next) {
-        const layer_surface = &node.data;
-        const current_state = layer_surface.wlr_layer_surface.current;
-
-        const desired_width = @intCast(u31, math.min(math.maxInt(u31), current_state.desired_width));
-        const desired_height = @intCast(u31, math.min(math.maxInt(u31), current_state.desired_height));
-
-        // If the value of exclusive_zone is greater than zero, then it exclusivly
-        // occupies some area of the screen.
-        if (exclusive != (current_state.exclusive_zone > 0)) continue;
-
-        // If the exclusive zone is set to -1, this means the the client would like
-        // to ignore any exclusive zones and use the full area of the output.
-        const bounds = if (current_state.exclusive_zone == -1) &full_box else usable_box;
-
-        var new_box: wlr.Box = undefined;
-
-        // Horizontal alignment
-        if (desired_width == 0) {
-            assert(current_state.anchor.right and current_state.anchor.left);
-            new_box.x = bounds.x + current_state.margin.left;
-            new_box.width = bounds.width - (current_state.margin.left + current_state.margin.right);
-        } else if (current_state.anchor.left == current_state.anchor.right) {
-            new_box.x = bounds.x + @divTrunc(bounds.width, 2) - desired_width / 2;
-            new_box.width = desired_width;
-        } else if (current_state.anchor.left) {
-            new_box.x = bounds.x + current_state.margin.left;
-            new_box.width = desired_width;
-        } else {
-            assert(current_state.anchor.right);
-            new_box.x = bounds.x + bounds.width - desired_width - current_state.margin.right;
-            new_box.width = desired_width;
-        }
-
-        // Vertical alignment
-        if (desired_height == 0) {
-            assert(current_state.anchor.top and current_state.anchor.bottom);
-            new_box.y = bounds.y + current_state.margin.top;
-            new_box.height = bounds.height - (current_state.margin.top + current_state.margin.bottom);
-        } else if (current_state.anchor.top == current_state.anchor.bottom) {
-            new_box.y = bounds.y + @divTrunc(bounds.height, 2) - desired_height / 2;
-            new_box.height = desired_height;
-        } else if (current_state.anchor.top) {
-            new_box.y = bounds.y + current_state.margin.top;
-            new_box.height = desired_height;
-        } else {
-            assert(current_state.anchor.bottom);
-            new_box.y = bounds.y + bounds.height - desired_height - current_state.margin.bottom;
-            new_box.height = desired_height;
-        }
-
-        // Apply the exclusive zone to the current bounds
-        const edges = [4]struct {
-            single: zwlr.LayerSurfaceV1.Anchor,
-            triple: zwlr.LayerSurfaceV1.Anchor,
-            to_increase: ?*i32,
-            to_decrease: *i32,
-            margin: i32,
-        }{
-            .{
-                .single = .{ .top = true },
-                .triple = .{ .top = true, .left = true, .right = true },
-                .to_increase = &usable_box.y,
-                .to_decrease = &usable_box.height,
-                .margin = current_state.margin.top,
-            },
-            .{
-                .single = .{ .bottom = true },
-                .triple = .{ .bottom = true, .left = true, .right = true },
-                .to_increase = null,
-                .to_decrease = &usable_box.height,
-                .margin = current_state.margin.bottom,
-            },
-            .{
-                .single = .{ .left = true },
-                .triple = .{ .left = true, .top = true, .bottom = true },
-                .to_increase = &usable_box.x,
-                .to_decrease = &usable_box.width,
-                .margin = current_state.margin.left,
-            },
-            .{
-                .single = .{ .right = true },
-                .triple = .{ .right = true, .top = true, .bottom = true },
-                .to_increase = null,
-                .to_decrease = &usable_box.width,
-                .margin = current_state.margin.right,
-            },
-        };
-
-        for (edges) |edge| {
-            if ((std.meta.eql(current_state.anchor, edge.single) or std.meta.eql(current_state.anchor, edge.triple)) and
-                current_state.exclusive_zone + edge.margin > 0)
-            {
-                const delta = current_state.exclusive_zone + edge.margin;
-                if (edge.to_increase) |value| value.* += delta;
-                edge.to_decrease.* -= delta;
-                break;
-            }
-        }
-
-        switch (target) {
-            .mapped => {
-                assert(layer_surface.wlr_layer_surface.mapped);
-                layer_surface.box = new_box;
-                _ = layer_surface.wlr_layer_surface.configure(
-                    @intCast(u32, new_box.width),
-                    @intCast(u32, new_box.height),
-                );
-            },
-            .unmapped => if (!layer_surface.wlr_layer_surface.mapped) {
-                _ = layer_surface.wlr_layer_surface.configure(
-                    @intCast(u32, new_box.width),
-                    @intCast(u32, new_box.height),
-                );
-            },
-        }
     }
 }
 
@@ -513,7 +349,6 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
     // Remove the destroyed output from root if it wasn't already removed
     server.root.removeOutput(self);
     assert(self.views.first == null and self.views.last == null);
-    for (self.layer_surfaces) |layer| assert(layer.len == 0);
     assert(self.layouts.len == 0);
 
     var it = server.root.all_outputs.first;
@@ -588,8 +423,7 @@ fn handleMode(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
         background_color_rect.setSize(width, height);
     }
 
-    self.arrangeLayers(.mapped);
-    self.arrangeViews();
+    self.arrangeLayers();
     server.root.startTransaction();
 }
 
