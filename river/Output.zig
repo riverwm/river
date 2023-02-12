@@ -329,7 +329,12 @@ pub fn arrangeLayers(self: *Self) void {
         while (it.next()) |node| {
             assert(node.type == .tree);
             if (@intToPtr(?*SceneNodeData, node.data)) |node_data| {
-                node_data.data.layer_surface.scene_layer_surface.configure(&full_box, &usable_box);
+                const layer_surface = node_data.data.layer_surface;
+                layer_surface.scene_layer_surface.configure(&full_box, &usable_box);
+                layer_surface.popup_tree.node.setPosition(
+                    layer_surface.scene_layer_surface.tree.node.x,
+                    layer_surface.scene_layer_surface.tree.node.y,
+                );
             }
         }
     }

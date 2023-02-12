@@ -26,6 +26,7 @@ const util = @import("util.zig");
 
 const Output = @import("Output.zig");
 const Seat = @import("Seat.zig");
+const XdgPopup = @import("XdgPopup.zig");
 const View = @import("View.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
 
@@ -44,6 +45,7 @@ acked_pending_serial: bool = false,
 destroy: wl.Listener(void) = wl.Listener(void).init(handleDestroy),
 map: wl.Listener(void) = wl.Listener(void).init(handleMap),
 unmap: wl.Listener(void) = wl.Listener(void).init(handleUnmap),
+new_popup: wl.Listener(*wlr.XdgPopup) = wl.Listener(*wlr.XdgPopup).init(handleNewPopup),
 
 // Listeners that are only active while the view is mapped
 ack_configure: wl.Listener(*wlr.XdgSurface.Configure) =
@@ -78,6 +80,7 @@ pub fn create(output: *Output, xdg_toplevel: *wlr.XdgToplevel) error{OutOfMemory
     xdg_toplevel.base.events.destroy.add(&self.destroy);
     xdg_toplevel.base.events.map.add(&self.map);
     xdg_toplevel.base.events.unmap.add(&self.unmap);
+    xdg_toplevel.base.events.new_popup.add(&self.new_popup);
 }
 
 /// Returns true if a configure must be sent to ensure that the pending
@@ -143,6 +146,11 @@ pub fn getConstraints(self: Self) View.Constraints {
         .min_height = @intCast(u31, math.max(state.min_height, 1)),
         .max_height = if (state.max_height > 0) @intCast(u31, state.max_height) else math.maxInt(u31),
     };
+}
+
+pub fn destroyPopups(self: Self) void {
+    var it = self.xdg_toplevel.base.popups.safeIterator(.forward);
+    while (it.next()) |wlr_xdg_popup| wlr_xdg_popup.destroy();
 }
 
 fn handleDestroy(listener: *wl.Listener(void)) void {
@@ -231,6 +239,20 @@ fn handleUnmap(listener: *wl.Listener(void)) void {
     self.set_app_id.link.remove();
 
     self.view.unmap();
+}
+
+fn handleNewPopup(listener: *wl.Listener(*wlr.XdgPopup), wlr_xdg_popup: *wlr.XdgPopup) void {
+    const self = @fieldParentPtr(Self, "new_popup", listener);
+
+    XdgPopup.create(
+        wlr_xdg_popup,
+        self.view.popup_tree,
+        self.view.popup_tree,
+        &self.view.output,
+    ) catch {
+        wlr_xdg_popup.resource.postNoMemory();
+        return;
+    };
 }
 
 fn handleAckConfigure(

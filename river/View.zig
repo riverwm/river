@@ -84,6 +84,7 @@ borders: struct {
     top: *wlr.SceneRect,
     bottom: *wlr.SceneRect,
 },
+popup_tree: *wlr.SceneTree,
 
 /// This indicates that the view should be destroyed when the current
 /// transaction completes. See View.destroy()
@@ -126,8 +127,6 @@ pub fn init(self: *Self, output: *Output, tree: *wlr.SceneTree, impl: Impl) erro
         break :blk if (tags != 0) tags else output.current.tags;
     };
 
-    try SceneNodeData.attach(&tree.node, .{ .view = self });
-
     self.* = .{
         .impl = impl,
         .output = output,
@@ -138,9 +137,13 @@ pub fn init(self: *Self, output: *Output, tree: *wlr.SceneTree, impl: Impl) erro
             .top = try tree.createSceneRect(0, 0, &server.config.border_color_unfocused),
             .bottom = try tree.createSceneRect(0, 0, &server.config.border_color_unfocused),
         },
+        .popup_tree = try output.layers.popups.createSceneTree(),
         .current = .{ .tags = initial_tags },
         .pending = .{ .tags = initial_tags },
     };
+
+    try SceneNodeData.attach(&self.tree.node, .{ .view = self });
+    try SceneNodeData.attach(&self.popup_tree.node, .{ .view = self });
 }
 
 /// If saved buffers of the view are currently in use by a transaction,
@@ -211,6 +214,7 @@ pub fn updateCurrent(self: *Self) void {
 
     const box = &self.current.box;
     self.tree.node.setPosition(box.x, box.y);
+    self.popup_tree.node.setPosition(box.x, box.y);
 
     const border_width: c_int = config.border_width;
     self.borders.left.node.setPosition(-border_width, -border_width);
@@ -361,6 +365,13 @@ pub fn close(self: Self) void {
     }
 }
 
+pub fn destroyPopups(self: Self) void {
+    switch (self.impl) {
+        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.destroyPopups(),
+        .xwayland_view => {},
+    }
+}
+
 pub fn setActivated(self: Self, activated: bool) void {
     switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.setActivated(activated),
@@ -489,6 +500,7 @@ pub fn map(self: *Self) !void {
     log.debug("view '{?s}' mapped", .{self.getTitle()});
 
     self.tree.node.setEnabled(true);
+    self.popup_tree.node.setEnabled(true);
 
     server.xdg_activation.events.request_activate.add(&self.request_activate);
 
@@ -510,6 +522,7 @@ pub fn unmap(self: *Self) void {
     log.debug("view '{?s}' unmapped", .{self.getTitle()});
 
     self.tree.node.setEnabled(false);
+    self.popup_tree.node.setEnabled(false);
 
     if (self.saved_buffers.items.len == 0) self.saveBuffers();
 

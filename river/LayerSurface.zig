@@ -27,42 +27,52 @@ const util = @import("util.zig");
 
 const Output = @import("Output.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
+const XdgPopup = @import("XdgPopup.zig");
 
 const log = std.log.scoped(.layer_shell);
 
 output: *Output,
 scene_layer_surface: *wlr.SceneLayerSurfaceV1,
+popup_tree: *wlr.SceneTree,
 
 destroy: wl.Listener(*wlr.LayerSurfaceV1) = wl.Listener(*wlr.LayerSurfaceV1).init(handleDestroy),
 map: wl.Listener(*wlr.LayerSurfaceV1) = wl.Listener(*wlr.LayerSurfaceV1).init(handleMap),
 unmap: wl.Listener(*wlr.LayerSurfaceV1) = wl.Listener(*wlr.LayerSurfaceV1).init(handleUnmap),
 commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
+new_popup: wl.Listener(*wlr.XdgPopup) = wl.Listener(*wlr.XdgPopup).init(handleNewPopup),
 
 pub fn create(wlr_layer_surface: *wlr.LayerSurfaceV1) error{OutOfMemory}!void {
     const output = @intToPtr(*Output, wlr_layer_surface.output.?.data);
     const layer_surface = try util.gpa.create(LayerSurface);
     errdefer util.gpa.destroy(layer_surface);
 
-    const tree = output.layerSurfaceTree(wlr_layer_surface.current.layer);
-    const scene_layer_surface = try tree.createSceneLayerSurfaceV1(wlr_layer_surface);
-
-    try SceneNodeData.attach(&scene_layer_surface.tree.node, .{ .layer_surface = layer_surface });
+    const layer_tree = output.layerSurfaceTree(wlr_layer_surface.current.layer);
 
     layer_surface.* = .{
         .output = output,
-        .scene_layer_surface = scene_layer_surface,
+        .scene_layer_surface = try layer_tree.createSceneLayerSurfaceV1(wlr_layer_surface),
+        .popup_tree = try output.layers.popups.createSceneTree(),
     };
     wlr_layer_surface.data = @ptrToInt(layer_surface);
+
+    try SceneNodeData.attach(&layer_surface.scene_layer_surface.tree.node, .{ .layer_surface = layer_surface });
+    try SceneNodeData.attach(&layer_surface.popup_tree.node, .{ .layer_surface = layer_surface });
 
     wlr_layer_surface.events.destroy.add(&layer_surface.destroy);
     wlr_layer_surface.events.map.add(&layer_surface.map);
     wlr_layer_surface.events.unmap.add(&layer_surface.unmap);
     wlr_layer_surface.surface.events.commit.add(&layer_surface.commit);
+    wlr_layer_surface.events.new_popup.add(&layer_surface.new_popup);
 
     // wlroots only informs us of the new surface after the first commit,
     // so our listener does not get called for this first commit. However,
     // we do want our listener called in order to send the initial configure.
     handleCommit(&layer_surface.commit, wlr_layer_surface.surface);
+}
+
+pub fn destroyPopups(layer_surface: *LayerSurface) void {
+    var it = layer_surface.scene_layer_surface.layer_surface.popups.safeIterator(.forward);
+    while (it.next()) |wlr_xdg_popup| wlr_xdg_popup.destroy();
 }
 
 fn handleDestroy(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wlr.LayerSurfaceV1) void {
@@ -74,6 +84,8 @@ fn handleDestroy(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface:
     layer_surface.map.link.remove();
     layer_surface.unmap.link.remove();
     layer_surface.commit.link.remove();
+
+    layer_surface.destroyPopups();
 
     util.gpa.destroy(layer_surface);
 }
@@ -162,4 +174,18 @@ fn handleKeyboardInteractiveExclusive(output: *Output) void {
             }
         }
     }
+}
+
+fn handleNewPopup(listener: *wl.Listener(*wlr.XdgPopup), wlr_xdg_popup: *wlr.XdgPopup) void {
+    const layer_surface = @fieldParentPtr(LayerSurface, "new_popup", listener);
+
+    XdgPopup.create(
+        wlr_xdg_popup,
+        layer_surface.popup_tree,
+        layer_surface.popup_tree,
+        &layer_surface.output,
+    ) catch {
+        wlr_xdg_popup.resource.postNoMemory();
+        return;
+    };
 }

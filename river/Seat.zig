@@ -241,8 +241,12 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
         .view => |view| {
             view.pending.focus -= 1;
             if (view.pending.focus == 0) view.setActivated(false);
+            view.destroyPopups();
         },
-        .xwayland_override_redirect, .layer, .lock_surface, .none => {},
+        .layer => |layer_surface| {
+            layer_surface.destroyPopups();
+        },
+        .xwayland_override_redirect, .lock_surface, .none => {},
     }
 
     // Set the new focus

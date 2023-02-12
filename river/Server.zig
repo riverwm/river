@@ -100,7 +100,7 @@ pub fn init(self: *Self) !void {
     const compositor = try wlr.Compositor.create(self.wl_server, self.renderer);
     _ = try wlr.Subcompositor.create(self.wl_server);
 
-    self.xdg_shell = try wlr.XdgShell.create(self.wl_server, 2);
+    self.xdg_shell = try wlr.XdgShell.create(self.wl_server, 3);
     self.new_xdg_surface.setNotify(handleNewXdgSurface);
     self.xdg_shell.events.new_surface.add(&self.new_xdg_surface);
 
