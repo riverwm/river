@@ -81,6 +81,8 @@ pub fn create(output: *Output, xdg_toplevel: *wlr.XdgToplevel) error{OutOfMemory
     xdg_toplevel.base.events.map.add(&self.map);
     xdg_toplevel.base.events.unmap.add(&self.unmap);
     xdg_toplevel.base.events.new_popup.add(&self.new_popup);
+
+    _ = xdg_toplevel.setWmCapabilities(.{ .fullscreen = true });
 }
 
 /// Returns true if a configure must be sent to ensure that the pending
