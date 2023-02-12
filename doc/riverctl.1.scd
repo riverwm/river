@@ -31,6 +31,8 @@ over the Wayland protocol.
 *csd-filter-add* *app-id*|*title* _pattern_
 	Add _pattern_ to the CSD filter list. Views with this _pattern_ are told to
 	use client side decoration instead of the default server side decoration.
+	If first or last caracter in _pattern_ is asterisk, _pattern_ is matched
+	against end or beginning of view respectively.
 	Note that this affects new views as well as already existing ones. Title
 	updates are not taken into account.
 
@@ -42,9 +44,10 @@ over the Wayland protocol.
 	Exit the compositor, terminating the Wayland session.
 
 *float-filter-add* *app-id*|*title* _pattern_
-	Add a pattern to the float filter list. Note that this affects only new
-	views, not already existing ones. Title updates are also not taken into
-	account.
+	Add a pattern to the float filter list. If first or last caracter in _pattern_
+	is asterisk, _pattern_ is matched against end or beginning of view respectively.
+	Note that this affects only new views, not already existing ones. Title updates
+	are also not taken into account.
 
 *float-filter-remove* *app-id*|*title* _pattern_
 	Remove an app-id or title from the float filter list. Note that this

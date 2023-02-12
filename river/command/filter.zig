@@ -24,6 +24,7 @@ const util = @import("../util.zig");
 const View = @import("../View.zig");
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
+const Config = @import("../Config.zig");
 
 const FilterKind = enum {
     @"app-id",
@@ -143,5 +144,5 @@ fn viewMatchesPattern(kind: FilterKind, pattern: []const u8, view: *View) bool {
         .title => mem.span(view.getTitle()),
     } orelse return false;
 
-    return mem.eql(u8, pattern, p);
+    return Config.itemMatchesPattern(pattern, p);
 }

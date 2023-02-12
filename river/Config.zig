@@ -178,15 +178,24 @@ pub fn deinit(self: *Self) void {
     self.xkb_context.unref();
 }
 
+const FilterKind = enum {
+    @"app-id",
+    title,
+};
+const FilterEffect = enum {
+    float,
+    csd,
+};
+
 pub fn shouldFloat(self: Self, view: *View) bool {
     if (view.getAppId()) |app_id| {
-        if (self.float_filter_app_ids.contains(std.mem.span(app_id))) {
+        if (self.matchesFilterPattern(FilterKind.@"app-id", FilterEffect.float, std.mem.span(app_id))) {
             return true;
         }
     }
 
     if (view.getTitle()) |title| {
-        if (self.float_filter_titles.contains(std.mem.span(title))) {
+        if (self.matchesFilterPattern(FilterKind.title, FilterEffect.float, std.mem.span(title))) {
             return true;
         }
     }
@@ -196,16 +205,48 @@ pub fn shouldFloat(self: Self, view: *View) bool {
 
 pub fn csdAllowed(self: Self, view: *View) bool {
     if (view.getAppId()) |app_id| {
-        if (self.csd_filter_app_ids.contains(std.mem.span(app_id))) {
+        if (self.matchesFilterPattern(FilterKind.@"app-id", FilterEffect.csd, std.mem.span(app_id))) {
             return true;
         }
     }
 
     if (view.getTitle()) |title| {
-        if (self.csd_filter_titles.contains(std.mem.span(title))) {
+        if (self.matchesFilterPattern(FilterKind.title, FilterEffect.csd, std.mem.span(title))) {
             return true;
         }
     }
 
+    return false;
+}
+
+fn matchesFilterPattern(self: Self, kind: FilterKind, effect: FilterEffect, item: [:0]const u8) bool {
+    const filters = switch (effect) {
+        .float => switch (kind) {
+            .title => self.float_filter_titles,
+            .@"app-id" => self.float_filter_app_ids,
+        },
+        .csd => switch (kind) {
+            .title => self.csd_filter_titles,
+            .@"app-id" => self.csd_filter_app_ids,
+        },
+    };
+    var it = filters.keyIterator();
+    while (it.next()) |f| {
+        if (itemMatchesPattern(std.mem.span(f.*), item)) return true;
+    }
+    return false;
+}
+
+pub fn itemMatchesPattern(fltr: []const u8, item: [:0]const u8) bool {
+    if (fltr[0] == '*') {
+        if (fltr.len - 1 > item.len) return false;
+        if (fltr.len == 1) return true;
+        if (std.mem.eql(u8, fltr[1 .. fltr.len - 1], item[item.len - (fltr.len - 1) .. item.len - 1])) return true;
+    } else if (fltr[fltr.len - 1] == '*') {
+        if (fltr.len - 1 > item.len) return false;
+        if (std.mem.eql(u8, fltr[0 .. fltr.len - 1], item[0 .. fltr.len - 1])) return true;
+    } else {
+        if (std.mem.eql(u8, fltr, item)) return true;
+    }
     return false;
 }
