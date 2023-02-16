@@ -31,6 +31,7 @@ const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Config = @import("Config.zig");
+const DragIcon = @import("DragIcon.zig");
 const LayerSurface = @import("LayerSurface.zig");
 const LockSurface = @import("LockSurface.zig");
 const Output = @import("Output.zig");
@@ -523,6 +524,8 @@ fn handleTouchMotion(
         log.err("out of memory", .{});
     };
 
+    self.updateDragIcons();
+
     if (server.root.at(lx, ly)) |result| {
         self.seat.wlr_seat.touchNotifyMotion(event.time_msec, event.touch_id, result.sx, result.sy);
     }
@@ -721,6 +724,7 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
         unaccel_dx,
         unaccel_dy,
     );
+
     var dx: f64 = delta_x;
     var dy: f64 = delta_y;
     switch (self.mode) {
@@ -728,6 +732,7 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
             self.wlr_cursor.move(device, dx, dy);
             self.checkFocusFollowsCursor();
             self.passthrough(time);
+            self.updateDragIcons();
         },
         .down => |down| {
             self.wlr_cursor.move(device, dx, dy);
@@ -736,6 +741,7 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
                 down.sx + (self.wlr_cursor.x - down.lx),
                 down.sy + (self.wlr_cursor.y - down.ly),
             );
+            self.updateDragIcons();
         },
         .move => |*data| {
             dx += data.delta_x;
@@ -930,6 +936,33 @@ fn warp(self: *Self) void {
         const ly = @intToFloat(f64, target_box.y + @divTrunc(target_box.height, 2));
         if (!self.wlr_cursor.warp(null, lx, ly)) {
             log.err("failed to warp cursor on focus change", .{});
+        }
+    }
+}
+
+fn updateDragIcons(self: *Self) void {
+    var it = server.root.layers.drag_icons.children.iterator(.forward);
+    while (it.next()) |node| {
+        const icon = @intToPtr(*DragIcon, node.data);
+
+        if (icon.wlr_drag_icon.drag.seat != self.seat.wlr_seat) continue;
+
+        switch (icon.wlr_drag_icon.drag.grab_type) {
+            .keyboard => unreachable,
+            .keyboard_pointer => {
+                icon.tree.node.setPosition(
+                    @floatToInt(c_int, self.wlr_cursor.x),
+                    @floatToInt(c_int, self.wlr_cursor.y),
+                );
+            },
+            .keyboard_touch => {
+                const touch_id = icon.wlr_drag_icon.drag.touch_id;
+                const point = self.touch_points.get(touch_id) orelse continue;
+                icon.tree.node.setPosition(
+                    @floatToInt(c_int, point.lx),
+                    @floatToInt(c_int, point.ly),
+                );
+            },
         }
     }
 }

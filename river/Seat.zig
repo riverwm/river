@@ -92,7 +92,6 @@ drag: enum {
     pointer,
     touch,
 } = .none,
-drag_icon: ?*DragIcon = null,
 
 request_set_selection: wl.Listener(*wlr.Seat.event.RequestSetSelection) =
     wl.Listener(*wlr.Seat.event.RequestSetSelection).init(handleRequestSetSelection),
@@ -573,13 +572,11 @@ fn handleStartDrag(listener: *wl.Listener(*wlr.Drag), wlr_drag: *wlr.Drag) void 
     wlr_drag.events.destroy.add(&self.drag_destroy);
 
     if (wlr_drag.icon) |wlr_drag_icon| {
-        const drag_icon = util.gpa.create(DragIcon) catch {
+        DragIcon.create(wlr_drag_icon) catch {
             log.err("out of memory", .{});
             wlr_drag.seat_client.client.postNoMemory();
             return;
         };
-        drag_icon.init(self, wlr_drag_icon);
-        self.drag_icon = drag_icon;
     }
 }
 

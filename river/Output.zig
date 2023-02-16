@@ -68,6 +68,7 @@ tree: *wlr.SceneTree,
 normal_content: *wlr.SceneTree,
 locked_content: *wlr.SceneTree,
 
+/// Child nodes of normal_content
 layers: struct {
     background_color_rect: *wlr.SceneRect,
     /// Background layer shell layer
@@ -82,7 +83,7 @@ layers: struct {
     fullscreen: *wlr.SceneTree,
     /// Overlay layer shell layer
     overlay: *wlr.SceneTree,
-    /// Xdg popups, Xwayland override redirect windows
+    /// xdg-popups of views and layer-shell surfaces
     popups: *wlr.SceneTree,
 },
 
@@ -166,7 +167,7 @@ pub fn create(wlr_output: *wlr.Output) !void {
     var height: c_int = undefined;
     wlr_output.effectiveResolution(&width, &height);
 
-    const tree = try server.root.scene.tree.createSceneTree();
+    const tree = try server.root.layers.outputs.createSceneTree();
     const normal_content = try tree.createSceneTree();
 
     self.* = .{

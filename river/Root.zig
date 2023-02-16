@@ -37,6 +37,16 @@ const ViewStack = @import("view_stack.zig").ViewStack;
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
 scene: *wlr.Scene,
+/// All direct children of the root scene node
+layers: struct {
+    /// Parent tree for output trees which have their position updated when
+    /// outputs are moved in the layout.
+    outputs: *wlr.SceneTree,
+    /// Drag icons which have a position in layout coordinates that is updated
+    /// on cursor/touch point movement.
+    /// This tree is ignored by Root.at()
+    drag_icons: *wlr.SceneTree,
+},
 
 new_output: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleNewOutput),
 
@@ -94,12 +104,19 @@ pub fn init(self: *Self) !void {
     const transaction_timer = try event_loop.addTimer(*Self, handleTransactionTimeout, self);
     errdefer transaction_timer.remove();
 
+    const outputs = try scene.tree.createSceneTree();
+
     // TODO get rid of this hack somehow
     const noop_wlr_output = try server.headless_backend.headlessAddOutput(1920, 1080);
-    const noop_tree = try scene.tree.createSceneTree();
+    const noop_tree = try outputs.createSceneTree();
     noop_tree.node.setEnabled(false);
+
     self.* = .{
         .scene = scene,
+        .layers = .{
+            .outputs = outputs,
+            .drag_icons = try scene.tree.createSceneTree(),
+        },
         .output_layout = output_layout,
         .output_manager = try wlr.OutputManagerV1.create(server.wl_server),
         .power_manager = try wlr.OutputPowerManagerV1.create(server.wl_server),
@@ -153,11 +170,12 @@ pub const AtResult = struct {
     },
 };
 
-/// Return information about what is currently rendered at the given layout coordinates.
+/// Return information about what is currently rendered in the Root.layers.outputs
+/// tree at the given layout coordinates.
 pub fn at(self: Self, lx: f64, ly: f64) ?AtResult {
     var sx: f64 = undefined;
     var sy: f64 = undefined;
-    const node_at = self.scene.tree.node.at(lx, ly, &sx, &sy) orelse return null;
+    const node_at = self.layers.outputs.node.at(lx, ly, &sx, &sy) orelse return null;
 
     const surface: ?*wlr.Surface = blk: {
         if (node_at.type == .buffer) {
