@@ -37,15 +37,20 @@ const ViewStack = @import("view_stack.zig").ViewStack;
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
 scene: *wlr.Scene,
-/// All direct children of the root scene node
+/// All windows, status bars, drowdown menus, etc. that can recieve pointer events and similar.
+interactive_content: *wlr.SceneTree,
+/// Drag icons, which cannot recieve e.g. pointer events and are therefore kept in a separate tree.
+drag_icons: *wlr.SceneTree,
+
+/// All direct children of the interactive_content scene node
 layers: struct {
     /// Parent tree for output trees which have their position updated when
     /// outputs are moved in the layout.
     outputs: *wlr.SceneTree,
-    /// Drag icons which have a position in layout coordinates that is updated
-    /// on cursor/touch point movement.
-    /// This tree is ignored by Root.at()
-    drag_icons: *wlr.SceneTree,
+    /// Xwayland override redirect windows are a legacy wart that decide where
+    /// to place themselves in layout coordinates. Unfortunately this is how
+    /// X11 decided to make dropdown menus and the like possible.
+    xwayland_override_redirect: if (build_options.xwayland) *wlr.SceneTree else void,
 },
 
 new_output: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleNewOutput),
@@ -73,14 +78,6 @@ outputs: std.TailQueue(Output) = .{},
 /// It is not advertised to clients.
 noop_output: Output = undefined,
 
-/// This list stores all "override redirect" Xwayland windows. This needs to be in root
-/// since X is like the wild west and who knows where these things will place themselves.
-xwayland_override_redirect_views: if (build_options.xwayland)
-    std.TailQueue(XwaylandOverrideRedirect)
-else
-    void = if (build_options.xwayland)
-.{},
-
 /// Number of layout demands pending before the transaction may be started.
 pending_layout_demands: u32 = 0,
 /// Number of pending configures sent in the current transaction.
@@ -96,6 +93,12 @@ pub fn init(self: *Self) !void {
     const scene = try wlr.Scene.create();
     errdefer scene.tree.node.destroy();
 
+    const interactive_content = try scene.tree.createSceneTree();
+    const drag_icons = try scene.tree.createSceneTree();
+
+    const outputs = try interactive_content.createSceneTree();
+    const xwayland_override_redirect = if (build_options.xwayland) try interactive_content.createSceneTree();
+
     try scene.attachOutputLayout(output_layout);
 
     _ = try wlr.XdgOutputManagerV1.create(server.wl_server, output_layout);
@@ -104,8 +107,6 @@ pub fn init(self: *Self) !void {
     const transaction_timer = try event_loop.addTimer(*Self, handleTransactionTimeout, self);
     errdefer transaction_timer.remove();
 
-    const outputs = try scene.tree.createSceneTree();
-
     // TODO get rid of this hack somehow
     const noop_wlr_output = try server.headless_backend.headlessAddOutput(1920, 1080);
     const noop_tree = try outputs.createSceneTree();
@@ -113,9 +114,11 @@ pub fn init(self: *Self) !void {
 
     self.* = .{
         .scene = scene,
+        .interactive_content = interactive_content,
+        .drag_icons = drag_icons,
         .layers = .{
             .outputs = outputs,
-            .drag_icons = try scene.tree.createSceneTree(),
+            .xwayland_override_redirect = xwayland_override_redirect,
         },
         .output_layout = output_layout,
         .output_manager = try wlr.OutputManagerV1.create(server.wl_server),
@@ -170,12 +173,12 @@ pub const AtResult = struct {
     },
 };
 
-/// Return information about what is currently rendered in the Root.layers.outputs
-/// tree at the given layout coordinates.
+/// Return information about what is currently rendered in the interactive_content
+/// tree at the given layout coordinates, taking surface input regions into account.
 pub fn at(self: Self, lx: f64, ly: f64) ?AtResult {
     var sx: f64 = undefined;
     var sy: f64 = undefined;
-    const node_at = self.layers.outputs.node.at(lx, ly, &sx, &sy) orelse return null;
+    const node_at = self.interactive_content.node.at(lx, ly, &sx, &sy) orelse return null;
 
     const surface: ?*wlr.Surface = blk: {
         if (node_at.type == .buffer) {
@@ -199,6 +202,9 @@ pub fn at(self: Self, lx: f64, ly: f64) ?AtResult {
                         .view => |view| .{ .view = view },
                         .layer_surface => |layer_surface| .{ .layer_surface = layer_surface },
                         .lock_surface => |lock_surface| .{ .lock_surface = lock_surface },
+                        .xwayland_override_redirect => |xwayland_override_redirect| .{
+                            .xwayland_override_redirect = xwayland_override_redirect,
+                        },
                     },
                 };
             }

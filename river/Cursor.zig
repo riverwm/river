@@ -941,7 +941,7 @@ fn warp(self: *Self) void {
 }
 
 fn updateDragIcons(self: *Self) void {
-    var it = server.root.layers.drag_icons.children.iterator(.forward);
+    var it = server.root.drag_icons.children.iterator(.forward);
     while (it.next()) |node| {
         const icon = @intToPtr(*DragIcon, node.data);
 

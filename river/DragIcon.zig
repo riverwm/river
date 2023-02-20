@@ -36,7 +36,7 @@ unmap: wl.Listener(*wlr.Drag.Icon) = wl.Listener(*wlr.Drag.Icon).init(handleUnma
 commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
 
 pub fn create(wlr_drag_icon: *wlr.Drag.Icon) error{OutOfMemory}!void {
-    const tree = try server.root.layers.drag_icons.createSceneTree();
+    const tree = try server.root.drag_icons.createSceneTree();
     errdefer tree.node.destroy();
 
     const drag_icon = try util.gpa.create(DragIcon);

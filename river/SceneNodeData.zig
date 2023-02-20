@@ -25,11 +25,13 @@ const util = @import("util.zig");
 const LayerSurface = @import("LayerSurface.zig");
 const LockSurface = @import("LockSurface.zig");
 const View = @import("View.zig");
+const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
 const Data = union(enum) {
     view: *View,
     lock_surface: *LockSurface,
     layer_surface: *LayerSurface,
+    xwayland_override_redirect: if (build_options.xwayland) *XwaylandOverrideRedirect else noreturn,
 };
 
 node: *wlr.SceneNode,

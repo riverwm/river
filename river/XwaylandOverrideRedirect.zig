@@ -25,41 +25,42 @@ const wl = @import("wayland").server.wl;
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
+const SceneNodeData = @import("SceneNodeData.zig");
 const View = @import("View.zig");
-const XwaylandView = @import("XwaylandView.zig");
 const ViewStack = @import("view_stack.zig").ViewStack;
+const XwaylandView = @import("XwaylandView.zig");
 
 const log = std.log.scoped(.xwayland);
 
-/// The corresponding wlroots object
 xwayland_surface: *wlr.XwaylandSurface,
+surface_tree: ?*wlr.SceneTree = null,
 
-// Listeners that are always active over the view's lifetime
 request_configure: wl.Listener(*wlr.XwaylandSurface.event.Configure) =
     wl.Listener(*wlr.XwaylandSurface.event.Configure).init(handleRequestConfigure),
 destroy: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleDestroy),
 map: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleMap),
 unmap: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleUnmap),
+set_geometry: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleSetGeometry),
 set_override_redirect: wl.Listener(*wlr.XwaylandSurface) =
     wl.Listener(*wlr.XwaylandSurface).init(handleSetOverrideRedirect),
 
-/// The override redirect surface will add itself to the list in Root when it is mapped.
-pub fn create(xwayland_surface: *wlr.XwaylandSurface) error{OutOfMemory}!*Self {
-    const node = try util.gpa.create(std.TailQueue(Self).Node);
-    const self = &node.data;
+pub fn create(xwayland_surface: *wlr.XwaylandSurface) error{OutOfMemory}!void {
+    const self = try util.gpa.create(Self);
+    errdefer util.gpa.destroy(self);
 
     self.* = .{ .xwayland_surface = xwayland_surface };
     // This must be set to 0 for usage in View.fromWlrSurface()
     xwayland_surface.data = 0;
 
-    // Add listeners that are active over the the entire lifetime
     xwayland_surface.events.request_configure.add(&self.request_configure);
     xwayland_surface.events.destroy.add(&self.destroy);
     xwayland_surface.events.map.add(&self.map);
     xwayland_surface.events.unmap.add(&self.unmap);
     xwayland_surface.events.set_override_redirect.add(&self.set_override_redirect);
 
-    return self;
+    if (xwayland_surface.mapped) {
+        handleMap(&self.map, xwayland_surface);
+    }
 }
 
 fn handleRequestConfigure(
@@ -69,28 +70,36 @@ fn handleRequestConfigure(
     event.surface.configure(event.x, event.y, event.width, event.height);
 }
 
-/// Called when the xwayland surface is destroyed
 fn handleDestroy(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
 
-    // Remove listeners that are active for the entire lifetime
     self.request_configure.link.remove();
     self.destroy.link.remove();
     self.map.link.remove();
     self.unmap.link.remove();
     self.set_override_redirect.link.remove();
 
-    // Deallocate the node
-    const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-    util.gpa.destroy(node);
+    util.gpa.destroy(self);
 }
 
-/// Called when the xwayland surface is mapped, or ready to display on-screen.
 pub fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "map", listener);
 
-    const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-    server.root.xwayland_override_redirect_views.prepend(node);
+    self.mapImpl() catch {
+        log.err("out of memory", .{});
+        self.xwayland_surface.surface.?.resource.getClient().postNoMemory();
+    };
+}
+
+fn mapImpl(self: *Self) error{OutOfMemory}!void {
+    self.surface_tree = try server.root.layers.xwayland_override_redirect.createSceneSubsurfaceTree(
+        self.xwayland_surface.surface.?,
+    );
+    try SceneNodeData.attach(&self.surface_tree.?.node, .{ .xwayland_override_redirect = self });
+
+    self.surface_tree.?.node.setPosition(self.xwayland_surface.x, self.xwayland_surface.y);
+
+    self.xwayland_surface.events.set_geometry.add(&self.set_geometry);
 
     self.focusIfDesired();
 }
@@ -117,12 +126,13 @@ pub fn focusIfDesired(self: *Self) void {
     }
 }
 
-/// Called when the surface is unmapped and will no longer be displayed.
 fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "unmap", listener);
 
-    const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-    server.root.xwayland_override_redirect_views.remove(node);
+    self.set_geometry.link.remove();
+
+    self.surface_tree.?.node.destroy();
+    self.surface_tree = null;
 
     // If the unmapped surface is currently focused, pass keyboard focus
     // to the most appropriate surface.
@@ -144,6 +154,12 @@ fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSur
     server.root.startTransaction();
 }
 
+fn handleSetGeometry(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
+    const self = @fieldParentPtr(Self, "set_geometry", listener);
+
+    self.surface_tree.?.node.setPosition(self.xwayland_surface.x, self.xwayland_surface.y);
+}
+
 fn handleSetOverrideRedirect(
     listener: *wl.Listener(*wlr.XwaylandSurface),
     xwayland_surface: *wlr.XwaylandSurface,
@@ -158,12 +174,8 @@ fn handleSetOverrideRedirect(
     handleDestroy(&self.destroy, xwayland_surface);
 
     const output = server.input_manager.defaultSeat().focused_output;
-    const xwayland_view = XwaylandView.create(output, xwayland_surface) catch {
+    XwaylandView.create(output, xwayland_surface) catch {
         log.err("out of memory", .{});
         return;
     };
-
-    if (xwayland_surface.mapped) {
-        XwaylandView.handleMap(&xwayland_view.map, xwayland_surface);
-    }
 }

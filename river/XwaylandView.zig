@@ -36,8 +36,9 @@ const log = std.log.scoped(.xwayland);
 /// The view this xwayland view implements
 view: *View,
 
-/// The corresponding wlroots object
 xwayland_surface: *wlr.XwaylandSurface,
+/// Created on map and destroyed on unmap
+surface_tree: ?*wlr.SceneTree = null,
 
 /// The wlroots Xwayland implementation overwrites xwayland_surface.fullscreen
 /// immediately when the client requests it, so we track this state here to be
@@ -62,8 +63,7 @@ request_fullscreen: wl.Listener(*wlr.XwaylandSurface) =
 request_minimize: wl.Listener(*wlr.XwaylandSurface.event.Minimize) =
     wl.Listener(*wlr.XwaylandSurface.event.Minimize).init(handleRequestMinimize),
 
-/// The View will add itself to the output's view stack on map
-pub fn create(output: *Output, xwayland_surface: *wlr.XwaylandSurface) error{OutOfMemory}!*Self {
+pub fn create(output: *Output, xwayland_surface: *wlr.XwaylandSurface) error{OutOfMemory}!void {
     const node = try util.gpa.create(ViewStack(View).Node);
     const view = &node.view;
 
@@ -84,7 +84,9 @@ pub fn create(output: *Output, xwayland_surface: *wlr.XwaylandSurface) error{Out
     xwayland_surface.events.request_configure.add(&self.request_configure);
     xwayland_surface.events.set_override_redirect.add(&self.set_override_redirect);
 
-    return self;
+    if (xwayland_surface.mapped) {
+        handleMap(&self.map, xwayland_surface);
+    }
 }
 
 pub fn needsConfigure(self: Self) bool {
@@ -181,7 +183,6 @@ fn handleDestroy(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandS
     self.view.destroy();
 }
 
-/// Called when the xwayland surface is mapped, or ready to display on-screen.
 pub fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "map", listener);
     const view = self.view;
@@ -194,12 +195,13 @@ pub fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface:
     xwayland_surface.events.request_fullscreen.add(&self.request_fullscreen);
     xwayland_surface.events.request_minimize.add(&self.request_minimize);
 
-    const surface_tree = view.tree.createSceneSubsurfaceTree(surface) catch {
+    self.surface_tree = view.tree.createSceneSubsurfaceTree(surface) catch {
         log.err("out of memory", .{});
         surface.resource.getClient().postNoMemory();
         return;
     };
-    surface_tree.node.lowerToBottom();
+    // Place the node below the view's border nodes
+    self.surface_tree.?.node.lowerToBottom();
 
     // Use the view's "natural" size centered on the output as the default
     // floating dimensions
@@ -231,9 +233,11 @@ pub fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface:
     };
 }
 
-/// Called when the surface is unmapped and will no longer be displayed.
 fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "unmap", listener);
+
+    self.surface_tree.?.node.destroy();
+    self.surface_tree = null;
 
     // Remove listeners that are only active while mapped
     self.commit.link.remove();
@@ -278,14 +282,10 @@ fn handleSetOverrideRedirect(
     if (xwayland_surface.mapped) handleUnmap(&self.unmap, xwayland_surface);
     handleDestroy(&self.destroy, xwayland_surface);
 
-    const override_redirect = XwaylandOverrideRedirect.create(xwayland_surface) catch {
+    XwaylandOverrideRedirect.create(xwayland_surface) catch {
         log.err("out of memory", .{});
         return;
     };
-
-    if (xwayland_surface.mapped) {
-        XwaylandOverrideRedirect.handleMap(&override_redirect.map, xwayland_surface);
-    }
 }
 
 fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) void {
