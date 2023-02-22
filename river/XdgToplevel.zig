@@ -32,11 +32,12 @@ const ViewStack = @import("view_stack.zig").ViewStack;
 
 const log = std.log.scoped(.xdg_shell);
 
-/// The view this xdg toplevel implements
+/// TODO(zig): get rid of this and use @fieldParentPtr(), https://github.com/ziglang/zig/issues/6611
 view: *View,
 
-/// The corresponding wlroots object
 xdg_toplevel: *wlr.XdgToplevel,
+
+geometry: wlr.Box,
 
 /// Set to true when the client acks the configure with serial View.pending_serial.
 acked_pending_serial: bool = false,
@@ -59,19 +60,18 @@ request_resize: wl.Listener(*wlr.XdgToplevel.event.Resize) =
 set_title: wl.Listener(void) = wl.Listener(void).init(handleSetTitle),
 set_app_id: wl.Listener(void) = wl.Listener(void).init(handleSetAppId),
 
-/// The View will add itself to the output's view stack on map
 pub fn create(output: *Output, xdg_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
-    const node = try util.gpa.create(ViewStack(View).Node);
-    errdefer util.gpa.destroy(node);
-    const view = &node.view;
-
-    const tree = try output.layers.views.createSceneTree();
-    _ = try tree.createSceneXdgSurface(xdg_toplevel.base);
-
-    try view.init(output, tree, .{ .xdg_toplevel = .{
-        .view = view,
+    const view = try View.create(output, .{ .xdg_toplevel = .{
+        .view = undefined,
         .xdg_toplevel = xdg_toplevel,
+        .geometry = undefined,
     } });
+    errdefer view.destroy();
+
+    view.impl.xdg_toplevel.view = view;
+    xdg_toplevel.base.getGeometry(&view.impl.xdg_toplevel.geometry);
+
+    _ = try view.surface_tree.createSceneXdgSurface(xdg_toplevel.base);
 
     xdg_toplevel.base.data = @ptrToInt(view);
 
@@ -273,14 +273,14 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     const self = @fieldParentPtr(Self, "commit", listener);
     const view = self.view;
 
-    var new_box: wlr.Box = undefined;
-    self.xdg_toplevel.base.getGeometry(&new_box);
+    var new_geometry: wlr.Box = undefined;
+    self.xdg_toplevel.base.getGeometry(&new_geometry);
+
+    const size_changed = !std.meta.eql(self.geometry, new_geometry);
+    self.geometry = new_geometry;
 
     // If we have sent a configure changing the size
     if (view.pending_serial != null) {
-        // Update the stored dimensions of the surface
-        view.surface_box = new_box;
-
         if (self.acked_pending_serial) {
             // If this commit is in response to our configure and the
             // transaction code is tracking this configure, notify it.
@@ -307,16 +307,12 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
             // stashed buffer from when the transaction started.
             view.sendFrameDone();
         }
-    } else {
-        const size_changed = !std.meta.eql(view.surface_box, new_box);
-        view.surface_box = new_box;
+    } else if ((self.view.pending.float or self.view.output.pending.layout == null) and size_changed) {
         // If the client has decided to resize itself and the view is floating,
         // then respect that resize.
-        if ((self.view.pending.float or self.view.output.pending.layout == null) and size_changed) {
-            view.pending.box.width = new_box.width;
-            view.pending.box.height = new_box.height;
-            view.applyPending();
-        }
+        view.pending.box.width = new_geometry.width;
+        view.pending.box.height = new_geometry.height;
+        view.applyPending();
     }
 }
 

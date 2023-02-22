@@ -63,14 +63,6 @@ const State = struct {
     urgent: bool = false,
 };
 
-const SavedBuffer = struct {
-    client_buffer: *wlr.ClientBuffer,
-    /// x/y relative to the root surface in the surface tree.
-    surface_box: wlr.Box,
-    source_box: wlr.FBox,
-    transform: wl.Output.Transform,
-};
-
 /// The implementation of this view
 impl: Impl,
 
@@ -78,6 +70,8 @@ impl: Impl,
 output: *Output,
 
 tree: *wlr.SceneTree,
+surface_tree: *wlr.SceneTree,
+saved_surface_tree: *wlr.SceneTree,
 borders: struct {
     left: *wlr.SceneRect,
     right: *wlr.SceneRect,
@@ -97,17 +91,6 @@ pending: State,
 /// The serial sent with the currently pending configure event
 pending_serial: ?u32 = null,
 
-/// The currently commited geometry of the surface. The x/y may be negative if
-/// for example the client has decided to draw CSD shadows a la GTK.
-surface_box: wlr.Box = undefined,
-
-/// The geometry the view's surface had when the transaction started and
-/// buffers were saved.
-saved_surface_box: wlr.Box = undefined,
-
-/// These are what we render while a transaction is in progress
-saved_buffers: std.ArrayListUnmanaged(SavedBuffer) = .{},
-
 /// The floating dimensions the view, saved so that they can be restored if the
 /// view returns to floating mode.
 float_box: wlr.Box = undefined,
@@ -121,29 +104,45 @@ draw_borders: bool = true,
 request_activate: wl.Listener(*wlr.XdgActivationV1.event.RequestActivate) =
     wl.Listener(*wlr.XdgActivationV1.event.RequestActivate).init(handleRequestActivate),
 
-pub fn init(self: *Self, output: *Output, tree: *wlr.SceneTree, impl: Impl) error{OutOfMemory}!void {
+pub fn create(output: *Output, impl: Impl) error{OutOfMemory}!*Self {
+    const node = try util.gpa.create(ViewStack(Self).Node);
+    errdefer util.gpa.destroy(node);
+    const self = &node.view;
+
     const initial_tags = blk: {
         const tags = output.current.tags & server.config.spawn_tagmask;
         break :blk if (tags != 0) tags else output.current.tags;
     };
 
+    const tree = try output.layers.views.createSceneTree();
+    errdefer tree.node.destroy();
+
+    const popup_tree = try output.layers.popups.createSceneTree();
+    errdefer popup_tree.node.destroy();
+
     self.* = .{
         .impl = impl,
         .output = output,
         .tree = tree,
+        .surface_tree = try tree.createSceneTree(),
+        .saved_surface_tree = try tree.createSceneTree(),
         .borders = .{
             .left = try tree.createSceneRect(0, 0, &server.config.border_color_unfocused),
             .right = try tree.createSceneRect(0, 0, &server.config.border_color_unfocused),
             .top = try tree.createSceneRect(0, 0, &server.config.border_color_unfocused),
             .bottom = try tree.createSceneRect(0, 0, &server.config.border_color_unfocused),
         },
-        .popup_tree = try output.layers.popups.createSceneTree(),
+        .popup_tree = popup_tree,
         .current = .{ .tags = initial_tags },
         .pending = .{ .tags = initial_tags },
     };
 
+    self.saved_surface_tree.node.setEnabled(false);
+
     try SceneNodeData.attach(&self.tree.node, .{ .view = self });
     try SceneNodeData.attach(&self.popup_tree.node, .{ .view = self });
+
+    return self;
 }
 
 /// If saved buffers of the view are currently in use by a transaction,
@@ -155,8 +154,9 @@ pub fn destroy(self: *Self) void {
     // If there are still saved buffers, then this view needs to be kept
     // around until the current transaction completes. This function will be
     // called again in Root.commitTransaction()
-    if (self.saved_buffers.items.len == 0) {
-        self.saved_buffers.deinit(util.gpa);
+    if (!self.saved_surface_tree.node.enabled) {
+        self.tree.node.destroy();
+        self.popup_tree.node.destroy();
 
         const node = @fieldParentPtr(ViewStack(Self).Node, "view", self);
         util.gpa.destroy(node);
@@ -204,7 +204,7 @@ pub fn updateCurrent(self: *Self) void {
     const config = &server.config;
 
     self.current = self.pending;
-    self.dropSavedBuffers();
+    if (self.saved_surface_tree.node.enabled) self.dropSavedSurfaceTree();
 
     const color = blk: {
         if (self.current.urgent) break :blk &config.border_color_urgent;
@@ -274,39 +274,40 @@ pub fn sendFrameDone(self: Self) void {
     self.rootSurface().sendFrameDone(&now);
 }
 
-pub fn dropSavedBuffers(self: *Self) void {
-    for (self.saved_buffers.items) |buffer| buffer.client_buffer.base.unlock();
-    self.saved_buffers.items.len = 0;
+pub fn dropSavedSurfaceTree(self: *Self) void {
+    assert(self.saved_surface_tree.node.enabled);
+
+    var it = self.saved_surface_tree.children.safeIterator(.forward);
+    while (it.next()) |node| node.destroy();
+
+    self.saved_surface_tree.node.setEnabled(false);
+    self.surface_tree.node.setEnabled(true);
 }
 
-pub fn saveBuffers(self: *Self) void {
-    assert(self.saved_buffers.items.len == 0);
-    self.saved_surface_box = self.surface_box;
-    self.forEachSurface(*std.ArrayListUnmanaged(SavedBuffer), saveBuffersIterator, &self.saved_buffers);
+pub fn saveSurfaceTree(self: *Self) void {
+    assert(!self.saved_surface_tree.node.enabled);
+    assert(self.saved_surface_tree.children.empty());
+
+    self.surface_tree.node.forEachBuffer(*wlr.SceneTree, saveSurfaceTreeIter, self.saved_surface_tree);
+
+    self.surface_tree.node.setEnabled(false);
+    self.saved_surface_tree.node.setEnabled(true);
 }
 
-fn saveBuffersIterator(
-    surface: *wlr.Surface,
-    surface_x: c_int,
-    surface_y: c_int,
-    saved_buffers: *std.ArrayListUnmanaged(SavedBuffer),
+fn saveSurfaceTreeIter(
+    buffer: *wlr.SceneBuffer,
+    sx: c_int,
+    sy: c_int,
+    saved_surface_tree: *wlr.SceneTree,
 ) void {
-    if (surface.buffer) |buffer| {
-        var source_box: wlr.FBox = undefined;
-        surface.getBufferSourceBox(&source_box);
-        saved_buffers.append(util.gpa, .{
-            .client_buffer = buffer,
-            .surface_box = .{
-                .x = surface_x,
-                .y = surface_y,
-                .width = surface.current.width,
-                .height = surface.current.height,
-            },
-            .source_box = source_box,
-            .transform = surface.current.transform,
-        }) catch return;
-        _ = buffer.base.lock();
-    }
+    const saved = saved_surface_tree.createSceneBuffer(buffer.buffer) catch {
+        log.err("out of memory", .{});
+        return;
+    };
+    saved.node.setPosition(sx, sy);
+    saved.setDestSize(buffer.dst_width, buffer.dst_height);
+    saved.setSourceBox(&buffer.src_box);
+    saved.setTransform(buffer.transform);
 }
 
 /// Move a view from one output to another, sending the required enter/leave
@@ -524,7 +525,7 @@ pub fn unmap(self: *Self) void {
     self.tree.node.setEnabled(false);
     self.popup_tree.node.setEnabled(false);
 
-    if (self.saved_buffers.items.len == 0) self.saveBuffers();
+    if (!self.saved_surface_tree.node.enabled) self.saveSurfaceTree();
 
     // Inform all seats that the view has been unmapped so they can handle focus
     var it = server.input_manager.seats.first;

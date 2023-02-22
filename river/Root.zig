@@ -393,9 +393,9 @@ pub fn startTransaction(self: *Self) void {
                     view.sendFrameDone();
                 }
 
-                // If there are saved buffers present, then this transaction is interrupting
-                // a previous transaction and we should keep the old buffers.
-                if (view.saved_buffers.items.len == 0) view.saveBuffers();
+                // If the saved surface tree is enabled, then this transaction is interrupting
+                // a previous transaction and we should keep the old surface tree.
+                if (!view.saved_surface_tree.node.enabled) view.saveSurfaceTree();
             } else {
                 if (view.needsConfigure()) view.configure();
             }
@@ -473,7 +473,7 @@ fn commitTransaction(self: *Self) void {
             view_it = view_node.next;
 
             if (!view.tree.node.enabled) {
-                view.dropSavedBuffers();
+                view.dropSavedSurfaceTree();
                 view.output.views.remove(view_node);
                 if (view.destroying) view.destroy();
                 continue;

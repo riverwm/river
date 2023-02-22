@@ -33,7 +33,7 @@ const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
 const log = std.log.scoped(.xwayland);
 
-/// The view this xwayland view implements
+/// TODO(zig): get rid of this and use @fieldParentPtr(), https://github.com/ziglang/zig/issues/6611
 view: *View,
 
 xwayland_surface: *wlr.XwaylandSurface,
@@ -55,7 +55,6 @@ set_override_redirect: wl.Listener(*wlr.XwaylandSurface) =
     wl.Listener(*wlr.XwaylandSurface).init(handleSetOverrideRedirect),
 
 // Listeners that are only active while the view is mapped
-commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
 set_title: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleSetTitle),
 set_class: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleSetClass),
 request_fullscreen: wl.Listener(*wlr.XwaylandSurface) =
@@ -64,17 +63,14 @@ request_minimize: wl.Listener(*wlr.XwaylandSurface.event.Minimize) =
     wl.Listener(*wlr.XwaylandSurface.event.Minimize).init(handleRequestMinimize),
 
 pub fn create(output: *Output, xwayland_surface: *wlr.XwaylandSurface) error{OutOfMemory}!void {
-    const node = try util.gpa.create(ViewStack(View).Node);
-    const view = &node.view;
-
-    const tree = try output.layers.views.createSceneTree();
-
-    try view.init(output, tree, .{ .xwayland_view = .{
-        .view = view,
+    const view = try View.create(output, .{ .xwayland_view = .{
+        .view = undefined,
         .xwayland_surface = xwayland_surface,
     } });
+    errdefer view.destroy();
 
-    const self = &node.view.impl.xwayland_view;
+    const self = &view.impl.xwayland_view;
+    self.view = view;
     xwayland_surface.data = @ptrToInt(self);
 
     // Add listeners that are active over the view's entire lifetime
@@ -189,19 +185,16 @@ pub fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface:
 
     // Add listeners that are only active while mapped
     const surface = xwayland_surface.surface.?;
-    surface.events.commit.add(&self.commit);
     xwayland_surface.events.set_title.add(&self.set_title);
     xwayland_surface.events.set_class.add(&self.set_class);
     xwayland_surface.events.request_fullscreen.add(&self.request_fullscreen);
     xwayland_surface.events.request_minimize.add(&self.request_minimize);
 
-    self.surface_tree = view.tree.createSceneSubsurfaceTree(surface) catch {
+    self.surface_tree = view.surface_tree.createSceneSubsurfaceTree(surface) catch {
         log.err("out of memory", .{});
         surface.resource.getClient().postNoMemory();
         return;
     };
-    // Place the node below the view's border nodes
-    self.surface_tree.?.node.lowerToBottom();
 
     // Use the view's "natural" size centered on the output as the default
     // floating dimensions
@@ -240,7 +233,6 @@ fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSur
     self.surface_tree = null;
 
     // Remove listeners that are only active while mapped
-    self.commit.link.remove();
     self.set_title.link.remove();
     self.set_class.link.remove();
     self.request_fullscreen.link.remove();
@@ -285,17 +277,6 @@ fn handleSetOverrideRedirect(
     XwaylandOverrideRedirect.create(xwayland_surface) catch {
         log.err("out of memory", .{});
         return;
-    };
-}
-
-fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) void {
-    const self = @fieldParentPtr(Self, "commit", listener);
-
-    self.view.surface_box = .{
-        .x = 0,
-        .y = 0,
-        .width = surface.current.width,
-        .height = surface.current.height,
     };
 }
 
