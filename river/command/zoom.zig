@@ -15,13 +15,13 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
+const assert = std.debug.assert;
 
 const server = &@import("../main.zig").server;
 
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 const View = @import("../View.zig");
-const ViewStack = @import("../view_stack.zig").ViewStack;
 
 /// Bump the focused view to the top of the stack. If the view on the top of
 /// the stack is focused, bump the second view to the top.
@@ -32,33 +32,50 @@ pub fn zoom(
 ) Error!void {
     if (args.len > 1) return Error.TooManyArguments;
 
-    if (seat.focused == .view) {
-        // Only zoom views that are part of the layout
-        if (seat.focused.view.pending.float or seat.focused.view.pending.fullscreen) return;
+    if (seat.focused != .view) return;
+    if (seat.focused.view.pending.float or seat.focused.view.pending.fullscreen) return;
 
-        // If the first view that is part of the layout is focused, zoom
-        // the next view in the layout. Otherwise zoom the focused view.
-        const output = seat.focused_output;
-        var it = ViewStack(View).iter(output.views.first, .forward, output.pending.tags, filter);
-        const layout_first = @fieldParentPtr(ViewStack(View).Node, "view", it.next().?);
+    const output = seat.focused_output orelse return;
 
-        const focused_node = @fieldParentPtr(ViewStack(View).Node, "view", seat.focused.view);
-        const zoom_node = if (focused_node == layout_first)
-            if (it.next()) |view| @fieldParentPtr(ViewStack(View).Node, "view", view) else null
-        else
-            focused_node;
-
-        if (zoom_node) |to_bump| {
-            output.views.remove(to_bump);
-            output.views.push(to_bump);
-            seat.focus(&to_bump.view);
-            output.arrangeViews();
-            server.root.startTransaction();
+    const layout_first = blk: {
+        var it = output.pending.wm_stack.iterator(.forward);
+        while (it.next()) |view| {
+            if (view.pending.tags & output.pending.tags != 0 and !view.pending.float) break :blk view;
+        } else {
+            // If we are focusing a view that is not fullscreen or floating
+            // it must be visible and in the layout.
+            unreachable;
         }
-    }
-}
+    };
 
-fn filter(view: *View, filter_tags: u32) bool {
-    return view.tree.node.enabled and !view.pending.float and
-        !view.pending.fullscreen and view.pending.tags & filter_tags != 0;
+    // If the first view that is part of the layout is focused, zoom
+    // the next view in the layout if any. Otherwise zoom the focused view.
+    const zoom_target = blk: {
+        if (seat.focused.view == layout_first) {
+            var it = output.pending.wm_stack.iterator(.forward);
+            while (it.next()) |view| {
+                if (view == seat.focused.view) break;
+            } else {
+                unreachable;
+            }
+
+            while (it.next()) |view| {
+                if (view.pending.tags & output.pending.tags != 0 and !view.pending.float) break :blk view;
+            } else {
+                break :blk null;
+            }
+        } else {
+            break :blk seat.focused.view;
+        }
+    };
+
+    if (zoom_target) |target| {
+        assert(!target.pending.float);
+        assert(!target.pending.fullscreen);
+
+        target.pending_wm_stack_link.remove();
+        output.pending.wm_stack.prepend(target);
+        seat.focus(target);
+        server.root.applyPending();
+    }
 }

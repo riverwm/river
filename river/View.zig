@@ -30,7 +30,6 @@ const util = @import("util.zig");
 const Output = @import("Output.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
 const Seat = @import("Seat.zig");
-const ViewStack = @import("view_stack.zig").ViewStack;
 const XdgToplevel = @import("XdgToplevel.zig");
 const XwaylandView = @import("XwaylandView.zig");
 
@@ -49,11 +48,16 @@ const Impl = union(enum) {
 };
 
 const State = struct {
+    /// The output the view is currently assigned to.
+    /// May be null if there are no outputs or for newly created views.
+    /// Must be set using setPendingOutput()
+    output: ?*Output = null,
+
     /// The output-relative coordinates of the view and dimensions requested by river.
-    box: wlr.Box = wlr.Box{ .x = 0, .y = 0, .width = 0, .height = 0 },
+    box: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
 
     /// The tags of the view, as a bitmask
-    tags: u32,
+    tags: u32 = 0,
 
     /// Number of seats currently focusing the view
     focus: u32 = 0,
@@ -65,9 +69,6 @@ const State = struct {
 
 /// The implementation of this view
 impl: Impl,
-
-/// The output this view is currently associated with
-output: *Output,
 
 tree: *wlr.SceneTree,
 surface_tree: *wlr.SceneTree,
@@ -84,12 +85,18 @@ popup_tree: *wlr.SceneTree,
 /// transaction completes. See View.destroy()
 destroying: bool = false,
 
-/// The double-buffered state of the view
-current: State,
-pending: State,
+pending: State = .{},
+pending_focus_stack_link: wl.list.Link,
+pending_wm_stack_link: wl.list.Link,
 
-/// The serial sent with the currently pending configure event
-pending_serial: ?u32 = null,
+inflight: State = .{},
+inflight_focus_stack_link: wl.list.Link,
+inflight_wm_stack_link: wl.list.Link,
+
+current: State = .{},
+
+/// The serial sent with the currently inflight configure event
+inflight_serial: ?u32 = null,
 
 /// The floating dimensions the view, saved so that they can be restored if the
 /// view returns to floating mode.
@@ -104,25 +111,18 @@ draw_borders: bool = true,
 request_activate: wl.Listener(*wlr.XdgActivationV1.event.RequestActivate) =
     wl.Listener(*wlr.XdgActivationV1.event.RequestActivate).init(handleRequestActivate),
 
-pub fn create(output: *Output, impl: Impl) error{OutOfMemory}!*Self {
-    const node = try util.gpa.create(ViewStack(Self).Node);
-    errdefer util.gpa.destroy(node);
-    const self = &node.view;
+pub fn create(impl: Impl) error{OutOfMemory}!*Self {
+    const view = try util.gpa.create(Self);
+    errdefer util.gpa.destroy(view);
 
-    const initial_tags = blk: {
-        const tags = output.current.tags & server.config.spawn_tagmask;
-        break :blk if (tags != 0) tags else output.current.tags;
-    };
-
-    const tree = try output.layers.views.createSceneTree();
+    const tree = try server.root.hidden.tree.createSceneTree();
     errdefer tree.node.destroy();
 
-    const popup_tree = try output.layers.popups.createSceneTree();
+    const popup_tree = try server.root.hidden.tree.createSceneTree();
     errdefer popup_tree.node.destroy();
 
-    self.* = .{
+    view.* = .{
         .impl = impl,
-        .output = output,
         .tree = tree,
         .surface_tree = try tree.createSceneTree(),
         .saved_surface_tree = try tree.createSceneTree(),
@@ -133,105 +133,82 @@ pub fn create(output: *Output, impl: Impl) error{OutOfMemory}!*Self {
             .bottom = try tree.createSceneRect(0, 0, &server.config.border_color_unfocused),
         },
         .popup_tree = popup_tree,
-        .current = .{ .tags = initial_tags },
-        .pending = .{ .tags = initial_tags },
+
+        .pending_wm_stack_link = undefined,
+        .pending_focus_stack_link = undefined,
+        .inflight_wm_stack_link = undefined,
+        .inflight_focus_stack_link = undefined,
     };
 
-    self.saved_surface_tree.node.setEnabled(false);
+    server.root.hidden.pending.focus_stack.prepend(view);
+    server.root.hidden.pending.wm_stack.prepend(view);
+    server.root.hidden.inflight.focus_stack.prepend(view);
+    server.root.hidden.inflight.wm_stack.prepend(view);
 
-    try SceneNodeData.attach(&self.tree.node, .{ .view = self });
-    try SceneNodeData.attach(&self.popup_tree.node, .{ .view = self });
+    view.tree.node.setEnabled(false);
+    view.popup_tree.node.setEnabled(false);
+    view.saved_surface_tree.node.setEnabled(false);
 
-    return self;
+    try SceneNodeData.attach(&view.tree.node, .{ .view = view });
+    try SceneNodeData.attach(&view.popup_tree.node, .{ .view = view });
+
+    return view;
 }
 
 /// If saved buffers of the view are currently in use by a transaction,
 /// mark this view for destruction when the transaction completes. Otherwise
 /// destroy immediately.
-pub fn destroy(self: *Self) void {
-    self.destroying = true;
+pub fn destroy(view: *Self) void {
+    view.destroying = true;
 
     // If there are still saved buffers, then this view needs to be kept
     // around until the current transaction completes. This function will be
     // called again in Root.commitTransaction()
-    if (!self.saved_surface_tree.node.enabled) {
-        self.tree.node.destroy();
-        self.popup_tree.node.destroy();
+    if (!view.saved_surface_tree.node.enabled) {
+        view.tree.node.destroy();
+        view.popup_tree.node.destroy();
 
-        const node = @fieldParentPtr(ViewStack(Self).Node, "view", self);
-        util.gpa.destroy(node);
+        view.pending_focus_stack_link.remove();
+        view.pending_wm_stack_link.remove();
+        view.inflight_focus_stack_link.remove();
+        view.inflight_wm_stack_link.remove();
+
+        util.gpa.destroy(view);
     }
 }
 
-/// Handle changes to pending state and start a transaction to apply them
-pub fn applyPending(self: *Self) void {
-    if (self.current.float and !self.pending.float) {
-        // If switching from float to non-float, save the dimensions.
-        self.float_box = self.current.box;
-    } else if (!self.current.float and self.pending.float) {
-        // If switching from non-float to float, apply the saved float dimensions.
-        self.pending.box = self.float_box;
-    }
-
-    if (!self.lastSetFullscreenState() and self.pending.fullscreen) {
-        // If switching to fullscreen, set the dimensions to the full area of the output
-        self.setFullscreen(true);
-        self.post_fullscreen_box = self.current.box;
-
-        self.pending.box = .{
-            .x = 0,
-            .y = 0,
-            .width = undefined,
-            .height = undefined,
-        };
-        self.output.wlr_output.effectiveResolution(&self.pending.box.width, &self.pending.box.height);
-    } else if (self.lastSetFullscreenState() and !self.pending.fullscreen) {
-        self.setFullscreen(false);
-        self.pending.box = self.post_fullscreen_box;
-    }
-
-    // We always need to arrange the output, as there could already be a
-    // transaction in progress. If we were able to check against the state
-    // that was pending when that transaction was started, we could in some
-    // cases avoid the arrangeViews() call here, but we don't store that
-    // information and it's simpler to always arrange anyways.
-    self.output.arrangeViews();
-
-    server.root.startTransaction();
-}
-
-pub fn updateCurrent(self: *Self) void {
+pub fn updateCurrent(view: *Self) void {
     const config = &server.config;
 
-    self.current = self.pending;
-    if (self.saved_surface_tree.node.enabled) self.dropSavedSurfaceTree();
+    view.current = view.inflight;
+    view.dropSavedSurfaceTree();
 
     const color = blk: {
-        if (self.current.urgent) break :blk &config.border_color_urgent;
-        if (self.current.focus != 0) break :blk &config.border_color_focused;
+        if (view.current.urgent) break :blk &config.border_color_urgent;
+        if (view.current.focus != 0) break :blk &config.border_color_focused;
         break :blk &config.border_color_unfocused;
     };
 
-    const box = &self.current.box;
-    self.tree.node.setPosition(box.x, box.y);
-    self.popup_tree.node.setPosition(box.x, box.y);
+    const box = &view.current.box;
+    view.tree.node.setPosition(box.x, box.y);
+    view.popup_tree.node.setPosition(box.x, box.y);
 
     const border_width: c_int = config.border_width;
-    self.borders.left.node.setPosition(-border_width, -border_width);
-    self.borders.left.setSize(border_width, box.height + 2 * border_width);
-    self.borders.left.setColor(color);
+    view.borders.left.node.setPosition(-border_width, -border_width);
+    view.borders.left.setSize(border_width, box.height + 2 * border_width);
+    view.borders.left.setColor(color);
 
-    self.borders.right.node.setPosition(box.width, -border_width);
-    self.borders.right.setSize(border_width, box.height + 2 * border_width);
-    self.borders.right.setColor(color);
+    view.borders.right.node.setPosition(box.width, -border_width);
+    view.borders.right.setSize(border_width, box.height + 2 * border_width);
+    view.borders.right.setColor(color);
 
-    self.borders.top.node.setPosition(0, -border_width);
-    self.borders.top.setSize(box.width, border_width);
-    self.borders.top.setColor(color);
+    view.borders.top.node.setPosition(0, -border_width);
+    view.borders.top.setSize(box.width, border_width);
+    view.borders.top.setColor(color);
 
-    self.borders.bottom.node.setPosition(0, box.height);
-    self.borders.bottom.setSize(box.width, border_width);
-    self.borders.bottom.setColor(color);
+    view.borders.bottom.node.setPosition(0, box.height);
+    view.borders.bottom.setSize(box.width, border_width);
+    view.borders.bottom.setColor(color);
 }
 
 pub fn needsConfigure(self: Self) bool {
@@ -252,13 +229,6 @@ pub fn configure(self: *Self) void {
     }
 }
 
-fn lastSetFullscreenState(self: Self) bool {
-    return switch (self.impl) {
-        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.lastSetFullscreenState(),
-        .xwayland_view => |xwayland_view| xwayland_view.lastSetFullscreenState(),
-    };
-}
-
 pub fn rootSurface(self: Self) *wlr.Surface {
     assert(!self.destroying);
     return switch (self.impl) {
@@ -275,7 +245,7 @@ pub fn sendFrameDone(self: Self) void {
 }
 
 pub fn dropSavedSurfaceTree(self: *Self) void {
-    assert(self.saved_surface_tree.node.enabled);
+    if (!self.saved_surface_tree.node.enabled) return;
 
     var it = self.saved_surface_tree.children.safeIterator(.forward);
     while (it.next()) |node| node.destroy();
@@ -310,52 +280,28 @@ fn saveSurfaceTreeIter(
     saved.setTransform(buffer.transform);
 }
 
-/// Move a view from one output to another, sending the required enter/leave
-/// events.
-pub fn sendToOutput(self: *Self, destination_output: *Output) void {
-    const node = @fieldParentPtr(ViewStack(Self).Node, "view", self);
+pub fn setPendingOutput(view: *Self, output: *Output) void {
+    view.pending.output = output;
+    view.pending_wm_stack_link.remove();
+    view.pending_focus_stack_link.remove();
 
-    self.output.views.remove(node);
-    destination_output.views.attach(node, server.config.attach_mode);
-
-    self.output.sendViewTags();
-    destination_output.sendViewTags();
-
-    if (self.pending.urgent) {
-        self.output.sendUrgentTags();
-        destination_output.sendUrgentTags();
+    switch (server.config.attach_mode) {
+        .top => output.pending.wm_stack.prepend(view),
+        .bottom => output.pending.wm_stack.append(view),
     }
+    output.pending.focus_stack.prepend(view);
 
-    self.output = destination_output;
+    // Adapt the floating position/dimensions of the view to the new output.
+    if (view.pending.float) {
+        var output_width: i32 = undefined;
+        var output_height: i32 = undefined;
+        output.wlr_output.effectiveResolution(&output_width, &output_height);
 
-    var output_width: i32 = undefined;
-    var output_height: i32 = undefined;
-    destination_output.wlr_output.effectiveResolution(&output_width, &output_height);
+        const border_width = if (view.draw_borders) server.config.border_width else 0;
+        view.pending.box.width = math.min(view.pending.box.width, output_width - (2 * border_width));
+        view.pending.box.height = math.min(view.pending.box.height, output_height - (2 * border_width));
 
-    if (self.pending.float) {
-        // Adapt dimensions of view to new output. Only necessary when floating,
-        // because for tiled views the output will be rearranged, taking care
-        // of this.
-        if (self.pending.fullscreen) self.pending.box = self.post_fullscreen_box;
-        const border_width = if (self.draw_borders) server.config.border_width else 0;
-        self.pending.box.width = math.min(self.pending.box.width, output_width - (2 * border_width));
-        self.pending.box.height = math.min(self.pending.box.height, output_height - (2 * border_width));
-
-        // Adjust position of view so that it is fully inside the target output.
-        self.move(0, 0);
-    }
-
-    if (self.pending.fullscreen) {
-        // If the view is floating, we need to set the post_fullscreen_box, as
-        // that is still set for the previous output.
-        if (self.pending.float) self.post_fullscreen_box = self.pending.box;
-
-        self.pending.box = .{
-            .x = 0,
-            .y = 0,
-            .width = output_width,
-            .height = output_height,
-        };
+        view.move(0, 0);
     }
 }
 
@@ -380,7 +326,7 @@ pub fn setActivated(self: Self, activated: bool) void {
     }
 }
 
-fn setFullscreen(self: *Self, fullscreen: bool) void {
+pub fn setFullscreen(self: *Self, fullscreen: bool) void {
     switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.setFullscreen(fullscreen),
         .xwayland_view => |*xwayland_view| {
@@ -431,10 +377,9 @@ pub fn getAppId(self: Self) ?[*:0]const u8 {
     };
 }
 
-/// Clamp the width/height of the pending state to the constraints of the view
-pub fn applyConstraints(self: *Self) void {
+/// Clamp the width/height of the box to the constraints of the view
+pub fn applyConstraints(self: *Self, box: *wlr.Box) void {
     const constraints = self.getConstraints();
-    const box = &self.pending.box;
     box.width = math.clamp(box.width, constraints.min_width, constraints.max_width);
     box.height = math.clamp(box.height, constraints.min_height, constraints.max_height);
 }
@@ -451,9 +396,12 @@ pub fn getConstraints(self: Self) Constraints {
 /// bounds of the output.
 pub fn move(self: *Self, delta_x: i32, delta_y: i32) void {
     const border_width = if (self.draw_borders) server.config.border_width else 0;
-    var output_width: i32 = undefined;
-    var output_height: i32 = undefined;
-    self.output.wlr_output.effectiveResolution(&output_width, &output_height);
+
+    var output_width: i32 = math.maxInt(i32);
+    var output_height: i32 = math.maxInt(i32);
+    if (self.pending.output) |output| {
+        output.wlr_output.effectiveResolution(&output_width, &output_height);
+    }
 
     const max_x = output_width - self.pending.box.width - border_width;
     self.pending.box.x += delta_x;
@@ -483,62 +431,60 @@ pub fn fromWlrSurface(surface: *wlr.Surface) ?*Self {
     return null;
 }
 
-pub fn shouldTrackConfigure(self: Self) bool {
-    // We don't give a damn about frame perfection for xwayland views
-    if (build_options.xwayland and self.impl == .xwayland_view) return false;
-
-    // There are exactly three cases in which we do not track configures
-    // 1. the view was and remains floating
-    // 2. the view is changing from float/layout to fullscreen
-    // 3. the view is changing from fullscreen to float
-    return !((self.pending.float and self.current.float) or
-        (self.pending.fullscreen and !self.current.fullscreen) or
-        (self.pending.float and !self.pending.fullscreen and self.current.fullscreen));
-}
-
 /// Called by the impl when the surface is ready to be displayed
-pub fn map(self: *Self) !void {
-    log.debug("view '{?s}' mapped", .{self.getTitle()});
+pub fn map(view: *Self) !void {
+    log.debug("view '{?s}' mapped", .{view.getTitle()});
 
-    self.tree.node.setEnabled(true);
-    self.popup_tree.node.setEnabled(true);
+    server.xdg_activation.events.request_activate.add(&view.request_activate);
 
-    server.xdg_activation.events.request_activate.add(&self.request_activate);
+    if (server.input_manager.defaultSeat().focused_output) |output| {
+        // Center the initial pending box on the output
+        view.pending.box.x = @divTrunc(math.max(0, output.usable_box.width - view.pending.box.width), 2);
+        view.pending.box.y = @divTrunc(math.max(0, output.usable_box.height - view.pending.box.height), 2);
 
-    // Add the view to the stack of its output
-    const node = @fieldParentPtr(ViewStack(Self).Node, "view", self);
-    self.output.views.attach(node, server.config.attach_mode);
+        view.pending.tags = blk: {
+            const tags = output.pending.tags & server.config.spawn_tagmask;
+            break :blk if (tags != 0) tags else output.pending.tags;
+        };
 
-    // Inform all seats that the view has been mapped so they can handle focus
-    var it = server.input_manager.seats.first;
-    while (it) |seat_node| : (it = seat_node.next) try seat_node.data.handleViewMap(self);
+        view.setPendingOutput(output);
 
-    self.output.sendViewTags();
+        var it = server.input_manager.seats.first;
+        while (it) |seat_node| : (it = seat_node.next) seat_node.data.focus(view);
+    }
 
-    self.applyPending();
+    view.float_box = view.pending.box;
+
+    server.root.applyPending();
 }
 
 /// Called by the impl when the surface will no longer be displayed
-pub fn unmap(self: *Self) void {
-    log.debug("view '{?s}' unmapped", .{self.getTitle()});
+pub fn unmap(view: *Self) void {
+    log.debug("view '{?s}' unmapped", .{view.getTitle()});
 
-    self.tree.node.setEnabled(false);
-    self.popup_tree.node.setEnabled(false);
+    if (!view.saved_surface_tree.node.enabled) view.saveSurfaceTree();
 
-    if (!self.saved_surface_tree.node.enabled) self.saveSurfaceTree();
+    {
+        view.pending.output = null;
+        view.pending_focus_stack_link.remove();
+        view.pending_wm_stack_link.remove();
+        server.root.hidden.pending.focus_stack.prepend(view);
+        server.root.hidden.pending.wm_stack.prepend(view);
+    }
 
-    // Inform all seats that the view has been unmapped so they can handle focus
-    var it = server.input_manager.seats.first;
-    while (it) |seat_node| : (it = seat_node.next) seat_node.data.handleViewUnmap(self);
+    {
+        var it = server.input_manager.seats.first;
+        while (it) |node| : (it = node.next) {
+            const seat = &node.data;
+            if (seat.focused == .view and seat.focused.view == view) {
+                seat.focus(null);
+            }
+        }
+    }
 
-    self.request_activate.link.remove();
+    view.request_activate.link.remove();
 
-    self.output.sendViewTags();
-
-    // Still need to arrange if fullscreened from the layout
-    if (!self.current.float) self.output.arrangeViews();
-
-    server.root.startTransaction();
+    server.root.applyPending();
 }
 
 pub fn notifyTitle(self: *const Self) void {
@@ -565,7 +511,7 @@ fn handleRequestActivate(
     if (fromWlrSurface(event.surface)) |view| {
         if (view.current.focus == 0) {
             view.pending.urgent = true;
-            server.root.startTransaction();
+            server.root.applyPending();
         }
     }
 }

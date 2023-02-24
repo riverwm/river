@@ -38,7 +38,7 @@ pub fn init(self: *Self, seat: *Seat, seat_status: *zriver.SeatStatusV1) void {
 
     // Send all info once on bind
     self.sendMode(server.config.modes.items[seat.mode_id].name);
-    self.sendOutput(.focused);
+    if (seat.focused_output) |output| self.sendOutput(output, .focused);
     self.sendFocusedView();
 }
 
@@ -54,9 +54,9 @@ fn handleDestroy(_: *zriver.SeatStatusV1, self: *Self) void {
     util.gpa.destroy(node);
 }
 
-pub fn sendOutput(self: Self, state: enum { focused, unfocused }) void {
+pub fn sendOutput(self: Self, output: *Output, state: enum { focused, unfocused }) void {
     const client = self.seat_status.getClient();
-    var it = self.seat.focused_output.wlr_output.resources.iterator(.forward);
+    var it = output.wlr_output.resources.iterator(.forward);
     while (it.next()) |wl_output| {
         if (wl_output.getClient() == client) switch (state) {
             .focused => self.seat_status.sendFocusedOutput(wl_output),

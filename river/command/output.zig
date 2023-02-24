@@ -37,14 +37,14 @@ pub fn focusOutput(
     if (args.len > 2) return Error.TooManyArguments;
 
     // If the noop output is focused, there are no other outputs to switch to
-    if (seat.focused_output == &server.root.noop_output) {
+    if (seat.focused_output == null) {
         assert(server.root.outputs.len == 0);
         return;
     }
 
     seat.focusOutput((try getOutput(seat, args[1])) orelse return);
     seat.focus(null);
-    server.root.startTransaction();
+    server.root.applyPending();
 }
 
 pub fn sendToOutput(
@@ -56,22 +56,21 @@ pub fn sendToOutput(
     if (args.len > 2) return Error.TooManyArguments;
 
     // If the noop output is focused, there is nowhere to send the view
-    if (seat.focused_output == &server.root.noop_output) {
+    if (seat.focused_output == null) {
         assert(server.root.outputs.len == 0);
         return;
     }
 
     if (seat.focused == .view) {
         const destination_output = (try getOutput(seat, args[1])) orelse return;
+
         // If the view is already on destination_output, do nothing
-        if (seat.focused.view.output == destination_output) return;
-        seat.focused.view.sendToOutput(destination_output);
+        if (seat.focused.view.pending.output == destination_output) return;
+        seat.focused.view.setPendingOutput(destination_output);
 
         // Handle the change and focus whatever's next in the focus stack
         seat.focus(null);
-        seat.focused_output.arrangeViews();
-        destination_output.arrangeViews();
-        server.root.startTransaction();
+        server.root.applyPending();
     }
 }
 
@@ -80,19 +79,19 @@ pub fn sendToOutput(
 fn getOutput(seat: *Seat, str: []const u8) !?*Output {
     if (std.meta.stringToEnum(Direction, str)) |direction| { // Logical direction
         // Return the next/prev output in the list if there is one, else wrap
-        const focused_node = @fieldParentPtr(std.TailQueue(Output).Node, "data", seat.focused_output);
+        const focused_node = @fieldParentPtr(std.TailQueue(Output).Node, "data", seat.focused_output.?);
         return switch (direction) {
             .next => if (focused_node.next) |node| &node.data else &server.root.outputs.first.?.data,
             .previous => if (focused_node.prev) |node| &node.data else &server.root.outputs.last.?.data,
         };
     } else if (std.meta.stringToEnum(wlr.OutputLayout.Direction, str)) |direction| { // Spacial direction
         var focus_box: wlr.Box = undefined;
-        server.root.output_layout.getBox(seat.focused_output.wlr_output, &focus_box);
+        server.root.output_layout.getBox(seat.focused_output.?.wlr_output, &focus_box);
         if (focus_box.empty()) return null;
 
         const wlr_output = server.root.output_layout.adjacentOutput(
             direction,
-            seat.focused_output.wlr_output,
+            seat.focused_output.?.wlr_output,
             @intToFloat(f64, focus_box.x + @divTrunc(focus_box.width, 2)),
             @intToFloat(f64, focus_box.y + @divTrunc(focus_box.height, 2)),
         ) orelse return null;

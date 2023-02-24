@@ -15,14 +15,15 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
+const assert = std.debug.assert;
 
 const server = &@import("../main.zig").server;
 
 const Direction = @import("../command.zig").Direction;
 const Error = @import("../command.zig").Error;
+const Output = @import("../Output.zig");
 const Seat = @import("../Seat.zig");
 const View = @import("../View.zig");
-const ViewStack = @import("../view_stack.zig").ViewStack;
 
 /// Focus either the next or the previous visible view, depending on the enum
 /// passed. Does nothing if there are 1 or 0 views in the stack.
@@ -35,40 +36,45 @@ pub fn focusView(
     if (args.len > 2) return Error.TooManyArguments;
 
     const direction = std.meta.stringToEnum(Direction, args[1]) orelse return Error.InvalidDirection;
-    const output = seat.focused_output;
+    const output = seat.focused_output orelse return;
 
-    if (seat.focused == .view) {
-        // If the focused view is fullscreen, do nothing
-        if (seat.focused.view.current.fullscreen) return;
+    if (seat.focused != .view) return;
+    if (seat.focused.view.pending.fullscreen) return;
 
-        // If there is a currently focused view, focus the next visible view in the stack.
-        const focused_node = @fieldParentPtr(ViewStack(View).Node, "view", seat.focused.view);
-        var it = switch (direction) {
-            .next => ViewStack(View).iter(focused_node, .forward, output.pending.tags, filter),
-            .previous => ViewStack(View).iter(focused_node, .reverse, output.pending.tags, filter),
-        };
-
-        // Skip past the focused node
-        _ = it.next();
-        // Focus the next visible node if there is one
-        if (it.next()) |view| {
-            seat.focus(view);
-            server.root.startTransaction();
-            return;
-        }
+    if (focusViewTarget(seat, output, direction)) |target| {
+        assert(!target.pending.fullscreen);
+        seat.focus(target);
+        server.root.applyPending();
     }
-
-    // There is either no currently focused view or the last visible view in the
-    // stack is focused and we need to wrap.
-    var it = switch (direction) {
-        .next => ViewStack(View).iter(output.views.first, .forward, output.pending.tags, filter),
-        .previous => ViewStack(View).iter(output.views.last, .reverse, output.pending.tags, filter),
-    };
-
-    seat.focus(it.next());
-    server.root.startTransaction();
 }
 
-fn filter(view: *View, filter_tags: u32) bool {
-    return view.tree.node.enabled and view.pending.tags & filter_tags != 0;
+fn focusViewTarget(seat: *Seat, output: *Output, direction: Direction) ?*View {
+    switch (direction) {
+        inline else => |dir| {
+            const it_dir = comptime switch (dir) {
+                .next => .forward,
+                .previous => .reverse,
+            };
+            var it = output.pending.wm_stack.iterator(it_dir);
+            while (it.next()) |view| {
+                if (view == seat.focused.view) break;
+            } else {
+                unreachable;
+            }
+
+            // Return the next view in the stack matching the tags if any.
+            while (it.next()) |view| {
+                if (output.pending.tags & view.pending.tags != 0) return view;
+            }
+
+            // Wrap and return the first view in the stack matching the tags if
+            // any is found before completing the loop back to the focused view.
+            while (it.next()) |view| {
+                if (view == seat.focused.view) return null;
+                if (output.pending.tags & view.pending.tags != 0) return view;
+            }
+
+            unreachable;
+        },
+    }
 }

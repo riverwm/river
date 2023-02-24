@@ -15,14 +15,15 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
+const assert = std.debug.assert;
 
 const server = &@import("../main.zig").server;
 
-const Error = @import("../command.zig").Error;
 const Direction = @import("../command.zig").Direction;
+const Error = @import("../command.zig").Error;
+const Output = @import("../Output.zig");
 const Seat = @import("../Seat.zig");
 const View = @import("../View.zig");
-const ViewStack = @import("../view_stack.zig").ViewStack;
 
 /// Swap the currently focused view with either the view higher or lower in the visible stack
 pub fn swap(
@@ -33,51 +34,47 @@ pub fn swap(
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
 
-    if (seat.focused != .view)
-        return;
+    const direction = std.meta.stringToEnum(Direction, args[1]) orelse return Error.InvalidDirection;
+    const output = seat.focused_output orelse return;
 
-    // Filter out everything that is not part of the current layout
+    if (seat.focused != .view) return;
     if (seat.focused.view.pending.float or seat.focused.view.pending.fullscreen) return;
 
-    const direction = std.meta.stringToEnum(Direction, args[1]) orelse return Error.InvalidDirection;
-
-    const focused_node = @fieldParentPtr(ViewStack(View).Node, "view", seat.focused.view);
-    const output = seat.focused_output;
-    var it = ViewStack(View).iter(
-        focused_node,
-        if (direction == .next) .forward else .reverse,
-        output.pending.tags,
-        filter,
-    );
-    var it_wrap = ViewStack(View).iter(
-        if (direction == .next) output.views.first else output.views.last,
-        if (direction == .next) .forward else .reverse,
-        output.pending.tags,
-        filter,
-    );
-
-    // skip the first node which is focused_node
-    _ = it.next().?;
-
-    const to_swap = @fieldParentPtr(
-        ViewStack(View).Node,
-        "view",
-        // Wrap around if needed
-        if (it.next()) |next| next else it_wrap.next().?,
-    );
-
-    // Dont swap when only the focused view is part of the layout
-    if (focused_node == to_swap) {
-        return;
+    if (swapTarget(seat, output, direction)) |target| {
+        assert(!target.pending.float);
+        assert(!target.pending.fullscreen);
+        seat.focused.view.pending_wm_stack_link.swapWith(&target.pending_wm_stack_link);
+        server.root.applyPending();
     }
-
-    output.views.swap(focused_node, to_swap);
-
-    output.arrangeViews();
-    server.root.startTransaction();
 }
 
-fn filter(view: *View, filter_tags: u32) bool {
-    return view.tree.node.enabled and !view.pending.float and
-        !view.pending.fullscreen and view.pending.tags & filter_tags != 0;
+fn swapTarget(seat: *Seat, output: *Output, direction: Direction) ?*View {
+    switch (direction) {
+        inline else => |dir| {
+            const it_dir = comptime switch (dir) {
+                .next => .forward,
+                .previous => .reverse,
+            };
+            var it = output.pending.wm_stack.iterator(it_dir);
+            while (it.next()) |view| {
+                if (view == seat.focused.view) break;
+            } else {
+                unreachable;
+            }
+
+            // Return the next view in the stack matching the tags if any.
+            while (it.next()) |view| {
+                if (output.pending.tags & view.pending.tags != 0 and !view.pending.float) return view;
+            }
+
+            // Wrap and return the first view in the stack matching the tags if
+            // any is found before completing the loop back to the focused view.
+            while (it.next()) |view| {
+                if (view == seat.focused.view) return null;
+                if (output.pending.tags & view.pending.tags != 0 and !view.pending.float) return view;
+            }
+
+            unreachable;
+        },
+    }
 }

@@ -28,10 +28,8 @@ const river = wayland.server.river;
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
-const Server = @import("Server.zig");
 const Output = @import("Output.zig");
 const View = @import("View.zig");
-const ViewStack = @import("view_stack.zig").ViewStack;
 const LayoutDemand = @import("LayoutDemand.zig");
 
 const log = std.log.scoped(.layout);
@@ -63,8 +61,8 @@ pub fn create(client: *wl.Client, version: u32, id: u32, output: *Output, namesp
     // If the namespace matches that of the output, set the layout as
     // the active one of the output and arrange it.
     if (mem.eql(u8, namespace, output.layoutNamespace())) {
-        output.pending.layout = &node.data;
-        output.arrangeViews();
+        output.layout = &node.data;
+        server.root.applyPending();
     }
 }
 
@@ -103,8 +101,8 @@ pub fn startLayoutDemand(self: *Self, views: u32) void {
         .{ self.namespace, self.output.wlr_output.name },
     );
 
-    assert(self.output.layout_demand == null);
-    self.output.layout_demand = LayoutDemand.init(self, views) catch {
+    assert(self.output.inflight.layout_demand == null);
+    self.output.inflight.layout_demand = LayoutDemand.init(self, views) catch {
         log.err("failed starting layout demand", .{});
         return;
     };
@@ -114,10 +112,10 @@ pub fn startLayoutDemand(self: *Self, views: u32) void {
         @intCast(u32, self.output.usable_box.width),
         @intCast(u32, self.output.usable_box.height),
         self.output.pending.tags,
-        self.output.layout_demand.?.serial,
+        self.output.inflight.layout_demand.?.serial,
     );
 
-    server.root.trackLayoutDemands();
+    server.root.inflight_layout_demands += 1;
 }
 
 fn handleRequest(layout: *river.LayoutV3, request: river.LayoutV3.Request, self: *Self) void {
@@ -132,7 +130,7 @@ fn handleRequest(layout: *river.LayoutV3, request: river.LayoutV3.Request, self:
                 .{ self.namespace, self.output.wlr_output.name, req.x, req.y, req.width, req.height },
             );
 
-            if (self.output.layout_demand) |*layout_demand| {
+            if (self.output.inflight.layout_demand) |*layout_demand| {
                 // We can't raise a protocol error when the serial is old/wrong
                 // because we do not keep track of old serials server-side.
                 // Therefore, simply ignore requests with old/wrong serials.
@@ -154,7 +152,7 @@ fn handleRequest(layout: *river.LayoutV3, request: river.LayoutV3.Request, self:
                 .{ self.namespace, self.output.wlr_output.name },
             );
 
-            if (self.output.layout_demand) |*layout_demand| {
+            if (self.output.inflight.layout_demand) |*layout_demand| {
                 // We can't raise a protocol error when the serial is old/wrong
                 // because we do not keep track of old serials server-side.
                 // Therefore, simply ignore requests with old/wrong serials.
@@ -185,11 +183,11 @@ pub fn destroy(self: *Self) void {
     self.output.layouts.remove(node);
 
     // If we are the currently active layout of an output, clean up.
-    if (self.output.pending.layout == self) {
-        self.output.pending.layout = null;
-        if (self.output.layout_demand) |*layout_demand| {
+    if (self.output.layout == self) {
+        self.output.layout = null;
+        if (self.output.inflight.layout_demand) |*layout_demand| {
             layout_demand.deinit();
-            self.output.layout_demand = null;
+            self.output.inflight.layout_demand = null;
             server.root.notifyLayoutDemandDone();
         }
 

@@ -38,7 +38,6 @@ const Output = @import("Output.zig");
 const Root = @import("Root.zig");
 const Seat = @import("Seat.zig");
 const View = @import("View.zig");
-const ViewStack = @import("view_stack.zig").ViewStack;
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
 const Mode = union(enum) {
@@ -253,17 +252,6 @@ pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
     }
 }
 
-pub fn handleViewUnmap(self: *Self, view: *View) void {
-    if (switch (self.mode) {
-        .passthrough, .down => false,
-        .move => |data| data.view == view,
-        .resize => |data| data.view == view,
-    }) {
-        self.mode = .passthrough;
-        self.clearFocus();
-    }
-}
-
 /// It seems that setCursorImage is actually fairly expensive to call repeatedly
 /// as it does no checks to see if the the given image is already set. Therefore,
 /// do that check here.
@@ -346,7 +334,7 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
         self.updateOutputFocus(self.wlr_cursor.x, self.wlr_cursor.y);
     }
 
-    server.root.startTransaction();
+    server.root.applyPending();
 }
 
 fn updateKeyboardFocus(self: Self, result: Root.AtResult) void {
@@ -505,7 +493,7 @@ fn handleTouchDown(
         self.updateOutputFocus(lx, ly);
     }
 
-    server.root.startTransaction();
+    server.root.applyPending();
 }
 
 fn handleTouchMotion(
@@ -558,7 +546,7 @@ fn handlePointerMapping(self: *Self, event: *wlr.Pointer.event.Button, view: *Vi
                     // This is mildly inefficient as running the command may have already
                     // started a transaction. However we need to start one after the Seat.focus()
                     // call in the case where it didn't.
-                    server.root.startTransaction();
+                    server.root.applyPending();
                 },
             }
             break true;
@@ -679,20 +667,17 @@ pub fn enterMode(self: *Self, mode: enum { move, resize }, view: *View) void {
     // their dimensions are set by a layout generator. If however the views
     // are unarranged, leave them as non-floating so the next active
     // layout can affect them.
-    if (!view.current.float and view.output.current.layout != null) {
+    if (!view.current.float and view.current.output.?.layout != null) {
         view.pending.float = true;
         view.float_box = view.current.box;
-        view.applyPending();
-    } else {
-        // The View.applyPending() call in the other branch starts
-        // the transaction needed after the seat.focus() call above.
-        server.root.startTransaction();
     }
 
     // Clear cursor focus, so that the surface does not receive events
     self.seat.wlr_seat.pointerNotifyClearFocus();
 
     self.setImage(if (mode == .move) .move else .@"se-resize");
+
+    server.root.applyPending();
 }
 
 /// Return from down/move/resize to passthrough
@@ -756,7 +741,7 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
                 @intToFloat(f64, view.pending.box.x - view.current.box.x),
                 @intToFloat(f64, view.pending.box.y - view.current.box.y),
             );
-            view.applyPending();
+            server.root.applyPending();
         },
         .resize => |*data| {
             dx += data.delta_x;
@@ -769,17 +754,15 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
             // Set width/height of view, clamp to view size constraints and output dimensions
             data.view.pending.box.width += @floatToInt(i32, dx);
             data.view.pending.box.height += @floatToInt(i32, dy);
-            data.view.applyConstraints();
+            data.view.applyConstraints(&data.view.pending.box);
 
             var output_width: i32 = undefined;
             var output_height: i32 = undefined;
-            data.view.output.wlr_output.effectiveResolution(&output_width, &output_height);
+            data.view.current.output.?.wlr_output.effectiveResolution(&output_width, &output_height);
 
             const box = &data.view.pending.box;
             box.width = math.min(box.width, output_width - border_width - box.x);
             box.height = math.min(box.height, output_height - border_width - box.y);
-
-            data.view.applyPending();
 
             // Keep cursor locked to the original offset from the bottom right corner
             self.wlr_cursor.warpClosest(
@@ -787,6 +770,7 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
                 @intToFloat(f64, box.x + box.width - data.offset_x),
                 @intToFloat(f64, box.y + box.height - data.offset_y),
             );
+            server.root.applyPending();
         },
     }
 }
@@ -806,16 +790,16 @@ pub fn checkFocusFollowsCursor(self: *Self) void {
                 // geometry, we only want to move focus when the cursor
                 // properly enters the window (the box that we draw borders around)
                 var output_layout_box: wlr.Box = undefined;
-                server.root.output_layout.getBox(view.output.wlr_output, &output_layout_box);
+                server.root.output_layout.getBox(view.current.output.?.wlr_output, &output_layout_box);
                 const cursor_ox = self.wlr_cursor.x - @intToFloat(f64, output_layout_box.x);
                 const cursor_oy = self.wlr_cursor.y - @intToFloat(f64, output_layout_box.y);
                 if ((self.seat.focused != .view or self.seat.focused.view != view) and
                     view.current.box.containsPoint(cursor_ox, cursor_oy))
                 {
-                    self.seat.focusOutput(view.output);
+                    self.seat.focusOutput(view.current.output.?);
                     self.seat.focus(view);
                     self.last_focus_follows_cursor_target = view;
-                    server.root.startTransaction();
+                    server.root.applyPending();
                 }
             },
             .layer_surface, .lock_surface => {},
@@ -866,8 +850,9 @@ fn shouldPassthrough(self: Self) bool {
             assert(server.lock_manager.state != .locked);
             const target = if (self.mode == .resize) self.mode.resize.view else self.mode.move.view;
             // The target view is no longer visible, is part of the layout, or is fullscreen.
-            return target.current.tags & target.output.current.tags == 0 or
-                (!target.current.float and target.output.current.layout != null) or
+            return target.current.output == null or
+                target.current.tags & target.current.output.?.current.tags == 0 or
+                (!target.current.float and target.current.output.?.layout != null) or
                 target.current.fullscreen;
         },
     }
@@ -896,10 +881,12 @@ fn passthrough(self: *Self, time: u32) void {
 
 fn warp(self: *Self) void {
     self.may_need_warp = false;
-    if (self.seat.focused_output == &server.root.noop_output) return;
+
+    const focused_output = self.seat.focused_output orelse return;
+
     // Warp pointer to center of the focused view/output (In layout coordinates) if enabled.
     var output_layout_box: wlr.Box = undefined;
-    server.root.output_layout.getBox(self.seat.focused_output.wlr_output, &output_layout_box);
+    server.root.output_layout.getBox(focused_output.wlr_output, &output_layout_box);
     const target_box = switch (server.config.warp_cursor) {
         .disabled => return,
         .@"on-output-change" => output_layout_box,
@@ -921,7 +908,7 @@ fn warp(self: *Self) void {
     };
     // Checking against the usable box here gives much better UX when, for example,
     // a status bar allows using the pointer to change tag/view focus.
-    const usable_box = self.seat.focused_output.usable_box;
+    const usable_box = focused_output.usable_box;
     const usable_layout_box = wlr.Box{
         .x = output_layout_box.x + usable_box.x,
         .y = output_layout_box.y + usable_box.y,

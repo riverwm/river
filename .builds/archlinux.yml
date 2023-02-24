@@ -48,9 +48,6 @@ tasks:
   - build_xwayland: |
       cd river
       zig build -Dxwayland
-  - xwayland_test: |
-      cd river
-      zig build -Dxwayland test
   - fmt: |
       cd river
       zig fmt --check river/

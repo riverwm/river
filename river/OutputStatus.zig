@@ -25,7 +25,6 @@ const util = @import("util.zig");
 
 const Output = @import("Output.zig");
 const View = @import("View.zig");
-const ViewStack = @import("view_stack.zig").ViewStack;
 
 const log = std.log.scoped(.river_status);
 
@@ -41,12 +40,7 @@ pub fn init(self: *Self, output: *Output, output_status: *zriver.OutputStatusV1)
     self.sendViewTags();
     self.sendFocusedTags(output.current.tags);
 
-    var urgent_tags: u32 = 0;
-    var view_it = self.output.views.first;
-    while (view_it) |node| : (view_it = node.next) {
-        if (node.view.current.urgent) urgent_tags |= node.view.current.tags;
-    }
-    self.sendUrgentTags(urgent_tags);
+    output.sendUrgentTags();
 
     if (output.layout_name) |name| {
         self.sendLayoutName(name);
@@ -75,14 +69,15 @@ pub fn sendViewTags(self: Self) void {
     var view_tags = std.ArrayList(u32).init(util.gpa);
     defer view_tags.deinit();
 
-    var it = self.output.views.first;
-    while (it) |node| : (it = node.next) {
-        if (!node.view.tree.node.enabled) continue;
-        view_tags.append(node.view.current.tags) catch {
-            self.output_status.postNoMemory();
-            log.err("out of memory", .{});
-            return;
-        };
+    {
+        var it = self.output.inflight.wm_stack.iterator(.forward);
+        while (it.next()) |view| {
+            view_tags.append(view.current.tags) catch {
+                self.output_status.postNoMemory();
+                log.err("out of memory", .{});
+                return;
+            };
+        }
     }
 
     var wl_array = wl.Array.fromArrayList(u32, view_tags);

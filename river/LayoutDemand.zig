@@ -29,7 +29,6 @@ const Layout = @import("Layout.zig");
 const Server = @import("Server.zig");
 const Output = @import("Output.zig");
 const View = @import("View.zig");
-const ViewStack = @import("view_stack.zig").ViewStack;
 
 const log = std.log.scoped(.layout);
 
@@ -71,8 +70,8 @@ fn handleTimeout(layout: *Layout) c_int {
         "layout demand for layout '{s}' on output '{s}' timed out",
         .{ layout.namespace, layout.output.wlr_output.name },
     );
-    layout.output.layout_demand.?.deinit();
-    layout.output.layout_demand = null;
+    layout.output.inflight.layout_demand.?.deinit();
+    layout.output.inflight.layout_demand = null;
 
     server.root.notifyLayoutDemandDone();
 
@@ -104,8 +103,8 @@ pub fn apply(self: *Self, layout: *Layout) void {
     // Whether the layout demand succeeds or fails, we are done with it and
     // need to clean up
     defer {
-        output.layout_demand.?.deinit();
-        output.layout_demand = null;
+        output.inflight.layout_demand.?.deinit();
+        output.inflight.layout_demand = null;
         server.root.notifyLayoutDemandDone();
     }
 
@@ -122,24 +121,36 @@ pub fn apply(self: *Self, layout: *Layout) void {
         return;
     }
 
-    // Apply proposed layout to views
-    var it = ViewStack(View).iter(output.views.first, .forward, output.pending.tags, Output.arrangeFilter);
+    // Apply proposed layout to the inflight state of the target views
+    var it = output.inflight.wm_stack.iterator(.forward);
     var i: u32 = 0;
-    while (it.next()) |view| : (i += 1) {
-        const proposed = &self.view_boxen[i];
+    while (it.next()) |view| {
+        if (!view.inflight.float and !view.inflight.fullscreen and
+            view.inflight.tags & output.inflight.tags != 0)
+        {
+            const proposed = &self.view_boxen[i];
 
-        // Here we apply the offset to align the coords with the origin of the
-        // usable area and shrink the dimensions to accomodate the border size.
-        const border_width = if (view.draw_borders) server.config.border_width else 0;
-        view.pending.box = .{
-            .x = proposed.x + output.usable_box.x + border_width,
-            .y = proposed.y + output.usable_box.y + border_width,
-            .width = proposed.width - 2 * border_width,
-            .height = proposed.height - 2 * border_width,
-        };
+            // Here we apply the offset to align the coords with the origin of the
+            // usable area and shrink the dimensions to accommodate the border size.
+            const border_width = if (view.draw_borders) server.config.border_width else 0;
+            view.inflight.box = .{
+                .x = proposed.x + output.usable_box.x + border_width,
+                .y = proposed.y + output.usable_box.y + border_width,
+                .width = proposed.width - 2 * border_width,
+                .height = proposed.height - 2 * border_width,
+            };
 
-        view.applyConstraints();
+            view.applyConstraints(&view.inflight.box);
+
+            // State flowing "backwards" like this is pretty ugly, but I don't
+            // see a better way to sync this up right now.
+            if (!view.pending.float and !view.pending.fullscreen) {
+                view.pending.box = view.inflight.box;
+            }
+
+            i += 1;
+        }
     }
     assert(i == self.view_boxen.len);
-    assert(output.pending.layout == layout);
+    assert(output.layout == layout);
 }

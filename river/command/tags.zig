@@ -30,12 +30,12 @@ pub fn setFocusedTags(
     out: *?[]const u8,
 ) Error!void {
     const tags = try parseTags(args, out);
-    if (seat.focused_output.pending.tags != tags) {
-        seat.focused_output.previous_tags = seat.focused_output.pending.tags;
-        seat.focused_output.pending.tags = tags;
-        seat.focused_output.arrangeViews();
+    const output = seat.focused_output orelse return;
+    if (output.pending.tags != tags) {
+        output.previous_tags = output.pending.tags;
+        output.pending.tags = tags;
         seat.focus(null);
-        server.root.startTransaction();
+        server.root.applyPending();
     }
 }
 
@@ -59,7 +59,7 @@ pub fn setViewTags(
         const view = seat.focused.view;
         view.pending.tags = tags;
         seat.focus(null);
-        view.applyPending();
+        server.root.applyPending();
     }
 }
 
@@ -70,14 +70,13 @@ pub fn toggleFocusedTags(
     out: *?[]const u8,
 ) Error!void {
     const tags = try parseTags(args, out);
-    const output = seat.focused_output;
+    const output = seat.focused_output orelse return;
     const new_focused_tags = output.pending.tags ^ tags;
     if (new_focused_tags != 0) {
         output.previous_tags = output.pending.tags;
         output.pending.tags = new_focused_tags;
-        output.arrangeViews();
         seat.focus(null);
-        server.root.startTransaction();
+        server.root.applyPending();
     }
 }
 
@@ -94,7 +93,7 @@ pub fn toggleViewTags(
             const view = seat.focused.view;
             view.pending.tags = new_tags;
             seat.focus(null);
-            view.applyPending();
+            server.root.applyPending();
         }
     }
 }
@@ -106,13 +105,13 @@ pub fn focusPreviousTags(
     _: *?[]const u8,
 ) Error!void {
     if (args.len > 1) return error.TooManyArguments;
-    const previous_tags = seat.focused_output.previous_tags;
-    if (seat.focused_output.pending.tags != previous_tags) {
-        seat.focused_output.previous_tags = seat.focused_output.pending.tags;
-        seat.focused_output.pending.tags = previous_tags;
-        seat.focused_output.arrangeViews();
+    const output = seat.focused_output orelse return;
+    const previous_tags = output.previous_tags;
+    if (output.pending.tags != previous_tags) {
+        output.previous_tags = output.pending.tags;
+        output.pending.tags = previous_tags;
         seat.focus(null);
-        server.root.startTransaction();
+        server.root.applyPending();
     }
 }
 
@@ -123,12 +122,13 @@ pub fn sendToPreviousTags(
     _: *?[]const u8,
 ) Error!void {
     if (args.len > 1) return error.TooManyArguments;
-    const previous_tags = seat.focused_output.previous_tags;
+
+    const output = seat.focused_output orelse return;
     if (seat.focused == .view) {
         const view = seat.focused.view;
-        view.pending.tags = previous_tags;
+        view.pending.tags = output.previous_tags;
         seat.focus(null);
-        view.applyPending();
+        server.root.applyPending();
     }
 }
 

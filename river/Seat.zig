@@ -41,7 +41,6 @@ const Output = @import("Output.zig");
 const SeatStatus = @import("SeatStatus.zig");
 const Switch = @import("Switch.zig");
 const View = @import("View.zig");
-const ViewStack = @import("view_stack.zig").ViewStack;
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
 const log = std.log.scoped(.seat);
@@ -73,15 +72,10 @@ repeating_mapping: ?*const Mapping = null,
 
 keyboard_groups: std.TailQueue(KeyboardGroup) = .{},
 
-/// Currently focused output, may be the noop output if no real output
-/// is currently available for focus.
-focused_output: *Output,
+/// Currently focused output. Null only when there are no outputs at all.
+focused_output: ?*Output = null,
 
 focused: FocusTarget = .none,
-
-/// Stack of views in most recently focused order
-/// If there is a currently focused view, it is on top.
-focus_stack: ViewStack(*View) = .{},
 
 /// List of status tracking objects relaying changes to this seat to clients.
 status_trackers: std.SinglyLinkedList(SeatStatus) = .{},
@@ -110,7 +104,6 @@ pub fn init(self: *Self, name: [*:0]const u8) !void {
     self.* = .{
         // This will be automatically destroyed when the display is destroyed
         .wlr_seat = try wlr.Seat.create(server.wl_server, name),
-        .focused_output = &server.root.noop_output,
         .mapping_repeat_timer = mapping_repeat_timer,
     };
     self.wlr_seat.data = @ptrToInt(self);
@@ -136,11 +129,6 @@ pub fn deinit(self: *Self) void {
         node.data.destroy();
     }
 
-    while (self.focus_stack.first) |node| {
-        self.focus_stack.remove(node);
-        util.gpa.destroy(node);
-    }
-
     self.request_set_selection.link.remove();
     self.request_start_drag.link.remove();
     self.start_drag.link.remove();
@@ -149,14 +137,17 @@ pub fn deinit(self: *Self) void {
 }
 
 /// Set the current focus. If a visible view is passed it will be focused.
-/// If null is passed, the first visible view in the focus stack will be focused.
+/// If null is passed, the top view in the stack of the focused output will be focused.
 pub fn focus(self: *Self, _target: ?*View) void {
     var target = _target;
 
-    // Views may not recieve focus while locked.
+    // Don't change focus if there are no outputs.
+    if (self.focused_output == null) return;
+
+    // Views may not receive focus while locked.
     if (server.lock_manager.state != .unlocked) return;
 
-    // While a layer surface is exclusively focused, views may not recieve focus
+    // While a layer surface is exclusively focused, views may not receive focus
     if (self.focused == .layer) {
         const wlr_layer_surface = self.focused.layer.scene_layer_surface.layer_surface;
         if (wlr_layer_surface.current.keyboard_interactive == .exclusive and
@@ -167,56 +158,45 @@ pub fn focus(self: *Self, _target: ?*View) void {
     }
 
     if (target) |view| {
-        // If the view is not currently visible, behave as if null was passed
-        if (view.pending.tags & view.output.pending.tags == 0) {
+        if (view.pending.tags & view.pending.output.?.pending.tags == 0) {
+            // If the view is not currently visible, behave as if null was passed
             target = null;
-        } else {
+        } else if (view.pending.output.? != self.focused_output.?) {
             // If the view is not on the currently focused output, focus it
-            if (view.output != self.focused_output) self.focusOutput(view.output);
+            self.focusOutput(view.pending.output.?);
         }
     }
 
-    // If the target view is not fullscreen or null, then a fullscreen view
-    // will grab focus if visible.
-    if (if (target) |v| !v.pending.fullscreen else true) {
-        const tags = self.focused_output.pending.tags;
-        var it = ViewStack(*View).iter(self.focus_stack.first, .forward, tags, pendingFilter);
-        target = while (it.next()) |view| {
-            if (view.output == self.focused_output and view.pending.fullscreen) break view;
-        } else target;
+    {
+        var it = self.focused_output.?.pending.focus_stack.iterator(.forward);
+        while (it.next()) |view| {
+            if (view.pending.fullscreen and
+                view.pending.tags & self.focused_output.?.pending.tags != 0)
+            {
+                target = view;
+                break;
+            }
+        }
     }
 
+    // If null, set the target to the first currently visible view in the focus stack if any
     if (target == null) {
-        // Set view to the first currently visible view in the focus stack if any
-        const tags = self.focused_output.pending.tags;
-        var it = ViewStack(*View).iter(self.focus_stack.first, .forward, tags, pendingFilter);
+        var it = self.focused_output.?.pending.focus_stack.iterator(.forward);
         target = while (it.next()) |view| {
-            if (view.output == self.focused_output) break view;
+            if (view.pending.tags & self.focused_output.?.pending.tags != 0) {
+                break view;
+            }
         } else null;
     }
 
     // Focus the target view or clear the focus if target is null
     if (target) |view| {
-        // Find the node for this view in the focus stack and move it to the top.
-        var it = self.focus_stack.first;
-        while (it) |node| : (it = node.next) {
-            if (node.view == view) {
-                self.focus_stack.remove(node);
-                self.focus_stack.push(node);
-                break;
-            }
-        } else {
-            // A node is added when new Views are mapped in Seat.handleViewMap()
-            unreachable;
-        }
+        view.pending_focus_stack_link.remove();
+        self.focused_output.?.pending.focus_stack.prepend(view);
         self.setFocusRaw(.{ .view = view });
     } else {
         self.setFocusRaw(.{ .none = {} });
     }
-}
-
-fn pendingFilter(view: *View, filter_tags: u32) bool {
-    return view.tree.node.enabled and view.pending.tags & filter_tags != 0;
 }
 
 /// Switch focus to the target, handling unfocus and input inhibition
@@ -252,7 +232,7 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
     switch (new_focus) {
         .view => |target_view| {
             assert(server.lock_manager.state != .locked);
-            assert(self.focused_output == target_view.output);
+            assert(self.focused_output == target_view.pending.output);
             if (target_view.pending.focus == 0) target_view.setActivated(true);
             target_view.pending.focus += 1;
             target_view.pending.urgent = false;
@@ -314,46 +294,24 @@ fn keyboardNotifyEnter(self: *Self, wlr_surface: *wlr.Surface) void {
 }
 
 /// Focus the given output, notifying any listening clients of the change.
-pub fn focusOutput(self: *Self, output: *Output) void {
+pub fn focusOutput(self: *Self, output: ?*Output) void {
     if (self.focused_output == output) return;
 
-    var it = self.status_trackers.first;
-    while (it) |node| : (it = node.next) node.data.sendOutput(.unfocused);
+    if (self.focused_output) |old| {
+        var it = self.status_trackers.first;
+        while (it) |node| : (it = node.next) node.data.sendOutput(old, .unfocused);
+    }
 
     self.focused_output = output;
 
-    it = self.status_trackers.first;
-    while (it) |node| : (it = node.next) node.data.sendOutput(.focused);
+    if (self.focused_output) |new| {
+        var it = self.status_trackers.first;
+        while (it) |node| : (it = node.next) node.data.sendOutput(new, .focused);
+    }
 }
 
 pub fn handleActivity(self: Self) void {
     server.input_manager.idle_notifier.notifyActivity(self.wlr_seat);
-}
-
-pub fn handleViewMap(self: *Self, view: *View) !void {
-    const new_focus_node = try util.gpa.create(ViewStack(*View).Node);
-    new_focus_node.view = view;
-    self.focus_stack.append(new_focus_node);
-    self.focus(view);
-}
-
-/// Handle the unmapping of a view, removing it from the focus stack and
-/// setting the focus if needed.
-pub fn handleViewUnmap(self: *Self, view: *View) void {
-    // Remove the node from the focus stack and destroy it.
-    var it = self.focus_stack.first;
-    while (it) |node| : (it = node.next) {
-        if (node.view == view) {
-            self.focus_stack.remove(node);
-            util.gpa.destroy(node);
-            break;
-        }
-    }
-
-    self.cursor.handleViewUnmap(view);
-
-    // If the unmapped view is focused, choose a new focus
-    if (self.focused == .view and self.focused.view == view) self.focus(null);
 }
 
 pub fn enterMode(self: *Self, mode_id: u32) void {

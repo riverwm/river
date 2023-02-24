@@ -33,7 +33,6 @@ const LockSurface = @import("LockSurface.zig");
 const Output = @import("Output.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
 const View = @import("View.zig");
-const ViewStack = @import("view_stack.zig").ViewStack;
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
 scene: *wlr.Scene,
@@ -51,6 +50,25 @@ layers: struct {
     /// to place themselves in layout coordinates. Unfortunately this is how
     /// X11 decided to make dropdown menus and the like possible.
     xwayland_override_redirect: if (build_options.xwayland) *wlr.SceneTree else void,
+},
+
+/// This is kind of like an imaginary output where views start and end their life.
+/// It is also used to store views and tags when no actual outputs are available.
+hidden: struct {
+    /// This tree is always disabled.
+    tree: *wlr.SceneTree,
+
+    tags: u32 = 1 << 0,
+
+    pending: struct {
+        focus_stack: wl.list.Head(View, .pending_focus_stack_link),
+        wm_stack: wl.list.Head(View, .pending_wm_stack_link),
+    },
+
+    inflight: struct {
+        focus_stack: wl.list.Head(View, .inflight_focus_stack_link),
+        wm_stack: wl.list.Head(View, .inflight_wm_stack_link),
+    },
 },
 
 new_output: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleNewOutput),
@@ -74,17 +92,14 @@ all_outputs: std.TailQueue(*Output) = .{},
 /// A list of all active outputs. See Output.active
 outputs: std.TailQueue(Output) = .{},
 
-/// This output is used internally when no real outputs are available.
-/// It is not advertised to clients.
-noop_output: Output = undefined,
-
-/// Number of layout demands pending before the transaction may be started.
-pending_layout_demands: u32 = 0,
-/// Number of pending configures sent in the current transaction.
-/// A value of 0 means there is no current transaction.
-pending_configures: u32 = 0,
-/// Handles timeout of transactions
-transaction_timer: *wl.EventSource,
+/// Number of layout demands before sending configures to clients.
+inflight_layout_demands: u32 = 0,
+/// Number of inflight configures sent in the current transaction.
+inflight_configures: u32 = 0,
+transaction_timeout: *wl.EventSource,
+/// Set to true if applyPending() is called while a transaction is inflight.
+/// If true when a transaction completes will cause applyPending() to be called again.
+pending_state_dirty: bool = false,
 
 pub fn init(self: *Self) !void {
     const output_layout = try wlr.OutputLayout.create();
@@ -95,6 +110,8 @@ pub fn init(self: *Self) !void {
 
     const interactive_content = try scene.tree.createSceneTree();
     const drag_icons = try scene.tree.createSceneTree();
+    const hidden_tree = try scene.tree.createSceneTree();
+    hidden_tree.node.setEnabled(false);
 
     const outputs = try interactive_content.createSceneTree();
     const xwayland_override_redirect = if (build_options.xwayland) try interactive_content.createSceneTree();
@@ -104,13 +121,8 @@ pub fn init(self: *Self) !void {
     _ = try wlr.XdgOutputManagerV1.create(server.wl_server, output_layout);
 
     const event_loop = server.wl_server.getEventLoop();
-    const transaction_timer = try event_loop.addTimer(*Self, handleTransactionTimeout, self);
-    errdefer transaction_timer.remove();
-
-    // TODO get rid of this hack somehow
-    const noop_wlr_output = try server.headless_backend.headlessAddOutput(1920, 1080);
-    const noop_tree = try outputs.createSceneTree();
-    noop_tree.node.setEnabled(false);
+    const transaction_timeout = try event_loop.addTimer(*Self, handleTransactionTimeout, self);
+    errdefer transaction_timeout.remove();
 
     self.* = .{
         .scene = scene,
@@ -120,33 +132,26 @@ pub fn init(self: *Self) !void {
             .outputs = outputs,
             .xwayland_override_redirect = xwayland_override_redirect,
         },
+        .hidden = .{
+            .tree = hidden_tree,
+            .pending = .{
+                .focus_stack = undefined,
+                .wm_stack = undefined,
+            },
+            .inflight = .{
+                .focus_stack = undefined,
+                .wm_stack = undefined,
+            },
+        },
         .output_layout = output_layout,
         .output_manager = try wlr.OutputManagerV1.create(server.wl_server),
         .power_manager = try wlr.OutputPowerManagerV1.create(server.wl_server),
-        .transaction_timer = transaction_timer,
-        .noop_output = .{
-            .wlr_output = noop_wlr_output,
-            .tree = noop_tree,
-            .normal_content = try noop_tree.createSceneTree(),
-            .locked_content = try noop_tree.createSceneTree(),
-            .layers = .{
-                .background_color_rect = try noop_tree.createSceneRect(
-                    0,
-                    0,
-                    &server.config.background_color,
-                ),
-                .background = try noop_tree.createSceneTree(),
-                .bottom = try noop_tree.createSceneTree(),
-                .views = try noop_tree.createSceneTree(),
-                .top = try noop_tree.createSceneTree(),
-                .fullscreen = try noop_tree.createSceneTree(),
-                .overlay = try noop_tree.createSceneTree(),
-                .popups = try noop_tree.createSceneTree(),
-            },
-            .usable_box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
-        },
+        .transaction_timeout = transaction_timeout,
     };
-    noop_wlr_output.data = @ptrToInt(&self.noop_output);
+    self.hidden.pending.focus_stack.init();
+    self.hidden.pending.wm_stack.init();
+    self.hidden.inflight.focus_stack.init();
+    self.hidden.inflight.wm_stack.init();
 
     server.backend.events.new_output.add(&self.new_output);
     self.output_manager.events.apply.add(&self.manager_apply);
@@ -158,7 +163,7 @@ pub fn init(self: *Self) !void {
 pub fn deinit(self: *Self) void {
     self.scene.tree.node.destroy();
     self.output_layout.destroy();
-    self.transaction_timer.remove();
+    self.transaction_timeout.remove();
 }
 
 pub const AtResult = struct {
@@ -190,28 +195,23 @@ pub fn at(self: Self, lx: f64, ly: f64) ?AtResult {
         break :blk null;
     };
 
-    {
-        var it: ?*wlr.SceneNode = node_at;
-        while (it) |node| : (it = node.parent) {
-            if (@intToPtr(?*SceneNodeData, node.data)) |scene_node_data| {
-                return .{
-                    .surface = surface,
-                    .sx = sx,
-                    .sy = sy,
-                    .node = switch (scene_node_data.data) {
-                        .view => |view| .{ .view = view },
-                        .layer_surface => |layer_surface| .{ .layer_surface = layer_surface },
-                        .lock_surface => |lock_surface| .{ .lock_surface = lock_surface },
-                        .xwayland_override_redirect => |xwayland_override_redirect| .{
-                            .xwayland_override_redirect = xwayland_override_redirect,
-                        },
-                    },
-                };
-            }
-        }
+    if (SceneNodeData.get(node_at)) |scene_node_data| {
+        return .{
+            .surface = surface,
+            .sx = sx,
+            .sy = sy,
+            .node = switch (scene_node_data.data) {
+                .view => |view| .{ .view = view },
+                .layer_surface => |layer_surface| .{ .layer_surface = layer_surface },
+                .lock_surface => |lock_surface| .{ .lock_surface = lock_surface },
+                .xwayland_override_redirect => |xwayland_override_redirect| .{
+                    .xwayland_override_redirect = xwayland_override_redirect,
+                },
+            },
+        };
+    } else {
+        return null;
     }
-
-    return null;
 }
 
 fn handleNewOutput(_: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
@@ -230,34 +230,50 @@ fn handleNewOutput(_: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
 
 /// Remove the output from self.outputs and evacuate views if it is a member of
 /// the list. The node is not freed
-pub fn removeOutput(self: *Self, output: *Output) void {
-    const node = @fieldParentPtr(std.TailQueue(Output).Node, "data", output);
+pub fn removeOutput(root: *Self, output: *Output) void {
+    {
+        const node = @fieldParentPtr(std.TailQueue(Output).Node, "data", output);
 
-    // If the node has already been removed, do nothing
-    var output_it = self.outputs.first;
-    while (output_it) |n| : (output_it = n.next) {
-        if (n == node) break;
-    } else return;
+        // If the node has already been removed, do nothing
+        var output_it = root.outputs.first;
+        while (output_it) |n| : (output_it = n.next) {
+            if (n == node) break;
+        } else return;
 
-    self.outputs.remove(node);
+        root.outputs.remove(node);
+    }
 
-    // Use the first output in the list as fallback. If the last real output
-    // is being removed, use the noop output.
-    const fallback_output = blk: {
-        if (self.outputs.first) |output_node| {
-            break :blk &output_node.data;
-        } else {
-            // Store the focused output tags if we are hotplugged down to
-            // 0 real outputs so they can be restored on gaining a new output.
-            self.noop_output.current.tags = output.current.tags;
-            break :blk &self.noop_output;
+    if (output.inflight.layout_demand) |layout_demand| {
+        layout_demand.deinit();
+        output.inflight.layout_demand = null;
+    }
+    while (output.layouts.first) |node| node.data.destroy();
+
+    {
+        var it = output.inflight.focus_stack.iterator(.forward);
+        while (it.next()) |view| {
+            view.inflight.output = null;
+            view.current.output = null;
+            view.tree.node.reparent(root.hidden.tree);
+            view.popup_tree.node.reparent(root.hidden.tree);
         }
-    };
-
-    // Move all views from the destroyed output to the fallback one
-    while (output.views.last) |view_node| {
-        const view = &view_node.view;
-        view.sendToOutput(fallback_output);
+        root.hidden.inflight.focus_stack.prependList(&output.inflight.focus_stack);
+        root.hidden.inflight.wm_stack.prependList(&output.inflight.wm_stack);
+    }
+    // Use the first output in the list as fallback. If the last real output
+    // is being removed store the views in Root.hidden.
+    const fallback_output = if (root.outputs.first) |node| &node.data else null;
+    if (fallback_output) |fallback| {
+        var it = output.pending.focus_stack.safeIterator(.reverse);
+        while (it.next()) |view| view.setPendingOutput(fallback);
+    } else {
+        var it = output.pending.focus_stack.iterator(.forward);
+        while (it.next()) |view| view.pending.output = null;
+        root.hidden.pending.focus_stack.prependList(&output.pending.focus_stack);
+        root.hidden.pending.wm_stack.prependList(&output.pending.wm_stack);
+        // Store the focused output tags if we are hotplugged down to
+        // 0 real outputs so they can be restored on gaining a new output.
+        root.hidden.tags = output.pending.tags;
     }
 
     // Close all layer surfaces on the removed output
@@ -282,211 +298,320 @@ pub fn removeOutput(self: *Self, output: *Output) void {
         }
     }
 
-    // Destroy all layouts of the output
-    while (output.layouts.first) |layout_node| layout_node.data.destroy();
-
     while (output.status_trackers.first) |status_node| status_node.data.destroy();
 
-    // Arrange the root in case evacuated views affect the layout
-    fallback_output.arrangeViews();
-    self.startTransaction();
+    root.applyPending();
 }
 
 /// Add the output to self.outputs and the output layout if it has not
 /// already been added.
-pub fn addOutput(self: *Self, output: *Output) void {
+pub fn addOutput(root: *Self, output: *Output) void {
     const node = @fieldParentPtr(std.TailQueue(Output).Node, "data", output);
 
     // If we have already added the output, do nothing and return
-    var output_it = self.outputs.first;
+    var output_it = root.outputs.first;
     while (output_it) |n| : (output_it = n.next) if (n == node) return;
 
-    self.outputs.append(node);
+    root.outputs.append(node);
 
-    // This aarranges outputs from left-to-right in the order they appear. The
+    // This arranges outputs from left-to-right in the order they appear. The
     // wlr-output-management protocol may be used to modify this arrangement.
     // This also creates a wl_output global which is advertised to clients.
-    self.output_layout.addAuto(output.wlr_output);
+    root.output_layout.addAuto(output.wlr_output);
 
-    const layout_output = self.output_layout.get(output.wlr_output).?;
+    const layout_output = root.output_layout.get(output.wlr_output).?;
     output.tree.node.setEnabled(true);
     output.tree.node.setPosition(layout_output.x, layout_output.y);
 
-    // If we previously had no real outputs, move focus from the noop output
-    // to the new one.
-    if (self.outputs.len == 1) {
-        // Restore the focused tags of the last output to be removed
-        output.pending.tags = self.noop_output.current.tags;
-        output.current.tags = self.noop_output.current.tags;
+    // If we previously had no outputs move all views to the new output and focus it.
+    if (root.outputs.len == 1) {
+        output.pending.tags = root.hidden.tags;
+        {
+            var it = root.hidden.pending.focus_stack.safeIterator(.reverse);
+            while (it.next()) |view| view.setPendingOutput(output);
+            assert(root.hidden.pending.focus_stack.empty());
+            assert(root.hidden.pending.wm_stack.empty());
+            assert(root.hidden.inflight.focus_stack.empty());
+            assert(root.hidden.inflight.wm_stack.empty());
+        }
+        {
+            // Focus the new output with all seats
+            var it = server.input_manager.seats.first;
+            while (it) |seat_node| : (it = seat_node.next) {
+                const seat = &seat_node.data;
+                seat.focusOutput(output);
+                seat.focus(null);
+            }
+        }
+        root.applyPending();
+    }
+}
 
-        // Move all views from noop output to the new output
-        while (self.noop_output.views.last) |n| n.view.sendToOutput(output);
+/// Trigger asynchronous application of pending state for all outputs and views.
+/// Changes will not be applied to the scene graph until the layout generator
+/// generates a new layout for all outputs and all affected clients ack a
+/// configure and commit a new buffer.
+pub fn applyPending(root: *Self) void {
+    // If there is already a transaction inflight, wait until it completes.
+    if (root.inflight_layout_demands > 0 or root.inflight_configures > 0) {
+        root.pending_state_dirty = true;
+        return;
+    }
+    root.pending_state_dirty = false;
 
-        // Focus the new output with all seats
-        var it = server.input_manager.seats.first;
-        while (it) |seat_node| : (it = seat_node.next) {
-            const seat = &seat_node.data;
-            seat.focusOutput(output);
-            seat.focus(null);
+    {
+        var it = root.hidden.pending.focus_stack.iterator(.forward);
+        while (it.next()) |view| {
+            assert(view.pending.output == null);
+            view.inflight.output = null;
+            view.inflight_focus_stack_link.remove();
+            root.hidden.inflight.focus_stack.append(view);
         }
     }
-}
 
-/// Arrange all views on all outputs
-pub fn arrangeAll(self: *Self) void {
-    var it = self.outputs.first;
-    while (it) |node| : (it = node.next) node.data.arrangeViews();
-}
-
-/// Record the number of currently pending layout demands so that a transaction
-/// can be started once all are either complete or have timed out.
-pub fn trackLayoutDemands(self: *Self) void {
-    self.pending_layout_demands = 0;
-
-    var it = self.outputs.first;
-    while (it) |node| : (it = node.next) {
-        if (node.data.layout_demand != null) self.pending_layout_demands += 1;
+    {
+        var it = root.hidden.pending.wm_stack.iterator(.forward);
+        while (it.next()) |view| {
+            view.inflight_wm_stack_link.remove();
+            root.hidden.inflight.wm_stack.append(view);
+        }
     }
-    assert(self.pending_layout_demands > 0);
+
+    var output_it = root.outputs.first;
+    while (output_it) |node| : (output_it = node.next) {
+        const output = &node.data;
+
+        if (output.inflight.fullscreen) |view| {
+            if (!view.pending.fullscreen or view.pending.tags & output.pending.tags == 0) {
+                output.inflight.fullscreen = null;
+
+                view.setFullscreen(false);
+                view.pending.box = view.post_fullscreen_box;
+            }
+        }
+
+        // Iterate the focus stack in order to ensure the currently focused/most
+        // recently focused view that requests fullscreen is given fullscreen.
+        {
+            var it = output.pending.focus_stack.iterator(.forward);
+            while (it.next()) |view| {
+                assert(view.pending.output == output);
+
+                if (view.current.float and !view.pending.float) {
+                    // If switching from float to non-float, save the dimensions.
+                    view.float_box = view.current.box;
+                } else if (!view.current.float and view.pending.float) {
+                    // If switching from non-float to float, apply the saved float dimensions.
+                    view.pending.box = view.float_box;
+                }
+
+                if (output.inflight.fullscreen == null) {
+                    if (view.pending.fullscreen and view.pending.tags & output.pending.tags != 0) {
+                        output.inflight.fullscreen = view;
+
+                        view.setFullscreen(true);
+                        view.post_fullscreen_box = view.pending.box;
+                        view.pending.box = .{
+                            .x = 0,
+                            .y = 0,
+                            .width = undefined,
+                            .height = undefined,
+                        };
+                        output.wlr_output.effectiveResolution(
+                            &view.pending.box.width,
+                            &view.pending.box.height,
+                        );
+                    }
+                }
+
+                view.inflight_focus_stack_link.remove();
+                output.inflight.focus_stack.append(view);
+
+                view.inflight = view.pending;
+            }
+        }
+
+        {
+            var it = output.pending.wm_stack.iterator(.forward);
+            while (it.next()) |view| {
+                view.inflight_wm_stack_link.remove();
+                output.inflight.wm_stack.append(view);
+            }
+        }
+
+        output.inflight.tags = output.pending.tags;
+
+        assert(output.inflight.layout_demand == null);
+        if (output.layout) |layout| {
+            var layout_count: u32 = 0;
+            {
+                var it = output.inflight.wm_stack.iterator(.forward);
+                while (it.next()) |view| {
+                    if (!view.inflight.float and !view.inflight.fullscreen and
+                        view.inflight.tags & output.inflight.tags != 0)
+                    {
+                        layout_count += 1;
+                    }
+                }
+            }
+
+            if (layout_count > 0) {
+                // TODO don't do this if the count has not changed
+                layout.startLayoutDemand(layout_count);
+            }
+        }
+    }
+
+    if (root.inflight_layout_demands == 0) {
+        root.sendConfigures();
+    }
 }
 
 /// This function is used to inform the transaction system that a layout demand
 /// has either been completed or timed out. If it was the last pending layout
 /// demand in the current sequence, a transaction is started.
-pub fn notifyLayoutDemandDone(self: *Self) void {
-    self.pending_layout_demands -= 1;
-    if (self.pending_layout_demands == 0) self.startTransaction();
+pub fn notifyLayoutDemandDone(root: *Self) void {
+    root.inflight_layout_demands -= 1;
+    if (root.inflight_layout_demands == 0) {
+        root.sendConfigures();
+    }
 }
 
-/// Initiate an atomic change to the layout. This change will not be
-/// applied until all affected clients ack a configure and commit a buffer.
-pub fn startTransaction(self: *Self) void {
-    // If one or more layout demands are currently in progress, postpone
-    // transactions until they complete. Every frame must be perfect.
-    if (self.pending_layout_demands > 0) return;
-
-    // If a new transaction is started while another is in progress, we need
-    // to reset the pending count to 0 and clear serials from the views
-    const preempting = self.pending_configures > 0;
-    self.pending_configures = 0;
+fn sendConfigures(root: *Self) void {
+    assert(root.inflight_layout_demands == 0);
+    assert(root.inflight_configures == 0);
 
     // Iterate over all views of all outputs
-    var output_it = self.outputs.first;
+    var output_it = root.outputs.first;
     while (output_it) |output_node| : (output_it = output_node.next) {
-        var view_it = output_node.data.views.first;
-        while (view_it) |view_node| : (view_it = view_node.next) {
-            const view = &view_node.view;
+        const output = &output_node.data;
 
-            if (!view.tree.node.enabled) continue;
+        var focus_stack_it = output.inflight.focus_stack.iterator(.forward);
+        while (focus_stack_it.next()) |view| {
+            if (view.needsConfigure()) {
+                view.configure();
 
-            if (view.shouldTrackConfigure()) {
-                // Clear the serial in case this transaction is interrupting a prior one.
-                view.pending_serial = null;
-
-                if (view.needsConfigure()) {
-                    view.configure();
-                    self.pending_configures += 1;
-
-                    // Send a frame done that the client will commit a new frame
-                    // with the dimensions we sent in the configure. Normally this
-                    // event would be sent in the render function.
+                // We don't give a damn about frame perfection for xwayland views
+                if (!build_options.xwayland or view.impl != .xwayland_view) {
+                    root.inflight_configures += 1;
+                    view.saveSurfaceTree();
                     view.sendFrameDone();
                 }
-
-                // If the saved surface tree is enabled, then this transaction is interrupting
-                // a previous transaction and we should keep the old surface tree.
-                if (!view.saved_surface_tree.node.enabled) view.saveSurfaceTree();
-            } else {
-                if (view.needsConfigure()) view.configure();
             }
         }
     }
 
-    if (self.pending_configures > 0) {
+    if (root.inflight_configures > 0) {
         std.log.scoped(.transaction).debug("started transaction with {} pending configure(s)", .{
-            self.pending_configures,
+            root.inflight_configures,
         });
 
-        // Timeout the transaction after 200ms. If we are preempting an
-        // already in progress transaction, don't extend the timeout.
-        if (!preempting) {
-            self.transaction_timer.timerUpdate(200) catch {
-                std.log.scoped(.transaction).err("failed to update timer", .{});
-                self.commitTransaction();
-            };
-        }
+        root.transaction_timeout.timerUpdate(200) catch {
+            std.log.scoped(.transaction).err("failed to update timer", .{});
+            root.commitTransaction();
+        };
     } else {
-        // No views need configures, clear the current timer in case we are
-        // interrupting another transaction and commit.
-        self.transaction_timer.timerUpdate(0) catch std.log.scoped(.transaction).err("error disarming timer", .{});
-        self.commitTransaction();
+        root.commitTransaction();
     }
 }
 
 fn handleTransactionTimeout(self: *Self) c_int {
+    assert(self.inflight_layout_demands == 0);
+
     std.log.scoped(.transaction).err("timeout occurred, some imperfect frames may be shown", .{});
 
-    self.pending_configures = 0;
+    self.inflight_configures = 0;
     self.commitTransaction();
 
     return 0;
 }
 
 pub fn notifyConfigured(self: *Self) void {
-    self.pending_configures -= 1;
-    if (self.pending_configures == 0) {
+    assert(self.inflight_layout_demands == 0);
+
+    self.inflight_configures -= 1;
+    if (self.inflight_configures == 0) {
         // Disarm the timer, as we didn't timeout
-        self.transaction_timer.timerUpdate(0) catch std.log.scoped(.transaction).err("error disarming timer", .{});
+        self.transaction_timeout.timerUpdate(0) catch std.log.scoped(.transaction).err("error disarming timer", .{});
         self.commitTransaction();
     }
 }
 
-/// Apply the pending state and drop stashed buffers. This means that
+/// Apply the inflight state and drop stashed buffers. This means that
 /// the next frame drawn will be the post-transaction state of the
 /// layout. Should only be called after all clients have configured for
 /// the new layout. If called early imperfect frames may be drawn.
-fn commitTransaction(self: *Self) void {
-    assert(self.pending_configures == 0);
+fn commitTransaction(root: *Self) void {
+    assert(root.inflight_layout_demands == 0);
+    assert(root.inflight_configures == 0);
 
-    // Iterate over all views of all outputs
-    var output_it = self.outputs.first;
+    {
+        var it = root.hidden.inflight.focus_stack.safeIterator(.forward);
+        while (it.next()) |view| {
+            assert(view.inflight.output == null);
+            view.current.output = null;
+
+            view.tree.node.reparent(root.hidden.tree);
+            view.popup_tree.node.reparent(root.hidden.tree);
+
+            view.updateCurrent();
+        }
+    }
+
+    var output_it = root.outputs.first;
     while (output_it) |output_node| : (output_it = output_node.next) {
         const output = &output_node.data;
 
-        // Apply pending state of the output
-        if (output.pending.tags != output.current.tags) {
+        if (output.inflight.tags != output.current.tags) {
             std.log.scoped(.output).debug(
                 "changing current focus: {b:0>10} to {b:0>10}",
-                .{ output.current.tags, output.pending.tags },
+                .{ output.current.tags, output.inflight.tags },
             );
+
+            output.current.tags = output.pending.tags;
+
             var it = output.status_trackers.first;
-            while (it) |node| : (it = node.next) node.data.sendFocusedTags(output.pending.tags);
+            while (it) |node| : (it = node.next) node.data.sendFocusedTags(output.current.tags);
         }
-        output.current = output.pending;
+
+        if (output.inflight.fullscreen != output.current.fullscreen) {
+            if (output.current.fullscreen) |view| {
+                if (view.inflight.output) |new_output| {
+                    view.tree.node.reparent(new_output.layers.views);
+                } else {
+                    view.tree.node.reparent(root.hidden.tree);
+                }
+            }
+            if (output.inflight.fullscreen) |view| {
+                assert(view.inflight.output == output);
+                view.tree.node.reparent(output.layers.fullscreen);
+            }
+            output.current.fullscreen = output.inflight.fullscreen;
+            output.layers.fullscreen.node.setEnabled(output.current.fullscreen != null);
+        }
 
         var view_tags_changed = false;
         var urgent_tags_dirty = false;
 
-        var view_it = output.views.first;
-        while (view_it) |view_node| {
-            const view = &view_node.view;
-            view_it = view_node.next;
+        var focus_stack_it = output.inflight.focus_stack.iterator(.forward);
+        while (focus_stack_it.next()) |view| {
+            assert(view.inflight.output == output);
 
-            if (!view.tree.node.enabled) {
-                view.dropSavedSurfaceTree();
-                view.output.views.remove(view_node);
-                if (view.destroying) view.destroy();
-                continue;
+            view.inflight_serial = null;
+
+            if (view.inflight.tags != view.current.tags) view_tags_changed = true;
+            if (view.inflight.urgent != view.current.urgent) urgent_tags_dirty = true;
+            if (view.inflight.urgent and view_tags_changed) urgent_tags_dirty = true;
+
+            if (view.current.output != output) {
+                view.tree.node.reparent(output.layers.views);
+                view.popup_tree.node.reparent(output.layers.popups);
             }
-            assert(!view.destroying);
-
-            if (view.pending_serial != null and !view.shouldTrackConfigure()) continue;
-
-            // Apply pending state of the view
-            view.pending_serial = null;
-            if (view.pending.tags != view.current.tags) view_tags_changed = true;
-            if (view.pending.urgent != view.current.urgent) urgent_tags_dirty = true;
-            if (view.pending.urgent and view_tags_changed) urgent_tags_dirty = true;
+            const enabled = view.current.tags & output.current.tags != 0;
+            view.tree.node.setEnabled(enabled);
+            view.popup_tree.node.setEnabled(enabled);
+            // TODO this approach for syncing the order will likely cause over-damaging.
+            view.tree.node.lowerToBottom();
 
             view.updateCurrent();
         }
@@ -494,8 +619,25 @@ fn commitTransaction(self: *Self) void {
         if (view_tags_changed) output.sendViewTags();
         if (urgent_tags_dirty) output.sendUrgentTags();
     }
-    server.input_manager.updateCursorState();
+
+    {
+        var it = server.input_manager.seats.first;
+        while (it) |node| : (it = node.next) node.data.cursor.updateState();
+    }
+
+    {
+        // This must be done after updating cursor state in case the view was the target of move/resize.
+        var it = root.hidden.inflight.focus_stack.safeIterator(.forward);
+        while (it.next()) |view| {
+            if (view.destroying) view.destroy();
+        }
+    }
+
     server.idle_inhibitor_manager.idleInhibitCheckActive();
+
+    if (root.pending_state_dirty) {
+        root.applyPending();
+    }
 }
 
 /// Send the new output configuration to all wlr-output-manager clients
@@ -582,7 +724,7 @@ fn processOutputConfig(
         }
     }
 
-    if (action == .apply) self.startTransaction();
+    if (action == .apply) self.applyPending();
 
     if (success) {
         config.sendSucceeded();

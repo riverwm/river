@@ -24,8 +24,12 @@ const util = @import("util.zig");
 
 const Server = @import("Server.zig");
 const Mode = @import("Mode.zig");
-const AttachMode = @import("view_stack.zig").AttachMode;
 const View = @import("View.zig");
+
+pub const AttachMode = enum {
+    top,
+    bottom,
+};
 
 pub const FocusFollowsCursorMode = enum {
     disabled,

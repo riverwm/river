@@ -24,14 +24,11 @@ const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Output = @import("Output.zig");
+const SceneNodeData = @import("SceneNodeData.zig");
 
 const log = std.log.scoped(.xdg_popup);
 
 wlr_xdg_popup: *wlr.XdgPopup,
-/// This isn't terribly clean, but pointing to the output field of the parent
-/// View or LayerSurface struct is ok in practice as all popups are destroyed
-/// before their parent View or LayerSurface.
-output: *const *Output,
 /// The root of the surface tree, i.e. the View or LayerSurface popup_tree.
 root: *wlr.SceneTree,
 
@@ -41,18 +38,17 @@ destroy: wl.Listener(void) = wl.Listener(void).init(handleDestroy),
 new_popup: wl.Listener(*wlr.XdgPopup) = wl.Listener(*wlr.XdgPopup).init(handleNewPopup),
 reposition: wl.Listener(void) = wl.Listener(void).init(handleReposition),
 
+// TODO check if popup is set_reactive and reposition on parent movement.
 pub fn create(
     wlr_xdg_popup: *wlr.XdgPopup,
     root: *wlr.SceneTree,
     parent: *wlr.SceneTree,
-    output: *const *Output,
 ) error{OutOfMemory}!void {
     const xdg_popup = try util.gpa.create(XdgPopup);
     errdefer util.gpa.destroy(xdg_popup);
 
     xdg_popup.* = .{
         .wlr_xdg_popup = wlr_xdg_popup,
-        .output = output,
         .root = root,
         .tree = try parent.createSceneXdgSurface(wlr_xdg_popup.base),
     };
@@ -81,7 +77,6 @@ fn handleNewPopup(listener: *wl.Listener(*wlr.XdgPopup), wlr_xdg_popup: *wlr.Xdg
         wlr_xdg_popup,
         xdg_popup.root,
         xdg_popup.tree,
-        xdg_popup.output,
     ) catch {
         wlr_xdg_popup.resource.postNoMemory();
         return;
@@ -91,8 +86,14 @@ fn handleNewPopup(listener: *wl.Listener(*wlr.XdgPopup), wlr_xdg_popup: *wlr.Xdg
 fn handleReposition(listener: *wl.Listener(void)) void {
     const xdg_popup = @fieldParentPtr(XdgPopup, "reposition", listener);
 
+    const output = switch (SceneNodeData.get(&xdg_popup.root.node).?.data) {
+        .view => |view| view.current.output orelse return,
+        .layer_surface => |layer_surface| layer_surface.output,
+        else => unreachable,
+    };
+
     var box: wlr.Box = undefined;
-    server.root.output_layout.getBox(xdg_popup.output.*.wlr_output, &box);
+    server.root.output_layout.getBox(output.wlr_output, &box);
 
     var root_lx: c_int = undefined;
     var root_ly: c_int = undefined;

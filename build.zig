@@ -123,7 +123,47 @@ pub fn build(b: *zbs.Builder) !void {
         river.setBuildMode(mode);
         river.addOptions("build_options", options);
 
-        addServerDeps(river, scanner);
+        const wayland = zbs.Pkg{
+            .name = "wayland",
+            .source = .{ .generated = &scanner.result },
+        };
+        const xkbcommon = zbs.Pkg{
+            .name = "xkbcommon",
+            .source = .{ .path = "deps/zig-xkbcommon/src/xkbcommon.zig" },
+        };
+        const pixman = zbs.Pkg{
+            .name = "pixman",
+            .source = .{ .path = "deps/zig-pixman/pixman.zig" },
+        };
+        const wlroots = zbs.Pkg{
+            .name = "wlroots",
+            .source = .{ .path = "deps/zig-wlroots/src/wlroots.zig" },
+            .dependencies = &[_]zbs.Pkg{ wayland, xkbcommon, pixman },
+        };
+
+        river.step.dependOn(&scanner.step);
+
+        river.linkLibC();
+        river.linkSystemLibrary("libevdev");
+        river.linkSystemLibrary("libinput");
+
+        river.addPackage(wayland);
+        river.linkSystemLibrary("wayland-server");
+
+        river.addPackage(xkbcommon);
+        river.linkSystemLibrary("xkbcommon");
+
+        river.addPackage(pixman);
+        river.linkSystemLibrary("pixman-1");
+
+        river.addPackage(wlroots);
+        river.linkSystemLibrary("wlroots");
+
+        river.addPackagePath("flags", "common/flags.zig");
+        river.addCSourceFile("river/wlroots_log_wrapper.c", &[_][]const u8{ "-std=c99", "-O2" });
+
+        // TODO: remove when zig issue #131 is implemented
+        scanner.addCSource(river);
 
         river.strip = strip;
         river.pie = pie;
@@ -211,62 +251,6 @@ pub fn build(b: *zbs.Builder) !void {
     if (fish_completion) {
         b.installFile("completions/fish/riverctl.fish", "share/fish/vendor_completions.d/riverctl.fish");
     }
-
-    {
-        const river_test = b.addTest("river/test_main.zig");
-        river_test.setTarget(target);
-        river_test.setBuildMode(mode);
-        river_test.addOptions("build_options", options);
-
-        addServerDeps(river_test, scanner);
-
-        const test_step = b.step("test", "Run the tests");
-        test_step.dependOn(&river_test.step);
-    }
-}
-
-fn addServerDeps(exe: *zbs.LibExeObjStep, scanner: *ScanProtocolsStep) void {
-    const wayland = zbs.Pkg{
-        .name = "wayland",
-        .source = .{ .generated = &scanner.result },
-    };
-    const xkbcommon = zbs.Pkg{
-        .name = "xkbcommon",
-        .source = .{ .path = "deps/zig-xkbcommon/src/xkbcommon.zig" },
-    };
-    const pixman = zbs.Pkg{
-        .name = "pixman",
-        .source = .{ .path = "deps/zig-pixman/pixman.zig" },
-    };
-    const wlroots = zbs.Pkg{
-        .name = "wlroots",
-        .source = .{ .path = "deps/zig-wlroots/src/wlroots.zig" },
-        .dependencies = &[_]zbs.Pkg{ wayland, xkbcommon, pixman },
-    };
-
-    exe.step.dependOn(&scanner.step);
-
-    exe.linkLibC();
-    exe.linkSystemLibrary("libevdev");
-    exe.linkSystemLibrary("libinput");
-
-    exe.addPackage(wayland);
-    exe.linkSystemLibrary("wayland-server");
-
-    exe.addPackage(xkbcommon);
-    exe.linkSystemLibrary("xkbcommon");
-
-    exe.addPackage(pixman);
-    exe.linkSystemLibrary("pixman-1");
-
-    exe.addPackage(wlroots);
-    exe.linkSystemLibrary("wlroots");
-
-    exe.addPackagePath("flags", "common/flags.zig");
-    exe.addCSourceFile("river/wlroots_log_wrapper.c", &[_][]const u8{ "-std=c99", "-O2" });
-
-    // TODO: remove when zig issue #131 is implemented
-    scanner.addCSource(exe);
 }
 
 const ScdocStep = struct {

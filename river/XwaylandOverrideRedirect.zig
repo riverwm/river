@@ -27,7 +27,6 @@ const util = @import("util.zig");
 
 const SceneNodeData = @import("SceneNodeData.zig");
 const View = @import("View.zig");
-const ViewStack = @import("view_stack.zig").ViewStack;
 const XwaylandView = @import("XwaylandView.zig");
 
 const log = std.log.scoped(.xwayland);
@@ -151,7 +150,7 @@ fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSur
         }
     }
 
-    server.root.startTransaction();
+    server.root.applyPending();
 }
 
 fn handleSetGeometry(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
@@ -173,8 +172,7 @@ fn handleSetOverrideRedirect(
     if (xwayland_surface.mapped) handleUnmap(&self.unmap, xwayland_surface);
     handleDestroy(&self.destroy, xwayland_surface);
 
-    const output = server.input_manager.defaultSeat().focused_output;
-    XwaylandView.create(output, xwayland_surface) catch {
+    XwaylandView.create(xwayland_surface) catch {
         log.err("out of memory", .{});
         return;
     };

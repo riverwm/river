@@ -97,7 +97,7 @@ fn handleMap(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wl
 
     layer_surface.output.arrangeLayers();
     handleKeyboardInteractiveExclusive(layer_surface.output);
-    server.root.startTransaction();
+    server.root.applyPending();
 }
 
 fn handleUnmap(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wlr.LayerSurfaceV1) void {
@@ -107,7 +107,7 @@ fn handleUnmap(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *
 
     layer_surface.output.arrangeLayers();
     handleKeyboardInteractiveExclusive(layer_surface.output);
-    server.root.startTransaction();
+    server.root.applyPending();
 }
 
 fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
@@ -123,10 +123,12 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     }
 
     // If a surface is committed while it is not mapped, we must send a configure.
+    // TODO: this mapped check is not correct as it will be true in the commit
+    // that triggers the unmap as well.
     if (!wlr_layer_surface.mapped or @bitCast(u32, wlr_layer_surface.current.committed) != 0) {
         layer_surface.output.arrangeLayers();
         handleKeyboardInteractiveExclusive(layer_surface.output);
-        server.root.startTransaction();
+        server.root.applyPending();
     }
 }
 
@@ -183,7 +185,6 @@ fn handleNewPopup(listener: *wl.Listener(*wlr.XdgPopup), wlr_xdg_popup: *wlr.Xdg
         wlr_xdg_popup,
         layer_surface.popup_tree,
         layer_surface.popup_tree,
-        &layer_surface.output,
     ) catch {
         wlr_xdg_popup.resource.postNoMemory();
         return;

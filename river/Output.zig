@@ -37,23 +37,6 @@ const LockSurface = @import("LockSurface.zig");
 const OutputStatus = @import("OutputStatus.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
 const View = @import("View.zig");
-const ViewStack = @import("view_stack.zig").ViewStack;
-
-const State = struct {
-    /// A bit field of focused tags
-    tags: u32,
-
-    /// Active layout, or null if views are un-arranged.
-    ///
-    /// If null, views which are manually moved or resized (with the pointer or
-    /// or command) will not be automatically set to floating. Everything is
-    /// already floating, so this would be an unexpected change of a views state
-    /// the user will only notice once a layout affects the views. So instead we
-    /// "snap back" all manually moved views the next time a layout is active.
-    /// This is similar to dwms behvaviour. Note that this of course does not
-    /// affect already floating views.
-    layout: ?*Layout = null,
-};
 
 wlr_output: *wlr.Output,
 
@@ -87,9 +70,6 @@ layers: struct {
     popups: *wlr.SceneTree,
 },
 
-/// The top of the stack is the "most important" view.
-views: ViewStack(View) = .{},
-
 /// Tracks the currently presented frame on the output as it pertains to ext-session-lock.
 /// The output is initially considered blanked:
 /// If using the DRM backend it will be blanked with the initial modeset.
@@ -109,15 +89,65 @@ lock_render_state: enum {
     lock_surface,
 } = .blanked,
 
-/// The double-buffered state of the output.
-current: State = State{ .tags = 1 << 0 },
-pending: State = State{ .tags = 1 << 0 },
+/// The state of the output that is directly acted upon/modified through user input.
+///
+/// Pending state will be copied to the pending state and communicated to clients
+/// to be applied as a single atomic transaction across all clients as soon as any
+/// in progress transaction has been completed.
+///
+/// On completion of a transaction
+/// Any time pending state is modified Root.dirty must be set.
+///
+pending: struct {
+    /// A bit field of focused tags
+    tags: u32 = 1 << 0,
+    /// The stack of views in focus/rendering order.
+    ///
+    /// This contains views that aren't currently visible because they do not
+    /// match the tags of the output.
+    ///
+    /// This list is used to update the rendering order of nodes in the scene
+    /// graph when the pending state is committed.
+    focus_stack: wl.list.Head(View, .pending_focus_stack_link),
+    /// The stack of views acted upon by window management commands such
+    /// as focus-view, zoom, etc.
+    ///
+    /// This contains views that aren't currently visible because they do not
+    /// match the tags of the output. This means that a filtered version of the
+    /// list must be used for window management commands.
+    ///
+    /// This includes both floating/fullscreen views and those arranged in the layout.
+    wm_stack: wl.list.Head(View, .pending_wm_stack_link),
+},
+
+/// The state most recently sent to the layout generator and clients.
+/// This state is immutable until all clients have replied and the transaction
+/// is completed, at which point this inflight state is copied to current.
+inflight: struct {
+    /// A bit field of focused tags
+    tags: u32 = 1 << 0,
+    /// See pending.focus_stack
+    focus_stack: wl.list.Head(View, .inflight_focus_stack_link),
+    /// See pending.wm_stack
+    wm_stack: wl.list.Head(View, .inflight_wm_stack_link),
+    /// The view to be made fullscreen, if any.
+    fullscreen: ?*View = null,
+    layout_demand: ?LayoutDemand = null,
+},
+
+/// The current state represented by the scene graph.
+/// There is no need to have a current focus_stack/wm_stack copy as this
+/// information is transferred from the inflight state to the scene graph
+/// as an inflight transaction completes.
+current: struct {
+    /// A bit field of focused tags
+    tags: u32 = 1 << 0,
+    /// The currently fullscreen view, if any.
+    fullscreen: ?*View = null,
+} = .{},
 
 /// Remembered version of tags (from last run)
 previous_tags: u32 = 1 << 0,
-
-/// The currently active LayoutDemand
-layout_demand: ?LayoutDemand = null,
 
 /// List of all layouts
 layouts: std.TailQueue(Layout) = .{},
@@ -129,6 +159,17 @@ layout_namespace: ?[]const u8 = null,
 
 /// The last set layout name.
 layout_name: ?[:0]const u8 = null,
+
+/// Active layout, or null if views are un-arranged.
+///
+/// If null, views which are manually moved or resized (with the pointer or
+/// or command) will not be automatically set to floating. Everything is
+/// already floating, so this would be an unexpected change of a views state
+/// the user will only notice once a layout affects the views. So instead we
+/// "snap back" all manually moved views the next time a layout is active.
+/// This is similar to dwms behvaviour. Note that this of course does not
+/// affect already floating views.
+layout: ?*Layout = null,
 
 /// List of status tracking objects relaying changes to this output to clients.
 status_trackers: std.SinglyLinkedList(OutputStatus) = .{},
@@ -189,6 +230,14 @@ pub fn create(wlr_output: *wlr.Output) !void {
             .overlay = try normal_content.createSceneTree(),
             .popups = try normal_content.createSceneTree(),
         },
+        .pending = .{
+            .focus_stack = undefined,
+            .wm_stack = undefined,
+        },
+        .inflight = .{
+            .focus_stack = undefined,
+            .wm_stack = undefined,
+        },
         .usable_box = .{
             .x = 0,
             .y = 0,
@@ -197,6 +246,11 @@ pub fn create(wlr_output: *wlr.Output) !void {
         },
     };
     wlr_output.data = @ptrToInt(self);
+
+    self.pending.focus_stack.init();
+    self.pending.wm_stack.init();
+    self.inflight.focus_stack.init();
+    self.inflight.wm_stack.init();
 
     _ = try self.layers.fullscreen.createSceneRect(width, height, &[_]f32{ 0, 0, 0, 1.0 });
     self.layers.fullscreen.node.setEnabled(false);
@@ -240,16 +294,18 @@ pub fn sendViewTags(self: Self) void {
     while (it) |node| : (it = node.next) node.data.sendViewTags();
 }
 
-pub fn sendUrgentTags(self: Self) void {
+pub fn sendUrgentTags(output: *Self) void {
     var urgent_tags: u32 = 0;
-
-    var view_it = self.views.first;
-    while (view_it) |node| : (view_it = node.next) {
-        if (node.view.current.urgent) urgent_tags |= node.view.current.tags;
+    {
+        var it = output.inflight.wm_stack.iterator(.forward);
+        while (it.next()) |view| {
+            if (view.current.urgent) urgent_tags |= view.current.tags;
+        }
     }
-
-    var it = self.status_trackers.first;
-    while (it) |node| : (it = node.next) node.data.sendUrgentTags(urgent_tags);
+    {
+        var it = output.status_trackers.first;
+        while (it) |node| : (it = node.next) node.data.sendUrgentTags(urgent_tags);
+    }
 }
 
 pub fn sendLayoutName(self: Self) void {
@@ -262,52 +318,6 @@ pub fn sendLayoutNameClear(self: Self) void {
     std.debug.assert(self.layout_name == null);
     var it = self.status_trackers.first;
     while (it) |node| : (it = node.next) node.data.sendLayoutNameClear();
-}
-
-pub fn arrangeFilter(view: *View, filter_tags: u32) bool {
-    return view.tree.node.enabled and !view.pending.float and !view.pending.fullscreen and
-        view.pending.tags & filter_tags != 0;
-}
-
-/// Start a layout demand with the currently active (pending) layout.
-/// Note that this function does /not/ decide which layout shall be active. That
-/// is done in two places: 1) When the user changed the layout namespace option
-/// of this output and 2) when a new layout is added.
-///
-/// If no layout is active, all views will simply retain their current
-/// dimensions. So without any active layouts, river will function like a simple
-/// floating WM.
-///
-/// The changes of view dimensions are async. Therefore all transactions are
-/// blocked until the layout demand has either finished or was aborted. Both
-/// cases will start a transaction.
-pub fn arrangeViews(self: *Self) void {
-    if (self == &server.root.noop_output) return;
-
-    // If there is already an active layout demand, discard it.
-    if (self.layout_demand) |demand| {
-        demand.deinit();
-        self.layout_demand = null;
-    }
-
-    // We only need to do something if there is an active layout.
-    if (self.pending.layout) |layout| {
-        // If the usable area has a zero dimension, trying to arrange the layout
-        // would cause an underflow and is pointless anyway.
-        if (self.usable_box.width == 0 or self.usable_box.height == 0) return;
-
-        // How many views will be part of the layout?
-        var views: u32 = 0;
-        var view_it = ViewStack(View).iter(self.views.first, .forward, self.pending.tags, arrangeFilter);
-        while (view_it.next() != null) views += 1;
-
-        // No need to arrange an empty output.
-        if (views == 0) return;
-
-        // Note that this is async. A layout demand will start a transaction
-        // once its done.
-        layout.startLayoutDemand(views);
-    }
 }
 
 /// Arrange all layer surfaces of this output and adjust the usable area.
@@ -340,45 +350,43 @@ pub fn arrangeLayers(self: *Self) void {
         }
     }
 
-    // If the the usable_box has changed, we need to rearrange the output
-    if (!std.meta.eql(self.usable_box, usable_box)) {
-        self.usable_box = usable_box;
-        self.arrangeViews();
-    }
+    self.usable_box = usable_box;
 }
 
 fn handleDestroy(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
-    const self = @fieldParentPtr(Self, "destroy", listener);
+    const output = @fieldParentPtr(Self, "destroy", listener);
 
-    std.log.scoped(.server).debug("output '{s}' destroyed", .{self.wlr_output.name});
+    std.log.scoped(.server).debug("output '{s}' destroyed", .{output.wlr_output.name});
 
     // Remove the destroyed output from root if it wasn't already removed
-    server.root.removeOutput(self);
-    assert(self.views.first == null and self.views.last == null);
-    assert(self.layouts.len == 0);
+    server.root.removeOutput(output);
+
+    assert(output.pending.focus_stack.empty());
+    assert(output.pending.wm_stack.empty());
+    assert(output.inflight.focus_stack.empty());
+    assert(output.inflight.wm_stack.empty());
+    assert(output.inflight.layout_demand == null);
+    assert(output.layouts.len == 0);
 
     var it = server.root.all_outputs.first;
     while (it) |all_node| : (it = all_node.next) {
-        if (all_node.data == self) {
+        if (all_node.data == output) {
             server.root.all_outputs.remove(all_node);
             break;
         }
     }
 
-    // Remove all listeners
-    self.destroy.link.remove();
-    self.enable.link.remove();
-    self.frame.link.remove();
-    self.mode.link.remove();
-    self.present.link.remove();
+    output.destroy.link.remove();
+    output.enable.link.remove();
+    output.frame.link.remove();
+    output.mode.link.remove();
+    output.present.link.remove();
 
-    // Free all memory and clean up the wlr.Output
-    if (self.layout_demand) |demand| demand.deinit();
-    if (self.layout_namespace) |namespace| util.gpa.free(namespace);
+    if (output.layout_namespace) |namespace| util.gpa.free(namespace);
 
-    self.wlr_output.data = undefined;
+    output.wlr_output.data = 0;
 
-    const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
+    const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", output);
     util.gpa.destroy(node);
 }
 
@@ -429,8 +437,7 @@ fn handleMode(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
         background_color_rect.setSize(width, height);
     }
 
-    self.arrangeLayers();
-    server.root.startTransaction();
+    server.root.applyPending();
 }
 
 fn handlePresent(
@@ -475,11 +482,10 @@ pub fn handleLayoutNamespaceChange(self: *Self) void {
     // The user changed the layout namespace of this output. Try to find a
     // matching layout.
     var it = self.layouts.first;
-    self.pending.layout = while (it) |node| : (it = node.next) {
+    self.layout = while (it) |node| : (it = node.next) {
         if (mem.eql(u8, self.layoutNamespace(), node.data.namespace)) break &node.data;
     } else null;
-    self.arrangeViews();
-    server.root.startTransaction();
+    server.root.applyPending();
 }
 
 pub fn layoutNamespace(self: Self) []const u8 {

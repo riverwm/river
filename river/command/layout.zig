@@ -32,7 +32,7 @@ pub fn outputLayout(
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
 
-    const output = seat.focused_output;
+    const output = seat.focused_output orelse return;
     const old_layout_namespace = output.layout_namespace;
     output.layout_namespace = try util.gpa.dupe(u8, args[1]);
     if (old_layout_namespace) |old| util.gpa.free(old);
@@ -69,7 +69,7 @@ pub fn sendLayoutCmd(
     if (args.len < 3) return Error.NotEnoughArguments;
     if (args.len > 3) return Error.TooManyArguments;
 
-    const output = seat.focused_output;
+    const output = seat.focused_output orelse return;
     const target_namespace = args[1];
 
     var it = output.layouts.first;
@@ -82,5 +82,5 @@ pub fn sendLayoutCmd(
         layout.layout.sendUserCommandTags(output.pending.tags);
     }
     layout.layout.sendUserCommand(args[2]);
-    if (layout == output.current.layout) output.arrangeViews();
+    if (layout == output.layout) server.root.applyPending();
 }

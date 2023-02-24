@@ -33,8 +33,7 @@ pub fn borderWidth(
     if (args.len > 2) return Error.TooManyArguments;
 
     server.config.border_width = try fmt.parseInt(u31, args[1], 10);
-    server.root.arrangeAll();
-    server.root.startTransaction();
+    server.root.applyPending();
 }
 
 pub fn backgroundColor(
@@ -62,7 +61,7 @@ pub fn borderColorFocused(
     if (args.len > 2) return Error.TooManyArguments;
 
     server.config.border_color_focused = try parseRgba(args[1]);
-    server.root.startTransaction();
+    server.root.applyPending();
 }
 
 pub fn borderColorUnfocused(
@@ -74,7 +73,7 @@ pub fn borderColorUnfocused(
     if (args.len > 2) return Error.TooManyArguments;
 
     server.config.border_color_unfocused = try parseRgba(args[1]);
-    server.root.startTransaction();
+    server.root.applyPending();
 }
 
 pub fn borderColorUrgent(
@@ -86,7 +85,7 @@ pub fn borderColorUrgent(
     if (args.len > 2) return Error.TooManyArguments;
 
     server.config.border_color_urgent = try parseRgba(args[1]);
-    server.root.startTransaction();
+    server.root.applyPending();
 }
 
 pub fn setCursorWarp(

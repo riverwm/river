@@ -36,13 +36,12 @@ pub fn toggleFloat(
         // If views are unarranged, don't allow changing the views float status.
         // It would just lead to confusing because this state would not be
         // visible immediately, only after a layout is connected.
-        if (view.output.pending.layout == null)
-            return;
+        if (view.pending.output == null or view.pending.output.?.layout == null) return;
 
         // Don't float fullscreen views
         if (view.pending.fullscreen) return;
 
         view.pending.float = !view.pending.float;
-        view.applyPending();
+        server.root.applyPending();
     }
 }

@@ -33,6 +33,6 @@ pub fn toggleFullscreen(
         const view = seat.focused.view;
 
         view.pending.fullscreen = !view.pending.fullscreen;
-        view.applyPending();
+        server.root.applyPending();
     }
 }

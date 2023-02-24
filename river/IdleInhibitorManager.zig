@@ -34,7 +34,7 @@ pub fn idleInhibitCheckActive(self: *Self) void {
     while (it) |node| : (it = node.next) {
         if (View.fromWlrSurface(node.data.inhibitor.surface)) |v| {
             // If view is visible,
-            if (v.current.tags & v.output.current.tags != 0) {
+            if (v.current.output != null and v.current.tags & v.current.output.?.current.tags != 0) {
                 inhibited = true;
                 break;
             }

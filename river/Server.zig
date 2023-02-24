@@ -180,9 +180,7 @@ fn terminate(_: c_int, wl_server: *wl.Server) c_int {
     return 0;
 }
 
-fn handleNewXdgSurface(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurface) void {
-    const self = @fieldParentPtr(Self, "new_xdg_surface", listener);
-
+fn handleNewXdgSurface(_: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSurface) void {
     if (xdg_surface.role == .popup) {
         log.debug("new xdg_popup", .{});
         return;
@@ -190,8 +188,7 @@ fn handleNewXdgSurface(listener: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wl
 
     log.debug("new xdg_toplevel", .{});
 
-    const output = self.input_manager.defaultSeat().focused_output;
-    XdgToplevel.create(output, xdg_surface.role_data.toplevel) catch {
+    XdgToplevel.create(xdg_surface.role_data.toplevel) catch {
         log.err("out of memory", .{});
         xdg_surface.resource.postNoMemory();
         return;
@@ -220,12 +217,11 @@ fn handleNewLayerSurface(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_
     // If the new layer surface does not have an output assigned to it, use the
     // first output or close the surface if none are available.
     if (wlr_layer_surface.output == null) {
-        const output = self.input_manager.defaultSeat().focused_output;
-        if (output == &self.root.noop_output) {
+        const output = self.input_manager.defaultSeat().focused_output orelse {
             log.err("no output available for layer surface '{s}'", .{wlr_layer_surface.namespace});
             wlr_layer_surface.destroy();
             return;
-        }
+        };
 
         log.debug("new layer surface had null output, assigning it to output '{s}'", .{output.wlr_output.name});
         wlr_layer_surface.output = output.wlr_output;
@@ -237,9 +233,7 @@ fn handleNewLayerSurface(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_
     };
 }
 
-fn handleNewXwaylandSurface(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
-    const self = @fieldParentPtr(Self, "new_xwayland_surface", listener);
-
+fn handleNewXwaylandSurface(_: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
     log.debug(
         "new xwayland surface: title='{?s}', class='{?s}', override redirect={}",
         .{ xwayland_surface.title, xwayland_surface.class, xwayland_surface.override_redirect },
@@ -251,8 +245,7 @@ fn handleNewXwaylandSurface(listener: *wl.Listener(*wlr.XwaylandSurface), xwayla
             return;
         };
     } else {
-        const output = self.input_manager.defaultSeat().focused_output;
-        _ = XwaylandView.create(output, xwayland_surface) catch {
+        _ = XwaylandView.create(xwayland_surface) catch {
             log.err("out of memory", .{});
             return;
         };

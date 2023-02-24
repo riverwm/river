@@ -60,10 +60,11 @@ pub fn snap(
         return Error.InvalidPhysicalDirection;
 
     const view = getView(seat) orelse return;
+    const output = view.pending.output orelse return;
     const border_width = server.config.border_width;
     var output_width: i32 = undefined;
     var output_height: i32 = undefined;
-    view.output.wlr_output.effectiveResolution(&output_width, &output_height);
+    output.wlr_output.effectiveResolution(&output_width, &output_height);
     switch (direction) {
         .up => view.pending.box.y = border_width,
         .down => view.pending.box.y = output_height - view.pending.box.height - border_width,
@@ -87,14 +88,16 @@ pub fn resize(
         return Error.InvalidOrientation;
 
     const view = getView(seat) orelse return;
-    var output_width: i32 = undefined;
-    var output_height: i32 = undefined;
-    view.output.wlr_output.effectiveResolution(&output_width, &output_height);
+    var output_width: c_int = math.maxInt(c_int);
+    var output_height: c_int = math.maxInt(c_int);
+    if (view.pending.output) |output| {
+        output.wlr_output.effectiveResolution(&output_width, &output_height);
+    }
     switch (orientation) {
         .horizontal => {
             const prev_width = view.pending.box.width;
             view.pending.box.width += delta;
-            view.applyConstraints();
+            view.applyConstraints(&view.pending.box);
             // Get width difference after applying view constraints, so that the
             // move reflects the actual size difference, but before applying the
             // output size constraints, to allow growing a view even if it is
@@ -110,7 +113,7 @@ pub fn resize(
         .vertical => {
             const prev_height = view.pending.box.height;
             view.pending.box.height += delta;
-            view.applyConstraints();
+            view.applyConstraints(&view.pending.box);
             const diff_height = prev_height - view.pending.box.height;
             // Do not grow bigger than the output
             view.pending.box.height = math.min(
@@ -129,12 +132,11 @@ fn apply(view: *View) void {
     // dimensions are set by a layout generator. If however the views are
     // unarranged, leave them as non-floating so the next active layout can
     // affect them.
-    if (view.output.pending.layout != null)
+    if (view.pending.output == null or view.pending.output.?.layout != null) {
         view.pending.float = true;
+    }
 
-    view.float_box = view.pending.box;
-
-    view.applyPending();
+    server.root.applyPending();
 }
 
 fn getView(seat: *Seat) ?*View {

@@ -28,7 +28,6 @@ const util = @import("util.zig");
 
 const Output = @import("Output.zig");
 const View = @import("View.zig");
-const ViewStack = @import("view_stack.zig").ViewStack;
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
 const log = std.log.scoped(.xwayland);
@@ -39,11 +38,6 @@ view: *View,
 xwayland_surface: *wlr.XwaylandSurface,
 /// Created on map and destroyed on unmap
 surface_tree: ?*wlr.SceneTree = null,
-
-/// The wlroots Xwayland implementation overwrites xwayland_surface.fullscreen
-/// immediately when the client requests it, so we track this state here to be
-/// able to match the XdgToplevel API.
-last_set_fullscreen_state: bool = false,
 
 // Listeners that are always active over the view's lifetime
 destroy: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleDestroy),
@@ -62,8 +56,8 @@ request_fullscreen: wl.Listener(*wlr.XwaylandSurface) =
 request_minimize: wl.Listener(*wlr.XwaylandSurface.event.Minimize) =
     wl.Listener(*wlr.XwaylandSurface.event.Minimize).init(handleRequestMinimize),
 
-pub fn create(output: *Output, xwayland_surface: *wlr.XwaylandSurface) error{OutOfMemory}!void {
-    const view = try View.create(output, .{ .xwayland_view = .{
+pub fn create(xwayland_surface: *wlr.XwaylandSurface) error{OutOfMemory}!void {
+    const view = try View.create(.{ .xwayland_view = .{
         .view = undefined,
         .xwayland_surface = xwayland_surface,
     } });
@@ -86,33 +80,29 @@ pub fn create(output: *Output, xwayland_surface: *wlr.XwaylandSurface) error{Out
 }
 
 pub fn needsConfigure(self: Self) bool {
-    const output = self.view.output;
+    const output = self.view.inflight.output orelse return false;
     var output_box: wlr.Box = undefined;
     server.root.output_layout.getBox(output.wlr_output, &output_box);
-    return self.xwayland_surface.x != self.view.pending.box.x + output_box.x or
-        self.xwayland_surface.y != self.view.pending.box.y + output_box.y or
-        self.xwayland_surface.width != self.view.pending.box.width or
-        self.xwayland_surface.height != self.view.pending.box.height;
+
+    const state = &self.view.inflight;
+    return self.xwayland_surface.x != state.box.x + output_box.x or
+        self.xwayland_surface.y != state.box.y + output_box.y or
+        self.xwayland_surface.width != state.box.width or
+        self.xwayland_surface.height != state.box.height;
 }
 
-/// Apply pending state. Note: we don't set View.serial as
-/// shouldTrackConfigure() is always false for xwayland views.
 pub fn configure(self: Self) void {
-    const output = self.view.output;
+    const output = self.view.inflight.output orelse return;
     var output_box: wlr.Box = undefined;
     server.root.output_layout.getBox(output.wlr_output, &output_box);
 
-    const state = &self.view.pending;
+    const state = &self.view.inflight;
     self.xwayland_surface.configure(
         @intCast(i16, state.box.x + output_box.x),
         @intCast(i16, state.box.y + output_box.y),
         @intCast(u16, state.box.width),
         @intCast(u16, state.box.height),
     );
-}
-
-pub fn lastSetFullscreenState(self: Self) bool {
-    return self.last_set_fullscreen_state;
 }
 
 pub fn rootSurface(self: Self) *wlr.Surface {
@@ -135,7 +125,6 @@ pub fn setActivated(self: Self, activated: bool) void {
 }
 
 pub fn setFullscreen(self: *Self, fullscreen: bool) void {
-    self.last_set_fullscreen_state = fullscreen;
     self.xwayland_surface.setFullscreen(fullscreen);
 }
 
@@ -196,14 +185,14 @@ pub fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface:
         return;
     };
 
-    // Use the view's "natural" size centered on the output as the default
-    // floating dimensions
-    view.float_box = .{
-        .x = @divTrunc(math.max(0, view.output.usable_box.width - self.xwayland_surface.width), 2),
-        .y = @divTrunc(math.max(0, view.output.usable_box.height - self.xwayland_surface.height), 2),
+    view.pending.box = .{
+        .x = 0,
+        .y = 0,
         .width = self.xwayland_surface.width,
         .height = self.xwayland_surface.height,
     };
+    view.inflight.box = view.pending.box;
+    view.current.box = view.pending.box;
 
     const has_fixed_size = if (self.xwayland_surface.size_hints) |size_hints|
         size_hints.min_width != 0 and size_hints.min_height != 0 and
@@ -294,7 +283,7 @@ fn handleRequestFullscreen(listener: *wl.Listener(*wlr.XwaylandSurface), xwaylan
     const self = @fieldParentPtr(Self, "request_fullscreen", listener);
     if (self.view.pending.fullscreen != xwayland_surface.fullscreen) {
         self.view.pending.fullscreen = xwayland_surface.fullscreen;
-        self.view.applyPending();
+        server.root.applyPending();
     }
 }
 

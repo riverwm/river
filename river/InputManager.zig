@@ -107,11 +107,6 @@ pub fn inputAllowed(self: Self, wlr_surface: *wlr.Surface) bool {
         true;
 }
 
-pub fn updateCursorState(self: Self) void {
-    var it = self.seats.first;
-    while (it) |node| : (it = node.next) node.data.cursor.updateState();
-}
-
 fn handleNewInput(listener: *wl.Listener(*wlr.InputDevice), wlr_device: *wlr.InputDevice) void {
     const self = @fieldParentPtr(Self, "new_input", listener);
 
