@@ -46,7 +46,7 @@ virtual_pointer_manager: *wlr.VirtualPointerManagerV1,
 virtual_keyboard_manager: *wlr.VirtualKeyboardManagerV1,
 
 configs: std.ArrayList(InputConfig),
-devices: wl.list.Head(InputDevice, "link"),
+devices: wl.list.Head(InputDevice, .link),
 seats: std.TailQueue(Seat) = .{},
 
 exclusive_client: ?*wl.Client = null,
