@@ -32,6 +32,7 @@ const XdgPopup = @import("XdgPopup.zig");
 const log = std.log.scoped(.layer_shell);
 
 output: *Output,
+wlr_layer_surface: *wlr.LayerSurfaceV1,
 scene_layer_surface: *wlr.SceneLayerSurfaceV1,
 popup_tree: *wlr.SceneTree,
 
@@ -50,6 +51,7 @@ pub fn create(wlr_layer_surface: *wlr.LayerSurfaceV1) error{OutOfMemory}!void {
 
     layer_surface.* = .{
         .output = output,
+        .wlr_layer_surface = wlr_layer_surface,
         .scene_layer_surface = try layer_tree.createSceneLayerSurfaceV1(wlr_layer_surface),
         .popup_tree = try output.layers.popups.createSceneTree(),
     };
@@ -71,14 +73,14 @@ pub fn create(wlr_layer_surface: *wlr.LayerSurfaceV1) error{OutOfMemory}!void {
 }
 
 pub fn destroyPopups(layer_surface: *LayerSurface) void {
-    var it = layer_surface.scene_layer_surface.layer_surface.popups.safeIterator(.forward);
+    var it = layer_surface.wlr_layer_surface.popups.safeIterator(.forward);
     while (it.next()) |wlr_xdg_popup| wlr_xdg_popup.destroy();
 }
 
-fn handleDestroy(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wlr.LayerSurfaceV1) void {
+fn handleDestroy(listener: *wl.Listener(*wlr.LayerSurfaceV1), _: *wlr.LayerSurfaceV1) void {
     const layer_surface = @fieldParentPtr(LayerSurface, "destroy", listener);
 
-    log.debug("layer surface '{s}' destroyed", .{wlr_layer_surface.namespace});
+    log.debug("layer surface '{s}' destroyed", .{layer_surface.wlr_layer_surface.namespace});
 
     layer_surface.destroy.link.remove();
     layer_surface.map.link.remove();
@@ -112,7 +114,7 @@ fn handleUnmap(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *
 
 fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     const layer_surface = @fieldParentPtr(LayerSurface, "commit", listener);
-    const wlr_layer_surface = layer_surface.scene_layer_surface.layer_surface;
+    const wlr_layer_surface = layer_surface.wlr_layer_surface;
 
     assert(wlr_layer_surface.output != null);
 
@@ -145,7 +147,7 @@ fn handleKeyboardInteractiveExclusive(output: *Output) void {
             assert(node.type == .tree);
             if (@intToPtr(?*SceneNodeData, node.data)) |node_data| {
                 const layer_surface = node_data.data.layer_surface;
-                const wlr_layer_surface = layer_surface.scene_layer_surface.layer_surface;
+                const wlr_layer_surface = layer_surface.wlr_layer_surface;
                 if (wlr_layer_surface.mapped and
                     wlr_layer_surface.current.keyboard_interactive == .exclusive)
                 {
@@ -167,7 +169,7 @@ fn handleKeyboardInteractiveExclusive(output: *Output) void {
             // seats.
             seat.setFocusRaw(.{ .layer = to_focus });
         } else if (seat.focused == .layer) {
-            const current_focus = seat.focused.layer.scene_layer_surface.layer_surface;
+            const current_focus = seat.focused.layer.wlr_layer_surface;
             // If the seat is currently focusing an unmapped layer surface or one
             // without keyboard interactivity, stop focusing that layer surface.
             if (!current_focus.mapped or current_focus.current.keyboard_interactive == .none) {

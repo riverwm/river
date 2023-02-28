@@ -283,7 +283,7 @@ pub fn removeOutput(root: *Self, output: *Output) void {
         while (it.next()) |scene_node| {
             assert(scene_node.type == .tree);
             if (@intToPtr(?*SceneNodeData, scene_node.data)) |node_data| {
-                node_data.data.layer_surface.scene_layer_surface.layer_surface.destroy();
+                node_data.data.layer_surface.wlr_layer_surface.destroy();
             }
         }
     }
