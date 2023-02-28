@@ -71,25 +71,17 @@ fn handleRequest(
             const wlr_output = wlr.Output.fromWlOutput(req.output) orelse return;
             const output = @intToPtr(*Output, wlr_output.data);
 
-            const node = util.gpa.create(std.SinglyLinkedList(OutputStatus).Node) catch {
-                status_manager.getClient().postNoMemory();
-                log.err("out of memory", .{});
-                return;
-            };
-
-            const output_status = zriver.OutputStatusV1.create(
+            const resource = zriver.OutputStatusV1.create(
                 status_manager.getClient(),
                 status_manager.getVersion(),
                 req.id,
             ) catch {
                 status_manager.getClient().postNoMemory();
-                util.gpa.destroy(node);
                 log.err("out of memory", .{});
                 return;
             };
 
-            node.data.init(output, output_status);
-            output.status_trackers.prepend(node);
+            output.status.add(resource, output);
         },
         .get_river_seat_status => |req| {
             // ignore if the seat is inert

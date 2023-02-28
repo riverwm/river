@@ -298,7 +298,7 @@ pub fn removeOutput(root: *Self, output: *Output) void {
         }
     }
 
-    while (output.status_trackers.first) |status_node| status_node.data.destroy();
+    output.status.deinit();
 
     root.applyPending();
 }
@@ -567,12 +567,8 @@ fn commitTransaction(root: *Self) void {
                 "changing current focus: {b:0>10} to {b:0>10}",
                 .{ output.current.tags, output.inflight.tags },
             );
-
-            output.current.tags = output.pending.tags;
-
-            var it = output.status_trackers.first;
-            while (it) |node| : (it = node.next) node.data.sendFocusedTags(output.current.tags);
         }
+        output.current.tags = output.inflight.tags;
 
         if (output.inflight.fullscreen != output.current.fullscreen) {
             if (output.current.fullscreen) |view| {
@@ -590,23 +586,17 @@ fn commitTransaction(root: *Self) void {
             output.layers.fullscreen.node.setEnabled(output.current.fullscreen != null);
         }
 
-        var view_tags_changed = false;
-        var urgent_tags_dirty = false;
-
         var focus_stack_it = output.inflight.focus_stack.iterator(.forward);
         while (focus_stack_it.next()) |view| {
             assert(view.inflight.output == output);
 
             view.inflight_serial = null;
 
-            if (view.inflight.tags != view.current.tags) view_tags_changed = true;
-            if (view.inflight.urgent != view.current.urgent) urgent_tags_dirty = true;
-            if (view.inflight.urgent and view_tags_changed) urgent_tags_dirty = true;
-
             if (view.current.output != output) {
                 view.tree.node.reparent(output.layers.views);
                 view.popup_tree.node.reparent(output.layers.popups);
             }
+
             const enabled = view.current.tags & output.current.tags != 0;
             view.tree.node.setEnabled(enabled);
             view.popup_tree.node.setEnabled(enabled);
@@ -616,8 +606,7 @@ fn commitTransaction(root: *Self) void {
             view.updateCurrent();
         }
 
-        if (view_tags_changed) output.sendViewTags();
-        if (urgent_tags_dirty) output.sendUrgentTags();
+        output.status.handleTransactionCommit(output);
     }
 
     {

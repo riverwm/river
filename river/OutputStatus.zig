@@ -14,9 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const Self = @This();
+const OutputStatus = @This();
 
 const std = @import("std");
+const assert = std.debug.assert;
+
 const wayland = @import("wayland");
 const wl = wayland.server.wl;
 const zriver = wayland.server.zriver;
@@ -28,80 +30,143 @@ const View = @import("View.zig");
 
 const log = std.log.scoped(.river_status);
 
-output: *Output,
-output_status: *zriver.OutputStatusV1,
+resources: wl.list.Head(zriver.OutputStatusV1, null),
+view_tags: std.ArrayListUnmanaged(u32) = .{},
+focused_tags: u32 = 0,
+urgent_tags: u32 = 0,
 
-pub fn init(self: *Self, output: *Output, output_status: *zriver.OutputStatusV1) void {
-    self.* = .{ .output = output, .output_status = output_status };
+pub fn init(status: *OutputStatus) void {
+    status.* = .{
+        .resources = undefined,
+    };
+    status.resources.init();
+}
 
-    output_status.setHandler(*Self, handleRequest, handleDestroy, self);
+pub fn add(status: *OutputStatus, resource: *zriver.OutputStatusV1, output: *Output) void {
+    resource.setHandler(?*anyopaque, handleRequest, handleDestroy, null);
 
-    // Send view/focused/urgent tags once on bind.
-    self.sendViewTags();
-    self.sendFocusedTags(output.current.tags);
-
-    output.sendUrgentTags();
-
-    if (output.layout_name) |name| {
-        self.sendLayoutName(name);
+    var wl_array: wl.Array = .{
+        .size = status.view_tags.items.len * @sizeOf(u32),
+        .alloc = status.view_tags.items.len * @sizeOf(u32),
+        .data = status.view_tags.items.ptr,
+    };
+    resource.sendViewTags(&wl_array);
+    resource.sendFocusedTags(status.focused_tags);
+    if (resource.getVersion() >= 2) resource.sendUrgentTags(status.urgent_tags);
+    if (resource.getVersion() >= 4) {
+        if (output.layout_name) |name| resource.sendLayoutName(name);
     }
+
+    status.resources.append(resource);
 }
 
-pub fn destroy(self: *Self) void {
-    const node = @fieldParentPtr(std.SinglyLinkedList(Self).Node, "data", self);
-    self.output.status_trackers.remove(node);
-    self.output_status.setHandler(*Self, handleRequest, null, self);
-    util.gpa.destroy(node);
-}
-
-fn handleRequest(output_status: *zriver.OutputStatusV1, request: zriver.OutputStatusV1.Request, _: *Self) void {
-    switch (request) {
-        .destroy => output_status.destroy(),
-    }
-}
-
-fn handleDestroy(_: *zriver.OutputStatusV1, self: *Self) void {
-    self.destroy();
-}
-
-/// Send the current tags of each view on the output to the client.
-pub fn sendViewTags(self: Self) void {
-    var view_tags = std.ArrayList(u32).init(util.gpa);
-    defer view_tags.deinit();
-
+pub fn deinit(status: *OutputStatus) void {
     {
-        var it = self.output.inflight.wm_stack.iterator(.forward);
-        while (it.next()) |view| {
-            view_tags.append(view.current.tags) catch {
-                self.output_status.postNoMemory();
-                log.err("out of memory", .{});
-                return;
-            };
+        var it = status.resources.safeIterator(.forward);
+        while (it.next()) |resource| {
+            resource.setHandler(?*anyopaque, handleRequest, null, null);
+            resource.getLink().remove();
+        }
+    }
+    status.view_tags.deinit(util.gpa);
+}
+
+fn handleRequest(resource: *zriver.OutputStatusV1, request: zriver.OutputStatusV1.Request, _: ?*anyopaque) void {
+    switch (request) {
+        .destroy => resource.destroy(),
+    }
+}
+
+fn handleDestroy(resource: *zriver.OutputStatusV1, _: ?*anyopaque) void {
+    resource.getLink().remove();
+}
+
+pub fn handleTransactionCommit(status: *OutputStatus, output: *Output) void {
+    status.sendViewTags(output);
+    status.sendFocusedTags(output);
+    status.sendUrgentTags(output);
+}
+
+fn sendViewTags(status: *OutputStatus, output: *Output) void {
+    var dirty: bool = false;
+    {
+        var it = output.inflight.wm_stack.iterator(.forward);
+        var i: usize = 0;
+        while (it.next()) |view| : (i += 1) {
+            assert(view.inflight.tags == view.current.tags);
+            if (status.view_tags.items.len <= i) {
+                dirty = true;
+                _ = status.view_tags.addOne(util.gpa) catch {
+                    log.err("out of memory", .{});
+                    return;
+                };
+            } else if (view.inflight.tags != status.view_tags.items[i]) {
+                dirty = true;
+            }
+            status.view_tags.items[i] = view.inflight.tags;
+        }
+
+        if (i != status.view_tags.items.len) {
+            assert(i < status.view_tags.items.len);
+            status.view_tags.items.len = i;
+            dirty = true;
         }
     }
 
-    var wl_array = wl.Array.fromArrayList(u32, view_tags);
-    self.output_status.sendViewTags(&wl_array);
-}
-
-pub fn sendFocusedTags(self: Self, tags: u32) void {
-    self.output_status.sendFocusedTags(tags);
-}
-
-pub fn sendUrgentTags(self: Self, tags: u32) void {
-    if (self.output_status.getVersion() >= 2) {
-        self.output_status.sendUrgentTags(tags);
+    if (dirty) {
+        var wl_array: wl.Array = .{
+            .size = status.view_tags.items.len * @sizeOf(u32),
+            .alloc = status.view_tags.items.len * @sizeOf(u32),
+            .data = status.view_tags.items.ptr,
+        };
+        var it = status.resources.iterator(.forward);
+        while (it.next()) |resource| resource.sendViewTags(&wl_array);
     }
 }
 
-pub fn sendLayoutName(self: Self, name: [:0]const u8) void {
-    if (self.output_status.getVersion() >= 4) {
-        self.output_status.sendLayoutName(name);
+fn sendFocusedTags(status: *OutputStatus, output: *Output) void {
+    assert(output.inflight.tags == output.current.tags);
+    if (status.focused_tags != output.inflight.tags) {
+        status.focused_tags = output.inflight.tags;
+
+        var it = status.resources.iterator(.forward);
+        while (it.next()) |resource| resource.sendFocusedTags(status.focused_tags);
     }
 }
 
-pub fn sendLayoutNameClear(self: Self) void {
-    if (self.output_status.getVersion() >= 4) {
-        self.output_status.sendLayoutNameClear();
+fn sendUrgentTags(status: *OutputStatus, output: *Output) void {
+    var urgent_tags: u32 = 0;
+    {
+        var it = output.inflight.wm_stack.iterator(.forward);
+        while (it.next()) |view| {
+            if (view.current.urgent) urgent_tags |= view.current.tags;
+        }
+    }
+
+    if (status.urgent_tags != urgent_tags) {
+        status.urgent_tags = urgent_tags;
+
+        var it = status.resources.iterator(.forward);
+        while (it.next()) |resource| {
+            if (resource.getVersion() >= 2) resource.sendUrgentTags(urgent_tags);
+        }
+    }
+}
+
+pub fn sendLayoutName(status: *OutputStatus, output: *Output) void {
+    assert(output.layout_name != null);
+
+    var it = status.resources.iterator(.forward);
+    while (it.next()) |resource| {
+        if (resource.getVersion() >= 4) resource.sendLayoutName(output.layout_name.?);
+    }
+}
+
+pub fn sendLayoutNameClear(status: *OutputStatus, output: *Output) void {
+    assert(output.layout_name == null);
+
+    var it = status.resources.iterator(.forward);
+    while (it.next()) |resource| {
+        if (resource.getVersion() >= 4) resource.sendLayoutNameClear();
     }
 }

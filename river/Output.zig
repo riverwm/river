@@ -171,8 +171,7 @@ layout_name: ?[:0]const u8 = null,
 /// affect already floating views.
 layout: ?*Layout = null,
 
-/// List of status tracking objects relaying changes to this output to clients.
-status_trackers: std.SinglyLinkedList(OutputStatus) = .{},
+status: OutputStatus,
 
 destroy: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleDestroy),
 enable: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleEnable),
@@ -183,7 +182,7 @@ present: wl.Listener(*wlr.Output.event.Present) = wl.Listener(*wlr.Output.event.
 pub fn create(wlr_output: *wlr.Output) !void {
     const node = try util.gpa.create(std.TailQueue(Self).Node);
     errdefer util.gpa.destroy(node);
-    const self = &node.data;
+    const output = &node.data;
 
     if (!wlr_output.initRender(server.allocator, server.renderer)) return error.InitRenderFailed;
 
@@ -211,7 +210,7 @@ pub fn create(wlr_output: *wlr.Output) !void {
     const tree = try server.root.layers.outputs.createSceneTree();
     const normal_content = try tree.createSceneTree();
 
-    self.* = .{
+    output.* = .{
         .wlr_output = wlr_output,
         .tree = tree,
         .normal_content = normal_content,
@@ -244,22 +243,25 @@ pub fn create(wlr_output: *wlr.Output) !void {
             .width = width,
             .height = height,
         },
+        .status = undefined,
     };
-    wlr_output.data = @ptrToInt(self);
+    wlr_output.data = @ptrToInt(output);
 
-    self.pending.focus_stack.init();
-    self.pending.wm_stack.init();
-    self.inflight.focus_stack.init();
-    self.inflight.wm_stack.init();
+    output.pending.focus_stack.init();
+    output.pending.wm_stack.init();
+    output.inflight.focus_stack.init();
+    output.inflight.wm_stack.init();
 
-    _ = try self.layers.fullscreen.createSceneRect(width, height, &[_]f32{ 0, 0, 0, 1.0 });
-    self.layers.fullscreen.node.setEnabled(false);
+    output.status.init();
 
-    wlr_output.events.destroy.add(&self.destroy);
-    wlr_output.events.enable.add(&self.enable);
-    wlr_output.events.mode.add(&self.mode);
-    wlr_output.events.frame.add(&self.frame);
-    wlr_output.events.present.add(&self.present);
+    _ = try output.layers.fullscreen.createSceneRect(width, height, &[_]f32{ 0, 0, 0, 1.0 });
+    output.layers.fullscreen.node.setEnabled(false);
+
+    wlr_output.events.destroy.add(&output.destroy);
+    wlr_output.events.enable.add(&output.enable);
+    wlr_output.events.mode.add(&output.mode);
+    wlr_output.events.frame.add(&output.frame);
+    wlr_output.events.present.add(&output.present);
 
     // Ensure that a cursor image at the output's scale factor is loaded
     // for each seat.
@@ -270,13 +272,13 @@ pub fn create(wlr_output: *wlr.Output) !void {
             std.log.scoped(.cursor).err("failed to load xcursor theme at scale {}", .{wlr_output.scale});
     }
 
-    self.setTitle();
+    output.setTitle();
 
     const ptr_node = try util.gpa.create(std.TailQueue(*Self).Node);
     ptr_node.data = &node.data;
     server.root.all_outputs.append(ptr_node);
 
-    handleEnable(&self.enable, self.wlr_output);
+    handleEnable(&output.enable, wlr_output);
 }
 
 pub fn layerSurfaceTree(self: Self, layer: zwlr.LayerShellV1.Layer) *wlr.SceneTree {
@@ -287,37 +289,6 @@ pub fn layerSurfaceTree(self: Self, layer: zwlr.LayerShellV1.Layer) *wlr.SceneTr
         self.layers.overlay,
     };
     return trees[@intCast(usize, @enumToInt(layer))];
-}
-
-pub fn sendViewTags(self: Self) void {
-    var it = self.status_trackers.first;
-    while (it) |node| : (it = node.next) node.data.sendViewTags();
-}
-
-pub fn sendUrgentTags(output: *Self) void {
-    var urgent_tags: u32 = 0;
-    {
-        var it = output.inflight.wm_stack.iterator(.forward);
-        while (it.next()) |view| {
-            if (view.current.urgent) urgent_tags |= view.current.tags;
-        }
-    }
-    {
-        var it = output.status_trackers.first;
-        while (it) |node| : (it = node.next) node.data.sendUrgentTags(urgent_tags);
-    }
-}
-
-pub fn sendLayoutName(self: Self) void {
-    std.debug.assert(self.layout_name != null);
-    var it = self.status_trackers.first;
-    while (it) |node| : (it = node.next) node.data.sendLayoutName(self.layout_name.?);
-}
-
-pub fn sendLayoutNameClear(self: Self) void {
-    std.debug.assert(self.layout_name == null);
-    var it = self.status_trackers.first;
-    while (it) |node| : (it = node.next) node.data.sendLayoutNameClear();
 }
 
 /// Arrange all layer surfaces of this output and adjust the usable area.

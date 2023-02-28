@@ -159,11 +159,13 @@ fn handleRequest(layout: *river.LayoutV3, request: river.LayoutV3.Request, self:
                 if (layout_demand.serial == req.serial) layout_demand.apply(self);
             }
 
-            if (self.output.layout_name) |name| {
-                util.gpa.free(name);
-            }
-            self.output.layout_name = util.gpa.dupeZ(u8, mem.span(req.layout_name)) catch null;
-            self.output.sendLayoutName();
+            const new_name = util.gpa.dupeZ(u8, mem.sliceTo(req.layout_name, 0)) catch {
+                log.err("out of memory", .{});
+                return;
+            };
+            if (self.output.layout_name) |name| util.gpa.free(name);
+            self.output.layout_name = new_name;
+            self.output.status.sendLayoutName(self.output);
         },
     }
 }
@@ -194,7 +196,7 @@ pub fn destroy(self: *Self) void {
         if (self.output.layout_name) |name| {
             util.gpa.free(name);
             self.output.layout_name = null;
-            self.output.sendLayoutNameClear();
+            self.output.status.sendLayoutNameClear(self.output);
         }
     }
 
