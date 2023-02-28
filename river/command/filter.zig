@@ -90,6 +90,7 @@ pub fn csdFilterAdd(
     gop.key_ptr.* = try util.gpa.dupe(u8, key);
 
     csdFilterUpdateViews(kind, key, .add);
+    server.root.applyPending();
 }
 
 pub fn csdFilterRemove(
@@ -110,6 +111,7 @@ pub fn csdFilterRemove(
     if (map.fetchRemove(key)) |kv| {
         util.gpa.free(kv.key);
         csdFilterUpdateViews(kind, key, .remove);
+        server.root.applyPending();
     }
 }
 
