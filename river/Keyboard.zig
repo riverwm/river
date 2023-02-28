@@ -85,7 +85,10 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
     const modifiers = wlr_keyboard.getModifiers();
     const released = event.state == .released;
 
-    const xkb_state = wlr_keyboard.xkb_state orelse return;
+    // We must ref() the state here as a mapping could change the keyboard layout.
+    const xkb_state = (wlr_keyboard.xkb_state orelse return).ref();
+    defer xkb_state.unref();
+
     const keysyms = xkb_state.keyGetSyms(keycode);
 
     // Hide cursor when typing
