@@ -33,6 +33,9 @@ pub fn toggleFullscreen(
         const view = seat.focused.view;
 
         view.pending.fullscreen = !view.pending.fullscreen;
+        // It is possible to end up with multiple fullscreen views in which
+        // case making one non-fullscreen should switch focus to the next.
+        seat.focus(null);
         server.root.applyPending();
     }
 }

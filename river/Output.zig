@@ -406,6 +406,8 @@ fn handleMode(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
         var it = self.layers.fullscreen.children.iterator(.forward);
         const background_color_rect = @fieldParentPtr(wlr.SceneRect, "node", it.next().?);
         background_color_rect.setSize(width, height);
+
+        std.log.info("new output mode, width: {}, height: {}", .{ width, height });
     }
 
     server.root.applyPending();

@@ -193,19 +193,25 @@ pub fn updateCurrent(view: *Self) void {
     view.tree.node.setPosition(box.x, box.y);
     view.popup_tree.node.setPosition(box.x, box.y);
 
+    const enable_borders = view.draw_borders and !view.current.fullscreen;
+
     const border_width: c_int = config.border_width;
+    view.borders.left.node.setEnabled(enable_borders);
     view.borders.left.node.setPosition(-border_width, -border_width);
     view.borders.left.setSize(border_width, box.height + 2 * border_width);
     view.borders.left.setColor(color);
 
+    view.borders.right.node.setEnabled(enable_borders);
     view.borders.right.node.setPosition(box.width, -border_width);
     view.borders.right.setSize(border_width, box.height + 2 * border_width);
     view.borders.right.setColor(color);
 
+    view.borders.top.node.setEnabled(enable_borders);
     view.borders.top.node.setPosition(0, -border_width);
     view.borders.top.setSize(box.width, border_width);
     view.borders.top.setColor(color);
 
+    view.borders.bottom.node.setEnabled(enable_borders);
     view.borders.bottom.node.setPosition(0, box.height);
     view.borders.bottom.setSize(box.width, border_width);
     view.borders.bottom.setColor(color);

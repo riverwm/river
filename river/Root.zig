@@ -377,87 +377,102 @@ pub fn applyPending(root: *Self) void {
         }
     }
 
-    var output_it = root.outputs.first;
-    while (output_it) |node| : (output_it = node.next) {
-        const output = &node.data;
+    {
+        var output_it = root.outputs.first;
+        while (output_it) |node| : (output_it = node.next) {
+            const output = &node.data;
 
-        if (output.inflight.fullscreen) |view| {
-            if (!view.pending.fullscreen or view.pending.tags & output.pending.tags == 0) {
-                output.inflight.fullscreen = null;
-
-                view.setFullscreen(false);
-                view.pending.box = view.post_fullscreen_box;
-            }
-        }
-
-        // Iterate the focus stack in order to ensure the currently focused/most
-        // recently focused view that requests fullscreen is given fullscreen.
-        {
-            var it = output.pending.focus_stack.iterator(.forward);
-            while (it.next()) |view| {
-                assert(view.pending.output == output);
-
-                if (view.current.float and !view.pending.float) {
-                    // If switching from float to non-float, save the dimensions.
-                    view.float_box = view.current.box;
-                } else if (!view.current.float and view.pending.float) {
-                    // If switching from non-float to float, apply the saved float dimensions.
-                    view.pending.box = view.float_box;
-                }
-
-                if (output.inflight.fullscreen == null) {
-                    if (view.pending.fullscreen and view.pending.tags & output.pending.tags != 0) {
-                        output.inflight.fullscreen = view;
-
-                        view.setFullscreen(true);
-                        view.post_fullscreen_box = view.pending.box;
-                        view.pending.box = .{
-                            .x = 0,
-                            .y = 0,
-                            .width = undefined,
-                            .height = undefined,
-                        };
-                        output.wlr_output.effectiveResolution(
-                            &view.pending.box.width,
-                            &view.pending.box.height,
-                        );
-                    }
-                }
-
-                view.inflight_focus_stack_link.remove();
-                output.inflight.focus_stack.append(view);
-
-                view.inflight = view.pending;
-            }
-        }
-
-        {
-            var it = output.pending.wm_stack.iterator(.forward);
-            while (it.next()) |view| {
-                view.inflight_wm_stack_link.remove();
-                output.inflight.wm_stack.append(view);
-            }
-        }
-
-        output.inflight.tags = output.pending.tags;
-
-        assert(output.inflight.layout_demand == null);
-        if (output.layout) |layout| {
-            var layout_count: u32 = 0;
+            // Iterate the focus stack in order to ensure the currently focused/most
+            // recently focused view that requests fullscreen is given fullscreen.
+            var fullscreen_found = false;
             {
-                var it = output.inflight.wm_stack.iterator(.forward);
+                var it = output.pending.focus_stack.iterator(.forward);
                 while (it.next()) |view| {
-                    if (!view.inflight.float and !view.inflight.fullscreen and
-                        view.inflight.tags & output.inflight.tags != 0)
-                    {
-                        layout_count += 1;
+                    assert(view.pending.output == output);
+
+                    if (view.current.float and !view.pending.float) {
+                        // If switching from float to non-float, save the dimensions.
+                        view.float_box = view.current.box;
+                    } else if (!view.current.float and view.pending.float) {
+                        // If switching from non-float to float, apply the saved float dimensions.
+                        view.pending.box = view.float_box;
                     }
+
+                    if (!fullscreen_found and view.pending.fullscreen and
+                        view.pending.tags & output.pending.tags != 0)
+                    {
+                        fullscreen_found = true;
+                        if (output.inflight.fullscreen != view) {
+                            if (output.inflight.fullscreen) |old| {
+                                old.setFullscreen(false);
+                                old.pending.box = old.post_fullscreen_box;
+                                old.inflight.box = old.pending.box;
+                            }
+
+                            output.inflight.fullscreen = view;
+
+                            view.setFullscreen(true);
+                            view.post_fullscreen_box = view.pending.box;
+                            view.pending.box = .{
+                                .x = 0,
+                                .y = 0,
+                                .width = undefined,
+                                .height = undefined,
+                            };
+                            output.wlr_output.effectiveResolution(
+                                &view.pending.box.width,
+                                &view.pending.box.height,
+                            );
+                            view.inflight.box = view.pending.box;
+                        }
+                    }
+
+                    view.inflight_focus_stack_link.remove();
+                    output.inflight.focus_stack.append(view);
+
+                    view.inflight = view.pending;
+                }
+            }
+            if (!fullscreen_found) {
+                output.inflight.fullscreen = null;
+            }
+
+            {
+                var it = output.pending.wm_stack.iterator(.forward);
+                while (it.next()) |view| {
+                    view.inflight_wm_stack_link.remove();
+                    output.inflight.wm_stack.append(view);
                 }
             }
 
-            if (layout_count > 0) {
-                // TODO don't do this if the count has not changed
-                layout.startLayoutDemand(layout_count);
+            output.inflight.tags = output.pending.tags;
+        }
+    }
+
+    {
+        // Layout demands can't be sent until after the inflight stacks of
+        // all outputs have been updated.
+        var output_it = root.outputs.first;
+        while (output_it) |node| : (output_it = node.next) {
+            const output = &node.data;
+            assert(output.inflight.layout_demand == null);
+            if (output.layout) |layout| {
+                var layout_count: u32 = 0;
+                {
+                    var it = output.inflight.wm_stack.iterator(.forward);
+                    while (it.next()) |view| {
+                        if (!view.inflight.float and !view.inflight.fullscreen and
+                            view.inflight.tags & output.inflight.tags != 0)
+                        {
+                            layout_count += 1;
+                        }
+                    }
+                }
+
+                if (layout_count > 0) {
+                    // TODO don't do this if the count has not changed
+                    layout.startLayoutDemand(layout_count);
+                }
             }
         }
     }
@@ -570,29 +585,15 @@ fn commitTransaction(root: *Self) void {
         }
         output.current.tags = output.inflight.tags;
 
-        if (output.inflight.fullscreen != output.current.fullscreen) {
-            if (output.current.fullscreen) |view| {
-                if (view.inflight.output) |new_output| {
-                    view.tree.node.reparent(new_output.layers.views);
-                } else {
-                    view.tree.node.reparent(root.hidden.tree);
-                }
-            }
-            if (output.inflight.fullscreen) |view| {
-                assert(view.inflight.output == output);
-                view.tree.node.reparent(output.layers.fullscreen);
-            }
-            output.current.fullscreen = output.inflight.fullscreen;
-            output.layers.fullscreen.node.setEnabled(output.current.fullscreen != null);
-        }
-
         var focus_stack_it = output.inflight.focus_stack.iterator(.forward);
         while (focus_stack_it.next()) |view| {
             assert(view.inflight.output == output);
 
             view.inflight_serial = null;
 
-            if (view.current.output != output) {
+            if (view.current.output != output or
+                (output.current.fullscreen == view and output.inflight.fullscreen != view))
+            {
                 view.tree.node.reparent(output.layers.views);
                 view.popup_tree.node.reparent(output.layers.popups);
             }
@@ -600,10 +601,22 @@ fn commitTransaction(root: *Self) void {
             const enabled = view.current.tags & output.current.tags != 0;
             view.tree.node.setEnabled(enabled);
             view.popup_tree.node.setEnabled(enabled);
-            // TODO this approach for syncing the order will likely cause over-damaging.
-            view.tree.node.lowerToBottom();
+            if (output.inflight.fullscreen != view) {
+                // TODO this approach for syncing the order will likely cause over-damaging.
+                view.tree.node.lowerToBottom();
+            }
 
             view.updateCurrent();
+        }
+
+        if (output.inflight.fullscreen != output.current.fullscreen) {
+            if (output.inflight.fullscreen) |view| {
+                assert(view.inflight.output == output);
+                assert(view.current.output == output);
+                view.tree.node.reparent(output.layers.fullscreen);
+            }
+            output.current.fullscreen = output.inflight.fullscreen;
+            output.layers.fullscreen.node.setEnabled(output.current.fullscreen != null);
         }
 
         output.status.handleTransactionCommit(output);
