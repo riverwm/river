@@ -729,6 +729,11 @@ fn processOutputConfig(
                         self.output_layout.add(output.wlr_output, head.state.x, head.state.y);
                         output.tree.node.setEnabled(true);
                         output.tree.node.setPosition(head.state.x, head.state.y);
+                        // Even though we call this in the output's handler for the mode event
+                        // it is necessary to call it here as well since changing e.g. only
+                        // the transform will require the dimensions of the background to be
+                        // updated but will not trigger a mode event.
+                        output.updateBackgroundRect();
                         output.arrangeLayers();
                     } else {
                         self.removeOutput(output);

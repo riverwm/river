@@ -395,22 +395,22 @@ fn handleEnable(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) vo
 }
 
 fn handleMode(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
-    const self = @fieldParentPtr(Self, "mode", listener);
+    const output = @fieldParentPtr(Self, "mode", listener);
 
-    {
-        var width: c_int = undefined;
-        var height: c_int = undefined;
-        self.wlr_output.effectiveResolution(&width, &height);
-        self.layers.background_color_rect.setSize(width, height);
-
-        var it = self.layers.fullscreen.children.iterator(.forward);
-        const background_color_rect = @fieldParentPtr(wlr.SceneRect, "node", it.next().?);
-        background_color_rect.setSize(width, height);
-
-        log.info("new output mode, width: {}, height: {}", .{ width, height });
-    }
-
+    output.updateBackgroundRect();
+    output.arrangeLayers();
     server.root.applyPending();
+}
+
+pub fn updateBackgroundRect(output: *Self) void {
+    var width: c_int = undefined;
+    var height: c_int = undefined;
+    output.wlr_output.effectiveResolution(&width, &height);
+    output.layers.background_color_rect.setSize(width, height);
+
+    var it = output.layers.fullscreen.children.iterator(.forward);
+    const fullscreen_background = @fieldParentPtr(wlr.SceneRect, "node", it.next().?);
+    fullscreen_background.setSize(width, height);
 }
 
 fn handleFrame(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
