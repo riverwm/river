@@ -391,7 +391,7 @@ pub fn applyPending(root: *Self) void {
 
             // Iterate the focus stack in order to ensure the currently focused/most
             // recently focused view that requests fullscreen is given fullscreen.
-            var fullscreen_found = false;
+            output.pending.fullscreen = null;
             {
                 var it = output.pending.focus_stack.iterator(.forward);
                 while (it.next()) |view| {
@@ -405,33 +405,10 @@ pub fn applyPending(root: *Self) void {
                         view.pending.box = view.float_box;
                     }
 
-                    if (!fullscreen_found and view.pending.fullscreen and
+                    if (output.pending.fullscreen == null and view.pending.fullscreen and
                         view.pending.tags & output.pending.tags != 0)
                     {
-                        fullscreen_found = true;
-                        if (output.inflight.fullscreen != view) {
-                            if (output.inflight.fullscreen) |old| {
-                                old.setFullscreen(false);
-                                old.pending.box = old.post_fullscreen_box;
-                                old.inflight.box = old.pending.box;
-                            }
-
-                            output.inflight.fullscreen = view;
-
-                            view.setFullscreen(true);
-                            view.post_fullscreen_box = view.pending.box;
-                            view.pending.box = .{
-                                .x = 0,
-                                .y = 0,
-                                .width = undefined,
-                                .height = undefined,
-                            };
-                            output.wlr_output.effectiveResolution(
-                                &view.pending.box.width,
-                                &view.pending.box.height,
-                            );
-                            view.inflight.box = view.pending.box;
-                        }
+                        output.pending.fullscreen = view;
                     }
 
                     view.inflight_focus_stack_link.remove();
@@ -440,8 +417,12 @@ pub fn applyPending(root: *Self) void {
                     view.inflight = view.pending;
                 }
             }
-            if (!fullscreen_found) {
-                output.inflight.fullscreen = null;
+            if (output.pending.fullscreen != output.inflight.fullscreen) {
+                if (output.inflight.fullscreen) |view| {
+                    view.setFullscreen(false);
+                    view.pending.box = view.post_fullscreen_box;
+                    view.inflight.box = view.pending.box;
+                }
             }
 
             {
@@ -453,6 +434,33 @@ pub fn applyPending(root: *Self) void {
             }
 
             output.inflight.tags = output.pending.tags;
+        }
+    }
+
+    {
+        // This must be done after the original loop completes to handle the
+        // case where a fullscreen is moved between outputs.
+        var output_it = root.outputs.first;
+        while (output_it) |node| : (output_it = node.next) {
+            const output = &node.data;
+            if (output.pending.fullscreen != output.inflight.fullscreen) {
+                if (output.pending.fullscreen) |view| {
+                    view.setFullscreen(true);
+                    view.post_fullscreen_box = view.pending.box;
+                    view.pending.box = .{
+                        .x = 0,
+                        .y = 0,
+                        .width = undefined,
+                        .height = undefined,
+                    };
+                    output.wlr_output.effectiveResolution(
+                        &view.pending.box.width,
+                        &view.pending.box.height,
+                    );
+                    view.inflight.box = view.pending.box;
+                }
+                output.inflight.fullscreen = output.pending.fullscreen;
+            }
         }
     }
 

@@ -119,6 +119,9 @@ pending: struct {
     ///
     /// This includes both floating/fullscreen views and those arranged in the layout.
     wm_stack: wl.list.Head(View, .pending_wm_stack_link),
+    /// The view to be made fullscreen, if any.
+    /// This state should only be read/written inside Root.applyPending()
+    fullscreen: ?*View = null,
 },
 
 /// The state most recently sent to the layout generator and clients.
