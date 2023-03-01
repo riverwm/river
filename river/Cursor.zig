@@ -748,7 +748,7 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
             data.delta_x = dx - @trunc(dx);
             data.delta_y = dy - @trunc(dy);
 
-            const border_width = if (data.view.draw_borders) server.config.border_width else 0;
+            const border_width = if (data.view.pending.borders) server.config.border_width else 0;
 
             // Set width/height of view, clamp to view size constraints and output dimensions
             data.view.pending.box.width += @floatToInt(i32, dx);

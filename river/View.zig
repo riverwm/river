@@ -65,6 +65,7 @@ const State = struct {
     float: bool = false,
     fullscreen: bool = false,
     urgent: bool = false,
+    borders: bool = true,
 };
 
 /// The implementation of this view
@@ -105,8 +106,6 @@ float_box: wlr.Box = undefined,
 /// This state exists purely to allow for more intuitive behavior when
 /// exiting fullscreen if there is no active layout.
 post_fullscreen_box: wlr.Box = undefined,
-
-draw_borders: bool = true,
 
 request_activate: wl.Listener(*wlr.XdgActivationV1.event.RequestActivate) =
     wl.Listener(*wlr.XdgActivationV1.event.RequestActivate).init(handleRequestActivate),
@@ -193,7 +192,7 @@ pub fn updateCurrent(view: *Self) void {
     view.tree.node.setPosition(box.x, box.y);
     view.popup_tree.node.setPosition(box.x, box.y);
 
-    const enable_borders = view.draw_borders and !view.current.fullscreen;
+    const enable_borders = view.current.borders and !view.current.fullscreen;
 
     const border_width: c_int = config.border_width;
     view.borders.left.node.setEnabled(enable_borders);
@@ -303,7 +302,7 @@ pub fn setPendingOutput(view: *Self, output: *Output) void {
         var output_height: i32 = undefined;
         output.wlr_output.effectiveResolution(&output_width, &output_height);
 
-        const border_width = if (view.draw_borders) server.config.border_width else 0;
+        const border_width = if (view.pending.borders) server.config.border_width else 0;
         view.pending.box.width = math.min(view.pending.box.width, output_width - (2 * border_width));
         view.pending.box.height = math.min(view.pending.box.height, output_height - (2 * border_width));
 
@@ -401,7 +400,7 @@ pub fn getConstraints(self: Self) Constraints {
 /// Modify the pending x/y of the view by the given deltas, clamping to the
 /// bounds of the output.
 pub fn move(self: *Self, delta_x: i32, delta_y: i32) void {
-    const border_width = if (self.draw_borders) server.config.border_width else 0;
+    const border_width = if (self.pending.borders) server.config.border_width else 0;
 
     var output_width: i32 = math.maxInt(i32);
     var output_height: i32 = math.maxInt(i32);

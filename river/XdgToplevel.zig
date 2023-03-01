@@ -196,7 +196,7 @@ fn handleMap(listener: *wl.Listener(void)) void {
     // If the view has an app_id or title which is not configured to use client
     // side decorations, inform it that it is tiled.
     if (server.config.csdAllowed(view)) {
-        view.draw_borders = false;
+        view.pending.borders = false;
     } else {
         _ = self.xdg_toplevel.setTiled(.{ .top = true, .bottom = true, .left = true, .right = true });
     }
