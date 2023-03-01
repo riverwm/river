@@ -89,13 +89,33 @@ pub fn needsConfigure(self: Self) bool {
     // configured by setting the current width/height to the initial width/height
     // of the view in handleMap().
     return view.inflight.box.width != view.current.box.width or
-        view.inflight.box.height != view.current.box.height;
+        view.inflight.box.height != view.current.box.height or
+        (view.inflight.focus != 0) != (view.current.focus != 0) or
+        (view.inflight.output != null and view.inflight.output.?.inflight.fullscreen == view) !=
+        (view.current.output != null and view.current.output.?.current.fullscreen == view) or
+        view.inflight.borders != view.current.borders or
+        view.inflight.resizing != view.current.resizing;
 }
 
 /// Send a configure event, applying the inflight state of the view.
 pub fn configure(self: *Self) void {
     const state = &self.view.inflight;
+
     self.view.inflight_serial = self.xdg_toplevel.setSize(state.box.width, state.box.height);
+
+    _ = self.xdg_toplevel.setActivated(state.focus != 0);
+
+    const fullscreen = state.output != null and state.output.?.inflight.fullscreen == self.view;
+    _ = self.xdg_toplevel.setFullscreen(fullscreen);
+
+    if (state.borders) {
+        _ = self.xdg_toplevel.setTiled(.{ .top = true, .bottom = true, .left = true, .right = true });
+    } else {
+        _ = self.xdg_toplevel.setTiled(.{ .top = false, .bottom = false, .left = false, .right = false });
+    }
+
+    _ = self.xdg_toplevel.setResizing(state.resizing);
+
     self.acked_inflight_serial = false;
 }
 
@@ -106,18 +126,6 @@ pub fn rootSurface(self: Self) *wlr.Surface {
 /// Close the view. This will lead to the unmap and destroy events being sent
 pub fn close(self: Self) void {
     self.xdg_toplevel.sendClose();
-}
-
-pub fn setActivated(self: Self, activated: bool) void {
-    _ = self.xdg_toplevel.setActivated(activated);
-}
-
-pub fn setFullscreen(self: Self, fullscreen: bool) void {
-    _ = self.xdg_toplevel.setFullscreen(fullscreen);
-}
-
-pub fn setResizing(self: Self, resizing: bool) void {
-    _ = self.xdg_toplevel.setResizing(resizing);
 }
 
 /// Return the current title of the toplevel if any.
@@ -193,13 +201,7 @@ fn handleMap(listener: *wl.Listener(void)) void {
 
     self.view.pending.fullscreen = self.xdg_toplevel.requested.fullscreen;
 
-    // If the view has an app_id or title which is not configured to use client
-    // side decorations, inform it that it is tiled.
-    if (server.config.csdAllowed(view)) {
-        view.pending.borders = false;
-    } else {
-        _ = self.xdg_toplevel.setTiled(.{ .top = true, .bottom = true, .left = true, .right = true });
-    }
+    view.pending.borders = !server.config.csdAllowed(view);
 
     view.map() catch {
         log.err("out of memory", .{});

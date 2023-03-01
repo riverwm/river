@@ -84,11 +84,14 @@ pub fn needsConfigure(self: Self) bool {
     var output_box: wlr.Box = undefined;
     server.root.output_layout.getBox(output.wlr_output, &output_box);
 
-    const state = &self.view.inflight;
-    return self.xwayland_surface.x != state.box.x + output_box.x or
-        self.xwayland_surface.y != state.box.y + output_box.y or
-        self.xwayland_surface.width != state.box.width or
-        self.xwayland_surface.height != state.box.height;
+    const view = self.view;
+    return self.xwayland_surface.x != view.inflight.box.x + output_box.x or
+        self.xwayland_surface.y != view.inflight.box.y + output_box.y or
+        self.xwayland_surface.width != view.inflight.box.width or
+        self.xwayland_surface.height != view.inflight.box.height or
+        (view.inflight.focus != 0) != (view.current.focus != 0) or
+        (view.inflight.output != null and view.inflight.output.?.inflight.fullscreen == view) !=
+        (view.current.output != null and view.current.output.?.current.fullscreen == view);
 }
 
 pub fn configure(self: Self) void {
@@ -103,6 +106,11 @@ pub fn configure(self: Self) void {
         @intCast(u16, state.box.width),
         @intCast(u16, state.box.height),
     );
+
+    self.setActivated(state.focus != 0);
+
+    const fullscreen = state.output != null and state.output.?.inflight.fullscreen == self.view;
+    self.xwayland_surface.setFullscreen(fullscreen);
 }
 
 pub fn rootSurface(self: Self) *wlr.Surface {
@@ -115,17 +123,13 @@ pub fn close(self: Self) void {
     self.xwayland_surface.close();
 }
 
-pub fn setActivated(self: Self, activated: bool) void {
+fn setActivated(self: Self, activated: bool) void {
     // See comment on handleRequestMinimize() for details
     if (activated and self.xwayland_surface.minimized) {
         self.xwayland_surface.setMinimized(false);
     }
     self.xwayland_surface.activate(activated);
     self.xwayland_surface.restack(null, .above);
-}
-
-pub fn setFullscreen(self: *Self, fullscreen: bool) void {
-    self.xwayland_surface.setFullscreen(fullscreen);
 }
 
 /// Get the current title of the xwayland surface if any.

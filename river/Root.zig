@@ -420,8 +420,6 @@ pub fn applyPending(root: *Self) void {
             }
             if (output.pending.fullscreen != output.inflight.fullscreen) {
                 if (output.inflight.fullscreen) |view| {
-                    view.setFullscreen(false);
-
                     view.pending.box = view.post_fullscreen_box;
                     view.pending.clampToOutput();
 
@@ -449,7 +447,6 @@ pub fn applyPending(root: *Self) void {
             const output = &node.data;
             if (output.pending.fullscreen != output.inflight.fullscreen) {
                 if (output.pending.fullscreen) |view| {
-                    view.setFullscreen(true);
                     view.post_fullscreen_box = view.pending.box;
                     view.pending.box = .{
                         .x = 0,

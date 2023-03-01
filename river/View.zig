@@ -66,6 +66,7 @@ pub const State = struct {
     fullscreen: bool = false,
     urgent: bool = false,
     borders: bool = true,
+    resizing: bool = false,
 
     /// Modify the x/y of the given state by delta_x/delta_y, clamping to the
     /// bounds of the output.
@@ -350,48 +351,6 @@ pub fn destroyPopups(self: Self) void {
     switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.destroyPopups(),
         .xwayland_view => {},
-    }
-}
-
-pub fn setActivated(self: Self, activated: bool) void {
-    switch (self.impl) {
-        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.setActivated(activated),
-        .xwayland_view => |xwayland_view| xwayland_view.setActivated(activated),
-    }
-}
-
-pub fn setFullscreen(self: *Self, fullscreen: bool) void {
-    switch (self.impl) {
-        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.setFullscreen(fullscreen),
-        .xwayland_view => |*xwayland_view| {
-            // TODO(zig): remove this uneeded if statement
-            // https://github.com/ziglang/zig/issues/13655
-            if (build_options.xwayland) xwayland_view.setFullscreen(fullscreen);
-        },
-    }
-}
-
-pub fn setResizing(self: Self, resizing: bool) void {
-    switch (self.impl) {
-        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.setResizing(resizing),
-        .xwayland_view => {},
-    }
-}
-
-/// Iterates over all surfaces, subsurfaces, and popups in the tree
-pub inline fn forEachSurface(
-    self: Self,
-    comptime T: type,
-    comptime iterator: fn (surface: *wlr.Surface, sx: c_int, sy: c_int, data: T) void,
-    user_data: T,
-) void {
-    switch (self.impl) {
-        .xdg_toplevel => |xdg_toplevel| {
-            xdg_toplevel.xdg_toplevel.base.forEachSurface(T, iterator, user_data);
-        },
-        .xwayland_view => |xwayland_view| {
-            xwayland_view.xwayland_surface.surface.?.forEachSurface(T, iterator, user_data);
-        },
     }
 }
 

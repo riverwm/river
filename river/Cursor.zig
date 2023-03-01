@@ -658,7 +658,7 @@ pub fn enterMode(self: *Self, mode: enum { move, resize }, view: *View) void {
                 .offset_x = cur_box.x + cur_box.width - @floatToInt(i32, self.wlr_cursor.x),
                 .offset_y = cur_box.y + cur_box.height - @floatToInt(i32, self.wlr_cursor.y),
             } };
-            view.setResizing(true);
+            view.pending.resizing = true;
         },
     }
 
@@ -690,7 +690,7 @@ fn leaveMode(self: *Self, event: *wlr.Pointer.event.Button) void {
             _ = self.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
         },
         .move => {},
-        .resize => |resize| resize.view.setResizing(false),
+        .resize => |resize| resize.view.pending.resizing = false,
     }
 
     self.mode = .passthrough;

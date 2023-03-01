@@ -220,7 +220,6 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
     switch (self.focused) {
         .view => |view| {
             view.pending.focus -= 1;
-            if (view.pending.focus == 0) view.setActivated(false);
             view.destroyPopups();
         },
         .layer => |layer_surface| {
@@ -234,7 +233,6 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
         .view => |target_view| {
             assert(server.lock_manager.state != .locked);
             assert(self.focused_output == target_view.pending.output);
-            if (target_view.pending.focus == 0) target_view.setActivated(true);
             target_view.pending.focus += 1;
             target_view.pending.urgent = false;
         },

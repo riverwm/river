@@ -122,17 +122,14 @@ fn csdFilterUpdateViews(kind: FilterKind, pattern: []const u8, operation: enum {
 
         const view = @intToPtr(*View, xdg_toplevel_decoration.surface.data);
         if (viewMatchesPattern(kind, pattern, view)) {
-            const toplevel = view.impl.xdg_toplevel.xdg_toplevel;
             switch (operation) {
                 .add => {
                     _ = xdg_toplevel_decoration.setMode(.client_side);
                     view.pending.borders = false;
-                    _ = toplevel.setTiled(.{ .top = false, .bottom = false, .left = false, .right = false });
                 },
                 .remove => {
                     _ = xdg_toplevel_decoration.setMode(.server_side);
                     view.pending.borders = true;
-                    _ = toplevel.setTiled(.{ .top = true, .bottom = true, .left = true, .right = true });
                 },
             }
         }
