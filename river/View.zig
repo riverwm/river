@@ -478,16 +478,6 @@ pub fn unmap(view: *Self) void {
         server.root.hidden.pending.wm_stack.prepend(view);
     }
 
-    {
-        var it = server.input_manager.seats.first;
-        while (it) |node| : (it = node.next) {
-            const seat = &node.data;
-            if (seat.focused == .view and seat.focused.view == view) {
-                seat.focus(null);
-            }
-        }
-    }
-
     view.request_activate.link.remove();
 
     server.root.applyPending();

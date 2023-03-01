@@ -134,6 +134,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     }
 }
 
+/// Requires a call to Root.applyPending()
 fn handleKeyboardInteractiveExclusive(output: *Output) void {
     if (server.lock_manager.state != .unlocked) return;
 
@@ -174,7 +175,6 @@ fn handleKeyboardInteractiveExclusive(output: *Output) void {
             // without keyboard interactivity, stop focusing that layer surface.
             if (!current_focus.mapped or current_focus.current.keyboard_interactive == .none) {
                 seat.setFocusRaw(.{ .none = {} });
-                seat.focus(null);
             }
         }
     }

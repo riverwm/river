@@ -138,6 +138,7 @@ pub fn deinit(self: *Self) void {
 
 /// Set the current focus. If a visible view is passed it will be focused.
 /// If null is passed, the top view in the stack of the focused output will be focused.
+/// Requires a call to Root.applyPending()
 pub fn focus(self: *Self, _target: ?*View) void {
     var target = _target;
 

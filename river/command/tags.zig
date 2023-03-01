@@ -34,7 +34,6 @@ pub fn setFocusedTags(
     if (output.pending.tags != tags) {
         output.previous_tags = output.pending.tags;
         output.pending.tags = tags;
-        seat.focus(null);
         server.root.applyPending();
     }
 }
@@ -58,7 +57,6 @@ pub fn setViewTags(
     if (seat.focused == .view) {
         const view = seat.focused.view;
         view.pending.tags = tags;
-        seat.focus(null);
         server.root.applyPending();
     }
 }
@@ -75,7 +73,6 @@ pub fn toggleFocusedTags(
     if (new_focused_tags != 0) {
         output.previous_tags = output.pending.tags;
         output.pending.tags = new_focused_tags;
-        seat.focus(null);
         server.root.applyPending();
     }
 }
@@ -92,7 +89,6 @@ pub fn toggleViewTags(
         if (new_tags != 0) {
             const view = seat.focused.view;
             view.pending.tags = new_tags;
-            seat.focus(null);
             server.root.applyPending();
         }
     }
@@ -110,7 +106,6 @@ pub fn focusPreviousTags(
     if (output.pending.tags != previous_tags) {
         output.previous_tags = output.pending.tags;
         output.pending.tags = previous_tags;
-        seat.focus(null);
         server.root.applyPending();
     }
 }
@@ -127,7 +122,6 @@ pub fn sendToPreviousTags(
     if (seat.focused == .view) {
         const view = seat.focused.view;
         view.pending.tags = output.previous_tags;
-        seat.focus(null);
         server.root.applyPending();
     }
 }

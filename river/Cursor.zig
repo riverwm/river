@@ -337,6 +337,7 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
     server.root.applyPending();
 }
 
+/// Requires a call to Root.applyPending()
 fn updateKeyboardFocus(self: Self, result: Root.AtResult) void {
     switch (result.node) {
         .view => |view| {
@@ -348,8 +349,6 @@ fn updateKeyboardFocus(self: Self, result: Root.AtResult) void {
             // give it keyboard focus.
             if (layer_surface.wlr_layer_surface.current.keyboard_interactive != .none) {
                 self.seat.setFocusRaw(.{ .layer = layer_surface });
-            } else {
-                self.seat.focus(null);
             }
         },
         .lock_surface => |lock_surface| {
@@ -364,11 +363,11 @@ fn updateKeyboardFocus(self: Self, result: Root.AtResult) void {
 }
 
 /// Focus the output at the given layout coordinates, if any
+/// Requires a call to Root.applyPending()
 fn updateOutputFocus(self: Self, lx: f64, ly: f64) void {
     if (server.root.output_layout.outputAt(lx, ly)) |wlr_output| {
         const output = @intToPtr(*Output, wlr_output.data);
         self.seat.focusOutput(output);
-        self.seat.focus(null);
     }
 }
 

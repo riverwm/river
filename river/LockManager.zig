@@ -223,8 +223,6 @@ fn handleUnlock(listener: *wl.Listener(void)) void {
         while (it) |node| : (it = node.next) {
             const seat = &node.data;
             seat.setFocusRaw(.none);
-            seat.focus(null);
-            seat.cursor.updateState();
 
             // Exit locked mode
             seat.enterMode(seat.prev_mode_id);
@@ -232,6 +230,8 @@ fn handleUnlock(listener: *wl.Listener(void)) void {
     }
 
     handleDestroy(&manager.destroy);
+
+    server.root.applyPending();
 }
 
 fn handleDestroy(listener: *wl.Listener(void)) void {

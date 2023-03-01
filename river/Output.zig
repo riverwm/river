@@ -293,6 +293,7 @@ pub fn layerSurfaceTree(self: Self, layer: zwlr.LayerShellV1.Layer) *wlr.SceneTr
 
 /// Arrange all layer surfaces of this output and adjust the usable area.
 /// Will arrange views as well if the usable area changes.
+/// Requires a call to Root.applyPending()
 pub fn arrangeLayers(self: *Self) void {
     var full_box: wlr.Box = .{
         .x = 0,

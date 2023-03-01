@@ -43,7 +43,6 @@ pub fn focusOutput(
     }
 
     seat.focusOutput((try getOutput(seat, args[1])) orelse return);
-    seat.focus(null);
     server.root.applyPending();
 }
 
@@ -68,8 +67,6 @@ pub fn sendToOutput(
         if (seat.focused.view.pending.output == destination_output) return;
         seat.focused.view.setPendingOutput(destination_output);
 
-        // Handle the change and focus whatever's next in the focus stack
-        seat.focus(null);
         server.root.applyPending();
     }
 }

@@ -294,7 +294,6 @@ pub fn removeOutput(root: *Self, output: *Output) void {
         const seat = &seat_node.data;
         if (seat.focused_output == output) {
             seat.focusOutput(fallback_output);
-            seat.focus(null);
         }
     }
 
@@ -340,7 +339,6 @@ pub fn addOutput(root: *Self, output: *Output) void {
             while (it) |seat_node| : (it = seat_node.next) {
                 const seat = &seat_node.data;
                 seat.focusOutput(output);
-                seat.focus(null);
             }
         }
         root.applyPending();
@@ -352,6 +350,15 @@ pub fn addOutput(root: *Self, output: *Output) void {
 /// generates a new layout for all outputs and all affected clients ack a
 /// configure and commit a new buffer.
 pub fn applyPending(root: *Self) void {
+    {
+        // Changes to the pending state may require a focus update to keep
+        // state consistent. Instead of having focus(null) calls spread all
+        // around the codebase and risk forgetting one, always ensure focus
+        // state is synchronized here.
+        var it = server.input_manager.seats.first;
+        while (it) |node| : (it = node.next) node.data.focus(null);
+    }
+
     // If there is already a transaction inflight, wait until it completes.
     if (root.inflight_layout_demands > 0 or root.inflight_configures > 0) {
         root.pending_state_dirty = true;

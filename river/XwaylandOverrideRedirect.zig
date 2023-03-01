@@ -138,15 +138,11 @@ fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSur
     var seat_it = server.input_manager.seats.first;
     while (seat_it) |seat_node| : (seat_it = seat_node.next) {
         const seat = &seat_node.data;
-        switch (seat.focused) {
-            .view => |focused| if (focused.impl == .xwayland_view and
-                focused.impl.xwayland_view.xwayland_surface.pid == self.xwayland_surface.pid and
-                seat.wlr_seat.keyboard_state.focused_surface == self.xwayland_surface.surface)
-            {
-                seat.keyboardEnterOrLeave(focused.rootSurface());
-            },
-            .xwayland_override_redirect => |focused| if (focused == self) seat.focus(null),
-            .layer, .lock_surface, .none => {},
+        if (seat.focused == .view and seat.focused.view.impl == .xwayland_view and
+            seat.focused.view.impl.xwayland_view.xwayland_surface.pid == self.xwayland_surface.pid and
+            seat.wlr_seat.keyboard_state.focused_surface == self.xwayland_surface.surface)
+        {
+            seat.keyboardEnterOrLeave(seat.focused.view.rootSurface());
         }
     }
 
