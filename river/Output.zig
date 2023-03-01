@@ -26,7 +26,6 @@ const wayland = @import("wayland");
 const wl = wayland.server.wl;
 const zwlr = wayland.server.zwlr;
 
-const render = @import("render.zig");
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
@@ -37,6 +36,8 @@ const LockSurface = @import("LockSurface.zig");
 const OutputStatus = @import("OutputStatus.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
 const View = @import("View.zig");
+
+const log = std.log.scoped(.output);
 
 wlr_output: *wlr.Output,
 
@@ -269,7 +270,7 @@ pub fn create(wlr_output: *wlr.Output) !void {
     while (it) |seat_node| : (it = seat_node.next) {
         const seat = &seat_node.data;
         seat.cursor.xcursor_manager.load(wlr_output.scale) catch
-            std.log.scoped(.cursor).err("failed to load xcursor theme at scale {}", .{wlr_output.scale});
+            log.err("failed to load xcursor theme at scale {}", .{wlr_output.scale});
     }
 
     output.setTitle();
@@ -328,7 +329,7 @@ pub fn arrangeLayers(self: *Self) void {
 fn handleDestroy(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
     const output = @fieldParentPtr(Self, "destroy", listener);
 
-    std.log.scoped(.server).debug("output '{s}' destroyed", .{output.wlr_output.name});
+    log.debug("output '{s}' destroyed", .{output.wlr_output.name});
 
     // Remove the destroyed output from root if it wasn't already removed
     server.root.removeOutput(output);
@@ -390,11 +391,6 @@ fn handleEnable(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) vo
     }
 }
 
-fn handleFrame(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
-    const self = @fieldParentPtr(Self, "frame", listener);
-    render.renderOutput(self);
-}
-
 fn handleMode(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
     const self = @fieldParentPtr(Self, "mode", listener);
 
@@ -408,27 +404,58 @@ fn handleMode(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
         const background_color_rect = @fieldParentPtr(wlr.SceneRect, "node", it.next().?);
         background_color_rect.setSize(width, height);
 
-        std.log.info("new output mode, width: {}, height: {}", .{ width, height });
+        log.info("new output mode, width: {}, height: {}", .{ width, height });
     }
 
     server.root.applyPending();
+}
+
+fn handleFrame(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
+    const output = @fieldParentPtr(Self, "frame", listener);
+    const scene_output = server.root.scene.getSceneOutput(output.wlr_output).?;
+
+    if (scene_output.commit()) {
+        if (server.lock_manager.state == .locked or
+            (server.lock_manager.state == .waiting_for_lock_surfaces and output.locked_content.node.enabled) or
+            server.lock_manager.state == .waiting_for_blank)
+        {
+            assert(!output.normal_content.node.enabled);
+            assert(output.locked_content.node.enabled);
+
+            switch (server.lock_manager.state) {
+                .unlocked => unreachable,
+                .locked => switch (output.lock_render_state) {
+                    .unlocked, .pending_blank, .pending_lock_surface => unreachable,
+                    .blanked, .lock_surface => {},
+                },
+                .waiting_for_blank => output.lock_render_state = .pending_blank,
+                .waiting_for_lock_surfaces => output.lock_render_state = .pending_lock_surface,
+            }
+        }
+    } else {
+        log.err("output commit failed for {s}", .{output.wlr_output.name});
+    }
+
+    var now: std.os.timespec = undefined;
+    std.os.clock_gettime(std.os.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
+    scene_output.sendFrameDone(&now);
 }
 
 fn handlePresent(
     listener: *wl.Listener(*wlr.Output.event.Present),
     event: *wlr.Output.event.Present,
 ) void {
-    const self = @fieldParentPtr(Self, "present", listener);
+    const output = @fieldParentPtr(Self, "present", listener);
 
-    switch (self.lock_render_state) {
+    switch (output.lock_render_state) {
         .unlocked => assert(server.lock_manager.state != .locked),
         .pending_blank, .pending_lock_surface => {
             if (!event.presented) {
-                self.lock_render_state = .unlocked;
+                output.lock_render_state = .unlocked;
                 return;
             }
 
-            self.lock_render_state = switch (self.lock_render_state) {
+            output.lock_render_state = switch (output.lock_render_state) {
                 .pending_blank => .blanked,
                 .pending_lock_surface => .lock_surface,
                 .unlocked, .blanked, .lock_surface => unreachable,
