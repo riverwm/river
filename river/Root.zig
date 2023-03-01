@@ -617,6 +617,8 @@ fn commitTransaction(root: *Self) void {
                 view.popup_tree.node.reparent(output.layers.popups);
             }
 
+            view.updateCurrent();
+
             const enabled = view.current.tags & output.current.tags != 0;
             view.tree.node.setEnabled(enabled);
             view.popup_tree.node.setEnabled(enabled);
@@ -624,8 +626,6 @@ fn commitTransaction(root: *Self) void {
                 // TODO this approach for syncing the order will likely cause over-damaging.
                 view.tree.node.lowerToBottom();
             }
-
-            view.updateCurrent();
         }
 
         if (output.inflight.fullscreen != output.current.fullscreen) {
