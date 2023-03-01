@@ -428,8 +428,16 @@ fn handleFrame(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
                     .unlocked, .pending_blank, .pending_lock_surface => unreachable,
                     .blanked, .lock_surface => {},
                 },
-                .waiting_for_blank => output.lock_render_state = .pending_blank,
-                .waiting_for_lock_surfaces => output.lock_render_state = .pending_lock_surface,
+                .waiting_for_blank => {
+                    if (output.lock_render_state != .blanked) {
+                        output.lock_render_state = .pending_blank;
+                    }
+                },
+                .waiting_for_lock_surfaces => {
+                    if (output.lock_render_state != .lock_surface) {
+                        output.lock_render_state = .pending_lock_surface;
+                    }
+                },
             }
         }
     } else {
