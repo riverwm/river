@@ -222,9 +222,6 @@ pub fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface:
 fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "unmap", listener);
 
-    self.surface_tree.?.node.destroy();
-    self.surface_tree = null;
-
     // Remove listeners that are only active while mapped
     self.set_title.link.remove();
     self.set_class.link.remove();
@@ -232,6 +229,11 @@ fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSur
     self.request_minimize.link.remove();
 
     self.view.unmap();
+
+    // Don't destroy the surface tree until after View.unmap() has a chance
+    // to save buffers for frame perfection.
+    self.surface_tree.?.node.destroy();
+    self.surface_tree = null;
 }
 
 fn handleRequestConfigure(

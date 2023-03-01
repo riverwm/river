@@ -220,7 +220,17 @@ fn handleUnmap(listener: *wl.Listener(void)) void {
     self.set_title.link.remove();
     self.set_app_id.link.remove();
 
+    // TODO(wlroots): This enable/disable dance is a workaround for an signal
+    // ordering issue with the scene xdg surface helper's unmap handler that
+    // disables the node. We however need the node enabled for View.unmap()
+    // so that we can save buffers for frame perfection.
+    var it = self.view.surface_tree.children.iterator(.forward);
+    const xdg_surface_tree_node = it.next().?;
+    xdg_surface_tree_node.setEnabled(true);
+
     self.view.unmap();
+
+    xdg_surface_tree_node.setEnabled(false);
 }
 
 fn handleNewPopup(listener: *wl.Listener(*wlr.XdgPopup), wlr_xdg_popup: *wlr.XdgPopup) void {
