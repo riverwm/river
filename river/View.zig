@@ -47,7 +47,7 @@ const Impl = union(enum) {
     xwayland_view: if (build_options.xwayland) XwaylandView else noreturn,
 };
 
-const State = struct {
+pub const State = struct {
     /// The output the view is currently assigned to.
     /// May be null if there are no outputs or for newly created views.
     /// Must be set using setPendingOutput()
@@ -66,6 +66,44 @@ const State = struct {
     fullscreen: bool = false,
     urgent: bool = false,
     borders: bool = true,
+
+    /// Modify the x/y of the given state by delta_x/delta_y, clamping to the
+    /// bounds of the output.
+    pub fn move(state: *State, delta_x: i32, delta_y: i32) void {
+        const border_width = if (state.borders) server.config.border_width else 0;
+
+        var output_width: i32 = math.maxInt(i32);
+        var output_height: i32 = math.maxInt(i32);
+        if (state.output) |output| {
+            output.wlr_output.effectiveResolution(&output_width, &output_height);
+        }
+
+        const max_x = output_width - state.box.width - border_width;
+        state.box.x += delta_x;
+        state.box.x = math.max(state.box.x, border_width);
+        state.box.x = math.min(state.box.x, max_x);
+        state.box.x = math.max(state.box.x, 0);
+
+        const max_y = output_height - state.box.height - border_width;
+        state.box.y += delta_y;
+        state.box.y = math.max(state.box.y, border_width);
+        state.box.y = math.min(state.box.y, max_y);
+        state.box.y = math.max(state.box.y, 0);
+    }
+
+    pub fn clampToOutput(state: *State) void {
+        const output = state.output orelse return;
+
+        var output_width: i32 = undefined;
+        var output_height: i32 = undefined;
+        output.wlr_output.effectiveResolution(&output_width, &output_height);
+
+        const border_width = if (state.borders) server.config.border_width else 0;
+        state.box.width = math.min(state.box.width, output_width - (2 * border_width));
+        state.box.height = math.min(state.box.height, output_height - (2 * border_width));
+
+        state.move(0, 0);
+    }
 };
 
 /// The implementation of this view
@@ -296,17 +334,8 @@ pub fn setPendingOutput(view: *Self, output: *Output) void {
     }
     output.pending.focus_stack.prepend(view);
 
-    // Adapt the floating position/dimensions of the view to the new output.
     if (view.pending.float) {
-        var output_width: i32 = undefined;
-        var output_height: i32 = undefined;
-        output.wlr_output.effectiveResolution(&output_width, &output_height);
-
-        const border_width = if (view.pending.borders) server.config.border_width else 0;
-        view.pending.box.width = math.min(view.pending.box.width, output_width - (2 * border_width));
-        view.pending.box.height = math.min(view.pending.box.height, output_height - (2 * border_width));
-
-        view.move(0, 0);
+        view.pending.clampToOutput();
     }
 }
 
@@ -395,30 +424,6 @@ pub fn getConstraints(self: Self) Constraints {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.getConstraints(),
         .xwayland_view => |xwayland_view| xwayland_view.getConstraints(),
     };
-}
-
-/// Modify the pending x/y of the view by the given deltas, clamping to the
-/// bounds of the output.
-pub fn move(self: *Self, delta_x: i32, delta_y: i32) void {
-    const border_width = if (self.pending.borders) server.config.border_width else 0;
-
-    var output_width: i32 = math.maxInt(i32);
-    var output_height: i32 = math.maxInt(i32);
-    if (self.pending.output) |output| {
-        output.wlr_output.effectiveResolution(&output_width, &output_height);
-    }
-
-    const max_x = output_width - self.pending.box.width - border_width;
-    self.pending.box.x += delta_x;
-    self.pending.box.x = math.max(self.pending.box.x, border_width);
-    self.pending.box.x = math.min(self.pending.box.x, max_x);
-    self.pending.box.x = math.max(self.pending.box.x, 0);
-
-    const max_y = output_height - self.pending.box.height - border_width;
-    self.pending.box.y += delta_y;
-    self.pending.box.y = math.max(self.pending.box.y, border_width);
-    self.pending.box.y = math.min(self.pending.box.y, max_y);
-    self.pending.box.y = math.max(self.pending.box.y, 0);
 }
 
 /// Find and return the view corresponding to a given surface, if any

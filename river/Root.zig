@@ -403,6 +403,7 @@ pub fn applyPending(root: *Self) void {
                     } else if (!view.current.float and view.pending.float) {
                         // If switching from non-float to float, apply the saved float dimensions.
                         view.pending.box = view.float_box;
+                        view.pending.clampToOutput();
                     }
 
                     if (output.pending.fullscreen == null and view.pending.fullscreen and
@@ -420,7 +421,10 @@ pub fn applyPending(root: *Self) void {
             if (output.pending.fullscreen != output.inflight.fullscreen) {
                 if (output.inflight.fullscreen) |view| {
                     view.setFullscreen(false);
+
                     view.pending.box = view.post_fullscreen_box;
+                    view.pending.clampToOutput();
+
                     view.inflight.box = view.pending.box;
                 }
             }

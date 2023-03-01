@@ -39,10 +39,10 @@ pub fn move(
 
     const view = getView(seat) orelse return;
     switch (direction) {
-        .up => view.move(0, -delta),
-        .down => view.move(0, delta),
-        .left => view.move(-delta, 0),
-        .right => view.move(delta, 0),
+        .up => view.pending.move(0, -delta),
+        .down => view.pending.move(0, delta),
+        .left => view.pending.move(-delta, 0),
+        .right => view.pending.move(delta, 0),
     }
 
     apply(view);
@@ -108,7 +108,7 @@ pub fn resize(
                 view.pending.box.width,
                 output_width - 2 * server.config.border_width,
             );
-            view.move(@divFloor(diff_width, 2), 0);
+            view.pending.move(@divFloor(diff_width, 2), 0);
         },
         .vertical => {
             const prev_height = view.pending.box.height;
@@ -120,7 +120,7 @@ pub fn resize(
                 view.pending.box.height,
                 output_height - 2 * server.config.border_width,
             );
-            view.move(0, @divFloor(diff_height, 2));
+            view.pending.move(0, @divFloor(diff_height, 2));
         },
     }
 

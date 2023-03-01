@@ -734,7 +734,7 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
             data.delta_y = dy - @trunc(dy);
 
             const view = data.view;
-            view.move(@floatToInt(i32, dx), @floatToInt(i32, dy));
+            view.pending.move(@floatToInt(i32, dx), @floatToInt(i32, dy));
             self.wlr_cursor.move(
                 device,
                 @intToFloat(f64, view.pending.box.x - view.current.box.x),
