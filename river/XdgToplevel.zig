@@ -36,7 +36,8 @@ view: *View,
 
 xdg_toplevel: *wlr.XdgToplevel,
 
-geometry: wlr.Box,
+/// Initialized on map
+geometry: wlr.Box = undefined,
 
 /// Set to true when the client acks the configure with serial View.inflight_serial.
 acked_inflight_serial: bool = false,
@@ -59,12 +60,10 @@ pub fn create(xdg_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
     const view = try View.create(.{ .xdg_toplevel = .{
         .view = undefined,
         .xdg_toplevel = xdg_toplevel,
-        .geometry = undefined,
     } });
     errdefer view.destroy();
 
     view.impl.xdg_toplevel.view = view;
-    xdg_toplevel.base.getGeometry(&view.impl.xdg_toplevel.geometry);
 
     _ = try view.surface_tree.createSceneXdgSurface(xdg_toplevel.base);
 
@@ -165,14 +164,13 @@ fn handleMap(listener: *wl.Listener(void)) void {
     self.xdg_toplevel.events.set_title.add(&self.set_title);
     self.xdg_toplevel.events.set_app_id.add(&self.set_app_id);
 
-    var geometry: wlr.Box = undefined;
-    self.xdg_toplevel.base.getGeometry(&geometry);
+    self.xdg_toplevel.base.getGeometry(&self.geometry);
 
     view.pending.box = .{
         .x = 0,
         .y = 0,
-        .width = geometry.width,
-        .height = geometry.height,
+        .width = self.geometry.width,
+        .height = self.geometry.height,
     };
     view.inflight.box = view.pending.box;
     view.current.box = view.pending.box;
@@ -255,11 +253,10 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
         };
     }
 
-    var new_geometry: wlr.Box = undefined;
-    self.xdg_toplevel.base.getGeometry(&new_geometry);
-
-    const size_changed = !std.meta.eql(self.geometry, new_geometry);
-    self.geometry = new_geometry;
+    const old_geometry = self.geometry;
+    self.xdg_toplevel.base.getGeometry(&self.geometry);
+    const size_changed = self.geometry.width != old_geometry.width or
+        self.geometry.height != old_geometry.height;
 
     if (view.inflight_serial != null) {
         if (self.acked_inflight_serial) {
@@ -275,12 +272,17 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     } else if (size_changed and !view.current.fullscreen and
         (view.current.float or view.current.output == null or view.current.output.?.layout == null))
     {
+        log.info(
+            "client initiated size change: {}x{} -> {}x{}",
+            .{ old_geometry.width, old_geometry.height, self.geometry.width, self.geometry.height },
+        );
+
         // If the client has decided to resize itself and the view is floating,
         // then respect that resize.
-        view.current.box.width = new_geometry.width;
-        view.current.box.height = new_geometry.height;
-        view.pending.box.width = new_geometry.width;
-        view.pending.box.height = new_geometry.height;
+        view.current.box.width = self.geometry.width;
+        view.current.box.height = self.geometry.height;
+        view.pending.box.width = self.geometry.width;
+        view.pending.box.height = self.geometry.height;
         server.root.applyPending();
     }
 }
