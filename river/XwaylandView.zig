@@ -181,8 +181,9 @@ pub fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface:
     view.inflight.box = view.pending.box;
     view.current.box = view.pending.box;
 
+    // A value of -1 seems to indicate being unset for these size hints.
     const has_fixed_size = if (self.xwayland_surface.size_hints) |size_hints|
-        size_hints.min_width != 0 and size_hints.min_height != 0 and
+        size_hints.min_width > 0 and size_hints.min_height > 0 and
             (size_hints.min_width == size_hints.max_width or size_hints.min_height == size_hints.max_height)
     else
         false;
