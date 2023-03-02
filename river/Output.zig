@@ -59,8 +59,10 @@ layers: struct {
     background: *wlr.SceneTree,
     /// Bottom layer shell layer
     bottom: *wlr.SceneTree,
-    /// Tiled and floating views
-    views: *wlr.SceneTree,
+    /// Views in the layout
+    layout: *wlr.SceneTree,
+    /// Floating views
+    float: *wlr.SceneTree,
     /// Top layer shell layer
     top: *wlr.SceneTree,
     /// Fullscreen views
@@ -227,7 +229,8 @@ pub fn create(wlr_output: *wlr.Output) !void {
             ),
             .background = try normal_content.createSceneTree(),
             .bottom = try normal_content.createSceneTree(),
-            .views = try normal_content.createSceneTree(),
+            .layout = try normal_content.createSceneTree(),
+            .float = try normal_content.createSceneTree(),
             .top = try normal_content.createSceneTree(),
             .fullscreen = try normal_content.createSceneTree(),
             .overlay = try normal_content.createSceneTree(),

@@ -607,11 +607,23 @@ fn commitTransaction(root: *Self) void {
 
             view.inflight_serial = null;
 
-            if (view.current.output != output or
+            if (view.current.output != view.inflight.output or
                 (output.current.fullscreen == view and output.inflight.fullscreen != view))
             {
-                view.tree.node.reparent(output.layers.views);
+                if (view.inflight.float) {
+                    view.tree.node.reparent(output.layers.float);
+                } else {
+                    view.tree.node.reparent(output.layers.layout);
+                }
                 view.popup_tree.node.reparent(output.layers.popups);
+            }
+
+            if (view.current.float != view.inflight.float) {
+                if (view.inflight.float) {
+                    view.tree.node.reparent(output.layers.float);
+                } else {
+                    view.tree.node.reparent(output.layers.layout);
+                }
             }
 
             view.updateCurrent();
