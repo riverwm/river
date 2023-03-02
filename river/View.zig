@@ -36,10 +36,10 @@ const XwaylandView = @import("XwaylandView.zig");
 const log = std.log.scoped(.view);
 
 pub const Constraints = struct {
-    min_width: u31,
-    max_width: u31,
-    min_height: u31,
-    max_height: u31,
+    min_width: u31 = 1,
+    max_width: u31 = math.maxInt(u31),
+    min_height: u31 = 1,
+    max_height: u31 = math.maxInt(u31),
 };
 
 const Impl = union(enum) {
@@ -121,6 +121,10 @@ borders: struct {
 },
 popup_tree: *wlr.SceneTree,
 
+/// Bounds on the width/height of the view, set by the xdg_toplevel/xwayland_view implementation.
+constraints: Constraints = .{},
+
+mapped: bool = false,
 /// This indicates that the view should be destroyed when the current
 /// transaction completes. See View.destroy()
 destroying: bool = false,
@@ -256,6 +260,7 @@ pub fn updateCurrent(view: *Self) void {
 }
 
 pub fn needsConfigure(self: Self) bool {
+    assert(self.mapped);
     return switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.needsConfigure(),
         .xwayland_view => |xwayland_view| xwayland_view.needsConfigure(),
@@ -263,6 +268,7 @@ pub fn needsConfigure(self: Self) bool {
 }
 
 pub fn configure(self: *Self) void {
+    assert(self.mapped and !self.destroying);
     switch (self.impl) {
         .xdg_toplevel => |*xdg_toplevel| xdg_toplevel.configure(),
         .xwayland_view => |*xwayland_view| {
@@ -274,7 +280,7 @@ pub fn configure(self: *Self) void {
 }
 
 pub fn rootSurface(self: Self) *wlr.Surface {
-    assert(!self.destroying);
+    assert(self.mapped and !self.destroying);
     return switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.rootSurface(),
         .xwayland_view => |xwayland_view| xwayland_view.rootSurface(),
@@ -282,7 +288,7 @@ pub fn rootSurface(self: Self) *wlr.Surface {
 }
 
 pub fn sendFrameDone(self: Self) void {
-    assert(!self.destroying);
+    assert(self.mapped and !self.destroying);
     var now: os.timespec = undefined;
     os.clock_gettime(os.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
     self.rootSurface().sendFrameDone(&now);
@@ -341,6 +347,7 @@ pub fn setPendingOutput(view: *Self, output: *Output) void {
 }
 
 pub fn close(self: Self) void {
+    assert(!self.destroying);
     switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.close(),
         .xwayland_view => |xwayland_view| xwayland_view.close(),
@@ -348,6 +355,7 @@ pub fn close(self: Self) void {
 }
 
 pub fn destroyPopups(self: Self) void {
+    assert(!self.destroying);
     switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.destroyPopups(),
         .xwayland_view => {},
@@ -356,6 +364,7 @@ pub fn destroyPopups(self: Self) void {
 
 /// Return the current title of the view if any.
 pub fn getTitle(self: Self) ?[*:0]const u8 {
+    assert(!self.destroying);
     return switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.getTitle(),
         .xwayland_view => |xwayland_view| xwayland_view.getTitle(),
@@ -364,6 +373,7 @@ pub fn getTitle(self: Self) ?[*:0]const u8 {
 
 /// Return the current app_id of the view if any.
 pub fn getAppId(self: Self) ?[*:0]const u8 {
+    assert(!self.destroying);
     return switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.getAppId(),
         .xwayland_view => |xwayland_view| xwayland_view.getAppId(),
@@ -372,17 +382,8 @@ pub fn getAppId(self: Self) ?[*:0]const u8 {
 
 /// Clamp the width/height of the box to the constraints of the view
 pub fn applyConstraints(self: *Self, box: *wlr.Box) void {
-    const constraints = self.getConstraints();
-    box.width = math.clamp(box.width, constraints.min_width, constraints.max_width);
-    box.height = math.clamp(box.height, constraints.min_height, constraints.max_height);
-}
-
-/// Return bounds on the dimensions of the view
-pub fn getConstraints(self: Self) Constraints {
-    return switch (self.impl) {
-        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.getConstraints(),
-        .xwayland_view => |xwayland_view| xwayland_view.getConstraints(),
-    };
+    box.width = math.clamp(box.width, self.constraints.min_width, self.constraints.max_width);
+    box.height = math.clamp(box.height, self.constraints.min_height, self.constraints.max_height);
 }
 
 /// Find and return the view corresponding to a given surface, if any
@@ -403,6 +404,11 @@ pub fn fromWlrSurface(surface: *wlr.Surface) ?*Self {
 /// Called by the impl when the surface is ready to be displayed
 pub fn map(view: *Self) !void {
     log.debug("view '{?s}' mapped", .{view.getTitle()});
+
+    assert(!view.mapped and !view.destroying);
+    view.mapped = true;
+
+    view.pending.borders = !server.config.csdAllowed(view);
 
     server.xdg_activation.events.request_activate.add(&view.request_activate);
 
@@ -442,6 +448,9 @@ pub fn unmap(view: *Self) void {
     }
 
     view.request_activate.link.remove();
+
+    assert(view.mapped and !view.destroying);
+    view.mapped = false;
 
     server.root.applyPending();
 }

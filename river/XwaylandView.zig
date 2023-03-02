@@ -142,23 +142,6 @@ pub fn getAppId(self: Self) ?[*:0]const u8 {
     return self.xwayland_surface.class;
 }
 
-/// Return bounds on the dimensions of the view
-pub fn getConstraints(self: Self) View.Constraints {
-    const hints = self.xwayland_surface.size_hints orelse return .{
-        .min_width = 1,
-        .min_height = 1,
-        .max_width = math.maxInt(u31),
-        .max_height = math.maxInt(u31),
-    };
-    return .{
-        .min_width = @intCast(u31, math.max(hints.min_width, 1)),
-        .min_height = @intCast(u31, math.max(hints.min_height, 1)),
-        .max_width = if (hints.max_width > 0) @intCast(u31, hints.max_width) else math.maxInt(u31),
-        .max_height = if (hints.max_height > 0) @intCast(u31, hints.max_height) else math.maxInt(u31),
-    };
-}
-
-/// Called when the xwayland surface is destroyed
 fn handleDestroy(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
 

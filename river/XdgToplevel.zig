@@ -138,17 +138,6 @@ pub fn getAppId(self: Self) ?[*:0]const u8 {
     return self.xdg_toplevel.app_id;
 }
 
-/// Return bounds on the dimensions of the toplevel.
-pub fn getConstraints(self: Self) View.Constraints {
-    const state = &self.xdg_toplevel.current;
-    return .{
-        .min_width = @intCast(u31, math.max(state.min_width, 1)),
-        .max_width = if (state.max_width > 0) @intCast(u31, state.max_width) else math.maxInt(u31),
-        .min_height = @intCast(u31, math.max(state.min_height, 1)),
-        .max_height = if (state.max_height > 0) @intCast(u31, state.max_height) else math.maxInt(u31),
-    };
-}
-
 pub fn destroyPopups(self: Self) void {
     var it = self.xdg_toplevel.base.popups.safeIterator(.forward);
     while (it.next()) |wlr_xdg_popup| wlr_xdg_popup.destroy();
@@ -200,8 +189,6 @@ fn handleMap(listener: *wl.Listener(void)) void {
     }
 
     self.view.pending.fullscreen = self.xdg_toplevel.requested.fullscreen;
-
-    view.pending.borders = !server.config.csdAllowed(view);
 
     view.map() catch {
         log.err("out of memory", .{});
@@ -257,6 +244,16 @@ fn handleAckConfigure(
 fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     const self = @fieldParentPtr(Self, "commit", listener);
     const view = self.view;
+
+    {
+        const state = &self.xdg_toplevel.current;
+        view.constraints = .{
+            .min_width = @intCast(u31, math.max(state.min_width, 1)),
+            .max_width = if (state.max_width > 0) @intCast(u31, state.max_width) else math.maxInt(u31),
+            .min_height = @intCast(u31, math.max(state.min_height, 1)),
+            .max_height = if (state.max_height > 0) @intCast(u31, state.max_height) else math.maxInt(u31),
+        };
+    }
 
     var new_geometry: wlr.Box = undefined;
     self.xdg_toplevel.base.getGeometry(&new_geometry);

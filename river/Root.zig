@@ -519,6 +519,9 @@ fn sendConfigures(root: *Self) void {
 
         var focus_stack_it = output.inflight.focus_stack.iterator(.forward);
         while (focus_stack_it.next()) |view| {
+            // This can happen if a view is unmapped while a layout demand including it is inflight
+            if (!view.mapped) continue;
+
             if (view.needsConfigure()) {
                 view.configure();
 
