@@ -741,7 +741,7 @@ fn computeEdges(cursor: *const Self, view: *const View) wlr.Edges {
 }
 
 fn enterMode(cursor: *Self, mode: Mode, view: *View, image: Image) void {
-    assert(cursor.mode == .passthrough);
+    assert(cursor.mode == .passthrough or cursor.mode == .down);
     assert(mode == .move or mode == .resize);
 
     log.debug("enter {s} cursor mode", .{@tagName(mode)});

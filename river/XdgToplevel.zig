@@ -53,6 +53,10 @@ ack_configure: wl.Listener(*wlr.XdgSurface.Configure) =
     wl.Listener(*wlr.XdgSurface.Configure).init(handleAckConfigure),
 commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
 request_fullscreen: wl.Listener(void) = wl.Listener(void).init(handleRequestFullscreen),
+request_move: wl.Listener(*wlr.XdgToplevel.event.Move) =
+    wl.Listener(*wlr.XdgToplevel.event.Move).init(handleRequestMove),
+request_resize: wl.Listener(*wlr.XdgToplevel.event.Resize) =
+    wl.Listener(*wlr.XdgToplevel.event.Resize).init(handleRequestResize),
 set_title: wl.Listener(void) = wl.Listener(void).init(handleSetTitle),
 set_app_id: wl.Listener(void) = wl.Listener(void).init(handleSetAppId),
 
@@ -161,6 +165,8 @@ fn handleMap(listener: *wl.Listener(void)) void {
     self.xdg_toplevel.base.events.ack_configure.add(&self.ack_configure);
     self.xdg_toplevel.base.surface.events.commit.add(&self.commit);
     self.xdg_toplevel.events.request_fullscreen.add(&self.request_fullscreen);
+    self.xdg_toplevel.events.request_move.add(&self.request_move);
+    self.xdg_toplevel.events.request_resize.add(&self.request_resize);
     self.xdg_toplevel.events.set_title.add(&self.set_title);
     self.xdg_toplevel.events.set_app_id.add(&self.set_app_id);
 
@@ -202,6 +208,8 @@ fn handleUnmap(listener: *wl.Listener(void)) void {
     self.ack_configure.link.remove();
     self.commit.link.remove();
     self.request_fullscreen.link.remove();
+    self.request_move.link.remove();
+    self.request_resize.link.remove();
     self.set_title.link.remove();
     self.set_app_id.link.remove();
 
@@ -295,6 +303,47 @@ fn handleRequestFullscreen(listener: *wl.Listener(void)) void {
         self.view.pending.fullscreen = self.xdg_toplevel.requested.fullscreen;
         server.root.applyPending();
     }
+}
+
+fn handleRequestMove(
+    listener: *wl.Listener(*wlr.XdgToplevel.event.Move),
+    event: *wlr.XdgToplevel.event.Move,
+) void {
+    const self = @fieldParentPtr(Self, "request_move", listener);
+    const seat = @intToPtr(*Seat, event.seat.seat.data);
+    const view = self.view;
+
+    if (view.current.output == null or view.pending.output == null) return;
+    if (view.current.tags & view.current.output.?.current.tags == 0) return;
+    if (view.pending.fullscreen) return;
+    if (!(view.pending.float or view.pending.output.?.layout == null)) return;
+
+    seat.cursor.startMove(view);
+}
+
+fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), event: *wlr.XdgToplevel.event.Resize) void {
+    const self = @fieldParentPtr(Self, "request_resize", listener);
+    const seat = @intToPtr(*Seat, event.seat.seat.data);
+    const view = self.view;
+
+    {
+        // TODO(wlroots) remove this after updating to the next wlroots version
+        // https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/4041
+        if ((event.edges.top and event.edges.bottom) or (event.edges.left and event.edges.right)) {
+            self.xdg_toplevel.resource.postError(
+                .invalid_resize_edge,
+                "provided value is not a valid variant of the resize_edge enum",
+            );
+            return;
+        }
+    }
+
+    if (view.current.output == null or view.pending.output == null) return;
+    if (view.current.tags & view.current.output.?.current.tags == 0) return;
+    if (view.pending.fullscreen) return;
+    if (!(view.pending.float or view.pending.output.?.layout == null)) return;
+
+    seat.cursor.startResize(view, event.edges);
 }
 
 /// Called when the client sets / updates its title
