@@ -39,7 +39,7 @@ request_configure: wl.Listener(*wlr.XwaylandSurface.event.Configure) =
 destroy: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleDestroy),
 map: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleMap),
 unmap: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleUnmap),
-set_geometry: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleSetGeometry),
+set_geometry: wl.Listener(void) = wl.Listener(void).init(handleSetGeometry),
 set_override_redirect: wl.Listener(*wlr.XwaylandSurface) =
     wl.Listener(*wlr.XwaylandSurface).init(handleSetOverrideRedirect),
 
@@ -149,7 +149,7 @@ fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSur
     server.root.applyPending();
 }
 
-fn handleSetGeometry(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
+fn handleSetGeometry(listener: *wl.Listener(void)) void {
     const self = @fieldParentPtr(Self, "set_geometry", listener);
 
     self.surface_tree.?.node.setPosition(self.xwayland_surface.x, self.xwayland_surface.y);
