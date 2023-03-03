@@ -18,6 +18,9 @@ const LockManager = @This();
 
 const std = @import("std");
 const assert = std.debug.assert;
+
+const build_options = @import("build_options");
+
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
@@ -91,6 +94,10 @@ fn handleLock(listener: *wl.Listener(*wlr.SessionLockV1), lock: *wlr.SessionLock
 
     if (manager.state == .unlocked) {
         manager.state = .waiting_for_lock_surfaces;
+
+        if (build_options.xwayland) {
+            server.root.layers.xwayland_override_redirect.node.setEnabled(false);
+        }
 
         manager.lock_surfaces_timer.timerUpdate(200) catch {
             log.err("error setting lock surfaces timer, imperfect frames may be shown", .{});
@@ -216,6 +223,10 @@ fn handleUnlock(listener: *wl.Listener(void)) void {
             assert(output.locked_content.node.enabled);
             output.locked_content.node.setEnabled(false);
         }
+    }
+
+    if (build_options.xwayland) {
+        server.root.layers.xwayland_override_redirect.node.setEnabled(true);
     }
 
     {
