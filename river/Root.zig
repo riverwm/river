@@ -391,7 +391,7 @@ pub fn applyPending(root: *Self) void {
 
             // Iterate the focus stack in order to ensure the currently focused/most
             // recently focused view that requests fullscreen is given fullscreen.
-            output.pending.fullscreen = null;
+            output.inflight.fullscreen = null;
             {
                 var it = output.pending.focus_stack.iterator(.forward);
                 while (it.next()) |view| {
@@ -406,24 +406,25 @@ pub fn applyPending(root: *Self) void {
                         view.pending.clampToOutput();
                     }
 
-                    if (output.pending.fullscreen == null and view.pending.fullscreen and
+                    if (!view.current.fullscreen and view.pending.fullscreen) {
+                        view.post_fullscreen_box = view.pending.box;
+                        view.pending.box = .{ .x = 0, .y = 0, .width = undefined, .height = undefined };
+                        output.wlr_output.effectiveResolution(&view.pending.box.width, &view.pending.box.height);
+                    } else if (view.current.fullscreen and !view.pending.fullscreen) {
+                        view.pending.box = view.post_fullscreen_box;
+                        view.pending.clampToOutput();
+                    }
+
+                    if (output.inflight.fullscreen == null and view.pending.fullscreen and
                         view.pending.tags & output.pending.tags != 0)
                     {
-                        output.pending.fullscreen = view;
+                        output.inflight.fullscreen = view;
                     }
 
                     view.inflight_focus_stack_link.remove();
                     output.inflight.focus_stack.append(view);
 
                     view.inflight = view.pending;
-                }
-            }
-            if (output.pending.fullscreen != output.inflight.fullscreen) {
-                if (output.inflight.fullscreen) |view| {
-                    view.pending.box = view.post_fullscreen_box;
-                    view.pending.clampToOutput();
-
-                    view.inflight.box = view.pending.box;
                 }
             }
 
@@ -436,32 +437,6 @@ pub fn applyPending(root: *Self) void {
             }
 
             output.inflight.tags = output.pending.tags;
-        }
-    }
-
-    {
-        // This must be done after the original loop completes to handle the
-        // case where a fullscreen is moved between outputs.
-        var output_it = root.outputs.first;
-        while (output_it) |node| : (output_it = node.next) {
-            const output = &node.data;
-            if (output.pending.fullscreen != output.inflight.fullscreen) {
-                if (output.pending.fullscreen) |view| {
-                    view.post_fullscreen_box = view.pending.box;
-                    view.pending.box = .{
-                        .x = 0,
-                        .y = 0,
-                        .width = undefined,
-                        .height = undefined,
-                    };
-                    output.wlr_output.effectiveResolution(
-                        &view.pending.box.width,
-                        &view.pending.box.height,
-                    );
-                    view.inflight.box = view.pending.box;
-                }
-                output.inflight.fullscreen = output.pending.fullscreen;
-            }
         }
     }
 

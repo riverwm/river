@@ -341,7 +341,10 @@ pub fn setPendingOutput(view: *Self, output: *Output) void {
     }
     output.pending.focus_stack.prepend(view);
 
-    if (view.pending.float) {
+    if (view.pending.fullscreen) {
+        view.pending.box = .{ .x = 0, .y = 0, .width = undefined, .height = undefined };
+        output.wlr_output.effectiveResolution(&view.pending.box.width, &view.pending.box.height);
+    } else if (view.pending.float) {
         view.pending.clampToOutput();
     }
 }
