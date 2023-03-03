@@ -68,10 +68,15 @@ const Mode = union(enum) {
     },
     resize: struct {
         view: *View,
+
         delta_x: f64 = 0,
         delta_y: f64 = 0,
-        /// Offset from the lower right corner of the view
+
+        /// Resize edges, maximum of 2 are set and they may not be opposing edges.
+        edges: wlr.Edges,
+        /// Offset from the left or right edge
         offset_x: i32,
+        /// Offset from the top or bottom edge
         offset_y: i32,
     },
 };
@@ -81,7 +86,30 @@ const Image = enum {
     unknown,
     left_ptr,
     move,
+    @"n-resize",
+    @"s-resize",
+    @"w-resize",
+    @"e-resize",
+    @"nw-resize",
+    @"ne-resize",
+    @"sw-resize",
     @"se-resize",
+
+    fn resize(edges: wlr.Edges) Image {
+        assert(!(edges.top and edges.bottom));
+        assert(!(edges.left and edges.right));
+
+        if (edges.top and edges.left) return .@"nw-resize";
+        if (edges.top and edges.right) return .@"ne-resize";
+        if (edges.bottom and edges.left) return .@"sw-resize";
+        if (edges.bottom and edges.right) return .@"se-resize";
+        if (edges.top) return .@"n-resize";
+        if (edges.bottom) return .@"s-resize";
+        if (edges.left) return .@"w-resize";
+        if (edges.right) return .@"e-resize";
+
+        return .@"se-resize";
+    }
 };
 
 const default_size = 24;
@@ -537,8 +565,8 @@ fn handlePointerMapping(self: *Self, event: *wlr.Pointer.event.Button, view: *Vi
     return for (server.config.modes.items[self.seat.mode_id].pointer_mappings.items) |mapping| {
         if (event.button == mapping.event_code and std.meta.eql(modifiers, mapping.modifiers)) {
             switch (mapping.action) {
-                .move => if (!fullscreen) self.enterMode(.move, view),
-                .resize => if (!fullscreen) self.enterMode(.resize, view),
+                .move => if (!fullscreen) self.startMove(view),
+                .resize => if (!fullscreen) self.startResize(view, null),
                 .command => |args| {
                     self.seat.focus(view);
                     self.seat.runCommand(args);
@@ -644,37 +672,91 @@ fn handleHideCursorTimeout(self: *Self) c_int {
     return 0;
 }
 
-pub fn enterMode(self: *Self, mode: enum { move, resize }, view: *View) void {
+pub fn startMove(cursor: *Self, view: *View) void {
+    cursor.enterMode(.{ .move = .{ .view = view } }, view, .move);
+}
+
+pub fn startResize(cursor: *Self, view: *View, proposed_edges: ?wlr.Edges) void {
+    const edges = blk: {
+        if (proposed_edges) |edges| {
+            if (edges.top or edges.bottom or edges.left or edges.right) {
+                break :blk edges;
+            }
+        }
+        break :blk cursor.computeEdges(view);
+    };
+
+    const box = &view.current.box;
+    const lx = @floatToInt(i32, cursor.wlr_cursor.x);
+    const ly = @floatToInt(i32, cursor.wlr_cursor.y);
+    const offset_x = if (edges.left) lx - box.x else box.x + box.width - lx;
+    const offset_y = if (edges.top) ly - box.y else box.y + box.height - ly;
+
+    view.pending.resizing = true;
+
+    const new_mode: Mode = .{ .resize = .{
+        .view = view,
+        .edges = edges,
+        .offset_x = offset_x,
+        .offset_y = offset_y,
+    } };
+    cursor.enterMode(new_mode, view, Image.resize(edges));
+}
+
+fn computeEdges(cursor: *const Self, view: *const View) wlr.Edges {
+    const min_handle_size = 20;
+    const box = &view.current.box;
+
+    var output_box: wlr.Box = undefined;
+    server.root.output_layout.getBox(view.current.output.?.wlr_output, &output_box);
+
+    const sx = @floatToInt(i32, cursor.wlr_cursor.x) - output_box.x - box.x;
+    const sy = @floatToInt(i32, cursor.wlr_cursor.y) - output_box.y - box.y;
+
+    var edges: wlr.Edges = .{};
+
+    if (box.width > min_handle_size * 2) {
+        const handle = math.max(min_handle_size, @divFloor(box.width, 5));
+        if (sx < handle) {
+            edges.left = true;
+        } else if (sx > box.width - handle) {
+            edges.right = true;
+        }
+    }
+
+    if (box.height > min_handle_size * 2) {
+        const handle = math.max(min_handle_size, @divFloor(box.height, 5));
+        if (sy < handle) {
+            edges.top = true;
+        } else if (sy > box.height - handle) {
+            edges.bottom = true;
+        }
+    }
+
+    if (!edges.top and !edges.bottom and !edges.left and !edges.right) {
+        return .{ .bottom = true, .right = true };
+    } else {
+        return edges;
+    }
+}
+
+fn enterMode(cursor: *Self, mode: Mode, view: *View, image: Image) void {
+    assert(cursor.mode == .passthrough);
+    assert(mode == .move or mode == .resize);
+
     log.debug("enter {s} cursor mode", .{@tagName(mode)});
 
-    self.seat.focus(view);
+    cursor.mode = mode;
 
-    switch (mode) {
-        .move => self.mode = .{ .move = .{ .view = view } },
-        .resize => {
-            const cur_box = &view.current.box;
-            self.mode = .{ .resize = .{
-                .view = view,
-                .offset_x = cur_box.x + cur_box.width - @floatToInt(i32, self.wlr_cursor.x),
-                .offset_y = cur_box.y + cur_box.height - @floatToInt(i32, self.wlr_cursor.y),
-            } };
-            view.pending.resizing = true;
-        },
-    }
+    cursor.seat.focus(view);
 
-    // Automatically float all views being moved by the pointer, if
-    // their dimensions are set by a layout generator. If however the views
-    // are unarranged, leave them as non-floating so the next active
-    // layout can affect them.
-    if (!view.current.float and view.current.output.?.layout != null) {
-        view.pending.float = true;
+    if (view.current.output.?.layout != null) {
         view.float_box = view.current.box;
+        view.pending.float = true;
     }
 
-    // Clear cursor focus, so that the surface does not receive events
-    self.seat.wlr_seat.pointerNotifyClearFocus();
-
-    self.setImage(if (mode == .move) .move else .@"se-resize");
+    cursor.seat.wlr_seat.pointerNotifyClearFocus();
+    cursor.setImage(image);
 
     server.root.applyPending();
 }
@@ -748,27 +830,57 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
             data.delta_x = dx - @trunc(dx);
             data.delta_y = dy - @trunc(dy);
 
-            const border_width = if (data.view.pending.borders) server.config.border_width else 0;
+            {
+                // Modify the pending box, taking constraints into account
+                const border_width = if (data.view.pending.borders) server.config.border_width else 0;
 
-            // Set width/height of view, clamp to view size constraints and output dimensions
-            data.view.pending.box.width += @floatToInt(i32, dx);
-            data.view.pending.box.height += @floatToInt(i32, dy);
-            data.view.applyConstraints(&data.view.pending.box);
+                var output_width: i32 = undefined;
+                var output_height: i32 = undefined;
+                data.view.current.output.?.wlr_output.effectiveResolution(&output_width, &output_height);
 
-            var output_width: i32 = undefined;
-            var output_height: i32 = undefined;
-            data.view.current.output.?.wlr_output.effectiveResolution(&output_width, &output_height);
+                const constraints = &data.view.constraints;
+                const box = &data.view.pending.box;
 
-            const box = &data.view.pending.box;
-            box.width = math.min(box.width, output_width - border_width - box.x);
-            box.height = math.min(box.height, output_height - border_width - box.y);
+                if (data.edges.left) {
+                    const x2 = box.x + box.width;
+                    box.x += @floatToInt(i32, dx);
+                    box.x = math.max(box.x, border_width);
+                    box.x = math.max(box.x, x2 - constraints.max_width);
+                    box.x = math.min(box.x, x2 - constraints.min_width);
+                    box.width = x2 - box.x;
+                } else if (data.edges.right) {
+                    box.width += @floatToInt(i32, dx);
+                    box.width = math.max(box.width, constraints.min_width);
+                    box.width = math.min(box.width, constraints.max_width);
+                    box.width = math.min(box.width, output_width - border_width - box.x);
+                }
 
-            // Keep cursor locked to the original offset from the bottom right corner
-            self.wlr_cursor.warpClosest(
-                device,
-                @intToFloat(f64, box.x + box.width - data.offset_x),
-                @intToFloat(f64, box.y + box.height - data.offset_y),
-            );
+                if (data.edges.top) {
+                    const y2 = box.y + box.height;
+                    box.y += @floatToInt(i32, dy);
+                    box.y = math.max(box.y, border_width);
+                    box.y = math.max(box.y, y2 - constraints.max_height);
+                    box.y = math.min(box.y, y2 - constraints.min_height);
+                    box.height = y2 - box.y;
+                } else if (data.edges.bottom) {
+                    box.height += @floatToInt(i32, dy);
+                    box.height = math.max(box.height, constraints.min_height);
+                    box.height = math.min(box.height, constraints.max_height);
+                    box.height = math.min(box.height, output_height - border_width - box.y);
+                }
+            }
+
+            {
+                // Keep cursor locked to the original offset from the resize edges
+                const box = &data.view.pending.box;
+                const off_x = data.offset_x;
+                const off_y = data.offset_y;
+                const cursor_x = if (data.edges.left) off_x + box.x else box.x + box.width - off_x;
+                const cursor_y = if (data.edges.top) off_y + box.y else box.y + box.height - off_y;
+
+                self.wlr_cursor.warpClosest(device, @intToFloat(f64, cursor_x), @intToFloat(f64, cursor_y));
+            }
+
             server.root.applyPending();
         },
     }
