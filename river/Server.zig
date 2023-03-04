@@ -48,7 +48,6 @@ sigint_source: *wl.EventSource,
 sigterm_source: *wl.EventSource,
 
 backend: *wlr.Backend,
-headless_backend: *wlr.Backend,
 
 renderer: *wlr.Renderer,
 allocator: *wlr.Allocator,
@@ -87,10 +86,6 @@ pub fn init(self: *Self) !void {
 
     // This frees itself when the wl.Server is destroyed
     self.backend = try wlr.Backend.autocreate(self.wl_server);
-
-    // This backend is used to create a headless output for use when no actual
-    // outputs are available. This frees itself when the wl.Server is destroyed.
-    self.headless_backend = try wlr.Backend.createHeadless(self.wl_server);
 
     self.renderer = try wlr.Renderer.autocreate(self.backend);
     errdefer self.renderer.destroy();
