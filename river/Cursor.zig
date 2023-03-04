@@ -57,6 +57,7 @@ const Mode = union(enum) {
     },
     move: struct {
         view: *View,
+
         /// View coordinates are stored as i32s as they are in logical pixels.
         /// However, it is possible to move the cursor by a fraction of a
         /// logical pixel and this happens in practice with low dpi, high
@@ -65,6 +66,11 @@ const Mode = union(enum) {
         /// motions to 0.
         delta_x: f64 = 0,
         delta_y: f64 = 0,
+
+        /// Offset from the left edge
+        offset_x: i32,
+        /// Offset from the top edge
+        offset_y: i32,
     },
     resize: struct {
         view: *View,
@@ -673,7 +679,12 @@ fn handleHideCursorTimeout(self: *Self) c_int {
 }
 
 pub fn startMove(cursor: *Self, view: *View) void {
-    cursor.enterMode(.{ .move = .{ .view = view } }, view, .move);
+    const new_mode: Mode = .{ .move = .{
+        .view = view,
+        .offset_x = @floatToInt(i32, cursor.wlr_cursor.x) - view.current.box.x,
+        .offset_y = @floatToInt(i32, cursor.wlr_cursor.y) - view.current.box.y,
+    } };
+    cursor.enterMode(new_mode, view, .move);
 }
 
 pub fn startResize(cursor: *Self, view: *View, proposed_edges: ?wlr.Edges) void {
@@ -817,11 +828,13 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
 
             const view = data.view;
             view.pending.move(@floatToInt(i32, dx), @floatToInt(i32, dy));
-            self.wlr_cursor.move(
+
+            self.wlr_cursor.warpClosest(
                 device,
-                @intToFloat(f64, view.pending.box.x - view.current.box.x),
-                @intToFloat(f64, view.pending.box.y - view.current.box.y),
+                @intToFloat(f64, data.offset_x + view.current.box.x),
+                @intToFloat(f64, data.offset_y + view.current.box.y),
             );
+
             server.root.applyPending();
         },
         .resize => |*data| {
