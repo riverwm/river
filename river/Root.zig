@@ -740,8 +740,6 @@ fn processOutputConfig(
 }
 
 fn currentOutputConfig(self: *Self) !*wlr.OutputConfigurationV1 {
-    // TODO there no real reason this needs to allocate memory every time it is called.
-    // consider improving this wlroots api or reimplementing in zig-wlroots/river.
     const config = try wlr.OutputConfigurationV1.create();
     // this destroys all associated config heads as well
     errdefer config.destroy();

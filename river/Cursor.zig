@@ -224,7 +224,6 @@ pub fn init(self: *Self, seat: *Seat) !void {
     wlr_cursor.events.pinch_end.add(&self.pinch_end);
     seat.wlr_seat.events.request_set_cursor.add(&self.request_set_cursor);
 
-    // TODO(wlroots) handle the cancel event, blocked on wlroots 0.16.0
     wlr_cursor.events.touch_up.add(&self.touch_up);
     wlr_cursor.events.touch_down.add(&self.touch_down);
     wlr_cursor.events.touch_motion.add(&self.touch_motion);

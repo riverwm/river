@@ -115,7 +115,6 @@ pub fn configure(self: Self) bool {
 }
 
 pub fn rootSurface(self: Self) *wlr.Surface {
-    // TODO This is probably not OK, understand when xwayland surfaces can be null.
     return self.xwayland_surface.surface.?;
 }
 

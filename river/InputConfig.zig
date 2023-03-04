@@ -29,11 +29,6 @@ const util = @import("util.zig");
 
 const InputDevice = @import("InputDevice.zig");
 
-// TODO - keyboards
-//      - mapping to output / region
-//      - calibration matrices
-//      - scroll factor
-
 pub const EventState = enum {
     enabled,
     disabled,
