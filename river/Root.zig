@@ -120,6 +120,9 @@ pub fn init(self: *Self) !void {
 
     _ = try wlr.XdgOutputManagerV1.create(server.wl_server, output_layout);
 
+    const presentation = try wlr.Presentation.create(server.wl_server, server.backend);
+    scene.setPresentation(presentation);
+
     const event_loop = server.wl_server.getEventLoop();
     const transaction_timeout = try event_loop.addTimer(*Self, handleTransactionTimeout, self);
     errdefer transaction_timeout.remove();
