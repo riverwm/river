@@ -7,8 +7,9 @@ const wl = @import("wayland").server.wl;
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
-const View = @import("View.zig");
 const IdleInhibitor = @import("IdleInhibitor.zig");
+const SceneNodeData = @import("SceneNodeData.zig");
+const View = @import("View.zig");
 
 idle_inhibit_manager: *wlr.IdleInhibitManagerV1,
 new_idle_inhibitor: wl.Listener(*wlr.IdleInhibitorV1),
@@ -32,17 +33,26 @@ pub fn idleInhibitCheckActive(self: *Self) void {
     var inhibited = false;
     var it = self.inhibitors.first;
     while (it) |node| : (it = node.next) {
-        if (View.fromWlrSurface(node.data.inhibitor.surface)) |v| {
-            // If view is visible,
-            if (v.current.output != null and v.current.tags & v.current.output.?.current.tags != 0) {
+        const node_data = SceneNodeData.fromSurface(node.data.inhibitor.surface) orelse continue;
+        switch (node_data.data) {
+            .view => |view| {
+                if (view.current.output != null and
+                    view.current.tags & view.current.output.?.current.tags != 0)
+                {
+                    inhibited = true;
+                    break;
+                }
+            },
+            .layer_surface => |layer_surface| {
+                if (layer_surface.wlr_layer_surface.mapped) {
+                    inhibited = true;
+                    break;
+                }
+            },
+            .lock_surface, .xwayland_override_redirect => {
                 inhibited = true;
                 break;
-            }
-        } else {
-            // If for whatever reason the inhibitor does not have a view, then
-            // assume it is visible.
-            inhibited = true;
-            break;
+            },
         }
     }
 

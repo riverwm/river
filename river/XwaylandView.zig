@@ -159,8 +159,10 @@ pub fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface:
     const self = @fieldParentPtr(Self, "map", listener);
     const view = self.view;
 
-    // Add listeners that are only active while mapped
     const surface = xwayland_surface.surface.?;
+    surface.data = @ptrToInt(&view.tree.node);
+
+    // Add listeners that are only active while mapped
     xwayland_surface.events.set_title.add(&self.set_title);
     xwayland_surface.events.set_class.add(&self.set_class);
     xwayland_surface.events.request_fullscreen.add(&self.request_fullscreen);
@@ -205,6 +207,8 @@ pub fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface:
 
 fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "unmap", listener);
+
+    self.xwayland_surface.surface.?.data = 0;
 
     // Remove listeners that are only active while mapped
     self.set_title.link.remove();

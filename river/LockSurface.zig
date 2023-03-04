@@ -51,6 +51,8 @@ pub fn create(wlr_lock_surface: *wlr.SessionLockSurfaceV1, lock: *wlr.SessionLoc
 
     try SceneNodeData.attach(&tree.node, .{ .lock_surface = lock_surface });
 
+    wlr_lock_surface.surface.data = @ptrToInt(&tree.node);
+
     wlr_lock_surface.output.events.mode.add(&lock_surface.output_mode);
     wlr_lock_surface.events.map.add(&lock_surface.map);
     wlr_lock_surface.events.destroy.add(&lock_surface.surface_destroy);

@@ -91,10 +91,11 @@ pub fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandS
 }
 
 fn mapImpl(self: *Self) error{OutOfMemory}!void {
-    self.surface_tree = try server.root.layers.xwayland_override_redirect.createSceneSubsurfaceTree(
-        self.xwayland_surface.surface.?,
-    );
+    const surface = self.xwayland_surface.surface.?;
+    self.surface_tree = try server.root.layers.xwayland_override_redirect.createSceneSubsurfaceTree(surface);
     try SceneNodeData.attach(&self.surface_tree.?.node, .{ .xwayland_override_redirect = self });
+
+    surface.data = @ptrToInt(&self.surface_tree.?.node);
 
     self.surface_tree.?.node.setPosition(self.xwayland_surface.x, self.xwayland_surface.y);
 
@@ -130,6 +131,7 @@ fn handleUnmap(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSur
 
     self.set_geometry.link.remove();
 
+    self.xwayland_surface.surface.?.data = 0;
     self.surface_tree.?.node.destroy();
     self.surface_tree = null;
 

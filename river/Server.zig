@@ -27,17 +27,18 @@ const util = @import("util.zig");
 const Config = @import("Config.zig");
 const Control = @import("Control.zig");
 const DecorationManager = @import("DecorationManager.zig");
+const IdleInhibitorManager = @import("IdleInhibitorManager.zig");
 const InputManager = @import("InputManager.zig");
 const LayerSurface = @import("LayerSurface.zig");
 const LayoutManager = @import("LayoutManager.zig");
 const LockManager = @import("LockManager.zig");
 const Output = @import("Output.zig");
 const Root = @import("Root.zig");
+const SceneNodeData = @import("SceneNodeData.zig");
 const StatusManager = @import("StatusManager.zig");
 const XdgToplevel = @import("XdgToplevel.zig");
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 const XwaylandView = @import("XwaylandView.zig");
-const IdleInhibitorManager = @import("IdleInhibitorManager.zig");
 
 const log = std.log.scoped(.server);
 
@@ -62,6 +63,7 @@ xwayland: if (build_options.xwayland) *wlr.Xwayland else void,
 new_xwayland_surface: if (build_options.xwayland) wl.Listener(*wlr.XwaylandSurface) else void,
 
 xdg_activation: *wlr.XdgActivationV1,
+request_activate: wl.Listener(*wlr.XdgActivationV1.event.RequestActivate),
 
 decoration_manager: DecorationManager,
 input_manager: InputManager,
@@ -115,6 +117,8 @@ pub fn init(self: *Self) !void {
     }
 
     self.xdg_activation = try wlr.XdgActivationV1.create(self.wl_server);
+    self.xdg_activation.events.request_activate.add(&self.request_activate);
+    self.request_activate.setNotify(handleRequestActivate);
 
     _ = try wlr.PrimarySelectionDeviceManagerV1.create(self.wl_server);
 
@@ -144,7 +148,14 @@ pub fn deinit(self: *Self) void {
     self.sigint_source.remove();
     self.sigterm_source.remove();
 
-    if (build_options.xwayland) self.xwayland.destroy();
+    self.new_xdg_surface.link.remove();
+    self.new_layer_surface.link.remove();
+    self.request_activate.link.remove();
+
+    if (build_options.xwayland) {
+        self.new_xwayland_surface.link.remove();
+        self.xwayland.destroy();
+    }
 
     self.wl_server.destroyClients();
 
@@ -249,5 +260,25 @@ fn handleNewXwaylandSurface(_: *wl.Listener(*wlr.XwaylandSurface), xwayland_surf
             log.err("out of memory", .{});
             return;
         };
+    }
+}
+
+fn handleRequestActivate(
+    listener: *wl.Listener(*wlr.XdgActivationV1.event.RequestActivate),
+    event: *wlr.XdgActivationV1.event.RequestActivate,
+) void {
+    const server = @fieldParentPtr(Self, "request_activate", listener);
+
+    std.debug.print("made it here ig\n", .{});
+
+    const node_data = SceneNodeData.fromSurface(event.surface) orelse return;
+    switch (node_data.data) {
+        .view => |view| if (view.current.focus == 0) {
+            view.pending.urgent = true;
+            server.root.applyPending();
+        },
+        else => |tag| {
+            log.info("ignoring xdg-activation-v1 activate request of {s} surface", .{@tagName(tag)});
+        },
     }
 }

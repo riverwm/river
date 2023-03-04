@@ -50,11 +50,20 @@ pub fn attach(node: *wlr.SceneNode, data: Data) error{OutOfMemory}!void {
     node.events.destroy.add(&scene_node_data.destroy);
 }
 
-pub fn get(node: *wlr.SceneNode) ?*SceneNodeData {
+pub fn fromNode(node: *wlr.SceneNode) ?*SceneNodeData {
     var it: ?*wlr.SceneNode = node;
     while (it) |n| : (it = n.parent) {
         if (@intToPtr(?*SceneNodeData, n.data)) |scene_node_data| {
             return scene_node_data;
+        }
+    }
+    return null;
+}
+
+pub fn fromSurface(surface: *wlr.Surface) ?*SceneNodeData {
+    if (surface.getRootSurface()) |root_surface| {
+        if (@intToPtr(?*wlr.SceneNode, root_surface.data)) |node| {
+            return fromNode(node);
         }
     }
     return null;

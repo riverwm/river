@@ -79,6 +79,7 @@ pub fn create(xdg_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
     _ = try view.surface_tree.createSceneXdgSurface(xdg_toplevel.base);
 
     xdg_toplevel.base.data = @ptrToInt(view);
+    xdg_toplevel.base.surface.data = @ptrToInt(&view.tree.node);
 
     // Add listeners that are active over the view's entire lifetime
     const self = &view.impl.xdg_toplevel;

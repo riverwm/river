@@ -60,6 +60,8 @@ pub fn create(wlr_layer_surface: *wlr.LayerSurfaceV1) error{OutOfMemory}!void {
     try SceneNodeData.attach(&layer_surface.scene_layer_surface.tree.node, .{ .layer_surface = layer_surface });
     try SceneNodeData.attach(&layer_surface.popup_tree.node, .{ .layer_surface = layer_surface });
 
+    wlr_layer_surface.surface.data = @ptrToInt(&layer_surface.scene_layer_surface.tree.node);
+
     wlr_layer_surface.events.destroy.add(&layer_surface.destroy);
     wlr_layer_surface.events.map.add(&layer_surface.map);
     wlr_layer_surface.events.unmap.add(&layer_surface.unmap);

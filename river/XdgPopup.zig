@@ -86,7 +86,7 @@ fn handleNewPopup(listener: *wl.Listener(*wlr.XdgPopup), wlr_xdg_popup: *wlr.Xdg
 fn handleReposition(listener: *wl.Listener(void)) void {
     const xdg_popup = @fieldParentPtr(XdgPopup, "reposition", listener);
 
-    const output = switch (SceneNodeData.get(&xdg_popup.root.node).?.data) {
+    const output = switch (SceneNodeData.fromNode(&xdg_popup.root.node).?.data) {
         .view => |view| view.current.output orelse return,
         .layer_surface => |layer_surface| layer_surface.output,
         else => unreachable,

@@ -195,7 +195,7 @@ pub fn at(self: Self, lx: f64, ly: f64) ?AtResult {
         break :blk null;
     };
 
-    if (SceneNodeData.get(node_at)) |scene_node_data| {
+    if (SceneNodeData.fromNode(node_at)) |scene_node_data| {
         return .{
             .surface = surface,
             .sx = sx,

@@ -147,9 +147,6 @@ float_box: wlr.Box = undefined,
 /// exiting fullscreen if there is no active layout.
 post_fullscreen_box: wlr.Box = undefined,
 
-request_activate: wl.Listener(*wlr.XdgActivationV1.event.RequestActivate) =
-    wl.Listener(*wlr.XdgActivationV1.event.RequestActivate).init(handleRequestActivate),
-
 pub fn create(impl: Impl) error{OutOfMemory}!*Self {
     const view = try util.gpa.create(Self);
     errdefer util.gpa.destroy(view);
@@ -383,21 +380,6 @@ pub fn applyConstraints(self: *Self, box: *wlr.Box) void {
     box.height = math.clamp(box.height, self.constraints.min_height, self.constraints.max_height);
 }
 
-/// Find and return the view corresponding to a given surface, if any
-pub fn fromWlrSurface(surface: *wlr.Surface) ?*Self {
-    if (surface.isXdgSurface()) {
-        const xdg_surface = wlr.XdgSurface.fromWlrSurface(surface) orelse return null;
-        if (xdg_surface.role == .toplevel) {
-            return @intToPtr(*Self, xdg_surface.data);
-        }
-    }
-    if (build_options.xwayland and surface.isXWaylandSurface()) {
-        const xwayland_surface = wlr.XwaylandSurface.fromWlrSurface(surface) orelse return null;
-        return @intToPtr(?*Self, xwayland_surface.data);
-    }
-    return null;
-}
-
 /// Called by the impl when the surface is ready to be displayed
 pub fn map(view: *Self) !void {
     log.debug("view '{?s}' mapped", .{view.getTitle()});
@@ -406,8 +388,6 @@ pub fn map(view: *Self) !void {
     view.mapped = true;
 
     view.pending.borders = !server.config.csdAllowed(view);
-
-    server.xdg_activation.events.request_activate.add(&view.request_activate);
 
     if (server.input_manager.defaultSeat().focused_output) |output| {
         // Center the initial pending box on the output
@@ -444,8 +424,6 @@ pub fn unmap(view: *Self) void {
         server.root.hidden.pending.wm_stack.prepend(view);
     }
 
-    view.request_activate.link.remove();
-
     assert(view.mapped and !view.destroying);
     view.mapped = false;
 
@@ -467,16 +445,4 @@ pub fn notifyTitle(self: *const Self) void {
 
 pub fn notifyAppId(_: Self) void {
     // TODO reimplement foreign-toplevel-management I guess.
-}
-
-fn handleRequestActivate(
-    _: *wl.Listener(*wlr.XdgActivationV1.event.RequestActivate),
-    event: *wlr.XdgActivationV1.event.RequestActivate,
-) void {
-    if (fromWlrSurface(event.surface)) |view| {
-        if (view.current.focus == 0) {
-            view.pending.urgent = true;
-            server.root.applyPending();
-        }
-    }
 }
