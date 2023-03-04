@@ -139,9 +139,6 @@ inflight_wm_stack_link: wl.list.Link,
 
 current: State = .{},
 
-/// The serial sent with the currently inflight configure event
-inflight_serial: ?u32 = null,
-
 /// The floating dimensions the view, saved so that they can be restored if the
 /// view returns to floating mode.
 float_box: wlr.Box = undefined,
@@ -224,6 +221,9 @@ pub fn updateCurrent(view: *Self) void {
 
     view.current = view.inflight;
     view.dropSavedSurfaceTree();
+    if (view.impl == .xdg_toplevel) {
+        view.impl.xdg_toplevel.configure_state = .idle;
+    }
 
     const color = blk: {
         if (view.current.urgent) break :blk &config.border_color_urgent;
@@ -259,22 +259,16 @@ pub fn updateCurrent(view: *Self) void {
     view.borders.bottom.setColor(color);
 }
 
-pub fn needsConfigure(self: Self) bool {
-    assert(self.mapped);
-    return switch (self.impl) {
-        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.needsConfigure(),
-        .xwayland_view => |xwayland_view| xwayland_view.needsConfigure(),
-    };
-}
-
-pub fn configure(self: *Self) void {
+/// Returns true if the configure should be waited for by the transaction system.
+pub fn configure(self: *Self) bool {
     assert(self.mapped and !self.destroying);
     switch (self.impl) {
-        .xdg_toplevel => |*xdg_toplevel| xdg_toplevel.configure(),
+        .xdg_toplevel => |*xdg_toplevel| return xdg_toplevel.configure(),
         .xwayland_view => |*xwayland_view| {
             // TODO(zig): remove this uneeded if statement
             // https://github.com/ziglang/zig/issues/13655
-            if (build_options.xwayland) xwayland_view.configure();
+            if (build_options.xwayland) return xwayland_view.configure();
+            unreachable;
         },
     }
 }

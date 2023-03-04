@@ -79,38 +79,39 @@ pub fn create(xwayland_surface: *wlr.XwaylandSurface) error{OutOfMemory}!void {
     }
 }
 
-pub fn needsConfigure(self: Self) bool {
+/// Always returns false as we do not care about frame perfection for Xwayland views.
+pub fn configure(self: Self) bool {
     const output = self.view.inflight.output orelse return false;
+
     var output_box: wlr.Box = undefined;
     server.root.output_layout.getBox(output.wlr_output, &output_box);
 
-    const view = self.view;
-    return self.xwayland_surface.x != view.inflight.box.x + output_box.x or
-        self.xwayland_surface.y != view.inflight.box.y + output_box.y or
-        self.xwayland_surface.width != view.inflight.box.width or
-        self.xwayland_surface.height != view.inflight.box.height or
-        (view.inflight.focus != 0) != (view.current.focus != 0) or
-        (view.inflight.output != null and view.inflight.output.?.inflight.fullscreen == view) !=
-        (view.current.output != null and view.current.output.?.current.fullscreen == view);
-}
+    const inflight = &self.view.inflight;
+    const current = &self.view.current;
 
-pub fn configure(self: Self) void {
-    const output = self.view.inflight.output orelse return;
-    var output_box: wlr.Box = undefined;
-    server.root.output_layout.getBox(output.wlr_output, &output_box);
+    if (self.xwayland_surface.x == inflight.box.x + output_box.x and
+        self.xwayland_surface.y == inflight.box.y + output_box.y and
+        self.xwayland_surface.width == inflight.box.width and
+        self.xwayland_surface.height == inflight.box.height and
+        (inflight.focus != 0) == (current.focus != 0) and
+        (output.inflight.fullscreen == self.view) ==
+        (current.output != null and current.output.?.current.fullscreen == self.view))
+    {
+        return false;
+    }
 
-    const state = &self.view.inflight;
     self.xwayland_surface.configure(
-        @intCast(i16, state.box.x + output_box.x),
-        @intCast(i16, state.box.y + output_box.y),
-        @intCast(u16, state.box.width),
-        @intCast(u16, state.box.height),
+        @intCast(i16, inflight.box.x + output_box.x),
+        @intCast(i16, inflight.box.y + output_box.y),
+        @intCast(u16, inflight.box.width),
+        @intCast(u16, inflight.box.height),
     );
 
-    self.setActivated(state.focus != 0);
+    self.setActivated(inflight.focus != 0);
 
-    const fullscreen = state.output != null and state.output.?.inflight.fullscreen == self.view;
-    self.xwayland_surface.setFullscreen(fullscreen);
+    self.xwayland_surface.setFullscreen(output.inflight.fullscreen == self.view);
+
+    return false;
 }
 
 pub fn rootSurface(self: Self) *wlr.Surface {
@@ -237,7 +238,7 @@ fn handleRequestConfigure(
         self.view.pending.box.width = event.width;
         self.view.pending.box.height = event.height;
     }
-    self.configure();
+    server.root.applyPending();
 }
 
 fn handleSetOverrideRedirect(

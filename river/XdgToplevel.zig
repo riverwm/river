@@ -17,6 +17,7 @@
 const Self = @This();
 
 const std = @import("std");
+const assert = std.debug.assert;
 const math = std.math;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
@@ -39,8 +40,14 @@ xdg_toplevel: *wlr.XdgToplevel,
 /// Initialized on map
 geometry: wlr.Box = undefined,
 
-/// Set to true when the client acks the configure with serial View.inflight_serial.
-acked_inflight_serial: bool = false,
+configure_state: union(enum) {
+    /// No configure has been sent since the last configure was acked.
+    idle,
+    /// A configure was sent with the given serial but has not yet been acked.
+    inflight: u32,
+    /// A configure was acked but the surface has not yet been committed.
+    acked,
+} = .idle,
 
 // Listeners that are always active over the view's lifetime
 destroy: wl.Listener(void) = wl.Listener(void).init(handleDestroy),
@@ -83,43 +90,52 @@ pub fn create(xdg_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
     _ = xdg_toplevel.setWmCapabilities(.{ .fullscreen = true });
 }
 
-/// Returns true if a configure must be sent to ensure that the inflight
-/// dimensions are applied.
-pub fn needsConfigure(self: Self) bool {
-    const view = self.view;
+/// Send a configure event, applying the inflight state of the view.
+pub fn configure(self: *Self) bool {
+    assert(self.configure_state == .idle);
+
+    const inflight = &self.view.inflight;
+    const current = &self.view.current;
 
     // We avoid a special case for newly mapped views which we have not yet
     // configured by setting the current width/height to the initial width/height
     // of the view in handleMap().
-    return view.inflight.box.width != view.current.box.width or
-        view.inflight.box.height != view.current.box.height or
-        (view.inflight.focus != 0) != (view.current.focus != 0) or
-        (view.inflight.output != null and view.inflight.output.?.inflight.fullscreen == view) !=
-        (view.current.output != null and view.current.output.?.current.fullscreen == view) or
-        view.inflight.borders != view.current.borders or
-        view.inflight.resizing != view.current.resizing;
-}
+    if (inflight.box.width == current.box.width and
+        inflight.box.height == current.box.height and
+        (inflight.focus != 0) == (current.focus != 0) and
+        (inflight.output != null and inflight.output.?.inflight.fullscreen == self.view) ==
+        (current.output != null and current.output.?.current.fullscreen == self.view) and
+        inflight.borders == current.borders and
+        inflight.resizing == current.resizing)
+    {
+        return false;
+    }
 
-/// Send a configure event, applying the inflight state of the view.
-pub fn configure(self: *Self) void {
-    const state = &self.view.inflight;
+    _ = self.xdg_toplevel.setActivated(inflight.focus != 0);
 
-    self.view.inflight_serial = self.xdg_toplevel.setSize(state.box.width, state.box.height);
-
-    _ = self.xdg_toplevel.setActivated(state.focus != 0);
-
-    const fullscreen = state.output != null and state.output.?.inflight.fullscreen == self.view;
+    const fullscreen = inflight.output != null and inflight.output.?.inflight.fullscreen == self.view;
     _ = self.xdg_toplevel.setFullscreen(fullscreen);
 
-    if (state.borders) {
+    if (inflight.borders) {
         _ = self.xdg_toplevel.setTiled(.{ .top = true, .bottom = true, .left = true, .right = true });
     } else {
         _ = self.xdg_toplevel.setTiled(.{ .top = false, .bottom = false, .left = false, .right = false });
     }
 
-    _ = self.xdg_toplevel.setResizing(state.resizing);
+    _ = self.xdg_toplevel.setResizing(inflight.resizing);
 
-    self.acked_inflight_serial = false;
+    // Only track configures with the transaction system if they affect the dimensions of the view.
+    if (inflight.box.width == current.box.width and
+        inflight.box.height == current.box.height)
+    {
+        return false;
+    }
+
+    self.configure_state = .{
+        .inflight = self.xdg_toplevel.setSize(inflight.box.width, inflight.box.height),
+    };
+
+    return true;
 }
 
 pub fn rootSurface(self: Self) *wlr.Surface {
@@ -240,10 +256,11 @@ fn handleAckConfigure(
     acked_configure: *wlr.XdgSurface.Configure,
 ) void {
     const self = @fieldParentPtr(Self, "ack_configure", listener);
-    if (self.view.inflight_serial) |serial| {
-        if (serial == acked_configure.serial) {
-            self.acked_inflight_serial = true;
-        }
+    switch (self.configure_state) {
+        .inflight => |serial| if (acked_configure.serial == serial) {
+            self.configure_state = .acked;
+        },
+        .acked, .idle => {},
     }
 }
 
@@ -263,35 +280,35 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
 
     const old_geometry = self.geometry;
     self.xdg_toplevel.base.getGeometry(&self.geometry);
-    const size_changed = self.geometry.width != old_geometry.width or
-        self.geometry.height != old_geometry.height;
 
-    if (view.inflight_serial != null) {
-        if (self.acked_inflight_serial) {
-            view.inflight_serial = null;
+    switch (self.configure_state) {
+        .idle => {
+            const size_changed = self.geometry.width != old_geometry.width or
+                self.geometry.height != old_geometry.height;
+            const no_layout = view.current.output != null and view.current.output.?.layout == null;
+
+            if (size_changed and (view.current.float or no_layout) and !view.current.fullscreen) {
+                log.info(
+                    "client initiated size change: {}x{} -> {}x{}",
+                    .{ old_geometry.width, old_geometry.height, self.geometry.width, self.geometry.height },
+                );
+
+                view.current.box.width = self.geometry.width;
+                view.current.box.height = self.geometry.height;
+                view.pending.box.width = self.geometry.width;
+                view.pending.box.height = self.geometry.height;
+                server.root.applyPending();
+            }
+        },
+        // If the client has not yet acked our configure, we need to send a
+        // frame done event so that it commits another buffer. These
+        // buffers won't be rendered since we are still rendering our
+        // stashed buffer from when the transaction started.
+        .inflight => view.sendFrameDone(),
+        .acked => {
+            self.configure_state = .idle;
             server.root.notifyConfigured();
-        } else {
-            // If the client has not yet acked our configure, we need to send a
-            // frame done event so that it commits another buffer. These
-            // buffers won't be rendered since we are still rendering our
-            // stashed buffer from when the transaction started.
-            view.sendFrameDone();
-        }
-    } else if (size_changed and !view.current.fullscreen and
-        (view.current.float or view.current.output == null or view.current.output.?.layout == null))
-    {
-        log.info(
-            "client initiated size change: {}x{} -> {}x{}",
-            .{ old_geometry.width, old_geometry.height, self.geometry.width, self.geometry.height },
-        );
-
-        // If the client has decided to resize itself and the view is floating,
-        // then respect that resize.
-        view.current.box.width = self.geometry.width;
-        view.current.box.height = self.geometry.height;
-        view.pending.box.width = self.geometry.width;
-        view.pending.box.height = self.geometry.height;
-        server.root.applyPending();
+        },
     }
 }
 

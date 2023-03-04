@@ -497,15 +497,10 @@ fn sendConfigures(root: *Self) void {
             // This can happen if a view is unmapped while a layout demand including it is inflight
             if (!view.mapped) continue;
 
-            if (view.needsConfigure()) {
-                view.configure();
-
-                // We don't give a damn about frame perfection for xwayland views
-                if (!build_options.xwayland or view.impl != .xwayland_view) {
-                    root.inflight_configures += 1;
-                    view.saveSurfaceTree();
-                    view.sendFrameDone();
-                }
+            if (view.configure()) {
+                root.inflight_configures += 1;
+                view.saveSurfaceTree();
+                view.sendFrameDone();
             }
         }
     }
@@ -582,8 +577,6 @@ fn commitTransaction(root: *Self) void {
         var focus_stack_it = output.inflight.focus_stack.iterator(.forward);
         while (focus_stack_it.next()) |view| {
             assert(view.inflight.output == output);
-
-            view.inflight_serial = null;
 
             if (view.current.output != view.inflight.output or
                 (output.current.fullscreen == view and output.inflight.fullscreen != view))
