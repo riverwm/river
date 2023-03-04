@@ -358,6 +358,8 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
     output.mode.link.remove();
     output.present.link.remove();
 
+    output.tree.node.destroy();
+
     if (output.layout_namespace) |namespace| util.gpa.free(namespace);
 
     output.wlr_output.data = 0;

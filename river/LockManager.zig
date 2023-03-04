@@ -273,6 +273,7 @@ fn handleSurface(
     assert(manager.lock != null);
 
     LockSurface.create(wlr_lock_surface, manager.lock.?) catch {
+        log.err("out of memory", .{});
         wlr_lock_surface.resource.postNoMemory();
     };
 }

@@ -89,6 +89,8 @@ fn handleDestroy(listener: *wl.Listener(*wlr.LayerSurfaceV1), _: *wlr.LayerSurfa
 
     layer_surface.destroyPopups();
 
+    layer_surface.popup_tree.node.destroy();
+
     util.gpa.destroy(layer_surface);
 }
 

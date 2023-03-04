@@ -37,6 +37,7 @@ surface_destroy: wl.Listener(void) = wl.Listener(void).init(handleDestroy),
 
 pub fn create(wlr_lock_surface: *wlr.SessionLockSurfaceV1, lock: *wlr.SessionLockV1) error{OutOfMemory}!void {
     const lock_surface = try util.gpa.create(LockSurface);
+    errdefer util.gpa.destroy(lock_surface);
 
     lock_surface.* = .{
         .wlr_lock_surface = wlr_lock_surface,
@@ -46,6 +47,8 @@ pub fn create(wlr_lock_surface: *wlr.SessionLockSurfaceV1, lock: *wlr.SessionLoc
 
     const output = lock_surface.getOutput();
     const tree = try output.locked_content.createSceneSubsurfaceTree(wlr_lock_surface.surface);
+    errdefer tree.node.destroy();
+
     try SceneNodeData.attach(&tree.node, .{ .lock_surface = lock_surface });
 
     wlr_lock_surface.output.events.mode.add(&lock_surface.output_mode);
