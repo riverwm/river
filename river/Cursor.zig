@@ -830,8 +830,8 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
 
             self.wlr_cursor.warpClosest(
                 device,
-                @intToFloat(f64, data.offset_x + view.current.box.x),
-                @intToFloat(f64, data.offset_y + view.current.box.y),
+                @intToFloat(f64, data.offset_x + view.pending.box.x),
+                @intToFloat(f64, data.offset_y + view.pending.box.y),
             );
 
             server.root.applyPending();
