@@ -263,7 +263,7 @@ pub fn keyboardEnterOrLeave(self: *Self, target_surface: ?*wlr.Surface) void {
         // may cause the cursor to be warped.
         self.cursor.may_need_warp = true;
     } else {
-        self.wlr_seat.keyboardClearFocus();
+        self.wlr_seat.keyboardNotifyClearFocus();
 
         // Depending on configuration and cursor position, changing keyboard focus
         // may cause the cursor to be warped.
