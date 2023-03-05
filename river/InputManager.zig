@@ -29,6 +29,7 @@ const util = @import("util.zig");
 const InputConfig = @import("InputConfig.zig");
 const InputDevice = @import("InputDevice.zig");
 const Keyboard = @import("Keyboard.zig");
+const PointerConstraint = @import("PointerConstraint.zig");
 const Seat = @import("Seat.zig");
 const Switch = @import("Switch.zig");
 
@@ -42,6 +43,7 @@ idle_notifier: *wlr.IdleNotifierV1,
 relative_pointer_manager: *wlr.RelativePointerManagerV1,
 virtual_pointer_manager: *wlr.VirtualPointerManagerV1,
 virtual_keyboard_manager: *wlr.VirtualKeyboardManagerV1,
+pointer_constraints: *wlr.PointerConstraintsV1,
 
 configs: std.ArrayList(InputConfig),
 devices: wl.list.Head(InputDevice, .link),
@@ -53,6 +55,8 @@ new_virtual_pointer: wl.Listener(*wlr.VirtualPointerManagerV1.event.NewPointer) 
     wl.Listener(*wlr.VirtualPointerManagerV1.event.NewPointer).init(handleNewVirtualPointer),
 new_virtual_keyboard: wl.Listener(*wlr.VirtualKeyboardV1) =
     wl.Listener(*wlr.VirtualKeyboardV1).init(handleNewVirtualKeyboard),
+new_constraint: wl.Listener(*wlr.PointerConstraintV1) =
+    wl.Listener(*wlr.PointerConstraintV1).init(handleNewConstraint),
 
 pub fn init(self: *Self) !void {
     const seat_node = try util.gpa.create(std.TailQueue(Seat).Node);
@@ -64,6 +68,7 @@ pub fn init(self: *Self) !void {
         .relative_pointer_manager = try wlr.RelativePointerManagerV1.create(server.wl_server),
         .virtual_pointer_manager = try wlr.VirtualPointerManagerV1.create(server.wl_server),
         .virtual_keyboard_manager = try wlr.VirtualKeyboardManagerV1.create(server.wl_server),
+        .pointer_constraints = try wlr.PointerConstraintsV1.create(server.wl_server),
         .configs = std.ArrayList(InputConfig).init(util.gpa),
 
         .devices = undefined,
@@ -78,11 +83,16 @@ pub fn init(self: *Self) !void {
     server.backend.events.new_input.add(&self.new_input);
     self.virtual_pointer_manager.events.new_virtual_pointer.add(&self.new_virtual_pointer);
     self.virtual_keyboard_manager.events.new_virtual_keyboard.add(&self.new_virtual_keyboard);
+    self.pointer_constraints.events.new_constraint.add(&self.new_constraint);
 }
 
 pub fn deinit(self: *Self) void {
     // This function must be called after the backend has been destroyed
     assert(self.devices.empty());
+
+    self.new_virtual_pointer.link.remove();
+    self.new_virtual_keyboard.link.remove();
+    self.new_constraint.link.remove();
 
     while (self.seats.pop()) |seat_node| {
         seat_node.data.deinit();
@@ -137,4 +147,14 @@ fn handleNewVirtualKeyboard(
 ) void {
     const seat = @intToPtr(*Seat, virtual_keyboard.seat.data);
     seat.addDevice(&virtual_keyboard.keyboard.base);
+}
+
+fn handleNewConstraint(
+    _: *wl.Listener(*wlr.PointerConstraintV1),
+    wlr_constraint: *wlr.PointerConstraintV1,
+) void {
+    PointerConstraint.create(wlr_constraint) catch {
+        log.err("out of memory", .{});
+        wlr_constraint.resource.postNoMemory();
+    };
 }

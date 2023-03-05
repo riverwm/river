@@ -35,6 +35,7 @@ const DragIcon = @import("DragIcon.zig");
 const LayerSurface = @import("LayerSurface.zig");
 const LockSurface = @import("LockSurface.zig");
 const Output = @import("Output.zig");
+const PointerConstraint = @import("PointerConstraint.zig");
 const Root = @import("Root.zig");
 const Seat = @import("Seat.zig");
 const View = @import("View.zig");
@@ -144,6 +145,11 @@ hide_cursor_timer: *wl.EventSource,
 
 hidden: bool = false,
 may_need_warp: bool = false,
+
+/// The pointer constraint for the surface that currently has keyboard focus, if any.
+/// This constraint is not necessarily active, activation only occurs once the cursor
+/// has been moved inside the constraint region.
+constraint: ?*PointerConstraint = null,
 
 last_focus_follows_cursor_target: ?*View = null,
 
@@ -344,7 +350,7 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
     }
 
     if (server.root.at(self.wlr_cursor.x, self.wlr_cursor.y)) |result| {
-        if (result.node == .view and self.handlePointerMapping(event, result.node.view)) {
+        if (result.data == .view and self.handlePointerMapping(event, result.data.view)) {
             // If a mapping is triggered don't send events to clients.
             return;
         }
@@ -372,7 +378,7 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
 
 /// Requires a call to Root.applyPending()
 fn updateKeyboardFocus(self: Self, result: Root.AtResult) void {
-    switch (result.node) {
+    switch (result.data) {
         .view => |view| {
             self.seat.focus(view);
         },
@@ -678,6 +684,10 @@ fn handleHideCursorTimeout(self: *Self) c_int {
 }
 
 pub fn startMove(cursor: *Self, view: *View) void {
+    if (cursor.constraint) |constraint| {
+        if (constraint.state == .active) constraint.deactivate();
+    }
+
     const new_mode: Mode = .{ .move = .{
         .view = view,
         .offset_x = @floatToInt(i32, cursor.wlr_cursor.x) - view.current.box.x,
@@ -687,6 +697,10 @@ pub fn startMove(cursor: *Self, view: *View) void {
 }
 
 pub fn startResize(cursor: *Self, view: *View, proposed_edges: ?wlr.Edges) void {
+    if (cursor.constraint) |constraint| {
+        if (constraint.state == .active) constraint.deactivate();
+    }
+
     const edges = blk: {
         if (proposed_edges) |edges| {
             if (edges.top or edges.bottom or edges.left or edges.right) {
@@ -803,21 +817,40 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
 
     var dx: f64 = delta_x;
     var dy: f64 = delta_y;
+
+    if (self.constraint) |constraint| {
+        if (constraint.state == .active) {
+            switch (constraint.wlr_constraint.type) {
+                .locked => return,
+                .confined => constraint.confine(&dx, &dy),
+            }
+        }
+    }
+
     switch (self.mode) {
-        .passthrough => {
+        .passthrough, .down => {
             self.wlr_cursor.move(device, dx, dy);
-            self.checkFocusFollowsCursor();
-            self.passthrough(time);
+
+            switch (self.mode) {
+                .passthrough => {
+                    self.checkFocusFollowsCursor();
+                    self.passthrough(time);
+                },
+                .down => |data| {
+                    self.seat.wlr_seat.pointerNotifyMotion(
+                        time,
+                        data.sx + (self.wlr_cursor.x - data.lx),
+                        data.sy + (self.wlr_cursor.y - data.ly),
+                    );
+                },
+                else => unreachable,
+            }
+
             self.updateDragIcons();
-        },
-        .down => |down| {
-            self.wlr_cursor.move(device, dx, dy);
-            self.seat.wlr_seat.pointerNotifyMotion(
-                time,
-                down.sx + (self.wlr_cursor.x - down.lx),
-                down.sy + (self.wlr_cursor.y - down.ly),
-            );
-            self.updateDragIcons();
+
+            if (self.constraint) |constraint| {
+                constraint.maybeActivate();
+            }
         },
         .move => |*data| {
             dx += data.delta_x;
@@ -904,7 +937,7 @@ pub fn checkFocusFollowsCursor(self: *Self) void {
     if (self.seat.drag == .pointer) return;
     if (server.config.focus_follows_cursor == .disabled) return;
     if (server.root.at(self.wlr_cursor.x, self.wlr_cursor.y)) |result| {
-        switch (result.node) {
+        switch (result.data) {
             .view => |view| {
                 // Don't re-focus the last focused view when the mode is .normal
                 if (server.config.focus_follows_cursor == .normal and
@@ -941,6 +974,11 @@ pub fn updateState(self: *Self) void {
     if (self.may_need_warp) {
         self.warp();
     }
+
+    if (self.constraint) |constraint| {
+        constraint.updateState();
+    }
+
     if (self.shouldPassthrough()) {
         self.mode = .passthrough;
         var now: os.timespec = undefined;
@@ -986,7 +1024,7 @@ fn passthrough(self: *Self, time: u32) void {
     assert(self.mode == .passthrough);
 
     if (server.root.at(self.wlr_cursor.x, self.wlr_cursor.y)) |result| {
-        if (result.node == .lock_surface) {
+        if (result.data == .lock_surface) {
             assert(server.lock_manager.state != .unlocked);
         } else {
             assert(server.lock_manager.state != .locked);

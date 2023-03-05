@@ -27,7 +27,7 @@ const LockSurface = @import("LockSurface.zig");
 const View = @import("View.zig");
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
-const Data = union(enum) {
+pub const Data = union(enum) {
     view: *View,
     lock_surface: *LockSurface,
     layer_surface: *LayerSurface,

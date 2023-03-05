@@ -170,15 +170,11 @@ pub fn deinit(self: *Self) void {
 }
 
 pub const AtResult = struct {
+    node: *wlr.SceneNode,
     surface: ?*wlr.Surface,
     sx: f64,
     sy: f64,
-    node: union(enum) {
-        view: *View,
-        layer_surface: *LayerSurface,
-        lock_surface: *LockSurface,
-        xwayland_override_redirect: if (build_options.xwayland) *XwaylandOverrideRedirect else noreturn,
-    },
+    data: SceneNodeData.Data,
 };
 
 /// Return information about what is currently rendered in the interactive_content
@@ -186,11 +182,11 @@ pub const AtResult = struct {
 pub fn at(self: Self, lx: f64, ly: f64) ?AtResult {
     var sx: f64 = undefined;
     var sy: f64 = undefined;
-    const node_at = self.interactive_content.node.at(lx, ly, &sx, &sy) orelse return null;
+    const node = self.interactive_content.node.at(lx, ly, &sx, &sy) orelse return null;
 
     const surface: ?*wlr.Surface = blk: {
-        if (node_at.type == .buffer) {
-            const scene_buffer = wlr.SceneBuffer.fromNode(node_at);
+        if (node.type == .buffer) {
+            const scene_buffer = wlr.SceneBuffer.fromNode(node);
             if (wlr.SceneSurface.fromBuffer(scene_buffer)) |scene_surface| {
                 break :blk scene_surface.surface;
             }
@@ -198,19 +194,13 @@ pub fn at(self: Self, lx: f64, ly: f64) ?AtResult {
         break :blk null;
     };
 
-    if (SceneNodeData.fromNode(node_at)) |scene_node_data| {
+    if (SceneNodeData.fromNode(node)) |scene_node_data| {
         return .{
+            .node = node,
             .surface = surface,
             .sx = sx,
             .sy = sy,
-            .node = switch (scene_node_data.data) {
-                .view => |view| .{ .view = view },
-                .layer_surface => |layer_surface| .{ .layer_surface = layer_surface },
-                .lock_surface => |lock_surface| .{ .lock_surface = lock_surface },
-                .xwayland_override_redirect => |xwayland_override_redirect| .{
-                    .xwayland_override_redirect = xwayland_override_redirect,
-                },
-            },
+            .data = scene_node_data.data,
         };
     } else {
         return null;

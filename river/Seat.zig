@@ -38,6 +38,7 @@ const LayerSurface = @import("LayerSurface.zig");
 const LockSurface = @import("LockSurface.zig");
 const Mapping = @import("Mapping.zig");
 const Output = @import("Output.zig");
+const PointerConstraint = @import("PointerConstraint.zig");
 const SeatStatus = @import("SeatStatus.zig");
 const Switch = @import("Switch.zig");
 const View = @import("View.zig");
@@ -245,7 +246,32 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
     }
     self.focused = new_focus;
 
+    if (self.cursor.constraint) |constraint| {
+        if (constraint.wlr_constraint.surface != target_surface) {
+            if (constraint.state == .active) {
+                log.info("deactivating pointer constraint for surface, keyboard focus lost", .{});
+                constraint.deactivate();
+            }
+            self.cursor.constraint = null;
+        }
+    }
+
     self.keyboardEnterOrLeave(target_surface);
+
+    if (target_surface) |surface| {
+        const pointer_constraints = server.input_manager.pointer_constraints;
+        if (pointer_constraints.constraintForSurface(surface, self.wlr_seat)) |wlr_constraint| {
+            if (self.cursor.constraint) |constraint| {
+                assert(constraint.wlr_constraint == wlr_constraint);
+            } else {
+                self.cursor.constraint = @intToPtr(*PointerConstraint, wlr_constraint.data);
+            }
+        }
+    }
+
+    // Depending on configuration and cursor position, changing keyboard focus
+    // may cause the cursor to be warped.
+    self.cursor.may_need_warp = true;
 
     // Inform any clients tracking status of the change
     var it = self.status_trackers.first;
@@ -258,16 +284,8 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
 pub fn keyboardEnterOrLeave(self: *Self, target_surface: ?*wlr.Surface) void {
     if (target_surface) |wlr_surface| {
         self.keyboardNotifyEnter(wlr_surface);
-
-        // Depending on configuration and cursor position, changing keyboard focus
-        // may cause the cursor to be warped.
-        self.cursor.may_need_warp = true;
     } else {
         self.wlr_seat.keyboardNotifyClearFocus();
-
-        // Depending on configuration and cursor position, changing keyboard focus
-        // may cause the cursor to be warped.
-        self.cursor.may_need_warp = true;
     }
 }
 
