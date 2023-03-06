@@ -27,6 +27,7 @@ const wl = @import("wayland").server.wl;
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
+const ForeignToplevelHandle = @import("ForeignToplevelHandle.zig");
 const Output = @import("Output.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
 const Seat = @import("Seat.zig");
@@ -147,6 +148,8 @@ float_box: wlr.Box = undefined,
 /// exiting fullscreen if there is no active layout.
 post_fullscreen_box: wlr.Box = undefined,
 
+foreign_toplevel_handle: ForeignToplevelHandle = .{},
+
 pub fn create(impl: Impl) error{OutOfMemory}!*Self {
     const view = try util.gpa.create(Self);
     errdefer util.gpa.destroy(view);
@@ -215,6 +218,8 @@ pub fn destroy(view: *Self) void {
 
 pub fn updateCurrent(view: *Self) void {
     const config = &server.config;
+
+    view.foreign_toplevel_handle.update();
 
     view.current = view.inflight;
     view.dropSavedSurfaceTree();
@@ -387,6 +392,8 @@ pub fn map(view: *Self) !void {
     assert(!view.mapped and !view.destroying);
     view.mapped = true;
 
+    view.foreign_toplevel_handle.map();
+
     view.pending.borders = !server.config.csdAllowed(view);
 
     if (server.input_manager.defaultSeat().focused_output) |output| {
@@ -427,14 +434,19 @@ pub fn unmap(view: *Self) void {
     assert(view.mapped and !view.destroying);
     view.mapped = false;
 
+    view.foreign_toplevel_handle.unmap();
+
     server.root.applyPending();
 }
 
-pub fn notifyTitle(self: *const Self) void {
+pub fn notifyTitle(view: *const Self) void {
+    if (view.foreign_toplevel_handle.wlr_handle) |wlr_handle| {
+        if (view.getTitle()) |title| wlr_handle.setTitle(title);
+    }
     // Send title to all status listeners attached to a seat which focuses this view
     var seat_it = server.input_manager.seats.first;
     while (seat_it) |seat_node| : (seat_it = seat_node.next) {
-        if (seat_node.data.focused == .view and seat_node.data.focused.view == self) {
+        if (seat_node.data.focused == .view and seat_node.data.focused.view == view) {
             var client_it = seat_node.data.status_trackers.first;
             while (client_it) |client_node| : (client_it = client_node.next) {
                 client_node.data.sendFocusedView();
@@ -443,6 +455,8 @@ pub fn notifyTitle(self: *const Self) void {
     }
 }
 
-pub fn notifyAppId(_: Self) void {
-    // TODO reimplement foreign-toplevel-management I guess.
+pub fn notifyAppId(view: Self) void {
+    if (view.foreign_toplevel_handle.wlr_handle) |wlr_handle| {
+        if (view.getAppId()) |app_id| wlr_handle.setAppId(app_id);
+    }
 }
