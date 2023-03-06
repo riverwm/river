@@ -160,7 +160,9 @@ pub fn focus(self: *Self, _target: ?*View) void {
     }
 
     if (target) |view| {
-        if (view.pending.tags & view.pending.output.?.pending.tags == 0) {
+        if (view.pending.output == null or
+            view.pending.tags & view.pending.output.?.pending.tags == 0)
+        {
             // If the view is not currently visible, behave as if null was passed
             target = null;
         } else if (view.pending.output.? != self.focused_output.?) {
