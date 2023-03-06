@@ -129,7 +129,9 @@ fn setActivated(self: Self, activated: bool) void {
         self.xwayland_surface.setMinimized(false);
     }
     self.xwayland_surface.activate(activated);
-    self.xwayland_surface.restack(null, .above);
+    if (activated) {
+        self.xwayland_surface.restack(null, .above);
+    }
 }
 
 /// Get the current title of the xwayland surface if any.
