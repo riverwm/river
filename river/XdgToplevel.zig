@@ -98,15 +98,20 @@ pub fn configure(self: *Self) bool {
     const inflight = &self.view.inflight;
     const current = &self.view.current;
 
+    const inflight_fullscreen = inflight.output != null and inflight.output.?.inflight.fullscreen == self.view;
+    const current_fullscreen = current.output != null and current.output.?.current.fullscreen == self.view;
+
+    const inflight_float = inflight.float or (inflight.output != null and inflight.output.?.layout == null);
+    const current_float = current.float or (current.output != null and current.output.?.layout == null);
+
     // We avoid a special case for newly mapped views which we have not yet
     // configured by setting the current width/height to the initial width/height
     // of the view in handleMap().
     if (inflight.box.width == current.box.width and
         inflight.box.height == current.box.height and
         (inflight.focus != 0) == (current.focus != 0) and
-        (inflight.output != null and inflight.output.?.inflight.fullscreen == self.view) ==
-        (current.output != null and current.output.?.current.fullscreen == self.view) and
-        inflight.borders == current.borders and
+        inflight_fullscreen == current_fullscreen and
+        inflight_float == current_float and
         inflight.resizing == current.resizing)
     {
         return false;
@@ -114,13 +119,12 @@ pub fn configure(self: *Self) bool {
 
     _ = self.xdg_toplevel.setActivated(inflight.focus != 0);
 
-    const fullscreen = inflight.output != null and inflight.output.?.inflight.fullscreen == self.view;
-    _ = self.xdg_toplevel.setFullscreen(fullscreen);
+    _ = self.xdg_toplevel.setFullscreen(inflight_fullscreen);
 
-    if (inflight.borders) {
-        _ = self.xdg_toplevel.setTiled(.{ .top = true, .bottom = true, .left = true, .right = true });
-    } else {
+    if (inflight_float) {
         _ = self.xdg_toplevel.setTiled(.{ .top = false, .bottom = false, .left = false, .right = false });
+    } else {
+        _ = self.xdg_toplevel.setTiled(.{ .top = true, .bottom = true, .left = true, .right = true });
     }
 
     _ = self.xdg_toplevel.setResizing(inflight.resizing);
