@@ -130,14 +130,26 @@ mapped: bool = false,
 /// transaction completes. See View.destroy()
 destroying: bool = false,
 
+/// The state of the view that is directly acted upon/modified through user input.
+///
+/// Pending state will be copied to the inflight state and communicated to clients
+/// to be applied as a single atomic transaction across all clients as soon as any
+/// in progress transaction has been completed.
+///
+/// Any time pending state is modified Root.applyPending() must be called
+/// before yielding back to the event loop.
 pending: State = .{},
 pending_focus_stack_link: wl.list.Link,
 pending_wm_stack_link: wl.list.Link,
 
+/// The state most recently sent to the layout generator and clients.
+/// This state is immutable until all clients have replied and the transaction
+/// is completed, at which point this inflight state is copied to current.
 inflight: State = .{},
 inflight_focus_stack_link: wl.list.Link,
 inflight_wm_stack_link: wl.list.Link,
 
+/// The current state represented by the scene graph.
 current: State = .{},
 
 /// The floating dimensions the view, saved so that they can be restored if the

@@ -94,13 +94,12 @@ lock_render_state: enum {
 
 /// The state of the output that is directly acted upon/modified through user input.
 ///
-/// Pending state will be copied to the pending state and communicated to clients
+/// Pending state will be copied to the inflight state and communicated to clients
 /// to be applied as a single atomic transaction across all clients as soon as any
 /// in progress transaction has been completed.
 ///
-/// On completion of a transaction
-/// Any time pending state is modified Root.dirty must be set.
-///
+/// Any time pending state is modified Root.applyPending() must be called
+/// before yielding back to the event loop.
 pending: struct {
     /// A bit field of focused tags
     tags: u32 = 1 << 0,
