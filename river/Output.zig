@@ -297,26 +297,44 @@ pub fn layerSurfaceTree(self: Self, layer: zwlr.LayerShellV1.Layer) *wlr.SceneTr
 /// Arrange all layer surfaces of this output and adjust the usable area.
 /// Will arrange views as well if the usable area changes.
 /// Requires a call to Root.applyPending()
-pub fn arrangeLayers(self: *Self) void {
+pub fn arrangeLayers(output: *Self) void {
     var full_box: wlr.Box = .{
         .x = 0,
         .y = 0,
         .width = undefined,
         .height = undefined,
     };
-    self.wlr_output.effectiveResolution(&full_box.width, &full_box.height);
+    output.wlr_output.effectiveResolution(&full_box.width, &full_box.height);
 
     // This box is modified as exclusive zones are applied
     var usable_box = full_box;
 
-    for ([_]zwlr.LayerShellV1.Layer{ .overlay, .top, .bottom, .background }) |layer| {
-        const tree = self.layerSurfaceTree(layer);
+    // Ensure all exclusive zones are applied before arranging surfaces
+    // without exclusive zones.
+    output.sendLayerConfigures(full_box, &usable_box, .exclusive);
+    output.sendLayerConfigures(full_box, &usable_box, .non_exclusive);
+
+    output.usable_box = usable_box;
+}
+
+fn sendLayerConfigures(
+    output: *Self,
+    full_box: wlr.Box,
+    usable_box: *wlr.Box,
+    mode: enum { exclusive, non_exclusive },
+) void {
+    for ([_]zwlr.LayerShellV1.Layer{ .background, .bottom, .top, .overlay }) |layer| {
+        const tree = output.layerSurfaceTree(layer);
         var it = tree.children.iterator(.forward);
         while (it.next()) |node| {
             assert(node.type == .tree);
             if (@intToPtr(?*SceneNodeData, node.data)) |node_data| {
                 const layer_surface = node_data.data.layer_surface;
-                layer_surface.scene_layer_surface.configure(&full_box, &usable_box);
+
+                const exclusive = layer_surface.wlr_layer_surface.current.exclusive_zone > 0;
+                if (exclusive != (mode == .exclusive)) continue;
+
+                layer_surface.scene_layer_surface.configure(&full_box, usable_box);
                 layer_surface.popup_tree.node.setPosition(
                     layer_surface.scene_layer_surface.tree.node.x,
                     layer_surface.scene_layer_surface.tree.node.y,
@@ -324,8 +342,6 @@ pub fn arrangeLayers(self: *Self) void {
             }
         }
     }
-
-    self.usable_box = usable_box;
 }
 
 fn handleDestroy(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
