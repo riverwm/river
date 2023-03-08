@@ -48,8 +48,6 @@ pub fn create(xwayland_surface: *wlr.XwaylandSurface) error{OutOfMemory}!void {
     errdefer util.gpa.destroy(self);
 
     self.* = .{ .xwayland_surface = xwayland_surface };
-    // This must be set to 0 for usage in View.fromWlrSurface()
-    xwayland_surface.data = 0;
 
     xwayland_surface.events.request_configure.add(&self.request_configure);
     xwayland_surface.events.destroy.add(&self.destroy);

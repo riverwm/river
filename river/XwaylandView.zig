@@ -65,7 +65,6 @@ pub fn create(xwayland_surface: *wlr.XwaylandSurface) error{OutOfMemory}!void {
 
     const self = &view.impl.xwayland_view;
     self.view = view;
-    xwayland_surface.data = @ptrToInt(self);
 
     // Add listeners that are active over the view's entire lifetime
     xwayland_surface.events.destroy.add(&self.destroy);
