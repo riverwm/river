@@ -171,6 +171,9 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
     self.map.link.remove();
     self.unmap.link.remove();
 
+    // The wlr_surface may outlive the wlr_xdg_surface so we must clean up the user data.
+    self.xdg_toplevel.base.surface.data = 0;
+
     self.view.destroy();
 }
 
