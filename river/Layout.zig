@@ -159,13 +159,18 @@ fn handleRequest(layout: *river.LayoutV3, request: river.LayoutV3.Request, self:
                 if (layout_demand.serial == req.serial) layout_demand.apply(self);
             }
 
-            const new_name = util.gpa.dupeZ(u8, mem.sliceTo(req.layout_name, 0)) catch {
-                log.err("out of memory", .{});
-                return;
-            };
-            if (self.output.layout_name) |name| util.gpa.free(name);
-            self.output.layout_name = new_name;
-            self.output.status.sendLayoutName(self.output);
+            const new_name = mem.sliceTo(req.layout_name, 0);
+            if (self.output.layout_name == null or
+                !mem.eql(u8, self.output.layout_name.?, new_name))
+            {
+                const owned = util.gpa.dupeZ(u8, new_name) catch {
+                    log.err("out of memory", .{});
+                    return;
+                };
+                if (self.output.layout_name) |name| util.gpa.free(name);
+                self.output.layout_name = owned;
+                self.output.status.sendLayoutName(self.output);
+            }
         },
     }
 }
