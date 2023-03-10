@@ -71,6 +71,8 @@ hidden: struct {
     },
 },
 
+views: wl.list.Head(View, .link),
+
 new_output: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleNewOutput),
 
 output_layout: *wlr.OutputLayout,
@@ -146,6 +148,7 @@ pub fn init(self: *Self) !void {
                 .wm_stack = undefined,
             },
         },
+        .views = undefined,
         .output_layout = output_layout,
         .output_manager = try wlr.OutputManagerV1.create(server.wl_server),
         .power_manager = try wlr.OutputPowerManagerV1.create(server.wl_server),
@@ -155,6 +158,7 @@ pub fn init(self: *Self) !void {
     self.hidden.pending.wm_stack.init();
     self.hidden.inflight.focus_stack.init();
     self.hidden.inflight.wm_stack.init();
+    self.views.init();
 
     server.backend.events.new_output.add(&self.new_output);
     self.output_manager.events.apply.add(&self.manager_apply);

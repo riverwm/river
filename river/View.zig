@@ -117,6 +117,9 @@ pub const State = struct {
 /// The implementation of this view
 impl: Impl,
 
+/// Link for Root.views
+link: wl.list.Link,
+
 tree: *wlr.SceneTree,
 surface_tree: *wlr.SceneTree,
 saved_surface_tree: *wlr.SceneTree,
@@ -182,6 +185,7 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Self {
 
     view.* = .{
         .impl = impl,
+        .link = undefined,
         .tree = tree,
         .surface_tree = try tree.createSceneTree(),
         .saved_surface_tree = try tree.createSceneTree(),
@@ -199,6 +203,7 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Self {
         .inflight_focus_stack_link = undefined,
     };
 
+    server.root.views.prepend(view);
     server.root.hidden.pending.focus_stack.prepend(view);
     server.root.hidden.pending.wm_stack.prepend(view);
     server.root.hidden.inflight.focus_stack.prepend(view);
@@ -229,6 +234,7 @@ pub fn destroy(view: *Self) void {
         view.tree.node.destroy();
         view.popup_tree.node.destroy();
 
+        view.link.remove();
         view.pending_focus_stack_link.remove();
         view.pending_wm_stack_link.remove();
         view.inflight_focus_stack_link.remove();

@@ -26,7 +26,6 @@ const util = @import("util.zig");
 
 const Config = @import("Config.zig");
 const Control = @import("Control.zig");
-const DecorationManager = @import("DecorationManager.zig");
 const IdleInhibitorManager = @import("IdleInhibitorManager.zig");
 const InputManager = @import("InputManager.zig");
 const LayerSurface = @import("LayerSurface.zig");
@@ -36,6 +35,7 @@ const Output = @import("Output.zig");
 const Root = @import("Root.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
 const StatusManager = @import("StatusManager.zig");
+const XdgDecoration = @import("XdgDecoration.zig");
 const XdgToplevel = @import("XdgToplevel.zig");
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 const XwaylandView = @import("XwaylandView.zig");
@@ -55,6 +55,9 @@ allocator: *wlr.Allocator,
 xdg_shell: *wlr.XdgShell,
 new_xdg_surface: wl.Listener(*wlr.XdgSurface),
 
+xdg_decoration_manager: *wlr.XdgDecorationManagerV1,
+new_toplevel_decoration: wl.Listener(*wlr.XdgToplevelDecorationV1),
+
 layer_shell: *wlr.LayerShellV1,
 new_layer_surface: wl.Listener(*wlr.LayerSurfaceV1),
 
@@ -66,7 +69,6 @@ foreign_toplevel_manager: *wlr.ForeignToplevelManagerV1,
 xdg_activation: *wlr.XdgActivationV1,
 request_activate: wl.Listener(*wlr.XdgActivationV1.event.RequestActivate),
 
-decoration_manager: DecorationManager,
 input_manager: InputManager,
 root: Root,
 config: Config,
@@ -103,6 +105,10 @@ pub fn init(self: *Self) !void {
     self.new_xdg_surface.setNotify(handleNewXdgSurface);
     self.xdg_shell.events.new_surface.add(&self.new_xdg_surface);
 
+    self.xdg_decoration_manager = try wlr.XdgDecorationManagerV1.create(self.wl_server);
+    self.new_toplevel_decoration.setNotify(handleNewToplevelDecoration);
+    self.xdg_decoration_manager.events.new_toplevel_decoration.add(&self.new_toplevel_decoration);
+
     self.layer_shell = try wlr.LayerShellV1.create(self.wl_server);
     self.new_layer_surface.setNotify(handleNewLayerSurface);
     self.layer_shell.events.new_surface.add(&self.new_layer_surface);
@@ -122,7 +128,6 @@ pub fn init(self: *Self) !void {
     _ = try wlr.PrimarySelectionDeviceManagerV1.create(self.wl_server);
 
     self.config = try Config.init();
-    try self.decoration_manager.init();
     try self.root.init();
     // Must be called after root is initialized
     try self.input_manager.init();
@@ -203,6 +208,24 @@ fn handleNewXdgSurface(_: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSu
         xdg_surface.resource.postNoMemory();
         return;
     };
+}
+
+fn handleNewToplevelDecoration(
+    _: *wl.Listener(*wlr.XdgToplevelDecorationV1),
+    wlr_decoration: *wlr.XdgToplevelDecorationV1,
+) void {
+    const xdg_toplevel = @intToPtr(*XdgToplevel, wlr_decoration.surface.data);
+
+    // TODO(wlroots): The next wlroots version will handle this for us
+    if (xdg_toplevel.decoration != null) {
+        wlr_decoration.resource.postError(
+            .already_constructed,
+            "xdg_toplevel already has a decoration object",
+        );
+        return;
+    }
+
+    XdgDecoration.init(wlr_decoration);
 }
 
 fn handleNewLayerSurface(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wlr.LayerSurfaceV1) void {

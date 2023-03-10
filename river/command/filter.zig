@@ -116,21 +116,22 @@ pub fn csdFilterRemove(
 }
 
 fn csdFilterUpdateViews(kind: FilterKind, pattern: []const u8, operation: enum { add, remove }) void {
-    var decoration_it = server.decoration_manager.decorations.first;
-    while (decoration_it) |decoration_node| : (decoration_it = decoration_node.next) {
-        const xdg_toplevel_decoration = decoration_node.data.xdg_toplevel_decoration;
-
-        const view = @intToPtr(*View, xdg_toplevel_decoration.surface.data);
-        if (viewMatchesPattern(kind, pattern, view)) {
-            switch (operation) {
-                .add => {
-                    _ = xdg_toplevel_decoration.setMode(.client_side);
-                    view.pending.borders = false;
-                },
-                .remove => {
-                    _ = xdg_toplevel_decoration.setMode(.server_side);
-                    view.pending.borders = true;
-                },
+    var it = server.root.views.iterator(.forward);
+    while (it.next()) |view| {
+        if (view.impl == .xdg_toplevel) {
+            if (view.impl.xdg_toplevel.decoration) |decoration| {
+                if (viewMatchesPattern(kind, pattern, view)) {
+                    switch (operation) {
+                        .add => {
+                            _ = decoration.wlr_decoration.setMode(.client_side);
+                            view.pending.borders = false;
+                        },
+                        .remove => {
+                            _ = decoration.wlr_decoration.setMode(.server_side);
+                            view.pending.borders = true;
+                        },
+                    }
+                }
             }
         }
     }

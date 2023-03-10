@@ -29,6 +29,7 @@ const Output = @import("Output.zig");
 const Seat = @import("Seat.zig");
 const XdgPopup = @import("XdgPopup.zig");
 const View = @import("View.zig");
+const XdgDecoration = @import("XdgDecoration.zig");
 
 const log = std.log.scoped(.xdg_shell);
 
@@ -36,6 +37,8 @@ const log = std.log.scoped(.xdg_shell);
 view: *View,
 
 xdg_toplevel: *wlr.XdgToplevel,
+
+decoration: ?XdgDecoration = null,
 
 /// Initialized on map
 geometry: wlr.Box = undefined,
@@ -74,15 +77,15 @@ pub fn create(xdg_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
     } });
     errdefer view.destroy();
 
-    view.impl.xdg_toplevel.view = view;
-
     _ = try view.surface_tree.createSceneXdgSurface(xdg_toplevel.base);
 
-    xdg_toplevel.base.data = @ptrToInt(view);
-    xdg_toplevel.base.surface.data = @ptrToInt(&view.tree.node);
-
-    // Add listeners that are active over the view's entire lifetime
     const self = &view.impl.xdg_toplevel;
+
+    self.view = view;
+
+    xdg_toplevel.base.data = @ptrToInt(self);
+
+    // Add listeners that are active over the toplevel's entire lifetime
     xdg_toplevel.base.events.destroy.add(&self.destroy);
     xdg_toplevel.base.events.map.add(&self.map);
     xdg_toplevel.base.events.unmap.add(&self.unmap);
@@ -169,6 +172,17 @@ pub fn destroyPopups(self: Self) void {
 
 fn handleDestroy(listener: *wl.Listener(void)) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
+
+    // TODO(wlroots): Replace this with an assertion when updating to wlroots 0.17.0
+    // https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/4051
+    if (self.decoration) |*decoration| {
+        decoration.wlr_decoration.resource.postError(
+            .orphaned,
+            "xdg_toplevel destroyed before xdg_toplevel_decoration",
+        );
+        decoration.deinit();
+        self.decoration = null;
+    }
 
     // Remove listeners that are active for the entire lifetime of the view
     self.destroy.link.remove();

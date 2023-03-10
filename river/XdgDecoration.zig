@@ -1,0 +1,80 @@
+// This file is part of river, a dynamic tiling wayland compositor.
+//
+// Copyright 2023 The River Developers
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 3.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+const XdgDecoration = @This();
+
+const std = @import("std");
+const assert = std.debug.assert;
+const wlr = @import("wlroots");
+const wl = @import("wayland").server.wl;
+
+const server = &@import("main.zig").server;
+const util = @import("util.zig");
+
+const XdgToplevel = @import("XdgToplevel.zig");
+
+wlr_decoration: *wlr.XdgToplevelDecorationV1,
+
+destroy: wl.Listener(*wlr.XdgToplevelDecorationV1) =
+    wl.Listener(*wlr.XdgToplevelDecorationV1).init(handleDestroy),
+request_mode: wl.Listener(*wlr.XdgToplevelDecorationV1) =
+    wl.Listener(*wlr.XdgToplevelDecorationV1).init(handleRequestMode),
+
+pub fn init(wlr_decoration: *wlr.XdgToplevelDecorationV1) void {
+    const xdg_toplevel = @intToPtr(*XdgToplevel, wlr_decoration.surface.data);
+
+    xdg_toplevel.decoration = .{ .wlr_decoration = wlr_decoration };
+    const decoration = &xdg_toplevel.decoration.?;
+
+    wlr_decoration.events.destroy.add(&decoration.destroy);
+    wlr_decoration.events.request_mode.add(&decoration.request_mode);
+
+    handleRequestMode(&decoration.request_mode, decoration.wlr_decoration);
+}
+
+// TODO(wlroots): remove this function when updating to 0.17.0
+// https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/4051
+pub fn deinit(decoration: *XdgDecoration) void {
+    decoration.destroy.link.remove();
+    decoration.request_mode.link.remove();
+}
+
+fn handleDestroy(
+    listener: *wl.Listener(*wlr.XdgToplevelDecorationV1),
+    _: *wlr.XdgToplevelDecorationV1,
+) void {
+    const decoration = @fieldParentPtr(XdgDecoration, "destroy", listener);
+    const xdg_toplevel = @intToPtr(*XdgToplevel, decoration.wlr_decoration.surface.data);
+
+    decoration.deinit();
+
+    assert(xdg_toplevel.decoration != null);
+    xdg_toplevel.decoration = null;
+}
+
+fn handleRequestMode(
+    listener: *wl.Listener(*wlr.XdgToplevelDecorationV1),
+    _: *wlr.XdgToplevelDecorationV1,
+) void {
+    const decoration = @fieldParentPtr(XdgDecoration, "request_mode", listener);
+
+    const xdg_toplevel = @intToPtr(*XdgToplevel, decoration.wlr_decoration.surface.data);
+    if (server.config.csdAllowed(xdg_toplevel.view)) {
+        _ = decoration.wlr_decoration.setMode(.client_side);
+    } else {
+        _ = decoration.wlr_decoration.setMode(.server_side);
+    }
+}

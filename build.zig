@@ -91,6 +91,7 @@ pub fn build(b: *zbs.Builder) !void {
     scanner.addSystemProtocol("staging/ext-session-lock/ext-session-lock-v1.xml");
     scanner.addSystemProtocol("unstable/pointer-gestures/pointer-gestures-unstable-v1.xml");
     scanner.addSystemProtocol("unstable/pointer-constraints/pointer-constraints-unstable-v1.xml");
+    scanner.addSystemProtocol("unstable/xdg-decoration/xdg-decoration-unstable-v1.xml");
     scanner.addProtocolPath("protocol/river-control-unstable-v1.xml");
     scanner.addProtocolPath("protocol/river-status-unstable-v1.xml");
     scanner.addProtocolPath("protocol/river-layout-v3.xml");
@@ -109,6 +110,7 @@ pub fn build(b: *zbs.Builder) !void {
     scanner.generate("xdg_wm_base", 2);
     scanner.generate("zwp_pointer_gestures_v1", 3);
     scanner.generate("zwp_pointer_constraints_v1", 1);
+    scanner.generate("zxdg_decoration_manager_v1", 1);
     scanner.generate("ext_session_lock_manager_v1", 1);
 
     scanner.generate("zriver_control_v1", 1);
