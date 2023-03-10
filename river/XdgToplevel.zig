@@ -178,7 +178,9 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
     // The wlr_surface may outlive the wlr_xdg_surface so we must clean up the user data.
     self.xdg_toplevel.base.surface.data = 0;
 
-    self.view.destroy();
+    const view = self.view;
+    view.impl = .none;
+    view.destroy();
 }
 
 fn handleMap(listener: *wl.Listener(void)) void {

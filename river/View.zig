@@ -46,6 +46,12 @@ pub const Constraints = struct {
 const Impl = union(enum) {
     xdg_toplevel: XdgToplevel,
     xwayland_view: if (build_options.xwayland) XwaylandView else noreturn,
+    /// This state is assigned during destruction after the xdg toplevel
+    /// has been destroyed but while the transaction system is still rendering
+    /// saved surfaces of the view.
+    /// The xdg_toplevel could simply be set to undefined instead, but using a
+    /// tag like this gives us better safety checks.
+    none,
 };
 
 pub const State = struct {
@@ -163,6 +169,8 @@ post_fullscreen_box: wlr.Box = undefined,
 foreign_toplevel_handle: ForeignToplevelHandle = .{},
 
 pub fn create(impl: Impl) error{OutOfMemory}!*Self {
+    assert(impl != .none);
+
     const view = try util.gpa.create(Self);
     errdefer util.gpa.destroy(view);
 
@@ -210,6 +218,8 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Self {
 /// mark this view for destruction when the transaction completes. Otherwise
 /// destroy immediately.
 pub fn destroy(view: *Self) void {
+    assert(view.impl == .none);
+
     view.destroying = true;
 
     // If there are still saved buffers, then this view needs to be kept
@@ -284,6 +294,7 @@ pub fn configure(self: *Self) bool {
             if (build_options.xwayland) return xwayland_view.configure();
             unreachable;
         },
+        .none => unreachable,
     }
 }
 
@@ -292,6 +303,7 @@ pub fn rootSurface(self: Self) *wlr.Surface {
     return switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.rootSurface(),
         .xwayland_view => |xwayland_view| xwayland_view.rootSurface(),
+        .none => unreachable,
     };
 }
 
@@ -362,6 +374,7 @@ pub fn close(self: Self) void {
     switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.close(),
         .xwayland_view => |xwayland_view| xwayland_view.close(),
+        .none => unreachable,
     }
 }
 
@@ -370,6 +383,7 @@ pub fn destroyPopups(self: Self) void {
     switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.destroyPopups(),
         .xwayland_view => {},
+        .none => unreachable,
     }
 }
 
@@ -379,6 +393,7 @@ pub fn getTitle(self: Self) ?[*:0]const u8 {
     return switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.getTitle(),
         .xwayland_view => |xwayland_view| xwayland_view.getTitle(),
+        .none => unreachable,
     };
 }
 
@@ -388,6 +403,7 @@ pub fn getAppId(self: Self) ?[*:0]const u8 {
     return switch (self.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.getAppId(),
         .xwayland_view => |xwayland_view| xwayland_view.getAppId(),
+        .none => unreachable,
     };
 }
 

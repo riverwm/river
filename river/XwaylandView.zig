@@ -153,7 +153,9 @@ fn handleDestroy(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandS
     self.request_configure.link.remove();
     self.set_override_redirect.link.remove();
 
-    self.view.destroy();
+    const view = self.view;
+    view.impl = .none;
+    view.destroy();
 }
 
 pub fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
