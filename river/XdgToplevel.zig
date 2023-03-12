@@ -115,6 +115,7 @@ pub fn configure(self: *Self) bool {
         (inflight.focus != 0) == (current.focus != 0) and
         inflight_fullscreen == current_fullscreen and
         inflight_float == current_float and
+        inflight.ssd == current.ssd and
         inflight.resizing == current.resizing)
     {
         return false;
@@ -128,6 +129,10 @@ pub fn configure(self: *Self) bool {
         _ = self.xdg_toplevel.setTiled(.{ .top = false, .bottom = false, .left = false, .right = false });
     } else {
         _ = self.xdg_toplevel.setTiled(.{ .top = true, .bottom = true, .left = true, .right = true });
+    }
+
+    if (self.decoration) |decoration| {
+        _ = decoration.wlr_decoration.setMode(if (inflight.ssd) .server_side else .client_side);
     }
 
     _ = self.xdg_toplevel.setResizing(inflight.resizing);
@@ -226,9 +231,8 @@ fn handleMap(listener: *wl.Listener(void)) void {
         (state.min_width == state.max_width or state.min_height == state.max_height);
 
     if (self.xdg_toplevel.parent != null or has_fixed_size) {
-        // If the self.xdg_toplevel has a parent or has a fixed size make it float
-        view.pending.float = true;
-    } else if (server.config.shouldFloat(view)) {
+        // If the self.xdg_toplevel has a parent or has a fixed size make it float.
+        // This will be overwritten in View.map() if the view is matched by a rule.
         view.pending.float = true;
     }
 

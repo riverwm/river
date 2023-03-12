@@ -132,7 +132,7 @@ pub fn apply(self: *Self, layout: *Layout) void {
 
             // Here we apply the offset to align the coords with the origin of the
             // usable area and shrink the dimensions to accommodate the border size.
-            const border_width = if (view.inflight.borders) server.config.border_width else 0;
+            const border_width = if (view.inflight.ssd) server.config.border_width else 0;
             view.inflight.box = .{
                 .x = proposed.x + output.usable_box.x + border_width,
                 .y = proposed.y + output.usable_box.y + border_width,

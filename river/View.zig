@@ -72,13 +72,13 @@ pub const State = struct {
     float: bool = false,
     fullscreen: bool = false,
     urgent: bool = false,
-    borders: bool = true,
+    ssd: bool = false,
     resizing: bool = false,
 
     /// Modify the x/y of the given state by delta_x/delta_y, clamping to the
     /// bounds of the output.
     pub fn move(state: *State, delta_x: i32, delta_y: i32) void {
-        const border_width = if (state.borders) server.config.border_width else 0;
+        const border_width = if (state.ssd) server.config.border_width else 0;
 
         var output_width: i32 = math.maxInt(i32);
         var output_height: i32 = math.maxInt(i32);
@@ -106,7 +106,7 @@ pub const State = struct {
         var output_height: i32 = undefined;
         output.wlr_output.effectiveResolution(&output_width, &output_height);
 
-        const border_width = if (state.borders) server.config.border_width else 0;
+        const border_width = if (state.ssd) server.config.border_width else 0;
         state.box.width = math.min(state.box.width, output_width - (2 * border_width));
         state.box.height = math.min(state.box.height, output_height - (2 * border_width));
 
@@ -265,7 +265,7 @@ pub fn updateCurrent(view: *Self) void {
     view.tree.node.setPosition(box.x, box.y);
     view.popup_tree.node.setPosition(box.x, box.y);
 
-    const enable_borders = view.current.borders and !view.current.fullscreen;
+    const enable_borders = view.current.ssd and !view.current.fullscreen;
 
     const border_width: c_int = config.border_width;
     view.borders.left.node.setEnabled(enable_borders);
@@ -428,7 +428,12 @@ pub fn map(view: *Self) !void {
 
     view.foreign_toplevel_handle.map();
 
-    view.pending.borders = !server.config.csdAllowed(view);
+    if (server.config.float_rules.match(view)) |float| {
+        view.pending.float = float;
+    }
+    if (server.config.ssd_rules.match(view)) |ssd| {
+        view.pending.ssd = ssd;
+    }
 
     if (server.input_manager.defaultSeat().focused_output) |output| {
         // Center the initial pending box on the output

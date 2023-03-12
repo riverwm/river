@@ -877,7 +877,7 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
 
             {
                 // Modify the pending box, taking constraints into account
-                const border_width = if (data.view.pending.borders) server.config.border_width else 0;
+                const border_width = if (data.view.pending.ssd) server.config.border_width else 0;
 
                 var output_width: i32 = undefined;
                 var output_height: i32 = undefined;

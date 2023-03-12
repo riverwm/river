@@ -42,7 +42,14 @@ pub fn init(wlr_decoration: *wlr.XdgToplevelDecorationV1) void {
     wlr_decoration.events.destroy.add(&decoration.destroy);
     wlr_decoration.events.request_mode.add(&decoration.request_mode);
 
-    handleRequestMode(&decoration.request_mode, decoration.wlr_decoration);
+    const ssd = server.config.ssd_rules.match(xdg_toplevel.view) orelse
+        (decoration.wlr_decoration.requested_mode != .client_side);
+
+    // TODO(wlroots): make sure this is properly batched in a single configure
+    // with all other initial state when wlroots makes this possible.
+    _ = wlr_decoration.setMode(if (ssd) .server_side else .client_side);
+
+    xdg_toplevel.view.pending.ssd = ssd;
 }
 
 // TODO(wlroots): remove this function when updating to 0.17.0
@@ -72,9 +79,13 @@ fn handleRequestMode(
     const decoration = @fieldParentPtr(XdgDecoration, "request_mode", listener);
 
     const xdg_toplevel = @intToPtr(*XdgToplevel, decoration.wlr_decoration.surface.data);
-    if (server.config.csdAllowed(xdg_toplevel.view)) {
-        _ = decoration.wlr_decoration.setMode(.client_side);
-    } else {
-        _ = decoration.wlr_decoration.setMode(.server_side);
+    const view = xdg_toplevel.view;
+
+    const ssd = server.config.ssd_rules.match(xdg_toplevel.view) orelse
+        (decoration.wlr_decoration.requested_mode != .client_side);
+
+    if (view.pending.ssd != ssd) {
+        view.pending.ssd = ssd;
+        server.root.applyPending();
     }
 }

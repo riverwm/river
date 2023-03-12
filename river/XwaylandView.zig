@@ -51,6 +51,8 @@ set_override_redirect: wl.Listener(*wlr.XwaylandSurface) =
 // Listeners that are only active while the view is mapped
 set_title: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleSetTitle),
 set_class: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleSetClass),
+set_decorations: wl.Listener(*wlr.XwaylandSurface) =
+    wl.Listener(*wlr.XwaylandSurface).init(handleSetDecorations),
 request_fullscreen: wl.Listener(*wlr.XwaylandSurface) =
     wl.Listener(*wlr.XwaylandSurface).init(handleRequestFullscreen),
 request_minimize: wl.Listener(*wlr.XwaylandSurface.event.Minimize) =
@@ -168,6 +170,7 @@ pub fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface:
     // Add listeners that are only active while mapped
     xwayland_surface.events.set_title.add(&self.set_title);
     xwayland_surface.events.set_class.add(&self.set_class);
+    xwayland_surface.events.set_decorations.add(&self.set_decorations);
     xwayland_surface.events.request_fullscreen.add(&self.request_fullscreen);
     xwayland_surface.events.request_minimize.add(&self.request_minimize);
 
@@ -194,11 +197,13 @@ pub fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface:
         false;
 
     if (self.xwayland_surface.parent != null or has_fixed_size) {
-        // If the toplevel has a parent or has a fixed size make it float
-        view.pending.float = true;
-    } else if (server.config.shouldFloat(view)) {
+        // If the toplevel has a parent or has a fixed size make it float by default.
+        // This will be overwritten in View.map() if the view is matched by a rule.
         view.pending.float = true;
     }
+
+    // This will be overwritten in View.map() if the view is matched by a rule.
+    view.pending.ssd = !xwayland_surface.decorations.no_border;
 
     view.pending.fullscreen = xwayland_surface.fullscreen;
 
@@ -274,6 +279,19 @@ fn handleSetTitle(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.Xwayland
 fn handleSetClass(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
     const self = @fieldParentPtr(Self, "set_class", listener);
     self.view.notifyAppId();
+}
+
+fn handleSetDecorations(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
+    const self = @fieldParentPtr(Self, "set_decorations", listener);
+    const view = self.view;
+
+    const ssd = server.config.ssd_rules.match(view) orelse
+        !self.xwayland_surface.decorations.no_border;
+
+    if (view.pending.ssd != ssd) {
+        view.pending.ssd = ssd;
+        server.root.applyPending();
+    }
 }
 
 fn handleRequestFullscreen(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {

@@ -163,6 +163,7 @@ pub fn build(b: *zbs.Builder) !void {
         river.linkSystemLibrary("wlroots");
 
         river.addPackagePath("flags", "common/flags.zig");
+        river.addPackagePath("globber", "common/globber.zig");
         river.addCSourceFile("river/wlroots_log_wrapper.c", &[_][]const u8{ "-std=c99", "-O2" });
 
         // TODO: remove when zig issue #131 is implemented
@@ -253,6 +254,15 @@ pub fn build(b: *zbs.Builder) !void {
 
     if (fish_completion) {
         b.installFile("completions/fish/riverctl.fish", "share/fish/vendor_completions.d/riverctl.fish");
+    }
+
+    {
+        const globber_test = b.addTest("common/globber.zig");
+        globber_test.setTarget(target);
+        globber_test.setBuildMode(mode);
+
+        const test_step = b.step("test", "Run the tests");
+        test_step.dependOn(&globber_test.step);
     }
 }
 

@@ -9,9 +9,7 @@ _riverctl_subcommands()
     riverctl_subcommands=(
         # Actions
         'close:Close the focused view'
-        'csd-filter-add:Add app-id to the CSD filter list'
         'exit:Exit the compositor, terminating the Wayland session'
-        'float-filter-add:Add app-id to the float filter list'
         'focus-output:Focus the next or previous output'
         'focus-view:Focus the next or previous view in the stack'
         'move:Move the focused view in the specified direction'
@@ -43,6 +41,10 @@ _riverctl_subcommands()
         'unmap:Remove the mapping defined by the arguments'
         'unmap-pointer:Remove the pointer mapping defined by the arguments'
         'unmap-switch:Remove the switch mapping defined by the arguments'
+        # Rules
+        'rule-add:Apply an action to matching views'
+        'rule-del:Delete a rule added with rule-add'
+        'list-rules:Print rules in a given list'
         # Configuration
         'attach-mode:Configure where new views should attach to the view stack'
         'background-color:Set the background color'
@@ -181,6 +183,9 @@ _riverctl()
                 focus-follows-cursor) _alternative 'arguments:args:(disabled normal always)' ;;
                 set-cursor-warp) _alternative 'arguments:args:(disabled on-output-change on-focus-change)' ;;
                 hide-cursor) _riverctl_hide_cursor ;;
+                rule-add) _alternative 'arguments:args:(float no-float ssd csd)' ;;
+                rule-del) _alternative 'arguments:args:(float no-float ssd csd)' ;;
+                list-rules) _alternative 'arguments:args:(float ssd)' ;;
                 *) return 0 ;;
             esac
         ;;

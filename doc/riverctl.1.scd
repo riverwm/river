@@ -28,27 +28,8 @@ over the Wayland protocol.
 *close*
 	Close the focused view.
 
-*csd-filter-add* *app-id*|*title* _pattern_
-	Add _pattern_ to the CSD filter list. Views with this _pattern_ are told to
-	use client side decoration instead of the default server side decoration.
-	Note that this affects new views as well as already existing ones. Title
-	updates are not taken into account.
-
-*csd-filter-remove* *app-id*|*title* _pattern_
-	Remove _pattern_ from the CSD filter list. Note that this affects new views
-	as well as already existing ones.
-
 *exit*
 	Exit the compositor, terminating the Wayland session.
-
-*float-filter-add* *app-id*|*title* _pattern_
-	Add a pattern to the float filter list. Note that this affects only new
-	views, not already existing ones. Title updates are also not taken into
-	account.
-
-*float-filter-remove* *app-id*|*title* _pattern_
-	Remove an app-id or title from the float filter list. Note that this
-	affects only new views, not already existing ones.
 
 *focus-output* *next*|*previous*|*up*|*right*|*down*|*left*|_name_
 	Focus the next or previous output, the closest output in any direction
@@ -192,18 +173,18 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 *enter-mode* _name_
 	Switch to given mode if it exists.
 
-*map* [_-release_|_-repeat_|_-layout_ _index_] _mode_ _modifiers_ _key_ _command_
+*map* [*-release*|*-repeat*|*-layout* _index_] _mode_ _modifiers_ _key_ _command_
 	Run _command_ when _key_ is pressed while _modifiers_ are held down
 	and in the specified _mode_.
 
-	- _-release_: if passed activate on key release instead of key press
-	- _-repeat_: if passed activate repeatedly until key release; may not
-	  be used with -release
-	- _-layout_: if passed, a specific layout is pinned to the mapping.
+	- *-release*: if passed activate on key release instead of key press
+	- *-repeat*: if passed activate repeatedly until key release; may not
+	  be used with *-release*
+	- *-layout*: if passed, a specific layout is pinned to the mapping.
 	  When the mapping is checked against a pressed key, this layout is
 	  used to translate the key independent of the active layout
 		- _index_: zero-based index of a layout set with the *keyboard-layout*
-		  command. If the index is out of range, the _-layout_ option will
+		  command. If the index is out of range, the *-layout* option will
 		  have no effect
 	- _mode_: name of the mode for which to create the mapping
 	- _modifiers_: one or more of the modifiers listed above, separated
@@ -239,10 +220,10 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 			- off
 	- _command_: any command that may be run with riverctl
 
-*unmap* [_-release_] _mode_ _modifiers_ _key_
+*unmap* [*-release*] _mode_ _modifiers_ _key_
 	Remove the mapping defined by the arguments:
 
-	- _-release_: if passed unmap the key release instead of the key press
+	- *-release*: if passed unmap the key release instead of the key press
 	- _mode_: name of the mode for which to remove the mapping
 	- _modifiers_: one or more of the modifiers listed above, separated
 	  by a plus sign (+).
@@ -262,6 +243,65 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 	- _mode_: name of the mode for which to remove the mapping
 	- _lid_|_tablet_: the switch for which to remove the mapping
 	- _state_: a state as listed above
+
+## RULES
+
+Rules match either the app-id and title of views against a _glob_ pattern.
+A _glob_ is a string that may optionally have an _\*_ at the beginning and/or
+end. A _\*_ in a _glob_ matches zero or more arbitrary characters in the
+app-id or title.
+
+For example, _abc_ is matched by _a\*_, _\*a\*_, _\*b\*_, _\*c_, _abc_, and
+_\*_ but not matched by _\*a_, _b\*_, _\*b_, _\*c_, or _ab_. Note that _\*_
+matches everything while _\*\*_ and the empty string are invalid.
+
+*rule-add* _action_ [*-app-id* _glob_|*-title* _glob_]
+	Add a rule that applies an _action_ to views with *app-id* and *title*
+	matched by the respective _glob_. Omitting *-app-id* or *-title*
+	is equivalent to passing *-app-id* _\*_ or *-title* _\*_.
+
+	The supported _action_ types are:
+
+	- *float*: Make the view floating. Applies only to new views.
+	- *no-float*: Don't make the view floating. Applies only to
+	  new views.
+	- *ssd*: Use server-side decorations for the view. Applies to new
+	  and existing views.
+	- *csd*: Use client-side decorations for the view. Applies to new
+	  and existing views.
+
+	Both *float* and *no-float* rules are added to the same list,
+	which means that adding a *no-float* rule with the same arguments
+	as a *float* rule will overwrite it. The same holds for *ssd* and
+	*csd* rules.
+
+	If multiple rules in a list match a given view the most specific
+	rule will be applied. For example with the following rules
+	```
+	action  app-id  title
+	ssd     foo     bar
+	csd     foo     *
+	csd     *       bar
+	ssd     *       baz
+	```
+	a view with app-id 'foo' and title 'bar' would get ssd despite matching
+	two csd rules as the first rule is most specific. Furthermore a view
+	with app-id 'foo' and title 'baz' would get csd despite matching the
+	last rule in the list since app-id specificity takes priority over
+	title specificity.
+
+	If a view is not matched by any rule, river will respect the csd/ssd
+	wishes of the client and may start the view floating based on simple
+	heuristics intended to catch popup-like views.
+
+*rule-del* _action_ [*-app-id* _glob_|*-title* _glob_]
+	Delete a rule created using *rule-add* with the given arguments.
+
+*list-rules* *float*|*ssd*
+	Print the specified rule list. The output is ordered from most specific
+	to least specific, the same order in which views are checked against
+	when searching for a match. Only the first matching rule in the list
+	has an effect on a given view.
 
 ## CONFIGURATION
 

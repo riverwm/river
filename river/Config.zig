@@ -18,13 +18,14 @@ const Self = @This();
 
 const std = @import("std");
 const mem = std.mem;
+const globber = @import("globber");
 const xkb = @import("xkbcommon");
 
 const util = @import("util.zig");
 
 const Server = @import("Server.zig");
 const Mode = @import("Mode.zig");
-const View = @import("View.zig");
+const RuleList = @import("RuleList.zig");
 
 pub const AttachMode = enum {
     top,
@@ -72,13 +73,8 @@ mode_to_id: std.StringHashMap(u32),
 /// All user-defined keymap modes, indexed by mode id
 modes: std.ArrayListUnmanaged(Mode),
 
-/// Sets of app_ids and titles which will be started floating
-float_filter_app_ids: std.StringHashMapUnmanaged(void) = .{},
-float_filter_titles: std.StringHashMapUnmanaged(void) = .{},
-
-/// Sets of app_ids and titles which are allowed to use client side decorations
-csd_filter_app_ids: std.StringHashMapUnmanaged(void) = .{},
-csd_filter_titles: std.StringHashMapUnmanaged(void) = .{},
+float_rules: RuleList = .{},
+ssd_rules: RuleList = .{},
 
 /// The selected focus_follows_cursor mode
 focus_follows_cursor: FocusFollowsCursorMode = .disabled,
@@ -152,64 +148,11 @@ pub fn deinit(self: *Self) void {
     for (self.modes.items) |*mode| mode.deinit();
     self.modes.deinit(util.gpa);
 
-    {
-        var it = self.float_filter_app_ids.keyIterator();
-        while (it.next()) |key| util.gpa.free(key.*);
-        self.float_filter_app_ids.deinit(util.gpa);
-    }
-
-    {
-        var it = self.float_filter_titles.keyIterator();
-        while (it.next()) |key| util.gpa.free(key.*);
-        self.float_filter_titles.deinit(util.gpa);
-    }
-
-    {
-        var it = self.csd_filter_app_ids.keyIterator();
-        while (it.next()) |key| util.gpa.free(key.*);
-        self.csd_filter_app_ids.deinit(util.gpa);
-    }
-
-    {
-        var it = self.csd_filter_titles.keyIterator();
-        while (it.next()) |key| util.gpa.free(key.*);
-        self.csd_filter_titles.deinit(util.gpa);
-    }
+    self.float_rules.deinit();
+    self.ssd_rules.deinit();
 
     util.gpa.free(self.default_layout_namespace);
 
     self.keymap.unref();
     self.xkb_context.unref();
-}
-
-pub fn shouldFloat(self: Self, view: *View) bool {
-    if (view.getAppId()) |app_id| {
-        if (self.float_filter_app_ids.contains(std.mem.span(app_id))) {
-            return true;
-        }
-    }
-
-    if (view.getTitle()) |title| {
-        if (self.float_filter_titles.contains(std.mem.span(title))) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-pub fn csdAllowed(self: Self, view: *View) bool {
-    if (view.getAppId()) |app_id| {
-        if (self.csd_filter_app_ids.contains(std.mem.span(app_id))) {
-            return true;
-        }
-    }
-
-    if (view.getTitle()) |title| {
-        if (self.csd_filter_titles.contains(std.mem.span(title))) {
-            return true;
-        }
-    }
-
-    return false;
 }

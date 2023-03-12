@@ -12,9 +12,7 @@ end
 
 # Actions
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'close'                  -d 'Close the focued view'
-complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'csd-filter-add'         -d 'Add app-id to the CSD filter list'
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'exit'                   -d 'Exit the compositor, terminating the Wayland session'
-complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'float-filter-add'       -d 'Add app-id to the float filter list'
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'focus-output'           -d 'Focus the next or previous output'
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'focus-view'             -d 'Focus the next or previous view in the stack'
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'input'                  -d 'Create a configuration rule for an input device'
@@ -49,6 +47,10 @@ complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'map-switch '    
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'unmap'                  -d 'Remove the mapping defined by the arguments'
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'unmap-pointer'          -d 'Remove the pointer mapping defined by the arguments'
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'unmap-switch'           -d 'Remove the switch mapping defined by the arguments'
+# Rules
+complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'rule-add'               -d 'Apply an action to matching views'
+complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'rule-del'               -d 'Delete a rule added with rule-add'
+complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'list-rules'             -d 'Print rules in a given list'
 # Configuration
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'attach-mode'            -d 'Configure where new views should attach to the view stack'
 complete -c riverctl -x -n '__fish_riverctl_complete_arg 1' -a 'background-color'       -d 'Set the background color'
@@ -81,6 +83,9 @@ complete -c riverctl -x -n '__fish_seen_subcommand_from unmap'                -a
 complete -c riverctl -x -n '__fish_seen_subcommand_from attach-mode'          -a 'top bottom'
 complete -c riverctl -x -n '__fish_seen_subcommand_from focus-follows-cursor' -a 'disabled normal always'
 complete -c riverctl -x -n '__fish_seen_subcommand_from set-cursor-warp'      -a 'disabled on-output-change on-focus-change'
+complete -c riverctl -x -n '__fish_seen_subcommand_from rule-add'             -a 'float no-float ssd csd'
+complete -c riverctl -x -n '__fish_seen_subcommand_from rule-del'             -a 'float no-float ssd csd'
+complete -c riverctl -x -n '__fish_seen_subcommand_from list-rules'           -a 'float ssd'
 
 # Subcommands for 'input'
 complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 2' -a "(__riverctl_list_input_devices)"

@@ -47,28 +47,32 @@ const command_impls = std.ComptimeStringMap(
         .{ "border-color-urgent",       @import("command/config.zig").borderColorUrgent },
         .{ "border-width",              @import("command/config.zig").borderWidth },
         .{ "close",                     @import("command/close.zig").close },
-        .{ "csd-filter-add",            @import("command/filter.zig").csdFilterAdd },
-        .{ "csd-filter-remove",         @import("command/filter.zig").csdFilterRemove },
         .{ "declare-mode",              @import("command/declare_mode.zig").declareMode },
         .{ "default-layout",            @import("command/layout.zig").defaultLayout },
         .{ "enter-mode",                @import("command/enter_mode.zig").enterMode },
         .{ "exit",                      @import("command/exit.zig").exit },
-        .{ "float-filter-add",          @import("command/filter.zig").floatFilterAdd },
-        .{ "float-filter-remove",       @import("command/filter.zig").floatFilterRemove },
         .{ "focus-follows-cursor",      @import("command/focus_follows_cursor.zig").focusFollowsCursor },
         .{ "focus-output",              @import("command/output.zig").focusOutput },
         .{ "focus-previous-tags",       @import("command/tags.zig").focusPreviousTags },
         .{ "focus-view",                @import("command/focus_view.zig").focusView },
         .{ "hide-cursor",               @import("command/cursor.zig").cursor },
         .{ "input",                     @import("command/input.zig").input },
+        .{ "keyboard-group-add",        @import("command/keyboard_group.zig").keyboardGroupAdd },
+        .{ "keyboard-group-create",     @import("command/keyboard_group.zig").keyboardGroupCreate },
+        .{ "keyboard-group-destroy",    @import("command/keyboard_group.zig").keyboardGroupDestroy },
+        .{ "keyboard-group-remove",     @import("command/keyboard_group.zig").keyboardGroupRemove },
+        .{ "keyboard-layout",           @import("command/keyboard.zig").keyboardLayout },
         .{ "list-input-configs",        @import("command/input.zig").listInputConfigs},
         .{ "list-inputs",               @import("command/input.zig").listInputs },
+        .{ "list-rules",                @import("command/rule.zig").listRules},
         .{ "map",                       @import("command/map.zig").map },
         .{ "map-pointer",               @import("command/map.zig").mapPointer },
         .{ "map-switch",                @import("command/map.zig").mapSwitch },
         .{ "move",                      @import("command/move.zig").move },
         .{ "output-layout",             @import("command/layout.zig").outputLayout },
         .{ "resize",                    @import("command/move.zig").resize },
+        .{ "rule-add",                  @import("command/rule.zig").ruleAdd },
+        .{ "rule-del",                  @import("command/rule.zig").ruleDel },
         .{ "send-layout-cmd",           @import("command/layout.zig").sendLayoutCmd },
         .{ "send-to-output",            @import("command/output.zig").sendToOutput },
         .{ "send-to-previous-tags",     @import("command/tags.zig").sendToPreviousTags },
@@ -89,11 +93,6 @@ const command_impls = std.ComptimeStringMap(
         .{ "unmap-switch",              @import("command/map.zig").unmapSwitch },
         .{ "xcursor-theme",             @import("command/xcursor_theme.zig").xcursorTheme },
         .{ "zoom",                      @import("command/zoom.zig").zoom },
-        .{ "keyboard-layout",           @import("command/keyboard.zig").keyboardLayout },
-        .{ "keyboard-group-create",     @import("command/keyboard_group.zig").keyboardGroupCreate },
-        .{ "keyboard-group-destroy",    @import("command/keyboard_group.zig").keyboardGroupDestroy },
-        .{ "keyboard-group-add",        @import("command/keyboard_group.zig").keyboardGroupAdd },
-        .{ "keyboard-group-remove",     @import("command/keyboard_group.zig").keyboardGroupRemove },
     },
 );
 // zig fmt: on
@@ -107,6 +106,7 @@ pub const Error = error{
     InvalidButton,
     InvalidCharacter,
     InvalidDirection,
+    InvalidGlob,
     InvalidPhysicalDirection,
     InvalidOutputIndicator,
     InvalidOrientation,
@@ -136,7 +136,7 @@ pub fn run(
     try impl_fn(seat, args, out);
 }
 
-/// Return a short error message for the given error. Passing Error.Other is UB
+/// Return a short error message for the given error. Passing Error.Other is invalid.
 pub fn errToMsg(err: Error) [:0]const u8 {
     return switch (err) {
         Error.NoCommand => "no command given",
@@ -149,6 +149,7 @@ pub fn errToMsg(err: Error) [:0]const u8 {
         Error.InvalidButton => "invalid button",
         Error.InvalidCharacter => "invalid character in argument",
         Error.InvalidDirection => "invalid direction. Must be 'next' or 'previous'",
+        Error.InvalidGlob => "invalid glob. '*' is only allowed as the first and/or last character",
         Error.InvalidPhysicalDirection => "invalid direction. Must be 'up', 'down', 'left' or 'right'",
         Error.InvalidOutputIndicator => "invalid indicator for an output. Must be 'next', 'previous', 'up', 'down', 'left', 'right' or a valid output name",
         Error.InvalidOrientation => "invalid orientation. Must be 'horizontal', or 'vertical'",
