@@ -246,10 +246,10 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 
 ## RULES
 
-Rules match either the app-id and title of views against a _glob_ pattern.
-A _glob_ is a string that may optionally have an _\*_ at the beginning and/or
-end. A _\*_ in a _glob_ matches zero or more arbitrary characters in the
-app-id or title.
+Rules match the app-id and title of views against a _glob_ pattern.  A _glob_
+is a string that may optionally have an _\*_ at the beginning and/or end. An
+_\*_ in a _glob_ matches zero or more arbitrary characters in the app-id
+or title.
 
 For example, _abc_ is matched by _a\*_, _\*a\*_, _\*b\*_, _\*c_, _abc_, and
 _\*_ but not matched by _\*a_, _b\*_, _\*b_, _\*c_, or _ab_. Note that _\*_
