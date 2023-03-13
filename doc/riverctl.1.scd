@@ -252,7 +252,7 @@ _\*_ in a _glob_ matches zero or more arbitrary characters in the app-id
 or title.
 
 For example, _abc_ is matched by _a\*_, _\*a\*_, _\*b\*_, _\*c_, _abc_, and
-_\*_ but not matched by _\*a_, _b\*_, _\*b_, _\*c_, or _ab_. Note that _\*_
+_\*_ but not matched by _\*a_, _b\*_, _\*b_, _c\*_, or _ab_. Note that _\*_
 matches everything while _\*\*_ and the empty string are invalid.
 
 *rule-add* _action_ [*-app-id* _glob_|*-title* _glob_]
