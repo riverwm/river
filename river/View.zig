@@ -244,22 +244,72 @@ pub fn destroy(view: *Self) void {
     }
 }
 
+/// The change in x/y position of the view during resize cannot be determined
+/// until the size of the buffer actually committed is known. Clients are permitted
+/// by the protocol to take a size smaller than that requested by the compositor in
+/// order to maintain an aspect ratio or similar (mpv does this for example).
+pub fn resizeUpdatePosition(view: *Self, width: i32, height: i32) void {
+    assert(view.inflight.resizing);
+
+    const data = blk: {
+        var it = server.input_manager.seats.first;
+        while (it) |node| : (it = node.next) {
+            const cursor = &node.data.cursor;
+            if (cursor.inflight_mode == .resize and cursor.inflight_mode.resize.view == view) {
+                break :blk cursor.inflight_mode.resize;
+            }
+        } else {
+            // The view resizing state should never be set when the view is
+            // not the target of an interactive resize.
+            unreachable;
+        }
+    };
+
+    if (data.edges.left) {
+        view.inflight.box.x += view.current.box.width - width;
+        view.pending.box.x = view.inflight.box.x;
+    }
+
+    if (data.edges.top) {
+        view.inflight.box.y += view.current.box.height - height;
+        view.pending.box.y = view.inflight.box.y;
+    }
+}
+
 pub fn updateCurrent(view: *Self) void {
     const config = &server.config;
 
-    if (view.impl == .xdg_toplevel) {
-        switch (view.impl.xdg_toplevel.configure_state) {
-            // If the configure timed out, don't update current to dimensions
-            // that have not been committed by the client.
-            .inflight, .acked => {
-                view.inflight.box.width = view.current.box.width;
-                view.inflight.box.height = view.current.box.height;
-                view.pending.box.width = view.current.box.width;
-                view.pending.box.height = view.current.box.height;
-            },
-            .idle, .committed => {},
-        }
-        view.impl.xdg_toplevel.configure_state = .idle;
+    switch (view.impl) {
+        .xdg_toplevel => |*xdg_toplevel| {
+            switch (xdg_toplevel.configure_state) {
+                // If the configure timed out, don't update current to dimensions
+                // that have not been committed by the client.
+                .inflight, .acked => {
+                    if (view.inflight.resizing) {
+                        view.resizeUpdatePosition(view.current.box.width, view.current.box.height);
+                    }
+                    view.inflight.box.width = view.current.box.width;
+                    view.inflight.box.height = view.current.box.height;
+                    view.pending.box.width = view.current.box.width;
+                    view.pending.box.height = view.current.box.height;
+                },
+                .idle, .committed => {},
+            }
+            xdg_toplevel.configure_state = .idle;
+        },
+        .xwayland_view => |xwayland_view| {
+            if (view.inflight.resizing) {
+                view.resizeUpdatePosition(
+                    xwayland_view.xwayland_surface.width,
+                    xwayland_view.xwayland_surface.height,
+                );
+            }
+            view.inflight.box.width = xwayland_view.xwayland_surface.width;
+            view.inflight.box.height = xwayland_view.xwayland_surface.height;
+            view.pending.box.width = xwayland_view.xwayland_surface.width;
+            view.pending.box.height = xwayland_view.xwayland_surface.height;
+        },
+        .none => {},
     }
 
     view.foreign_toplevel_handle.update();

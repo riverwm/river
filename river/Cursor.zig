@@ -131,6 +131,12 @@ const log = std.log.scoped(.cursor);
 /// Current cursor mode as well as any state needed to implement that mode
 mode: Mode = .passthrough,
 
+/// Set to whatever the current mode is when a transaction is started.
+/// This is necessary to handle termination of move/resize modes properly
+/// since the termination is not complete until a transaction completes and
+/// View.resizeUpdatePosition() is called.
+inflight_mode: Mode = .passthrough,
+
 seat: *Seat,
 wlr_cursor: *wlr.Cursor,
 pointer_gestures: *wlr.PointerGesturesV1,
@@ -334,7 +340,22 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
         assert(self.pressed_count > 0);
         self.pressed_count -= 1;
         if (self.pressed_count == 0 and self.mode != .passthrough) {
-            self.leaveMode(event);
+            log.debug("leaving {s} mode", .{@tagName(self.mode)});
+
+            switch (self.mode) {
+                .passthrough => unreachable,
+                .down => {
+                    // If we were in down mode, we need pass along the release event
+                    _ = self.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
+                },
+                .move => {},
+                .resize => |data| data.view.pending.resizing = false,
+            }
+
+            self.mode = .passthrough;
+            self.passthrough(event.time_msec);
+
+            server.root.applyPending();
         } else {
             _ = self.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
         }
@@ -785,24 +806,6 @@ fn enterMode(cursor: *Self, mode: Mode, view: *View, image: Image) void {
     server.root.applyPending();
 }
 
-/// Return from down/move/resize to passthrough
-fn leaveMode(self: *Self, event: *wlr.Pointer.event.Button) void {
-    log.debug("leave {s} mode", .{@tagName(self.mode)});
-
-    switch (self.mode) {
-        .passthrough => unreachable,
-        .down => {
-            // If we were in down mode, we need pass along the release event
-            _ = self.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
-        },
-        .move => {},
-        .resize => |resize| resize.view.pending.resizing = false,
-    }
-
-    self.mode = .passthrough;
-    self.passthrough(event.time_msec);
-}
-
 fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64, delta_y: f64, unaccel_dx: f64, unaccel_dy: f64) void {
     self.unhide();
 
@@ -852,25 +855,18 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
                 constraint.maybeActivate();
             }
         },
-        .move => |*data| {
+        inline .move, .resize => |*data, tag| {
             dx += data.delta_x;
             dy += data.delta_y;
             data.delta_x = dx - @trunc(dx);
             data.delta_y = dy - @trunc(dy);
 
-            const view = data.view;
-            view.pending.move(@floatToInt(i32, dx), @floatToInt(i32, dy));
-
-            server.root.applyPending();
-        },
-        .resize => |*data| {
-            dx += data.delta_x;
-            dy += data.delta_y;
-            data.delta_x = dx - @trunc(dx);
-            data.delta_y = dy - @trunc(dy);
-
-            {
-                // Modify the pending box, taking constraints into account
+            if (tag == .move) {
+                data.view.pending.move(@floatToInt(i32, dx), @floatToInt(i32, dy));
+            } else {
+                // Modify width/height of the pending box, taking constraints into account
+                // The x/y coordinates of the view will be adjusted as needed in View.resizeCommit()
+                // based on the dimensions actually committed by the client.
                 const border_width = if (data.view.pending.ssd) server.config.border_width else 0;
 
                 var output_width: i32 = undefined;
@@ -881,12 +877,13 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
                 const box = &data.view.pending.box;
 
                 if (data.edges.left) {
+                    var x1 = box.x;
                     const x2 = box.x + box.width;
-                    box.x += @floatToInt(i32, dx);
-                    box.x = math.max(box.x, border_width);
-                    box.x = math.max(box.x, x2 - constraints.max_width);
-                    box.x = math.min(box.x, x2 - constraints.min_width);
-                    box.width = x2 - box.x;
+                    x1 += @floatToInt(i32, dx);
+                    x1 = math.max(x1, border_width);
+                    x1 = math.max(x1, x2 - constraints.max_width);
+                    x1 = math.min(x1, x2 - constraints.min_width);
+                    box.width = x2 - x1;
                 } else if (data.edges.right) {
                     box.width += @floatToInt(i32, dx);
                     box.width = math.max(box.width, constraints.min_width);
@@ -895,12 +892,13 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
                 }
 
                 if (data.edges.top) {
+                    var y1 = box.y;
                     const y2 = box.y + box.height;
-                    box.y += @floatToInt(i32, dy);
-                    box.y = math.max(box.y, border_width);
-                    box.y = math.max(box.y, y2 - constraints.max_height);
-                    box.y = math.min(box.y, y2 - constraints.min_height);
-                    box.height = y2 - box.y;
+                    y1 += @floatToInt(i32, dy);
+                    y1 = math.max(y1, border_width);
+                    y1 = math.max(y1, y2 - constraints.max_height);
+                    y1 = math.min(y1, y2 - constraints.min_height);
+                    box.height = y2 - y1;
                 } else if (data.edges.bottom) {
                     box.height += @floatToInt(i32, dy);
                     box.height = math.max(box.height, constraints.min_height);
@@ -984,12 +982,26 @@ pub fn updateState(self: *Self) void {
 
             // Keep the cursor locked to the original offset from the edges of the view.
             const box = &data.view.current.box;
-            const dx = data.offset_x;
-            const dy = data.offset_y;
-            const lx = if (mode == .move or data.edges.left) dx + box.x else box.x + box.width - dx;
-            const ly = if (mode == .move or data.edges.top) dy + box.y else box.y + box.height - dy;
+            const new_x = blk: {
+                if (mode == .move or data.edges.left) {
+                    break :blk @intToFloat(f64, data.offset_x + box.x);
+                } else if (data.edges.right) {
+                    break :blk @intToFloat(f64, box.x + box.width - data.offset_x);
+                } else {
+                    break :blk self.wlr_cursor.x;
+                }
+            };
+            const new_y = blk: {
+                if (mode == .move or data.edges.top) {
+                    break :blk @intToFloat(f64, data.offset_y + box.y);
+                } else if (data.edges.bottom) {
+                    break :blk @intToFloat(f64, box.y + box.height - data.offset_y);
+                } else {
+                    break :blk self.wlr_cursor.y;
+                }
+            };
 
-            self.wlr_cursor.warpClosest(null, @intToFloat(f64, lx), @intToFloat(f64, ly));
+            self.wlr_cursor.warpClosest(null, new_x, new_y);
         },
     }
 }

@@ -317,17 +317,20 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
                 self.geometry.height != old_geometry.height;
             const no_layout = view.current.output != null and view.current.output.?.layout == null;
 
-            if (size_changed and (view.current.float or no_layout) and !view.current.fullscreen) {
+            if (size_changed) {
                 log.info(
                     "client initiated size change: {}x{} -> {}x{}",
                     .{ old_geometry.width, old_geometry.height, self.geometry.width, self.geometry.height },
                 );
-
-                view.current.box.width = self.geometry.width;
-                view.current.box.height = self.geometry.height;
-                view.pending.box.width = self.geometry.width;
-                view.pending.box.height = self.geometry.height;
-                server.root.applyPending();
+                if ((view.current.float or no_layout) and !view.current.fullscreen) {
+                    view.current.box.width = self.geometry.width;
+                    view.current.box.height = self.geometry.height;
+                    view.pending.box.width = self.geometry.width;
+                    view.pending.box.height = self.geometry.height;
+                    server.root.applyPending();
+                } else {
+                    log.err("client is buggy and initiated size change while tiled or fullscreen", .{});
+                }
             }
         },
         // If the client has not yet acked our configure, we need to send a
@@ -337,6 +340,10 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
         .inflight => view.sendFrameDone(),
         .acked => {
             self.configure_state = .committed;
+
+            if (view.inflight.resizing) {
+                view.resizeUpdatePosition(self.geometry.width, self.geometry.height);
+            }
 
             view.inflight.box.width = self.geometry.width;
             view.inflight.box.height = self.geometry.height;

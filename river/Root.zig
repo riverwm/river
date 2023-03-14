@@ -512,6 +512,8 @@ pub fn applyPending(root: *Self) void {
                     }
                 },
             }
+
+            cursor.inflight_mode = cursor.mode;
         }
     }
 
