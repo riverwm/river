@@ -327,6 +327,10 @@ pub fn focusOutput(self: *Self, output: ?*Output) void {
         var it = self.status_trackers.first;
         while (it) |node| : (it = node.next) node.data.sendOutput(new, .focused);
     }
+
+    // Depending on configuration and cursor position, changing output focus
+    // may cause the cursor to be warped.
+    self.cursor.may_need_warp = true;
 }
 
 pub fn handleActivity(self: Self) void {
