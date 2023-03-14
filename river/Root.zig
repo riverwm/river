@@ -326,8 +326,6 @@ pub fn addOutput(root: *Self, output: *Output) void {
             while (it.next()) |view| view.setPendingOutput(output);
             assert(root.hidden.pending.focus_stack.empty());
             assert(root.hidden.pending.wm_stack.empty());
-            assert(root.hidden.inflight.focus_stack.empty());
-            assert(root.hidden.inflight.wm_stack.empty());
         }
         {
             // Focus the new output with all seats
