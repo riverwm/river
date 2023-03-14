@@ -493,6 +493,28 @@ pub fn applyPending(root: *Self) void {
         }
     }
 
+    {
+        var it = server.input_manager.seats.first;
+        while (it) |node| : (it = node.next) {
+            const cursor = &node.data.cursor;
+
+            switch (cursor.mode) {
+                .passthrough, .down => {},
+                inline .move, .resize => |data| {
+                    if (data.view.inflight.output == null or
+                        data.view.inflight.tags & data.view.inflight.output.?.inflight.tags == 0 or
+                        (!data.view.inflight.float and data.view.inflight.output.?.layout != null) or
+                        data.view.inflight.fullscreen)
+                    {
+                        cursor.mode = .passthrough;
+                        data.view.pending.resizing = false;
+                        data.view.inflight.resizing = false;
+                    }
+                },
+            }
+        }
+    }
+
     if (root.inflight_layout_demands == 0) {
         root.sendConfigures();
     }

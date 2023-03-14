@@ -861,12 +861,6 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
             const view = data.view;
             view.pending.move(@floatToInt(i32, dx), @floatToInt(i32, dy));
 
-            self.wlr_cursor.warpClosest(
-                device,
-                @intToFloat(f64, data.offset_x + view.pending.box.x),
-                @intToFloat(f64, data.offset_y + view.pending.box.y),
-            );
-
             server.root.applyPending();
         },
         .resize => |*data| {
@@ -913,17 +907,6 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
                     box.height = math.min(box.height, constraints.max_height);
                     box.height = math.min(box.height, output_height - border_width - box.y);
                 }
-            }
-
-            {
-                // Keep cursor locked to the original offset from the resize edges
-                const box = &data.view.pending.box;
-                const off_x = data.offset_x;
-                const off_y = data.offset_y;
-                const cursor_x = if (data.edges.left) off_x + box.x else box.x + box.width - off_x;
-                const cursor_y = if (data.edges.top) off_y + box.y else box.y + box.height - off_y;
-
-                self.wlr_cursor.warpClosest(device, @intToFloat(f64, cursor_x), @intToFloat(f64, cursor_y));
             }
 
             server.root.applyPending();
@@ -979,42 +962,34 @@ pub fn updateState(self: *Self) void {
         constraint.updateState();
     }
 
-    if (self.shouldPassthrough()) {
-        self.mode = .passthrough;
-        var now: os.timespec = undefined;
-        os.clock_gettime(os.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
-        const msec = @intCast(u32, now.tv_sec * std.time.ms_per_s +
-            @divTrunc(now.tv_nsec, std.time.ns_per_ms));
-        self.passthrough(msec);
-    }
-}
-
-fn shouldPassthrough(self: Self) bool {
-    // We clear focus on hiding the cursor and should not re-focus until the cursor is moved
-    // and shown again.
-    if (self.hidden) return false;
-
     switch (self.mode) {
         .passthrough => {
-            // If we are not currently in down/resize/move mode, we *always* need to passthrough()
-            // as what is under the cursor may have changed and we are not locked to a single
-            // target view.
-            return true;
+            if (!self.hidden) {
+                var now: os.timespec = undefined;
+                os.clock_gettime(os.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
+                const msec = @intCast(u32, now.tv_sec * std.time.ms_per_s +
+                    @divTrunc(now.tv_nsec, std.time.ns_per_ms));
+                self.passthrough(msec);
+            }
         },
-        .down => {
-            // TODO: It's hard to determine from the target surface alone whether
-            // the surface is visible or not currently. Switching to the wlroots
-            // scene graph will fix this, but for now just don't bother.
-            return false;
-        },
-        .resize, .move => {
-            assert(server.lock_manager.state != .locked);
-            const target = if (self.mode == .resize) self.mode.resize.view else self.mode.move.view;
-            // The target view is no longer visible, is part of the layout, or is fullscreen.
-            return target.current.output == null or
-                target.current.tags & target.current.output.?.current.tags == 0 or
-                (!target.current.float and target.current.output.?.layout != null) or
-                target.current.fullscreen;
+        // TODO: Leave down mode if the target surface is no longer visible.
+        .down => assert(!self.hidden),
+        inline .move, .resize => |data, mode| {
+            assert(!self.hidden);
+
+            // These conditions are checked in Root.applyPending()
+            assert(data.view.current.tags & data.view.current.output.?.current.tags != 0);
+            assert(data.view.current.float or data.view.current.output.?.layout == null);
+            assert(!data.view.current.fullscreen);
+
+            // Keep the cursor locked to the original offset from the edges of the view.
+            const box = &data.view.current.box;
+            const dx = data.offset_x;
+            const dy = data.offset_y;
+            const lx = if (mode == .move or data.edges.left) dx + box.x else box.x + box.width - dx;
+            const ly = if (mode == .move or data.edges.top) dy + box.y else box.y + box.height - dy;
+
+            self.wlr_cursor.warpClosest(null, @intToFloat(f64, lx), @intToFloat(f64, ly));
         },
     }
 }
