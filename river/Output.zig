@@ -381,14 +381,12 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
 
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", output);
     util.gpa.destroy(node);
+
+    server.root.applyPending();
 }
 
 fn handleEnable(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
     const self = @fieldParentPtr(Self, "enable", listener);
-
-    // Add the output to root.outputs and the output layout if it has not
-    // already been added.
-    if (wlr_output.enabled) server.root.addOutput(self);
 
     // We can't assert the current state of normal_content/locked_content
     // here as this output may be newly created.
@@ -409,6 +407,10 @@ fn handleEnable(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) vo
         // Disabling and re-enabling an output always blanks it.
         self.lock_render_state = .blanked;
     }
+
+    // Add the output to root.outputs and the output layout if it has not
+    // already been added.
+    if (wlr_output.enabled) server.root.addOutput(self);
 }
 
 fn handleMode(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {

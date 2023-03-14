@@ -295,8 +295,7 @@ pub fn removeOutput(root: *Self, output: *Output) void {
     }
 
     output.status.deinit();
-
-    root.applyPending();
+    output.status.init();
 }
 
 /// Add the output to self.outputs and the output layout if it has not
@@ -338,8 +337,9 @@ pub fn addOutput(root: *Self, output: *Output) void {
                 seat.focusOutput(output);
             }
         }
-        root.applyPending();
     }
+
+    root.applyPending();
 }
 
 /// Trigger asynchronous application of pending state for all outputs and views.
@@ -546,6 +546,8 @@ fn commitTransaction(root: *Self) void {
     assert(root.inflight_layout_demands == 0);
     assert(root.inflight_configures == 0);
 
+    std.log.scoped(.transaction).debug("commiting transaction", .{});
+
     {
         var it = root.hidden.inflight.focus_stack.safeIterator(.forward);
         while (it.next()) |view| {
@@ -655,6 +657,8 @@ fn handleManagerApply(
 ) void {
     const self = @fieldParentPtr(Self, "manager_apply", listener);
     defer config.destroy();
+
+    std.log.scoped(.output_manager).info("applying output configuration", .{});
 
     self.processOutputConfig(config, .apply);
 
