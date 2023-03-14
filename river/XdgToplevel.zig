@@ -50,6 +50,8 @@ configure_state: union(enum) {
     inflight: u32,
     /// A configure was acked but the surface has not yet been committed.
     acked,
+    /// A configure was acked and the surface was committed.
+    committed,
 } = .idle,
 
 // Listeners that are always active over the view's lifetime
@@ -288,7 +290,7 @@ fn handleAckConfigure(
         .inflight => |serial| if (acked_configure.serial == serial) {
             self.configure_state = .acked;
         },
-        .acked, .idle => {},
+        .acked, .idle, .committed => {},
     }
 }
 
@@ -310,7 +312,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     self.xdg_toplevel.base.getGeometry(&self.geometry);
 
     switch (self.configure_state) {
-        .idle => {
+        .idle, .committed => {
             const size_changed = self.geometry.width != old_geometry.width or
                 self.geometry.height != old_geometry.height;
             const no_layout = view.current.output != null and view.current.output.?.layout == null;
@@ -334,7 +336,13 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
         // stashed buffer from when the transaction started.
         .inflight => view.sendFrameDone(),
         .acked => {
-            self.configure_state = .idle;
+            self.configure_state = .committed;
+
+            view.inflight.box.width = self.geometry.width;
+            view.inflight.box.height = self.geometry.height;
+            view.pending.box.width = self.geometry.width;
+            view.pending.box.height = self.geometry.height;
+
             server.root.notifyConfigured();
         },
     }

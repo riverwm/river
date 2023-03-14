@@ -247,13 +247,25 @@ pub fn destroy(view: *Self) void {
 pub fn updateCurrent(view: *Self) void {
     const config = &server.config;
 
+    if (view.impl == .xdg_toplevel) {
+        switch (view.impl.xdg_toplevel.configure_state) {
+            // If the configure timed out, don't update current to dimensions
+            // that have not been committed by the client.
+            .inflight, .acked => {
+                view.inflight.box.width = view.current.box.width;
+                view.inflight.box.height = view.current.box.height;
+                view.pending.box.width = view.current.box.width;
+                view.pending.box.height = view.current.box.height;
+            },
+            .idle, .committed => {},
+        }
+        view.impl.xdg_toplevel.configure_state = .idle;
+    }
+
     view.foreign_toplevel_handle.update();
 
     view.current = view.inflight;
     view.dropSavedSurfaceTree();
-    if (view.impl == .xdg_toplevel) {
-        view.impl.xdg_toplevel.configure_state = .idle;
-    }
 
     const color = blk: {
         if (view.current.urgent) break :blk &config.border_color_urgent;
