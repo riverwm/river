@@ -53,11 +53,25 @@ layers: struct {
 },
 
 /// This is kind of like an imaginary output where views start and end their life.
-/// It is also used to store views and tags when no actual outputs are available.
 hidden: struct {
     /// This tree is always disabled.
     tree: *wlr.SceneTree,
 
+    pending: struct {
+        focus_stack: wl.list.Head(View, .pending_focus_stack_link),
+        wm_stack: wl.list.Head(View, .pending_wm_stack_link),
+    },
+
+    inflight: struct {
+        focus_stack: wl.list.Head(View, .inflight_focus_stack_link),
+        wm_stack: wl.list.Head(View, .inflight_wm_stack_link),
+    },
+},
+
+/// This is used to store views and tags when no actual outputs are available.
+/// This must be separate from hidden to ensure we don't mix views that are
+/// in the process of being mapped/unmapped with the mapped views in these lists.
+fallback: struct {
     tags: u32 = 1 << 0,
 
     pending: struct {
@@ -148,6 +162,16 @@ pub fn init(self: *Self) !void {
                 .wm_stack = undefined,
             },
         },
+        .fallback = .{
+            .pending = .{
+                .focus_stack = undefined,
+                .wm_stack = undefined,
+            },
+            .inflight = .{
+                .focus_stack = undefined,
+                .wm_stack = undefined,
+            },
+        },
         .views = undefined,
         .output_layout = output_layout,
         .output_manager = try wlr.OutputManagerV1.create(server.wl_server),
@@ -158,6 +182,12 @@ pub fn init(self: *Self) !void {
     self.hidden.pending.wm_stack.init();
     self.hidden.inflight.focus_stack.init();
     self.hidden.inflight.wm_stack.init();
+
+    self.fallback.pending.focus_stack.init();
+    self.fallback.pending.wm_stack.init();
+    self.fallback.inflight.focus_stack.init();
+    self.fallback.inflight.wm_stack.init();
+
     self.views.init();
 
     server.backend.events.new_output.add(&self.new_output);
@@ -254,8 +284,8 @@ pub fn removeOutput(root: *Self, output: *Output) void {
             view.tree.node.reparent(root.hidden.tree);
             view.popup_tree.node.reparent(root.hidden.tree);
         }
-        root.hidden.inflight.focus_stack.prependList(&output.inflight.focus_stack);
-        root.hidden.inflight.wm_stack.prependList(&output.inflight.wm_stack);
+        root.fallback.inflight.focus_stack.prependList(&output.inflight.focus_stack);
+        root.fallback.inflight.wm_stack.prependList(&output.inflight.wm_stack);
     }
     // Use the first output in the list as fallback. If the last real output
     // is being removed store the views in Root.hidden.
@@ -266,11 +296,11 @@ pub fn removeOutput(root: *Self, output: *Output) void {
     } else {
         var it = output.pending.focus_stack.iterator(.forward);
         while (it.next()) |view| view.pending.output = null;
-        root.hidden.pending.focus_stack.prependList(&output.pending.focus_stack);
-        root.hidden.pending.wm_stack.prependList(&output.pending.wm_stack);
+        root.fallback.pending.focus_stack.prependList(&output.pending.focus_stack);
+        root.fallback.pending.wm_stack.prependList(&output.pending.wm_stack);
         // Store the focused output tags if we are hotplugged down to
         // 0 real outputs so they can be restored on gaining a new output.
-        root.hidden.tags = output.pending.tags;
+        root.fallback.tags = output.pending.tags;
     }
 
     // Close all layer surfaces on the removed output
@@ -320,12 +350,12 @@ pub fn addOutput(root: *Self, output: *Output) void {
 
     // If we previously had no outputs move all views to the new output and focus it.
     if (root.outputs.len == 1) {
-        output.pending.tags = root.hidden.tags;
+        output.pending.tags = root.fallback.tags;
         {
-            var it = root.hidden.pending.focus_stack.safeIterator(.reverse);
+            var it = root.fallback.pending.focus_stack.safeIterator(.reverse);
             while (it.next()) |view| view.setPendingOutput(output);
-            assert(root.hidden.pending.focus_stack.empty());
-            assert(root.hidden.pending.wm_stack.empty());
+            assert(root.fallback.pending.focus_stack.empty());
+            assert(root.fallback.pending.wm_stack.empty());
         }
         {
             // Focus the new output with all seats
