@@ -166,9 +166,6 @@ fn handleKeyboardInteractiveExclusive(output: *Output) void {
     while (it) |node| : (it = node.next) {
         const seat = &node.data;
 
-        // Only grab focus of seats which have the output focused
-        if (seat.focused_output != output) continue;
-
         if (topmost_surface) |to_focus| {
             // If we found a surface that requires focus, grab the focus of all
             // seats.
