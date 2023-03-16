@@ -166,11 +166,16 @@ fn handleKeyboardInteractiveExclusive(output: *Output) void {
     while (it) |node| : (it = node.next) {
         const seat = &node.data;
 
-        if (topmost_surface) |to_focus| {
-            // If we found a surface that requires focus, grab the focus of all
-            // seats.
-            seat.setFocusRaw(.{ .layer = to_focus });
-        } else if (seat.focused == .layer) {
+        if (seat.focused_output == output) {
+            if (topmost_surface) |to_focus| {
+                // If we found a surface on the output that requires focus, grab the focus of all
+                // seats that are focusing that output.
+                seat.setFocusRaw(.{ .layer = to_focus });
+                continue;
+            }
+        }
+
+        if (seat.focused == .layer) {
             const current_focus = seat.focused.layer.wlr_layer_surface;
             // If the seat is currently focusing an unmapped layer surface or one
             // without keyboard interactivity, stop focusing that layer surface.
