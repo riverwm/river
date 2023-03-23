@@ -291,8 +291,6 @@ fn handleRequestActivate(
 ) void {
     const server = @fieldParentPtr(Self, "request_activate", listener);
 
-    std.debug.print("made it here ig\n", .{});
-
     const node_data = SceneNodeData.fromSurface(event.surface) orelse return;
     switch (node_data.data) {
         .view => |view| if (view.current.focus == 0) {
