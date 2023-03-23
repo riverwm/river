@@ -17,8 +17,8 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const mem = std.mem;
-
 const wlr = @import("wlroots");
+const flags = @import("flags");
 
 const server = &@import("../main.zig").server;
 
@@ -52,7 +52,13 @@ pub fn sendToOutput(
     _: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
-    if (args.len > 2) return Error.TooManyArguments;
+    const result = flags.parser([:0]const u8, &.{
+        .{ .name = "current-tags", .kind = .boolean },
+    }).parse(args[1..]) catch {
+        return error.InvalidOption;
+    };
+    if (result.args.len < 1) return Error.NotEnoughArguments;
+    if (result.args.len > 1) return Error.TooManyArguments;
 
     // If the noop output is focused, there is nowhere to send the view
     if (seat.focused_output == null) {
@@ -61,10 +67,15 @@ pub fn sendToOutput(
     }
 
     if (seat.focused == .view) {
-        const destination_output = (try getOutput(seat, args[1])) orelse return;
+        const destination_output = (try getOutput(seat, result.args[0])) orelse return;
 
         // If the view is already on destination_output, do nothing
         if (seat.focused.view.pending.output == destination_output) return;
+
+        if (result.flags.@"current-tags") {
+            seat.focused.view.pending.tags = destination_output.pending.tags;
+        }
+
         seat.focused.view.setPendingOutput(destination_output);
 
         server.root.applyPending();
