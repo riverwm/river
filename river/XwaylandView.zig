@@ -90,10 +90,12 @@ pub fn configure(self: Self) bool {
     const inflight = &self.view.inflight;
     const current = &self.view.current;
 
-    if (self.xwayland_surface.x == inflight.box.x + output_box.x and
-        self.xwayland_surface.y == inflight.box.y + output_box.y and
-        self.xwayland_surface.width == inflight.box.width and
-        self.xwayland_surface.height == inflight.box.height and
+    const inflight_box = &self.view.inflight_box;
+
+    if (self.xwayland_surface.x == inflight_box.x + output_box.x and
+        self.xwayland_surface.y == inflight_box.y + output_box.y and
+        self.xwayland_surface.width == inflight_box.width and
+        self.xwayland_surface.height == inflight_box.height and
         (inflight.focus != 0) == (current.focus != 0) and
         (output.inflight.fullscreen == self.view) ==
         (current.output != null and current.output.?.current.fullscreen == self.view))
@@ -102,10 +104,10 @@ pub fn configure(self: Self) bool {
     }
 
     self.xwayland_surface.configure(
-        @intCast(i16, inflight.box.x + output_box.x),
-        @intCast(i16, inflight.box.y + output_box.y),
-        @intCast(u16, inflight.box.width),
-        @intCast(u16, inflight.box.height),
+        @intCast(i16, inflight_box.x + output_box.x),
+        @intCast(i16, inflight_box.y + output_box.y),
+        @intCast(u16, inflight_box.width),
+        @intCast(u16, inflight_box.height),
     );
 
     self.setActivated(inflight.focus != 0);
@@ -180,14 +182,13 @@ pub fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface:
         return;
     };
 
-    view.pending.box = .{
+    view.inflight_box = .{
         .x = 0,
         .y = 0,
         .width = self.xwayland_surface.width,
         .height = self.xwayland_surface.height,
     };
-    view.inflight.box = view.pending.box;
-    view.current.box = view.pending.box;
+    view.current_box = view.inflight_box;
 
     // A value of -1 seems to indicate being unset for these size hints.
     const has_fixed_size = if (self.xwayland_surface.size_hints) |size_hints|
@@ -246,8 +247,8 @@ fn handleRequestConfigure(
 
     // Allow xwayland views to set their own dimensions (but not position) if floating
     if (self.view.pending.float) {
-        self.view.pending.box.width = event.width;
-        self.view.pending.box.height = event.height;
+        self.view.pending_delta.width +|= event.width - self.view.current_box.width;
+        self.view.pending_delta.height +|= event.height - self.view.current_box.height;
     }
     server.root.applyPending();
 }

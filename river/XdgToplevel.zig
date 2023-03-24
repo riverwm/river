@@ -104,6 +104,9 @@ pub fn configure(self: *Self) bool {
     const inflight = &self.view.inflight;
     const current = &self.view.current;
 
+    const inflight_box = &self.view.inflight_box;
+    const current_box = &self.view.current_box;
+
     const inflight_fullscreen = inflight.output != null and inflight.output.?.inflight.fullscreen == self.view;
     const current_fullscreen = current.output != null and current.output.?.current.fullscreen == self.view;
 
@@ -113,8 +116,8 @@ pub fn configure(self: *Self) bool {
     // We avoid a special case for newly mapped views which we have not yet
     // configured by setting the current width/height to the initial width/height
     // of the view in handleMap().
-    if (inflight.box.width == current.box.width and
-        inflight.box.height == current.box.height and
+    if (inflight_box.width == current_box.width and
+        inflight_box.height == current_box.height and
         (inflight.focus != 0) == (current.focus != 0) and
         inflight_fullscreen == current_fullscreen and
         inflight_float == current_float and
@@ -143,11 +146,11 @@ pub fn configure(self: *Self) bool {
     // We need to call this wlroots function even if the inflight dimensions
     // match the current dimensions in order to prevent wlroots internal state
     // from getting out of sync in the case where a client has resized itself.
-    const configure_serial = self.xdg_toplevel.setSize(inflight.box.width, inflight.box.height);
+    const configure_serial = self.xdg_toplevel.setSize(inflight_box.width, inflight_box.height);
 
     // Only track configures with the transaction system if they affect the dimensions of the view.
-    if (inflight.box.width == current.box.width and
-        inflight.box.height == current.box.height)
+    if (inflight_box.width == current_box.width and
+        inflight_box.height == current_box.height)
     {
         return false;
     }
@@ -225,14 +228,13 @@ fn handleMap(listener: *wl.Listener(void)) void {
 
     self.xdg_toplevel.base.getGeometry(&self.geometry);
 
-    view.pending.box = .{
+    view.inflight_box = .{
         .x = 0,
         .y = 0,
         .width = self.geometry.width,
         .height = self.geometry.height,
     };
-    view.inflight.box = view.pending.box;
-    view.current.box = view.pending.box;
+    view.current_box = view.inflight_box;
 
     const state = &self.xdg_toplevel.current;
     const has_fixed_size = state.min_width != 0 and state.min_height != 0 and
@@ -329,10 +331,10 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
                     .{ old_geometry.width, old_geometry.height, self.geometry.width, self.geometry.height },
                 );
                 if ((view.current.float or no_layout) and !view.current.fullscreen) {
-                    view.current.box.width = self.geometry.width;
-                    view.current.box.height = self.geometry.height;
-                    view.pending.box.width = self.geometry.width;
-                    view.pending.box.height = self.geometry.height;
+                    view.pending_delta.width +|= self.geometry.width - view.current_box.width;
+                    view.pending_delta.height +|= self.geometry.height - view.current_box.height;
+                    view.current_box.width = self.geometry.width;
+                    view.current_box.height = self.geometry.height;
                     server.root.applyPending();
                 } else {
                     log.err("client is buggy and initiated size change while tiled or fullscreen", .{});
@@ -351,10 +353,8 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
                 view.resizeUpdatePosition(self.geometry.width, self.geometry.height);
             }
 
-            view.inflight.box.width = self.geometry.width;
-            view.inflight.box.height = self.geometry.height;
-            view.pending.box.width = self.geometry.width;
-            view.pending.box.height = self.geometry.height;
+            view.inflight_box.width = self.geometry.width;
+            view.inflight_box.height = self.geometry.height;
 
             server.root.notifyConfigured();
         },

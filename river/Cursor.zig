@@ -711,8 +711,8 @@ pub fn startMove(cursor: *Self, view: *View) void {
 
     const new_mode: Mode = .{ .move = .{
         .view = view,
-        .offset_x = @floatToInt(i32, cursor.wlr_cursor.x) - view.current.box.x,
-        .offset_y = @floatToInt(i32, cursor.wlr_cursor.y) - view.current.box.y,
+        .offset_x = @floatToInt(i32, cursor.wlr_cursor.x) - view.current_box.x,
+        .offset_y = @floatToInt(i32, cursor.wlr_cursor.y) - view.current_box.y,
     } };
     cursor.enterMode(new_mode, view, .move);
 }
@@ -731,7 +731,7 @@ pub fn startResize(cursor: *Self, view: *View, proposed_edges: ?wlr.Edges) void 
         break :blk cursor.computeEdges(view);
     };
 
-    const box = &view.current.box;
+    const box = &view.current_box;
     const lx = @floatToInt(i32, cursor.wlr_cursor.x);
     const ly = @floatToInt(i32, cursor.wlr_cursor.y);
     const offset_x = if (edges.left) lx - box.x else box.x + box.width - lx;
@@ -750,7 +750,7 @@ pub fn startResize(cursor: *Self, view: *View, proposed_edges: ?wlr.Edges) void 
 
 fn computeEdges(cursor: *const Self, view: *const View) wlr.Edges {
     const min_handle_size = 20;
-    const box = &view.current.box;
+    const box = &view.current_box;
 
     var output_box: wlr.Box = undefined;
     server.root.output_layout.getBox(view.current.output.?.wlr_output, &output_box);
@@ -796,7 +796,7 @@ fn enterMode(cursor: *Self, mode: Mode, view: *View, image: Image) void {
     cursor.seat.focus(view);
 
     if (view.current.output.?.layout != null) {
-        view.float_box = view.current.box;
+        view.float_box = view.current_box;
         view.pending.float = true;
     }
 
@@ -862,48 +862,21 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
             data.delta_y = dy - @trunc(dy);
 
             if (tag == .move) {
-                data.view.pending.move(@floatToInt(i32, dx), @floatToInt(i32, dy));
+                data.view.pending_delta.x +|= @floatToInt(i32, dx);
+                data.view.pending_delta.y +|= @floatToInt(i32, dy);
             } else {
-                // Modify width/height of the pending box, taking constraints into account
-                // The x/y coordinates of the view will be adjusted as needed in View.resizeCommit()
-                // based on the dimensions actually committed by the client.
-                const border_width = if (data.view.pending.ssd) server.config.border_width else 0;
-
-                var output_width: i32 = undefined;
-                var output_height: i32 = undefined;
-                data.view.current.output.?.wlr_output.effectiveResolution(&output_width, &output_height);
-
-                const constraints = &data.view.constraints;
-                const box = &data.view.pending.box;
-
                 if (data.edges.left) {
-                    var x1 = box.x;
-                    const x2 = box.x + box.width;
-                    x1 += @floatToInt(i32, dx);
-                    x1 = math.max(x1, border_width);
-                    x1 = math.max(x1, x2 - constraints.max_width);
-                    x1 = math.min(x1, x2 - constraints.min_width);
-                    box.width = x2 - x1;
+                    data.view.pending_delta.x +|= @floatToInt(i32, dx);
+                    data.view.pending_delta.width -|= @floatToInt(i32, dx);
                 } else if (data.edges.right) {
-                    box.width += @floatToInt(i32, dx);
-                    box.width = math.max(box.width, constraints.min_width);
-                    box.width = math.min(box.width, constraints.max_width);
-                    box.width = math.min(box.width, output_width - border_width - box.x);
+                    data.view.pending_delta.width +|= @floatToInt(i32, dx);
                 }
 
                 if (data.edges.top) {
-                    var y1 = box.y;
-                    const y2 = box.y + box.height;
-                    y1 += @floatToInt(i32, dy);
-                    y1 = math.max(y1, border_width);
-                    y1 = math.max(y1, y2 - constraints.max_height);
-                    y1 = math.min(y1, y2 - constraints.min_height);
-                    box.height = y2 - y1;
+                    data.view.pending_delta.y +|= @floatToInt(i32, dy);
+                    data.view.pending_delta.height -|= @floatToInt(i32, dy);
                 } else if (data.edges.bottom) {
-                    box.height += @floatToInt(i32, dy);
-                    box.height = math.max(box.height, constraints.min_height);
-                    box.height = math.min(box.height, constraints.max_height);
-                    box.height = math.min(box.height, output_height - border_width - box.y);
+                    data.view.pending_delta.height +|= @floatToInt(i32, dy);
                 }
             }
 
@@ -931,7 +904,7 @@ pub fn checkFocusFollowsCursor(self: *Self) void {
                 const cursor_ox = self.wlr_cursor.x - @intToFloat(f64, output_layout_box.x);
                 const cursor_oy = self.wlr_cursor.y - @intToFloat(f64, output_layout_box.y);
                 if ((self.seat.focused != .view or self.seat.focused.view != view) and
-                    view.current.box.containsPoint(cursor_ox, cursor_oy))
+                    view.current_box.containsPoint(cursor_ox, cursor_oy))
                 {
                     self.seat.focusOutput(view.current.output.?);
                     self.seat.focus(view);
@@ -981,7 +954,7 @@ pub fn updateState(self: *Self) void {
             assert(!data.view.current.fullscreen);
 
             // Keep the cursor locked to the original offset from the edges of the view.
-            const box = &data.view.current.box;
+            const box = &data.view.current_box;
             const new_x = blk: {
                 if (mode == .move or data.edges.left) {
                     break :blk @intToFloat(f64, data.offset_x + box.x);
@@ -1041,10 +1014,10 @@ fn warp(self: *Self) void {
         .@"on-focus-change" => switch (self.seat.focused) {
             .layer, .lock_surface, .none => output_layout_box,
             .view => |view| wlr.Box{
-                .x = output_layout_box.x + view.current.box.x,
-                .y = output_layout_box.y + view.current.box.y,
-                .width = view.current.box.width,
-                .height = view.current.box.height,
+                .x = output_layout_box.x + view.current_box.x,
+                .y = output_layout_box.y + view.current_box.y,
+                .width = view.current_box.width,
+                .height = view.current_box.height,
             },
             .xwayland_override_redirect => |or_window| wlr.Box{
                 .x = or_window.xwayland_surface.x,

@@ -39,10 +39,10 @@ pub fn move(
 
     const view = getView(seat) orelse return;
     switch (direction) {
-        .up => view.pending.move(0, -delta),
-        .down => view.pending.move(0, delta),
-        .left => view.pending.move(-delta, 0),
-        .right => view.pending.move(delta, 0),
+        .up => view.pending_delta.y -|= delta,
+        .down => view.pending_delta.y +|= delta,
+        .left => view.pending_delta.x -|= delta,
+        .right => view.pending_delta.x +|= delta,
     }
 
     apply(view);
@@ -60,16 +60,12 @@ pub fn snap(
         return Error.InvalidPhysicalDirection;
 
     const view = getView(seat) orelse return;
-    const output = view.pending.output orelse return;
-    const border_width = server.config.border_width;
-    var output_width: i32 = undefined;
-    var output_height: i32 = undefined;
-    output.wlr_output.effectiveResolution(&output_width, &output_height);
+
     switch (direction) {
-        .up => view.pending.box.y = border_width,
-        .down => view.pending.box.y = output_height - view.pending.box.height - border_width,
-        .left => view.pending.box.x = border_width,
-        .right => view.pending.box.x = output_width - view.pending.box.width - border_width,
+        .up => view.pending_delta.y = std.math.minInt(i32),
+        .down => view.pending_delta.y = std.math.maxInt(i32),
+        .left => view.pending_delta.x = std.math.minInt(i32),
+        .right => view.pending_delta.x = std.math.maxInt(i32),
     }
 
     apply(view);
@@ -88,39 +84,15 @@ pub fn resize(
         return Error.InvalidOrientation;
 
     const view = getView(seat) orelse return;
-    var output_width: c_int = math.maxInt(c_int);
-    var output_height: c_int = math.maxInt(c_int);
-    if (view.pending.output) |output| {
-        output.wlr_output.effectiveResolution(&output_width, &output_height);
-    }
+
     switch (orientation) {
         .horizontal => {
-            const prev_width = view.pending.box.width;
-            view.pending.box.width += delta;
-            view.applyConstraints(&view.pending.box);
-            // Get width difference after applying view constraints, so that the
-            // move reflects the actual size difference, but before applying the
-            // output size constraints, to allow growing a view even if it is
-            // up against an output edge.
-            const diff_width = prev_width - view.pending.box.width;
-            // Do not grow bigger than the output
-            view.pending.box.width = math.min(
-                view.pending.box.width,
-                output_width - 2 * server.config.border_width,
-            );
-            view.pending.move(@divFloor(diff_width, 2), 0);
+            view.pending_delta.width +|= delta;
+            view.pending_delta.x -|= @divFloor(delta, 2);
         },
         .vertical => {
-            const prev_height = view.pending.box.height;
-            view.pending.box.height += delta;
-            view.applyConstraints(&view.pending.box);
-            const diff_height = prev_height - view.pending.box.height;
-            // Do not grow bigger than the output
-            view.pending.box.height = math.min(
-                view.pending.box.height,
-                output_height - 2 * server.config.border_width,
-            );
-            view.pending.move(0, @divFloor(diff_height, 2));
+            view.pending_delta.height +|= delta;
+            view.pending_delta.y -|= @divFloor(delta, 2);
         },
     }
 

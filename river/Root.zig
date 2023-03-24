@@ -422,34 +422,46 @@ pub fn applyPending(root: *Self) void {
                 while (it.next()) |view| {
                     assert(view.pending.output == output);
 
-                    if (view.current.float and !view.pending.float) {
-                        // If switching from float to non-float, save the dimensions.
-                        view.float_box = view.current.box;
-                    } else if (!view.current.float and view.pending.float) {
+                    if (view.pending.float) {
                         // If switching from non-float to float, apply the saved float dimensions.
-                        view.pending.box = view.float_box;
-                        view.pending.clampToOutput();
+                        if (!view.inflight.float) {
+                            view.inflight_box = view.float_box;
+                        }
+
+                        view.inflight_box.x +|= view.pending_delta.x;
+                        view.inflight_box.y +|= view.pending_delta.y;
+                        view.inflight_box.width +|= view.pending_delta.width;
+                        view.inflight_box.height +|= view.pending_delta.height;
+
+                        view.applyConstraints(&view.inflight_box, view.inflight);
+                    } else if (view.inflight.float) {
+                        // If switching from float to non-float, save the dimensions.
+                        view.float_box = view.inflight_box;
                     }
 
-                    if (!view.current.fullscreen and view.pending.fullscreen) {
-                        view.post_fullscreen_box = view.pending.box;
-                        view.pending.box = .{ .x = 0, .y = 0, .width = undefined, .height = undefined };
-                        output.wlr_output.effectiveResolution(&view.pending.box.width, &view.pending.box.height);
-                    } else if (view.current.fullscreen and !view.pending.fullscreen) {
-                        view.pending.box = view.post_fullscreen_box;
-                        view.pending.clampToOutput();
-                    }
+                    if (view.pending.fullscreen) {
+                        if (!view.inflight.fullscreen) {
+                            view.post_fullscreen_box = view.inflight_box;
+                        }
 
-                    if (output.inflight.fullscreen == null and view.pending.fullscreen and
-                        view.pending.tags & output.pending.tags != 0)
-                    {
-                        output.inflight.fullscreen = view;
+                        if (output.inflight.fullscreen == null and
+                            view.pending.tags & output.pending.tags != 0)
+                        {
+                            output.inflight.fullscreen = view;
+                        }
+
+                        view.inflight_box = .{ .x = 0, .y = 0, .width = undefined, .height = undefined };
+                        output.wlr_output.effectiveResolution(&view.inflight_box.width, &view.inflight_box.height);
+                    } else if (view.inflight.fullscreen) {
+                        view.inflight_box = view.post_fullscreen_box;
+                        view.applyConstraints(&view.inflight_box, view.inflight);
                     }
 
                     view.inflight_focus_stack_link.remove();
                     output.inflight.focus_stack.append(view);
 
                     view.inflight = view.pending;
+                    view.pending_delta = .{ .x = 0, .y = 0, .width = 0, .height = 0 };
                 }
             }
 

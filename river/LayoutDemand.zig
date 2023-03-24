@@ -133,20 +133,14 @@ pub fn apply(self: *Self, layout: *Layout) void {
             // Here we apply the offset to align the coords with the origin of the
             // usable area and shrink the dimensions to accommodate the border size.
             const border_width = if (view.inflight.ssd) server.config.border_width else 0;
-            view.inflight.box = .{
+            view.inflight_box = .{
                 .x = proposed.x + output.usable_box.x + border_width,
                 .y = proposed.y + output.usable_box.y + border_width,
                 .width = proposed.width - 2 * border_width,
                 .height = proposed.height - 2 * border_width,
             };
 
-            view.applyConstraints(&view.inflight.box);
-
-            // State flowing "backwards" like this is pretty ugly, but I don't
-            // see a better way to sync this up right now.
-            if (!view.pending.float and !view.pending.fullscreen) {
-                view.pending.box = view.inflight.box;
-            }
+            view.applyConstraints(&view.inflight_box, view.inflight);
 
             i += 1;
         }

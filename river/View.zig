@@ -60,9 +60,6 @@ pub const State = struct {
     /// Must be set using setPendingOutput()
     output: ?*Output = null,
 
-    /// The output-relative coordinates of the view and dimensions requested by river.
-    box: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
-
     /// The tags of the view, as a bitmask
     tags: u32 = 0,
 
@@ -74,45 +71,25 @@ pub const State = struct {
     urgent: bool = false,
     ssd: bool = false,
     resizing: bool = false,
-
-    /// Modify the x/y of the given state by delta_x/delta_y, clamping to the
-    /// bounds of the output.
-    pub fn move(state: *State, delta_x: i32, delta_y: i32) void {
-        const border_width = if (state.ssd) server.config.border_width else 0;
-
-        var output_width: i32 = math.maxInt(i32);
-        var output_height: i32 = math.maxInt(i32);
-        if (state.output) |output| {
-            output.wlr_output.effectiveResolution(&output_width, &output_height);
-        }
-
-        const max_x = output_width - state.box.width - border_width;
-        state.box.x += delta_x;
-        state.box.x = math.max(state.box.x, border_width);
-        state.box.x = math.min(state.box.x, max_x);
-        state.box.x = math.max(state.box.x, 0);
-
-        const max_y = output_height - state.box.height - border_width;
-        state.box.y += delta_y;
-        state.box.y = math.max(state.box.y, border_width);
-        state.box.y = math.min(state.box.y, max_y);
-        state.box.y = math.max(state.box.y, 0);
-    }
-
-    pub fn clampToOutput(state: *State) void {
-        const output = state.output orelse return;
-
-        var output_width: i32 = undefined;
-        var output_height: i32 = undefined;
-        output.wlr_output.effectiveResolution(&output_width, &output_height);
-
-        const border_width = if (state.ssd) server.config.border_width else 0;
-        state.box.width = math.min(state.box.width, output_width - (2 * border_width));
-        state.box.height = math.min(state.box.height, output_height - (2 * border_width));
-
-        state.move(0, 0);
-    }
 };
+
+/// Modify the x/y of the given state by delta_x/delta_y, clamping to the
+/// bounds of the output.
+//pub fn move(state: *State, delta_x: i32, delta_y: i32) void {
+//    var output_width: i32 = math.maxInt(i32);
+//    var output_height: i32 = math.maxInt(i32);
+//    if (state.output) |output| {
+//        output.wlr_output.effectiveResolution(&output_width, &output_height);
+//    }
+//
+//    state.box.x += delta_x;
+//    state.box.x = math.min(state.box.x, output_width - state.box.width);
+//    state.box.x = math.max(state.box.x, 0);
+//
+//    state.box.y += delta_y;
+//    state.box.y = math.min(state.box.y, output_height - state.box.height);
+//    state.box.y = math.max(state.box.y, 0);
+//}
 
 /// The implementation of this view
 impl: Impl,
@@ -148,6 +125,10 @@ destroying: bool = false,
 /// Any time pending state is modified Root.applyPending() must be called
 /// before yielding back to the event loop.
 pending: State = .{},
+/// A relative change in size/position to be applied by Root.applyPending().
+/// Root.applyPending() is responsible for clamping to the output bounds.
+/// Reset to 0 on starting a transaction.
+pending_delta: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
 pending_focus_stack_link: wl.list.Link,
 pending_wm_stack_link: wl.list.Link,
 
@@ -155,11 +136,13 @@ pending_wm_stack_link: wl.list.Link,
 /// This state is immutable until all clients have replied and the transaction
 /// is completed, at which point this inflight state is copied to current.
 inflight: State = .{},
+inflight_box: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
 inflight_focus_stack_link: wl.list.Link,
 inflight_wm_stack_link: wl.list.Link,
 
 /// The current state represented by the scene graph.
 current: State = .{},
+current_box: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
 
 /// The floating dimensions the view, saved so that they can be restored if the
 /// view returns to floating mode.
@@ -266,18 +249,21 @@ pub fn resizeUpdatePosition(view: *Self, width: i32, height: i32) void {
     };
 
     if (data.edges.left) {
-        view.inflight.box.x += view.current.box.width - width;
-        view.pending.box.x = view.inflight.box.x;
+        view.inflight_box.x += view.current_box.width - width;
     }
 
     if (data.edges.top) {
-        view.inflight.box.y += view.current.box.height - height;
-        view.pending.box.y = view.inflight.box.y;
+        view.inflight_box.y += view.current_box.height - height;
     }
 }
 
 pub fn updateCurrent(view: *Self) void {
     const config = &server.config;
+
+    {
+        const box = view.inflight_box;
+        std.debug.print("updateCurrent start: {} {} {} {}\n", .{ box.x, box.y, box.width, box.height });
+    }
 
     switch (view.impl) {
         .xdg_toplevel => |*xdg_toplevel| {
@@ -286,12 +272,10 @@ pub fn updateCurrent(view: *Self) void {
                 // that have not been committed by the client.
                 .inflight, .acked => {
                     if (view.inflight.resizing) {
-                        view.resizeUpdatePosition(view.current.box.width, view.current.box.height);
+                        view.resizeUpdatePosition(view.current_box.width, view.current_box.height);
                     }
-                    view.inflight.box.width = view.current.box.width;
-                    view.inflight.box.height = view.current.box.height;
-                    view.pending.box.width = view.current.box.width;
-                    view.pending.box.height = view.current.box.height;
+                    view.inflight_box.width = view.current_box.width;
+                    view.inflight_box.height = view.current_box.height;
                 },
                 .idle, .committed => {},
             }
@@ -308,10 +292,8 @@ pub fn updateCurrent(view: *Self) void {
                         xwayland_view.xwayland_surface.height,
                     );
                 }
-                view.inflight.box.width = xwayland_view.xwayland_surface.width;
-                view.inflight.box.height = xwayland_view.xwayland_surface.height;
-                view.pending.box.width = xwayland_view.xwayland_surface.width;
-                view.pending.box.height = xwayland_view.xwayland_surface.height;
+                view.inflight_box.width = xwayland_view.xwayland_surface.width;
+                view.inflight_box.height = xwayland_view.xwayland_surface.height;
             }
         },
         .none => {},
@@ -320,6 +302,7 @@ pub fn updateCurrent(view: *Self) void {
     view.foreign_toplevel_handle.update();
 
     view.current = view.inflight;
+    view.current_box = view.inflight_box;
     view.dropSavedSurfaceTree();
 
     const color = blk: {
@@ -328,7 +311,7 @@ pub fn updateCurrent(view: *Self) void {
         break :blk &config.border_color_unfocused;
     };
 
-    const box = &view.current.box;
+    const box = &view.current_box;
     view.tree.node.setPosition(box.x, box.y);
     view.popup_tree.node.setPosition(box.x, box.y);
 
@@ -354,6 +337,11 @@ pub fn updateCurrent(view: *Self) void {
     view.borders.bottom.node.setPosition(0, box.height);
     view.borders.bottom.setSize(box.width, border_width);
     view.borders.bottom.setColor(color);
+
+    {
+        const b = view.current_box;
+        std.debug.print("updateCurrent end: {} {} {} {}\n", .{ b.x, b.y, b.width, b.height });
+    }
 }
 
 /// Returns true if the configure should be waited for by the transaction system.
@@ -433,13 +421,6 @@ pub fn setPendingOutput(view: *Self, output: *Output) void {
         .bottom => output.pending.wm_stack.append(view),
     }
     output.pending.focus_stack.prepend(view);
-
-    if (view.pending.fullscreen) {
-        view.pending.box = .{ .x = 0, .y = 0, .width = undefined, .height = undefined };
-        output.wlr_output.effectiveResolution(&view.pending.box.width, &view.pending.box.height);
-    } else if (view.pending.float) {
-        view.pending.clampToOutput();
-    }
 }
 
 pub fn close(self: Self) void {
@@ -481,9 +462,27 @@ pub fn getAppId(self: Self) ?[*:0]const u8 {
 }
 
 /// Clamp the width/height of the box to the constraints of the view
-pub fn applyConstraints(self: *Self, box: *wlr.Box) void {
+pub fn applyConstraints(self: *Self, box: *wlr.Box, state: State) void {
+    std.debug.print("unconstrained: {} {} {} {}\n", .{ box.x, box.y, box.width, box.height });
     box.width = math.clamp(box.width, self.constraints.min_width, self.constraints.max_width);
     box.height = math.clamp(box.height, self.constraints.min_height, self.constraints.max_height);
+
+    if (state.output) |output| {
+        var max_width: i32 = undefined;
+        var max_height: i32 = undefined;
+        output.wlr_output.effectiveResolution(&max_width, &max_height);
+
+        const border_width = if (state.ssd) server.config.border_width else 0;
+        max_width -= border_width * 2;
+        max_height -= border_width * 2;
+
+        box.width = math.min(box.width, max_width);
+        box.height = math.min(box.height, max_height);
+
+        box.x = math.min(box.x, max_width - box.width);
+        box.y = math.min(box.y, max_height - box.height);
+    }
+    std.debug.print("constrained: {} {} {} {}\n", .{ box.x, box.y, box.width, box.height });
 }
 
 /// Called by the impl when the surface is ready to be displayed
@@ -503,9 +502,9 @@ pub fn map(view: *Self) !void {
     }
 
     if (server.input_manager.defaultSeat().focused_output) |output| {
-        // Center the initial pending box on the output
-        view.pending.box.x = @divTrunc(math.max(0, output.usable_box.width - view.pending.box.width), 2);
-        view.pending.box.y = @divTrunc(math.max(0, output.usable_box.height - view.pending.box.height), 2);
+        // Center on the output in case the view is floating.
+        view.inflight_box.x = @divTrunc(math.max(0, output.usable_box.width - view.inflight_box.width), 2);
+        view.inflight_box.y = @divTrunc(math.max(0, output.usable_box.height - view.inflight_box.height), 2);
 
         view.pending.tags = blk: {
             const tags = output.pending.tags & server.config.spawn_tagmask;
@@ -518,7 +517,7 @@ pub fn map(view: *Self) !void {
         while (it) |seat_node| : (it = seat_node.next) seat_node.data.focus(view);
     }
 
-    view.float_box = view.pending.box;
+    view.float_box = view.inflight_box;
 
     server.root.applyPending();
 }
