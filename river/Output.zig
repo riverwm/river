@@ -78,6 +78,8 @@ layers: struct {
 /// If using the DRM backend it will be blanked with the initial modeset.
 /// If using the Wayland or X11 backend nothing will be visible until the first frame is rendered.
 lock_render_state: enum {
+    /// Submitted an unlocked buffer but the buffer has not yet been presented.
+    pending_unlock,
     /// Normal, "unlocked" content may be visible.
     unlocked,
     /// Submitted a blank buffer but the buffer has not yet been presented.
@@ -393,7 +395,7 @@ fn handleEnable(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) vo
     if (wlr_output.enabled) {
         switch (server.lock_manager.state) {
             .unlocked => {
-                self.lock_render_state = .unlocked;
+                assert(self.lock_render_state == .blanked);
                 self.normal_content.node.setEnabled(true);
                 self.locked_content.node.setEnabled(false);
             },
@@ -406,6 +408,8 @@ fn handleEnable(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) vo
     } else {
         // Disabling and re-enabling an output always blanks it.
         self.lock_render_state = .blanked;
+        self.normal_content.node.setEnabled(false);
+        self.locked_content.node.setEnabled(true);
     }
 
     // Add the output to root.outputs and the output layout if it has not
@@ -447,7 +451,7 @@ fn handleFrame(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
             switch (server.lock_manager.state) {
                 .unlocked => unreachable,
                 .locked => switch (output.lock_render_state) {
-                    .unlocked, .pending_blank, .pending_lock_surface => unreachable,
+                    .pending_unlock, .unlocked, .pending_blank, .pending_lock_surface => unreachable,
                     .blanked, .lock_surface => {},
                 },
                 .waiting_for_blank => {
@@ -460,6 +464,10 @@ fn handleFrame(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
                         output.lock_render_state = .pending_lock_surface;
                     }
                 },
+            }
+        } else {
+            if (output.lock_render_state != .unlocked) {
+                output.lock_render_state = .pending_unlock;
             }
         }
     } else {
@@ -477,18 +485,21 @@ fn handlePresent(
 ) void {
     const output = @fieldParentPtr(Self, "present", listener);
 
+    if (!event.presented) {
+        return;
+    }
+
     switch (output.lock_render_state) {
+        .pending_unlock => {
+            assert(server.lock_manager.state != .locked);
+            output.lock_render_state = .unlocked;
+        },
         .unlocked => assert(server.lock_manager.state != .locked),
         .pending_blank, .pending_lock_surface => {
-            if (!event.presented) {
-                output.lock_render_state = .unlocked;
-                return;
-            }
-
             output.lock_render_state = switch (output.lock_render_state) {
                 .pending_blank => .blanked,
                 .pending_lock_surface => .lock_surface,
-                .unlocked, .blanked, .lock_surface => unreachable,
+                .pending_unlock, .unlocked, .blanked, .lock_surface => unreachable,
             };
 
             if (server.lock_manager.state != .locked) {

@@ -100,12 +100,9 @@ fn handleOutputMode(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
 
 fn handleMap(listener: *wl.Listener(void)) void {
     const lock_surface = @fieldParentPtr(LockSurface, "map", listener);
-
     const output = lock_surface.getOutput();
-    assert(output.normal_content.node.enabled);
-    output.normal_content.node.setEnabled(false);
 
-    assert(!output.locked_content.node.enabled);
+    output.normal_content.node.setEnabled(false);
     output.locked_content.node.setEnabled(true);
 
     {

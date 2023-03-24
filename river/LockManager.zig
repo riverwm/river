@@ -142,14 +142,6 @@ fn handleLockSurfacesTimeout(manager: *LockManager) c_int {
         while (it) |node| : (it = node.next) {
             const output = &node.data;
 
-            switch (output.lock_render_state) {
-                .unlocked, .pending_lock_surface => {},
-                .pending_blank, .blanked, .lock_surface => {
-                    assert(!output.normal_content.node.enabled);
-                    assert(output.locked_content.node.enabled);
-                },
-            }
-
             output.normal_content.node.setEnabled(false);
             output.locked_content.node.setEnabled(true);
         }
@@ -169,7 +161,7 @@ pub fn maybeLock(manager: *LockManager) void {
         while (it) |node| : (it = node.next) {
             const output = &node.data;
             switch (output.lock_render_state) {
-                .unlocked, .pending_blank, .pending_lock_surface => {
+                .pending_unlock, .unlocked, .pending_blank, .pending_lock_surface => {
                     all_outputs_blanked = false;
                     all_outputs_rendered_lock_surface = false;
                 },
