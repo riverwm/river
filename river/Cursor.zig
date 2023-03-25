@@ -157,7 +157,8 @@ may_need_warp: bool = false,
 /// has been moved inside the constraint region.
 constraint: ?*PointerConstraint = null,
 
-last_focus_follows_cursor_target: ?*View = null,
+/// View under the cursor, defined by view geometry rather than input region
+focus_follows_cursor_target: ?*View = null,
 
 /// Keeps track of the last known location of all touch points in layout coordinates.
 /// This information is necessary for proper touch dnd support if there are multiple touch points.
@@ -917,34 +918,48 @@ pub fn checkFocusFollowsCursor(self: *Self) void {
     // change can't occur.
     if (self.seat.drag == .pointer) return;
     if (server.config.focus_follows_cursor == .disabled) return;
+
+    const last_target = self.focus_follows_cursor_target;
+    self.updateFocusFollowsCursorTarget();
+    if (self.focus_follows_cursor_target) |view| {
+        // In .normal mode, only entering a view changes focus
+        if (server.config.focus_follows_cursor == .normal and
+            last_target == view) return;
+        if (self.seat.focused != .view or self.seat.focused.view != view) {
+            self.seat.focusOutput(view.current.output.?);
+            self.seat.focus(view);
+            server.root.applyPending();
+        }
+    }
+}
+
+fn updateFocusFollowsCursorTarget(self: *Self) void {
     if (server.root.at(self.wlr_cursor.x, self.wlr_cursor.y)) |result| {
         switch (result.data) {
             .view => |view| {
-                // Don't re-focus the last focused view when the mode is .normal
-                if (server.config.focus_follows_cursor == .normal and
-                    self.last_focus_follows_cursor_target == view) return;
-                // Some windows have a input region bigger than their window
-                // geometry, we only want to move focus when the cursor
+                // Some windows have an input region bigger than their window
+                // geometry, we only want to update this when the cursor
                 // properly enters the window (the box that we draw borders around)
+                // in order to avoid clashes with cursor warping on focus change.
                 var output_layout_box: wlr.Box = undefined;
                 server.root.output_layout.getBox(view.current.output.?.wlr_output, &output_layout_box);
                 const cursor_ox = self.wlr_cursor.x - @intToFloat(f64, output_layout_box.x);
                 const cursor_oy = self.wlr_cursor.y - @intToFloat(f64, output_layout_box.y);
-                if ((self.seat.focused != .view or self.seat.focused.view != view) and
-                    view.current.box.containsPoint(cursor_ox, cursor_oy))
-                {
-                    self.seat.focusOutput(view.current.output.?);
-                    self.seat.focus(view);
-                    self.last_focus_follows_cursor_target = view;
-                    server.root.applyPending();
+                if (view.current.box.containsPoint(cursor_ox, cursor_oy)) {
+                    self.focus_follows_cursor_target = view;
                 }
             },
-            .layer_surface, .lock_surface => {},
-            .xwayland_override_redirect => assert(build_options.xwayland),
+            .layer_surface, .lock_surface => {
+                self.focus_follows_cursor_target = null;
+            },
+            .xwayland_override_redirect => {
+                assert(build_options.xwayland);
+                self.focus_follows_cursor_target = null;
+            },
         }
     } else {
-        // The cursor is not above any view, so clear the last followed check
-        self.last_focus_follows_cursor_target = null;
+        // The cursor is not above any view
+        self.focus_follows_cursor_target = null;
     }
 }
 
@@ -962,6 +977,7 @@ pub fn updateState(self: *Self) void {
 
     switch (self.mode) {
         .passthrough => {
+            self.updateFocusFollowsCursorTarget();
             if (!self.hidden) {
                 var now: os.timespec = undefined;
                 os.clock_gettime(os.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
