@@ -18,6 +18,8 @@ const Self = @This();
 
 const build_options = @import("build_options");
 const std = @import("std");
+const mem = std.mem;
+const fmt = std.fmt;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
@@ -68,6 +70,7 @@ foreign_toplevel_manager: *wlr.ForeignToplevelManagerV1,
 
 xdg_activation: *wlr.XdgActivationV1,
 request_activate: wl.Listener(*wlr.XdgActivationV1.event.RequestActivate),
+activated_unmapped_surfaces: std.ArrayListUnmanaged(struct { surface: *wlr.Surface, pending_tags: u32 }),
 
 input_manager: InputManager,
 root: Root,
@@ -124,6 +127,7 @@ pub fn init(self: *Self) !void {
     self.xdg_activation = try wlr.XdgActivationV1.create(self.wl_server);
     self.xdg_activation.events.request_activate.add(&self.request_activate);
     self.request_activate.setNotify(handleRequestActivate);
+    self.activated_unmapped_surfaces = .{};
 
     _ = try wlr.PrimarySelectionDeviceManagerV1.create(self.wl_server);
 
@@ -291,14 +295,35 @@ fn handleRequestActivate(
 ) void {
     const server = @fieldParentPtr(Self, "request_activate", listener);
 
-    const node_data = SceneNodeData.fromSurface(event.surface) orelse return;
-    switch (node_data.data) {
-        .view => |view| if (view.current.focus == 0) {
-            view.pending.urgent = true;
-            server.root.applyPending();
-        },
-        else => |tag| {
-            log.info("ignoring xdg-activation-v1 activate request of {s} surface", .{@tagName(tag)});
-        },
+    const name = mem.span(event.token.name());
+    const tags: ?u32 = blk: {
+        if (!mem.startsWith(u8, name, "!river")) break :blk null;
+        var it = mem.split(u8, name, "-");
+        _ = it.next() orelse break :blk null;
+        const tag_str = it.next() orelse break :blk null;
+        if (it.next() == null) break :blk null;
+        const tags = fmt.parseInt(u32, tag_str, 10) catch break :blk null;
+        break :blk tags;
+    };
+
+    if (SceneNodeData.fromSurface(event.surface)) |node_data| {
+        switch (node_data.data) {
+            .view => |view| {
+                if (view.current.focus == 0) view.pending.urgent = true;
+                if (tags) |t| view.pending.tags = t;
+                server.root.applyPending();
+            },
+            else => |tag| {
+                log.info("ignoring xdg-activation-v1 activate request of {s} surface", .{@tagName(tag)});
+            },
+        }
+        return;
+    }
+
+    // The surface is not a mapped view.
+    if (tags) |t| {
+        const unmapped_surface = server.activated_unmapped_surfaces.addOne(util.gpa) catch return;
+        unmapped_surface.surface = event.surface;
+        unmapped_surface.pending_tags = t;
     }
 }

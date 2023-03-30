@@ -16,6 +16,10 @@
 
 const std = @import("std");
 const os = std.os;
+const mem = std.mem;
+const fmt = std.fmt;
+const wlr = @import("wlr");
+const flags = @import("flags");
 
 const c = @import("../c.zig");
 const util = @import("../util.zig");
@@ -23,16 +27,38 @@ const util = @import("../util.zig");
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
+const server = &@import("../main.zig").server;
+
 /// Spawn a program.
 pub fn spawn(
-    _: *Seat,
+    seat: *Seat,
     args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
-    if (args.len > 2) return Error.TooManyArguments;
+    const result = flags.parser([:0]const u8, &.{
+        .{ .name = "current-tags", .kind = .boolean },
+    }).parse(args[1..]) catch {
+        return error.InvalidOption;
+    };
+    if (result.args.len < 1) return Error.NotEnoughArguments;
+    if (result.args.len > 1) return Error.TooManyArguments;
 
-    const child_args = [_:null]?[*:0]const u8{ "/bin/sh", "-c", args[1], null };
+    var token: ?[:0]const u8 = null;
+    if (result.flags.@"current-tags") {
+        var now: os.timespec = undefined;
+        os.clock_gettime(os.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
+        token = try fmt.allocPrintZ(util.gpa, "!river-{}-{}", .{
+            (seat.focused_output orelse return).pending.tags,
+            now.tv_nsec,
+        });
+        // TODO find out whether the string we punch into this function needs to
+        //      remain allocated after we return from this call site.
+        _ = server.xdg_activation.addToken(token.?) orelse unreachable;
+    }
+    //defer if (token) |t| util.gpa.free(t);
+
+    const child_args = [_:null]?[*:0]const u8{ "/bin/sh", "-c", result.args[0], null };
 
     const pid = os.fork() catch {
         out.* = try std.fmt.allocPrint(util.gpa, "fork/execve failed", .{});
@@ -40,6 +66,10 @@ pub fn spawn(
     };
 
     if (pid == 0) {
+        if (result.flags.@"current-tags") {
+            std.debug.assert(token != null);
+            _ = c.setenv("XDG_ACTIVATION_TOKEN", token.?.ptr, 1);
+        }
         util.post_fork_pre_execve();
         const pid2 = os.fork() catch c._exit(1);
         if (pid2 == 0) os.execveZ("/bin/sh", &child_args, std.c.environ) catch c._exit(1);

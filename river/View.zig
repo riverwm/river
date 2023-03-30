@@ -487,7 +487,7 @@ pub fn applyConstraints(self: *Self, box: *wlr.Box) void {
 }
 
 /// Called by the impl when the surface is ready to be displayed
-pub fn map(view: *Self) !void {
+pub fn map(view: *Self, tags: ?u32) !void {
     log.debug("view '{?s}' mapped", .{view.getTitle()});
 
     assert(!view.mapped and !view.destroying);
@@ -507,9 +507,9 @@ pub fn map(view: *Self) !void {
         view.pending.box.x = @divTrunc(math.max(0, output.usable_box.width - view.pending.box.width), 2);
         view.pending.box.y = @divTrunc(math.max(0, output.usable_box.height - view.pending.box.height), 2);
 
-        view.pending.tags = blk: {
-            const tags = output.pending.tags & server.config.spawn_tagmask;
-            break :blk if (tags != 0) tags else output.pending.tags;
+        view.pending.tags = if (tags) |t| t else blk: {
+            const t = output.pending.tags & server.config.spawn_tagmask;
+            break :blk if (t != 0) t else output.pending.tags;
         };
 
         view.setPendingOutput(output);

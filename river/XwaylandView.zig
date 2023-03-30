@@ -207,7 +207,7 @@ pub fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface:
 
     view.pending.fullscreen = xwayland_surface.fullscreen;
 
-    view.map() catch {
+    view.map(null) catch {
         log.err("out of memory", .{});
         surface.resource.getClient().postNoMemory();
     };

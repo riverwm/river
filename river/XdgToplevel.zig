@@ -240,7 +240,16 @@ fn handleMap(listener: *wl.Listener(void)) void {
 
     self.view.pending.fullscreen = self.xdg_toplevel.requested.fullscreen;
 
-    view.map() catch {
+    const tags: ?u32 = for (server.activated_unmapped_surfaces.items) |unmapped_surface, i| {
+        if (unmapped_surface.surface == self.xdg_toplevel.base.surface) {
+            const tags = unmapped_surface.pending_tags;
+            _ = server.activated_unmapped_surfaces.orderedRemove(i);
+            log.debug("assigning tags based on previous activation request: '{}'", .{tags});
+            break tags;
+        }
+    } else null;
+
+    view.map(tags) catch {
         log.err("out of memory", .{});
         self.xdg_toplevel.resource.getClient().postNoMemory();
     };
