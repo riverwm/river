@@ -17,6 +17,7 @@
 const std = @import("std");
 const mem = std.mem;
 const meta = std.meta;
+const globber = @import("globber");
 
 const server = &@import("../main.zig").server;
 const util = @import("../util.zig");
@@ -41,7 +42,7 @@ pub fn listInputs(
     var it = server.input_manager.devices.iterator(.forward);
     while (it.next()) |device| {
         const configured = for (server.input_manager.configs.items) |*input_config| {
-            if (mem.eql(u8, input_config.identifier, device.identifier)) {
+            if (globber.match(device.identifier, input_config.identifier)) {
                 break true;
             }
         } else false;
@@ -129,26 +130,32 @@ pub fn input(
 ) Error!void {
     if (args.len < 4) return Error.NotEnoughArguments;
     if (args.len > 4) return Error.TooManyArguments;
+    try globber.validate(args[1]);
 
     // Try to find an existing InputConfig with matching identifier, or create
     // a new one if none was found.
     var new = false;
-    const input_config = for (server.input_manager.configs.items) |*input_config| {
-        if (mem.eql(u8, input_config.identifier, args[1])) break input_config;
+    const index = for (server.input_manager.configs.items) |*input_config, i| {
+        if (mem.eql(u8, input_config.identifier, args[1])) {
+            break i;
+        } else if (globber.order(input_config.identifier, args[1]) == .lt) {
+            new = true;
+            break i;
+        }
     } else blk: {
-        try server.input_manager.configs.ensureUnusedCapacity(1);
-        server.input_manager.configs.appendAssumeCapacity(.{
+        new = true;
+        break :blk server.input_manager.configs.items.len;
+    };
+    if (new) {
+        try server.input_manager.configs.insert(index, .{
             .identifier = try util.gpa.dupe(u8, args[1]),
         });
-        new = true;
-        break :blk &server.input_manager.configs.items[server.input_manager.configs.items.len - 1];
-    };
-    errdefer {
-        if (new) {
-            var cfg = server.input_manager.configs.pop();
+        errdefer {
+            var cfg = server.input_manager.configs.orderedRemove(index);
             cfg.deinit();
         }
     }
+    const input_config = &server.input_manager.configs.items[index];
 
     if (mem.eql(u8, "events", args[2])) {
         input_config.event_state = meta.stringToEnum(InputConfig.EventState, args[3]) orelse
@@ -205,10 +212,12 @@ pub fn input(
     // Update matching existing input devices.
     var it = server.input_manager.devices.iterator(.forward);
     while (it.next()) |device| {
-        if (mem.eql(u8, device.identifier, args[1])) {
-            input_config.apply(device);
-            // We don't break here because it is common to have multiple input
-            // devices with the same identifier.
+        for (server.input_manager.configs.items) |*config| {
+            if (globber.match(device.identifier, config.identifier)) {
+                config.apply(device);
+                // We don't break here because it is common to have multiple input
+                // devices with the same identifier.
+            }
         }
     }
 }

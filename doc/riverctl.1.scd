@@ -407,46 +407,54 @@ The _input_ command can be used to create a configuration rule for an input
 device identified by its _name_.
 The _name_ of an input device consists of its type, its numerical vendor id,
 its numerical product id and finally its self-advertised name, separated by -.
+A _glob_ pattern can be used in place of _name_ to match input devices with less
+specificity. A _glob_ is a string that may optionally have an _\*_ at the
+beginning and/or end. An _\*_ in a _glob_ matches zero or more arbitrary
+characters in the app-id or title.
+
+For example, _abc_ is matched by _a\*_, _\*a\*_, _\*b\*_, _\*c_, _abc_, and
+_\*_ but not matched by _\*a_, _b\*_, _\*b_, _c\*_, or _ab_. Note that _\*_
+matches everything while _\*\*_ and the empty string are invalid.
 
 A list of all device properties that can be configured may be found below.
 However note that not every input device supports every property.
 
-*input* _name_ *events* *enabled*|*disabled*|*disabled-on-external-mouse*
+*input* _glob_ *events* *enabled*|*disabled*|*disabled-on-external-mouse*
 	Configure whether the input devices events will be used by river.
 
-*input* _name_ *accel-profile* *none*|*flat*|*adaptive*
+*input* _glob_ *accel-profile* *none*|*flat*|*adaptive*
 	Set the pointer acceleration profile of the input device.
 
-*input* _name_ *pointer-accel* _factor_
+*input* _glob_ *pointer-accel* _factor_
 	Set the pointer acceleration factor of the input device. Needs a float
 	between -1.0 and 1.0.
 
-*input* _name_ *click-method* *none*|*button-areas*|*clickfinger*
+*input* _glob_ *click-method* *none*|*button-areas*|*clickfinger*
 	Set the click method of the input device.
 
-*input* _name_ *drag* *enabled*|*disabled*
+*input* _glob_ *drag* *enabled*|*disabled*
 	Enable or disable the tap-and-drag functionality of the input device.
 
-*input* _name_ *drag-lock* *enabled*|*disabled*
+*input* _glob_ *drag-lock* *enabled*|*disabled*
 	Enable or disable the drag lock functionality of the input device.
 
-*input* _name_ *disable-while-typing* *enabled*|*disabled*
+*input* _glob_ *disable-while-typing* *enabled*|*disabled*
 	Enable or disable the disable-while-typing functionality of the input device.
 
-*input* _name_ *middle-emulation* *enabled*|*disabled*
+*input* _glob_ *middle-emulation* *enabled*|*disabled*
 	Enable or disable the middle click emulation functionality of the input device.
 
-*input* _name_ *natural-scroll* *enabled*|*disabled*
+*input* _glob_ *natural-scroll* *enabled*|*disabled*
 	Enable or disable the natural scroll functionality of the input device. If
 	active, the scroll direction is inverted.
 
-*input* _name_ *left-handed* *enabled*|*disabled*
+*input* _glob_ *left-handed* *enabled*|*disabled*
 	Enable or disable the left handed mode of the input device.
 
-*input* _name_ *tap* *enabled*|*disabled*
+*input* _glob_ *tap* *enabled*|*disabled*
 	Enable or disable the tap functionality of the input device.
 
-*input* _name_ *tap-button-map* *left-right-middle*|*left-middle-right*
+*input* _glob_ *tap-button-map* *left-right-middle*|*left-middle-right*
 	Configure the button mapping for tapping.
 
 	- _left-right-middle_: 1 finger tap equals left click, 2 finger tap equals
@@ -454,7 +462,7 @@ However note that not every input device supports every property.
 	- _left-middle-right_: 1 finger tap equals left click, 2 finger tap equals
 	  middle click, 3 finger tap equals right click.
 
-*input* _name_ *scroll-method* *none*|*two-finger*|*edge*|*button*
+*input* _glob_ *scroll-method* *none*|*two-finger*|*edge*|*button*
 	Set the scroll method of the input device.
 
 	- _none_: No scrolling
@@ -462,7 +470,7 @@ However note that not every input device supports every property.
 	- _edge_: Scroll by swiping along the edge
 	- _button_: Scroll with pointer movement while holding down a button
 
-*input* _name_ *scroll-button* _button_
+*input* _glob_ *scroll-button* _button_
 	Set the scroll button of an input device. _button_ is the name of a Linux
 	input event code.
 
