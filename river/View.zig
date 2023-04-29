@@ -249,21 +249,16 @@ pub fn resizeUpdatePosition(view: *Self, width: i32, height: i32) void {
     };
 
     if (data.edges.left) {
-        view.inflight_box.x += view.current_box.width - width;
+        view.inflight_box.x += view.inflight_box.width - width;
     }
 
     if (data.edges.top) {
-        view.inflight_box.y += view.current_box.height - height;
+        view.inflight_box.y += view.inflight_box.height - height;
     }
 }
 
 pub fn updateCurrent(view: *Self) void {
     const config = &server.config;
-
-    {
-        const box = view.inflight_box;
-        std.debug.print("updateCurrent start: {} {} {} {}\n", .{ box.x, box.y, box.width, box.height });
-    }
 
     switch (view.impl) {
         .xdg_toplevel => |*xdg_toplevel| {
@@ -337,11 +332,6 @@ pub fn updateCurrent(view: *Self) void {
     view.borders.bottom.node.setPosition(0, box.height);
     view.borders.bottom.setSize(box.width, border_width);
     view.borders.bottom.setColor(color);
-
-    {
-        const b = view.current_box;
-        std.debug.print("updateCurrent end: {} {} {} {}\n", .{ b.x, b.y, b.width, b.height });
-    }
 }
 
 /// Returns true if the configure should be waited for by the transaction system.
@@ -463,26 +453,22 @@ pub fn getAppId(self: Self) ?[*:0]const u8 {
 
 /// Clamp the width/height of the box to the constraints of the view
 pub fn applyConstraints(self: *Self, box: *wlr.Box, state: State) void {
-    std.debug.print("unconstrained: {} {} {} {}\n", .{ box.x, box.y, box.width, box.height });
     box.width = math.clamp(box.width, self.constraints.min_width, self.constraints.max_width);
     box.height = math.clamp(box.height, self.constraints.min_height, self.constraints.max_height);
 
     if (state.output) |output| {
-        var max_width: i32 = undefined;
-        var max_height: i32 = undefined;
-        output.wlr_output.effectiveResolution(&max_width, &max_height);
+        var output_width: i32 = undefined;
+        var output_height: i32 = undefined;
+        output.wlr_output.effectiveResolution(&output_width, &output_height);
 
         const border_width = if (state.ssd) server.config.border_width else 0;
-        max_width -= border_width * 2;
-        max_height -= border_width * 2;
 
-        box.width = math.min(box.width, max_width);
-        box.height = math.min(box.height, max_height);
+        box.width = math.min(box.width, output_width - border_width * 2);
+        box.height = math.min(box.height, output_height - border_width * 2);
 
-        box.x = math.min(box.x, max_width - box.width);
-        box.y = math.min(box.y, max_height - box.height);
+        box.x = math.clamp(box.x, border_width, output_width - border_width - box.width);
+        box.y = math.clamp(box.y, border_width, output_height - border_width - box.height);
     }
-    std.debug.print("constrained: {} {} {} {}\n", .{ box.x, box.y, box.width, box.height });
 }
 
 /// Called by the impl when the surface is ready to be displayed
