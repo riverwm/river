@@ -433,7 +433,45 @@ pub fn applyPending(root: *Self) void {
                         view.inflight_box.width +|= view.pending_delta.width;
                         view.inflight_box.height +|= view.pending_delta.height;
 
-                        view.applyConstraints(&view.inflight_box, view.inflight);
+                        {
+                            const math = std.math;
+                            const box = &view.inflight_box;
+
+                            var width = math.clamp(box.width, view.constraints.min_width, view.constraints.max_width);
+                            var height = math.clamp(box.height, view.constraints.min_height, view.constraints.max_height);
+
+                            var output_width: i32 = undefined;
+                            var output_height: i32 = undefined;
+                            output.wlr_output.effectiveResolution(&output_width, &output_height);
+
+                            const border_width = if (view.pending.ssd) server.config.border_width else 0;
+
+                            width = math.min(width, output_width - border_width * 2);
+                            height = math.min(height, output_height - border_width * 2);
+
+                            if (view.pending.resizing) {
+                                var seat_it = server.input_manager.seats.first;
+                                const data = while (seat_it) |n| : (seat_it = n.next) {
+                                    const cursor = &n.data.cursor;
+                                    switch (cursor.mode) {
+                                        .passthrough, .down, .move => {},
+                                        .resize => |data| break data,
+                                    }
+                                } else unreachable;
+                                if (data.edges.left) {
+                                    box.x += box.width - width;
+                                }
+                                if (data.edges.top) {
+                                    box.y += box.height - height;
+                                }
+                            } else {
+                                box.x = math.clamp(box.x, border_width, output_width - border_width - width);
+                                box.y = math.clamp(box.y, border_width, output_height - border_width - height);
+                            }
+
+                            box.width = width;
+                            box.height = height;
+                        }
                     } else if (view.inflight.float) {
                         // If switching from float to non-float, save the dimensions.
                         view.float_box = view.inflight_box;
@@ -512,7 +550,11 @@ pub fn applyPending(root: *Self) void {
 
             switch (cursor.mode) {
                 .passthrough, .down => {},
-                inline .move, .resize => |data| {
+                inline .move, .resize => |*data, tag| {
+                    if (tag == .resize and cursor.inflight_mode == .resize) {
+                        data.fixup_x = cursor.inflight_mode.resize.fixup_x;
+                        data.fixup_y = cursor.inflight_mode.resize.fixup_y;
+                    }
                     if (data.view.inflight.output == null or
                         data.view.inflight.tags & data.view.inflight.output.?.inflight.tags == 0 or
                         (!data.view.inflight.float and data.view.inflight.output.?.layout != null) or

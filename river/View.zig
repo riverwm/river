@@ -73,24 +73,6 @@ pub const State = struct {
     resizing: bool = false,
 };
 
-/// Modify the x/y of the given state by delta_x/delta_y, clamping to the
-/// bounds of the output.
-//pub fn move(state: *State, delta_x: i32, delta_y: i32) void {
-//    var output_width: i32 = math.maxInt(i32);
-//    var output_height: i32 = math.maxInt(i32);
-//    if (state.output) |output| {
-//        output.wlr_output.effectiveResolution(&output_width, &output_height);
-//    }
-//
-//    state.box.x += delta_x;
-//    state.box.x = math.min(state.box.x, output_width - state.box.width);
-//    state.box.x = math.max(state.box.x, 0);
-//
-//    state.box.y += delta_y;
-//    state.box.y = math.min(state.box.y, output_height - state.box.height);
-//    state.box.y = math.max(state.box.y, 0);
-//}
-
 /// The implementation of this view
 impl: Impl,
 
@@ -239,7 +221,7 @@ pub fn resizeUpdatePosition(view: *Self, width: i32, height: i32) void {
         while (it) |node| : (it = node.next) {
             const cursor = &node.data.cursor;
             if (cursor.inflight_mode == .resize and cursor.inflight_mode.resize.view == view) {
-                break :blk cursor.inflight_mode.resize;
+                break :blk &cursor.inflight_mode.resize;
             }
         } else {
             // The view resizing state should never be set when the view is
@@ -248,13 +230,33 @@ pub fn resizeUpdatePosition(view: *Self, width: i32, height: i32) void {
         }
     };
 
+    const box = &view.inflight_box;
+
+    box.x +|= data.fixup_x;
+    box.y +|= data.fixup_y;
+
     if (data.edges.left) {
-        view.inflight_box.x += view.inflight_box.width - width;
+        box.x += box.width - width;
     }
 
     if (data.edges.top) {
-        view.inflight_box.y += view.inflight_box.height - height;
+        box.y += box.height - height;
     }
+
+    var output_width: i32 = undefined;
+    var output_height: i32 = undefined;
+    view.inflight.output.?.wlr_output.effectiveResolution(&output_width, &output_height);
+
+    const border_width = if (view.inflight.ssd) server.config.border_width else 0;
+
+    const unconstrained_x = box.x;
+    const unconstrained_y = box.y;
+
+    box.x = math.clamp(box.x, border_width, output_width - border_width - width);
+    box.y = math.clamp(box.y, border_width, output_height - border_width - height);
+
+    data.fixup_x = unconstrained_x -| box.x;
+    data.fixup_y = unconstrained_y -| box.y;
 }
 
 pub fn updateCurrent(view: *Self) void {

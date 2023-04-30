@@ -79,6 +79,9 @@ const Mode = union(enum) {
         delta_x: f64 = 0,
         delta_y: f64 = 0,
 
+        fixup_x: i32 = 0,
+        fixup_y: i32 = 0,
+
         /// Resize edges, maximum of 2 are set and they may not be opposing edges.
         edges: wlr.Edges,
         /// Offset from the left or right edge
