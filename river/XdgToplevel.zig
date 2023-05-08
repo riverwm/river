@@ -139,6 +139,11 @@ pub fn configure(self: *Self) bool {
 
     _ = self.xdg_toplevel.setResizing(inflight.resizing);
 
+    // We need to call this wlroots function even if the inflight dimensions
+    // match the current dimensions in order to prevent wlroots internal state
+    // from getting out of sync in the case where a client has resized itself.
+    const configure_serial = self.xdg_toplevel.setSize(inflight.box.width, inflight.box.height);
+
     // Only track configures with the transaction system if they affect the dimensions of the view.
     if (inflight.box.width == current.box.width and
         inflight.box.height == current.box.height)
@@ -147,7 +152,7 @@ pub fn configure(self: *Self) bool {
     }
 
     self.configure_state = .{
-        .inflight = self.xdg_toplevel.setSize(inflight.box.width, inflight.box.height),
+        .inflight = configure_serial,
     };
 
     return true;
