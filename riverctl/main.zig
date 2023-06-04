@@ -47,8 +47,6 @@ pub const Globals = struct {
 
 pub fn main() !void {
     _main() catch |err| {
-        if (builtin.mode == .Debug) return err;
-
         switch (err) {
             error.RiverControlNotAdvertised => fatal(
                 \\The Wayland server does not support river-control-unstable-v1.
@@ -57,6 +55,14 @@ pub fn main() !void {
             error.SeatNotAdverstised => fatal(
                 \\The Wayland server did not advertise any seat.
             , .{}),
+            error.ConnectFailed => {
+                std.log.err("Unable to connect to the Wayland server.", .{});
+                if (os.getenvZ("WAYLAND_DISPLAY") == null) {
+                    fatal("WAYLAND_DISPLAY is not set.", .{});
+                } else {
+                    fatal("Does WAYLAND_DISPLAY contain the socket name of a running server?", .{});
+                }
+            },
             else => return err,
         }
     };
