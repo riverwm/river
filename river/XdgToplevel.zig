@@ -86,6 +86,7 @@ pub fn create(xdg_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
     self.view = view;
 
     xdg_toplevel.base.data = @ptrToInt(self);
+    xdg_toplevel.base.surface.data = @ptrToInt(&view.tree.node);
 
     // Add listeners that are active over the toplevel's entire lifetime
     xdg_toplevel.base.events.destroy.add(&self.destroy);
