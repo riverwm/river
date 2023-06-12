@@ -45,7 +45,7 @@ fn bind(client: *wl.Client, self: *Self, version: u32, id: u32) void {
         log.err("out of memory", .{});
         return;
     };
-    foreign_toplevel_list.setHandler(?*anyopaque, handleRequest, null, null);
+    foreign_toplevel_list.setHandler(*Self, handleRequest, handleDestroy, self);
     self.instances.append(foreign_toplevel_list);
 
     var it = server.root.views.iterator(.forward);
@@ -67,12 +67,19 @@ fn bind(client: *wl.Client, self: *Self, version: u32, id: u32) void {
 fn handleRequest(
     foreign_toplevel_list: *ext.ForeignToplevelListV1,
     request: ext.ForeignToplevelListV1.Request,
-    _: ?*anyopaque,
+    _: *Self,
 ) void {
     switch (request) {
         .destroy => foreign_toplevel_list.destroy(),
         .stop => {},
     }
+}
+
+fn handleDestroy(
+    foreign_toplevel_list: *ext.ForeignToplevelListV1,
+    _: *Self,
+) void {
+    foreign_toplevel_list.getLink().remove();
 }
 
 fn handleServerDestroy(listener: *wl.Listener(*wl.Server), _: *wl.Server) void {

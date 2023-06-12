@@ -600,6 +600,12 @@ pub fn notifyAppId(view: *Self) void {
 }
 
 pub fn addForeignToplevelListHandle(view: *Self, handle: *ext.ForeignToplevelHandleV1) void {
+    handle.setHandler(
+        *Self,
+        foreignToplevelHandleV1handleRequest,
+        foreignToplevelHandleV1handleDestroy,
+        view,
+    );
     view.foreign_toplevel_list_handles.append(handle);
     if (view.getTitle()) |title| handle.sendTitle(title);
     if (view.getAppId()) |app_id| handle.sendAppId(app_id);
@@ -612,4 +618,21 @@ pub fn addForeignToplevelListHandle(view: *Self, handle: *ext.ForeignToplevelHan
     };
     handle.sendIdentifier(id_str);
     handle.sendDone();
+}
+
+fn foreignToplevelHandleV1handleRequest(
+    handle: *ext.ForeignToplevelHandleV1,
+    request: ext.ForeignToplevelHandleV1.Request,
+    _: *Self,
+) void {
+    switch (request) {
+        .destroy => handle.destroy(),
+    }
+}
+
+fn foreignToplevelHandleV1handleDestroy(
+    handle: *ext.ForeignToplevelHandleV1,
+    _: *Self,
+) void {
+    handle.getLink().remove();
 }
