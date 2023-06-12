@@ -16,6 +16,7 @@
 
 const std = @import("std");
 const assert = std.debug.assert;
+const fmt = std.fmt;
 
 const server = &@import("../main.zig").server;
 
@@ -76,5 +77,28 @@ fn focusViewTarget(seat: *Seat, output: *Output, direction: Direction) ?*View {
 
             unreachable;
         },
+    }
+}
+
+pub fn focusViewById(
+    seat: *Seat,
+    args: []const [:0]const u8,
+    _: *?[]const u8,
+) Error!void {
+    if (args.len < 2) return Error.NotEnoughArguments;
+    if (args.len > 2) return Error.TooManyArguments;
+
+    if (seat.focused != .view) return;
+    if (seat.focused.view.pending.fullscreen) return;
+
+    const id = fmt.parseInt(u8, args[1], 10) catch return;
+
+    var it = server.root.views.iterator(.forward);
+    while (it.next()) |view| {
+        if (id == view.id) {
+            seat.focusOutput(view.pending.output);
+            seat.focus(view);
+            server.root.applyPending();
+        }
     }
 }
