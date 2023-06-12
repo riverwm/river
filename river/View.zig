@@ -21,6 +21,7 @@ const std = @import("std");
 const assert = std.debug.assert;
 const math = std.math;
 const os = std.os;
+const fmt = std.fmt;
 const wlr = @import("wlroots");
 const wayland = @import("wayland").server;
 const wl = wayland.wl;
@@ -175,6 +176,8 @@ foreign_toplevel_handle: ForeignToplevelHandle = .{},
 
 foreign_toplevel_list_handles: wl.list.Head(ext.ForeignToplevelHandleV1, null) = undefined,
 
+id: usize,
+
 pub fn create(impl: Impl) error{OutOfMemory}!*Self {
     assert(impl != .none);
 
@@ -205,6 +208,7 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Self {
         .pending_focus_stack_link = undefined,
         .inflight_wm_stack_link = undefined,
         .inflight_focus_stack_link = undefined,
+        .id = server.wl_server.nextSerial(),
     };
 
     view.foreign_toplevel_list_handles.init();
@@ -599,6 +603,13 @@ pub fn addForeignToplevelListHandle(view: *Self, handle: *ext.ForeignToplevelHan
     view.foreign_toplevel_list_handles.append(handle);
     if (view.getTitle()) |title| handle.sendTitle(title);
     if (view.getAppId()) |app_id| handle.sendAppId(app_id);
-    handle.sendIdentifier("TODO");
+
+    var buf: [1024]u8 = undefined;
+    const id_str = fmt.bufPrintZ(&buf, "{}", .{view.id}) catch {
+        handle.sendIdentifier("error?");
+        handle.sendDone();
+        return;
+    };
+    handle.sendIdentifier(id_str);
     handle.sendDone();
 }
