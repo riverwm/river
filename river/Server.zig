@@ -35,6 +35,7 @@ const Output = @import("Output.zig");
 const Root = @import("Root.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
 const StatusManager = @import("StatusManager.zig");
+const ForeignToplevelListManager = @import("ForeignToplevelListManager.zig");
 const XdgDecoration = @import("XdgDecoration.zig");
 const XdgToplevel = @import("XdgToplevel.zig");
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
@@ -75,6 +76,7 @@ config: Config,
 control: Control,
 status_manager: StatusManager,
 layout_manager: LayoutManager,
+foreign_toplevel_list_manager: ForeignToplevelListManager,
 idle_inhibitor_manager: IdleInhibitorManager,
 lock_manager: LockManager,
 
@@ -134,6 +136,7 @@ pub fn init(self: *Self) !void {
     try self.control.init();
     try self.status_manager.init();
     try self.layout_manager.init();
+    try self.foreign_toplevel_list_manager.init();
     try self.idle_inhibitor_manager.init();
     try self.lock_manager.init();
 

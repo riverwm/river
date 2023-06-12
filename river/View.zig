@@ -22,7 +22,9 @@ const assert = std.debug.assert;
 const math = std.math;
 const os = std.os;
 const wlr = @import("wlroots");
-const wl = @import("wayland").server.wl;
+const wayland = @import("wayland").server;
+const wl = wayland.wl;
+const ext = wayland.ext;
 
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
@@ -171,6 +173,8 @@ post_fullscreen_box: wlr.Box = undefined,
 
 foreign_toplevel_handle: ForeignToplevelHandle = .{},
 
+foreign_toplevel_list_handles: wl.list.Head(ext.ForeignToplevelHandleV1, null) = undefined,
+
 pub fn create(impl: Impl) error{OutOfMemory}!*Self {
     assert(impl != .none);
 
@@ -203,6 +207,8 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Self {
         .inflight_focus_stack_link = undefined,
     };
 
+    view.foreign_toplevel_list_handles.init();
+
     server.root.views.prepend(view);
     server.root.hidden.pending.focus_stack.prepend(view);
     server.root.hidden.pending.wm_stack.prepend(view);
@@ -226,6 +232,13 @@ pub fn destroy(view: *Self) void {
     assert(view.impl == .none);
 
     view.destroying = true;
+
+    var it = view.foreign_toplevel_list_handles.iterator(.forward);
+    while (it.next()) |handle| {
+        handle.sendClosed();
+        handle.sendDone();
+        handle.destroy();
+    }
 
     // If there are still saved buffers, then this view needs to be kept
     // around until the current transaction completes. This function will be
@@ -545,10 +558,18 @@ pub fn unmap(view: *Self) void {
     server.root.applyPending();
 }
 
-pub fn notifyTitle(view: *const Self) void {
-    if (view.foreign_toplevel_handle.wlr_handle) |wlr_handle| {
-        if (view.getTitle()) |title| wlr_handle.setTitle(title);
+pub fn notifyTitle(view: *Self) void {
+    if (view.getTitle()) |title| {
+        if (view.foreign_toplevel_handle.wlr_handle) |wlr_handle| {
+            wlr_handle.setTitle(title);
+        }
+        var it = view.foreign_toplevel_list_handles.iterator(.forward);
+        while (it.next()) |handle| {
+            handle.sendTitle(title);
+            handle.sendDone();
+        }
     }
+
     // Send title to all status listeners attached to a seat which focuses this view
     var seat_it = server.input_manager.seats.first;
     while (seat_it) |seat_node| : (seat_it = seat_node.next) {
@@ -561,8 +582,23 @@ pub fn notifyTitle(view: *const Self) void {
     }
 }
 
-pub fn notifyAppId(view: Self) void {
-    if (view.foreign_toplevel_handle.wlr_handle) |wlr_handle| {
-        if (view.getAppId()) |app_id| wlr_handle.setAppId(app_id);
+pub fn notifyAppId(view: *Self) void {
+    if (view.getAppId()) |app_id| {
+        if (view.foreign_toplevel_handle.wlr_handle) |wlr_handle| {
+            wlr_handle.setAppId(app_id);
+        }
+        var it = view.foreign_toplevel_list_handles.iterator(.forward);
+        while (it.next()) |handle| {
+            handle.sendAppId(app_id);
+            handle.sendDone();
+        }
     }
+}
+
+pub fn addForeignToplevelListHandle(view: *Self, handle: *ext.ForeignToplevelHandleV1) void {
+    view.foreign_toplevel_list_handles.append(handle);
+    if (view.getTitle()) |title| handle.sendTitle(title);
+    if (view.getAppId()) |app_id| handle.sendAppId(app_id);
+    handle.sendIdentifier("TODO");
+    handle.sendDone();
 }

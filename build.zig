@@ -95,6 +95,7 @@ pub fn build(b: *zbs.Builder) !void {
     scanner.addProtocolPath("protocol/river-control-unstable-v1.xml");
     scanner.addProtocolPath("protocol/river-status-unstable-v1.xml");
     scanner.addProtocolPath("protocol/river-layout-v3.xml");
+    scanner.addProtocolPath("protocol/ext-foreign-toplevel-list-v1");
     scanner.addProtocolPath("protocol/wlr-layer-shell-unstable-v1.xml");
     scanner.addProtocolPath("protocol/wlr-output-power-management-unstable-v1.xml");
 
@@ -112,6 +113,7 @@ pub fn build(b: *zbs.Builder) !void {
     scanner.generate("zwp_pointer_constraints_v1", 1);
     scanner.generate("zxdg_decoration_manager_v1", 1);
     scanner.generate("ext_session_lock_manager_v1", 1);
+    scanner.generate("ext_foreign_toplevel_list_v1", 1);
 
     scanner.generate("zriver_control_v1", 1);
     scanner.generate("zriver_status_manager_v1", 4);
