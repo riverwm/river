@@ -252,8 +252,11 @@ pub fn resizeUpdatePosition(view: *Self, width: i32, height: i32) void {
     const unconstrained_x = box.x;
     const unconstrained_y = box.y;
 
-    box.x = math.clamp(box.x, border_width, output_width - border_width - width);
-    box.y = math.clamp(box.y, border_width, output_height - border_width - height);
+    box.x = math.min(box.x, output_width - border_width - width);
+    box.x = math.max(box.x, border_width);
+
+    box.y = math.min(box.y, output_height - border_width - height);
+    box.y = math.max(box.y, border_width);
 
     data.fixup_x = unconstrained_x -| box.x;
     data.fixup_y = unconstrained_y -| box.y;
