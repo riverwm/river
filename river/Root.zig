@@ -19,6 +19,7 @@ const Self = @This();
 const build_options = @import("build_options");
 const std = @import("std");
 const assert = std.debug.assert;
+const math = std.math;
 const mem = std.mem;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
@@ -117,6 +118,9 @@ transaction_timeout: *wl.EventSource,
 /// If true when a transaction completes will cause applyPending() to be called again.
 pending_state_dirty: bool = false,
 
+/// Incremental counter for view IDs.
+view_id_counter: usize = 0,
+
 pub fn init(self: *Self) !void {
     const output_layout = try wlr.OutputLayout.create();
     errdefer output_layout.destroy();
@@ -201,6 +205,20 @@ pub fn deinit(self: *Self) void {
     self.scene.tree.node.destroy();
     self.output_layout.destroy();
     self.transaction_timeout.remove();
+}
+
+pub fn nextViewId(self: *Self) usize {
+    defer {
+        // Theoretically it is possible to reach the end in a really long-running
+        // session. At that point, we can wrap around back to 0, because the
+        // chance of views with those low IDs still being open is ifinitesimal.
+        if (self.view_id_counter == math.maxInt(usize)) {
+            self.view_id_counter = 0;
+        } else {
+            self.view_id_counter += 1;
+        }
+    }
+    return self.view_id_counter;
 }
 
 pub const AtResult = struct {

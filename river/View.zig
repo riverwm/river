@@ -208,7 +208,7 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Self {
         .pending_focus_stack_link = undefined,
         .inflight_wm_stack_link = undefined,
         .inflight_focus_stack_link = undefined,
-        .id = server.wl_server.nextSerial(),
+        .id = server.root.nextViewId(),
     };
 
     view.foreign_toplevel_list_handles.init();

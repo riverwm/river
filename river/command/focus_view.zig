@@ -91,7 +91,7 @@ pub fn focusViewById(
     if (seat.focused != .view) return;
     if (seat.focused.view.pending.fullscreen) return;
 
-    const id = fmt.parseInt(u8, args[1], 10) catch return;
+    const id = fmt.parseInt(usize, args[1], 10) catch return;
 
     var it = server.root.views.iterator(.forward);
     while (it.next()) |view| {
