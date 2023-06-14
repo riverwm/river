@@ -18,6 +18,8 @@ const Self = @This();
 
 const build_options = @import("build_options");
 const std = @import("std");
+const rand = std.rand;
+const os = std.os;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
@@ -43,6 +45,8 @@ const XwaylandView = @import("XwaylandView.zig");
 const log = std.log.scoped(.server);
 
 wl_server: *wl.Server,
+
+rng: rand.DefaultPrng,
 
 sigint_source: *wl.EventSource,
 sigterm_source: *wl.EventSource,
@@ -79,6 +83,11 @@ idle_inhibitor_manager: IdleInhibitorManager,
 lock_manager: LockManager,
 
 pub fn init(self: *Self) !void {
+    // Seed RNG.
+    var now: os.timespec = undefined;
+    os.clock_gettime(os.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported!");
+    self.rng = rand.DefaultPrng.init(@intCast(u64, now.tv_nsec));
+
     self.wl_server = try wl.Server.create();
     errdefer self.wl_server.destroy();
 
@@ -301,4 +310,14 @@ fn handleRequestActivate(
             log.info("ignoring xdg-activation-v1 activate request of {s} surface", .{@tagName(tag)});
         },
     }
+}
+
+pub fn getUniqueId(self: *Self) ![:0]const u8 {
+    const random = self.rng.random();
+    var buf: [16]u8 = undefined;
+    for (buf) |*chr| {
+        // Random character from ASCII lower case block.
+        chr.* = 97 + random.uintLessThan(u8, 26);
+    }
+    return try util.gpa.dupeZ(u8, &buf);
 }
