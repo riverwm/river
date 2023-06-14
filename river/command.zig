@@ -55,6 +55,7 @@ const command_impls = std.ComptimeStringMap(
         .{ "focus-output",              @import("command/output.zig").focusOutput },
         .{ "focus-previous-tags",       @import("command/tags.zig").focusPreviousTags },
         .{ "focus-view",                @import("command/focus_view.zig").focusView },
+        .{ "focus-view-by-id",          @import("command/by-id.zig").focusViewById },
         .{ "hide-cursor",               @import("command/cursor.zig").cursor },
         .{ "input",                     @import("command/input.zig").input },
         .{ "keyboard-group-add",        @import("command/keyboard_group.zig").keyboardGroupAdd },
