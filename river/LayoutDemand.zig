@@ -98,6 +98,8 @@ pub fn pushViewDimensions(self: *Self, x: i32, y: i32, width: u31, height: u31) 
 
 /// Apply the proposed layout to the output
 pub fn apply(self: *Self, layout: *Layout) void {
+    // Note: output.layout may not be equal to layout here if the layout
+    // namespace changes while a transactions is inflight.
     const output = layout.output;
 
     // Whether the layout demand succeeds or fails, we are done with it and
@@ -152,5 +154,4 @@ pub fn apply(self: *Self, layout: *Layout) void {
         }
     }
     assert(i == self.view_boxen.len);
-    assert(output.layout == layout);
 }
