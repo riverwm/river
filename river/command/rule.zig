@@ -24,7 +24,6 @@ const server = &@import("../main.zig").server;
 const util = @import("../util.zig");
 
 const Error = @import("../command.zig").Error;
-const RuleList = @import("../RuleList.zig");
 const Seat = @import("../Seat.zig");
 const View = @import("../View.zig");
 
@@ -95,14 +94,12 @@ pub fn ruleDel(_: *Seat, args: []const [:0]const u8, _: *?[]const u8) Error!void
             server.config.float_rules.del(.{
                 .app_id_glob = app_id_glob,
                 .title_glob = title_glob,
-                .value = (action == .float),
             });
         },
         .ssd, .csd => {
             server.config.ssd_rules.del(.{
                 .app_id_glob = app_id_glob,
                 .title_glob = title_glob,
-                .value = (action == .ssd),
             });
             apply_ssd_rules();
             server.root.applyPending();

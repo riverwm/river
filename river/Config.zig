@@ -25,7 +25,7 @@ const util = @import("util.zig");
 
 const Server = @import("Server.zig");
 const Mode = @import("Mode.zig");
-const RuleList = @import("RuleList.zig");
+const RuleList = @import("rule_list.zig").RuleList;
 
 pub const AttachMode = enum {
     top,
@@ -73,8 +73,8 @@ mode_to_id: std.StringHashMap(u32),
 /// All user-defined keymap modes, indexed by mode id
 modes: std.ArrayListUnmanaged(Mode),
 
-float_rules: RuleList = .{},
-ssd_rules: RuleList = .{},
+float_rules: RuleList(bool) = .{},
+ssd_rules: RuleList(bool) = .{},
 
 /// The selected focus_follows_cursor mode
 focus_follows_cursor: FocusFollowsCursorMode = .disabled,
