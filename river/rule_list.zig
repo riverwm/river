@@ -22,6 +22,11 @@ const util = @import("util.zig");
 
 const View = @import("View.zig");
 
+pub const MaxGlobLen = struct {
+    app_id: usize,
+    title: usize,
+};
+
 pub fn RuleList(comptime T: type) type {
     return struct {
         const Self = @This();

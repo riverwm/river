@@ -281,11 +281,11 @@ matches everything while _\*\*_ and the empty string are invalid.
 	If multiple rules in a list match a given view the most specific
 	rule will be applied. For example with the following rules
 	```
-	action  app-id  title
-	ssd     foo     bar
-	csd     foo     *
-	csd     *       bar
-	ssd     *       baz
+	app-id  title  action
+	foo     bar    ssd
+	foo     *      csd
+	*       bar    csd
+	*       baz    ssd
 	```
 	a view with app-id 'foo' and title 'bar' would get ssd despite matching
 	two csd rules as the first rule is most specific. Furthermore a view

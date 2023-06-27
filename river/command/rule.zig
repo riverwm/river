@@ -121,40 +121,35 @@ pub fn listRules(_: *Seat, args: []const [:0]const u8, out: *?[]const u8) Error!
     if (args.len > 2) return error.TooManyArguments;
 
     const list = std.meta.stringToEnum(enum { float, ssd }, args[1]) orelse return Error.UnknownOption;
-
-    const rules = switch (list) {
-        .float => server.config.float_rules.rules.items,
-        .ssd => server.config.ssd_rules.rules.items,
+    const max_glob_len = switch (list) {
+        .float => server.config.float_rules.getMaxGlobLen(),
+        .ssd => server.config.ssd_rules.getMaxGlobLen(),
     };
-
-    var action_column_max = "action".len;
-    var app_id_column_max = "app-id".len;
-    for (rules) |rule| {
-        const action = switch (list) {
-            .float => if (rule.value) "float" else "no-float",
-            .ssd => if (rule.value) "ssd" else "csd",
-        };
-        action_column_max = @max(action_column_max, action.len);
-        app_id_column_max = @max(app_id_column_max, rule.app_id_glob.len);
-    }
-    action_column_max += 2;
-    app_id_column_max += 2;
+    const app_id_column_max = 2 + @max("app-id".len, max_glob_len.app_id);
+    const title_column_max = 2 + @max("title".len, max_glob_len.title);
 
     var buffer = std.ArrayList(u8).init(util.gpa);
     const writer = buffer.writer();
 
-    try fmt.formatBuf("action", .{ .width = action_column_max, .alignment = .Left }, writer);
+    try fmt.formatBuf("title", .{ .width = title_column_max, .alignment = .Left }, writer);
     try fmt.formatBuf("app-id", .{ .width = app_id_column_max, .alignment = .Left }, writer);
-    try writer.writeAll("title\n");
+    try writer.writeAll("action\n");
 
-    for (rules) |rule| {
-        const action = switch (list) {
-            .float => if (rule.value) "float" else "no-float",
-            .ssd => if (rule.value) "ssd" else "csd",
-        };
-        try fmt.formatBuf(action, .{ .width = action_column_max, .alignment = .Left }, writer);
-        try fmt.formatBuf(rule.app_id_glob, .{ .width = app_id_column_max, .alignment = .Left }, writer);
-        try writer.print("{s}\n", .{rule.title_glob});
+    switch (list) {
+        .float, .ssd => {
+            const rules = switch (list) {
+                .float => server.config.float_rules.rules.items,
+                .ssd => server.config.ssd_rules.rules.items,
+            };
+            for (rules) |rule| {
+                try fmt.formatBuf(rule.title_glob, .{ .width = title_column_max, .alignment = .Left }, writer);
+                try fmt.formatBuf(rule.app_id_glob, .{ .width = app_id_column_max, .alignment = .Left }, writer);
+                try writer.print("{s}\n", .{switch (list) {
+                    .float => if (rule.value) "float" else "no-float",
+                    .ssd => if (rule.value) "ssd" else "csd",
+                }});
+            }
+        },
     }
 
     out.* = buffer.toOwnedSlice();
