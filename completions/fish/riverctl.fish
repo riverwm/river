@@ -83,9 +83,9 @@ complete -c riverctl -x -n '__fish_seen_subcommand_from unmap'                -a
 complete -c riverctl -x -n '__fish_seen_subcommand_from attach-mode'          -a 'top bottom'
 complete -c riverctl -x -n '__fish_seen_subcommand_from focus-follows-cursor' -a 'disabled normal always'
 complete -c riverctl -x -n '__fish_seen_subcommand_from set-cursor-warp'      -a 'disabled on-output-change on-focus-change'
-complete -c riverctl -x -n '__fish_seen_subcommand_from rule-add'             -a 'float no-float ssd csd'
-complete -c riverctl -x -n '__fish_seen_subcommand_from rule-del'             -a 'float no-float ssd csd'
-complete -c riverctl -x -n '__fish_seen_subcommand_from list-rules'           -a 'float ssd'
+complete -c riverctl -x -n '__fish_seen_subcommand_from rule-add'             -a 'float no-float ssd csd tag'
+complete -c riverctl -x -n '__fish_seen_subcommand_from rule-del'             -a 'float no-float ssd csd tag'
+complete -c riverctl -x -n '__fish_seen_subcommand_from list-rules'           -a 'float ssd tag'
 
 # Subcommands for 'input'
 complete -c riverctl -x -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 2' -a "(__riverctl_list_input_devices)"

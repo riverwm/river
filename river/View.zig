@@ -508,6 +508,7 @@ pub fn map(view: *Self) !void {
         view.pending.box.y = @divTrunc(math.max(0, output.usable_box.height - view.pending.box.height), 2);
 
         view.pending.tags = blk: {
+            if (server.config.tag_rules.match(view)) |tags| break :blk tags;
             const tags = output.pending.tags & server.config.spawn_tagmask;
             break :blk if (tags != 0) tags else output.pending.tags;
         };

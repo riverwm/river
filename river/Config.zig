@@ -75,6 +75,7 @@ modes: std.ArrayListUnmanaged(Mode),
 
 float_rules: RuleList(bool) = .{},
 ssd_rules: RuleList(bool) = .{},
+tag_rules: RuleList(u32) = .{},
 
 /// The selected focus_follows_cursor mode
 focus_follows_cursor: FocusFollowsCursorMode = .disabled,
@@ -150,6 +151,7 @@ pub fn deinit(self: *Self) void {
 
     self.float_rules.deinit();
     self.ssd_rules.deinit();
+    self.tag_rules.deinit();
 
     util.gpa.free(self.default_layout_namespace);
 

@@ -258,10 +258,11 @@ For example, _abc_ is matched by _a\*_, _\*a\*_, _\*b\*_, _\*c_, _abc_, and
 _\*_ but not matched by _\*a_, _b\*_, _\*b_, _c\*_, or _ab_. Note that _\*_
 matches everything while _\*\*_ and the empty string are invalid.
 
-*rule-add* _action_ [*-app-id* _glob_|*-title* _glob_]
+*rule-add* _action_ [*-app-id* _glob_|*-title* _glob_] [_argument_]
 	Add a rule that applies an _action_ to views with *app-id* and *title*
 	matched by the respective _glob_. Omitting *-app-id* or *-title*
 	is equivalent to passing *-app-id* _\*_ or *-title* _\*_.
+	Some actions require an _argument_.
 
 	The supported _action_ types are:
 
@@ -272,6 +273,8 @@ matches everything while _\*\*_ and the empty string are invalid.
 	  and existing views.
 	- *csd*: Use client-side decorations for the view. Applies to new
 	  and existing views.
+	- *tag*: Set the initial tags of the view. Requires the tags as
+	  an argument. Applies only to new views.
 
 	Both *float* and *no-float* rules are added to the same list,
 	which means that adding a *no-float* rule with the same arguments
@@ -300,7 +303,7 @@ matches everything while _\*\*_ and the empty string are invalid.
 *rule-del* _action_ [*-app-id* _glob_|*-title* _glob_]
 	Delete a rule created using *rule-add* with the given arguments.
 
-*list-rules* *float*|*ssd*
+*list-rules* *float*|*ssd*|*tag*
 	Print the specified rule list. The output is ordered from most specific
 	to least specific, the same order in which views are checked against
 	when searching for a match. Only the first matching rule in the list

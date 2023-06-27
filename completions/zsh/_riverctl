@@ -183,9 +183,9 @@ _riverctl()
                 focus-follows-cursor) _alternative 'arguments:args:(disabled normal always)' ;;
                 set-cursor-warp) _alternative 'arguments:args:(disabled on-output-change on-focus-change)' ;;
                 hide-cursor) _riverctl_hide_cursor ;;
-                rule-add) _alternative 'arguments:args:(float no-float ssd csd)' ;;
-                rule-del) _alternative 'arguments:args:(float no-float ssd csd)' ;;
-                list-rules) _alternative 'arguments:args:(float ssd)' ;;
+                rule-add) _alternative 'arguments:args:(float no-float ssd csd tag)' ;;
+                rule-del) _alternative 'arguments:args:(float no-float ssd csd tag)' ;;
+                list-rules) _alternative 'arguments:args:(float ssd tag)' ;;
                 *) return 0 ;;
             esac
         ;;

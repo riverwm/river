@@ -62,8 +62,8 @@ function __riverctl_completion ()
 			"focus-output"|"focus-view"|"send-to-output"|"swap") OPTS="next previous" ;;
 			"move"|"snap") OPTS="up down left right" ;;
 			"resize") OPTS="horizontal vertical" ;;
-			"rule-add"|"rule-del") OPTS="float no-float ssd csd" ;;
-			"list-rules") OPTS="float ssd" ;;
+			"rule-add"|"rule-del") OPTS="float no-float ssd csd tag" ;;
+			"list-rules") OPTS="float ssd tag" ;;
 			"map") OPTS="-release -repeat -layout" ;;
 			"unmap") OPTS="-release" ;;
 			"attach-mode") OPTS="top bottom" ;;
