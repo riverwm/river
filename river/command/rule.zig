@@ -52,6 +52,7 @@ pub fn ruleAdd(_: *Seat, args: []const [:0]const u8, _: *?[]const u8) Error!void
         .tag => 1,
     };
     if (result.args.len > positional_arguments_count) return Error.TooManyArguments;
+    if (result.args.len < positional_arguments_count) return Error.NotEnoughArguments;
 
     const app_id_glob = result.flags.@"app-id" orelse "*";
     const title_glob = result.flags.title orelse "*";
