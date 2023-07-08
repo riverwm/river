@@ -170,13 +170,13 @@ _riverctl()
         args)
             case "$words[1]" in
                 focus-output) _alternative 'arguments:args:(next previous)' ;;
-                focus-view) _alternative 'arguments:args:(next previous)' ;;
+                focus-view) _alternative 'arguments:args:(next previous up down left right)' ;;
                 input) _riverctl_input ;;
                 move) _alternative 'arguments:args:(up down left right)' ;;
                 resize) _alternative 'arguments:args:(horizontal vertical)' ;;
                 snap) _alternative 'arguments:args:(up down left right)' ;;
                 send-to-output) _alternative 'arguments:args:(next previous)' ;;
-                swap) _alternative 'arguments:args:(next previous)' ;;
+                swap) _alternative 'arguments:args:(next previous up down left right)' ;;
                 map) _alternative 'arguments:optional:(-release -repeat -layout)' ;;
                 unmap) _alternative 'arguments:optional:(-release)' ;;
                 attach-mode) _alternative 'arguments:args:(top bottom)' ;;

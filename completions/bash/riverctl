@@ -59,7 +59,8 @@ function __riverctl_completion ()
 	elif [ "${COMP_CWORD}" -eq 2 ]
 	then
 		case "${COMP_WORDS[1]}" in
-			"focus-output"|"focus-view"|"send-to-output"|"swap") OPTS="next previous" ;;
+			"focus-output"|"send-to-output") OPTS="next previous" ;;
+			"focus-view"|"swap") OPTS="next previous up down left right" ;;
 			"move"|"snap") OPTS="up down left right" ;;
 			"resize") OPTS="horizontal vertical" ;;
 			"rule-add"|"rule-del") OPTS="float no-float ssd csd tag" ;;

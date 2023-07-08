@@ -35,8 +35,9 @@ over the Wayland protocol.
 	Focus the next or previous output, the closest output in any direction
 	or an output by name.
 
-*focus-view* *next*|*previous*
-	Focus the next or previous view in the stack.
+*focus-view* *next*|*previous*|*up*|*down*|*left*|*right*
+	Focus the next or previous view in the stack or the closest view in
+	any direction.
 
 *move* *up*|*down*|*left*|*right* _delta_
 	Move the focused view in the specified direction by _delta_ logical
@@ -62,9 +63,9 @@ over the Wayland protocol.
 	*spawn* only takes a single argument. To spawn a command taking
 	multiple arguments, wrapping the command in quotes is recommended.
 
-*swap* *next*|*previous*
-	Swap the focused view with the next/previous visible non-floating
-	view. If the first/last view in the stack is focused, wrap.
+*swap* *next*|*previous*|*up*|*down*|*left*|*right*
+	Swap the focused view with the next or previous non-floating view in the
+	stack or the closest non-floating view in any direction.
 
 *toggle-float*
 	Toggle the floating state of the focused view.
