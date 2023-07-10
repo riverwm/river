@@ -115,6 +115,7 @@ fn getTarget(seat: *Seat, direction_str: []const u8, target_mode: TargetMode) !?
         var target_distance: usize = std.math.maxInt(usize);
         var it = output.pending.wm_stack.iterator(.forward);
         while (it.next()) |view| {
+            if (output.pending.tags & view.pending.tags == 0) continue;
             if (target_mode == .skip_float and view.pending.float) continue;
             if (view == seat.focused.view) continue;
             const view_position = Vector.positionOfBox(view.current.box);
