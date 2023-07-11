@@ -40,6 +40,11 @@ pub fn add(self: *Self, new: u32) void {
     self.len += 1;
 }
 
+pub fn present(self: *Self, value: u32) bool {
+    for (self.items[0..self.len]) |item| if (value == item) return true;
+    return false;
+}
+
 pub fn remove(self: *Self, old: u32) bool {
     for (self.items[0..self.len], 0..) |item, idx| if (old == item) {
         self.len -= 1;
