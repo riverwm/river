@@ -24,4 +24,6 @@ pub usingnamespace @cImport({
     @cInclude("libevdev/libevdev.h");
 
     @cInclude("libinput.h");
+
+    @cInclude("xcb/xcb.h");
 });

@@ -149,6 +149,7 @@ pub fn build(b: *zbs.Builder) !void {
         river.linkLibC();
         river.linkSystemLibrary("libevdev");
         river.linkSystemLibrary("libinput");
+        river.linkSystemLibrary("xcb");
 
         river.addPackage(wayland);
         river.linkSystemLibrary("wayland-server");

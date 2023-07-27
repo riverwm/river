@@ -63,6 +63,7 @@ new_layer_surface: wl.Listener(*wlr.LayerSurfaceV1),
 
 xwayland: if (build_options.xwayland) *wlr.Xwayland else void,
 new_xwayland_surface: if (build_options.xwayland) wl.Listener(*wlr.XwaylandSurface) else void,
+xwayland_ready: if (build_options.xwayland) wl.Listener(void) else void,
 
 foreign_toplevel_manager: *wlr.ForeignToplevelManagerV1,
 
@@ -115,8 +116,12 @@ pub fn init(self: *Self) !void {
 
     if (build_options.xwayland) {
         self.xwayland = try wlr.Xwayland.create(self.wl_server, compositor, false);
+
         self.new_xwayland_surface.setNotify(handleNewXwaylandSurface);
         self.xwayland.events.new_surface.add(&self.new_xwayland_surface);
+
+        self.xwayland_ready.setNotify(handleXwaylandReady);
+        self.xwayland.events.ready.add(&self.xwayland_ready);
     }
 
     self.foreign_toplevel_manager = try wlr.ForeignToplevelManagerV1.create(self.wl_server);
@@ -187,6 +192,50 @@ pub fn start(self: Self) !void {
     if (build_options.xwayland) {
         if (c.setenv("DISPLAY", self.xwayland.display_name, 1) < 0) return error.SetenvError;
     }
+}
+
+// Set XWayland Global Scale
+//
+// This is done by connecting to the XWayland server over socket, and
+// sending a property change update for global output scale
+//
+// Both xserver's xwayland binary, as well as wlroots, must be patched to support this.
+// - https://gitlab.freedesktop.org/lilydjwg/wlroots/-/commit/c4ddb89686d84f8250b66a28471c5cb6e085e855
+// - https://gitlab.freedesktop.org/xorg/xserver/-/merge_requests/733
+fn setXwaylandScale(self: *Self) void {
+    const xcb_conn = c.xcb_connect(self.xwayland.display_name, null);
+    defer c.xcb_disconnect(xcb_conn);
+
+    var scale: u32 = 1;
+    const output = self.input_manager.defaultSeat().focused_output;
+    if (output != &self.root.noop_output) {
+        scale = @floatToInt(u32, output.wlr_output.scale);
+    }
+
+    const atom_name = "_XWAYLAND_GLOBAL_OUTPUT_SCALE";
+    const atom_cookie = c.xcb_intern_atom(xcb_conn, 1, atom_name.len, atom_name);
+    const atom_reply = c.xcb_intern_atom_reply(xcb_conn, atom_cookie, null);
+
+    if (atom_reply == null) {
+        log.warn("no {s} atom, xwayland output scaling not supported", .{atom_name});
+    } else {
+        const screen = c.xcb_setup_roots_iterator(c.xcb_get_setup(xcb_conn)).data;
+        const atom_id = atom_reply.*.atom;
+        const window_id = screen.*.root;
+
+        log.debug("setting xwayland scale atom `{}` to `{}` on root window `{}`", .{ atom_id, scale, window_id });
+        const err_cookie = c.xcb_change_property_checked(xcb_conn, c.XCB_PROP_MODE_REPLACE, window_id, atom_id, c.XCB_ATOM_CARDINAL, 32, 1, &scale);
+        const err = c.xcb_request_check(xcb_conn, err_cookie);
+        if (err != null) {
+            log.warn("unable to set xwayland scale atom: {}", .{err.*.error_code});
+        }
+        _ = c.xcb_flush(xcb_conn);
+    }
+}
+
+fn handleXwaylandReady(listener: *wl.Listener(void)) void {
+    const self = @fieldParentPtr(Self, "xwayland_ready", listener);
+    self.setXwaylandScale();
 }
 
 /// Handle SIGINT and SIGTERM by gracefully stopping the server
