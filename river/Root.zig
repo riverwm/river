@@ -105,7 +105,8 @@ power_manager_set_mode: wl.Listener(*wlr.OutputPowerManagerV1.event.SetMode) =
 /// A list of all outputs
 all_outputs: std.TailQueue(*Output) = .{},
 
-/// A list of all active outputs. See Output.active
+/// A list of all active outputs (any one that can be interacted with, even if
+/// it's turned off by dpms)
 outputs: std.TailQueue(Output) = .{},
 
 /// Number of layout demands before sending configures to clients.
@@ -114,7 +115,7 @@ inflight_layout_demands: u32 = 0,
 inflight_configures: u32 = 0,
 transaction_timeout: *wl.EventSource,
 /// Set to true if applyPending() is called while a transaction is inflight.
-/// If true when a transaction completes will cause applyPending() to be called again.
+/// If true when a transaction completes, causes applyPending() to be called again.
 pending_state_dirty: bool = false,
 
 pub fn init(self: *Self) !void {
@@ -255,7 +256,7 @@ fn handleNewOutput(_: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
     };
 }
 
-/// Remove the output from self.outputs and evacuate views if it is a member of
+/// Remove the output from root.outputs and evacuate views if it is a member of
 /// the list. The node is not freed
 pub fn removeOutput(root: *Self, output: *Output) void {
     {
@@ -288,7 +289,7 @@ pub fn removeOutput(root: *Self, output: *Output) void {
         root.fallback.inflight.wm_stack.prependList(&output.inflight.wm_stack);
     }
     // Use the first output in the list as fallback. If the last real output
-    // is being removed store the views in Root.hidden.
+    // is being removed, store the views in Root.fallback.
     const fallback_output = if (root.outputs.first) |node| &node.data else null;
     if (fallback_output) |fallback| {
         var it = output.pending.focus_stack.safeIterator(.reverse);
@@ -328,7 +329,7 @@ pub fn removeOutput(root: *Self, output: *Output) void {
     output.status.init();
 }
 
-/// Add the output to self.outputs and the output layout if it has not
+/// Add the output to root.outputs and the output layout if it has not
 /// already been added.
 pub fn addOutput(root: *Self, output: *Output) void {
     const node = @fieldParentPtr(std.TailQueue(Output).Node, "data", output);
@@ -348,7 +349,7 @@ pub fn addOutput(root: *Self, output: *Output) void {
     output.tree.node.setEnabled(true);
     output.tree.node.setPosition(layout_output.x, layout_output.y);
 
-    // If we previously had no outputs move all views to the new output and focus it.
+    // If we previously had no outputs, move all views to the new output and focus it.
     if (root.outputs.len == 1) {
         output.pending.tags = root.fallback.tags;
         {

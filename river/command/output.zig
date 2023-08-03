@@ -36,7 +36,7 @@ pub fn focusOutput(
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
 
-    // If the noop output is focused, there are no other outputs to switch to
+    // If the fallback pseudo-output is focused, there are no other outputs to switch to
     if (seat.focused_output == null) {
         assert(server.root.outputs.len == 0);
         return;
@@ -60,7 +60,7 @@ pub fn sendToOutput(
     if (result.args.len < 1) return Error.NotEnoughArguments;
     if (result.args.len > 1) return Error.TooManyArguments;
 
-    // If the noop output is focused, there is nowhere to send the view
+    // If the fallback pseudo-output is focused, there is nowhere to send the view
     if (seat.focused_output == null) {
         assert(server.root.outputs.len == 0);
         return;
