@@ -69,7 +69,7 @@ pub fn create(client: *wl.Client, version: u32, id: u32, output: *Output, namesp
 /// Returns true if the given namespace is already in use on the given output
 /// or on another output by a different client.
 fn namespaceInUse(namespace: []const u8, output: *Output, client: *wl.Client) bool {
-    var output_it = server.root.outputs.first;
+    var output_it = server.root.active_outputs.first;
     while (output_it) |output_node| : (output_it = output_node.next) {
         var layout_it = output_node.data.layouts.first;
         if (output_node.data.wlr_output == output.wlr_output) {

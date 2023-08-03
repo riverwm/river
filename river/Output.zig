@@ -352,7 +352,7 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
     log.debug("output '{s}' destroyed", .{output.wlr_output.name});
 
     // Remove the destroyed output from root if it wasn't already removed
-    server.root.removeOutput(output);
+    server.root.deactivateOutput(output);
 
     assert(output.pending.focus_stack.empty());
     assert(output.pending.wm_stack.empty());
@@ -412,9 +412,9 @@ fn handleEnable(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) vo
         self.locked_content.node.setEnabled(true);
     }
 
-    // Add the output to root.outputs and the output layout if it has not
+    // Add the output to root.active_outputs and the output layout if it has not
     // already been added.
-    if (wlr_output.enabled) server.root.addOutput(self);
+    if (wlr_output.enabled) server.root.activateOutput(self);
 }
 
 fn handleMode(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {

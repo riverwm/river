@@ -138,7 +138,7 @@ fn handleLockSurfacesTimeout(manager: *LockManager) c_int {
     manager.state = .waiting_for_blank;
 
     {
-        var it = server.root.outputs.first;
+        var it = server.root.active_outputs.first;
         while (it) |node| : (it = node.next) {
             const output = &node.data;
 
@@ -157,7 +157,7 @@ pub fn maybeLock(manager: *LockManager) void {
     var all_outputs_blanked = true;
     var all_outputs_rendered_lock_surface = true;
     {
-        var it = server.root.outputs.first;
+        var it = server.root.active_outputs.first;
         while (it) |node| : (it = node.next) {
             const output = &node.data;
             switch (output.lock_render_state) {
@@ -205,7 +205,7 @@ fn handleUnlock(listener: *wl.Listener(void)) void {
     log.info("session unlocked", .{});
 
     {
-        var it = server.root.outputs.first;
+        var it = server.root.active_outputs.first;
         while (it) |node| : (it = node.next) {
             const output = &node.data;
 

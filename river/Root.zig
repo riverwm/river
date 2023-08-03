@@ -107,7 +107,7 @@ all_outputs: std.TailQueue(*Output) = .{},
 
 /// A list of all active outputs (any one that can be interacted with, even if
 /// it's turned off by dpms)
-outputs: std.TailQueue(Output) = .{},
+active_outputs: std.TailQueue(Output) = .{},
 
 /// Number of layout demands before sending configures to clients.
 inflight_layout_demands: u32 = 0,
@@ -256,19 +256,19 @@ fn handleNewOutput(_: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
     };
 }
 
-/// Remove the output from root.outputs and evacuate views if it is a member of
-/// the list. The node is not freed
-pub fn removeOutput(root: *Self, output: *Output) void {
+/// Remove the output from root.active_outputs and evacuate views if it is a
+/// member of the list. The node is not freed
+pub fn deactivateOutput(root: *Self, output: *Output) void {
     {
         const node = @fieldParentPtr(std.TailQueue(Output).Node, "data", output);
 
         // If the node has already been removed, do nothing
-        var output_it = root.outputs.first;
+        var output_it = root.active_outputs.first;
         while (output_it) |n| : (output_it = n.next) {
             if (n == node) break;
         } else return;
 
-        root.outputs.remove(node);
+        root.active_outputs.remove(node);
     }
 
     if (output.inflight.layout_demand) |layout_demand| {
@@ -290,7 +290,7 @@ pub fn removeOutput(root: *Self, output: *Output) void {
     }
     // Use the first output in the list as fallback. If the last real output
     // is being removed, store the views in Root.fallback.
-    const fallback_output = if (root.outputs.first) |node| &node.data else null;
+    const fallback_output = if (root.active_outputs.first) |node| &node.data else null;
     if (fallback_output) |fallback| {
         var it = output.pending.focus_stack.safeIterator(.reverse);
         while (it.next()) |view| view.setPendingOutput(fallback);
@@ -329,16 +329,16 @@ pub fn removeOutput(root: *Self, output: *Output) void {
     output.status.init();
 }
 
-/// Add the output to root.outputs and the output layout if it has not
+/// Add the output to root.active_outputs and the output layout if it has not
 /// already been added.
-pub fn addOutput(root: *Self, output: *Output) void {
+pub fn activateOutput(root: *Self, output: *Output) void {
     const node = @fieldParentPtr(std.TailQueue(Output).Node, "data", output);
 
     // If we have already added the output, do nothing and return
-    var output_it = root.outputs.first;
+    var output_it = root.active_outputs.first;
     while (output_it) |n| : (output_it = n.next) if (n == node) return;
 
-    root.outputs.append(node);
+    root.active_outputs.append(node);
 
     // This arranges outputs from left-to-right in the order they appear. The
     // wlr-output-management protocol may be used to modify this arrangement.
@@ -350,7 +350,7 @@ pub fn addOutput(root: *Self, output: *Output) void {
     output.tree.node.setPosition(layout_output.x, layout_output.y);
 
     // If we previously had no outputs, move all views to the new output and focus it.
-    if (root.outputs.len == 1) {
+    if (root.active_outputs.len == 1) {
         output.pending.tags = root.fallback.tags;
         {
             var it = root.fallback.pending.focus_stack.safeIterator(.reverse);
@@ -411,7 +411,7 @@ pub fn applyPending(root: *Self) void {
     }
 
     {
-        var output_it = root.outputs.first;
+        var output_it = root.active_outputs.first;
         while (output_it) |node| : (output_it = node.next) {
             const output = &node.data;
 
@@ -469,7 +469,7 @@ pub fn applyPending(root: *Self) void {
     {
         // Layout demands can't be sent until after the inflight stacks of
         // all outputs have been updated.
-        var output_it = root.outputs.first;
+        var output_it = root.active_outputs.first;
         while (output_it) |node| : (output_it = node.next) {
             const output = &node.data;
             assert(output.inflight.layout_demand == null);
@@ -538,7 +538,7 @@ fn sendConfigures(root: *Self) void {
     assert(root.inflight_configures == 0);
 
     // Iterate over all views of all outputs
-    var output_it = root.outputs.first;
+    var output_it = root.active_outputs.first;
     while (output_it) |output_node| : (output_it = output_node.next) {
         const output = &output_node.data;
 
@@ -614,7 +614,7 @@ fn commitTransaction(root: *Self) void {
         }
     }
 
-    var output_it = root.outputs.first;
+    var output_it = root.active_outputs.first;
     while (output_it) |output_node| : (output_it = output_node.next) {
         const output = &output_node.data;
 
@@ -770,7 +770,7 @@ fn processOutputConfig(
                         output.updateBackgroundRect();
                         output.arrangeLayers();
                     } else {
-                        self.removeOutput(output);
+                        self.deactivateOutput(output);
                         self.output_layout.remove(output.wlr_output);
                         output.tree.node.setEnabled(false);
                     }
