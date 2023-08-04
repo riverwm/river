@@ -355,8 +355,6 @@ pub fn activateOutput(root: *Self, output: *Output) void {
         {
             var it = root.fallback.pending.focus_stack.safeIterator(.reverse);
             while (it.next()) |view| view.setPendingOutput(output);
-            assert(root.fallback.pending.focus_stack.empty());
-            assert(root.fallback.pending.wm_stack.empty());
         }
         {
             // Focus the new output with all seats
@@ -367,6 +365,8 @@ pub fn activateOutput(root: *Self, output: *Output) void {
             }
         }
     }
+    assert(root.fallback.pending.focus_stack.empty());
+    assert(root.fallback.pending.wm_stack.empty());
 
     root.applyPending();
 }
