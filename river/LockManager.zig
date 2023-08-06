@@ -138,10 +138,8 @@ fn handleLockSurfacesTimeout(manager: *LockManager) c_int {
     manager.state = .waiting_for_blank;
 
     {
-        var it = server.root.active_outputs.first;
-        while (it) |node| : (it = node.next) {
-            const output = &node.data;
-
+        var it = server.root.active_outputs.iterator(.forward);
+        while (it.next()) |output| {
             output.normal_content.node.setEnabled(false);
             output.locked_content.node.setEnabled(true);
         }
@@ -157,9 +155,8 @@ pub fn maybeLock(manager: *LockManager) void {
     var all_outputs_blanked = true;
     var all_outputs_rendered_lock_surface = true;
     {
-        var it = server.root.active_outputs.first;
-        while (it) |node| : (it = node.next) {
-            const output = &node.data;
+        var it = server.root.active_outputs.iterator(.forward);
+        while (it.next()) |output| {
             switch (output.lock_render_state) {
                 .pending_unlock, .unlocked, .pending_blank, .pending_lock_surface => {
                     all_outputs_blanked = false;
@@ -205,10 +202,8 @@ fn handleUnlock(listener: *wl.Listener(void)) void {
     log.info("session unlocked", .{});
 
     {
-        var it = server.root.active_outputs.first;
-        while (it) |node| : (it = node.next) {
-            const output = &node.data;
-
+        var it = server.root.active_outputs.iterator(.forward);
+        while (it.next()) |output| {
             assert(!output.normal_content.node.enabled);
             output.normal_content.node.setEnabled(true);
 

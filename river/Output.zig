@@ -41,6 +41,12 @@ const log = std.log.scoped(.output);
 
 wlr_output: *wlr.Output,
 
+/// For Root.all_outputs
+all_link: wl.list.Link,
+
+/// For Root.active_outputs
+active_link: wl.list.Link,
+
 /// The area left for views and other layer surfaces after applying the
 /// exclusive zones of exclusive layer surfaces.
 /// TODO: this should be part of the output's State
@@ -184,9 +190,8 @@ frame: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleFrame),
 present: wl.Listener(*wlr.Output.event.Present) = wl.Listener(*wlr.Output.event.Present).init(handlePresent),
 
 pub fn create(wlr_output: *wlr.Output) !void {
-    const node = try util.gpa.create(std.TailQueue(Self).Node);
-    errdefer util.gpa.destroy(node);
-    const output = &node.data;
+    const output = try util.gpa.create(Self);
+    errdefer util.gpa.destroy(output);
 
     if (!wlr_output.initRender(server.allocator, server.renderer)) return error.InitRenderFailed;
 
@@ -216,6 +221,8 @@ pub fn create(wlr_output: *wlr.Output) !void {
 
     output.* = .{
         .wlr_output = wlr_output,
+        .all_link = undefined,
+        .active_link = undefined,
         .tree = tree,
         .normal_content = normal_content,
         .locked_content = try tree.createSceneTree(),
@@ -279,9 +286,8 @@ pub fn create(wlr_output: *wlr.Output) !void {
 
     output.setTitle();
 
-    const ptr_node = try util.gpa.create(std.TailQueue(*Self).Node);
-    ptr_node.data = &node.data;
-    server.root.all_outputs.append(ptr_node);
+    output.active_link.init();
+    server.root.all_outputs.append(output);
 
     handleEnable(&output.enable, wlr_output);
 }
@@ -361,13 +367,7 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
     assert(output.inflight.layout_demand == null);
     assert(output.layouts.len == 0);
 
-    var it = server.root.all_outputs.first;
-    while (it) |all_node| : (it = all_node.next) {
-        if (all_node.data == output) {
-            server.root.all_outputs.remove(all_node);
-            break;
-        }
-    }
+    output.all_link.remove();
 
     output.destroy.link.remove();
     output.enable.link.remove();
@@ -381,8 +381,7 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
 
     output.wlr_output.data = 0;
 
-    const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", output);
-    util.gpa.destroy(node);
+    util.gpa.destroy(output);
 
     server.root.applyPending();
 }

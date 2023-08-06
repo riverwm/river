@@ -17,6 +17,7 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const mem = std.mem;
+const wl = @import("wayland").server.wl;
 const wlr = @import("wlroots");
 const flags = @import("flags");
 
@@ -38,7 +39,7 @@ pub fn focusOutput(
 
     // If the fallback pseudo-output is focused, there are no other outputs to switch to
     if (seat.focused_output == null) {
-        assert(server.root.active_outputs.len == 0);
+        assert(server.root.active_outputs.empty());
         return;
     }
 
@@ -62,7 +63,7 @@ pub fn sendToOutput(
 
     // If the fallback pseudo-output is focused, there is nowhere to send the view
     if (seat.focused_output == null) {
-        assert(server.root.active_outputs.len == 0);
+        assert(server.root.active_outputs.empty());
         return;
     }
 
@@ -86,12 +87,20 @@ pub fn sendToOutput(
 /// spacial direction
 fn getOutput(seat: *Seat, str: []const u8) !?*Output {
     if (std.meta.stringToEnum(Direction, str)) |direction| { // Logical direction
-        // Return the next/prev output in the list if there is one, else wrap
-        const focused_node = @fieldParentPtr(std.TailQueue(Output).Node, "data", seat.focused_output.?);
-        return switch (direction) {
-            .next => if (focused_node.next) |node| &node.data else &server.root.active_outputs.first.?.data,
-            .previous => if (focused_node.prev) |node| &node.data else &server.root.active_outputs.last.?.data,
+        // Return the next/prev output in the list
+        var link = &seat.focused_output.?.active_link;
+        link = switch (direction) {
+            .next => link.next.?,
+            .previous => link.prev.?,
         };
+        // Wrap around list head
+        if (link == &server.root.active_outputs.link) {
+            link = switch (direction) {
+                .next => link.next.?,
+                .previous => link.prev.?,
+            };
+        }
+        return @fieldParentPtr(Output, "active_link", link);
     } else if (std.meta.stringToEnum(wlr.OutputLayout.Direction, str)) |direction| { // Spacial direction
         var focus_box: wlr.Box = undefined;
         server.root.output_layout.getBox(seat.focused_output.?.wlr_output, &focus_box);
@@ -106,10 +115,10 @@ fn getOutput(seat: *Seat, str: []const u8) !?*Output {
         return @intToPtr(*Output, wlr_output.data);
     } else {
         // Check if an output matches by name
-        var it = server.root.active_outputs.first;
-        while (it) |node| : (it = node.next) {
-            if (mem.eql(u8, mem.span(node.data.wlr_output.name), str)) {
-                return &node.data;
+        var it = server.root.active_outputs.iterator(.forward);
+        while (it.next()) |output| {
+            if (mem.eql(u8, mem.span(output.wlr_output.name), str)) {
+                return output;
             }
         }
         return Error.InvalidOutputIndicator;

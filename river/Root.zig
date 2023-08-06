@@ -103,11 +103,11 @@ power_manager_set_mode: wl.Listener(*wlr.OutputPowerManagerV1.event.SetMode) =
     wl.Listener(*wlr.OutputPowerManagerV1.event.SetMode).init(handlePowerManagerSetMode),
 
 /// A list of all outputs
-all_outputs: std.TailQueue(*Output) = .{},
+all_outputs: wl.list.Head(Output, .all_link),
 
 /// A list of all active outputs (any one that can be interacted with, even if
 /// it's turned off by dpms)
-active_outputs: std.TailQueue(Output) = .{},
+active_outputs: wl.list.Head(Output, .active_link),
 
 /// Number of layout demands before sending configures to clients.
 inflight_layout_demands: u32 = 0,
@@ -175,6 +175,8 @@ pub fn init(self: *Self) !void {
         },
         .views = undefined,
         .output_layout = output_layout,
+        .all_outputs = undefined,
+        .active_outputs = undefined,
         .output_manager = try wlr.OutputManagerV1.create(server.wl_server),
         .power_manager = try wlr.OutputPowerManagerV1.create(server.wl_server),
         .transaction_timeout = transaction_timeout,
@@ -190,6 +192,8 @@ pub fn init(self: *Self) !void {
     self.fallback.inflight.wm_stack.init();
 
     self.views.init();
+    self.all_outputs.init();
+    self.active_outputs.init();
 
     server.backend.events.new_output.add(&self.new_output);
     self.output_manager.events.apply.add(&self.manager_apply);
@@ -257,18 +261,17 @@ fn handleNewOutput(_: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
 }
 
 /// Remove the output from root.active_outputs and evacuate views if it is a
-/// member of the list. The node is not freed
+/// member of the list.
 pub fn deactivateOutput(root: *Self, output: *Output) void {
     {
-        const node = @fieldParentPtr(std.TailQueue(Output).Node, "data", output);
-
-        // If the node has already been removed, do nothing
-        var output_it = root.active_outputs.first;
-        while (output_it) |n| : (output_it = n.next) {
-            if (n == node) break;
+        // If the output has already been removed, do nothing
+        var it = root.active_outputs.iterator(.forward);
+        while (it.next()) |o| {
+            if (o == output) break;
         } else return;
 
-        root.active_outputs.remove(node);
+        output.active_link.remove();
+        output.active_link.init();
     }
 
     if (output.inflight.layout_demand) |layout_demand| {
@@ -290,7 +293,12 @@ pub fn deactivateOutput(root: *Self, output: *Output) void {
     }
     // Use the first output in the list as fallback. If the last real output
     // is being removed, store the views in Root.fallback.
-    const fallback_output = if (root.active_outputs.first) |node| &node.data else null;
+    const fallback_output = blk: {
+        var it = root.active_outputs.iterator(.forward);
+        if (it.next()) |o| break :blk o;
+
+        break :blk null;
+    };
     if (fallback_output) |fallback| {
         var it = output.pending.focus_stack.safeIterator(.reverse);
         while (it.next()) |view| view.setPendingOutput(fallback);
@@ -332,13 +340,15 @@ pub fn deactivateOutput(root: *Self, output: *Output) void {
 /// Add the output to root.active_outputs and the output layout if it has not
 /// already been added.
 pub fn activateOutput(root: *Self, output: *Output) void {
-    const node = @fieldParentPtr(std.TailQueue(Output).Node, "data", output);
+    {
+        // If we have already added the output, do nothing and return
+        var it = root.active_outputs.iterator(.forward);
+        while (it.next()) |o| if (o == output) return;
+    }
 
-    // If we have already added the output, do nothing and return
-    var output_it = root.active_outputs.first;
-    while (output_it) |n| : (output_it = n.next) if (n == node) return;
+    const first = root.active_outputs.empty();
 
-    root.active_outputs.append(node);
+    root.active_outputs.append(output);
 
     // This arranges outputs from left-to-right in the order they appear. The
     // wlr-output-management protocol may be used to modify this arrangement.
@@ -350,7 +360,7 @@ pub fn activateOutput(root: *Self, output: *Output) void {
     output.tree.node.setPosition(layout_output.x, layout_output.y);
 
     // If we previously had no outputs, move all views to the new output and focus it.
-    if (root.active_outputs.len == 1) {
+    if (first) {
         output.pending.tags = root.fallback.tags;
         {
             var it = root.fallback.pending.focus_stack.safeIterator(.reverse);
@@ -411,10 +421,8 @@ pub fn applyPending(root: *Self) void {
     }
 
     {
-        var output_it = root.active_outputs.first;
-        while (output_it) |node| : (output_it = node.next) {
-            const output = &node.data;
-
+        var output_it = root.active_outputs.iterator(.forward);
+        while (output_it.next()) |output| {
             // Iterate the focus stack in order to ensure the currently focused/most
             // recently focused view that requests fullscreen is given fullscreen.
             output.inflight.fullscreen = null;
@@ -469,9 +477,8 @@ pub fn applyPending(root: *Self) void {
     {
         // Layout demands can't be sent until after the inflight stacks of
         // all outputs have been updated.
-        var output_it = root.active_outputs.first;
-        while (output_it) |node| : (output_it = node.next) {
-            const output = &node.data;
+        var output_it = root.active_outputs.iterator(.forward);
+        while (output_it.next()) |output| {
             assert(output.inflight.layout_demand == null);
             if (output.layout) |layout| {
                 var layout_count: u32 = 0;
@@ -538,10 +545,8 @@ fn sendConfigures(root: *Self) void {
     assert(root.inflight_configures == 0);
 
     // Iterate over all views of all outputs
-    var output_it = root.active_outputs.first;
-    while (output_it) |output_node| : (output_it = output_node.next) {
-        const output = &output_node.data;
-
+    var output_it = root.active_outputs.iterator(.forward);
+    while (output_it.next()) |output| {
         var focus_stack_it = output.inflight.focus_stack.iterator(.forward);
         while (focus_stack_it.next()) |view| {
             // This can happen if a view is unmapped while a layout demand including it is inflight
@@ -614,10 +619,8 @@ fn commitTransaction(root: *Self) void {
         }
     }
 
-    var output_it = root.active_outputs.first;
-    while (output_it) |output_node| : (output_it = output_node.next) {
-        const output = &output_node.data;
-
+    var output_it = root.active_outputs.iterator(.forward);
+    while (output_it.next()) |output| {
         if (output.inflight.tags != output.current.tags) {
             std.log.scoped(.output).debug(
                 "changing current focus: {b:0>10} to {b:0>10}",
@@ -798,9 +801,8 @@ fn currentOutputConfig(self: *Self) !*wlr.OutputConfigurationV1 {
     // this destroys all associated config heads as well
     errdefer config.destroy();
 
-    var it = self.all_outputs.first;
-    while (it) |node| : (it = node.next) {
-        const output = node.data;
+    var it = self.all_outputs.iterator(.forward);
+    while (it.next()) |output| {
         const head = try wlr.OutputConfigurationV1.Head.create(config, output.wlr_output);
 
         // If the output is not part of the layout (and thus disabled)

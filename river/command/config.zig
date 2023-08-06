@@ -45,9 +45,8 @@ pub fn backgroundColor(
     if (args.len > 2) return Error.TooManyArguments;
 
     server.config.background_color = try parseRgba(args[1]);
-    var it = server.root.all_outputs.first;
-    while (it) |node| : (it = node.next) {
-        const output = node.data;
+    var it = server.root.all_outputs.iterator(.forward);
+    while (it.next()) |output| {
         output.layers.background_color_rect.setColor(&server.config.background_color);
     }
 }

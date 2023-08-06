@@ -258,9 +258,9 @@ pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
     self.xcursor_manager = try wlr.XcursorManager.create(theme, size);
 
     // For each output, ensure a theme of the proper scale is loaded
-    var it = server.root.active_outputs.first;
-    while (it) |node| : (it = node.next) {
-        const wlr_output = node.data.wlr_output;
+    var it = server.root.active_outputs.iterator(.forward);
+    while (it.next()) |output| {
+        const wlr_output = output.wlr_output;
         self.xcursor_manager.load(wlr_output.scale) catch
             log.err("failed to load xcursor theme '{?s}' at scale {}", .{ theme, wlr_output.scale });
     }
