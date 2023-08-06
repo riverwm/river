@@ -274,12 +274,6 @@ pub fn deactivateOutput(root: *Self, output: *Output) void {
         output.active_link.init();
     }
 
-    if (output.inflight.layout_demand) |layout_demand| {
-        layout_demand.deinit();
-        output.inflight.layout_demand = null;
-    }
-    while (output.layouts.first) |node| node.data.destroy();
-
     {
         var it = output.inflight.focus_stack.iterator(.forward);
         while (it.next()) |view| {
@@ -335,6 +329,13 @@ pub fn deactivateOutput(root: *Self, output: *Output) void {
 
     output.status.deinit();
     output.status.init();
+
+    if (output.inflight.layout_demand) |layout_demand| {
+        layout_demand.deinit();
+        output.inflight.layout_demand = null;
+        root.notifyLayoutDemandDone();
+    }
+    while (output.layouts.first) |node| node.data.destroy();
 }
 
 /// Add the output to root.active_outputs and the output layout if it has not
