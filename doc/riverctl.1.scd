@@ -424,6 +424,12 @@ matches everything while _\*\*_ and the empty string are invalid.
 	"grp:ctrl_space_toggle"). See *xkeyboard-config*(7) for possible values and
 	more information.
 
+*keyboard-layout-file* _path_
+	Set the XKB layout for all keyboards from an XKB keymap file at the provided
+	path. Documentation for the XKB keymap file format can be found at the
+	following URL:
+	https://xkbcommon.org/doc/current/keymap-text-format-v1.html
+
 *keyboard-group-create* _group_name_
 	Create a keyboard group. A keyboard group collects multiple keyboards in
 	a single logical keyboard. This means that all state, like the active

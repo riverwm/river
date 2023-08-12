@@ -9,6 +9,7 @@ function __riverctl_completion ()
 			keyboard-group-add \
 			keyboard-group-remove \
 			keyboard-layout \
+			keyboard-layout-file \
 			exit \
 			focus-output \
 			focus-view \

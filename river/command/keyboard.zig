@@ -58,6 +58,42 @@ pub fn keyboardLayout(
     ) orelse return error.InvalidValue;
     defer new_keymap.unref();
 
+    applyLayout(new_keymap);
+}
+
+pub fn keyboardLayoutFile(
+    _: *Seat,
+    args: []const [:0]const u8,
+    _: *?[]const u8,
+) Error!void {
+    if (args.len < 2) return Error.NotEnoughArguments;
+    if (args.len > 2) return Error.TooManyArguments;
+
+    const file = std.fs.cwd().openFile(args[1], .{}) catch return error.CannotReadFile;
+    defer file.close();
+
+    // 1 GiB is arbitrarily chosen as an exceedingly large but not infinite upper bound.
+    const file_bytes = file.readToEndAlloc(util.gpa, 1024 * 1024 * 1024) catch |err| {
+        switch (err) {
+            error.FileTooBig, error.OutOfMemory => return error.OutOfMemory,
+            else => return error.CannotReadFile,
+        }
+    };
+    defer util.gpa.free(file_bytes);
+
+    const new_keymap = xkb.Keymap.newFromBuffer(
+        server.config.xkb_context,
+        file_bytes.ptr,
+        file_bytes.len,
+        .text_v1,
+        .no_flags,
+    ) orelse return error.CannotParseFile;
+    defer new_keymap.unref();
+
+    applyLayout(new_keymap);
+}
+
+fn applyLayout(new_keymap: *xkb.Keymap) void {
     server.config.keymap.unref();
     server.config.keymap = new_keymap.ref();
 
