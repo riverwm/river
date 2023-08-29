@@ -34,6 +34,8 @@ const Action = enum {
     csd,
     tag,
     output,
+    position,
+    dimensions,
 };
 
 pub fn ruleAdd(_: *Seat, args: []const [:0]const u8, _: *?[]const u8) Error!void {
@@ -51,6 +53,7 @@ pub fn ruleAdd(_: *Seat, args: []const [:0]const u8, _: *?[]const u8) Error!void
     const positional_arguments_count: u8 = switch (action) {
         .float, .@"no-float", .ssd, .csd => 1,
         .tag, .output => 2,
+        .position, .dimensions => 3,
     };
     if (result.args.len > positional_arguments_count) return Error.TooManyArguments;
     if (result.args.len < positional_arguments_count) return Error.NotEnoughArguments;
@@ -95,6 +98,30 @@ pub fn ruleAdd(_: *Seat, args: []const [:0]const u8, _: *?[]const u8) Error!void
                 .value = output_name,
             });
         },
+        .position => {
+            const x = try fmt.parseInt(u31, result.args[1], 10);
+            const y = try fmt.parseInt(u31, result.args[2], 10);
+            try server.config.position_rules.add(.{
+                .app_id_glob = app_id_glob,
+                .title_glob = title_glob,
+                .value = .{
+                    .x = x,
+                    .y = y,
+                },
+            });
+        },
+        .dimensions => {
+            const width = try fmt.parseInt(u31, result.args[1], 10);
+            const height = try fmt.parseInt(u31, result.args[2], 10);
+            try server.config.dimensions_rules.add(.{
+                .app_id_glob = app_id_glob,
+                .title_glob = title_glob,
+                .value = .{
+                    .width = width,
+                    .height = height,
+                },
+            });
+        },
     }
 }
 
@@ -132,6 +159,12 @@ pub fn ruleDel(_: *Seat, args: []const [:0]const u8, _: *?[]const u8) Error!void
                 util.gpa.free(output_rule);
             }
         },
+        .position => {
+            _ = server.config.position_rules.del(rule);
+        },
+        .dimensions => {
+            _ = server.config.dimensions_rules.del(rule);
+        },
     }
 }
 
@@ -153,12 +186,16 @@ pub fn listRules(_: *Seat, args: []const [:0]const u8, out: *?[]const u8) Error!
         ssd,
         tag,
         output,
+        position,
+        dimensions,
     }, args[1]) orelse return Error.UnknownOption;
     const max_glob_len = switch (list) {
         .float => server.config.float_rules.getMaxGlobLen(),
         .ssd => server.config.ssd_rules.getMaxGlobLen(),
         .tag => server.config.tag_rules.getMaxGlobLen(),
         .output => server.config.output_rules.getMaxGlobLen(),
+        .position => server.config.position_rules.getMaxGlobLen(),
+        .dimensions => server.config.dimensions_rules.getMaxGlobLen(),
     };
     const app_id_column_max = 2 + @max("app-id".len, max_glob_len.app_id);
     const title_column_max = 2 + @max("title".len, max_glob_len.title);
@@ -201,6 +238,22 @@ pub fn listRules(_: *Seat, args: []const [:0]const u8, out: *?[]const u8) Error!
                 try fmt.formatBuf(rule.title_glob, .{ .width = title_column_max, .alignment = .left }, writer);
                 try fmt.formatBuf(rule.app_id_glob, .{ .width = app_id_column_max, .alignment = .left }, writer);
                 try writer.print("{s}\n", .{rule.value});
+            }
+        },
+        .position => {
+            const rules = server.config.position_rules.rules.items;
+            for (rules) |rule| {
+                try fmt.formatBuf(rule.title_glob, .{ .width = title_column_max, .alignment = .left }, writer);
+                try fmt.formatBuf(rule.app_id_glob, .{ .width = app_id_column_max, .alignment = .left }, writer);
+                try writer.print("{d},{d}\n", .{ rule.value.x, rule.value.y });
+            }
+        },
+        .dimensions => {
+            const rules = server.config.dimensions_rules.rules.items;
+            for (rules) |rule| {
+                try fmt.formatBuf(rule.title_glob, .{ .width = title_column_max, .alignment = .left }, writer);
+                try fmt.formatBuf(rule.app_id_glob, .{ .width = app_id_column_max, .alignment = .left }, writer);
+                try writer.print("{d}x{d}\n", .{ rule.value.width, rule.value.height });
             }
         },
     }

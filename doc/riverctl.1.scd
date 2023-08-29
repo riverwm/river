@@ -274,11 +274,11 @@ For example, _abc_ is matched by _a\*_, _\*a\*_, _\*b\*_, _\*c_, _abc_, and
 _\*_ but not matched by _\*a_, _b\*_, _\*b_, _c\*_, or _ab_. Note that _\*_
 matches everything while _\*\*_ and the empty string are invalid.
 
-*rule-add* [*-app-id* _glob_|*-title* _glob_] _action_ [_argument_]
+*rule-add* [*-app-id* _glob_|*-title* _glob_] _action_ [_arguments_]
 	Add a rule that applies an _action_ to views with *app-id* and *title*
 	matched by the respective _glob_. Omitting *-app-id* or *-title*
 	is equivalent to passing *-app-id* _\*_ or *-title* _\*_.
-	Some actions require an _argument_.
+	Some actions require one or more _arguments_.
 
 	The supported _action_ types are:
 
@@ -298,6 +298,15 @@ matches everything while _\*\*_ and the empty string are invalid.
 	  with make: _HP Inc._, model: _HP 22w_, and serial: _CNC93720WF_, the
 	  identifier would be: _HP Inc. HP 22w CNC93720WF_. If the make, model, or
 	  serial is unknown, the word "Unknown" is used instead.
+	- *position*: Set the initial position of the view, clamping to the
+	  bounds of the output. Requires x and y coordinates of the view as
+	  arguments, both of which must be non-negative. Applies only to new views.
+	- *dimensions*: Set the initial dimensions of the view, clamping to the
+	  constraints of the view. Requires width and height of the view as
+	  arguments, both of which must be non-negative. Applies only to new views.
+	- *fullscreen*: Make the view fullscreen. Applies only to new views.
+	- *no-fullscreen*: Don't make the view fullscreen. Applies only to
+	  new views.
 
 	Both *float* and *no-float* rules are added to the same list,
 	which means that adding a *no-float* rule with the same arguments
@@ -323,10 +332,14 @@ matches everything while _\*\*_ and the empty string are invalid.
 	wishes of the client and may start the view floating based on simple
 	heuristics intended to catch popup-like views.
 
+	If a view is started fullscreen or is not floating, then *position* and
+	*dimensions* rules will have no effect  A view must be matched by a *float*
+	rule in order for them to take effect.
+
 *rule-del* [*-app-id* _glob_|*-title* _glob_] _action_
 	Delete a rule created using *rule-add* with the given arguments.
 
-*list-rules* *float*|*ssd*|*tag*
+*list-rules* *float*|*ssd*|*tag*|*position*|*dimensions*
 	Print the specified rule list. The output is ordered from most specific
 	to least specific, the same order in which views are checked against
 	when searching for a match. Only the first matching rule in the list

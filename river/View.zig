@@ -494,9 +494,19 @@ pub fn map(view: *Self) !void {
 
     const focused_output = server.input_manager.defaultSeat().focused_output;
     if (try server.config.outputRuleMatch(view) orelse focused_output) |output| {
-        // Center the initial pending box on the output
-        view.pending.box.x = @divTrunc(@max(0, output.usable_box.width - view.pending.box.width), 2);
-        view.pending.box.y = @divTrunc(@max(0, output.usable_box.height - view.pending.box.height), 2);
+        if (server.config.position_rules.match(view)) |position| {
+            view.pending.box.x = position.x;
+            view.pending.box.y = position.y;
+        } else {
+            // Center the initial pending box on the output
+            view.pending.box.x = @divTrunc(@max(0, output.usable_box.width - view.pending.box.width), 2);
+            view.pending.box.y = @divTrunc(@max(0, output.usable_box.height - view.pending.box.height), 2);
+        }
+
+        if (server.config.dimensions_rules.match(view)) |dimensions| {
+            view.pending.box.width = dimensions.width;
+            view.pending.box.height = dimensions.height;
+        }
 
         view.pending.tags = blk: {
             if (server.config.tag_rules.match(view)) |tags| break :blk tags;

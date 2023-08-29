@@ -55,6 +55,16 @@ pub const HideCursorWhenTypingMode = enum {
     enabled,
 };
 
+pub const Position = struct {
+    x: u31,
+    y: u31,
+};
+
+pub const Dimensions = struct {
+    width: u31,
+    height: u31,
+};
+
 /// Color of background in RGBA with premultiplied alpha (alpha should only affect nested sessions)
 background_color: [4]f32 = [_]f32{ 0.0, 0.16862745, 0.21176471, 1.0 }, // Solarized base03
 
@@ -81,6 +91,9 @@ float_rules: RuleList(bool) = .{},
 ssd_rules: RuleList(bool) = .{},
 tag_rules: RuleList(u32) = .{},
 output_rules: RuleList([]const u8) = .{},
+position_rules: RuleList(Position) = .{},
+dimensions_rules: RuleList(Dimensions) = .{},
+fullscreen_rules: RuleList(bool) = .{},
 
 /// The selected focus_follows_cursor mode
 focus_follows_cursor: FocusFollowsCursorMode = .disabled,
@@ -161,6 +174,9 @@ pub fn deinit(self: *Self) void {
         util.gpa.free(rule.value);
     }
     self.output_rules.deinit();
+    self.position_rules.deinit();
+    self.dimensions_rules.deinit();
+    self.fullscreen_rules.deinit();
 
     util.gpa.free(self.default_layout_namespace);
 
