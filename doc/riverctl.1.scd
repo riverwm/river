@@ -259,7 +259,7 @@ For example, _abc_ is matched by _a\*_, _\*a\*_, _\*b\*_, _\*c_, _abc_, and
 _\*_ but not matched by _\*a_, _b\*_, _\*b_, _c\*_, or _ab_. Note that _\*_
 matches everything while _\*\*_ and the empty string are invalid.
 
-*rule-add* _action_ [*-app-id* _glob_|*-title* _glob_] [_argument_]
+*rule-add* [*-app-id* _glob_|*-title* _glob_] _action_ [_argument_]
 	Add a rule that applies an _action_ to views with *app-id* and *title*
 	matched by the respective _glob_. Omitting *-app-id* or *-title*
 	is equivalent to passing *-app-id* _\*_ or *-title* _\*_.
@@ -301,7 +301,7 @@ matches everything while _\*\*_ and the empty string are invalid.
 	wishes of the client and may start the view floating based on simple
 	heuristics intended to catch popup-like views.
 
-*rule-del* _action_ [*-app-id* _glob_|*-title* _glob_]
+*rule-del* [*-app-id* _glob_|*-title* _glob_] _action_
 	Delete a rule created using *rule-add* with the given arguments.
 
 *list-rules* *float*|*ssd*|*tag*

@@ -1,5 +1,6 @@
 function __riverctl_completion ()
 {
+	local rule_actions="float no-float ssd csd tag"
 	if [ "${COMP_CWORD}" -eq 1 ]
 	then
 		OPTS=" \
@@ -63,7 +64,7 @@ function __riverctl_completion ()
 			"focus-view"|"swap") OPTS="next previous up down left right" ;;
 			"move"|"snap") OPTS="up down left right" ;;
 			"resize") OPTS="horizontal vertical" ;;
-			"rule-add"|"rule-del") OPTS="float no-float ssd csd tag" ;;
+			"rule-add"|"rule-del") OPTS="-app-id -title $rule_actions" ;;
 			"list-rules") OPTS="float ssd tag" ;;
 			"map") OPTS="-release -repeat -layout" ;;
 			"unmap") OPTS="-release" ;;
@@ -114,6 +115,24 @@ function __riverctl_completion ()
 				"scroll-method") OPTS="none two-finger edge button" ;;
 				*) return ;;
 			esac
+		elif [ "${COMP_WORDS[1]:0:5}" == "rule-" ]
+		then
+			case "${COMP_WORDS[2]}" in
+				"-app-id") OPTS="-title $rule_actions" ;;
+				"-title") OPTS="-app-id $rule_actions" ;;
+				*) return ;;
+			esac
+			COMPREPLY=($(compgen -W "${OPTS}" -- "${COMP_WORDS[4]}"))
+		fi
+	elif [ "${COMP_CWORD}" -eq 6 ]
+	then
+		if [ "${COMP_WORDS[1]:0:5}" == "rule-" ]
+		then
+			case "${COMP_WORDS[4]}" in
+				"-app-id"|"-title") OPTS="$rule_actions" ;;
+				*) return ;;
+			esac
+			COMPREPLY=($(compgen -W "${OPTS}" -- "${COMP_WORDS[6]}"))
 		fi
 	else
 		return

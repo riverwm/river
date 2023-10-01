@@ -36,20 +36,20 @@ const Action = enum {
 };
 
 pub fn ruleAdd(_: *Seat, args: []const [:0]const u8, _: *?[]const u8) Error!void {
-    if (args.len < 2) return Error.NotEnoughArguments;
-
     const result = flags.parser([:0]const u8, &.{
         .{ .name = "app-id", .kind = .arg },
         .{ .name = "title", .kind = .arg },
-    }).parse(args[2..]) catch {
+    }).parse(args[1..]) catch {
         return error.InvalidValue;
     };
 
-    const action = std.meta.stringToEnum(Action, args[1]) orelse return Error.UnknownOption;
+    if (result.args.len < 1) return Error.NotEnoughArguments;
+
+    const action = std.meta.stringToEnum(Action, result.args[0]) orelse return Error.UnknownOption;
 
     const positional_arguments_count: u8 = switch (action) {
-        .float, .@"no-float", .ssd, .csd => 0,
-        .tag => 1,
+        .float, .@"no-float", .ssd, .csd => 1,
+        .tag => 2,
     };
     if (result.args.len > positional_arguments_count) return Error.TooManyArguments;
     if (result.args.len < positional_arguments_count) return Error.NotEnoughArguments;
@@ -78,7 +78,7 @@ pub fn ruleAdd(_: *Seat, args: []const [:0]const u8, _: *?[]const u8) Error!void
             server.root.applyPending();
         },
         .tag => {
-            const tag = try fmt.parseInt(u32, result.args[0], 10);
+            const tag = try fmt.parseInt(u32, result.args[1], 10);
             try server.config.tag_rules.add(.{
                 .app_id_glob = app_id_glob,
                 .title_glob = title_glob,
@@ -89,18 +89,17 @@ pub fn ruleAdd(_: *Seat, args: []const [:0]const u8, _: *?[]const u8) Error!void
 }
 
 pub fn ruleDel(_: *Seat, args: []const [:0]const u8, _: *?[]const u8) Error!void {
-    if (args.len < 2) return Error.NotEnoughArguments;
-
     const result = flags.parser([:0]const u8, &.{
         .{ .name = "app-id", .kind = .arg },
         .{ .name = "title", .kind = .arg },
-    }).parse(args[2..]) catch {
+    }).parse(args[1..]) catch {
         return error.InvalidValue;
     };
 
-    if (result.args.len > 0) return Error.TooManyArguments;
+    if (result.args.len > 1) return Error.TooManyArguments;
+    if (result.args.len < 1) return Error.NotEnoughArguments;
 
-    const action = std.meta.stringToEnum(Action, args[1]) orelse return Error.UnknownOption;
+    const action = std.meta.stringToEnum(Action, result.args[0]) orelse return Error.UnknownOption;
     const app_id_glob = result.flags.@"app-id" orelse "*";
     const title_glob = result.flags.title orelse "*";
 
