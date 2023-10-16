@@ -297,22 +297,17 @@ pub fn updateCurrent(view: *Self) void {
             }
             xdg_toplevel.configure_state = .idle;
         },
-        // TODO(zig): this capture does not need to be mutable and the if (build_options.xwayland)
-        // is unnecessary. However, zig 0.10.0 is buggy and these work around a bug. They are both
-        // fixed in zig 0.10.1 and newer but we currently rely on 0.10.0 for FreeBSD CI.
-        .xwayland_view => |*xwayland_view| {
-            if (build_options.xwayland) {
-                if (view.inflight.resizing) {
-                    view.resizeUpdatePosition(
-                        xwayland_view.xwayland_surface.width,
-                        xwayland_view.xwayland_surface.height,
-                    );
-                }
-                view.inflight.box.width = xwayland_view.xwayland_surface.width;
-                view.inflight.box.height = xwayland_view.xwayland_surface.height;
-                view.pending.box.width = xwayland_view.xwayland_surface.width;
-                view.pending.box.height = xwayland_view.xwayland_surface.height;
+        .xwayland_view => |xwayland_view| {
+            if (view.inflight.resizing) {
+                view.resizeUpdatePosition(
+                    xwayland_view.xwayland_surface.width,
+                    xwayland_view.xwayland_surface.height,
+                );
             }
+            view.inflight.box.width = xwayland_view.xwayland_surface.width;
+            view.inflight.box.height = xwayland_view.xwayland_surface.height;
+            view.pending.box.width = xwayland_view.xwayland_surface.width;
+            view.pending.box.height = xwayland_view.xwayland_surface.height;
         },
         .none => {},
     }
@@ -361,12 +356,7 @@ pub fn configure(self: *Self) bool {
     assert(self.mapped and !self.destroying);
     switch (self.impl) {
         .xdg_toplevel => |*xdg_toplevel| return xdg_toplevel.configure(),
-        .xwayland_view => |*xwayland_view| {
-            // TODO(zig): remove this uneeded if statement
-            // https://github.com/ziglang/zig/issues/13655
-            if (build_options.xwayland) return xwayland_view.configure();
-            unreachable;
-        },
+        .xwayland_view => |*xwayland_view| return xwayland_view.configure(),
         .none => unreachable,
     }
 }
