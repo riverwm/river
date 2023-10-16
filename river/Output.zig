@@ -257,7 +257,7 @@ pub fn create(wlr_output: *wlr.Output) !void {
         },
         .status = undefined,
     };
-    wlr_output.data = @ptrToInt(output);
+    wlr_output.data = @intFromPtr(output);
 
     output.pending.focus_stack.init();
     output.pending.wm_stack.init();
@@ -299,7 +299,7 @@ pub fn layerSurfaceTree(self: Self, layer: zwlr.LayerShellV1.Layer) *wlr.SceneTr
         self.layers.top,
         self.layers.overlay,
     };
-    return trees[@intCast(usize, @enumToInt(layer))];
+    return trees[@intCast(@intFromEnum(layer))];
 }
 
 /// Arrange all layer surfaces of this output and adjust the usable area.
@@ -336,7 +336,7 @@ fn sendLayerConfigures(
         var it = tree.children.iterator(.forward);
         while (it.next()) |node| {
             assert(node.type == .tree);
-            if (@intToPtr(?*SceneNodeData, node.data)) |node_data| {
+            if (@as(?*SceneNodeData, @ptrFromInt(node.data))) |node_data| {
                 const layer_surface = node_data.data.layer_surface;
 
                 const exclusive = layer_surface.wlr_layer_surface.current.exclusive_zone > 0;

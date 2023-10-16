@@ -54,5 +54,5 @@ pub fn direction(self: Vector) ?wlr.OutputLayout.Direction {
 
 /// Returns the length of the vector.
 pub fn length(self: Vector) u31 {
-    return math.sqrt(@intCast(u31, (self.x *| self.x) +| (self.y *| self.y)));
+    return math.sqrt(@as(u31, @intCast((self.x *| self.x) +| (self.y *| self.y))));
 }

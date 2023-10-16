@@ -108,12 +108,12 @@ fn parseRgba(string: []const u8) ![4]f32 {
     const b = try fmt.parseInt(u8, string[6..8], 16);
     const a = if (string.len == 10) try fmt.parseInt(u8, string[8..10], 16) else 255;
 
-    const alpha = @intToFloat(f32, a) / 255.0;
+    const alpha = @as(f32, @floatFromInt(a)) / 255.0;
 
     return [4]f32{
-        @intToFloat(f32, r) / 255.0 * alpha,
-        @intToFloat(f32, g) / 255.0 * alpha,
-        @intToFloat(f32, b) / 255.0 * alpha,
+        @as(f32, @floatFromInt(r)) / 255.0 * alpha,
+        @as(f32, @floatFromInt(g)) / 255.0 * alpha,
+        @as(f32, @floatFromInt(b)) / 255.0 * alpha,
         alpha,
     };
 }

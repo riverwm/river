@@ -214,7 +214,7 @@ fn handleNewToplevelDecoration(
     _: *wl.Listener(*wlr.XdgToplevelDecorationV1),
     wlr_decoration: *wlr.XdgToplevelDecorationV1,
 ) void {
-    const xdg_toplevel = @intToPtr(*XdgToplevel, wlr_decoration.surface.data);
+    const xdg_toplevel: *XdgToplevel = @ptrFromInt(wlr_decoration.surface.data);
 
     // TODO(wlroots): The next wlroots version will handle this for us
     if (xdg_toplevel.decoration != null) {
@@ -236,7 +236,7 @@ fn handleNewLayerSurface(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_
         .{
             wlr_layer_surface.namespace,
             @tagName(wlr_layer_surface.current.layer),
-            @bitCast(u32, wlr_layer_surface.current.anchor),
+            @as(u32, @bitCast(wlr_layer_surface.current.anchor)),
             wlr_layer_surface.current.desired_width,
             wlr_layer_surface.current.desired_height,
             wlr_layer_surface.current.margin.top,

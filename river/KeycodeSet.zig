@@ -28,8 +28,8 @@ len: usize = 0,
 pub fn add(self: *Self, new: u32) void {
     for (self.items[0..self.len]) |item| if (new == item) return;
 
-    comptime assert(@typeInfo(std.meta.fieldInfo(Self, .items).field_type).Array.len ==
-        @typeInfo(std.meta.fieldInfo(wlr.Keyboard, .keycodes).field_type).Array.len);
+    comptime assert(@typeInfo(std.meta.fieldInfo(Self, .items).type).Array.len ==
+        @typeInfo(std.meta.fieldInfo(wlr.Keyboard, .keycodes).type).Array.len);
 
     if (self.len == self.items.len) {
         log.err("KeycodeSet limit reached, code {d} omitted", .{new});
@@ -41,7 +41,7 @@ pub fn add(self: *Self, new: u32) void {
 }
 
 pub fn remove(self: *Self, old: u32) bool {
-    for (self.items[0..self.len]) |item, idx| if (old == item) {
+    for (self.items[0..self.len], 0..) |item, idx| if (old == item) {
         self.len -= 1;
         if (self.len > 0) self.items[idx] = self.items[self.len];
 

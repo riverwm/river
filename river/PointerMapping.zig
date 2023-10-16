@@ -52,7 +52,7 @@ pub fn init(
             const arena_allocator = arena.allocator();
 
             const owned_args = try arena_allocator.alloc([:0]const u8, command_args.len);
-            for (command_args) |arg, i| {
+            for (command_args, 0..) |arg, i| {
                 owned_args[i] = try arena_allocator.dupeZ(u8, arg);
             }
 

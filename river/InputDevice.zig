@@ -57,13 +57,13 @@ pub fn init(device: *InputDevice, seat: *Seat, wlr_device: *wlr.InputDevice) !vo
             device_type,
             wlr_device.vendor,
             wlr_device.product,
-            mem.trim(u8, mem.span(wlr_device.name), &ascii.spaces),
+            mem.trim(u8, mem.sliceTo(wlr_device.name, 0), &ascii.whitespace),
         },
     );
     errdefer util.gpa.free(identifier);
 
     for (identifier) |*char| {
-        if (!ascii.isGraph(char.*)) {
+        if (!ascii.isPrint(char.*) or ascii.isWhitespace(char.*)) {
             char.* = '_';
         }
     }

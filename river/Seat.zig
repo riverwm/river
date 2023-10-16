@@ -107,7 +107,7 @@ pub fn init(self: *Self, name: [*:0]const u8) !void {
         .wlr_seat = try wlr.Seat.create(server.wl_server, name),
         .mapping_repeat_timer = mapping_repeat_timer,
     };
-    self.wlr_seat.data = @ptrToInt(self);
+    self.wlr_seat.data = @intFromPtr(self);
 
     try self.cursor.init(self);
 
@@ -267,7 +267,8 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
             if (self.cursor.constraint) |constraint| {
                 assert(constraint.wlr_constraint == wlr_constraint);
             } else {
-                self.cursor.constraint = @intToPtr(*PointerConstraint, wlr_constraint.data);
+                self.cursor.constraint = @ptrFromInt(wlr_constraint.data);
+                assert(self.cursor.constraint != null);
             }
         }
     }
@@ -299,7 +300,7 @@ fn keyboardNotifyEnter(self: *Self, wlr_surface: *wlr.Surface) void {
             .len = wlr_keyboard.num_keycodes,
         };
 
-        const keyboard = @intToPtr(*Keyboard, wlr_keyboard.data);
+        const keyboard: *Keyboard = @ptrFromInt(wlr_keyboard.data);
         keycodes.subtract(keyboard.eaten_keycodes);
 
         self.wlr_seat.keyboardNotifyEnter(

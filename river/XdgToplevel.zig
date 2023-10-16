@@ -85,8 +85,8 @@ pub fn create(xdg_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
 
     self.view = view;
 
-    xdg_toplevel.base.data = @ptrToInt(self);
-    xdg_toplevel.base.surface.data = @ptrToInt(&view.tree.node);
+    xdg_toplevel.base.data = @intFromPtr(self);
+    xdg_toplevel.base.surface.data = @intFromPtr(&view.tree.node);
 
     // Add listeners that are active over the toplevel's entire lifetime
     xdg_toplevel.base.events.destroy.add(&self.destroy);
@@ -307,10 +307,10 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     {
         const state = &self.xdg_toplevel.current;
         view.constraints = .{
-            .min_width = @intCast(u31, math.max(state.min_width, 1)),
-            .max_width = if (state.max_width > 0) @intCast(u31, state.max_width) else math.maxInt(u31),
-            .min_height = @intCast(u31, math.max(state.min_height, 1)),
-            .max_height = if (state.max_height > 0) @intCast(u31, state.max_height) else math.maxInt(u31),
+            .min_width = @max(state.min_width, 1),
+            .max_width = if (state.max_width > 0) @intCast(state.max_width) else math.maxInt(u31),
+            .min_height = @max(state.min_height, 1),
+            .max_height = if (state.max_height > 0) @intCast(state.max_height) else math.maxInt(u31),
         };
     }
 
@@ -376,7 +376,7 @@ fn handleRequestMove(
     event: *wlr.XdgToplevel.event.Move,
 ) void {
     const self = @fieldParentPtr(Self, "request_move", listener);
-    const seat = @intToPtr(*Seat, event.seat.seat.data);
+    const seat: *Seat = @ptrFromInt(event.seat.seat.data);
     const view = self.view;
 
     if (view.current.output == null or view.pending.output == null) return;
@@ -389,7 +389,7 @@ fn handleRequestMove(
 
 fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), event: *wlr.XdgToplevel.event.Resize) void {
     const self = @fieldParentPtr(Self, "request_resize", listener);
-    const seat = @intToPtr(*Seat, event.seat.seat.data);
+    const seat: *Seat = @ptrFromInt(event.seat.seat.data);
     const view = self.view;
 
     {

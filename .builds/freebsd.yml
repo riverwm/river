@@ -41,11 +41,11 @@ tasks:
       sudo ninja -C build/ install
       cd ..
 
-      wget -nv https://ziglang.org/download/0.10.0/zig-freebsd-x86_64-0.10.0.tar.xz
+      wget -nv https://ziglang.org/download/0.11.0/zig-freebsd-x86_64-0.11.0.tar.xz
       # Remove a lot of useless lines from tar output.
-      tar -xvf zig-freebsd-x86_64-0.10.0.tar.xz 1>/dev/null
-      sudo mv zig-freebsd-x86_64-0.10.0/zig /usr/bin/
-      sudo mv zig-freebsd-x86_64-0.10.0/lib /usr/lib/zig
+      tar -xvf zig-freebsd-x86_64-0.11.0.tar.xz 1>/dev/null
+      sudo mv zig-freebsd-x86_64-0.11.0/zig /usr/bin/
+      sudo mv zig-freebsd-x86_64-0.11.0/lib /usr/lib/zig
   - build: |
       cd river
       zig build

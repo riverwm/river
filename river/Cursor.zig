@@ -287,8 +287,8 @@ pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
                 image.width * 4,
                 image.width,
                 image.height,
-                @intCast(i32, image.hotspot_x),
-                @intCast(i32, image.hotspot_y),
+                @intCast(image.hotspot_x),
+                @intCast(image.hotspot_y),
             );
         }
 
@@ -427,7 +427,7 @@ fn updateKeyboardFocus(self: Self, result: Root.AtResult) void {
 /// Requires a call to Root.applyPending()
 fn updateOutputFocus(self: Self, lx: f64, ly: f64) void {
     if (server.root.output_layout.outputAt(lx, ly)) |wlr_output| {
-        const output = @intToPtr(*Output, wlr_output.data);
+        const output: *Output = @ptrFromInt(wlr_output.data);
         self.seat.focusOutput(output);
     }
 }
@@ -712,8 +712,8 @@ pub fn startMove(cursor: *Self, view: *View) void {
 
     const new_mode: Mode = .{ .move = .{
         .view = view,
-        .offset_x = @floatToInt(i32, cursor.wlr_cursor.x) - view.current.box.x,
-        .offset_y = @floatToInt(i32, cursor.wlr_cursor.y) - view.current.box.y,
+        .offset_x = @as(i32, @intFromFloat(cursor.wlr_cursor.x)) - view.current.box.x,
+        .offset_y = @as(i32, @intFromFloat(cursor.wlr_cursor.y)) - view.current.box.y,
     } };
     cursor.enterMode(new_mode, view, .move);
 }
@@ -733,8 +733,8 @@ pub fn startResize(cursor: *Self, view: *View, proposed_edges: ?wlr.Edges) void 
     };
 
     const box = &view.current.box;
-    const lx = @floatToInt(i32, cursor.wlr_cursor.x);
-    const ly = @floatToInt(i32, cursor.wlr_cursor.y);
+    const lx: i32 = @intFromFloat(cursor.wlr_cursor.x);
+    const ly: i32 = @intFromFloat(cursor.wlr_cursor.y);
     const offset_x = if (edges.left) lx - box.x else box.x + box.width - lx;
     const offset_y = if (edges.top) ly - box.y else box.y + box.height - ly;
 
@@ -756,13 +756,13 @@ fn computeEdges(cursor: *const Self, view: *const View) wlr.Edges {
     var output_box: wlr.Box = undefined;
     server.root.output_layout.getBox(view.current.output.?.wlr_output, &output_box);
 
-    const sx = @floatToInt(i32, cursor.wlr_cursor.x) - output_box.x - box.x;
-    const sy = @floatToInt(i32, cursor.wlr_cursor.y) - output_box.y - box.y;
+    const sx = @as(i32, @intFromFloat(cursor.wlr_cursor.x)) - output_box.x - box.x;
+    const sy = @as(i32, @intFromFloat(cursor.wlr_cursor.y)) - output_box.y - box.y;
 
     var edges: wlr.Edges = .{};
 
     if (box.width > min_handle_size * 2) {
-        const handle = math.max(min_handle_size, @divFloor(box.width, 5));
+        const handle = @max(min_handle_size, @divFloor(box.width, 5));
         if (sx < handle) {
             edges.left = true;
         } else if (sx > box.width - handle) {
@@ -771,7 +771,7 @@ fn computeEdges(cursor: *const Self, view: *const View) wlr.Edges {
     }
 
     if (box.height > min_handle_size * 2) {
-        const handle = math.max(min_handle_size, @divFloor(box.height, 5));
+        const handle = @max(min_handle_size, @divFloor(box.height, 5));
         if (sy < handle) {
             edges.top = true;
         } else if (sy > box.height - handle) {
@@ -863,7 +863,7 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
             data.delta_y = dy - @trunc(dy);
 
             if (tag == .move) {
-                data.view.pending.move(@floatToInt(i32, dx), @floatToInt(i32, dy));
+                data.view.pending.move(@intFromFloat(dx), @intFromFloat(dy));
             } else {
                 // Modify width/height of the pending box, taking constraints into account
                 // The x/y coordinates of the view will be adjusted as needed in View.resizeCommit()
@@ -880,31 +880,31 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
                 if (data.edges.left) {
                     var x1 = box.x;
                     const x2 = box.x + box.width;
-                    x1 += @floatToInt(i32, dx);
-                    x1 = math.max(x1, border_width);
-                    x1 = math.max(x1, x2 - constraints.max_width);
-                    x1 = math.min(x1, x2 - constraints.min_width);
+                    x1 += @intFromFloat(dx);
+                    x1 = @max(x1, border_width);
+                    x1 = @max(x1, x2 - constraints.max_width);
+                    x1 = @min(x1, x2 - constraints.min_width);
                     box.width = x2 - x1;
                 } else if (data.edges.right) {
-                    box.width += @floatToInt(i32, dx);
-                    box.width = math.max(box.width, constraints.min_width);
-                    box.width = math.min(box.width, constraints.max_width);
-                    box.width = math.min(box.width, output_width - border_width - box.x);
+                    box.width += @intFromFloat(dx);
+                    box.width = @max(box.width, constraints.min_width);
+                    box.width = @min(box.width, constraints.max_width);
+                    box.width = @min(box.width, output_width - border_width - box.x);
                 }
 
                 if (data.edges.top) {
                     var y1 = box.y;
                     const y2 = box.y + box.height;
-                    y1 += @floatToInt(i32, dy);
-                    y1 = math.max(y1, border_width);
-                    y1 = math.max(y1, y2 - constraints.max_height);
-                    y1 = math.min(y1, y2 - constraints.min_height);
+                    y1 += @intFromFloat(dy);
+                    y1 = @max(y1, border_width);
+                    y1 = @max(y1, y2 - constraints.max_height);
+                    y1 = @min(y1, y2 - constraints.min_height);
                     box.height = y2 - y1;
                 } else if (data.edges.bottom) {
-                    box.height += @floatToInt(i32, dy);
-                    box.height = math.max(box.height, constraints.min_height);
-                    box.height = math.min(box.height, constraints.max_height);
-                    box.height = math.min(box.height, output_height - border_width - box.y);
+                    box.height += @intFromFloat(dy);
+                    box.height = @max(box.height, constraints.min_height);
+                    box.height = @min(box.height, constraints.max_height);
+                    box.height = @min(box.height, output_height - border_width - box.y);
                 }
             }
 
@@ -943,8 +943,9 @@ fn updateFocusFollowsCursorTarget(self: *Self) void {
                 // in order to avoid clashes with cursor warping on focus change.
                 var output_layout_box: wlr.Box = undefined;
                 server.root.output_layout.getBox(view.current.output.?.wlr_output, &output_layout_box);
-                const cursor_ox = self.wlr_cursor.x - @intToFloat(f64, output_layout_box.x);
-                const cursor_oy = self.wlr_cursor.y - @intToFloat(f64, output_layout_box.y);
+
+                const cursor_ox = self.wlr_cursor.x - @as(f64, @floatFromInt(output_layout_box.x));
+                const cursor_oy = self.wlr_cursor.y - @as(f64, @floatFromInt(output_layout_box.y));
                 if (view.current.box.containsPoint(cursor_ox, cursor_oy)) {
                     self.focus_follows_cursor_target = view;
                 }
@@ -981,7 +982,7 @@ pub fn updateState(self: *Self) void {
             if (!self.hidden) {
                 var now: os.timespec = undefined;
                 os.clock_gettime(os.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
-                const msec = @intCast(u32, now.tv_sec * std.time.ms_per_s +
+                const msec: u32 = @intCast(now.tv_sec * std.time.ms_per_s +
                     @divTrunc(now.tv_nsec, std.time.ns_per_ms));
                 self.passthrough(msec);
             }
@@ -998,20 +999,20 @@ pub fn updateState(self: *Self) void {
 
             // Keep the cursor locked to the original offset from the edges of the view.
             const box = &data.view.current.box;
-            const new_x = blk: {
+            const new_x: f64 = blk: {
                 if (mode == .move or data.edges.left) {
-                    break :blk @intToFloat(f64, data.offset_x + box.x);
+                    break :blk @floatFromInt(data.offset_x + box.x);
                 } else if (data.edges.right) {
-                    break :blk @intToFloat(f64, box.x + box.width - data.offset_x);
+                    break :blk @floatFromInt(box.x + box.width - data.offset_x);
                 } else {
                     break :blk self.wlr_cursor.x;
                 }
             };
-            const new_y = blk: {
+            const new_y: f64 = blk: {
                 if (mode == .move or data.edges.top) {
-                    break :blk @intToFloat(f64, data.offset_y + box.y);
+                    break :blk @floatFromInt(data.offset_y + box.y);
                 } else if (data.edges.bottom) {
-                    break :blk @intToFloat(f64, box.y + box.height - data.offset_y);
+                    break :blk @floatFromInt(box.y + box.height - data.offset_y);
                 } else {
                     break :blk self.wlr_cursor.y;
                 }
@@ -1083,8 +1084,8 @@ fn warp(self: *Self) void {
         (usable_layout_box.containsPoint(self.wlr_cursor.x, self.wlr_cursor.y) and
         !target_box.containsPoint(self.wlr_cursor.x, self.wlr_cursor.y)))
     {
-        const lx = @intToFloat(f64, target_box.x + @divTrunc(target_box.width, 2));
-        const ly = @intToFloat(f64, target_box.y + @divTrunc(target_box.height, 2));
+        const lx: f64 = @floatFromInt(target_box.x + @divTrunc(target_box.width, 2));
+        const ly: f64 = @floatFromInt(target_box.y + @divTrunc(target_box.height, 2));
         if (!self.wlr_cursor.warp(null, lx, ly)) {
             log.err("failed to warp cursor on focus change", .{});
         }
@@ -1094,7 +1095,7 @@ fn warp(self: *Self) void {
 fn updateDragIcons(self: *Self) void {
     var it = server.root.drag_icons.children.iterator(.forward);
     while (it.next()) |node| {
-        const icon = @intToPtr(*DragIcon, node.data);
+        const icon = @as(*DragIcon, @ptrFromInt(node.data));
 
         if (icon.wlr_drag_icon.drag.seat != self.seat.wlr_seat) continue;
 
@@ -1102,16 +1103,16 @@ fn updateDragIcons(self: *Self) void {
             .keyboard => unreachable,
             .keyboard_pointer => {
                 icon.tree.node.setPosition(
-                    @floatToInt(c_int, self.wlr_cursor.x),
-                    @floatToInt(c_int, self.wlr_cursor.y),
+                    @intFromFloat(self.wlr_cursor.x),
+                    @intFromFloat(self.wlr_cursor.y),
                 );
             },
             .keyboard_touch => {
                 const touch_id = icon.wlr_drag_icon.drag.touch_id;
                 const point = self.touch_points.get(touch_id) orelse continue;
                 icon.tree.node.setPosition(
-                    @floatToInt(c_int, point.lx),
-                    @floatToInt(c_int, point.ly),
+                    @intFromFloat(point.lx),
+                    @intFromFloat(point.ly),
                 );
             },
         }

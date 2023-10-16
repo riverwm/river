@@ -43,7 +43,7 @@ commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit)
 new_popup: wl.Listener(*wlr.XdgPopup) = wl.Listener(*wlr.XdgPopup).init(handleNewPopup),
 
 pub fn create(wlr_layer_surface: *wlr.LayerSurfaceV1) error{OutOfMemory}!void {
-    const output = @intToPtr(*Output, wlr_layer_surface.output.?.data);
+    const output: *Output = @ptrFromInt(wlr_layer_surface.output.?.data);
     const layer_surface = try util.gpa.create(LayerSurface);
     errdefer util.gpa.destroy(layer_surface);
 
@@ -55,12 +55,12 @@ pub fn create(wlr_layer_surface: *wlr.LayerSurfaceV1) error{OutOfMemory}!void {
         .scene_layer_surface = try layer_tree.createSceneLayerSurfaceV1(wlr_layer_surface),
         .popup_tree = try output.layers.popups.createSceneTree(),
     };
-    wlr_layer_surface.data = @ptrToInt(layer_surface);
+    wlr_layer_surface.data = @intFromPtr(layer_surface);
 
     try SceneNodeData.attach(&layer_surface.scene_layer_surface.tree.node, .{ .layer_surface = layer_surface });
     try SceneNodeData.attach(&layer_surface.popup_tree.node, .{ .layer_surface = layer_surface });
 
-    wlr_layer_surface.surface.data = @ptrToInt(&layer_surface.scene_layer_surface.tree.node);
+    wlr_layer_surface.surface.data = @intFromPtr(&layer_surface.scene_layer_surface.tree.node);
 
     wlr_layer_surface.events.destroy.add(&layer_surface.destroy);
     wlr_layer_surface.events.map.add(&layer_surface.map);
@@ -131,7 +131,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     // If a surface is committed while it is not mapped, we must send a configure.
     // TODO: this mapped check is not correct as it will be true in the commit
     // that triggers the unmap as well.
-    if (!wlr_layer_surface.mapped or @bitCast(u32, wlr_layer_surface.current.committed) != 0) {
+    if (!wlr_layer_surface.mapped or @as(u32, @bitCast(wlr_layer_surface.current.committed)) != 0) {
         layer_surface.output.arrangeLayers();
         handleKeyboardInteractiveExclusive(layer_surface.output);
         server.root.applyPending();
@@ -150,7 +150,7 @@ fn handleKeyboardInteractiveExclusive(output: *Output) void {
         var it = tree.children.iterator(.reverse);
         while (it.next()) |node| {
             assert(node.type == .tree);
-            if (@intToPtr(?*SceneNodeData, node.data)) |node_data| {
+            if (@as(?*SceneNodeData, @ptrFromInt(node.data))) |node_data| {
                 const layer_surface = node_data.data.layer_surface;
                 const wlr_layer_surface = layer_surface.wlr_layer_surface;
                 if (wlr_layer_surface.mapped and

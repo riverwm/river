@@ -71,7 +71,7 @@ fn handleRequest(control: *zriver.ControlV1, request: zriver.ControlV1.Request, 
     switch (request) {
         .destroy => control.destroy(),
         .add_argument => |add_argument| {
-            const owned_slice = util.gpa.dupeZ(u8, mem.span(add_argument.argument)) catch {
+            const owned_slice = util.gpa.dupeZ(u8, mem.sliceTo(add_argument.argument, 0)) catch {
                 control.getClient().postNoMemory();
                 return;
             };
@@ -84,7 +84,7 @@ fn handleRequest(control: *zriver.ControlV1, request: zriver.ControlV1.Request, 
             };
         },
         .run_command => |run_command| {
-            const seat = @intToPtr(*Seat, wlr.Seat.Client.fromWlSeat(run_command.seat).?.seat.data);
+            const seat: *Seat = @ptrFromInt(wlr.Seat.Client.fromWlSeat(run_command.seat).?.seat.data);
 
             const callback = zriver.CommandCallbackV1.create(
                 control.getClient(),
@@ -109,7 +109,7 @@ fn handleRequest(control: *zriver.ControlV1, request: zriver.ControlV1.Request, 
                         callback.getClient().postNoMemory();
                         return;
                     },
-                    command.Error.Other => std.cstr.addNullByte(util.gpa, out.?) catch {
+                    command.Error.Other => util.gpa.dupeZ(u8, out.?) catch {
                         callback.getClient().postNoMemory();
                         return;
                     },

@@ -200,7 +200,7 @@ fn mappingExists(
     keysym: xkb.Keysym,
     release: bool,
 ) ?usize {
-    for (mappings.items) |mapping, i| {
+    for (mappings.items, 0..) |mapping, i| {
         if (meta.eql(mapping.modifiers, modifiers) and
             mapping.keysym == keysym and mapping.options.release == release)
         {
@@ -217,7 +217,7 @@ fn switchMappingExists(
     switch_type: Switch.Type,
     switch_state: Switch.State,
 ) ?usize {
-    for (switch_mappings.items) |mapping, i| {
+    for (switch_mappings.items, 0..) |mapping, i| {
         if (mapping.switch_type == switch_type and meta.eql(mapping.switch_state, switch_state)) {
             return i;
         }
@@ -232,7 +232,7 @@ fn pointerMappingExists(
     modifiers: wlr.Keyboard.ModifierMask,
     event_code: u32,
 ) ?usize {
-    for (pointer_mappings.items) |mapping, i| {
+    for (pointer_mappings.items, 0..) |mapping, i| {
         if (meta.eql(mapping.modifiers, modifiers) and mapping.event_code == event_code) {
             return i;
         }
@@ -248,7 +248,7 @@ fn parseEventCode(name: [:0]const u8, out: *?[]const u8) !u32 {
         return Error.Other;
     }
 
-    return @intCast(u32, event_code);
+    return @intCast(event_code);
 }
 
 fn parseKeysym(name: [:0]const u8, out: *?[]const u8) !xkb.Keysym {

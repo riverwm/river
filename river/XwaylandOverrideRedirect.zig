@@ -93,7 +93,7 @@ fn mapImpl(self: *Self) error{OutOfMemory}!void {
     self.surface_tree = try server.root.layers.xwayland_override_redirect.createSceneSubsurfaceTree(surface);
     try SceneNodeData.attach(&self.surface_tree.?.node, .{ .xwayland_override_redirect = self });
 
-    surface.data = @ptrToInt(&self.surface_tree.?.node);
+    surface.data = @intFromPtr(&self.surface_tree.?.node);
 
     self.surface_tree.?.node.setPosition(self.xwayland_surface.x, self.xwayland_surface.y);
 

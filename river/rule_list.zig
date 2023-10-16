@@ -50,7 +50,7 @@ pub fn RuleList(comptime T: type) type {
         }
 
         pub fn add(list: *Self, rule: Rule) error{OutOfMemory}!void {
-            const index = for (list.rules.items) |*existing, i| {
+            const index = for (list.rules.items, 0..) |*existing, i| {
                 if (mem.eql(u8, rule.app_id_glob, existing.app_id_glob) and
                     mem.eql(u8, rule.title_glob, existing.title_glob))
                 {
@@ -83,7 +83,7 @@ pub fn RuleList(comptime T: type) type {
         }
 
         pub fn del(list: *Self, rule: struct { app_id_glob: []const u8, title_glob: []const u8 }) void {
-            for (list.rules.items) |existing, i| {
+            for (list.rules.items, 0..) |existing, i| {
                 if (mem.eql(u8, rule.app_id_glob, existing.app_id_glob) and
                     mem.eql(u8, rule.title_glob, existing.title_glob))
                 {

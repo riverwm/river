@@ -312,7 +312,7 @@ pub fn deactivateOutput(root: *Self, output: *Output) void {
         var it = tree.children.safeIterator(.forward);
         while (it.next()) |scene_node| {
             assert(scene_node.type == .tree);
-            if (@intToPtr(?*SceneNodeData, scene_node.data)) |node_data| {
+            if (@as(?*SceneNodeData, @ptrFromInt(scene_node.data))) |node_data| {
                 node_data.data.layer_surface.wlr_layer_surface.destroy();
             }
         }
@@ -751,7 +751,7 @@ fn processOutputConfig(
     var it = config.heads.iterator(.forward);
     while (it.next()) |head| {
         const wlr_output = head.state.output;
-        const output = @intToPtr(*Output, wlr_output.data);
+        const output: *Output = @ptrFromInt(wlr_output.data);
 
         var proposed_state = wlr.Output.State.init();
         head.state.apply(&proposed_state);

@@ -34,7 +34,7 @@ request_mode: wl.Listener(*wlr.XdgToplevelDecorationV1) =
     wl.Listener(*wlr.XdgToplevelDecorationV1).init(handleRequestMode),
 
 pub fn init(wlr_decoration: *wlr.XdgToplevelDecorationV1) void {
-    const xdg_toplevel = @intToPtr(*XdgToplevel, wlr_decoration.surface.data);
+    const xdg_toplevel: *XdgToplevel = @ptrFromInt(wlr_decoration.surface.data);
 
     xdg_toplevel.decoration = .{ .wlr_decoration = wlr_decoration };
     const decoration = &xdg_toplevel.decoration.?;
@@ -64,7 +64,7 @@ fn handleDestroy(
     _: *wlr.XdgToplevelDecorationV1,
 ) void {
     const decoration = @fieldParentPtr(XdgDecoration, "destroy", listener);
-    const xdg_toplevel = @intToPtr(*XdgToplevel, decoration.wlr_decoration.surface.data);
+    const xdg_toplevel: *XdgToplevel = @ptrFromInt(decoration.wlr_decoration.surface.data);
 
     decoration.deinit();
 
@@ -78,7 +78,7 @@ fn handleRequestMode(
 ) void {
     const decoration = @fieldParentPtr(XdgDecoration, "request_mode", listener);
 
-    const xdg_toplevel = @intToPtr(*XdgToplevel, decoration.wlr_decoration.surface.data);
+    const xdg_toplevel: *XdgToplevel = @ptrFromInt(decoration.wlr_decoration.surface.data);
     const view = xdg_toplevel.view;
 
     const ssd = server.config.ssd_rules.match(xdg_toplevel.view) orelse

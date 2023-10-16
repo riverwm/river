@@ -88,15 +88,15 @@ pub const State = struct {
 
         const max_x = output_width - state.box.width - border_width;
         state.box.x += delta_x;
-        state.box.x = math.max(state.box.x, border_width);
-        state.box.x = math.min(state.box.x, max_x);
-        state.box.x = math.max(state.box.x, 0);
+        state.box.x = @max(state.box.x, border_width);
+        state.box.x = @min(state.box.x, max_x);
+        state.box.x = @max(state.box.x, 0);
 
         const max_y = output_height - state.box.height - border_width;
         state.box.y += delta_y;
-        state.box.y = math.max(state.box.y, border_width);
-        state.box.y = math.min(state.box.y, max_y);
-        state.box.y = math.max(state.box.y, 0);
+        state.box.y = @max(state.box.y, border_width);
+        state.box.y = @min(state.box.y, max_y);
+        state.box.y = @max(state.box.y, 0);
     }
 
     pub fn clampToOutput(state: *State) void {
@@ -107,8 +107,8 @@ pub const State = struct {
         output.wlr_output.effectiveResolution(&output_width, &output_height);
 
         const border_width = if (state.ssd) server.config.border_width else 0;
-        state.box.width = math.min(state.box.width, output_width - (2 * border_width));
-        state.box.height = math.min(state.box.height, output_height - (2 * border_width));
+        state.box.width = @min(state.box.width, output_width - (2 * border_width));
+        state.box.height = @min(state.box.height, output_height - (2 * border_width));
 
         state.move(0, 0);
     }
@@ -504,8 +504,8 @@ pub fn map(view: *Self) !void {
 
     if (server.input_manager.defaultSeat().focused_output) |output| {
         // Center the initial pending box on the output
-        view.pending.box.x = @divTrunc(math.max(0, output.usable_box.width - view.pending.box.width), 2);
-        view.pending.box.y = @divTrunc(math.max(0, output.usable_box.height - view.pending.box.height), 2);
+        view.pending.box.x = @divTrunc(@max(0, output.usable_box.width - view.pending.box.width), 2);
+        view.pending.box.y = @divTrunc(@max(0, output.usable_box.height - view.pending.box.height), 2);
 
         view.pending.tags = blk: {
             if (server.config.tag_rules.match(view)) |tags| break :blk tags;

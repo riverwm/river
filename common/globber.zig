@@ -34,19 +34,19 @@ pub fn validate(glob: []const u8) error{InvalidGlob}!void {
 test validate {
     const testing = std.testing;
 
-    _ = try validate("*");
-    _ = try validate("a");
-    _ = try validate("*a");
-    _ = try validate("a*");
-    _ = try validate("*a*");
-    _ = try validate("ab");
-    _ = try validate("*ab");
-    _ = try validate("ab*");
-    _ = try validate("*ab*");
-    _ = try validate("abc");
-    _ = try validate("*abc");
-    _ = try validate("abc*");
-    _ = try validate("*abc*");
+    try validate("*");
+    try validate("a");
+    try validate("*a");
+    try validate("a*");
+    try validate("*a*");
+    try validate("ab");
+    try validate("*ab");
+    try validate("ab*");
+    try validate("*ab*");
+    try validate("abc");
+    try validate("*abc");
+    try validate("abc*");
+    try validate("*abc*");
 
     try testing.expectError(error.InvalidGlob, validate(""));
     try testing.expectError(error.InvalidGlob, validate("**"));
@@ -165,8 +165,8 @@ pub fn order(a: []const u8, b: []const u8) std.math.Order {
         return .lt;
     }
 
-    const count_a = @as(u2, @boolToInt(a[0] == '*')) + @boolToInt(a[a.len - 1] == '*');
-    const count_b = @as(u2, @boolToInt(b[0] == '*')) + @boolToInt(b[b.len - 1] == '*');
+    const count_a = @as(u2, @intFromBool(a[0] == '*')) + @intFromBool(a[a.len - 1] == '*');
+    const count_b = @as(u2, @intFromBool(b[0] == '*')) + @intFromBool(b[b.len - 1] == '*');
 
     if (count_a == 0 and count_b == 0) {
         return .eq;
@@ -206,7 +206,7 @@ test order {
         "a",
     };
 
-    for (descending) |a, i| {
+    for (descending, 0..) |a, i| {
         for (descending[i..]) |b| {
             try testing.expect(order(a, b) != .lt);
         }
@@ -215,7 +215,7 @@ test order {
     var ascending = descending;
     mem.reverse([]const u8, &ascending);
 
-    for (ascending) |a, i| {
+    for (ascending, 0..) |a, i| {
         for (ascending[i..]) |b| {
             try testing.expect(order(a, b) != .gt);
         }

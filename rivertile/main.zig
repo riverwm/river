@@ -170,13 +170,13 @@ const Output = struct {
                             return;
                         };
                         switch (raw_arg[0]) {
-                            '+' => output.main_count +|= @intCast(u31, arg),
+                            '+' => output.main_count +|= @intCast(arg),
                             '-' => {
                                 const result = output.main_count +| arg;
-                                if (result >= 1) output.main_count = @intCast(u31, result);
+                                if (result >= 1) output.main_count = @intCast(result);
                             },
                             else => {
-                                if (arg >= 1) output.main_count = @intCast(u31, arg);
+                                if (arg >= 1) output.main_count = @intCast(arg);
                             },
                         }
                     },
@@ -198,16 +198,16 @@ const Output = struct {
             .layout_demand => |ev| {
                 assert(ev.view_count > 0);
 
-                const main_count = math.min(output.main_count, @truncate(u31, ev.view_count));
-                const secondary_count = @truncate(u31, ev.view_count) -| main_count;
+                const main_count = @min(output.main_count, ev.view_count);
+                const secondary_count = saturatingCast(u31, ev.view_count) -| main_count;
 
                 const usable_width = switch (output.main_location) {
-                    .left, .right => @truncate(u31, ev.usable_width) -| (2 *| outer_padding),
-                    .top, .bottom => @truncate(u31, ev.usable_height) -| (2 *| outer_padding),
+                    .left, .right => saturatingCast(u31, ev.usable_width) -| (2 *| outer_padding),
+                    .top, .bottom => saturatingCast(u31, ev.usable_height) -| (2 *| outer_padding),
                 };
                 const usable_height = switch (output.main_location) {
-                    .left, .right => @truncate(u31, ev.usable_height) -| (2 *| outer_padding),
-                    .top, .bottom => @truncate(u31, ev.usable_width) -| (2 *| outer_padding),
+                    .left, .right => saturatingCast(u31, ev.usable_height) -| (2 *| outer_padding),
+                    .top, .bottom => saturatingCast(u31, ev.usable_width) -| (2 *| outer_padding),
                 };
 
                 // to make things pixel-perfect, we make the first main and first secondary
@@ -221,7 +221,7 @@ const Output = struct {
                 var secondary_height_rem: u31 = undefined;
 
                 if (secondary_count > 0) {
-                    main_width = @floatToInt(u31, output.main_ratio * @intToFloat(f64, usable_width));
+                    main_width = @intFromFloat(output.main_ratio * @as(f64, @floatFromInt(usable_width)));
                     main_height = usable_height / main_count;
                     main_height_rem = usable_height % main_count;
 
@@ -382,9 +382,9 @@ pub fn main() !void {
 fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, context: *Context) void {
     switch (event) {
         .global => |global| {
-            if (std.cstr.cmp(global.interface, river.LayoutManagerV3.getInterface().name) == 0) {
+            if (mem.orderZ(u8, global.interface, river.LayoutManagerV3.getInterface().name) == .eq) {
                 context.layout_manager = registry.bind(global.name, river.LayoutManagerV3, 1) catch return;
-            } else if (std.cstr.cmp(global.interface, wl.Output.getInterface().name) == 0) {
+            } else if (mem.orderZ(u8, global.interface, wl.Output.getInterface().name) == .eq) {
                 context.addOutput(registry, global.name) catch |err| fatal("failed to bind output: {}", .{err});
             }
         },
@@ -412,4 +412,8 @@ fn fatalPrintUsage(comptime format: []const u8, args: anytype) noreturn {
     std.log.err(format, args);
     std.io.getStdErr().writeAll(usage) catch {};
     os.exit(1);
+}
+
+fn saturatingCast(comptime T: type, x: anytype) T {
+    return @intCast(math.clamp(x, math.minInt(T), math.maxInt(T)));
 }

@@ -35,7 +35,7 @@ To compile river first ensure that you have the following dependencies
 installed. The "development" versions are required if applicable to your
 distribution.
 
-- [zig](https://ziglang.org/download/) 0.10
+- [zig](https://ziglang.org/download/) 0.11
 - wayland
 - wayland-protocols
 - [wlroots](https://gitlab.freedesktop.org/wlroots/wlroots) 0.16
@@ -47,7 +47,7 @@ distribution.
 
 Then run, for example:
 ```
-zig build -Drelease-safe --prefix ~/.local install
+zig build -Doptimize=ReleaseSafe --prefix ~/.local install
 ```
 To enable experimental Xwayland support pass the `-Dxwayland` option as well.
 

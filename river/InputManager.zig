@@ -145,7 +145,7 @@ fn handleNewVirtualKeyboard(
     _: *wl.Listener(*wlr.VirtualKeyboardV1),
     virtual_keyboard: *wlr.VirtualKeyboardV1,
 ) void {
-    const seat = @intToPtr(*Seat, virtual_keyboard.seat.data);
+    const seat: *Seat = @ptrFromInt(virtual_keyboard.seat.data);
     seat.addDevice(&virtual_keyboard.keyboard.base);
 }
 

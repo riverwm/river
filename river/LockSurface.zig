@@ -43,7 +43,7 @@ pub fn create(wlr_lock_surface: *wlr.SessionLockSurfaceV1, lock: *wlr.SessionLoc
         .wlr_lock_surface = wlr_lock_surface,
         .lock = lock,
     };
-    wlr_lock_surface.data = @ptrToInt(lock_surface);
+    wlr_lock_surface.data = @intFromPtr(lock_surface);
 
     const output = lock_surface.getOutput();
     const tree = try output.locked_content.createSceneSubsurfaceTree(wlr_lock_surface.surface);
@@ -51,7 +51,7 @@ pub fn create(wlr_lock_surface: *wlr.SessionLockSurfaceV1, lock: *wlr.SessionLoc
 
     try SceneNodeData.attach(&tree.node, .{ .lock_surface = lock_surface });
 
-    wlr_lock_surface.surface.data = @ptrToInt(&tree.node);
+    wlr_lock_surface.surface.data = @intFromPtr(&tree.node);
 
     wlr_lock_surface.output.events.mode.add(&lock_surface.output_mode);
     wlr_lock_surface.events.map.add(&lock_surface.map);
@@ -65,7 +65,7 @@ pub fn destroy(lock_surface: *LockSurface) void {
         var surface_it = lock_surface.lock.surfaces.iterator(.forward);
         const new_focus: Seat.FocusTarget = while (surface_it.next()) |surface| {
             if (surface != lock_surface.wlr_lock_surface)
-                break .{ .lock_surface = @intToPtr(*LockSurface, surface.data) };
+                break .{ .lock_surface = @ptrFromInt(surface.data) };
         } else .none;
 
         var seat_it = server.input_manager.seats.first;
@@ -86,7 +86,7 @@ pub fn destroy(lock_surface: *LockSurface) void {
 }
 
 fn getOutput(lock_surface: *LockSurface) *Output {
-    return @intToPtr(*Output, lock_surface.wlr_lock_surface.output.data);
+    return @ptrFromInt(lock_surface.wlr_lock_surface.output.data);
 }
 
 fn handleOutputMode(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
@@ -95,7 +95,7 @@ fn handleOutputMode(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
     var output_width: i32 = undefined;
     var output_height: i32 = undefined;
     lock_surface.getOutput().wlr_output.effectiveResolution(&output_width, &output_height);
-    _ = lock_surface.wlr_lock_surface.configure(@intCast(u32, output_width), @intCast(u32, output_height));
+    _ = lock_surface.wlr_lock_surface.configure(@intCast(output_width), @intCast(output_height));
 }
 
 fn handleMap(listener: *wl.Listener(void)) void {

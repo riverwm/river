@@ -102,10 +102,10 @@ pub fn configure(self: Self) bool {
     }
 
     self.xwayland_surface.configure(
-        @intCast(i16, inflight.box.x + output_box.x),
-        @intCast(i16, inflight.box.y + output_box.y),
-        @intCast(u16, inflight.box.width),
-        @intCast(u16, inflight.box.height),
+        @intCast(inflight.box.x + output_box.x),
+        @intCast(inflight.box.y + output_box.y),
+        @intCast(inflight.box.width),
+        @intCast(inflight.box.height),
     );
 
     self.setActivated(inflight.focus != 0);
@@ -165,7 +165,7 @@ pub fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface:
     const view = self.view;
 
     const surface = xwayland_surface.surface.?;
-    surface.data = @ptrToInt(&view.tree.node);
+    surface.data = @intFromPtr(&view.tree.node);
 
     // Add listeners that are only active while mapped
     xwayland_surface.events.set_title.add(&self.set_title);

@@ -47,7 +47,7 @@ pub fn create(wlr_drag_icon: *wlr.Drag.Icon) error{OutOfMemory}!void {
         .tree = tree,
         .surface = try tree.createSceneSubsurfaceTree(wlr_drag_icon.surface),
     };
-    tree.node.data = @ptrToInt(drag_icon);
+    tree.node.data = @intFromPtr(drag_icon);
 
     tree.node.setEnabled(wlr_drag_icon.mapped);
 

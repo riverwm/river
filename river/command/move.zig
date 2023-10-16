@@ -104,7 +104,7 @@ pub fn resize(
             // up against an output edge.
             const diff_width = prev_width - view.pending.box.width;
             // Do not grow bigger than the output
-            view.pending.box.width = math.min(
+            view.pending.box.width = @min(
                 view.pending.box.width,
                 output_width - 2 * server.config.border_width,
             );
@@ -116,7 +116,7 @@ pub fn resize(
             view.applyConstraints(&view.pending.box);
             const diff_height = prev_height - view.pending.box.height;
             // Do not grow bigger than the output
-            view.pending.box.height = math.min(
+            view.pending.box.height = @min(
                 view.pending.box.height,
                 output_height - 2 * server.config.border_width,
             );

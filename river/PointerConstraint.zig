@@ -47,7 +47,7 @@ set_region: wl.Listener(void) = wl.Listener(void).init(handleSetRegion),
 node_destroy: wl.Listener(void) = wl.Listener(void).init(handleNodeDestroy),
 
 pub fn create(wlr_constraint: *wlr.PointerConstraintV1) error{OutOfMemory}!void {
-    const seat = @intToPtr(*Seat, wlr_constraint.seat.data);
+    const seat: *Seat = @ptrFromInt(wlr_constraint.seat.data);
 
     const constraint = try util.gpa.create(PointerConstraint);
     errdefer util.gpa.destroy(constraint);
@@ -55,7 +55,7 @@ pub fn create(wlr_constraint: *wlr.PointerConstraintV1) error{OutOfMemory}!void 
     constraint.* = .{
         .wlr_constraint = wlr_constraint,
     };
-    wlr_constraint.data = @ptrToInt(constraint);
+    wlr_constraint.data = @intFromPtr(constraint);
 
     wlr_constraint.events.destroy.add(&constraint.destroy);
     wlr_constraint.events.set_region.add(&constraint.set_region);
@@ -70,7 +70,7 @@ pub fn create(wlr_constraint: *wlr.PointerConstraintV1) error{OutOfMemory}!void 
 }
 
 pub fn maybeActivate(constraint: *PointerConstraint) void {
-    const seat = @intToPtr(*Seat, constraint.wlr_constraint.seat.data);
+    const seat: *Seat = @ptrFromInt(constraint.wlr_constraint.seat.data);
 
     assert(seat.cursor.constraint == constraint);
     assert(seat.wlr_seat.keyboard_state.focused_surface == constraint.wlr_constraint.surface);
@@ -82,8 +82,8 @@ pub fn maybeActivate(constraint: *PointerConstraint) void {
     const result = server.root.at(seat.cursor.wlr_cursor.x, seat.cursor.wlr_cursor.y) orelse return;
     if (result.surface != constraint.wlr_constraint.surface) return;
 
-    const sx = @floatToInt(i32, result.sx);
-    const sy = @floatToInt(i32, result.sy);
+    const sx: i32 = @intFromFloat(result.sx);
+    const sy: i32 = @intFromFloat(result.sy);
     if (!constraint.wlr_constraint.region.containsPoint(sx, sy, null)) return;
 
     assert(constraint.state == .inactive);
@@ -103,7 +103,7 @@ pub fn maybeActivate(constraint: *PointerConstraint) void {
 
 /// Called when the cursor position or content in the scene graph changes
 pub fn updateState(constraint: *PointerConstraint) void {
-    const seat = @intToPtr(*Seat, constraint.wlr_constraint.seat.data);
+    const seat: *Seat = @ptrFromInt(constraint.wlr_constraint.seat.data);
 
     assert(seat.wlr_seat.keyboard_state.focused_surface == constraint.wlr_constraint.surface);
 
@@ -119,8 +119,8 @@ pub fn updateState(constraint: *PointerConstraint) void {
         return;
     }
 
-    const warp_lx = @intToFloat(f64, lx) + constraint.state.active.sx;
-    const warp_ly = @intToFloat(f64, ly) + constraint.state.active.sy;
+    const warp_lx = @as(f64, @floatFromInt(lx)) + constraint.state.active.sx;
+    const warp_ly = @as(f64, @floatFromInt(ly)) + constraint.state.active.sy;
     if (!seat.cursor.wlr_cursor.warp(null, warp_lx, warp_ly)) {
         log.info("deactivating pointer constraint, could not warp cursor", .{});
         constraint.deactivate();
@@ -147,7 +147,7 @@ pub fn confine(constraint: *PointerConstraint, dx: *f64, dy: *f64) void {
 }
 
 pub fn deactivate(constraint: *PointerConstraint) void {
-    const seat = @intToPtr(*Seat, constraint.wlr_constraint.seat.data);
+    const seat: *Seat = @ptrFromInt(constraint.wlr_constraint.seat.data);
 
     assert(seat.cursor.constraint == constraint);
     assert(constraint.state == .active);
@@ -160,7 +160,7 @@ pub fn deactivate(constraint: *PointerConstraint) void {
 }
 
 fn warpToHintIfSet(constraint: *PointerConstraint) void {
-    const seat = @intToPtr(*Seat, constraint.wlr_constraint.seat.data);
+    const seat: *Seat = @ptrFromInt(constraint.wlr_constraint.seat.data);
 
     if (constraint.wlr_constraint.current.committed.cursor_hint) {
         var lx: i32 = undefined;
@@ -169,7 +169,7 @@ fn warpToHintIfSet(constraint: *PointerConstraint) void {
 
         const sx = constraint.wlr_constraint.current.cursor_hint.x;
         const sy = constraint.wlr_constraint.current.cursor_hint.y;
-        _ = seat.cursor.wlr_cursor.warp(null, @intToFloat(f64, lx) + sx, @intToFloat(f64, ly) + sy);
+        _ = seat.cursor.wlr_cursor.warp(null, @as(f64, @floatFromInt(lx)) + sx, @as(f64, @floatFromInt(ly)) + sy);
         _ = seat.wlr_seat.pointerWarp(sx, sy);
     }
 }
@@ -183,7 +183,7 @@ fn handleNodeDestroy(listener: *wl.Listener(void)) void {
 
 fn handleDestroy(listener: *wl.Listener(*wlr.PointerConstraintV1), _: *wlr.PointerConstraintV1) void {
     const constraint = @fieldParentPtr(PointerConstraint, "destroy", listener);
-    const seat = @intToPtr(*Seat, constraint.wlr_constraint.seat.data);
+    const seat: *Seat = @ptrFromInt(constraint.wlr_constraint.seat.data);
 
     if (constraint.state == .active) {
         // We can't simply call deactivate() here as it calls sendDeactivated(),
@@ -205,12 +205,12 @@ fn handleDestroy(listener: *wl.Listener(*wlr.PointerConstraintV1), _: *wlr.Point
 
 fn handleSetRegion(listener: *wl.Listener(void)) void {
     const constraint = @fieldParentPtr(PointerConstraint, "set_region", listener);
-    const seat = @intToPtr(*Seat, constraint.wlr_constraint.seat.data);
+    const seat: *Seat = @ptrFromInt(constraint.wlr_constraint.seat.data);
 
     switch (constraint.state) {
         .active => |state| {
-            const sx = @floatToInt(i32, state.sx);
-            const sy = @floatToInt(i32, state.sy);
+            const sx: i32 = @intFromFloat(state.sx);
+            const sy: i32 = @intFromFloat(state.sy);
             if (!constraint.wlr_constraint.region.containsPoint(sx, sy, null)) {
                 log.info("deactivating pointer constraint, region change left pointer outside constraint", .{});
                 constraint.deactivate();

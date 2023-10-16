@@ -157,8 +157,8 @@ pub fn listRules(_: *Seat, args: []const [:0]const u8, out: *?[]const u8) Error!
     var buffer = std.ArrayList(u8).init(util.gpa);
     const writer = buffer.writer();
 
-    try fmt.formatBuf("title", .{ .width = title_column_max, .alignment = .Left }, writer);
-    try fmt.formatBuf("app-id", .{ .width = app_id_column_max, .alignment = .Left }, writer);
+    try fmt.formatBuf("title", .{ .width = title_column_max, .alignment = .left }, writer);
+    try fmt.formatBuf("app-id", .{ .width = app_id_column_max, .alignment = .left }, writer);
     try writer.writeAll("action\n");
 
     switch (list) {
@@ -169,8 +169,8 @@ pub fn listRules(_: *Seat, args: []const [:0]const u8, out: *?[]const u8) Error!
                 else => unreachable,
             };
             for (rules) |rule| {
-                try fmt.formatBuf(rule.title_glob, .{ .width = title_column_max, .alignment = .Left }, writer);
-                try fmt.formatBuf(rule.app_id_glob, .{ .width = app_id_column_max, .alignment = .Left }, writer);
+                try fmt.formatBuf(rule.title_glob, .{ .width = title_column_max, .alignment = .left }, writer);
+                try fmt.formatBuf(rule.app_id_glob, .{ .width = app_id_column_max, .alignment = .left }, writer);
                 try writer.print("{s}\n", .{switch (list) {
                     .float => if (rule.value) "float" else "no-float",
                     .ssd => if (rule.value) "ssd" else "csd",
@@ -181,12 +181,12 @@ pub fn listRules(_: *Seat, args: []const [:0]const u8, out: *?[]const u8) Error!
         .tag => {
             const rules = server.config.tag_rules.rules.items;
             for (rules) |rule| {
-                try fmt.formatBuf(rule.title_glob, .{ .width = title_column_max, .alignment = .Left }, writer);
-                try fmt.formatBuf(rule.app_id_glob, .{ .width = app_id_column_max, .alignment = .Left }, writer);
+                try fmt.formatBuf(rule.title_glob, .{ .width = title_column_max, .alignment = .left }, writer);
+                try fmt.formatBuf(rule.app_id_glob, .{ .width = app_id_column_max, .alignment = .left }, writer);
                 try writer.print("{b}\n", .{rule.value});
             }
         },
     }
 
-    out.* = buffer.toOwnedSlice();
+    out.* = try buffer.toOwnedSlice();
 }
