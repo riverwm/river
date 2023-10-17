@@ -2,11 +2,15 @@
 #
 # Completion script for riverctl, part of river <https://github.com/riverwm/river>
 
-_riverctl_subcommands()
+# This is the list of all riverctl first argument, i.e `riverctl <first_arg>`.
+# If a command doesn't need completion for subcommands then you just need
+# to add a line to this list.
+# Format is '<command-name>:<description>'
+_riverctl_commands()
 {
-    local -a riverctl_subcommands
+    local -a riverctl_commands
 
-    riverctl_subcommands=(
+    riverctl_commands=(
         # Actions
         'close:Close the focused view'
         'exit:Exit the compositor, terminating the Wayland session'
@@ -69,109 +73,77 @@ _riverctl_subcommands()
         'list-input-configs:List all input configurations'
     )
 
-    _describe -t command 'command' riverctl_subcommands
+    _describe -t command 'command' riverctl_commands
 }
 
-_riverctl_input_subcommands()
-{
-    local -a input_subcommands
-
-    input_subcommands=(
-        'events:Configure whether the input devices events will be used by river'
-        'accel-profile:Set the pointer acceleration profile'
-        'pointer-accel:Set the pointer acceleration factor'
-        'click-method:Set the click method'
-        'drag:Enable or disable the tap-and-drag functionality'
-        'drag-lock:Enable or disable the drag lock functionality'
-        'disable-while-typing:Enable or disable the disable-while-typing functionality'
-        'middle-emulation:Enable or disable the middle click emulation functionality'
-        'natural-scroll:Enable or disable the natural scroll functionality'
-        'left-handed:Enable or disable the left handed mode'
-        'tap:Enable or disable the tap functionality'
-        'tap-button-map:Configure the button mapping for tapping'
-        'scroll-method:Set the scroll method'
-        'scroll-button:Set the scroll button'
-    )
-
-    _describe -t command 'command' input_subcommands
-}
-
-_riverctl_input()
-{
-    local state
-
-    _arguments \
-        '1: :->commands' \
-        '*:: :->args'
-
-    case $state in
-        commands) _alternative 'common-commands:common:_riverctl_input_subcommands' ;;
-        args)
-            case "$words[1]" in
-                events) _alternative 'input-cmds:args:(enabled disabled disabled-on-external-mouse)' ;;
-                accel-profile) _alternative 'input-cmds:args:(none flat adaptive)' ;;
-                click-method) _alternative 'input-cmds:args:(none button-area clickfinger)' ;;
-                drag) _alternative 'input-cmds:args:(enabled disabled)' ;;
-                drag-lock) _alternative 'input-cmds:args:(enabled disabled)' ;;
-                disable-while-typing) _alternative 'input-cmds:args:(enabled disabled)' ;;
-                middle-emulation) _alternative 'input-cmds:args:(enabled disabled)' ;;
-                natural-scroll) _alternative 'input-cmds:args:(enabled disabled)' ;;
-                left-handed) _alternative 'input-cmds:args:(enabled disabled)' ;;
-                tap) _alternative 'input-cmds:args:(enabled disabled)' ;;
-                tap-button-map) _alternative 'input-cmds:args:(left-right-middle left-middle-right)' ;;
-                scroll-method) _alternative 'input-cmds:args:(none two-finger edge button)' ;;
-                *) return 0 ;;
-            esac
-        ;;
-    esac
-}
-
-_riverctl_hide_cursor_subcommands()
-{
-    local -a hide_cursor_subcommands
-
-    hide_cursor_subcommands=(
-        "timeout:Hide cursor if it wasn\'t moved in the last X millisecond, until it is moved again"
-        'when-typing:Enable or disable whether the cursor should be hidden when pressing any non-modifier key'
-    )
-
-    _describe -t command 'command' hide_cursor_subcommands
-}
-
-_riverctl_hide_cursor()
-{
-    local state
-
-    _arguments \
-        '1: :->commands' \
-        '*:: :->args'
-
-    case $state in
-        commands) _alternative 'common-commands:common:_riverctl_hide_cursor_subcommands' ;;
-        args)
-            case "$words[1]" in
-                when-typing) _alternative 'hide-cursor-cmds:args:(enabled disabled)' ;;
-                *) return 0 ;;
-            esac
-        ;;
-    esac
-}
-
+# This is the function called for the completion. Commands added in the
+# riverctl_commands above are generated in the `commands` case, there is
+# nothing more to do for this. If a command has a subcommand then a new case
+# need to be added in `args`.
+# If this is a simple subcommand with simple multi choice, the easier way to
+# do it is:
+#   <command-name>) _alternative 'arguments:args:(<choice1 choice2)' ;;
+# If the subcommand also has subcommands then, good luck...
+# This is really complex, the easiest example to look at is the `hide-cursor` one.
 _riverctl()
 {
-    local state
+    local state line
 
-    _arguments \
+    _arguments -C \
         '1: :->commands' \
         '*:: :->args'
 
-    case $state in
-        commands) _alternative 'common-commands:common:_riverctl_subcommands' ;;
+    case "$state" in
+        commands) _alternative 'common-commands:common:_riverctl_commands' ;;
         args)
-            case "$words[1]" in
+            case "$line[1]" in
                 focus-output) _alternative 'arguments:args:(next previous)' ;;
                 focus-view) _alternative 'arguments:args:(next previous up down left right)' ;;
-                input) _riverctl_input ;;
+                input)
+                    _arguments '1: :->name' '2: :->commands' ':: :->args'
+
+                    case "$state" in
+                        name) _values 'inputs' $(riverctl list-inputs | grep -e '^[^[:space:]]') ;;
+                        commands)
+                            local -a input_subcommands
+                            input_subcommands=(
+                                'events:Configure whether the input devices events will be used by river'
+                                'accel-profile:Set the pointer acceleration profile'
+                                'pointer-accel:Set the pointer acceleration factor'
+                                'click-method:Set the click method'
+                                'drag:Enable or disable the tap-and-drag functionality'
+                                'drag-lock:Enable or disable the drag lock functionality'
+                                'disable-while-typing:Enable or disable the disable-while-typing functionality'
+                                'middle-emulation:Enable or disable the middle click emulation functionality'
+                                'natural-scroll:Enable or disable the natural scroll functionality'
+                                'left-handed:Enable or disable the left handed mode'
+                                'tap:Enable or disable the tap functionality'
+                                'tap-button-map:Configure the button mapping for tapping'
+                                'scroll-method:Set the scroll method'
+                                'scroll-button:Set the scroll button'
+                            )
+
+                        _describe -t command 'command' input_subcommands
+                        ;;
+                        args)
+                            case "$line[2]" in
+                                events) _alternative 'input-cmds:args:(enabled disabled disabled-on-external-mouse)' ;;
+                                accel-profile) _alternative 'input-cmds:args:(none flat adaptive)' ;;
+                                click-method) _alternative 'input-cmds:args:(none button-area clickfinger)' ;;
+                                drag) _alternative 'input-cmds:args:(enabled disabled)' ;;
+                                drag-lock) _alternative 'input-cmds:args:(enabled disabled)' ;;
+                                disable-while-typing) _alternative 'input-cmds:args:(enabled disabled)' ;;
+                                middle-emulation) _alternative 'input-cmds:args:(enabled disabled)' ;;
+                                natural-scroll) _alternative 'input-cmds:args:(enabled disabled)' ;;
+                                left-handed) _alternative 'input-cmds:args:(enabled disabled)' ;;
+                                tap) _alternative 'input-cmds:args:(enabled disabled)' ;;
+                                tap-button-map) _alternative 'input-cmds:args:(left-right-middle left-middle-right)' ;;
+                                scroll-method) _alternative 'input-cmds:args:(none two-finger edge button)' ;;
+                                *) return 0 ;;
+                            esac
+                        ;;
+                    esac
+                ;;
                 move) _alternative 'arguments:args:(up down left right)' ;;
                 resize) _alternative 'arguments:args:(horizontal vertical)' ;;
                 snap) _alternative 'arguments:args:(up down left right)' ;;
@@ -182,9 +154,37 @@ _riverctl()
                 attach-mode) _alternative 'arguments:args:(top bottom)' ;;
                 focus-follows-cursor) _alternative 'arguments:args:(disabled normal always)' ;;
                 set-cursor-warp) _alternative 'arguments:args:(disabled on-output-change on-focus-change)' ;;
-                hide-cursor) _riverctl_hide_cursor ;;
-                rule-add) _alternative 'arguments:args:(float no-float ssd csd tag)' ;;
-                rule-del) _alternative 'arguments:args:(float no-float ssd csd tag)' ;;
+                hide-cursor)
+                    _arguments '1: :->commands' ':: :->args'
+
+                    case "$state" in
+                        commands)
+                            local -a hide_cursor_subcommands
+                            hide_cursor_subcommands=(
+                                "timeout:Hide cursor if it wasn\'t moved in the last X millisecond, until it is moved again"
+                                'when-typing:Enable or disable whether the cursor should be hidden when pressing any non-modifier key'
+                            )
+
+                            _describe -t command 'command' hide_cursor_subcommands
+                            ;;
+                        args)
+                            case "$line[1]" in
+                                when-typing) _alternative 'hide-cursor-cmds:args:(enabled disabled)' ;;
+                                *) return 0 ;;
+                            esac
+                        ;;
+                    esac
+                ;;
+                rule-add | rule-del)
+                    # This is not perfect as it only complete if there is
+                    # either '-app-id' or '-title'.
+                    # The empty action(2) mean that we need an argument
+                    # but we don't generate anything for it.
+                    # In case of a new rule added in river, we just need
+                    # to add it to the third option between '()',
+                    # i.e (float no-float <new-option>)
+                    _arguments '1: :(-app-id -title)' '2: : ' ':: :(float no-float ssd csd tag)'
+                ;;
                 list-rules) _alternative 'arguments:args:(float ssd tag)' ;;
                 *) return 0 ;;
             esac
