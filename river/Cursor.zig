@@ -76,8 +76,10 @@ const Mode = union(enum) {
     resize: struct {
         view: *View,
 
-        delta_x: f64 = 0,
-        delta_y: f64 = 0,
+        /// Total x/y movement of the pointer device since the start of the resize.
+        /// This is not directly tied to cursor position.
+        x: f64 = 0,
+        y: f64 = 0,
 
         /// Resize edges, maximum of 2 are set and they may not be opposing edges.
         edges: wlr.Edges,
@@ -85,6 +87,9 @@ const Mode = union(enum) {
         offset_x: i32,
         /// Offset from the top or bottom edge
         offset_y: i32,
+
+        initial_width: u31,
+        initial_height: u31,
     },
 };
 
@@ -745,6 +750,8 @@ pub fn startResize(cursor: *Self, view: *View, proposed_edges: ?wlr.Edges) void 
         .edges = edges,
         .offset_x = offset_x,
         .offset_y = offset_y,
+        .initial_width = @intCast(box.width),
+        .initial_height = @intCast(box.height),
     } };
     cursor.enterMode(new_mode, view, Image.resize(edges));
 }
@@ -856,56 +863,56 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
                 constraint.maybeActivate();
             }
         },
-        inline .move, .resize => |*data, tag| {
+        .move => |*data| {
             dx += data.delta_x;
             dy += data.delta_y;
             data.delta_x = dx - @trunc(dx);
             data.delta_y = dy - @trunc(dy);
 
-            if (tag == .move) {
-                data.view.pending.move(@intFromFloat(dx), @intFromFloat(dy));
-            } else {
-                // Modify width/height of the pending box, taking constraints into account
-                // The x/y coordinates of the view will be adjusted as needed in View.resizeCommit()
-                // based on the dimensions actually committed by the client.
-                const border_width = if (data.view.pending.ssd) server.config.border_width else 0;
+            data.view.pending.move(@intFromFloat(dx), @intFromFloat(dy));
 
-                var output_width: i32 = undefined;
-                var output_height: i32 = undefined;
-                data.view.current.output.?.wlr_output.effectiveResolution(&output_width, &output_height);
+            server.root.applyPending();
+        },
+        .resize => |*data| {
+            data.x += dx;
+            data.y += dy;
 
-                const constraints = &data.view.constraints;
-                const box = &data.view.pending.box;
+            // Modify width/height of the pending box, taking constraints into account
+            // The x/y coordinates of the view will be adjusted as needed in View.resizeCommit()
+            // based on the dimensions actually committed by the client.
+            const border_width = if (data.view.pending.ssd) server.config.border_width else 0;
 
-                if (data.edges.left) {
-                    var x1 = box.x;
-                    const x2 = box.x + box.width;
-                    x1 += @intFromFloat(dx);
-                    x1 = @max(x1, border_width);
-                    x1 = @max(x1, x2 - constraints.max_width);
-                    x1 = @min(x1, x2 - constraints.min_width);
-                    box.width = x2 - x1;
-                } else if (data.edges.right) {
-                    box.width += @intFromFloat(dx);
-                    box.width = @max(box.width, constraints.min_width);
-                    box.width = @min(box.width, constraints.max_width);
-                    box.width = @min(box.width, output_width - border_width - box.x);
-                }
+            var output_width: i32 = undefined;
+            var output_height: i32 = undefined;
+            data.view.current.output.?.wlr_output.effectiveResolution(&output_width, &output_height);
 
-                if (data.edges.top) {
-                    var y1 = box.y;
-                    const y2 = box.y + box.height;
-                    y1 += @intFromFloat(dy);
-                    y1 = @max(y1, border_width);
-                    y1 = @max(y1, y2 - constraints.max_height);
-                    y1 = @min(y1, y2 - constraints.min_height);
-                    box.height = y2 - y1;
-                } else if (data.edges.bottom) {
-                    box.height += @intFromFloat(dy);
-                    box.height = @max(box.height, constraints.min_height);
-                    box.height = @min(box.height, constraints.max_height);
-                    box.height = @min(box.height, output_height - border_width - box.y);
-                }
+            const constraints = &data.view.constraints;
+            const box = &data.view.pending.box;
+
+            if (data.edges.left) {
+                const x2 = box.x + box.width;
+                box.width = data.initial_width - @as(i32, @intFromFloat(data.x));
+                box.width = @max(box.width, constraints.min_width);
+                box.width = @min(box.width, constraints.max_width);
+                box.width = @min(box.width, x2 - border_width);
+            } else if (data.edges.right) {
+                box.width = data.initial_width + @as(i32, @intFromFloat(data.x));
+                box.width = @max(box.width, constraints.min_width);
+                box.width = @min(box.width, constraints.max_width);
+                box.width = @min(box.width, output_width - border_width - box.x);
+            }
+
+            if (data.edges.top) {
+                const y2 = box.y + box.height;
+                box.height = data.initial_height - @as(i32, @intFromFloat(data.y));
+                box.height = @max(box.height, constraints.min_height);
+                box.height = @min(box.height, constraints.max_height);
+                box.height = @min(box.height, y2 - border_width);
+            } else if (data.edges.bottom) {
+                box.height = data.initial_height + @as(i32, @intFromFloat(data.y));
+                box.height = @max(box.height, constraints.min_height);
+                box.height = @min(box.height, constraints.max_height);
+                box.height = @min(box.height, output_height - border_width - box.y);
             }
 
             server.root.applyPending();
