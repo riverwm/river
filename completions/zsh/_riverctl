@@ -103,7 +103,7 @@ _riverctl()
                     _arguments '1: :->name' '2: :->commands' ':: :->args'
 
                     case "$state" in
-                        name) _values 'inputs' $(riverctl list-inputs | grep -e '^[^[:space:]]') ;;
+                        name)  _alternative "arguments:args:($(riverctl list-inputs | grep -e '^[^[:space:]]'))" ;;
                         commands)
                             local -a input_subcommands
                             input_subcommands=(
