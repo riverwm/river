@@ -82,17 +82,17 @@ pub fn RuleList(comptime T: type) type {
             });
         }
 
-        pub fn del(list: *Self, rule: struct { app_id_glob: []const u8, title_glob: []const u8 }) void {
+        pub fn del(list: *Self, rule: struct { app_id_glob: []const u8, title_glob: []const u8 }) ?T {
             for (list.rules.items, 0..) |existing, i| {
                 if (mem.eql(u8, rule.app_id_glob, existing.app_id_glob) and
                     mem.eql(u8, rule.title_glob, existing.title_glob))
                 {
                     util.gpa.free(existing.app_id_glob);
                     util.gpa.free(existing.title_glob);
-                    _ = list.rules.orderedRemove(i);
-                    return;
+                    return list.rules.orderedRemove(i).value;
                 }
             }
+            return null;
         }
 
         /// Returns the value of the most specific rule matching the view.

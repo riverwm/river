@@ -105,13 +105,13 @@ pub fn ruleDel(_: *Seat, args: []const [:0]const u8, _: *?[]const u8) Error!void
 
     switch (action) {
         .float, .@"no-float" => {
-            server.config.float_rules.del(.{
+            _ = server.config.float_rules.del(.{
                 .app_id_glob = app_id_glob,
                 .title_glob = title_glob,
             });
         },
         .ssd, .csd => {
-            server.config.ssd_rules.del(.{
+            _ = server.config.ssd_rules.del(.{
                 .app_id_glob = app_id_glob,
                 .title_glob = title_glob,
             });
@@ -119,7 +119,7 @@ pub fn ruleDel(_: *Seat, args: []const [:0]const u8, _: *?[]const u8) Error!void
             server.root.applyPending();
         },
         .tag => {
-            server.config.tag_rules.del(.{
+            _ = server.config.tag_rules.del(.{
                 .app_id_glob = app_id_glob,
                 .title_glob = title_glob,
             });
