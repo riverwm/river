@@ -276,6 +276,12 @@ matches everything while _\*\*_ and the empty string are invalid.
 	  and existing views.
 	- *tag*: Set the initial tags of the view. Requires the tags as
 	  an argument. Applies only to new views.
+	- *output*: Set the initial output of the view. Requires the output
+	  as an argument. Applies only to new views. The output can be specified
+	  either by connector name (such as _HDMI-A-1_, or _DP-2_), or by
+	  identifier in the form of _MAKE MODEL SERIAL_, for example for an output
+	  with make: _HP Inc._, model: _HP 22w_, and serial: _CNC93720WF_, the
+	  identifier would be: _HP Inc. HP 22w CNC93720WF_.
 
 	Both *float* and *no-float* rules are added to the same list,
 	which means that adding a *no-float* rule with the same arguments

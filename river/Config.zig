@@ -17,15 +17,19 @@
 const Self = @This();
 
 const std = @import("std");
+const fmt = std.fmt;
 const mem = std.mem;
 const globber = @import("globber");
 const xkb = @import("xkbcommon");
 
+const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Server = @import("Server.zig");
+const Output = @import("Output.zig");
 const Mode = @import("Mode.zig");
 const RuleList = @import("rule_list.zig").RuleList;
+const View = @import("View.zig");
 
 pub const AttachMode = enum {
     top,
@@ -76,6 +80,7 @@ modes: std.ArrayListUnmanaged(Mode),
 float_rules: RuleList(bool) = .{},
 ssd_rules: RuleList(bool) = .{},
 tag_rules: RuleList(u32) = .{},
+output_rules: RuleList([]const u8) = .{},
 
 /// The selected focus_follows_cursor mode
 focus_follows_cursor: FocusFollowsCursorMode = .disabled,
@@ -152,9 +157,33 @@ pub fn deinit(self: *Self) void {
     self.float_rules.deinit();
     self.ssd_rules.deinit();
     self.tag_rules.deinit();
+    for (self.output_rules.rules.items) |rule| {
+        util.gpa.free(rule.value);
+    }
+    self.output_rules.deinit();
 
     util.gpa.free(self.default_layout_namespace);
 
     self.keymap.unref();
     self.xkb_context.unref();
+}
+
+pub fn outputRuleMatch(self: *Self, view: *View) !?*Output {
+    const output_name = self.output_rules.match(view) orelse return null;
+    var it = server.root.active_outputs.iterator(.forward);
+    while (it.next()) |output| {
+        const wlr_output = output.wlr_output;
+        if (mem.eql(u8, output_name, mem.span(wlr_output.name))) return output;
+
+        // This allows matching with "Maker Model Serial" instead of "Connector"
+        const maker = wlr_output.make orelse "Unknown";
+        const model = wlr_output.model orelse "Unknown";
+        const serial = wlr_output.serial orelse "Unknown";
+        const identifier = try fmt.allocPrint(util.gpa, "{s} {s} {s}", .{ maker, model, serial });
+        defer util.gpa.free(identifier);
+
+        if (mem.eql(u8, output_name, identifier)) return output;
+    }
+
+    return null;
 }

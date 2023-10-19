@@ -492,7 +492,8 @@ pub fn map(view: *Self) !void {
         view.pending.ssd = ssd;
     }
 
-    if (server.input_manager.defaultSeat().focused_output) |output| {
+    const focused_output = server.input_manager.defaultSeat().focused_output;
+    if (try server.config.outputRuleMatch(view) orelse focused_output) |output| {
         // Center the initial pending box on the output
         view.pending.box.x = @divTrunc(@max(0, output.usable_box.width - view.pending.box.width), 2);
         view.pending.box.y = @divTrunc(@max(0, output.usable_box.height - view.pending.box.height), 2);
