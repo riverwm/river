@@ -281,7 +281,8 @@ matches everything while _\*\*_ and the empty string are invalid.
 	  either by connector name (such as _HDMI-A-1_, or _DP-2_), or by
 	  identifier in the form of _MAKE MODEL SERIAL_, for example for an output
 	  with make: _HP Inc._, model: _HP 22w_, and serial: _CNC93720WF_, the
-	  identifier would be: _HP Inc. HP 22w CNC93720WF_.
+	  identifier would be: _HP Inc. HP 22w CNC93720WF_. If the make, model, or
+	  serial is unknown, the word "Unknown" is used instead.
 
 	Both *float* and *no-float* rules are added to the same list,
 	which means that adding a *no-float* rule with the same arguments
