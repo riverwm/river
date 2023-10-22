@@ -62,6 +62,7 @@ function __riverctl_completion ()
 		case "${COMP_WORDS[1]}" in
 			"focus-output"|"send-to-output") OPTS="next previous" ;;
 			"focus-view"|"swap") OPTS="next previous up down left right" ;;
+			"input") OPTS="$(riverctl list-inputs | sed '/configured:/d')" ;;
 			"move"|"snap") OPTS="up down left right" ;;
 			"resize") OPTS="horizontal vertical" ;;
 			"rule-add"|"rule-del") OPTS="-app-id -title $rule_actions" ;;
@@ -93,7 +94,7 @@ function __riverctl_completion ()
 				tap-button-map \
 				scroll-method \
 				scroll-button"
-			COMPREPLY=($(compgen -W "${OPTS}" -- "${COMP_WORDS[2]}"))
+			COMPREPLY=($(compgen -W "${OPTS}" -- "${COMP_WORDS[3]}"))
 		elif [ "${COMP_WORDS[1]}" == "hide-cursor" ]
 		then
 			case "${COMP_WORDS[2]}" in
@@ -115,6 +116,7 @@ function __riverctl_completion ()
 				"scroll-method") OPTS="none two-finger edge button" ;;
 				*) return ;;
 			esac
+			COMPREPLY=($(compgen -W "${OPTS}" -- "${COMP_WORDS[4]}"))
 		elif [ "${COMP_WORDS[1]:0:5}" == "rule-" ]
 		then
 			case "${COMP_WORDS[2]}" in
