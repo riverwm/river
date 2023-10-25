@@ -415,5 +415,5 @@ fn fatalPrintUsage(comptime format: []const u8, args: anytype) noreturn {
 }
 
 fn saturatingCast(comptime T: type, x: anytype) T {
-    return @intCast(math.clamp(x, math.minInt(T), math.maxInt(T)));
+    return @max(math.minInt(T), @min(math.maxInt(T), x));
 }
