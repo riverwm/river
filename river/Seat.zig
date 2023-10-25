@@ -555,7 +555,7 @@ fn handleStartDrag(listener: *wl.Listener(*wlr.Drag), wlr_drag: *wlr.Drag) void 
     wlr_drag.events.destroy.add(&self.drag_destroy);
 
     if (wlr_drag.icon) |wlr_drag_icon| {
-        DragIcon.create(wlr_drag_icon) catch {
+        DragIcon.create(wlr_drag_icon, &self.cursor) catch {
             log.err("out of memory", .{});
             wlr_drag.seat_client.client.postNoMemory();
             return;

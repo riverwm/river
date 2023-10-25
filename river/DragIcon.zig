@@ -23,6 +23,7 @@ const wl = @import("wayland").server.wl;
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
+const Cursor = @import("Cursor.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
 
 wlr_drag_icon: *wlr.Drag.Icon,
@@ -35,7 +36,7 @@ map: wl.Listener(*wlr.Drag.Icon) = wl.Listener(*wlr.Drag.Icon).init(handleMap),
 unmap: wl.Listener(*wlr.Drag.Icon) = wl.Listener(*wlr.Drag.Icon).init(handleUnmap),
 commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
 
-pub fn create(wlr_drag_icon: *wlr.Drag.Icon) error{OutOfMemory}!void {
+pub fn create(wlr_drag_icon: *wlr.Drag.Icon, cursor: *Cursor) error{OutOfMemory}!void {
     const tree = try server.root.drag_icons.createSceneTree();
     errdefer tree.node.destroy();
 
@@ -49,12 +50,34 @@ pub fn create(wlr_drag_icon: *wlr.Drag.Icon) error{OutOfMemory}!void {
     };
     tree.node.data = @intFromPtr(drag_icon);
 
+    drag_icon.updatePosition(cursor);
     tree.node.setEnabled(wlr_drag_icon.mapped);
 
     wlr_drag_icon.events.destroy.add(&drag_icon.destroy);
     wlr_drag_icon.events.map.add(&drag_icon.map);
     wlr_drag_icon.events.unmap.add(&drag_icon.unmap);
     wlr_drag_icon.surface.events.commit.add(&drag_icon.commit);
+}
+
+pub fn updatePosition(drag_icon: *DragIcon, cursor: *Cursor) void {
+    switch (drag_icon.wlr_drag_icon.drag.grab_type) {
+        .keyboard => unreachable,
+        .keyboard_pointer => {
+            drag_icon.tree.node.setPosition(
+                @intFromFloat(cursor.wlr_cursor.x),
+                @intFromFloat(cursor.wlr_cursor.y),
+            );
+        },
+        .keyboard_touch => {
+            const touch_id = drag_icon.wlr_drag_icon.drag.touch_id;
+            if (cursor.touch_points.get(touch_id)) |point| {
+                drag_icon.tree.node.setPosition(
+                    @intFromFloat(point.lx),
+                    @intFromFloat(point.ly),
+                );
+            }
+        },
+    }
 }
 
 fn handleDestroy(listener: *wl.Listener(*wlr.Drag.Icon), _: *wlr.Drag.Icon) void {

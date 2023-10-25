@@ -1104,24 +1104,8 @@ fn updateDragIcons(self: *Self) void {
     while (it.next()) |node| {
         const icon = @as(*DragIcon, @ptrFromInt(node.data));
 
-        if (icon.wlr_drag_icon.drag.seat != self.seat.wlr_seat) continue;
-
-        switch (icon.wlr_drag_icon.drag.grab_type) {
-            .keyboard => unreachable,
-            .keyboard_pointer => {
-                icon.tree.node.setPosition(
-                    @intFromFloat(self.wlr_cursor.x),
-                    @intFromFloat(self.wlr_cursor.y),
-                );
-            },
-            .keyboard_touch => {
-                const touch_id = icon.wlr_drag_icon.drag.touch_id;
-                const point = self.touch_points.get(touch_id) orelse continue;
-                icon.tree.node.setPosition(
-                    @intFromFloat(point.lx),
-                    @intFromFloat(point.ly),
-                );
-            },
+        if (icon.wlr_drag_icon.drag.seat == self.seat.wlr_seat) {
+            icon.updatePosition(self);
         }
     }
 }
