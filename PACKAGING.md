@@ -66,18 +66,19 @@ in the first place. For greatest effect, both may be used.
 
 - Enable compiler optimizations:
 
-  - `-Drelease-safe`: Keep all assertions and runtime safety checks active.
+  - `-Doptimize=ReleaseSafe`: Optimize for execution speed,
+  keep all assertions and runtime safety checks active.
 
-  - `-Drelease-fast`: Optimize for execution speed, disable all assertions
-  and runtime safety checks.
+  - `-Doptimize=ReleaseFast`: Optimize for execution speed,
+  disable all assertions and runtime safety checks.
 
-  - `-Drelease-small`: Optimize for binary size, disable all assertions and
-  runtime safety checks.
+  - `-Doptimize=ReleaseSmall`: Optimize for binary size,
+  disable all assertions and runtime safety checks.
 
-Please use `-Drelease-safe` when building river for general use. CPU execution
-speed is not the performance bottleneck for river, the GPU is. Additionally,
-the increased safety is more than worth the binary size trade-off in my
-opinion.
+Please use `-Doptimize=ReleaseSafe` when building river for general
+use. CPU execution speed is not the performance bottleneck for river, the
+GPU is. Additionally, the increased safety is more than worth the binary
+size trade-off in my opinion.
 
 ## Build prefix and DESTDIR
 
@@ -114,7 +115,7 @@ a convention.
 
 Build for the host architecture and libc ABI:
 ```bash
-DESTDIR=/foo/bar zig build -Drelease-safe -Dcpu=baseline \
+DESTDIR=/foo/bar zig build -Doptimize=ReleaseSafe -Dcpu=baseline \
     -Dstrip -Dpie --prefix /usr install
 ```
 
@@ -133,7 +134,7 @@ DESTDIR="/foo/bar" zig build \
     --sysroot "${XBPS_CROSS_BASE}" \
     --libc xbps_zig_libc.txt \
     -Dtarget=aarch64-linux-musl -Dcpu=baseline \
-    -Drelease-safe -Dstrip -Dpie \
+    -Doptimize=ReleaseSafe -Dstrip -Dpie \
     --prefix /usr install
 ```
 
