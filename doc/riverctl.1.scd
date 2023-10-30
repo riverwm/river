@@ -21,6 +21,21 @@ over the Wayland protocol.
 *-version*
 	Print the version number and exit.
 
+# TERMINOLOGY
+
+This manual uses terms that some may find confusing, coming mostly from their
+usage among other Wayland projects.
+
+The *compositor*, display server, Wayland server etc. are ways to refer to river
+itself.
+
+A *view* (or *toplevel*) is what most call a window.
+
+An *output* is a synonym for a screen or monitor.
+
+*Tags* are river's way of dividing views of an output into groups (not
+necessarily disjunct), an analogy to workspaces.
+
 # COMMANDS
 
 ## ACTIONS
