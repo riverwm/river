@@ -996,36 +996,55 @@ pub fn updateState(self: *Self) void {
         },
         // TODO: Leave down mode if the target surface is no longer visible.
         .down => assert(!self.hidden),
-        inline .move, .resize => |data, mode| {
-            assert(!self.hidden);
+        .move, .resize => {
+            // Moving and resizing of views is handled through the transaction system. Therefore,
+            // we must inspect the inflight_mode instead if a move or a resize is in progress.
+            //
+            // The cases when a move/resize is being started or ended and e.g. mode is resize
+            // while inflight_mode is passthrough or mode is passthrough while inflight_mode
+            // is resize shouldn't need any special handling.
+            //
+            // In the first case, a move/resize has been started along with a transaction but the
+            // transaction hasn't been committed yet so there is nothing to do.
+            //
+            // In the second case, a move/resize has been terminated by the user but the
+            // transaction carrying out the final size/position change is still inflight.
+            // Therefore, the user already expects the cursor to be free from the view and
+            // we should not warp it back to the fixed offset of the move/resize.
+            switch (self.inflight_mode) {
+                .passthrough, .down => {},
+                inline .move, .resize => |data, mode| {
+                    assert(!self.hidden);
 
-            // These conditions are checked in Root.applyPending()
-            assert(data.view.current.tags & data.view.current.output.?.current.tags != 0);
-            assert(data.view.current.float or data.view.current.output.?.layout == null);
-            assert(!data.view.current.fullscreen);
+                    // These conditions are checked in Root.applyPending()
+                    assert(data.view.current.tags & data.view.current.output.?.current.tags != 0);
+                    assert(data.view.current.float or data.view.current.output.?.layout == null);
+                    assert(!data.view.current.fullscreen);
 
-            // Keep the cursor locked to the original offset from the edges of the view.
-            const box = &data.view.current.box;
-            const new_x: f64 = blk: {
-                if (mode == .move or data.edges.left) {
-                    break :blk @floatFromInt(data.offset_x + box.x);
-                } else if (data.edges.right) {
-                    break :blk @floatFromInt(box.x + box.width - data.offset_x);
-                } else {
-                    break :blk self.wlr_cursor.x;
-                }
-            };
-            const new_y: f64 = blk: {
-                if (mode == .move or data.edges.top) {
-                    break :blk @floatFromInt(data.offset_y + box.y);
-                } else if (data.edges.bottom) {
-                    break :blk @floatFromInt(box.y + box.height - data.offset_y);
-                } else {
-                    break :blk self.wlr_cursor.y;
-                }
-            };
+                    // Keep the cursor locked to the original offset from the edges of the view.
+                    const box = &data.view.current.box;
+                    const new_x: f64 = blk: {
+                        if (mode == .move or data.edges.left) {
+                            break :blk @floatFromInt(data.offset_x + box.x);
+                        } else if (data.edges.right) {
+                            break :blk @floatFromInt(box.x + box.width - data.offset_x);
+                        } else {
+                            break :blk self.wlr_cursor.x;
+                        }
+                    };
+                    const new_y: f64 = blk: {
+                        if (mode == .move or data.edges.top) {
+                            break :blk @floatFromInt(data.offset_y + box.y);
+                        } else if (data.edges.bottom) {
+                            break :blk @floatFromInt(box.y + box.height - data.offset_y);
+                        } else {
+                            break :blk self.wlr_cursor.y;
+                        }
+                    };
 
-            self.wlr_cursor.warpClosest(null, new_x, new_y);
+                    self.wlr_cursor.warpClosest(null, new_x, new_y);
+                },
+            }
         },
     }
 }
