@@ -104,9 +104,6 @@ pub fn configure(self: *Self) bool {
     const inflight = &self.view.inflight;
     const current = &self.view.current;
 
-    const inflight_fullscreen = inflight.output != null and inflight.output.?.inflight.fullscreen == self.view;
-    const current_fullscreen = current.output != null and current.output.?.current.fullscreen == self.view;
-
     const inflight_float = inflight.float or (inflight.output != null and inflight.output.?.layout == null);
     const current_float = current.float or (current.output != null and current.output.?.layout == null);
 
@@ -116,7 +113,7 @@ pub fn configure(self: *Self) bool {
     if (inflight.box.width == current.box.width and
         inflight.box.height == current.box.height and
         (inflight.focus != 0) == (current.focus != 0) and
-        inflight_fullscreen == current_fullscreen and
+        inflight.fullscreen == current.fullscreen and
         inflight_float == current_float and
         inflight.ssd == current.ssd and
         inflight.resizing == current.resizing)
@@ -126,7 +123,7 @@ pub fn configure(self: *Self) bool {
 
     _ = self.xdg_toplevel.setActivated(inflight.focus != 0);
 
-    _ = self.xdg_toplevel.setFullscreen(inflight_fullscreen);
+    _ = self.xdg_toplevel.setFullscreen(inflight.fullscreen);
 
     if (inflight_float) {
         _ = self.xdg_toplevel.setTiled(.{ .top = false, .bottom = false, .left = false, .right = false });
