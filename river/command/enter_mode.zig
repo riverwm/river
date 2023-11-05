@@ -15,6 +15,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
+const flags = @import("flags");
 
 const server = &@import("../main.zig").server;
 const util = @import("../util.zig");
@@ -28,8 +29,14 @@ pub fn enterMode(
     args: []const [:0]const u8,
     out: *?[]const u8,
 ) Error!void {
-    if (args.len < 2) return Error.NotEnoughArguments;
-    if (args.len > 2) return Error.TooManyArguments;
+    const result = flags.parser([:0]const u8, &.{
+        .{ .name = "oneshot", .kind = .boolean },
+    }).parse(args[1..]) catch {
+        return error.InvalidValue;
+    };
+
+    if (result.args.len < 1) return Error.NotEnoughArguments;
+    if (result.args.len > 1) return Error.TooManyArguments;
 
     if (seat.mode_id == 1) {
         out.* = try std.fmt.allocPrint(
@@ -40,7 +47,7 @@ pub fn enterMode(
         return Error.Other;
     }
 
-    const target_mode = args[1];
+    const target_mode = result.args[0];
     const mode_id = server.config.mode_to_id.get(target_mode) orelse {
         out.* = try std.fmt.allocPrint(
             util.gpa,
@@ -57,7 +64,17 @@ pub fn enterMode(
             .{},
         );
         return Error.Other;
+    } else if (mode_id == 0 and result.flags.oneshot) {
+        out.* = try std.fmt.allocPrint(
+            util.gpa,
+            "'-oneshot' is invalid for 'normal' mode",
+            .{},
+        );
+        return Error.Other;
     }
 
-    seat.enterMode(mode_id);
+    seat.enterMode(mode_id, if (result.flags.oneshot)
+        .oneshot
+    else
+        .continuous);
 }

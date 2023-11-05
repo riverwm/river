@@ -46,6 +46,17 @@ const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
 const log = std.log.scoped(.seat);
 
+/// The ModeLifetime modifies the lifetime of a keymap mode in response to
+/// its keymaps being activated.
+const ModeLifetime = enum {
+    /// River will return to normal or locked mode after a single keymap
+    /// has been activated.
+    oneshot,
+
+    /// The mode will stay active until another mode is entered explicitly.
+    continuous,
+};
+
 pub const FocusTarget = union(enum) {
     view: *View,
     xwayland_override_redirect: if (build_options.xwayland) *XwaylandOverrideRedirect else noreturn,
@@ -61,6 +72,9 @@ cursor: Cursor = undefined,
 
 /// ID of the current keymap mode
 mode_id: u32 = 0,
+
+/// Lifetime of current keymap mode
+mode_lifetime: ModeLifetime = .continuous,
 
 /// ID of previous keymap mode, used when returning from "locked" mode
 prev_mode_id: u32 = 0,
@@ -339,8 +353,12 @@ pub fn handleActivity(self: Self) void {
     server.input_manager.idle_notifier.notifyActivity(self.wlr_seat);
 }
 
-pub fn enterMode(self: *Self, mode_id: u32) void {
+pub fn enterMode(self: *Self, mode_id: u32, lifetime: ModeLifetime) void {
+    // It makes no sense to enter normal / locked mode as oneshot.
+    assert(lifetime != .oneshot or (mode_id != 1 and mode_id != 0));
+
     self.mode_id = mode_id;
+    self.mode_lifetime = lifetime;
 
     var it = self.status_trackers.first;
     while (it) |node| : (it = node.next) {
@@ -374,6 +392,7 @@ pub fn handleMapping(
     released: bool,
     xkb_state: *xkb.State,
 ) bool {
+    const current_mode = self.mode_id;
     const modes = &server.config.modes;
     // In case more than one mapping matches, all of them are activated
     var handled = false;
@@ -388,6 +407,20 @@ pub fn handleMapping(
             self.runCommand(mapping.command_args);
             handled = true;
         }
+    }
+    // Ignore oneshot activations if the mode has changes, as that is either
+    // the 'enter-mode' command that entered the oneshot mode or an 'enter-mode'
+    // command called from the oneshot. In both cases returning to normal/locked
+    // mode is undesired.
+    if (handled and
+        self.mode_lifetime == .oneshot and
+        current_mode == self.mode_id)
+    {
+        const ret_id: u1 = switch (server.lock_manager.state) {
+            .unlocked, .waiting_for_lock_surfaces, .waiting_for_blank => 0,
+            .locked => 1,
+        };
+        self.enterMode(ret_id, .continuous);
     }
     return handled;
 }

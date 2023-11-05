@@ -189,8 +189,11 @@ A complete list may be found in _/usr/include/linux/input-event-codes.h_
 *declare-mode* _name_
 	Create a new mode called _name_.
 
-*enter-mode* _name_
+*enter-mode* [*-oneshot*] _name_
 	Switch to given mode if it exists.
+
+	- *-oneshot*: if passed, the mode will be entered for a single keymap
+	  only after which river will return normal or locked mode automatically.
 
 *map* [*-release*|*-repeat*|*-layout* _index_] _mode_ _modifiers_ _key_ _command_
 	Run _command_ when _key_ is pressed while _modifiers_ are held down

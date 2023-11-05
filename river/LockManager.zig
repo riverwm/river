@@ -113,9 +113,12 @@ fn handleLock(listener: *wl.Listener(*wlr.SessionLockV1), lock: *wlr.SessionLock
                 seat.setFocusRaw(.none);
                 seat.cursor.updateState();
 
-                // Enter locked mode
-                seat.prev_mode_id = seat.mode_id;
-                seat.enterMode(1);
+                // Enter locked mode. If the currently active mode has a
+                // onehsot lifetime, ignore it and return to normal mode on
+                // unlock as returning to the oneshot mode would likely be
+                // unexpected to a user.
+                seat.prev_mode_id = if (seat.mode_lifetime == .oneshot) 0 else seat.mode_id;
+                seat.enterMode(1, .continuous);
             }
         }
     } else {
@@ -223,7 +226,9 @@ fn handleUnlock(listener: *wl.Listener(void)) void {
             seat.setFocusRaw(.none);
 
             // Exit locked mode
-            seat.enterMode(seat.prev_mode_id);
+            assert(seat.mode_id == 1);
+            assert(seat.mode_lifetime == .continuous);
+            seat.enterMode(seat.prev_mode_id, .continuous);
         }
     }
 
