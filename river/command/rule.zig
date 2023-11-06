@@ -36,6 +36,8 @@ const Action = enum {
     output,
     position,
     dimensions,
+    fullscreen,
+    @"no-fullscreen",
 };
 
 pub fn ruleAdd(_: *Seat, args: []const [:0]const u8, _: *?[]const u8) Error!void {
@@ -51,7 +53,7 @@ pub fn ruleAdd(_: *Seat, args: []const [:0]const u8, _: *?[]const u8) Error!void
     const action = std.meta.stringToEnum(Action, result.args[0]) orelse return Error.UnknownOption;
 
     const positional_arguments_count: u8 = switch (action) {
-        .float, .@"no-float", .ssd, .csd => 1,
+        .float, .@"no-float", .ssd, .csd, .fullscreen, .@"no-fullscreen" => 1,
         .tag, .output => 2,
         .position, .dimensions => 3,
     };
@@ -122,6 +124,13 @@ pub fn ruleAdd(_: *Seat, args: []const [:0]const u8, _: *?[]const u8) Error!void
                 },
             });
         },
+        .fullscreen, .@"no-fullscreen" => {
+            try server.config.fullscreen_rules.add(.{
+                .app_id_glob = app_id_glob,
+                .title_glob = title_glob,
+                .value = (action == .fullscreen),
+            });
+        },
     }
 }
 
@@ -165,6 +174,9 @@ pub fn ruleDel(_: *Seat, args: []const [:0]const u8, _: *?[]const u8) Error!void
         .dimensions => {
             _ = server.config.dimensions_rules.del(rule);
         },
+        .fullscreen, .@"no-fullscreen" => {
+            _ = server.config.fullscreen_rules.del(rule);
+        },
     }
 }
 
@@ -188,6 +200,7 @@ pub fn listRules(_: *Seat, args: []const [:0]const u8, out: *?[]const u8) Error!
         output,
         position,
         dimensions,
+        fullscreen,
     }, args[1]) orelse return Error.UnknownOption;
     const max_glob_len = switch (list) {
         .float => server.config.float_rules.getMaxGlobLen(),
@@ -196,6 +209,7 @@ pub fn listRules(_: *Seat, args: []const [:0]const u8, out: *?[]const u8) Error!
         .output => server.config.output_rules.getMaxGlobLen(),
         .position => server.config.position_rules.getMaxGlobLen(),
         .dimensions => server.config.dimensions_rules.getMaxGlobLen(),
+        .fullscreen => server.config.fullscreen_rules.getMaxGlobLen(),
     };
     const app_id_column_max = 2 + @max("app-id".len, max_glob_len.app_id);
     const title_column_max = 2 + @max("title".len, max_glob_len.title);
@@ -254,6 +268,14 @@ pub fn listRules(_: *Seat, args: []const [:0]const u8, out: *?[]const u8) Error!
                 try fmt.formatBuf(rule.title_glob, .{ .width = title_column_max, .alignment = .left }, writer);
                 try fmt.formatBuf(rule.app_id_glob, .{ .width = app_id_column_max, .alignment = .left }, writer);
                 try writer.print("{d}x{d}\n", .{ rule.value.width, rule.value.height });
+            }
+        },
+        .fullscreen => {
+            const rules = server.config.fullscreen_rules.rules.items;
+            for (rules) |rule| {
+                try fmt.formatBuf(rule.title_glob, .{ .width = title_column_max, .alignment = .left }, writer);
+                try fmt.formatBuf(rule.app_id_glob, .{ .width = app_id_column_max, .alignment = .left }, writer);
+                try writer.print("{s}\n", .{if (rule.value) "fullscreen" else "no-fullscreen"});
             }
         },
     }

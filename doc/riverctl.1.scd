@@ -311,7 +311,7 @@ matches everything while _\*\*_ and the empty string are invalid.
 	Both *float* and *no-float* rules are added to the same list,
 	which means that adding a *no-float* rule with the same arguments
 	as a *float* rule will overwrite it. The same holds for *ssd* and
-	*csd* rules.
+	*csd*, *fullscreen* and *no-fullscreen* rules.
 
 	If multiple rules in a list match a given view the most specific
 	rule will be applied. For example with the following rules
@@ -339,7 +339,7 @@ matches everything while _\*\*_ and the empty string are invalid.
 *rule-del* [*-app-id* _glob_|*-title* _glob_] _action_
 	Delete a rule created using *rule-add* with the given arguments.
 
-*list-rules* *float*|*ssd*|*tag*|*position*|*dimensions*
+*list-rules* *float*|*ssd*|*tag*|*position*|*dimensions*|*fullscreen*
 	Print the specified rule list. The output is ordered from most specific
 	to least specific, the same order in which views are checked against
 	when searching for a match. Only the first matching rule in the list

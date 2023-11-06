@@ -183,9 +183,9 @@ _riverctl()
                     # In case of a new rule added in river, we just need
                     # to add it to the third option between '()',
                     # i.e (float no-float <new-option>)
-                    _arguments '1: :(-app-id -title)' '2: : ' ':: :(float no-float ssd csd tag output position dimensions)'
+                    _arguments '1: :(-app-id -title)' '2: : ' ':: :(float no-float ssd csd tag output position dimensions fullscreen no-fullscreen)'
                 ;;
-                list-rules) _alternative 'arguments:args:(float ssd tag output position dimensions)' ;;
+                list-rules) _alternative 'arguments:args:(float ssd tag output position dimensions fullscreen)' ;;
                 *) return 0 ;;
             esac
         ;;

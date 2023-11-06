@@ -488,6 +488,9 @@ pub fn map(view: *Self) !void {
     if (server.config.float_rules.match(view)) |float| {
         view.pending.float = float;
     }
+    if (server.config.fullscreen_rules.match(view)) |fullscreen| {
+        view.pending.fullscreen = fullscreen;
+    }
     if (server.config.ssd_rules.match(view)) |ssd| {
         view.pending.ssd = ssd;
     }

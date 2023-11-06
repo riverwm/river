@@ -1,6 +1,6 @@
 function __riverctl_completion ()
 {
-	local rule_actions="float no-float ssd csd tag output position dimensions"
+	local rule_actions="float no-float ssd csd tag output position dimensions fullscreen no-fullscreen"
 	if [ "${COMP_CWORD}" -eq 1 ]
 	then
 		OPTS=" \
@@ -66,7 +66,7 @@ function __riverctl_completion ()
 			"move"|"snap") OPTS="up down left right" ;;
 			"resize") OPTS="horizontal vertical" ;;
 			"rule-add"|"rule-del") OPTS="-app-id -title $rule_actions" ;;
-			"list-rules") OPTS="float ssd tag output position dimensions" ;;
+			"list-rules") OPTS="float ssd tag output position dimensions fullscreen" ;;
 			"map") OPTS="-release -repeat -layout" ;;
 			"unmap") OPTS="-release" ;;
 			"attach-mode") OPTS="top bottom" ;;
