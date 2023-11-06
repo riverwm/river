@@ -119,10 +119,20 @@ pub fn updateState(constraint: *PointerConstraint) void {
         return;
     }
 
-    const warp_lx = @as(f64, @floatFromInt(lx)) + constraint.state.active.sx;
-    const warp_ly = @as(f64, @floatFromInt(ly)) + constraint.state.active.sy;
+    const sx = constraint.state.active.sx;
+    const sy = constraint.state.active.sy;
+    const warp_lx = @as(f64, @floatFromInt(lx)) + sx;
+    const warp_ly = @as(f64, @floatFromInt(ly)) + sy;
     if (!seat.cursor.wlr_cursor.warp(null, warp_lx, warp_ly)) {
         log.info("deactivating pointer constraint, could not warp cursor", .{});
+        constraint.deactivate();
+        return;
+    }
+
+    // It is possible for the cursor to end up outside of the constraint region despite the warp
+    // if, for example, the a keybinding is used to resize the view.
+    if (!constraint.wlr_constraint.region.containsPoint(@intFromFloat(sx), @intFromFloat(sy), null)) {
+        log.info("deactivating pointer constraint, cursor outside region despite warp", .{});
         constraint.deactivate();
         return;
     }
