@@ -289,7 +289,7 @@ matches everything while _\*\*_ and the empty string are invalid.
 	  and existing views.
 	- *csd*: Use client-side decorations for the view. Applies to new
 	  and existing views.
-	- *tag*: Set the initial tags of the view. Requires the tags as
+	- *tags*: Set the initial tags of the view. Requires the tags as
 	  an argument. Applies only to new views.
 	- *output*: Set the initial output of the view. Requires the output
 	  as an argument. Applies only to new views. The output can be specified
@@ -339,7 +339,7 @@ matches everything while _\*\*_ and the empty string are invalid.
 *rule-del* [*-app-id* _glob_|*-title* _glob_] _action_
 	Delete a rule created using *rule-add* with the given arguments.
 
-*list-rules* *float*|*ssd*|*tag*|*position*|*dimensions*|*fullscreen*
+*list-rules* *float*|*ssd*|*tags*|*position*|*dimensions*|*fullscreen*
 	Print the specified rule list. The output is ordered from most specific
 	to least specific, the same order in which views are checked against
 	when searching for a match. Only the first matching rule in the list
