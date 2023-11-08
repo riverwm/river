@@ -381,7 +381,10 @@ fn handleRequestMove(
     if (view.pending.fullscreen) return;
     if (!(view.pending.float or view.pending.output.?.layout == null)) return;
 
-    seat.cursor.startMove(view);
+    switch (seat.cursor.mode) {
+        .passthrough, .down => seat.cursor.startMove(view),
+        .move, .resize => {},
+    }
 }
 
 fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), event: *wlr.XdgToplevel.event.Resize) void {
@@ -406,7 +409,10 @@ fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), ev
     if (view.pending.fullscreen) return;
     if (!(view.pending.float or view.pending.output.?.layout == null)) return;
 
-    seat.cursor.startResize(view, event.edges);
+    switch (seat.cursor.mode) {
+        .passthrough, .down => seat.cursor.startResize(view, event.edges),
+        .move, .resize => {},
+    }
 }
 
 /// Called when the client sets / updates its title
