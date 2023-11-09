@@ -362,6 +362,9 @@ pub fn activateOutput(root: *Self, output: *Output) void {
 
     // If we previously had no outputs, move all views to the new output and focus it.
     if (first) {
+        const log = std.log.scoped(.output_manager);
+        log.debug("moving views from fallback stacks to new output", .{});
+
         output.pending.tags = root.fallback.tags;
         {
             var it = root.fallback.pending.focus_stack.safeIterator(.reverse);
