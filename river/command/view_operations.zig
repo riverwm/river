@@ -17,6 +17,7 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const wlr = @import("wlroots");
+const flags = @import("flags");
 
 const server = &@import("../main.zig").server;
 
@@ -34,10 +35,19 @@ pub fn focusView(
     args: []const [:0]const u8,
     _: *?[]const u8,
 ) Error!void {
-    if (args.len < 2) return Error.NotEnoughArguments;
-    if (args.len > 2) return Error.TooManyArguments;
+    const result = flags.parser([:0]const u8, &.{
+        .{ .name = "skip-floating", .kind = .boolean },
+    }).parse(args[1..]) catch {
+        return error.InvalidValue;
+    };
+    if (result.args.len < 1) return Error.NotEnoughArguments;
+    if (result.args.len > 1) return Error.TooManyArguments;
 
-    if (try getTarget(seat, args[1], .all)) |target| {
+    if (try getTarget(
+        seat,
+        result.args[0],
+        if (result.flags.@"skip-floating") .skip_float else .all,
+    )) |target| {
         assert(!target.pending.fullscreen);
         seat.focus(target);
         server.root.applyPending();

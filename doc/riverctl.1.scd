@@ -50,9 +50,11 @@ necessarily disjunct), an analogy to workspaces.
 	Focus the next or previous output, the closest output in any direction
 	or an output by name.
 
-*focus-view* *next*|*previous*|*up*|*down*|*left*|*right*
+*focus-view* [*-skip-floating*] *next*|*previous*|*up*|*down*|*left*|*right*
 	Focus the next or previous view in the stack or the closest view in
 	any direction.
+
+	- *-skip-floating*: Skip floating views, only focusing tiled ones.
 
 *move* *up*|*down*|*left*|*right* _delta_
 	Move the focused view in the specified direction by _delta_ logical
