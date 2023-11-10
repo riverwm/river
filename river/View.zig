@@ -174,6 +174,9 @@ post_fullscreen_box: wlr.Box = undefined,
 
 foreign_toplevel_handle: ForeignToplevelHandle = .{},
 
+/// Connector name of the output this view occupied before an evacuation.
+output_before_evac: ?[]const u8 = null,
+
 pub fn create(impl: Impl) error{OutOfMemory}!*Self {
     assert(impl != .none);
 
@@ -242,6 +245,8 @@ pub fn destroy(view: *Self) void {
         view.pending_wm_stack_link.remove();
         view.inflight_focus_stack_link.remove();
         view.inflight_wm_stack_link.remove();
+
+        if (view.output_before_evac) |name| util.gpa.free(name);
 
         util.gpa.destroy(view);
     }

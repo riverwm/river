@@ -286,6 +286,15 @@ pub fn deactivateOutput(root: *Self, output: *Output) void {
             if (view.inflight_transaction) {
                 view.commitTransaction();
             }
+
+            // Store outputs connector name so that views can be moved back to
+            // reconnecting outputs. Skip if there is already a connector name
+            // stored to better handle the case of multiple outputs being
+            // removed sequentially.
+            if (view.output_before_evac == null) {
+                const name = mem.span(output.wlr_output.name);
+                view.output_before_evac = util.gpa.dupe(u8, name) catch null;
+            }
         }
     }
     // Use the first output in the list as fallback. If the last real output
@@ -384,6 +393,20 @@ pub fn activateOutput(root: *Self, output: *Output) void {
             while (it) |seat_node| : (it = seat_node.next) {
                 const seat = &seat_node.data;
                 seat.focusOutput(output);
+            }
+        }
+    } else {
+        // Otherwise check if any views were previously evacuated from an output
+        // with the same (connector-)name and move them back.
+        var it = root.views.iterator(.forward);
+        while (it.next()) |view| {
+            const name = view.output_before_evac orelse continue;
+            if (mem.eql(u8, name, mem.span(output.wlr_output.name))) {
+                if (view.pending.output != output) {
+                    view.setPendingOutput(output);
+                }
+                util.gpa.free(name);
+                view.output_before_evac = null;
             }
         }
     }
