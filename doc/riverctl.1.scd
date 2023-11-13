@@ -124,9 +124,15 @@ are ignored by river.
 	Show views with tags corresponding to the set bits of _tags_ on the
 	currently focused output.
 
+*get-focused-tags*
+	Print the tag of the currently focused output.
+
 *set-view-tags* _tags_
 	Assign the currently focused view the tags corresponding to the set
 	bits of _tags_.
+
+*get-view-tags*
+	Print the tag of the currently focused view.
 
 *toggle-focused-tags* _tags_
 	Toggle visibility of views with tags corresponding to the set bits
