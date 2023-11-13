@@ -895,11 +895,13 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
                 box.width = @max(box.width, constraints.min_width);
                 box.width = @min(box.width, constraints.max_width);
                 box.width = @min(box.width, x2 - border_width);
+                data.x = @floatFromInt(data.initial_width - box.width);
             } else if (data.edges.right) {
                 box.width = data.initial_width + @as(i32, @intFromFloat(data.x));
                 box.width = @max(box.width, constraints.min_width);
                 box.width = @min(box.width, constraints.max_width);
                 box.width = @min(box.width, output_width - border_width - box.x);
+                data.x = @floatFromInt(box.width - data.initial_width);
             }
 
             if (data.edges.top) {
@@ -908,11 +910,13 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
                 box.height = @max(box.height, constraints.min_height);
                 box.height = @min(box.height, constraints.max_height);
                 box.height = @min(box.height, y2 - border_width);
+                data.y = @floatFromInt(data.initial_height - box.height);
             } else if (data.edges.bottom) {
                 box.height = data.initial_height + @as(i32, @intFromFloat(data.y));
                 box.height = @max(box.height, constraints.min_height);
                 box.height = @min(box.height, constraints.max_height);
                 box.height = @min(box.height, output_height - border_width - box.y);
+                data.y = @floatFromInt(box.height - data.initial_height);
             }
 
             server.root.applyPending();
