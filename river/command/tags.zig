@@ -16,6 +16,7 @@
 
 const std = @import("std");
 const mem = std.mem;
+const fmt = std.fmt;
 
 const server = &@import("../main.zig").server;
 const util = @import("../util.zig");
@@ -38,6 +39,17 @@ pub fn setFocusedTags(
     }
 }
 
+/// Get focus tag.
+pub fn getFocusedTags(
+    seat: *Seat,
+    _: []const [:0]const u8,
+    out: *?[]const u8,
+) Error!void {
+    const output = seat.focused_output orelse return;
+    const tag = output.pending.tags;
+    out.* = try std.fmt.allocPrint(util.gpa, "{d}", .{tag});
+}
+
 pub fn spawnTagmask(
     _: *Seat,
     args: []const [:0]const u8,
@@ -58,6 +70,19 @@ pub fn setViewTags(
         const view = seat.focused.view;
         view.pending.tags = tags;
         server.root.applyPending();
+    }
+}
+
+/// Get the tags of the focused view.
+pub fn getViewTags(
+    seat: *Seat,
+    _: []const [:0]const u8,
+    out: *?[]const u8,
+) Error!void {
+    if (seat.focused == .view) {
+        const view = seat.focused.view;
+        const tag = view.pending.tags;
+        out.* = try std.fmt.allocPrint(util.gpa, "{d}", .{tag});
     }
 }
 

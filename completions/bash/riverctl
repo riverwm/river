@@ -32,9 +32,11 @@ function __riverctl_completion ()
 			output-layout \
 			send-layout-cmd \
 			set-focused-tags \
+			get-focused-tags \
 			focus-previous-tags \
 			send-to-previous-tags \
 			set-view-tags \
+			get-view-tags \
 			toggle-focused-tags \
 			toggle-view-tags \
 			spawn-tagmask \
