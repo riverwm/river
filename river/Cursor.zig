@@ -76,10 +76,15 @@ const Mode = union(enum) {
     resize: struct {
         view: *View,
 
-        /// Total x/y movement of the pointer device since the start of the resize.
-        /// This is not directly tied to cursor position.
-        x: f64 = 0,
-        y: f64 = 0,
+        delta_x: f64 = 0,
+        delta_y: f64 = 0,
+
+        /// Total x/y movement of the pointer device since the start of the resize,
+        /// clamped to the bounds of the resize as defined by the view min/max
+        /// dimensions and output dimensions.
+        /// This is not directly tied to the rendered cursor position.
+        x: i32 = 0,
+        y: i32 = 0,
 
         /// Resize edges, maximum of 2 are set and they may not be opposing edges.
         edges: wlr.Edges,
@@ -874,8 +879,13 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
             server.root.applyPending();
         },
         .resize => |*data| {
-            data.x += dx;
-            data.y += dy;
+            dx += data.delta_x;
+            dy += data.delta_y;
+            data.delta_x = dx - @trunc(dx);
+            data.delta_y = dy - @trunc(dy);
+
+            data.x += @intFromFloat(dx);
+            data.y += @intFromFloat(dy);
 
             // Modify width/height of the pending box, taking constraints into account
             // The x/y coordinates of the view will be adjusted as needed in View.resizeCommit()
@@ -891,32 +901,32 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
 
             if (data.edges.left) {
                 const x2 = box.x + box.width;
-                box.width = data.initial_width - @as(i32, @intFromFloat(data.x));
+                box.width = data.initial_width - data.x;
                 box.width = @max(box.width, constraints.min_width);
                 box.width = @min(box.width, constraints.max_width);
                 box.width = @min(box.width, x2 - border_width);
-                data.x = @floatFromInt(data.initial_width - box.width);
+                data.x = data.initial_width - box.width;
             } else if (data.edges.right) {
-                box.width = data.initial_width + @as(i32, @intFromFloat(data.x));
+                box.width = data.initial_width + data.x;
                 box.width = @max(box.width, constraints.min_width);
                 box.width = @min(box.width, constraints.max_width);
                 box.width = @min(box.width, output_width - border_width - box.x);
-                data.x = @floatFromInt(box.width - data.initial_width);
+                data.x = box.width - data.initial_width;
             }
 
             if (data.edges.top) {
                 const y2 = box.y + box.height;
-                box.height = data.initial_height - @as(i32, @intFromFloat(data.y));
+                box.height = data.initial_height - data.y;
                 box.height = @max(box.height, constraints.min_height);
                 box.height = @min(box.height, constraints.max_height);
                 box.height = @min(box.height, y2 - border_width);
-                data.y = @floatFromInt(data.initial_height - box.height);
+                data.y = data.initial_height - box.height;
             } else if (data.edges.bottom) {
-                box.height = data.initial_height + @as(i32, @intFromFloat(data.y));
+                box.height = data.initial_height + data.y;
                 box.height = @max(box.height, constraints.min_height);
                 box.height = @min(box.height, constraints.max_height);
                 box.height = @min(box.height, output_height - border_width - box.y);
-                data.y = @floatFromInt(box.height - data.initial_height);
+                data.y = box.height - data.initial_height;
             }
 
             server.root.applyPending();
