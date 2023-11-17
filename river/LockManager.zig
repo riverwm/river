@@ -111,7 +111,6 @@ fn handleLock(listener: *wl.Listener(*wlr.SessionLockV1), lock: *wlr.SessionLock
             while (it) |node| : (it = node.next) {
                 const seat = &node.data;
                 seat.setFocusRaw(.none);
-                seat.cursor.updateState();
 
                 // Enter locked mode
                 seat.prev_mode_id = seat.mode_id;

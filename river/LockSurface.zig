@@ -31,6 +31,8 @@ const SceneNodeData = @import("SceneNodeData.zig");
 wlr_lock_surface: *wlr.SessionLockSurfaceV1,
 lock: *wlr.SessionLockV1,
 
+idle_update_focus: ?*wl.EventSource = null,
+
 output_mode: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleOutputMode),
 map: wl.Listener(void) = wl.Listener(void).init(handleMap),
 surface_destroy: wl.Listener(void) = wl.Listener(void).init(handleDestroy),
@@ -78,6 +80,10 @@ pub fn destroy(lock_surface: *LockSurface) void {
         }
     }
 
+    if (lock_surface.idle_update_focus) |event_source| {
+        event_source.remove();
+    }
+
     lock_surface.output_mode.link.remove();
     lock_surface.map.link.remove();
     lock_surface.surface_destroy.link.remove();
@@ -105,16 +111,29 @@ fn handleMap(listener: *wl.Listener(void)) void {
     output.normal_content.node.setEnabled(false);
     output.locked_content.node.setEnabled(true);
 
-    {
-        var it = server.input_manager.seats.first;
-        while (it) |node| : (it = node.next) {
-            const seat = &node.data;
-            if (seat.focused != .lock_surface) {
-                seat.setFocusRaw(.{ .lock_surface = lock_surface });
-            }
-            seat.cursor.updateState();
+    // Unfortunately the surface commit handlers for the scene subsurface tree corresponding to
+    // this lock surface won't be called until after this function returns, which means that we cannot
+    // update pointer focus yet as the nodes in the scene graph representing this lock surface are still
+    // 0x0 in size. To work around this, use an idle callback.
+    const event_loop = server.wl_server.getEventLoop();
+    assert(lock_surface.idle_update_focus == null);
+    lock_surface.idle_update_focus = event_loop.addIdle(*LockSurface, updateFocus, lock_surface) catch {
+        std.log.err("out of memory", .{});
+        return;
+    };
+}
+
+fn updateFocus(lock_surface: *LockSurface) void {
+    var it = server.input_manager.seats.first;
+    while (it) |node| : (it = node.next) {
+        const seat = &node.data;
+        if (seat.focused != .lock_surface) {
+            seat.setFocusRaw(.{ .lock_surface = lock_surface });
         }
+        seat.cursor.updateState();
     }
+
+    lock_surface.idle_update_focus = null;
 }
 
 fn handleDestroy(listener: *wl.Listener(void)) void {
