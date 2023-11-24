@@ -299,8 +299,8 @@ pub fn sendToOutput(self: *Self, destination_output: *Output) void {
         // of this.
         if (self.pending.fullscreen) self.pending.box = self.post_fullscreen_box;
         const border_width = if (self.draw_borders) server.config.border_width else 0;
-        self.pending.box.width = math.min(self.pending.box.width, output_width - (2 * border_width));
-        self.pending.box.height = math.min(self.pending.box.height, output_height - (2 * border_width));
+        self.pending.box.width = @min(self.pending.box.width, output_width - (2 * border_width));
+        self.pending.box.height = @min(self.pending.box.height, output_height - (2 * border_width));
 
         // Adjust position of view so that it is fully inside the target output.
         self.move(0, 0);
@@ -439,15 +439,15 @@ pub fn move(self: *Self, delta_x: i32, delta_y: i32) void {
 
     const max_x = output_width - self.pending.box.width - border_width;
     self.pending.box.x += delta_x;
-    self.pending.box.x = math.max(self.pending.box.x, border_width);
-    self.pending.box.x = math.min(self.pending.box.x, max_x);
-    self.pending.box.x = math.max(self.pending.box.x, 0);
+    self.pending.box.x = @max(self.pending.box.x, border_width);
+    self.pending.box.x = @min(self.pending.box.x, max_x);
+    self.pending.box.x = @max(self.pending.box.x, 0);
 
     const max_y = output_height - self.pending.box.height - border_width;
     self.pending.box.y += delta_y;
-    self.pending.box.y = math.max(self.pending.box.y, border_width);
-    self.pending.box.y = math.min(self.pending.box.y, max_y);
-    self.pending.box.y = math.max(self.pending.box.y, 0);
+    self.pending.box.y = @max(self.pending.box.y, border_width);
+    self.pending.box.y = @min(self.pending.box.y, max_y);
+    self.pending.box.y = @max(self.pending.box.y, 0);
 }
 
 /// Find and return the view corresponding to a given surface, if any
@@ -455,12 +455,12 @@ pub fn fromWlrSurface(surface: *wlr.Surface) ?*Self {
     if (surface.isXdgSurface()) {
         const xdg_surface = wlr.XdgSurface.fromWlrSurface(surface) orelse return null;
         if (xdg_surface.role == .toplevel) {
-            return @intToPtr(*Self, xdg_surface.data);
+            return @as(*Self, @ptrFromInt(xdg_surface.data));
         }
     }
-    if (build_options.xwayland and surface.isXWaylandSurface()) {
+    if (build_options.xwayland and surface.isXwaylandSurface()) {
         const xwayland_surface = wlr.XwaylandSurface.fromWlrSurface(surface) orelse return null;
-        return @intToPtr(?*Self, xwayland_surface.data);
+        return @as(?*Self, @ptrFromInt(xwayland_surface.data));
     }
     if (surface.isSubsurface()) {
         if (wlr.Subsurface.fromWlrSurface(surface)) |ss| {
@@ -581,7 +581,7 @@ fn handleForeignActivate(
     event: *wlr.ForeignToplevelHandleV1.event.Activated,
 ) void {
     const self = @fieldParentPtr(Self, "foreign_activate", listener);
-    const seat = @intToPtr(*Seat, event.seat.data);
+    const seat = @as(*Seat, @ptrFromInt(event.seat.data));
     seat.focus(self);
     server.root.startTransaction();
 }

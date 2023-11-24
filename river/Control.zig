@@ -84,7 +84,7 @@ fn handleRequest(control: *zriver.ControlV1, request: zriver.ControlV1.Request, 
             };
         },
         .run_command => |run_command| {
-            const seat = @intToPtr(*Seat, wlr.Seat.Client.fromWlSeat(run_command.seat).?.seat.data);
+            const seat = @as(*Seat, @ptrFromInt(wlr.Seat.Client.fromWlSeat(run_command.seat).?.seat.data));
 
             const callback = zriver.CommandCallbackV1.create(
                 control.getClient(),
@@ -109,7 +109,7 @@ fn handleRequest(control: *zriver.ControlV1, request: zriver.ControlV1.Request, 
                         callback.getClient().postNoMemory();
                         return;
                     },
-                    command.Error.Other => std.cstr.addNullByte(util.gpa, out.?) catch {
+                    command.Error.Other => util.gpa.dupeZ(u8, out.?) catch {
                         callback.getClient().postNoMemory();
                         return;
                     },

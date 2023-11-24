@@ -111,8 +111,8 @@ pub fn startLayoutDemand(self: *Self, views: u32) void {
 
     self.layout.sendLayoutDemand(
         views,
-        @intCast(u32, self.output.usable_box.width),
-        @intCast(u32, self.output.usable_box.height),
+        @as(u32, @intCast(self.output.usable_box.width)),
+        @as(u32, @intCast(self.output.usable_box.height)),
         self.output.pending.tags,
         self.output.layout_demand.?.serial,
     );
@@ -140,8 +140,8 @@ fn handleRequest(layout: *river.LayoutV3, request: river.LayoutV3.Request, self:
                 layout_demand.pushViewDimensions(
                     req.x,
                     req.y,
-                    @intCast(u31, math.min(math.maxInt(u31), req.width)),
-                    @intCast(u31, math.min(math.maxInt(u31), req.height)),
+                    @min(math.maxInt(u31), req.width),
+                    @min(math.maxInt(u31), req.height),
                 );
             }
         },

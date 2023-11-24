@@ -50,7 +50,7 @@ pub fn init(self: *Self, output: *Output, wlr_layer_surface: *wlr.LayerSurfaceV1
         .wlr_layer_surface = wlr_layer_surface,
         .layer = wlr_layer_surface.current.layer,
     };
-    wlr_layer_surface.data = @ptrToInt(self);
+    wlr_layer_surface.data = @intFromPtr(self);
 
     // Set up listeners that are active for the entire lifetime of the layer surface
     wlr_layer_surface.events.destroy.add(&self.destroy);
@@ -84,7 +84,7 @@ fn handleDestroy(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface:
     Subsurface.destroySubsurfaces(self.wlr_layer_surface.surface);
     var it = wlr_layer_surface.popups.iterator(.forward);
     while (it.next()) |wlr_xdg_popup| {
-        if (@intToPtr(?*XdgPopup, wlr_xdg_popup.base.data)) |xdg_popup| xdg_popup.destroy();
+        if (@as(?*XdgPopup, @ptrFromInt(wlr_xdg_popup.base.data))) |xdg_popup| xdg_popup.destroy();
     }
 
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
@@ -111,7 +111,7 @@ fn handleUnmap(listener: *wl.Listener(*wlr.LayerSurfaceV1), _: *wlr.LayerSurface
 
     // Remove from the output's list of layer surfaces
     const self_node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-    self.output.layers[@intCast(usize, @enumToInt(self.layer))].remove(self_node);
+    self.output.layers[@as(usize, @intCast(@intFromEnum(self.layer)))].remove(self_node);
 
     // If the unmapped surface is focused, clear focus
     var it = server.input_manager.seats.first;
@@ -151,7 +151,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
         return;
     }
 
-    if (@bitCast(u32, self.wlr_layer_surface.current.committed) != 0) {
+    if (@as(u32, @bitCast(self.wlr_layer_surface.current.committed)) != 0) {
         // If the layer changed, move the LayerSurface to the proper list
         if (self.wlr_layer_surface.current.layer != self.layer) {
             const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);

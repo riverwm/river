@@ -11,7 +11,7 @@ const IdleInhibitorManager = @import("IdleInhibitorManager.zig");
 
 inhibitor_manager: *IdleInhibitorManager,
 inhibitor: *wlr.IdleInhibitorV1,
-destroy: wl.Listener(*wlr.IdleInhibitorV1) = wl.Listener(*wlr.IdleInhibitorV1).init(handleDestroy),
+destroy: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleDestroy),
 
 pub fn init(self: *Self, inhibitor: *wlr.IdleInhibitorV1, inhibitor_manager: *IdleInhibitorManager) !void {
     self.inhibitor_manager = inhibitor_manager;
@@ -22,7 +22,7 @@ pub fn init(self: *Self, inhibitor: *wlr.IdleInhibitorV1, inhibitor_manager: *Id
     inhibitor_manager.idleInhibitCheckActive();
 }
 
-fn handleDestroy(listener: *wl.Listener(*wlr.IdleInhibitorV1), _: *wlr.IdleInhibitorV1) void {
+fn handleDestroy(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
     self.destroy.link.remove();
 

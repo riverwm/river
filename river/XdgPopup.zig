@@ -51,7 +51,7 @@ pub fn create(wlr_xdg_popup: *wlr.XdgPopup, parent: Parent) void {
         .wlr_xdg_popup = wlr_xdg_popup,
     };
     assert(wlr_xdg_popup.base.data == 0);
-    wlr_xdg_popup.base.data = @ptrToInt(xdg_popup);
+    wlr_xdg_popup.base.data = @intFromPtr(xdg_popup);
 
     switch (parent) {
         .xdg_toplevel => |xdg_toplevel| {
@@ -107,7 +107,7 @@ pub fn destroy(xdg_popup: *XdgPopup) void {
 pub fn destroyPopups(wlr_xdg_surface: *wlr.XdgSurface) void {
     var it = wlr_xdg_surface.popups.iterator(.forward);
     while (it.next()) |wlr_xdg_popup| {
-        if (@intToPtr(?*XdgPopup, wlr_xdg_popup.base.data)) |xdg_popup| xdg_popup.destroy();
+        if (@as(?*XdgPopup, @ptrFromInt(wlr_xdg_popup.base.data))) |xdg_popup| xdg_popup.destroy();
     }
 }
 

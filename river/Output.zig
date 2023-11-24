@@ -149,7 +149,7 @@ pub fn init(self: *Self, wlr_output: *wlr.Output) !void {
         .damage = try wlr.OutputDamage.create(wlr_output),
         .usable_box = undefined,
     };
-    wlr_output.data = @ptrToInt(self);
+    wlr_output.data = @intFromPtr(self);
 
     wlr_output.events.destroy.add(&self.destroy);
     wlr_output.events.enable.add(&self.enable);
@@ -180,7 +180,7 @@ pub fn init(self: *Self, wlr_output: *wlr.Output) !void {
 }
 
 pub fn getLayer(self: *Self, layer: zwlr.LayerShellV1.Layer) *std.TailQueue(LayerSurface) {
-    return &self.layers[@intCast(usize, @enumToInt(layer))];
+    return &self.layers[@as(usize, @intCast(@intFromEnum(layer)))];
 }
 
 pub fn sendViewTags(self: Self) void {
@@ -343,8 +343,8 @@ fn arrangeLayer(
         const layer_surface = &node.data;
         const current_state = layer_surface.wlr_layer_surface.current;
 
-        const desired_width = @intCast(u31, math.min(math.maxInt(u31), current_state.desired_width));
-        const desired_height = @intCast(u31, math.min(math.maxInt(u31), current_state.desired_height));
+        const desired_width = @min(math.maxInt(u31), current_state.desired_width);
+        const desired_height = @min(math.maxInt(u31), current_state.desired_height);
 
         // If the value of exclusive_zone is greater than zero, then it exclusivly
         // occupies some area of the screen.
@@ -444,14 +444,14 @@ fn arrangeLayer(
                 assert(layer_surface.wlr_layer_surface.mapped);
                 layer_surface.box = new_box;
                 _ = layer_surface.wlr_layer_surface.configure(
-                    @intCast(u32, new_box.width),
-                    @intCast(u32, new_box.height),
+                    @as(u32, @intCast(new_box.width)),
+                    @as(u32, @intCast(new_box.height)),
                 );
             },
             .unmapped => if (!layer_surface.wlr_layer_surface.mapped) {
                 _ = layer_surface.wlr_layer_surface.configure(
-                    @intCast(u32, new_box.width),
-                    @intCast(u32, new_box.height),
+                    @as(u32, @intCast(new_box.width)),
+                    @as(u32, @intCast(new_box.height)),
                 );
             },
         }

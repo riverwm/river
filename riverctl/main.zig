@@ -47,8 +47,6 @@ pub const Globals = struct {
 
 pub fn main() !void {
     _main() catch |err| {
-        if (builtin.mode == .Debug) return err;
-
         switch (err) {
             error.RiverControlNotAdvertised => fatal(
                 \\The Wayland server does not support river-control-unstable-v1.
@@ -57,6 +55,14 @@ pub fn main() !void {
             error.SeatNotAdverstised => fatal(
                 \\The Wayland server did not advertise any seat.
             , .{}),
+            error.ConnectFailed => {
+                std.log.err("Unable to connect to the Wayland server.", .{});
+                if (os.getenvZ("WAYLAND_DISPLAY") == null) {
+                    fatal("WAYLAND_DISPLAY is not set.", .{});
+                } else {
+                    fatal("Does WAYLAND_DISPLAY contain the socket name of a running server?", .{});
+                }
+            },
             else => return err,
         }
     };
@@ -104,10 +110,10 @@ fn _main() !void {
 fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, globals: *Globals) void {
     switch (event) {
         .global => |global| {
-            if (std.cstr.cmp(global.interface, wl.Seat.getInterface().name) == 0) {
+            if (mem.orderZ(u8, global.interface, wl.Seat.getInterface().name) == .eq) {
                 assert(globals.seat == null); // TODO: support multiple seats
                 globals.seat = registry.bind(global.name, wl.Seat, 1) catch @panic("out of memory");
-            } else if (std.cstr.cmp(global.interface, zriver.ControlV1.getInterface().name) == 0) {
+            } else if (mem.orderZ(u8, global.interface, zriver.ControlV1.getInterface().name) == .eq) {
                 globals.control = registry.bind(global.name, zriver.ControlV1, 1) catch @panic("out of memory");
             }
         },
@@ -126,7 +132,7 @@ fn callbackListener(_: *zriver.CommandCallbackV1, event: zriver.CommandCallbackV
         },
         .failure => |failure| {
             // A small hack to provide usage text when river reports an unknown command.
-            if (std.cstr.cmp(failure.failure_message, "unknown command") == 0) {
+            if (mem.orderZ(u8, failure.failure_message, "unknown command") == .eq) {
                 std.log.err("unknown command", .{});
                 io.getStdErr().writeAll(usage) catch {};
                 os.exit(1);

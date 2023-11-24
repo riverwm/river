@@ -118,7 +118,7 @@ fn csdFilterUpdateViews(kind: FilterKind, pattern: []const u8, operation: enum {
     while (decoration_it) |decoration_node| : (decoration_it = decoration_node.next) {
         const xdg_toplevel_decoration = decoration_node.data.xdg_toplevel_decoration;
 
-        const view = @intToPtr(*View, xdg_toplevel_decoration.surface.data);
+        const view = @as(*View, @ptrFromInt(xdg_toplevel_decoration.surface.data));
         if (viewMatchesPattern(kind, pattern, view)) {
             const toplevel = view.impl.xdg_toplevel.xdg_toplevel;
             switch (operation) {

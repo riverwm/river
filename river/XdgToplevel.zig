@@ -72,7 +72,7 @@ pub fn create(output: *Output, xdg_toplevel: *wlr.XdgToplevel) error{OutOfMemory
     } });
 
     const self = &node.view.impl.xdg_toplevel;
-    xdg_toplevel.base.data = @ptrToInt(self);
+    xdg_toplevel.base.data = @intFromPtr(self);
 
     // Add listeners that are active over the view's entire lifetime
     xdg_toplevel.base.events.destroy.add(&self.destroy);
@@ -129,8 +129,8 @@ pub fn setResizing(self: Self, resizing: bool) void {
 pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*wlr.Surface {
     const view = self.view;
     return self.xdg_toplevel.base.surfaceAt(
-        ox - @intToFloat(f64, view.current.box.x - view.surface_box.x),
-        oy - @intToFloat(f64, view.current.box.y - view.surface_box.y),
+        ox - @as(f64, @floatFromInt(view.current.box.x - view.surface_box.x)),
+        oy - @as(f64, @floatFromInt(view.current.box.y - view.surface_box.y)),
         sx,
         sy,
     );
@@ -150,10 +150,10 @@ pub fn getAppId(self: Self) ?[*:0]const u8 {
 pub fn getConstraints(self: Self) View.Constraints {
     const state = &self.xdg_toplevel.current;
     return .{
-        .min_width = @intCast(u31, math.max(state.min_width, 1)),
-        .max_width = if (state.max_width > 0) @intCast(u31, state.max_width) else math.maxInt(u31),
-        .min_height = @intCast(u31, math.max(state.min_height, 1)),
-        .max_height = if (state.max_height > 0) @intCast(u31, state.max_height) else math.maxInt(u31),
+        .min_width = @max(state.min_width, 1),
+        .max_width = if (state.max_width > 0) @as(u31, @intCast(state.max_width)) else math.maxInt(u31),
+        .min_height = @max(state.min_height, 1),
+        .max_height = if (state.max_height > 0) @as(u31, @intCast(state.max_height)) else math.maxInt(u31),
     };
 }
 
@@ -192,8 +192,8 @@ fn handleMap(listener: *wl.Listener(void)) void {
     self.xdg_toplevel.base.getGeometry(&initial_box);
 
     view.float_box = .{
-        .x = @divTrunc(math.max(0, view.output.usable_box.width - initial_box.width), 2),
-        .y = @divTrunc(math.max(0, view.output.usable_box.height - initial_box.height), 2),
+        .x = @divTrunc(@max(0, view.output.usable_box.width - initial_box.width), 2),
+        .y = @divTrunc(@max(0, view.output.usable_box.height - initial_box.height), 2),
         .width = initial_box.width,
         .height = initial_box.height,
     };
@@ -347,7 +347,7 @@ fn handleRequestMove(
     event: *wlr.XdgToplevel.event.Move,
 ) void {
     const self = @fieldParentPtr(Self, "request_move", listener);
-    const seat = @intToPtr(*Seat, event.seat.seat.data);
+    const seat = @as(*Seat, @ptrFromInt(event.seat.seat.data));
     if ((self.view.pending.float or self.view.output.pending.layout == null) and !self.view.pending.fullscreen)
         seat.cursor.enterMode(.move, self.view);
 }
@@ -355,7 +355,7 @@ fn handleRequestMove(
 /// Called when the client asks to be resized via the cursor.
 fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), event: *wlr.XdgToplevel.event.Resize) void {
     const self = @fieldParentPtr(Self, "request_resize", listener);
-    const seat = @intToPtr(*Seat, event.seat.seat.data);
+    const seat = @as(*Seat, @ptrFromInt(event.seat.seat.data));
     if ((self.view.pending.float or self.view.output.pending.layout == null) and !self.view.pending.fullscreen)
         seat.cursor.enterMode(.resize, self.view);
 }

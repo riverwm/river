@@ -69,7 +69,7 @@ pub fn create(wlr_subsurface: *wlr.Subsurface, parent: Parent) void {
     };
     subsurface.* = .{ .wlr_subsurface = wlr_subsurface, .parent = parent };
     assert(wlr_subsurface.data == 0);
-    wlr_subsurface.data = @ptrToInt(subsurface);
+    wlr_subsurface.data = @intFromPtr(subsurface);
 
     wlr_subsurface.events.destroy.add(&subsurface.subsurface_destroy);
     wlr_subsurface.events.map.add(&subsurface.map);
@@ -117,13 +117,13 @@ pub fn destroySubsurfaces(surface: *wlr.Surface) void {
     var below_it = surface.current.subsurfaces_below.iterator(.forward);
     while (below_it.next()) |parent_state| {
         const wlr_subsurface = @fieldParentPtr(wlr.Subsurface, "current", parent_state);
-        if (@intToPtr(?*Subsurface, wlr_subsurface.data)) |s| s.destroy();
+        if (@as(?*Subsurface, @ptrFromInt(wlr_subsurface.data))) |s| s.destroy();
     }
 
     var above_it = surface.current.subsurfaces_above.iterator(.forward);
     while (above_it.next()) |parent_state| {
         const wlr_subsurface = @fieldParentPtr(wlr.Subsurface, "current", parent_state);
-        if (@intToPtr(?*Subsurface, wlr_subsurface.data)) |s| s.destroy();
+        if (@as(?*Subsurface, @ptrFromInt(wlr_subsurface.data))) |s| s.destroy();
     }
 }
 

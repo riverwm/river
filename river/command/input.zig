@@ -55,7 +55,7 @@ pub fn listInputs(
         });
     }
 
-    out.* = input_list.toOwnedSlice();
+    out.* = try input_list.toOwnedSlice();
 }
 
 pub fn listInputConfigs(
@@ -68,7 +68,7 @@ pub fn listInputConfigs(
     var input_list = std.ArrayList(u8).init(util.gpa);
     const writer = input_list.writer();
 
-    for (server.input_manager.configs.items) |*input_config, i| {
+    for (server.input_manager.configs.items, 0..) |*input_config, i| {
         if (i > 0) try input_list.appendSlice("\n");
 
         try writer.print("{s}\n", .{input_config.identifier});
@@ -119,7 +119,7 @@ pub fn listInputConfigs(
         }
     }
 
-    out.* = input_list.toOwnedSlice();
+    out.* = try input_list.toOwnedSlice();
 }
 
 pub fn input(
@@ -197,7 +197,7 @@ pub fn input(
     } else if (mem.eql(u8, "scroll-button", args[2])) {
         const ret = c.libevdev_event_code_from_name(c.EV_KEY, args[3].ptr);
         if (ret < 1) return Error.InvalidButton;
-        input_config.scroll_button = InputConfig.ScrollButton{ .button = @intCast(u32, ret) };
+        input_config.scroll_button = InputConfig.ScrollButton{ .button = @as(u32, @intCast(ret)) };
     } else {
         return Error.UnknownCommand;
     }

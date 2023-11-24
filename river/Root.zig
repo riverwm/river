@@ -62,7 +62,7 @@ xwayland_override_redirect_views: if (build_options.xwayland)
     std.TailQueue(XwaylandOverrideRedirect)
 else
     void = if (build_options.xwayland)
-.{},
+    .{},
 
 /// Number of layout demands pending before the transaction may be started.
 pending_layout_demands: u32 = 0,
@@ -95,7 +95,7 @@ pub fn init(self: *Self) !void {
             .usable_box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
         },
     };
-    noop_wlr_output.data = @ptrToInt(&self.noop_output);
+    noop_wlr_output.data = @intFromPtr(&self.noop_output);
 
     server.backend.events.new_output.add(&self.new_output);
     self.output_manager.events.apply.add(&self.manager_apply);
@@ -166,7 +166,7 @@ pub fn removeOutput(self: *Self, output: *Output) void {
     }
 
     // Close all layer surfaces on the removed output
-    for (output.layers) |*layer| {
+    for (&output.layers) |*layer| {
         // Destroying the layer surface will cause it to be removed from this list.
         while (layer.first) |layer_node| layer_node.data.wlr_layer_surface.destroy();
     }
@@ -448,7 +448,7 @@ fn processOutputConfig(
     var it = config.heads.iterator(.forward);
     while (it.next()) |head| {
         const wlr_output = head.state.output;
-        const output = @intToPtr(*Output, wlr_output.data);
+        const output = @as(*Output, @ptrFromInt(wlr_output.data));
 
         if (head.state.enabled) {
             wlr_output.enable(true);

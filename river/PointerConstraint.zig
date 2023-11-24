@@ -36,13 +36,13 @@ destroy: wl.Listener(*wlr.PointerConstraintV1) = wl.Listener(*wlr.PointerConstra
 set_region: wl.Listener(void) = wl.Listener(void).init(handleSetRegion),
 
 pub fn init(self: *Self, constraint: *wlr.PointerConstraintV1) void {
-    const seat = @intToPtr(*Seat, constraint.seat.data);
+    const seat = @as(*Seat, @ptrFromInt(constraint.seat.data));
     self.* = .{
         .constraint = constraint,
         .cursor = &seat.cursor,
     };
 
-    self.constraint.data = @ptrToInt(self);
+    self.constraint.data = @intFromPtr(self);
 
     self.constraint.events.destroy.add(&self.destroy);
     self.constraint.events.set_region.add(&self.set_region);
@@ -83,19 +83,19 @@ fn constrainToRegion(self: *Self) void {
         var output_box: wlr.Box = undefined;
         server.root.output_layout.getBox(output.wlr_output, &output_box);
 
-        const surface_lx = @intToFloat(f64, output_box.x + view.current.box.x - view.surface_box.x);
-        const surface_ly = @intToFloat(f64, output_box.y + view.current.box.y - view.surface_box.y);
+        const surface_lx = @as(f64, @floatFromInt(output_box.x + view.current.box.x - view.surface_box.x));
+        const surface_ly = @as(f64, @floatFromInt(output_box.y + view.current.box.y - view.surface_box.y));
 
-        const sx = @floatToInt(c_int, self.cursor.wlr_cursor.x - surface_lx);
-        const sy = @floatToInt(c_int, self.cursor.wlr_cursor.y - surface_ly);
+        const sx = @as(c_int, @intFromFloat(self.cursor.wlr_cursor.x - surface_lx));
+        const sy = @as(c_int, @intFromFloat(self.cursor.wlr_cursor.y - surface_ly));
 
         // If the cursor is not already inside the constraint region, warp
         // it to an arbitrary point inside the constraint region.
         if (!self.constraint.region.containsPoint(sx, sy, null)) {
             const rects = self.constraint.region.rectangles();
             if (rects.len > 0) {
-                const new_lx = surface_lx + @intToFloat(f64, rects[0].x1 + rects[0].x2) / 2;
-                const new_ly = surface_ly + @intToFloat(f64, rects[0].y1 + rects[0].y2) / 2;
+                const new_lx = surface_lx + @as(f64, @floatFromInt(rects[0].x1 + rects[0].x2)) / 2;
+                const new_ly = surface_ly + @as(f64, @floatFromInt(rects[0].y1 + rects[0].y2)) / 2;
                 self.cursor.wlr_cursor.warpClosest(null, new_lx, new_ly);
             }
         }
@@ -130,8 +130,8 @@ pub fn warpToHint(cursor: *Cursor) void {
                 var output_box: wlr.Box = undefined;
                 server.root.output_layout.getBox(output.wlr_output, &output_box);
 
-                const surface_lx = @intToFloat(f64, output_box.x + view.current.box.x - view.surface_box.x);
-                const surface_ly = @intToFloat(f64, output_box.y + view.current.box.y - view.surface_box.y);
+                const surface_lx = @as(f64, @floatFromInt(output_box.x + view.current.box.x - view.surface_box.x));
+                const surface_ly = @as(f64, @floatFromInt(output_box.y + view.current.box.y - view.surface_box.y));
 
                 _ = cursor.wlr_cursor.warp(
                     null,

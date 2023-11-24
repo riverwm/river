@@ -242,8 +242,8 @@ pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
                 image.width * 4,
                 image.width,
                 image.height,
-                @intCast(i32, image.hotspot_x),
-                @intCast(i32, image.hotspot_y),
+                @as(i32, @intCast(image.hotspot_x)),
+                @as(i32, @intCast(image.hotspot_y)),
             );
         }
 
@@ -376,7 +376,7 @@ fn updateKeyboardFocus(self: Self, result: SurfaceAtResult) void {
 /// Focus the output at the given layout coordinates, if any
 fn updateOutputFocus(self: Self, lx: f64, ly: f64) void {
     if (server.root.output_layout.outputAt(lx, ly)) |wlr_output| {
-        const output = @intToPtr(*Output, wlr_output.data);
+        const output = @as(*Output, @ptrFromInt(wlr_output.data));
         self.seat.focusOutput(output);
         self.seat.focus(null);
     }
@@ -674,7 +674,7 @@ pub fn surfaceAt(self: Self) ?SurfaceAtResult {
 /// This function must be kept in sync with the rendering order in render.zig.
 fn surfaceAtCoords(lx: f64, ly: f64) ?SurfaceAtResult {
     const wlr_output = server.root.output_layout.outputAt(lx, ly) orelse return null;
-    const output = @intToPtr(*Output, wlr_output.data);
+    const output = @as(*Output, @ptrFromInt(wlr_output.data));
 
     // Get output-local coords from the layout coords
     var ox = lx;
@@ -759,8 +759,8 @@ fn layerPopupSurfaceAt(layer: std.TailQueue(LayerSurface), ox: f64, oy: f64) ?Su
         var sx: f64 = undefined;
         var sy: f64 = undefined;
         if (layer_surface.wlr_layer_surface.popupSurfaceAt(
-            ox - @intToFloat(f64, layer_surface.box.x),
-            oy - @intToFloat(f64, layer_surface.box.y),
+            ox - @as(f64, @floatFromInt(layer_surface.box.x)),
+            oy - @as(f64, @floatFromInt(layer_surface.box.y)),
             &sx,
             &sy,
         )) |found| {
@@ -783,8 +783,8 @@ fn layerSurfaceAt(layer: std.TailQueue(LayerSurface), ox: f64, oy: f64) ?Surface
         var sx: f64 = undefined;
         var sy: f64 = undefined;
         if (layer_surface.wlr_layer_surface.surfaceAt(
-            ox - @intToFloat(f64, layer_surface.box.x),
-            oy - @intToFloat(f64, layer_surface.box.y),
+            ox - @as(f64, @floatFromInt(layer_surface.box.x)),
+            oy - @as(f64, @floatFromInt(layer_surface.box.y)),
             &sx,
             &sy,
         )) |found| {
@@ -870,8 +870,8 @@ fn xwaylandOverrideRedirectSurfaceAt(lx: f64, ly: f64) ?SurfaceAtResult {
         var sx: f64 = undefined;
         var sy: f64 = undefined;
         if (xwayland_surface.surface.?.surfaceAt(
-            lx - @intToFloat(f64, xwayland_surface.x),
-            ly - @intToFloat(f64, xwayland_surface.y),
+            lx - @as(f64, @floatFromInt(xwayland_surface.x)),
+            ly - @as(f64, @floatFromInt(xwayland_surface.y)),
             &sx,
             &sy,
         )) |found| {
@@ -901,8 +901,8 @@ pub fn enterMode(self: *Self, mode: enum { move, resize }, view: *View) void {
             const cur_box = &view.current.box;
             self.mode = .{ .resize = .{
                 .view = view,
-                .offset_x = cur_box.x + cur_box.width - @floatToInt(i32, self.wlr_cursor.x),
-                .offset_y = cur_box.y + cur_box.height - @floatToInt(i32, self.wlr_cursor.y),
+                .offset_x = cur_box.x + cur_box.width - @as(i32, @intFromFloat(self.wlr_cursor.x)),
+                .offset_y = cur_box.y + cur_box.height - @as(i32, @intFromFloat(self.wlr_cursor.y)),
             } };
             view.setResizing(true);
         },
@@ -1000,11 +1000,11 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
             data.delta_y = dy - @trunc(dy);
 
             const view = data.view;
-            view.move(@floatToInt(i32, dx), @floatToInt(i32, dy));
+            view.move(@as(i32, @intFromFloat(dx)), @as(i32, @intFromFloat(dy)));
             self.wlr_cursor.move(
                 device,
-                @intToFloat(f64, view.pending.box.x - view.current.box.x),
-                @intToFloat(f64, view.pending.box.y - view.current.box.y),
+                @as(f64, @floatFromInt(view.pending.box.x - view.current.box.x)),
+                @as(f64, @floatFromInt(view.pending.box.y - view.current.box.y)),
             );
             view.applyPending();
         },
@@ -1017,8 +1017,8 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
             const border_width = if (data.view.draw_borders) server.config.border_width else 0;
 
             // Set width/height of view, clamp to view size constraints and output dimensions
-            data.view.pending.box.width += @floatToInt(i32, dx);
-            data.view.pending.box.height += @floatToInt(i32, dy);
+            data.view.pending.box.width += @as(i32, @intFromFloat(dx));
+            data.view.pending.box.height += @as(i32, @intFromFloat(dy));
             data.view.applyConstraints();
 
             var output_width: i32 = undefined;
@@ -1026,16 +1026,16 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
             data.view.output.wlr_output.effectiveResolution(&output_width, &output_height);
 
             const box = &data.view.pending.box;
-            box.width = math.min(box.width, output_width - border_width - box.x);
-            box.height = math.min(box.height, output_height - border_width - box.y);
+            box.width = @min(box.width, output_width - border_width - box.x);
+            box.height = @min(box.height, output_height - border_width - box.y);
 
             data.view.applyPending();
 
             // Keep cursor locked to the original offset from the bottom right corner
             self.wlr_cursor.warpClosest(
                 device,
-                @intToFloat(f64, box.x + box.width - data.offset_x),
-                @intToFloat(f64, box.y + box.height - data.offset_y),
+                @as(f64, @floatFromInt(box.x + box.width - data.offset_x)),
+                @as(f64, @floatFromInt(box.y + box.height - data.offset_y)),
             );
         },
     }
@@ -1057,8 +1057,8 @@ pub fn checkFocusFollowsCursor(self: *Self) void {
                 // properly enters the window (the box that we draw borders around)
                 var output_layout_box: wlr.Box = undefined;
                 server.root.output_layout.getBox(view.output.wlr_output, &output_layout_box);
-                const cursor_ox = self.wlr_cursor.x - @intToFloat(f64, output_layout_box.x);
-                const cursor_oy = self.wlr_cursor.y - @intToFloat(f64, output_layout_box.y);
+                const cursor_ox = self.wlr_cursor.x - @as(f64, @floatFromInt(output_layout_box.x));
+                const cursor_oy = self.wlr_cursor.y - @as(f64, @floatFromInt(output_layout_box.y));
                 if ((self.seat.focused != .view or self.seat.focused.view != view) and
                     view.current.box.containsPoint(cursor_ox, cursor_oy))
                 {
@@ -1088,8 +1088,8 @@ pub fn updateState(self: *Self) void {
         self.mode = .passthrough;
         var now: os.timespec = undefined;
         os.clock_gettime(os.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
-        const msec = @intCast(u32, now.tv_sec * std.time.ms_per_s +
-            @divTrunc(now.tv_nsec, std.time.ns_per_ms));
+        const msec = @as(u32, @intCast(now.tv_sec * std.time.ms_per_s +
+            @divTrunc(now.tv_nsec, std.time.ns_per_ms)));
         self.passthrough(msec);
     }
 }
@@ -1176,8 +1176,8 @@ fn warp(self: *Self) void {
         (usable_layout_box.containsPoint(self.wlr_cursor.x, self.wlr_cursor.y) and
         !target_box.containsPoint(self.wlr_cursor.x, self.wlr_cursor.y)))
     {
-        const lx = @intToFloat(f64, target_box.x + @divTrunc(target_box.width, 2));
-        const ly = @intToFloat(f64, target_box.y + @divTrunc(target_box.height, 2));
+        const lx = @as(f64, @floatFromInt(target_box.x + @divTrunc(target_box.width, 2)));
+        const ly = @as(f64, @floatFromInt(target_box.y + @divTrunc(target_box.height, 2)));
         if (!self.wlr_cursor.warp(null, lx, ly)) {
             log.err("failed to warp cursor on focus change", .{});
         }

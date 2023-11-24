@@ -115,7 +115,7 @@ pub fn init(self: *Self, name: [*:0]const u8) !void {
         .focused_output = &server.root.noop_output,
         .mapping_repeat_timer = mapping_repeat_timer,
     };
-    self.wlr_seat.data = @ptrToInt(self);
+    self.wlr_seat.data = @intFromPtr(self);
 
     try self.cursor.init(self);
 
@@ -272,7 +272,7 @@ pub fn keyboardEnterOrLeave(self: *Self, target_surface: ?*wlr.Surface) void {
         self.keyboardNotifyEnter(wlr_surface);
 
         if (server.input_manager.pointer_constraints.constraintForSurface(wlr_surface, self.wlr_seat)) |constraint| {
-            @intToPtr(*PointerConstraint, constraint.data).setAsActive();
+            @as(*PointerConstraint, @ptrFromInt(constraint.data)).setAsActive();
         } else if (self.cursor.constraint) |constraint| {
             PointerConstraint.warpToHint(&self.cursor);
             constraint.sendDeactivated();
@@ -304,7 +304,7 @@ fn keyboardNotifyEnter(self: *Self, wlr_surface: *wlr.Surface) void {
             .len = wlr_keyboard.num_keycodes,
         };
 
-        const keyboard = @intToPtr(*Keyboard, wlr_keyboard.data);
+        const keyboard = @as(*Keyboard, @ptrFromInt(wlr_keyboard.data));
         keycodes.subtract(keyboard.eaten_keycodes);
 
         self.wlr_seat.keyboardNotifyEnter(

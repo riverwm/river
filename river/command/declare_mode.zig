@@ -43,7 +43,7 @@ pub fn declareMode(
 
     const owned_name = try util.gpa.dupeZ(u8, new_mode_name);
 
-    const id = @intCast(u32, config.modes.items.len);
+    const id = @as(u32, @intCast(config.modes.items.len));
     config.mode_to_id.putAssumeCapacityNoClobber(owned_name, id);
     config.modes.appendAssumeCapacity(.{ .name = owned_name });
 }

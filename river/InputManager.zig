@@ -46,7 +46,7 @@ virtual_pointer_manager: *wlr.VirtualPointerManagerV1,
 virtual_keyboard_manager: *wlr.VirtualKeyboardManagerV1,
 
 configs: std.ArrayList(InputConfig),
-devices: wl.list.Head(InputDevice, "link"),
+devices: wl.list.Head(InputDevice, .link),
 seats: std.TailQueue(Seat) = .{},
 
 exclusive_client: ?*wl.Client = null,
@@ -159,6 +159,6 @@ fn handleNewVirtualKeyboard(
     _: *wl.Listener(*wlr.VirtualKeyboardV1),
     virtual_keyboard: *wlr.VirtualKeyboardV1,
 ) void {
-    const seat = @intToPtr(*Seat, virtual_keyboard.seat.data);
+    const seat = @as(*Seat, @ptrFromInt(virtual_keyboard.seat.data));
     seat.addDevice(&virtual_keyboard.keyboard.base);
 }

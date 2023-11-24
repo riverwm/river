@@ -45,7 +45,7 @@ pub fn init(
 ) !Self {
     const owned_args = try util.gpa.alloc([:0]u8, command_args.len);
     errdefer util.gpa.free(owned_args);
-    for (command_args) |arg, i| {
+    for (command_args, 0..) |arg, i| {
         errdefer for (owned_args[0..i]) |a| util.gpa.free(a);
         owned_args[i] = try util.gpa.dupeZ(u8, arg);
     }

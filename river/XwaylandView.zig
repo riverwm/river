@@ -74,7 +74,7 @@ pub fn create(output: *Output, xwayland_surface: *wlr.XwaylandSurface) error{Out
     } });
 
     const self = &node.view.impl.xwayland_view;
-    xwayland_surface.data = @ptrToInt(self);
+    xwayland_surface.data = @intFromPtr(self);
 
     // Add listeners that are active over the view's entire lifetime
     xwayland_surface.events.destroy.add(&self.destroy);
@@ -105,10 +105,10 @@ pub fn configure(self: Self) void {
 
     const state = &self.view.pending;
     self.xwayland_surface.configure(
-        @intCast(i16, state.box.x + output_box.x),
-        @intCast(i16, state.box.y + output_box.y),
-        @intCast(u16, state.box.width),
-        @intCast(u16, state.box.height),
+        @as(i16, @intCast(state.box.x + output_box.x)),
+        @as(i16, @intCast(state.box.y + output_box.y)),
+        @as(u16, @intCast(state.box.width)),
+        @as(u16, @intCast(state.box.height)),
     );
 }
 
@@ -139,8 +139,8 @@ pub fn setFullscreen(self: *Self, fullscreen: bool) void {
 /// corresponding surface-relative coordinates, if there is a surface.
 pub fn surfaceAt(self: Self, ox: f64, oy: f64, sx: *f64, sy: *f64) ?*wlr.Surface {
     return self.xwayland_surface.surface.?.surfaceAt(
-        ox - @intToFloat(f64, self.view.current.box.x),
-        oy - @intToFloat(f64, self.view.current.box.y),
+        ox - @as(f64, @floatFromInt(self.view.current.box.x)),
+        oy - @as(f64, @floatFromInt(self.view.current.box.y)),
         sx,
         sy,
     );
@@ -165,10 +165,10 @@ pub fn getConstraints(self: Self) View.Constraints {
         .max_height = math.maxInt(u31),
     };
     return .{
-        .min_width = @intCast(u31, math.max(hints.min_width, 1)),
-        .min_height = @intCast(u31, math.max(hints.min_height, 1)),
-        .max_width = if (hints.max_width > 0) @intCast(u31, hints.max_width) else math.maxInt(u31),
-        .max_height = if (hints.max_height > 0) @intCast(u31, hints.max_height) else math.maxInt(u31),
+        .min_width = @max(hints.min_width, 1),
+        .min_height = @max(hints.min_height, 1),
+        .max_width = if (hints.max_width > 0) @as(u31, @intCast(hints.max_width)) else math.maxInt(u31),
+        .max_height = if (hints.max_height > 0) @as(u31, @intCast(hints.max_height)) else math.maxInt(u31),
     };
 }
 
@@ -210,8 +210,8 @@ pub fn handleMap(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface:
     // Use the view's "natural" size centered on the output as the default
     // floating dimensions
     view.float_box = .{
-        .x = @divTrunc(math.max(0, view.output.usable_box.width - self.xwayland_surface.width), 2),
-        .y = @divTrunc(math.max(0, view.output.usable_box.height - self.xwayland_surface.height), 2),
+        .x = @divTrunc(@max(0, view.output.usable_box.width - self.xwayland_surface.width), 2),
+        .y = @divTrunc(@max(0, view.output.usable_box.height - self.xwayland_surface.height), 2),
         .width = self.xwayland_surface.width,
         .height = self.xwayland_surface.height,
     };

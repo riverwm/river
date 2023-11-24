@@ -209,7 +209,7 @@ fn handleNewLayerSurface(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_
         .{
             wlr_layer_surface.namespace,
             @tagName(wlr_layer_surface.pending.layer),
-            @bitCast(u32, wlr_layer_surface.pending.anchor),
+            @as(u32, @bitCast(wlr_layer_surface.pending.anchor)),
             wlr_layer_surface.pending.desired_width,
             wlr_layer_surface.pending.desired_height,
             wlr_layer_surface.pending.margin.top,
@@ -235,7 +235,7 @@ fn handleNewLayerSurface(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_
     }
 
     // The layer surface will add itself to the proper list of the output on map
-    const output = @intToPtr(*Output, wlr_layer_surface.output.?.data);
+    const output = @as(*Output, @ptrFromInt(wlr_layer_surface.output.?.data));
     const node = util.gpa.create(std.TailQueue(LayerSurface).Node) catch {
         wlr_layer_surface.resource.postNoMemory();
         return;

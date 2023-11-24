@@ -53,7 +53,7 @@ pub fn init(layout: *Layout, views: u32) !Self {
 
     return Self{
         .serial = server.wl_server.nextSerial(),
-        .views = @intCast(i32, views),
+        .views = @as(i32, @intCast(views)),
         .view_boxen = try util.gpa.alloc(wlr.Box, views),
         .timeout_timer = timeout_timer,
     };
@@ -87,7 +87,7 @@ pub fn pushViewDimensions(self: *Self, x: i32, y: i32, width: u31, height: u31) 
         return;
     }
 
-    self.view_boxen[self.view_boxen.len - @intCast(usize, self.views)] = .{
+    self.view_boxen[self.view_boxen.len - @as(usize, @intCast(self.views))] = .{
         .x = x,
         .y = y,
         .width = width,
@@ -113,7 +113,7 @@ pub fn apply(self: *Self, layout: *Layout) void {
     if (self.views != 0) {
         log.err(
             "proposed dimension count ({}) does not match view count ({}), aborting layout demand",
-            .{ -self.views + @intCast(i32, self.view_boxen.len), self.view_boxen.len },
+            .{ -self.views + @as(i32, @intCast(self.view_boxen.len)), self.view_boxen.len },
         );
         layout.layout.postError(
             .count_mismatch,

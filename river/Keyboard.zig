@@ -47,7 +47,7 @@ pub fn init(self: *Self, seat: *Seat, wlr_device: *wlr.InputDevice) !void {
     errdefer self.device.deinit();
 
     const wlr_keyboard = self.device.wlr_device.toKeyboard();
-    wlr_keyboard.data = @ptrToInt(self);
+    wlr_keyboard.data = @intFromPtr(self);
 
     // wlroots will log a more detailed error if this fails.
     if (!wlr_keyboard.setKeymap(server.config.keymap)) return error.OutOfMemory;
@@ -124,7 +124,7 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
 }
 
 fn isModifier(keysym: xkb.Keysym) bool {
-    return @enumToInt(keysym) >= xkb.Keysym.Shift_L and @enumToInt(keysym) <= xkb.Keysym.Hyper_R;
+    return @intFromEnum(keysym) >= xkb.Keysym.Shift_L and @intFromEnum(keysym) <= xkb.Keysym.Hyper_R;
 }
 
 fn handleModifiers(listener: *wl.Listener(*wlr.Keyboard), _: *wlr.Keyboard) void {
@@ -141,12 +141,12 @@ fn handleModifiers(listener: *wl.Listener(*wlr.Keyboard), _: *wlr.Keyboard) void
 /// Handle any builtin, harcoded compsitor mappings such as VT switching.
 /// Returns true if the keysym was handled.
 fn handleBuiltinMapping(keysym: xkb.Keysym) bool {
-    switch (@enumToInt(keysym)) {
+    switch (@intFromEnum(keysym)) {
         xkb.Keysym.XF86Switch_VT_1...xkb.Keysym.XF86Switch_VT_12 => {
             log.debug("switch VT keysym received", .{});
             if (server.backend.isMulti()) {
                 if (server.backend.getSession()) |session| {
-                    const vt = @enumToInt(keysym) - xkb.Keysym.XF86Switch_VT_1 + 1;
+                    const vt = @intFromEnum(keysym) - xkb.Keysym.XF86Switch_VT_1 + 1;
                     const log_server = std.log.scoped(.server);
                     log_server.info("switching to VT {}", .{vt});
                     session.changeVt(vt) catch log_server.err("changing VT failed", .{});

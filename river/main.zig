@@ -175,7 +175,7 @@ pub fn log(
     comptime format: []const u8,
     args: anytype,
 ) void {
-    if (@enumToInt(level) > @enumToInt(runtime_log_level)) return;
+    if (@intFromEnum(level) > @intFromEnum(runtime_log_level)) return;
 
     const scope_prefix = if (scope == .default) ": " else "(" ++ @tagName(scope) ++ "): ";
 

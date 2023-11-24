@@ -61,7 +61,7 @@ pub fn renderOutput(output: *Output) void {
         return;
     }
 
-    server.renderer.begin(@intCast(u32, output.wlr_output.width), @intCast(u32, output.wlr_output.height));
+    server.renderer.begin(@as(u32, @intCast(output.wlr_output.width)), @as(u32, @intCast(output.wlr_output.height)));
 
     // In order to avoid flashing a blank black screen as the session is locked
     // continue to render the unlocked session until either a lock surface is
@@ -290,8 +290,8 @@ fn renderDragIcons(output: *const Output, now: *os.timespec) void {
 
         var rdata = SurfaceRenderData{
             .output = output,
-            .output_x = @floatToInt(i32, lx) + icon.sx - output_box.x,
-            .output_y = @floatToInt(i32, ly) + icon.sy - output_box.y,
+            .output_x = @as(i32, @intFromFloat(lx)) + icon.sx - output_box.x,
+            .output_y = @as(i32, @intFromFloat(ly)) + icon.sy - output_box.y,
             .when = now,
         };
         icon.wlr_drag_icon.surface.forEachSurface(*SurfaceRenderData, renderSurfaceIterator, &rdata);
@@ -420,14 +420,14 @@ fn renderRect(output: *const Output, box: wlr.Box, color: *const [4]f32) void {
 fn scaleBox(box: *wlr.Box, scale: f64) void {
     box.width = scaleLength(box.width, box.x, scale);
     box.height = scaleLength(box.height, box.y, scale);
-    box.x = @floatToInt(c_int, @round(@intToFloat(f64, box.x) * scale));
-    box.y = @floatToInt(c_int, @round(@intToFloat(f64, box.y) * scale));
+    box.x = @as(c_int, @intFromFloat(@round(@as(f64, @floatFromInt(box.x)) * scale)));
+    box.y = @as(c_int, @intFromFloat(@round(@as(f64, @floatFromInt(box.y)) * scale)));
 }
 
 /// Scales a width/height.
 ///
 /// This might seem overly complex, but it needs to work for fractional scaling.
 fn scaleLength(length: c_int, offset: c_int, scale: f64) c_int {
-    return @floatToInt(c_int, @round(@intToFloat(f64, offset + length) * scale) -
-        @round(@intToFloat(f64, offset) * scale));
+    return @as(c_int, @intFromFloat(@round(@as(f64, @floatFromInt(offset + length)) * scale) -
+        @round(@as(f64, @floatFromInt(offset)) * scale)));
 }

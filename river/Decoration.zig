@@ -61,7 +61,7 @@ fn handleRequestMode(
 ) void {
     const self = @fieldParentPtr(Self, "request_mode", listener);
 
-    const view = @intToPtr(*View, self.xdg_toplevel_decoration.surface.data);
+    const view = @as(*View, @ptrFromInt(self.xdg_toplevel_decoration.surface.data));
     if (server.config.csdAllowed(view)) {
         _ = self.xdg_toplevel_decoration.setMode(.client_side);
     } else {

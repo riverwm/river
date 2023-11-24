@@ -69,7 +69,7 @@ fn handleRequest(
         .get_river_output_status => |req| {
             // ignore if the output is inert
             const wlr_output = wlr.Output.fromWlOutput(req.output) orelse return;
-            const output = @intToPtr(*Output, wlr_output.data);
+            const output = @as(*Output, @ptrFromInt(wlr_output.data));
 
             const node = util.gpa.create(std.SinglyLinkedList(OutputStatus).Node) catch {
                 status_manager.getClient().postNoMemory();
@@ -94,7 +94,7 @@ fn handleRequest(
         .get_river_seat_status => |req| {
             // ignore if the seat is inert
             const wlr_seat = wlr.Seat.Client.fromWlSeat(req.seat) orelse return;
-            const seat = @intToPtr(*Seat, wlr_seat.seat.data);
+            const seat = @as(*Seat, @ptrFromInt(wlr_seat.seat.data));
 
             const node = util.gpa.create(std.SinglyLinkedList(SeatStatus).Node) catch {
                 status_manager.getClient().postNoMemory();
