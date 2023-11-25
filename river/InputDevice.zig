@@ -63,7 +63,7 @@ pub fn init(device: *InputDevice, seat: *Seat, wlr_device: *wlr.InputDevice) !vo
     errdefer util.gpa.free(identifier);
 
     for (identifier) |*char| {
-        if (!ascii.isPrint(char.*) or !ascii.isWhitespace(char.*)) {
+        if (!ascii.isPrint(char.*) or ascii.isWhitespace(char.*)) {
             char.* = '_';
         }
     }
