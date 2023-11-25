@@ -325,15 +325,14 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
                     "client initiated size change: {}x{} -> {}x{}",
                     .{ old_geometry.width, old_geometry.height, self.geometry.width, self.geometry.height },
                 );
-                if ((view.current.float or no_layout) and !view.current.fullscreen) {
-                    view.current.box.width = self.geometry.width;
-                    view.current.box.height = self.geometry.height;
-                    view.pending.box.width = self.geometry.width;
-                    view.pending.box.height = self.geometry.height;
-                    server.root.applyPending();
-                } else {
+                if ((!view.current.float and !no_layout) or view.current.fullscreen) {
                     log.err("client is buggy and initiated size change while tiled or fullscreen", .{});
                 }
+                view.current.box.width = self.geometry.width;
+                view.current.box.height = self.geometry.height;
+                view.pending.box.width = self.geometry.width;
+                view.pending.box.height = self.geometry.height;
+                server.root.applyPending();
             }
         },
         // If the client has not yet acked our configure, we need to send a
