@@ -34,7 +34,7 @@ request_mode: wl.Listener(*wlr.XdgToplevelDecorationV1) =
     wl.Listener(*wlr.XdgToplevelDecorationV1).init(handleRequestMode),
 
 pub fn init(wlr_decoration: *wlr.XdgToplevelDecorationV1) void {
-    const xdg_toplevel: *XdgToplevel = @ptrFromInt(wlr_decoration.surface.data);
+    const xdg_toplevel: *XdgToplevel = @ptrFromInt(wlr_decoration.toplevel.base.data);
 
     xdg_toplevel.decoration = .{ .wlr_decoration = wlr_decoration };
     const decoration = &xdg_toplevel.decoration.?;
@@ -52,21 +52,15 @@ pub fn init(wlr_decoration: *wlr.XdgToplevelDecorationV1) void {
     xdg_toplevel.view.pending.ssd = ssd;
 }
 
-// TODO(wlroots): remove this function when updating to 0.17.0
-// https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/4051
-pub fn deinit(decoration: *XdgDecoration) void {
-    decoration.destroy.link.remove();
-    decoration.request_mode.link.remove();
-}
-
 fn handleDestroy(
     listener: *wl.Listener(*wlr.XdgToplevelDecorationV1),
     _: *wlr.XdgToplevelDecorationV1,
 ) void {
     const decoration = @fieldParentPtr(XdgDecoration, "destroy", listener);
-    const xdg_toplevel: *XdgToplevel = @ptrFromInt(decoration.wlr_decoration.surface.data);
+    const xdg_toplevel: *XdgToplevel = @ptrFromInt(decoration.wlr_decoration.toplevel.base.data);
 
-    decoration.deinit();
+    decoration.destroy.link.remove();
+    decoration.request_mode.link.remove();
 
     assert(xdg_toplevel.decoration != null);
     xdg_toplevel.decoration = null;
@@ -78,7 +72,7 @@ fn handleRequestMode(
 ) void {
     const decoration = @fieldParentPtr(XdgDecoration, "request_mode", listener);
 
-    const xdg_toplevel: *XdgToplevel = @ptrFromInt(decoration.wlr_decoration.surface.data);
+    const xdg_toplevel: *XdgToplevel = @ptrFromInt(decoration.wlr_decoration.toplevel.base.data);
     const view = xdg_toplevel.view;
 
     const ssd = server.config.rules.ssd.match(xdg_toplevel.view) orelse

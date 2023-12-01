@@ -152,7 +152,7 @@ pub fn focus(self: *Self, _target: ?*View) void {
     // While a layer surface is exclusively focused, views may not receive focus
     if (self.focused == .layer) {
         const wlr_layer_surface = self.focused.layer.wlr_layer_surface;
-        assert(wlr_layer_surface.mapped);
+        assert(wlr_layer_surface.surface.mapped);
         if (wlr_layer_surface.current.keyboard_interactive == .exclusive and
             (wlr_layer_surface.current.layer == .top or wlr_layer_surface.current.layer == .overlay))
         {

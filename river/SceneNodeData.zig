@@ -51,9 +51,9 @@ pub fn attach(node: *wlr.SceneNode, data: Data) error{OutOfMemory}!void {
 }
 
 pub fn fromNode(node: *wlr.SceneNode) ?*SceneNodeData {
-    var it: ?*wlr.SceneNode = node;
-    while (it) |n| : (it = n.parent) {
-        if (@as(?*SceneNodeData, @ptrFromInt(n.data))) |scene_node_data| {
+    var it: ?*wlr.SceneTree = node.parent;
+    while (it) |tree| : (it = tree.node.parent) {
+        if (@as(?*SceneNodeData, @ptrFromInt(tree.node.data))) |scene_node_data| {
             return scene_node_data;
         }
     }

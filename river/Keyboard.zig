@@ -147,13 +147,11 @@ fn handleBuiltinMapping(keysym: xkb.Keysym) bool {
     switch (@intFromEnum(keysym)) {
         xkb.Keysym.XF86Switch_VT_1...xkb.Keysym.XF86Switch_VT_12 => {
             log.debug("switch VT keysym received", .{});
-            if (server.backend.isMulti()) {
-                if (server.backend.getSession()) |session| {
-                    const vt = @intFromEnum(keysym) - xkb.Keysym.XF86Switch_VT_1 + 1;
-                    const log_server = std.log.scoped(.server);
-                    log_server.info("switching to VT {}", .{vt});
-                    session.changeVt(vt) catch log_server.err("changing VT failed", .{});
-                }
+            if (server.session) |session| {
+                const vt = @intFromEnum(keysym) - xkb.Keysym.XF86Switch_VT_1 + 1;
+                const log_server = std.log.scoped(.server);
+                log_server.info("switching to VT {}", .{vt});
+                session.changeVt(vt) catch log_server.err("changing VT failed", .{});
             }
             return true;
         },

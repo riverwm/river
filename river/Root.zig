@@ -90,6 +90,7 @@ views: wl.list.Head(View, .link),
 new_output: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleNewOutput),
 
 output_layout: *wlr.OutputLayout,
+scene_output_layout: *wlr.SceneOutputLayout,
 layout_change: wl.Listener(*wlr.OutputLayout) = wl.Listener(*wlr.OutputLayout).init(handleLayoutChange),
 
 output_manager: *wlr.OutputManagerV1,
@@ -133,7 +134,7 @@ pub fn init(self: *Self) !void {
     const outputs = try interactive_content.createSceneTree();
     const xwayland_override_redirect = if (build_options.xwayland) try interactive_content.createSceneTree();
 
-    try scene.attachOutputLayout(output_layout);
+    const scene_output_layout = try scene.attachOutputLayout(output_layout);
 
     _ = try wlr.XdgOutputManagerV1.create(server.wl_server, output_layout);
 
@@ -175,6 +176,7 @@ pub fn init(self: *Self) !void {
         },
         .views = undefined,
         .output_layout = output_layout,
+        .scene_output_layout = scene_output_layout,
         .all_outputs = undefined,
         .active_outputs = undefined,
         .output_manager = try wlr.OutputManagerV1.create(server.wl_server),
@@ -226,7 +228,7 @@ pub fn at(self: Self, lx: f64, ly: f64) ?AtResult {
     const surface: ?*wlr.Surface = blk: {
         if (node.type == .buffer) {
             const scene_buffer = wlr.SceneBuffer.fromNode(node);
-            if (wlr.SceneSurface.fromBuffer(scene_buffer)) |scene_surface| {
+            if (wlr.SceneSurface.tryFromBuffer(scene_buffer)) |scene_surface| {
                 break :blk scene_surface.surface;
             }
         }
@@ -354,9 +356,20 @@ pub fn activateOutput(root: *Self, output: *Output) void {
     // This arranges outputs from left-to-right in the order they appear. The
     // wlr-output-management protocol may be used to modify this arrangement.
     // This also creates a wl_output global which is advertised to clients.
-    root.output_layout.addAuto(output.wlr_output);
+    const layout_output = root.output_layout.addAuto(output.wlr_output) catch {
+        // This would currently be very awkward to handle well and this output
+        // handling code needs to be heavily refactored soon anyways for double
+        // buffered state application as part of the transaction system.
+        // In any case, wlroots 0.16 would have crashed here, the error is only
+        // possible to handle after updating to 0.17.
+        @panic("TODO handle allocation failure here");
+    };
+    const scene_output = root.scene.createSceneOutput(output.wlr_output) catch {
+        // See above
+        @panic("TODO handle allocation failure here");
+    };
+    root.scene_output_layout.addOutput(layout_output, scene_output);
 
-    const layout_output = root.output_layout.get(output.wlr_output).?;
     output.tree.node.setEnabled(true);
     output.tree.node.setPosition(layout_output.x, layout_output.y);
 
@@ -767,7 +780,8 @@ fn processOutputConfig(
                 if (wlr_output.commitState(&proposed_state)) {
                     if (head.state.enabled) {
                         // Just updates the output's position if it is already in the layout
-                        self.output_layout.add(output.wlr_output, head.state.x, head.state.y);
+                        // This can't fail if the output is already in the layout, which we know to be the case here.
+                        _ = self.output_layout.add(output.wlr_output, head.state.x, head.state.y) catch unreachable;
                         output.tree.node.setEnabled(true);
                         output.tree.node.setPosition(head.state.x, head.state.y);
                         // Even though we call this in the output's handler for the mode event

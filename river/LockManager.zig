@@ -28,6 +28,7 @@ const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const LockSurface = @import("LockSurface.zig");
+const Output = @import("Output.zig");
 
 const log = std.log.scoped(.session_lock);
 
@@ -190,12 +191,6 @@ pub fn maybeLock(manager: *LockManager) void {
 fn handleUnlock(listener: *wl.Listener(void)) void {
     const manager = @fieldParentPtr(LockManager, "unlock", listener);
 
-    // TODO(wlroots): this will soon be handled by the wlroots session lock implementation
-    if (manager.state != .locked) {
-        manager.lock.?.resource.postError(.invalid_unlock, "the locked event was never sent");
-        return;
-    }
-
     manager.state = .unlocked;
 
     log.info("session unlocked", .{});
@@ -262,4 +257,16 @@ fn handleSurface(
         log.err("out of memory", .{});
         wlr_lock_surface.resource.postNoMemory();
     };
+}
+
+pub fn updateLockSurfaceSize(manager: *LockManager, output: *Output) void {
+    const lock = manager.lock orelse return;
+
+    var it = lock.surfaces.iterator(.forward);
+    while (it.next()) |wlr_lock_surface| {
+        const lock_surface: *LockSurface = @ptrFromInt(wlr_lock_surface.data);
+        if (output == lock_surface.getOutput()) {
+            lock_surface.configure();
+        }
+    }
 }

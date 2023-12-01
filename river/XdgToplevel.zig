@@ -90,8 +90,8 @@ pub fn create(xdg_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
 
     // Add listeners that are active over the toplevel's entire lifetime
     xdg_toplevel.base.events.destroy.add(&self.destroy);
-    xdg_toplevel.base.events.map.add(&self.map);
-    xdg_toplevel.base.events.unmap.add(&self.unmap);
+    xdg_toplevel.base.surface.events.map.add(&self.map);
+    xdg_toplevel.base.surface.events.unmap.add(&self.unmap);
     xdg_toplevel.base.events.new_popup.add(&self.new_popup);
 
     _ = xdg_toplevel.setWmCapabilities(.{ .fullscreen = true });
@@ -183,16 +183,7 @@ pub fn destroyPopups(self: Self) void {
 fn handleDestroy(listener: *wl.Listener(void)) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
 
-    // TODO(wlroots): Replace this with an assertion when updating to wlroots 0.17.0
-    // https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/4051
-    if (self.decoration) |*decoration| {
-        decoration.wlr_decoration.resource.postError(
-            .orphaned,
-            "xdg_toplevel destroyed before xdg_toplevel_decoration",
-        );
-        decoration.deinit();
-        self.decoration = null;
-    }
+    assert(self.decoration == null);
 
     // Remove listeners that are active for the entire lifetime of the view
     self.destroy.link.remove();
@@ -391,18 +382,6 @@ fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), ev
     const self = @fieldParentPtr(Self, "request_resize", listener);
     const seat: *Seat = @ptrFromInt(event.seat.seat.data);
     const view = self.view;
-
-    {
-        // TODO(wlroots) remove this after updating to the next wlroots version
-        // https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/4041
-        if ((event.edges.top and event.edges.bottom) or (event.edges.left and event.edges.right)) {
-            self.xdg_toplevel.resource.postError(
-                .invalid_resize_edge,
-                "provided value is not a valid variant of the resize_edge enum",
-            );
-            return;
-        }
-    }
 
     if (view.current.output == null or view.pending.output == null) return;
     if (view.current.tags & view.current.output.?.current.tags == 0) return;

@@ -184,8 +184,7 @@ layout: ?*Layout = null,
 status: OutputStatus,
 
 destroy: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleDestroy),
-enable: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleEnable),
-mode: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleMode),
+request_state: wl.Listener(*wlr.Output.event.RequestState) = wl.Listener(*wlr.Output.event.RequestState).init(handleRequestState),
 frame: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleFrame),
 present: wl.Listener(*wlr.Output.event.Present) = wl.Listener(*wlr.Output.event.Present).init(handlePresent),
 
@@ -195,22 +194,18 @@ pub fn create(wlr_output: *wlr.Output) !void {
 
     if (!wlr_output.initRender(server.allocator, server.renderer)) return error.InitRenderFailed;
 
+    var state = wlr.Output.State.init();
+    defer state.finish();
+
+    state.setEnabled(true);
+
     if (wlr_output.preferredMode()) |preferred_mode| {
-        wlr_output.setMode(preferred_mode);
-        wlr_output.enable(true);
-        wlr_output.commit() catch {
-            var it = wlr_output.modes.iterator(.forward);
-            while (it.next()) |mode| {
-                if (mode == preferred_mode) continue;
-                wlr_output.setMode(mode);
-                wlr_output.commit() catch continue;
-                // This mode works, use it
-                break;
-            }
-            // If no mode works, then we will just leave the output disabled.
-            // Perhaps the user will want to set a custom mode using wlr-output-management.
-        };
+        state.setMode(preferred_mode);
     }
+
+    // Ignore failure here and create the Output anyways.
+    // It will stay disabled unless the user configures a custom mode which may work.
+    _ = wlr_output.commitState(&state);
 
     var width: c_int = undefined;
     var height: c_int = undefined;
@@ -270,8 +265,7 @@ pub fn create(wlr_output: *wlr.Output) !void {
     output.layers.fullscreen.node.setEnabled(false);
 
     wlr_output.events.destroy.add(&output.destroy);
-    wlr_output.events.enable.add(&output.enable);
-    wlr_output.events.mode.add(&output.mode);
+    wlr_output.events.request_state.add(&output.request_state);
     wlr_output.events.frame.add(&output.frame);
     wlr_output.events.present.add(&output.present);
 
@@ -289,7 +283,7 @@ pub fn create(wlr_output: *wlr.Output) !void {
     output.active_link.init();
     server.root.all_outputs.append(output);
 
-    handleEnable(&output.enable, wlr_output);
+    output.handleEnable();
 }
 
 pub fn layerSurfaceTree(self: Self, layer: zwlr.LayerShellV1.Layer) *wlr.SceneTree {
@@ -370,9 +364,8 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
     output.all_link.remove();
 
     output.destroy.link.remove();
-    output.enable.link.remove();
+    output.request_state.link.remove();
     output.frame.link.remove();
-    output.mode.link.remove();
     output.present.link.remove();
 
     output.tree.node.destroy();
@@ -386,42 +379,53 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
     server.root.applyPending();
 }
 
-fn handleEnable(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
-    const self = @fieldParentPtr(Self, "enable", listener);
+fn handleRequestState(listener: *wl.Listener(*wlr.Output.event.RequestState), event: *wlr.Output.event.RequestState) void {
+    const output = @fieldParentPtr(Self, "request_state", listener);
 
-    // We can't assert the current state of normal_content/locked_content
-    // here as this output may be newly created.
-    if (wlr_output.enabled) {
-        switch (server.lock_manager.state) {
-            .unlocked => {
-                assert(self.lock_render_state == .blanked);
-                self.normal_content.node.setEnabled(true);
-                self.locked_content.node.setEnabled(false);
-            },
-            .waiting_for_lock_surfaces, .waiting_for_blank, .locked => {
-                assert(self.lock_render_state == .blanked);
-                self.normal_content.node.setEnabled(false);
-                self.locked_content.node.setEnabled(true);
-            },
-        }
-    } else {
-        // Disabling and re-enabling an output always blanks it.
-        self.lock_render_state = .blanked;
-        self.normal_content.node.setEnabled(false);
-        self.locked_content.node.setEnabled(true);
+    // TODO double buffer output state changes for frame perfection and cleaner code.
+    // Schedule a frame and commit in the frame handler.
+    if (!output.wlr_output.commitState(event.state)) {
+        log.err("failed to commit requested state", .{});
+        return;
     }
 
-    // Add the output to root.active_outputs and the output layout if it has not
-    // already been added.
-    if (wlr_output.enabled) server.root.activateOutput(self);
+    if (event.state.committed.enabled) {
+        output.handleEnable();
+    }
+
+    if (event.state.committed.mode) {
+        output.updateBackgroundRect();
+        output.arrangeLayers();
+        server.lock_manager.updateLockSurfaceSize(output);
+        server.root.applyPending();
+    }
 }
 
-fn handleMode(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
-    const output = @fieldParentPtr(Self, "mode", listener);
-
-    output.updateBackgroundRect();
-    output.arrangeLayers();
-    server.root.applyPending();
+fn handleEnable(output: *Self) void {
+    // We can't assert the current state of normal_content/locked_content
+    // here as this output may be newly created.
+    if (output.wlr_output.enabled) {
+        switch (server.lock_manager.state) {
+            .unlocked => {
+                assert(output.lock_render_state == .blanked);
+                output.normal_content.node.setEnabled(true);
+                output.locked_content.node.setEnabled(false);
+            },
+            .waiting_for_lock_surfaces, .waiting_for_blank, .locked => {
+                assert(output.lock_render_state == .blanked);
+                output.normal_content.node.setEnabled(false);
+                output.locked_content.node.setEnabled(true);
+            },
+        }
+        // Add the output to root.active_outputs and the output layout if it has not
+        // already been added.
+        server.root.activateOutput(output);
+    } else {
+        // Disabling and re-enabling an output always blanks it.
+        output.lock_render_state = .blanked;
+        output.normal_content.node.setEnabled(false);
+        output.locked_content.node.setEnabled(true);
+    }
 }
 
 pub fn updateBackgroundRect(output: *Self) void {
@@ -439,7 +443,7 @@ fn handleFrame(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
     const output = @fieldParentPtr(Self, "frame", listener);
     const scene_output = server.root.scene.getSceneOutput(output.wlr_output).?;
 
-    if (scene_output.commit()) {
+    if (scene_output.commit(null)) {
         if (server.lock_manager.state == .locked or
             (server.lock_manager.state == .waiting_for_lock_surfaces and output.locked_content.node.enabled) or
             server.lock_manager.state == .waiting_for_blank)

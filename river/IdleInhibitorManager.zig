@@ -44,7 +44,7 @@ pub fn idleInhibitCheckActive(self: *Self) void {
                 }
             },
             .layer_surface => |layer_surface| {
-                if (layer_surface.wlr_layer_surface.mapped) {
+                if (layer_surface.wlr_layer_surface.surface.mapped) {
                     inhibited = true;
                     break;
                 }

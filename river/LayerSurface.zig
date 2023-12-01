@@ -37,8 +37,8 @@ scene_layer_surface: *wlr.SceneLayerSurfaceV1,
 popup_tree: *wlr.SceneTree,
 
 destroy: wl.Listener(*wlr.LayerSurfaceV1) = wl.Listener(*wlr.LayerSurfaceV1).init(handleDestroy),
-map: wl.Listener(*wlr.LayerSurfaceV1) = wl.Listener(*wlr.LayerSurfaceV1).init(handleMap),
-unmap: wl.Listener(*wlr.LayerSurfaceV1) = wl.Listener(*wlr.LayerSurfaceV1).init(handleUnmap),
+map: wl.Listener(void) = wl.Listener(void).init(handleMap),
+unmap: wl.Listener(void) = wl.Listener(void).init(handleUnmap),
 commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
 new_popup: wl.Listener(*wlr.XdgPopup) = wl.Listener(*wlr.XdgPopup).init(handleNewPopup),
 
@@ -63,8 +63,8 @@ pub fn create(wlr_layer_surface: *wlr.LayerSurfaceV1) error{OutOfMemory}!void {
     wlr_layer_surface.surface.data = @intFromPtr(&layer_surface.scene_layer_surface.tree.node);
 
     wlr_layer_surface.events.destroy.add(&layer_surface.destroy);
-    wlr_layer_surface.events.map.add(&layer_surface.map);
-    wlr_layer_surface.events.unmap.add(&layer_surface.unmap);
+    wlr_layer_surface.surface.events.map.add(&layer_surface.map);
+    wlr_layer_surface.surface.events.unmap.add(&layer_surface.unmap);
     wlr_layer_surface.surface.events.commit.add(&layer_surface.commit);
     wlr_layer_surface.events.new_popup.add(&layer_surface.new_popup);
 
@@ -96,20 +96,20 @@ fn handleDestroy(listener: *wl.Listener(*wlr.LayerSurfaceV1), _: *wlr.LayerSurfa
     util.gpa.destroy(layer_surface);
 }
 
-fn handleMap(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wlr.LayerSurfaceV1) void {
+fn handleMap(listener: *wl.Listener(void)) void {
     const layer_surface = @fieldParentPtr(LayerSurface, "map", listener);
 
-    log.debug("layer surface '{s}' mapped", .{wlr_layer_surface.namespace});
+    log.debug("layer surface '{s}' mapped", .{layer_surface.wlr_layer_surface.namespace});
 
     layer_surface.output.arrangeLayers();
     handleKeyboardInteractiveExclusive(layer_surface.output);
     server.root.applyPending();
 }
 
-fn handleUnmap(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wlr.LayerSurfaceV1) void {
+fn handleUnmap(listener: *wl.Listener(void)) void {
     const layer_surface = @fieldParentPtr(LayerSurface, "unmap", listener);
 
-    log.debug("layer surface '{s}' unmapped", .{wlr_layer_surface.namespace});
+    log.debug("layer surface '{s}' unmapped", .{layer_surface.wlr_layer_surface.namespace});
 
     layer_surface.output.arrangeLayers();
     handleKeyboardInteractiveExclusive(layer_surface.output);
@@ -128,10 +128,9 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
         layer_surface.scene_layer_surface.tree.node.reparent(tree);
     }
 
-    // If a surface is committed while it is not mapped, we must send a configure.
-    // TODO: this mapped check is not correct as it will be true in the commit
-    // that triggers the unmap as well.
-    if (!wlr_layer_surface.mapped or @as(u32, @bitCast(wlr_layer_surface.current.committed)) != 0) {
+    if (wlr_layer_surface.initial_commit or
+        @as(u32, @bitCast(wlr_layer_surface.current.committed)) != 0)
+    {
         layer_surface.output.arrangeLayers();
         handleKeyboardInteractiveExclusive(layer_surface.output);
         server.root.applyPending();
@@ -153,7 +152,7 @@ fn handleKeyboardInteractiveExclusive(output: *Output) void {
             if (@as(?*SceneNodeData, @ptrFromInt(node.data))) |node_data| {
                 const layer_surface = node_data.data.layer_surface;
                 const wlr_layer_surface = layer_surface.wlr_layer_surface;
-                if (wlr_layer_surface.mapped and
+                if (wlr_layer_surface.surface.mapped and
                     wlr_layer_surface.current.keyboard_interactive == .exclusive)
                 {
                     break :outer layer_surface;
@@ -179,7 +178,7 @@ fn handleKeyboardInteractiveExclusive(output: *Output) void {
             const current_focus = seat.focused.layer.wlr_layer_surface;
             // If the seat is currently focusing an unmapped layer surface or one
             // without keyboard interactivity, stop focusing that layer surface.
-            if (!current_focus.mapped or current_focus.current.keyboard_interactive == .none) {
+            if (!current_focus.surface.mapped or current_focus.current.keyboard_interactive == .none) {
                 seat.setFocusRaw(.{ .none = {} });
             }
         }

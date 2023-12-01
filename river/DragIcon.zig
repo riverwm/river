@@ -27,43 +27,33 @@ const Cursor = @import("Cursor.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
 
 wlr_drag_icon: *wlr.Drag.Icon,
-
-tree: *wlr.SceneTree,
-surface: *wlr.SceneTree,
+scene_drag_icon: *wlr.SceneTree,
 
 destroy: wl.Listener(*wlr.Drag.Icon) = wl.Listener(*wlr.Drag.Icon).init(handleDestroy),
-map: wl.Listener(*wlr.Drag.Icon) = wl.Listener(*wlr.Drag.Icon).init(handleMap),
-unmap: wl.Listener(*wlr.Drag.Icon) = wl.Listener(*wlr.Drag.Icon).init(handleUnmap),
-commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
 
 pub fn create(wlr_drag_icon: *wlr.Drag.Icon, cursor: *Cursor) error{OutOfMemory}!void {
-    const tree = try server.root.drag_icons.createSceneTree();
-    errdefer tree.node.destroy();
+    const scene_drag_icon = try server.root.drag_icons.createSceneDragIcon(wlr_drag_icon);
+    errdefer scene_drag_icon.node.destroy();
 
     const drag_icon = try util.gpa.create(DragIcon);
     errdefer util.gpa.destroy(drag_icon);
 
     drag_icon.* = .{
         .wlr_drag_icon = wlr_drag_icon,
-        .tree = tree,
-        .surface = try tree.createSceneSubsurfaceTree(wlr_drag_icon.surface),
+        .scene_drag_icon = scene_drag_icon,
     };
-    tree.node.data = @intFromPtr(drag_icon);
+    scene_drag_icon.node.data = @intFromPtr(drag_icon);
 
     drag_icon.updatePosition(cursor);
-    tree.node.setEnabled(wlr_drag_icon.mapped);
 
     wlr_drag_icon.events.destroy.add(&drag_icon.destroy);
-    wlr_drag_icon.events.map.add(&drag_icon.map);
-    wlr_drag_icon.events.unmap.add(&drag_icon.unmap);
-    wlr_drag_icon.surface.events.commit.add(&drag_icon.commit);
 }
 
 pub fn updatePosition(drag_icon: *DragIcon, cursor: *Cursor) void {
     switch (drag_icon.wlr_drag_icon.drag.grab_type) {
         .keyboard => unreachable,
         .keyboard_pointer => {
-            drag_icon.tree.node.setPosition(
+            drag_icon.scene_drag_icon.node.setPosition(
                 @intFromFloat(cursor.wlr_cursor.x),
                 @intFromFloat(cursor.wlr_cursor.y),
             );
@@ -71,7 +61,7 @@ pub fn updatePosition(drag_icon: *DragIcon, cursor: *Cursor) void {
         .keyboard_touch => {
             const touch_id = drag_icon.wlr_drag_icon.drag.touch_id;
             if (cursor.touch_points.get(touch_id)) |point| {
-                drag_icon.tree.node.setPosition(
+                drag_icon.scene_drag_icon.node.setPosition(
                     @intFromFloat(point.lx),
                     @intFromFloat(point.ly),
                 );
@@ -83,33 +73,7 @@ pub fn updatePosition(drag_icon: *DragIcon, cursor: *Cursor) void {
 fn handleDestroy(listener: *wl.Listener(*wlr.Drag.Icon), _: *wlr.Drag.Icon) void {
     const drag_icon = @fieldParentPtr(DragIcon, "destroy", listener);
 
-    drag_icon.tree.node.destroy();
-
     drag_icon.destroy.link.remove();
-    drag_icon.map.link.remove();
-    drag_icon.unmap.link.remove();
-    drag_icon.commit.link.remove();
 
     util.gpa.destroy(drag_icon);
-}
-
-fn handleMap(listener: *wl.Listener(*wlr.Drag.Icon), _: *wlr.Drag.Icon) void {
-    const drag_icon = @fieldParentPtr(DragIcon, "map", listener);
-
-    drag_icon.tree.node.setEnabled(true);
-}
-
-fn handleUnmap(listener: *wl.Listener(*wlr.Drag.Icon), _: *wlr.Drag.Icon) void {
-    const drag_icon = @fieldParentPtr(DragIcon, "unmap", listener);
-
-    drag_icon.tree.node.setEnabled(false);
-}
-
-fn handleCommit(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) void {
-    const drag_icon = @fieldParentPtr(DragIcon, "commit", listener);
-
-    drag_icon.surface.node.setPosition(
-        drag_icon.surface.node.x + surface.current.dx,
-        drag_icon.surface.node.y + surface.current.dy,
-    );
 }

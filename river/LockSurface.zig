@@ -33,7 +33,6 @@ lock: *wlr.SessionLockV1,
 
 idle_update_focus: ?*wl.EventSource = null,
 
-output_mode: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleOutputMode),
 map: wl.Listener(void) = wl.Listener(void).init(handleMap),
 surface_destroy: wl.Listener(void) = wl.Listener(void).init(handleDestroy),
 
@@ -55,11 +54,10 @@ pub fn create(wlr_lock_surface: *wlr.SessionLockSurfaceV1, lock: *wlr.SessionLoc
 
     wlr_lock_surface.surface.data = @intFromPtr(&tree.node);
 
-    wlr_lock_surface.output.events.mode.add(&lock_surface.output_mode);
-    wlr_lock_surface.events.map.add(&lock_surface.map);
+    wlr_lock_surface.surface.events.map.add(&lock_surface.map);
     wlr_lock_surface.events.destroy.add(&lock_surface.surface_destroy);
 
-    handleOutputMode(&lock_surface.output_mode, wlr_lock_surface.output);
+    lock_surface.configure();
 }
 
 pub fn destroy(lock_surface: *LockSurface) void {
@@ -84,20 +82,17 @@ pub fn destroy(lock_surface: *LockSurface) void {
         event_source.remove();
     }
 
-    lock_surface.output_mode.link.remove();
     lock_surface.map.link.remove();
     lock_surface.surface_destroy.link.remove();
 
     util.gpa.destroy(lock_surface);
 }
 
-fn getOutput(lock_surface: *LockSurface) *Output {
+pub fn getOutput(lock_surface: *LockSurface) *Output {
     return @ptrFromInt(lock_surface.wlr_lock_surface.output.data);
 }
 
-fn handleOutputMode(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
-    const lock_surface = @fieldParentPtr(LockSurface, "output_mode", listener);
-
+pub fn configure(lock_surface: *LockSurface) void {
     var output_width: i32 = undefined;
     var output_height: i32 = undefined;
     lock_surface.getOutput().wlr_output.effectiveResolution(&output_width, &output_height);

@@ -98,37 +98,6 @@ const Mode = union(enum) {
     },
 };
 
-const Image = enum {
-    /// The current image of the cursor is unknown, perhaps because it was set by a client.
-    unknown,
-    left_ptr,
-    move,
-    @"n-resize",
-    @"s-resize",
-    @"w-resize",
-    @"e-resize",
-    @"nw-resize",
-    @"ne-resize",
-    @"sw-resize",
-    @"se-resize",
-
-    fn resize(edges: wlr.Edges) Image {
-        assert(!(edges.top and edges.bottom));
-        assert(!(edges.left and edges.right));
-
-        if (edges.top and edges.left) return .@"nw-resize";
-        if (edges.top and edges.right) return .@"ne-resize";
-        if (edges.bottom and edges.left) return .@"sw-resize";
-        if (edges.bottom and edges.right) return .@"se-resize";
-        if (edges.top) return .@"n-resize";
-        if (edges.bottom) return .@"s-resize";
-        if (edges.left) return .@"w-resize";
-        if (edges.right) return .@"e-resize";
-
-        return .@"se-resize";
-    }
-};
-
 const default_size = 24;
 
 const LayoutPoint = struct {
@@ -150,9 +119,12 @@ inflight_mode: Mode = .passthrough,
 seat: *Seat,
 wlr_cursor: *wlr.Cursor,
 pointer_gestures: *wlr.PointerGesturesV1,
-xcursor_manager: *wlr.XcursorManager,
 
-image: Image = .unknown,
+/// Xcursor manager for the currently configured Xcursor theme.
+xcursor_manager: *wlr.XcursorManager,
+/// Name of the current Xcursor shape, or null if a client has configured a
+/// surface to be used as the cursor shape instead.
+xcursor_name: ?[*:0]const u8 = null,
 
 /// Number of distinct buttons currently pressed
 pressed_count: u32 = 0,
@@ -301,26 +273,15 @@ pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
                 @intCast(image.hotspot_y),
             );
         }
+    }
 
-        if (self.image != .unknown) {
-            self.xcursor_manager.setCursorImage(@tagName(self.image), self.wlr_cursor);
-        }
+    if (self.xcursor_name) |name| {
+        self.wlr_cursor.setXcursor(self.xcursor_manager, name);
     }
 }
 
-/// It seems that setCursorImage is actually fairly expensive to call repeatedly
-/// as it does no checks to see if the the given image is already set. Therefore,
-/// do that check here.
-fn setImage(self: *Self, image: Image) void {
-    assert(image != .unknown);
-
-    if (image == self.image) return;
-    self.image = image;
-    self.xcursor_manager.setCursorImage(@tagName(image), self.wlr_cursor);
-}
-
 fn clearFocus(self: *Self) void {
-    self.setImage(.left_ptr);
+    self.wlr_cursor.setXcursor(self.xcursor_manager, "left_ptr");
     self.seat.wlr_seat.pointerNotifyClearFocus();
 }
 
@@ -685,15 +646,15 @@ fn handleRequestSetCursor(
         // cursor moves between outputs.
         log.debug("focused client set cursor", .{});
         self.wlr_cursor.setSurface(event.surface, event.hotspot_x, event.hotspot_y);
-        self.image = .unknown;
+        self.xcursor_name = null;
     }
 }
 
 pub fn hide(self: *Self) void {
     if (self.pressed_count > 0) return;
     self.hidden = true;
-    self.wlr_cursor.setImage(null, 0, 0, 0, 0, 0, 0);
-    self.image = .unknown;
+    self.wlr_cursor.unsetImage();
+    self.xcursor_name = null;
     self.seat.wlr_seat.pointerNotifyClearFocus();
     self.hide_cursor_timer.timerUpdate(0) catch {
         log.err("failed to update cursor hide timeout", .{});
@@ -725,7 +686,7 @@ pub fn startMove(cursor: *Self, view: *View) void {
         .offset_x = @as(i32, @intFromFloat(cursor.wlr_cursor.x)) - view.current.box.x,
         .offset_y = @as(i32, @intFromFloat(cursor.wlr_cursor.y)) - view.current.box.y,
     } };
-    cursor.enterMode(new_mode, view, .move);
+    cursor.enterMode(new_mode, view, "move");
 }
 
 pub fn startResize(cursor: *Self, view: *View, proposed_edges: ?wlr.Edges) void {
@@ -758,7 +719,7 @@ pub fn startResize(cursor: *Self, view: *View, proposed_edges: ?wlr.Edges) void 
         .initial_width = @intCast(box.width),
         .initial_height = @intCast(box.height),
     } };
-    cursor.enterMode(new_mode, view, Image.resize(edges));
+    cursor.enterMode(new_mode, view, wlr.Xcursor.getResizeName(edges));
 }
 
 fn computeEdges(cursor: *const Self, view: *const View) wlr.Edges {
@@ -798,7 +759,7 @@ fn computeEdges(cursor: *const Self, view: *const View) wlr.Edges {
     }
 }
 
-fn enterMode(cursor: *Self, mode: Mode, view: *View, image: Image) void {
+fn enterMode(cursor: *Self, mode: Mode, view: *View, xcursor_name: [*:0]const u8) void {
     assert(cursor.mode == .passthrough or cursor.mode == .down);
     assert(mode == .move or mode == .resize);
 
@@ -814,7 +775,7 @@ fn enterMode(cursor: *Self, mode: Mode, view: *View, image: Image) void {
     }
 
     cursor.seat.wlr_seat.pointerNotifyClearFocus();
-    cursor.setImage(image);
+    cursor.wlr_cursor.setXcursor(cursor.xcursor_manager, xcursor_name);
 
     server.root.applyPending();
 }

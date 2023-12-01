@@ -48,6 +48,7 @@ sigint_source: *wl.EventSource,
 sigterm_source: *wl.EventSource,
 
 backend: *wlr.Backend,
+session: ?*wlr.Session,
 
 renderer: *wlr.Renderer,
 allocator: *wlr.Allocator,
@@ -89,7 +90,7 @@ pub fn init(self: *Self) !void {
     errdefer self.sigterm_source.remove();
 
     // This frees itself when the wl.Server is destroyed
-    self.backend = try wlr.Backend.autocreate(self.wl_server);
+    self.backend = try wlr.Backend.autocreate(self.wl_server, &self.session);
 
     self.renderer = try wlr.Renderer.autocreate(self.backend);
     errdefer self.renderer.destroy();
@@ -98,7 +99,7 @@ pub fn init(self: *Self) !void {
     self.allocator = try wlr.Allocator.autocreate(self.backend, self.renderer);
     errdefer self.allocator.destroy();
 
-    const compositor = try wlr.Compositor.create(self.wl_server, self.renderer);
+    const compositor = try wlr.Compositor.create(self.wl_server, 6, self.renderer);
     _ = try wlr.Subcompositor.create(self.wl_server);
 
     self.xdg_shell = try wlr.XdgShell.create(self.wl_server, 5);
@@ -109,7 +110,7 @@ pub fn init(self: *Self) !void {
     self.new_toplevel_decoration.setNotify(handleNewToplevelDecoration);
     self.xdg_decoration_manager.events.new_toplevel_decoration.add(&self.new_toplevel_decoration);
 
-    self.layer_shell = try wlr.LayerShellV1.create(self.wl_server);
+    self.layer_shell = try wlr.LayerShellV1.create(self.wl_server, 4);
     self.new_layer_surface.setNotify(handleNewLayerSurface);
     self.layer_shell.events.new_surface.add(&self.new_layer_surface);
 
@@ -203,7 +204,7 @@ fn handleNewXdgSurface(_: *wl.Listener(*wlr.XdgSurface), xdg_surface: *wlr.XdgSu
 
     log.debug("new xdg_toplevel", .{});
 
-    XdgToplevel.create(xdg_surface.role_data.toplevel) catch {
+    XdgToplevel.create(xdg_surface.role_data.toplevel.?) catch {
         log.err("out of memory", .{});
         xdg_surface.resource.postNoMemory();
         return;
@@ -214,17 +215,6 @@ fn handleNewToplevelDecoration(
     _: *wl.Listener(*wlr.XdgToplevelDecorationV1),
     wlr_decoration: *wlr.XdgToplevelDecorationV1,
 ) void {
-    const xdg_toplevel: *XdgToplevel = @ptrFromInt(wlr_decoration.surface.data);
-
-    // TODO(wlroots): The next wlroots version will handle this for us
-    if (xdg_toplevel.decoration != null) {
-        wlr_decoration.resource.postError(
-            .already_constructed,
-            "xdg_toplevel already has a decoration object",
-        );
-        return;
-    }
-
     XdgDecoration.init(wlr_decoration);
 }
 
