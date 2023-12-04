@@ -40,6 +40,7 @@ const View = @import("View.zig");
 const log = std.log.scoped(.output);
 
 wlr_output: *wlr.Output,
+scene_output: *wlr.SceneOutput,
 
 /// For Root.all_outputs
 all_link: wl.list.Link,
@@ -221,11 +222,14 @@ pub fn create(wlr_output: *wlr.Output) !void {
     var height: c_int = undefined;
     wlr_output.effectiveResolution(&width, &height);
 
+    const scene_output = try server.root.scene.createSceneOutput(wlr_output);
+
     const tree = try server.root.layers.outputs.createSceneTree();
     const normal_content = try tree.createSceneTree();
 
     output.* = .{
         .wlr_output = wlr_output,
+        .scene_output = scene_output,
         .all_link = undefined,
         .active_link = undefined,
         .tree = tree,

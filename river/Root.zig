@@ -90,7 +90,6 @@ views: wl.list.Head(View, .link),
 new_output: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleNewOutput),
 
 output_layout: *wlr.OutputLayout,
-scene_output_layout: *wlr.SceneOutputLayout,
 layout_change: wl.Listener(*wlr.OutputLayout) = wl.Listener(*wlr.OutputLayout).init(handleLayoutChange),
 
 output_manager: *wlr.OutputManagerV1,
@@ -134,8 +133,6 @@ pub fn init(self: *Self) !void {
     const outputs = try interactive_content.createSceneTree();
     const xwayland_override_redirect = if (build_options.xwayland) try interactive_content.createSceneTree();
 
-    const scene_output_layout = try scene.attachOutputLayout(output_layout);
-
     _ = try wlr.XdgOutputManagerV1.create(server.wl_server, output_layout);
 
     const presentation = try wlr.Presentation.create(server.wl_server, server.backend);
@@ -176,7 +173,6 @@ pub fn init(self: *Self) !void {
         },
         .views = undefined,
         .output_layout = output_layout,
-        .scene_output_layout = scene_output_layout,
         .all_outputs = undefined,
         .active_outputs = undefined,
         .output_manager = try wlr.OutputManagerV1.create(server.wl_server),
@@ -364,14 +360,9 @@ pub fn activateOutput(root: *Self, output: *Output) void {
         // possible to handle after updating to 0.17.
         @panic("TODO handle allocation failure here");
     };
-    const scene_output = root.scene.createSceneOutput(output.wlr_output) catch {
-        // See above
-        @panic("TODO handle allocation failure here");
-    };
-    root.scene_output_layout.addOutput(layout_output, scene_output);
-
     output.tree.node.setEnabled(true);
     output.tree.node.setPosition(layout_output.x, layout_output.y);
+    output.scene_output.setPosition(layout_output.x, layout_output.y);
 
     // If we previously had no outputs, move all views to the new output and focus it.
     if (first) {
@@ -780,10 +771,14 @@ fn processOutputConfig(
                 if (wlr_output.commitState(&proposed_state)) {
                     if (head.state.enabled) {
                         // Just updates the output's position if it is already in the layout
-                        // This can't fail if the output is already in the layout, which we know to be the case here.
-                        _ = self.output_layout.add(output.wlr_output, head.state.x, head.state.y) catch unreachable;
+                        _ = self.output_layout.add(output.wlr_output, head.state.x, head.state.y) catch {
+                            std.log.err("out of memory", .{});
+                            success = false;
+                            continue;
+                        };
                         output.tree.node.setEnabled(true);
                         output.tree.node.setPosition(head.state.x, head.state.y);
+                        output.scene_output.setPosition(head.state.x, head.state.y);
                         // Even though we call this in the output's handler for the mode event
                         // it is necessary to call it here as well since changing e.g. only
                         // the transform will require the dimensions of the background to be
