@@ -194,18 +194,28 @@ pub fn create(wlr_output: *wlr.Output) !void {
 
     if (!wlr_output.initRender(server.allocator, server.renderer)) return error.InitRenderFailed;
 
-    var state = wlr.Output.State.init();
-    defer state.finish();
-
-    state.setEnabled(true);
-
+    // If the list of modes for the output is empty or if no mode in the list of modes works,
+    // we can't enable the output automatically.
+    // It will stay disabled unless the user configures a custom mode which works.
     if (wlr_output.preferredMode()) |preferred_mode| {
-        state.setMode(preferred_mode);
-    }
+        var state = wlr.Output.State.init();
+        defer state.finish();
 
-    // Ignore failure here and create the Output anyways.
-    // It will stay disabled unless the user configures a custom mode which may work.
-    _ = wlr_output.commitState(&state);
+        state.setMode(preferred_mode);
+        state.setEnabled(true);
+
+        if (!wlr_output.commitState(&state)) {
+            // It is important to try other modes if the preferred mode fails
+            // which is reported to be helpful in practice with e.g. multiple
+            // high resolution monitors connected through a usb dock.
+            var it = wlr_output.modes.iterator(.forward);
+            while (it.next()) |mode| {
+                if (mode == preferred_mode) continue;
+                state.setMode(mode);
+                if (wlr_output.commitState(&state)) break;
+            }
+        }
+    }
 
     var width: c_int = undefined;
     var height: c_int = undefined;
@@ -283,7 +293,7 @@ pub fn create(wlr_output: *wlr.Output) !void {
     output.active_link.init();
     server.root.all_outputs.append(output);
 
-    output.handleEnable();
+    output.handleEnableDisable();
 }
 
 pub fn layerSurfaceTree(self: Self, layer: zwlr.LayerShellV1.Layer) *wlr.SceneTree {
@@ -390,7 +400,7 @@ fn handleRequestState(listener: *wl.Listener(*wlr.Output.event.RequestState), ev
     }
 
     if (event.state.committed.enabled) {
-        output.handleEnable();
+        output.handleEnableDisable();
     }
 
     if (event.state.committed.mode) {
@@ -401,7 +411,7 @@ fn handleRequestState(listener: *wl.Listener(*wlr.Output.event.RequestState), ev
     }
 }
 
-fn handleEnable(output: *Self) void {
+fn handleEnableDisable(output: *Self) void {
     // We can't assert the current state of normal_content/locked_content
     // here as this output may be newly created.
     if (output.wlr_output.enabled) {
