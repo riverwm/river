@@ -195,25 +195,44 @@ pub fn create(wlr_output: *wlr.Output) !void {
 
     if (!wlr_output.initRender(server.allocator, server.renderer)) return error.InitRenderFailed;
 
-    // If the list of modes for the output is empty or if no mode in the list of modes works,
-    // we can't enable the output automatically.
+    // If no standard mode for the output works we can't enable the output automatically.
     // It will stay disabled unless the user configures a custom mode which works.
-    if (wlr_output.preferredMode()) |preferred_mode| {
+    //
+    // For the Wayland backend, the list of modes will be empty and it is possible to
+    // enable the output without setting a mode.
+    {
         var state = wlr.Output.State.init();
         defer state.finish();
 
-        state.setMode(preferred_mode);
         state.setEnabled(true);
 
+        if (wlr_output.preferredMode()) |preferred_mode| {
+            state.setMode(preferred_mode);
+        }
+
         if (!wlr_output.commitState(&state)) {
+            log.err("initial output commit with preferred mode failed, trying all modes", .{});
+
             // It is important to try other modes if the preferred mode fails
             // which is reported to be helpful in practice with e.g. multiple
             // high resolution monitors connected through a usb dock.
             var it = wlr_output.modes.iterator(.forward);
             while (it.next()) |mode| {
-                if (mode == preferred_mode) continue;
                 state.setMode(mode);
-                if (wlr_output.commitState(&state)) break;
+                if (wlr_output.commitState(&state)) {
+                    log.info("initial output commit succeeded with mode {}x{}@{}mHz", .{
+                        mode.width,
+                        mode.height,
+                        mode.refresh,
+                    });
+                    break;
+                } else {
+                    log.err("initial output commit failed with mode {}x{}@{}mHz", .{
+                        mode.width,
+                        mode.height,
+                        mode.refresh,
+                    });
+                }
             }
         }
     }
