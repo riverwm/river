@@ -40,11 +40,10 @@ xwayland_surface: *wlr.XwaylandSurface,
 surface_tree: ?*wlr.SceneTree = null,
 
 // Active over entire lifetime
-destroy: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleDestroy),
+destroy: wl.Listener(void) = wl.Listener(void).init(handleDestroy),
 request_configure: wl.Listener(*wlr.XwaylandSurface.event.Configure) =
     wl.Listener(*wlr.XwaylandSurface.event.Configure).init(handleRequestConfigure),
-set_override_redirect: wl.Listener(*wlr.XwaylandSurface) =
-    wl.Listener(*wlr.XwaylandSurface).init(handleSetOverrideRedirect),
+set_override_redirect: wl.Listener(void) = wl.Listener(void).init(handleSetOverrideRedirect),
 associate: wl.Listener(void) = wl.Listener(void).init(handleAssociate),
 dissociate: wl.Listener(void) = wl.Listener(void).init(handleDissociate),
 
@@ -53,12 +52,10 @@ map: wl.Listener(void) = wl.Listener(void).init(handleMap),
 unmap: wl.Listener(void) = wl.Listener(void).init(handleUnmap),
 
 // Active while mapped
-set_title: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleSetTitle),
-set_class: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleSetClass),
-set_decorations: wl.Listener(*wlr.XwaylandSurface) =
-    wl.Listener(*wlr.XwaylandSurface).init(handleSetDecorations),
-request_fullscreen: wl.Listener(*wlr.XwaylandSurface) =
-    wl.Listener(*wlr.XwaylandSurface).init(handleRequestFullscreen),
+set_title: wl.Listener(void) = wl.Listener(void).init(handleSetTitle),
+set_class: wl.Listener(void) = wl.Listener(void).init(handleSetClass),
+set_decorations: wl.Listener(void) = wl.Listener(void).init(handleSetDecorations),
+request_fullscreen: wl.Listener(void) = wl.Listener(void).init(handleRequestFullscreen),
 request_minimize: wl.Listener(*wlr.XwaylandSurface.event.Minimize) =
     wl.Listener(*wlr.XwaylandSurface.event.Minimize).init(handleRequestMinimize),
 
@@ -152,7 +149,7 @@ pub fn getAppId(self: Self) ?[*:0]const u8 {
     return self.xwayland_surface.class;
 }
 
-fn handleDestroy(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
+fn handleDestroy(listener: *wl.Listener(void)) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
 
     // Remove listeners that are active for the entire lifetime of the view
@@ -275,11 +272,9 @@ fn handleRequestConfigure(
     server.root.applyPending();
 }
 
-fn handleSetOverrideRedirect(
-    listener: *wl.Listener(*wlr.XwaylandSurface),
-    xwayland_surface: *wlr.XwaylandSurface,
-) void {
+fn handleSetOverrideRedirect(listener: *wl.Listener(void)) void {
     const self = @fieldParentPtr(Self, "set_override_redirect", listener);
+    const xwayland_surface = self.xwayland_surface;
 
     log.debug("xwayland surface set override redirect", .{});
 
@@ -291,7 +286,7 @@ fn handleSetOverrideRedirect(
         }
         handleDissociate(&self.dissociate);
     }
-    handleDestroy(&self.destroy, xwayland_surface);
+    handleDestroy(&self.destroy);
 
     XwaylandOverrideRedirect.create(xwayland_surface) catch {
         log.err("out of memory", .{});
@@ -299,17 +294,17 @@ fn handleSetOverrideRedirect(
     };
 }
 
-fn handleSetTitle(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
+fn handleSetTitle(listener: *wl.Listener(void)) void {
     const self = @fieldParentPtr(Self, "set_title", listener);
     self.view.notifyTitle();
 }
 
-fn handleSetClass(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
+fn handleSetClass(listener: *wl.Listener(void)) void {
     const self = @fieldParentPtr(Self, "set_class", listener);
     self.view.notifyAppId();
 }
 
-fn handleSetDecorations(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
+fn handleSetDecorations(listener: *wl.Listener(void)) void {
     const self = @fieldParentPtr(Self, "set_decorations", listener);
     const view = self.view;
 
@@ -322,10 +317,10 @@ fn handleSetDecorations(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.Xw
     }
 }
 
-fn handleRequestFullscreen(listener: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
+fn handleRequestFullscreen(listener: *wl.Listener(void)) void {
     const self = @fieldParentPtr(Self, "request_fullscreen", listener);
-    if (self.view.pending.fullscreen != xwayland_surface.fullscreen) {
-        self.view.pending.fullscreen = xwayland_surface.fullscreen;
+    if (self.view.pending.fullscreen != self.xwayland_surface.fullscreen) {
+        self.view.pending.fullscreen = self.xwayland_surface.fullscreen;
         server.root.applyPending();
     }
 }

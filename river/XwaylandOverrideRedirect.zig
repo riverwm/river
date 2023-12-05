@@ -37,9 +37,8 @@ surface_tree: ?*wlr.SceneTree = null,
 // Active over entire lifetime
 request_configure: wl.Listener(*wlr.XwaylandSurface.event.Configure) =
     wl.Listener(*wlr.XwaylandSurface.event.Configure).init(handleRequestConfigure),
-destroy: wl.Listener(*wlr.XwaylandSurface) = wl.Listener(*wlr.XwaylandSurface).init(handleDestroy),
-set_override_redirect: wl.Listener(*wlr.XwaylandSurface) =
-    wl.Listener(*wlr.XwaylandSurface).init(handleSetOverrideRedirect),
+destroy: wl.Listener(void) = wl.Listener(void).init(handleDestroy),
+set_override_redirect: wl.Listener(void) = wl.Listener(void).init(handleSetOverrideRedirect),
 associate: wl.Listener(void) = wl.Listener(void).init(handleAssociate),
 dissociate: wl.Listener(void) = wl.Listener(void).init(handleDissociate),
 
@@ -78,7 +77,7 @@ fn handleRequestConfigure(
     event.surface.configure(event.x, event.y, event.width, event.height);
 }
 
-fn handleDestroy(listener: *wl.Listener(*wlr.XwaylandSurface), _: *wlr.XwaylandSurface) void {
+fn handleDestroy(listener: *wl.Listener(void)) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
 
     self.request_configure.link.remove();
@@ -180,11 +179,9 @@ fn handleSetGeometry(listener: *wl.Listener(void)) void {
     self.surface_tree.?.node.setPosition(self.xwayland_surface.x, self.xwayland_surface.y);
 }
 
-fn handleSetOverrideRedirect(
-    listener: *wl.Listener(*wlr.XwaylandSurface),
-    xwayland_surface: *wlr.XwaylandSurface,
-) void {
+fn handleSetOverrideRedirect(listener: *wl.Listener(void)) void {
     const self = @fieldParentPtr(Self, "set_override_redirect", listener);
+    const xwayland_surface = self.xwayland_surface;
 
     log.debug("xwayland surface unset override redirect", .{});
 
@@ -196,7 +193,7 @@ fn handleSetOverrideRedirect(
         }
         handleDissociate(&self.dissociate);
     }
-    handleDestroy(&self.destroy, xwayland_surface);
+    handleDestroy(&self.destroy);
 
     XwaylandView.create(xwayland_surface) catch {
         log.err("out of memory", .{});
