@@ -110,10 +110,8 @@ fn handleInputMethodGrabKeyboard(
 ) void {
     const self = @fieldParentPtr(Self, "grab_keyboard", listener);
 
-    const active_keyboard = self.seat.wlr_seat.getKeyboard() orelse return;
+    const active_keyboard = self.seat.wlr_seat.getKeyboard();
     keyboard_grab.setKeyboard(active_keyboard);
-    // sway says 'send modifier state to grab' but doesn't seem to do this send_modifiers
-    keyboard_grab.sendModifiers(&active_keyboard.modifiers);
 
     keyboard_grab.events.destroy.add(&self.grab_keyboard_destroy);
 }
