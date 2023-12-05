@@ -1,5 +1,6 @@
 image: archlinux
 packages:
+  - libdisplay-info
   - libevdev
   - libinput
   - libxkbcommon

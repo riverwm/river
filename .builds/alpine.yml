@@ -6,7 +6,8 @@ packages:
   - mesa-dev
   - libffi-dev
   - expat-dev
-  - hwdata
+  - hwdata-dev
+  - libdisplay-info-dev
   - libxkbcommon-dev
   - xcb-util-image-dev
   - xcb-util-renderutil-dev
@@ -14,7 +15,7 @@ packages:
   - pixman-dev
   - libevdev-dev
   - wayland-protocols
-  - xwayland
+  - xwayland-dev
   - meson
   - scdoc
   - tar
