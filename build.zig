@@ -97,8 +97,11 @@ pub fn build(b: *Build) !void {
     scanner.addCustomProtocol("protocol/wlr-layer-shell-unstable-v1.xml");
     scanner.addCustomProtocol("protocol/wlr-output-power-management-unstable-v1.xml");
 
-    // These must be manually kept in sync with the versions wlroots supports
-    // until wlroots gives the option to request a specific version.
+    // Some of these versions may be out of date with what wlroots implements.
+    // This is not a problem in practice though as long as river successfully compiles.
+    // These versions control Zig code generation and have no effect on anything internal
+    // to wlroots. Therefore, the only thnig that can happen due to a version being too
+    // old is that river fails to compile.
     scanner.generate("wl_compositor", 4);
     scanner.generate("wl_subcompositor", 1);
     scanner.generate("wl_shm", 1);
