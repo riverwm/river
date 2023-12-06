@@ -185,6 +185,8 @@ pub fn sendInputMethodState(self: *Self, wlr_text_input: *wlr.TextInputV3) void 
 
 /// Update the current focused surface. Surface must belong to the same seat.
 pub fn setSurfaceFocus(self: *Self, wlr_surface: ?*wlr.Surface) void {
+    var new_text_input: ?*TextInput = null;
+
     var it = self.text_inputs.first;
     while (it) |node| : (it = node.next) {
         const text_input = &node.data;
@@ -203,14 +205,19 @@ pub fn setSurfaceFocus(self: *Self, wlr_surface: ?*wlr.Surface) void {
                 continue;
             }
         }
+
         if (wlr_surface) |surface| {
             if (text_input.wlr_text_input.resource.getClient() == surface.resource.getClient()) {
-                if (self.input_method != null) {
-                    text_input.wlr_text_input.sendEnter(surface);
-                } else {
-                    text_input.setPendingFocusedSurface(surface);
-                }
+                new_text_input = text_input;
             }
+        }
+    }
+
+    if (new_text_input) |text_input| {
+        if (self.input_method != null) {
+            text_input.wlr_text_input.sendEnter(wlr_surface.?);
+        } else {
+            text_input.setPendingFocusedSurface(wlr_surface.?);
         }
     }
 }
