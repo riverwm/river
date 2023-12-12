@@ -17,11 +17,14 @@
 const std = @import("std");
 const mem = std.mem;
 
+const flags = @import("flags");
+
 const server = &@import("../main.zig").server;
 const util = @import("../util.zig");
 
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
+const View = @import("../View.zig");
 
 /// Switch focus to the passed tags.
 pub fn setFocusedTags(
@@ -65,16 +68,53 @@ pub fn setViewTags(
 pub fn toggleFocusedTags(
     seat: *Seat,
     args: []const [:0]const u8,
-    out: *?[]const u8,
+    _: *?[]const u8,
 ) Error!void {
-    const tags = try parseTags(args, out);
+    const result = flags.parser([:0]const u8, &.{
+        .{ .name = "select", .kind = .boolean },
+    }).parse(args[1..]) catch {
+        return Error.InvalidValue;
+    };
+
+    if (result.args.len < 1) return Error.NotEnoughArguments;
+    if (result.args.len > 1) return Error.TooManyArguments;
+
+    const tags = try std.fmt.parseInt(u32, result.args[0], 10);
+
     const output = seat.focused_output orelse return;
+
     const new_focused_tags = output.pending.tags ^ tags;
     if (new_focused_tags != 0) {
         output.previous_tags = output.pending.tags;
         output.pending.tags = new_focused_tags;
+
+        if (result.flags.select) {
+            const new_added_tags = new_focused_tags & tags;
+            if (new_added_tags != 0) {
+                if (try getFirstViewWithTags(seat, new_added_tags)) |view| {
+                    seat.focus(view);
+                }
+            }
+        }
+
         server.root.applyPending();
     }
+}
+
+fn getFirstViewWithTags(seat: *Seat, tags: u32) !?*View {
+    if (seat.focused != .view) return null;
+    if (seat.focused.view.pending.fullscreen) return null;
+    const output = seat.focused_output orelse return null;
+
+    var it = output.pending.wm_stack.iterator(.forward);
+
+    while (it.next()) |view| {
+        if (view.pending.tags & tags != 0) {
+            return view;
+        }
+    }
+
+    return null;
 }
 
 /// Toggle the passed tags of the focused view
