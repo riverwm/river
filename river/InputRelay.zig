@@ -60,9 +60,10 @@ fn handleInputMethodCommit(
     input_method: *wlr.InputMethodV2,
 ) void {
     const self = @fieldParentPtr(Self, "input_method_commit", listener);
-    const text_input = self.getFocusedTextInput() orelse return;
-
     assert(input_method == self.input_method);
+
+    if (!input_method.client_active) return;
+    const text_input = self.getFocusedTextInput() orelse return;
 
     if (input_method.current.preedit.text) |preedit_text| {
         text_input.wlr_text_input.sendPreeditString(
@@ -159,6 +160,7 @@ pub fn sendInputMethodState(self: *Self, wlr_text_input: *wlr.TextInputV3) void 
     const input_method = self.input_method orelse return;
 
     // TODO: only send each of those if they were modified
+    // after activation, all supported features must be sent
 
     if (wlr_text_input.active_features.surrounding_text) {
         if (wlr_text_input.current.surrounding.text) |text| {
@@ -201,7 +203,7 @@ pub fn setSurfaceFocus(self: *Self, wlr_surface: ?*wlr.Surface) void {
                 text_input.relay.disableTextInput(text_input);
                 text_input.wlr_text_input.sendLeave();
             } else {
-                log.debug("IM relay setSurfaceFocus already focused", .{});
+                log.debug("input relay setSurfaceFocus already focused", .{});
                 continue;
             }
         }

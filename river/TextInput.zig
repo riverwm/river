@@ -70,6 +70,8 @@ fn handleEnable(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) v
         return;
     }
 
+    // must send surrounding_text if supported
+    // must send content_type if supported
     self.relay.sendInputMethodState(self.wlr_text_input);
 }
 
