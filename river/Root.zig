@@ -102,6 +102,10 @@ power_manager: *wlr.OutputPowerManagerV1,
 power_manager_set_mode: wl.Listener(*wlr.OutputPowerManagerV1.event.SetMode) =
     wl.Listener(*wlr.OutputPowerManagerV1.event.SetMode).init(handlePowerManagerSetMode),
 
+gamma_control_manager: *wlr.GammaControlManagerV1,
+gamma_control_set_gamma: wl.Listener(*wlr.GammaControlManagerV1.event.SetGamma) =
+    wl.Listener(*wlr.GammaControlManagerV1.event.SetGamma).init(handleSetGamma),
+
 /// A list of all outputs
 all_outputs: wl.list.Head(Output, .all_link),
 
@@ -177,6 +181,7 @@ pub fn init(self: *Self) !void {
         .active_outputs = undefined,
         .output_manager = try wlr.OutputManagerV1.create(server.wl_server),
         .power_manager = try wlr.OutputPowerManagerV1.create(server.wl_server),
+        .gamma_control_manager = try wlr.GammaControlManagerV1.create(server.wl_server),
         .transaction_timeout = transaction_timeout,
     };
     self.hidden.pending.focus_stack.init();
@@ -198,6 +203,7 @@ pub fn init(self: *Self) !void {
     self.output_manager.events.@"test".add(&self.manager_test);
     self.output_layout.events.change.add(&self.layout_change);
     self.power_manager.events.set_mode.add(&self.power_manager_set_mode);
+    self.gamma_control_manager.events.set_gamma.add(&self.gamma_control_set_gamma);
 }
 
 pub fn deinit(self: *Self) void {
@@ -845,4 +851,16 @@ fn handlePowerManagerSetMode(
     event.output.commit() catch {
         std.log.scoped(.server).err("output commit failed for {s}", .{event.output.name});
     };
+}
+
+fn handleSetGamma(
+    _: *wl.Listener(*wlr.GammaControlManagerV1.event.SetGamma),
+    event: *wlr.GammaControlManagerV1.event.SetGamma,
+) void {
+    const output: *Output = @ptrFromInt(event.output.data);
+
+    std.log.debug("client requested to set gamma", .{});
+
+    output.gamma_dirty = true;
+    output.wlr_output.scheduleFrame();
 }

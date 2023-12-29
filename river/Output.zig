@@ -101,6 +101,10 @@ lock_render_state: enum {
     lock_surface,
 } = .blanked,
 
+/// Set to true if a gamma control client makes a set gamma request.
+/// This request is handled while rendering the next frame in handleFrame().
+gamma_dirty: bool = false,
+
 /// The state of the output that is directly acted upon/modified through user input.
 ///
 /// Pending state will be copied to the inflight state and communicated to clients
@@ -476,43 +480,69 @@ fn handleFrame(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
     const output = @fieldParentPtr(Self, "frame", listener);
     const scene_output = server.root.scene.getSceneOutput(output.wlr_output).?;
 
-    if (scene_output.commit(null)) {
-        if (server.lock_manager.state == .locked or
-            (server.lock_manager.state == .waiting_for_lock_surfaces and output.locked_content.node.enabled) or
-            server.lock_manager.state == .waiting_for_blank)
-        {
-            assert(!output.normal_content.node.enabled);
-            assert(output.locked_content.node.enabled);
-
-            switch (server.lock_manager.state) {
-                .unlocked => unreachable,
-                .locked => switch (output.lock_render_state) {
-                    .pending_unlock, .unlocked, .pending_blank, .pending_lock_surface => unreachable,
-                    .blanked, .lock_surface => {},
-                },
-                .waiting_for_blank => {
-                    if (output.lock_render_state != .blanked) {
-                        output.lock_render_state = .pending_blank;
-                    }
-                },
-                .waiting_for_lock_surfaces => {
-                    if (output.lock_render_state != .lock_surface) {
-                        output.lock_render_state = .pending_lock_surface;
-                    }
-                },
-            }
-        } else {
-            if (output.lock_render_state != .unlocked) {
-                output.lock_render_state = .pending_unlock;
-            }
-        }
-    } else {
-        log.err("output commit failed for {s}", .{output.wlr_output.name});
-    }
+    // TODO this should probably be retried on failure
+    output.renderAndCommit(scene_output) catch |err| switch (err) {
+        error.OutOfMemory => log.err("out of memory", .{}),
+        error.CommitFailed => log.err("output commit failed for {s}", .{output.wlr_output.name}),
+    };
 
     var now: std.os.timespec = undefined;
     std.os.clock_gettime(std.os.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
     scene_output.sendFrameDone(&now);
+}
+
+fn renderAndCommit(output: *Self, scene_output: *wlr.SceneOutput) !void {
+    if (output.gamma_dirty) {
+        var state = wlr.Output.State.init();
+        defer state.finish();
+
+        if (server.root.gamma_control_manager.getControl(output.wlr_output)) |control| {
+            log.info("applying gamma settings from client", .{});
+            if (!control.apply(&state)) return error.OutOfMemory;
+        } else {
+            log.info("clearing gamma settings from client", .{});
+            state.clearGammaLut();
+        }
+
+        if (!scene_output.buildState(&state, null)) return error.CommitFailed;
+
+        if (!output.wlr_output.commitState(&state)) return error.CommitFailed;
+
+        scene_output.damage_ring.rotate();
+        output.gamma_dirty = false;
+    } else {
+        if (!scene_output.commit(null)) return error.CommitFailed;
+    }
+
+    if (server.lock_manager.state == .locked or
+        (server.lock_manager.state == .waiting_for_lock_surfaces and output.locked_content.node.enabled) or
+        server.lock_manager.state == .waiting_for_blank)
+    {
+        assert(!output.normal_content.node.enabled);
+        assert(output.locked_content.node.enabled);
+
+        switch (server.lock_manager.state) {
+            .unlocked => unreachable,
+            .locked => switch (output.lock_render_state) {
+                .pending_unlock, .unlocked, .pending_blank, .pending_lock_surface => unreachable,
+                .blanked, .lock_surface => {},
+            },
+            .waiting_for_blank => {
+                if (output.lock_render_state != .blanked) {
+                    output.lock_render_state = .pending_blank;
+                }
+            },
+            .waiting_for_lock_surfaces => {
+                if (output.lock_render_state != .lock_surface) {
+                    output.lock_render_state = .pending_lock_surface;
+                }
+            },
+        }
+    } else {
+        if (output.lock_render_state != .unlocked) {
+            output.lock_render_state = .pending_unlock;
+        }
+    }
 }
 
 fn handlePresent(

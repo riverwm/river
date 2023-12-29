@@ -142,7 +142,6 @@ pub fn init(self: *Self) !void {
     _ = try wlr.DataDeviceManager.create(self.wl_server);
     _ = try wlr.DataControlManagerV1.create(self.wl_server);
     _ = try wlr.ExportDmabufManagerV1.create(self.wl_server);
-    _ = try wlr.GammaControlManagerV1.create(self.wl_server);
     _ = try wlr.ScreencopyManagerV1.create(self.wl_server);
     _ = try wlr.SinglePixelBufferManagerV1.create(self.wl_server);
     _ = try wlr.Viewporter.create(self.wl_server);
