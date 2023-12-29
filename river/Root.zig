@@ -264,8 +264,8 @@ fn handleNewOutput(_: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
     };
 }
 
-/// Remove the output from root.active_outputs and evacuate views if it is a
-/// member of the list.
+/// Remove the output from root.active_outputs and the output layout.
+/// Evacuate views if necessary.
 pub fn deactivateOutput(root: *Self, output: *Output) void {
     {
         // If the output has already been removed, do nothing
@@ -273,10 +273,13 @@ pub fn deactivateOutput(root: *Self, output: *Output) void {
         while (it.next()) |o| {
             if (o == output) break;
         } else return;
-
-        output.active_link.remove();
-        output.active_link.init();
     }
+
+    root.output_layout.remove(output.wlr_output);
+    output.tree.node.setEnabled(false);
+
+    output.active_link.remove();
+    output.active_link.init();
 
     {
         var it = output.inflight.focus_stack.iterator(.forward);
@@ -391,8 +394,6 @@ pub fn activateOutput(root: *Self, output: *Output) void {
     }
     assert(root.fallback.pending.focus_stack.empty());
     assert(root.fallback.pending.wm_stack.empty());
-
-    root.applyPending();
 }
 
 /// Trigger asynchronous application of pending state for all outputs and views.
@@ -774,33 +775,18 @@ fn processOutputConfig(
                 if (!wlr_output.testState(&proposed_state)) success = false;
             },
             .apply => {
-                if (wlr_output.commitState(&proposed_state)) {
-                    if (head.state.enabled) {
-                        // Just updates the output's position if it is already in the layout
-                        _ = self.output_layout.add(output.wlr_output, head.state.x, head.state.y) catch {
-                            std.log.err("out of memory", .{});
-                            success = false;
-                            continue;
-                        };
-                        output.tree.node.setEnabled(true);
-                        output.tree.node.setPosition(head.state.x, head.state.y);
-                        output.scene_output.setPosition(head.state.x, head.state.y);
-                        // Even though we call this in the output's handler for the mode event
-                        // it is necessary to call it here as well since changing e.g. only
-                        // the transform will require the dimensions of the background to be
-                        // updated but will not trigger a mode event.
-                        output.updateBackgroundRect();
-                        output.arrangeLayers();
-                    } else {
-                        self.deactivateOutput(output);
-                        self.output_layout.remove(output.wlr_output);
-                        output.tree.node.setEnabled(false);
-                    }
-                } else {
+                output.applyState(&proposed_state) catch {
                     std.log.scoped(.output_manager).err("failed to apply config to output {s}", .{
                         output.wlr_output.name,
                     });
                     success = false;
+                };
+                if (output.wlr_output.enabled) {
+                    // applyState() will always add the output to the layout on success, which means
+                    // that this function cannot fail as it does not need to allocate a new layout output.
+                    _ = self.output_layout.add(output.wlr_output, head.state.x, head.state.y) catch unreachable;
+                    output.tree.node.setPosition(head.state.x, head.state.y);
+                    output.scene_output.setPosition(head.state.x, head.state.y);
                 }
             },
         }
