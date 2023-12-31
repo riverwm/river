@@ -196,10 +196,8 @@ fn handleNewInputMethod(
 
     log.debug("new input method on seat {s}", .{relay.seat.wlr_seat.name});
 
-    const text_input = relay.getFocusableTextInput() orelse return;
-    if (text_input.pending_focused_surface) |surface| {
-        text_input.wlr_text_input.sendEnter(surface);
-        text_input.setPendingFocusedSurface(null);
+    if (seat.focused.surface()) |surface| {
+        relay.setSurfaceFocus(surface);
     }
 }
 

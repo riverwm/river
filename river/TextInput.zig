@@ -32,10 +32,6 @@ const log = std.log.scoped(.text_input);
 relay: *InputRelay,
 wlr_text_input: *wlr.TextInputV3,
 
-/// Surface stored for when text-input can't receive an enter event immediately
-/// after getting focus. Cleared once text-input receive the enter event.
-pending_focused_surface: ?*wlr.Surface = null,
-
 enable: wl.Listener(*wlr.TextInputV3) =
     wl.Listener(*wlr.TextInputV3).init(handleEnable),
 commit: wl.Listener(*wlr.TextInputV3) =
@@ -44,9 +40,6 @@ disable: wl.Listener(*wlr.TextInputV3) =
     wl.Listener(*wlr.TextInputV3).init(handleDisable),
 destroy: wl.Listener(*wlr.TextInputV3) =
     wl.Listener(*wlr.TextInputV3).init(handleDestroy),
-
-pending_focused_surface_destroy: wl.Listener(*wlr.Surface) =
-    wl.Listener(*wlr.Surface).init(handlePendingFocusedSurfaceDestroy),
 
 pub fn init(self: *Self, relay: *InputRelay, wlr_text_input: *wlr.TextInputV3) void {
     self.* = .{
@@ -104,8 +97,6 @@ fn handleDestroy(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) 
 
     if (self.wlr_text_input.current_enabled) self.relay.disableTextInput(self);
 
-    node.data.setPendingFocusedSurface(null);
-
     self.enable.link.remove();
     self.commit.link.remove();
     self.disable.link.remove();
@@ -113,19 +104,4 @@ fn handleDestroy(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) 
 
     self.relay.text_inputs.remove(node);
     util.gpa.destroy(node);
-}
-
-fn handlePendingFocusedSurfaceDestroy(listener: *wl.Listener(*wlr.Surface), surface: *wlr.Surface) void {
-    const self = @fieldParentPtr(Self, "pending_focused_surface_destroy", listener);
-    assert(self.pending_focused_surface == surface);
-    self.pending_focused_surface = null;
-    self.pending_focused_surface_destroy.link.remove();
-}
-
-pub fn setPendingFocusedSurface(self: *Self, wlr_surface: ?*wlr.Surface) void {
-    if (self.pending_focused_surface != null) self.pending_focused_surface_destroy.link.remove();
-    self.pending_focused_surface = wlr_surface;
-    if (self.pending_focused_surface) |surface| {
-        surface.events.destroy.add(&self.pending_focused_surface_destroy);
-    }
 }

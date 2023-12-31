@@ -53,6 +53,16 @@ pub const FocusTarget = union(enum) {
     layer: *LayerSurface,
     lock_surface: *LockSurface,
     none: void,
+
+    pub fn surface(target: FocusTarget) ?*wlr.Surface {
+        return switch (target) {
+            .view => |view| view.rootSurface(),
+            .xwayland_override_redirect => |xwayland_or| xwayland_or.xwayland_surface.surface,
+            .layer => |layer| layer.wlr_layer_surface.surface,
+            .lock_surface => |lock_surface| lock_surface.wlr_lock_surface.surface,
+            .none => null,
+        };
+    }
 };
 
 wlr_seat: *wlr.Seat,
@@ -216,14 +226,7 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
     // If the target is already focused, do nothing
     if (std.meta.eql(new_focus, self.focused)) return;
 
-    // Obtain the target surface
-    const target_surface = switch (new_focus) {
-        .view => |target_view| target_view.rootSurface(),
-        .xwayland_override_redirect => |target_or| target_or.xwayland_surface.surface,
-        .layer => |target_layer| target_layer.wlr_layer_surface.surface,
-        .lock_surface => |lock_surface| lock_surface.wlr_lock_surface.surface,
-        .none => null,
-    };
+    const target_surface = new_focus.surface();
 
     // First clear the current focus
     switch (self.focused) {

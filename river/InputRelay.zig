@@ -102,11 +102,9 @@ fn handleInputMethodDestroy(
 
     self.input_method = null;
 
-    const text_input = self.getFocusedTextInput() orelse return;
-    if (text_input.wlr_text_input.focused_surface) |surface| {
-        text_input.setPendingFocusedSurface(surface);
+    if (self.getFocusedTextInput()) |text_input| {
+        text_input.wlr_text_input.sendLeave();
     }
-    text_input.wlr_text_input.sendLeave();
 }
 
 fn handleInputMethodGrabKeyboard(
@@ -131,14 +129,6 @@ fn handleInputMethodGrabKeyboardDestroy(
     if (keyboard_grab.keyboard) |keyboard| {
         keyboard_grab.input_method.seat.keyboardNotifyModifiers(&keyboard.modifiers);
     }
-}
-
-pub fn getFocusableTextInput(self: *Self) ?*TextInput {
-    var it = self.text_inputs.first;
-    return while (it) |node| : (it = node.next) {
-        const text_input = &node.data;
-        if (text_input.pending_focused_surface != null) break text_input;
-    } else null;
 }
 
 pub fn getFocusedTextInput(self: *Self) ?*TextInput {
@@ -194,13 +184,7 @@ pub fn setSurfaceFocus(self: *Self, wlr_surface: ?*wlr.Surface) void {
     var it = self.text_inputs.first;
     while (it) |node| : (it = node.next) {
         const text_input = &node.data;
-        if (text_input.pending_focused_surface) |surface| {
-            assert(text_input.wlr_text_input.focused_surface == null);
-            if (wlr_surface != surface) {
-                text_input.setPendingFocusedSurface(null);
-            }
-        } else if (text_input.wlr_text_input.focused_surface) |surface| {
-            assert(text_input.pending_focused_surface == null);
+        if (text_input.wlr_text_input.focused_surface) |surface| {
             if (wlr_surface != surface) {
                 text_input.relay.disableTextInput(text_input);
                 text_input.wlr_text_input.sendLeave();
@@ -221,8 +205,6 @@ pub fn setSurfaceFocus(self: *Self, wlr_surface: ?*wlr.Surface) void {
     if (new_text_input) |text_input| {
         if (self.input_method != null) {
             text_input.wlr_text_input.sendEnter(wlr_surface.?);
-        } else {
-            text_input.setPendingFocusedSurface(wlr_surface.?);
         }
     }
 }
