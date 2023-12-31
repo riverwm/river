@@ -197,7 +197,7 @@ fn handleNewInputMethod(
     log.debug("new input method on seat {s}", .{relay.seat.wlr_seat.name});
 
     if (seat.focused.surface()) |surface| {
-        relay.setSurfaceFocus(surface);
+        relay.focus(surface);
     }
 }
 

@@ -268,7 +268,7 @@ pub fn setFocusRaw(self: *Self, new_focus: FocusTarget) void {
     }
 
     self.keyboardEnterOrLeave(target_surface);
-    self.relay.setSurfaceFocus(target_surface);
+    self.relay.focus(target_surface);
 
     if (target_surface) |surface| {
         const pointer_constraints = server.input_manager.pointer_constraints;

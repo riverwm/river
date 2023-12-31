@@ -56,46 +56,47 @@ pub fn init(self: *Self, relay: *InputRelay, wlr_text_input: *wlr.TextInputV3) v
 fn handleEnable(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) void {
     const self = @fieldParentPtr(Self, "enable", listener);
 
-    if (self.relay.input_method) |im| {
-        im.sendActivate();
-    } else {
-        log.debug("enabling text input but input method is gone", .{});
+    if (self.relay.text_input != null) {
+        log.err("client requested to enable more than one text input on a single seat, ignoring request", .{});
         return;
     }
 
-    // must send surrounding_text if supported
-    // must send content_type if supported
-    self.relay.sendInputMethodState(self.wlr_text_input);
+    self.relay.text_input = self;
+
+    if (self.relay.input_method) |input_method| {
+        input_method.sendActivate();
+        self.relay.sendInputMethodState();
+    }
 }
 
 fn handleCommit(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) void {
     const self = @fieldParentPtr(Self, "commit", listener);
-    if (!self.wlr_text_input.current_enabled) {
-        log.debug("inactive text input tried to commit an update", .{});
+
+    if (self.relay.text_input != self) {
+        log.err("inactive text input tried to commit an update, client bug?", .{});
         return;
     }
-    log.debug("text input committed update", .{});
-    if (self.relay.input_method == null) {
-        log.debug("committed text input but input method is gone", .{});
-        return;
+
+    if (self.relay.input_method != null) {
+        self.relay.sendInputMethodState();
     }
-    self.relay.sendInputMethodState(self.wlr_text_input);
 }
 
 fn handleDisable(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) void {
     const self = @fieldParentPtr(Self, "disable", listener);
-    if (self.wlr_text_input.focused_surface == null) {
-        log.debug("disabling text input, but no longer focused", .{});
-        return;
+
+    if (self.relay.text_input == self) {
+        self.relay.disableTextInput();
     }
-    self.relay.disableTextInput(self);
 }
 
 fn handleDestroy(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
     const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
 
-    if (self.wlr_text_input.current_enabled) self.relay.disableTextInput(self);
+    if (self.relay.text_input == self) {
+        self.relay.disableTextInput();
+    }
 
     self.enable.link.remove();
     self.commit.link.remove();

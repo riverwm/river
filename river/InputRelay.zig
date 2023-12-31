@@ -40,6 +40,8 @@ seat: *Seat,
 text_inputs: std.TailQueue(TextInput) = .{},
 
 input_method: ?*wlr.InputMethodV2 = null,
+/// The currently enabled text input for the currently focused surface.
+text_input: ?*TextInput = null,
 
 input_method_commit: wl.Listener(*wlr.InputMethodV2) =
     wl.Listener(*wlr.InputMethodV2).init(handleInputMethodCommit),
@@ -63,7 +65,7 @@ fn handleInputMethodCommit(
     assert(input_method == self.input_method);
 
     if (!input_method.client_active) return;
-    const text_input = self.getFocusedTextInput() orelse return;
+    const text_input = self.text_input orelse return;
 
     if (input_method.current.preedit.text) |preedit_text| {
         text_input.wlr_text_input.sendPreeditString(
@@ -102,9 +104,7 @@ fn handleInputMethodDestroy(
 
     self.input_method = null;
 
-    if (self.getFocusedTextInput()) |text_input| {
-        text_input.wlr_text_input.sendLeave();
-    }
+    self.focus(null);
 }
 
 fn handleInputMethodGrabKeyboard(
@@ -131,30 +131,23 @@ fn handleInputMethodGrabKeyboardDestroy(
     }
 }
 
-pub fn getFocusedTextInput(self: *Self) ?*TextInput {
-    var it = self.text_inputs.first;
-    return while (it) |node| : (it = node.next) {
-        const text_input = &node.data;
-        if (text_input.wlr_text_input.focused_surface != null) break text_input;
-    } else null;
-}
+pub fn disableTextInput(self: *Self) void {
+    assert(self.text_input != null);
 
-pub fn disableTextInput(self: *Self, text_input: *TextInput) void {
-    if (self.input_method) |im| {
-        im.sendDeactivate();
-    } else {
-        log.debug("disabling text input but input method is gone", .{});
-        return;
+    if (self.input_method) |input_method| {
+        input_method.sendDeactivate();
+        input_method.sendDone();
     }
 
-    self.sendInputMethodState(text_input.wlr_text_input);
+    self.text_input = null;
 }
 
-pub fn sendInputMethodState(self: *Self, wlr_text_input: *wlr.TextInputV3) void {
-    const input_method = self.input_method orelse return;
+pub fn sendInputMethodState(self: *Self) void {
+    const input_method = self.input_method.?;
+    const wlr_text_input = self.text_input.?.wlr_text_input;
 
-    // TODO: only send each of those if they were modified
-    // after activation, all supported features must be sent
+    // TODO Send these events only if something changed.
+    // On activation all events must be sent for all active features.
 
     if (wlr_text_input.active_features.surrounding_text) {
         if (wlr_text_input.current.surrounding.text) |text| {
@@ -178,33 +171,39 @@ pub fn sendInputMethodState(self: *Self, wlr_text_input: *wlr.TextInputV3) void 
     input_method.sendDone();
 }
 
-pub fn setSurfaceFocus(self: *Self, wlr_surface: ?*wlr.Surface) void {
-    var new_text_input: ?*TextInput = null;
+pub fn focus(self: *Self, new_focus: ?*wlr.Surface) void {
+    // Send leave events
+    {
+        var it = self.text_inputs.first;
+        while (it) |node| : (it = node.next) {
+            const text_input = &node.data;
 
-    var it = self.text_inputs.first;
-    while (it) |node| : (it = node.next) {
-        const text_input = &node.data;
-        if (text_input.wlr_text_input.focused_surface) |surface| {
-            if (wlr_surface != surface) {
-                text_input.relay.disableTextInput(text_input);
+            if (text_input.wlr_text_input.focused_surface) |surface| {
+                // This function should not be called unless focus changes
+                assert(surface != new_focus);
                 text_input.wlr_text_input.sendLeave();
-            } else {
-                log.debug("input relay setSurfaceFocus already focused", .{});
-                continue;
-            }
-        }
-
-        if (wlr_surface) |surface| {
-            if (text_input.wlr_text_input.resource.getClient() == surface.resource.getClient()) {
-                assert(new_text_input == null);
-                new_text_input = text_input;
             }
         }
     }
 
-    if (new_text_input) |text_input| {
+    // Clear currently enabled text input
+    if (self.text_input != null) {
+        self.disableTextInput();
+    }
+
+    // Send enter events if we have an input method.
+    // No text input for the new surface should be enabled yet as the client
+    // should wait until it receives an enter event.
+    if (new_focus) |surface| {
         if (self.input_method != null) {
-            text_input.wlr_text_input.sendEnter(wlr_surface.?);
+            var it = self.text_inputs.first;
+            while (it) |node| : (it = node.next) {
+                const text_input = &node.data;
+
+                if (text_input.wlr_text_input.resource.getClient() == surface.resource.getClient()) {
+                    text_input.wlr_text_input.sendEnter(surface);
+                }
+            }
         }
     }
 }
