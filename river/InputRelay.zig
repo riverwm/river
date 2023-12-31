@@ -94,8 +94,12 @@ fn handleInputMethodDestroy(
     input_method: *wlr.InputMethodV2,
 ) void {
     const self = @fieldParentPtr(Self, "input_method_destroy", listener);
-
     assert(input_method == self.input_method);
+
+    self.input_method_commit.link.remove();
+    self.grab_keyboard.link.remove();
+    self.input_method_destroy.link.remove();
+
     self.input_method = null;
 
     const text_input = self.getFocusedTextInput() orelse return;
@@ -182,10 +186,8 @@ pub fn sendInputMethodState(self: *Self, wlr_text_input: *wlr.TextInputV3) void 
     }
 
     input_method.sendDone();
-    // TODO: pass intent, display popup size
 }
 
-/// Update the current focused surface. Surface must belong to the same seat.
 pub fn setSurfaceFocus(self: *Self, wlr_surface: ?*wlr.Surface) void {
     var new_text_input: ?*TextInput = null;
 
@@ -210,6 +212,7 @@ pub fn setSurfaceFocus(self: *Self, wlr_surface: ?*wlr.Surface) void {
 
         if (wlr_surface) |surface| {
             if (text_input.wlr_text_input.resource.getClient() == surface.resource.getClient()) {
+                assert(new_text_input == null);
                 new_text_input = text_input;
             }
         }
