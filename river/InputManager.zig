@@ -173,48 +173,18 @@ fn handleNewConstraint(
     };
 }
 
-fn handleNewInputMethod(
-    _: *wl.Listener(*wlr.InputMethodV2),
-    input_method: *wlr.InputMethodV2,
-) void {
-    //const self = @fieldParentPtr(Self, "new_input_method", listener);
-    const seat = @as(*Seat, @ptrFromInt(input_method.seat.data));
-    const relay = &seat.relay;
+fn handleNewInputMethod(_: *wl.Listener(*wlr.InputMethodV2), input_method: *wlr.InputMethodV2) void {
+    const seat: *Seat = @ptrFromInt(input_method.seat.data);
 
-    // Only one input_method can be bound to a seat.
-    if (relay.input_method != null) {
-        log.debug("attempted to connect second input method to a seat", .{});
-        input_method.sendUnavailable();
-        return;
-    }
+    log.debug("new input method on seat {s}", .{seat.wlr_seat.name});
 
-    relay.input_method = input_method;
-
-    input_method.events.commit.add(&relay.input_method_commit);
-    input_method.events.grab_keyboard.add(&relay.grab_keyboard);
-    input_method.events.destroy.add(&relay.input_method_destroy);
-
-    log.debug("new input method on seat {s}", .{relay.seat.wlr_seat.name});
-
-    if (seat.focused.surface()) |surface| {
-        relay.focus(surface);
-    }
+    seat.relay.newInputMethod(input_method);
 }
 
-fn handleNewTextInput(
-    _: *wl.Listener(*wlr.TextInputV3),
-    wlr_text_input: *wlr.TextInputV3,
-) void {
-    //const self = @fieldParentPtr(Self, "new_text_input", listener);
-    const seat = @as(*Seat, @ptrFromInt(wlr_text_input.seat.data));
-    const relay = &seat.relay;
-
-    const text_input_node = util.gpa.create(std.TailQueue(TextInput).Node) catch {
+fn handleNewTextInput(_: *wl.Listener(*wlr.TextInputV3), wlr_text_input: *wlr.TextInputV3) void {
+    TextInput.create(wlr_text_input) catch {
+        log.err("out of memory", .{});
         wlr_text_input.resource.postNoMemory();
         return;
     };
-    text_input_node.data.init(relay, wlr_text_input);
-    relay.text_inputs.append(text_input_node);
-
-    log.debug("new text input on seat {s}", .{relay.seat.wlr_seat.name});
 }

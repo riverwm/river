@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const Self = @This();
+const InputRelay = @This();
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -30,17 +30,18 @@ const Seat = @import("Seat.zig");
 
 const log = std.log.scoped(.input_relay);
 
-/// The Relay structure manages the communication between text_inputs
-/// and input_method on a given seat.
-seat: *Seat,
+/// List of all text input objects for the seat.
+/// Multiple text input objects may be created per seat, even multiple from the same client.
+/// However, only one text input per seat may be enabled at a time.
+text_inputs: wl.list.Head(TextInput, .link),
 
-/// List of all TextInput bound to the relay.
-/// Multiple wlr_text_input interfaces can be bound to a relay,
-/// but only one at a time can receive events.
-text_inputs: std.TailQueue(TextInput) = .{},
-
+/// The input method currently in use for this seat.
+/// Only one input method per seat may be used at a time and if one is
+/// already in use new input methods are ignored.
+/// If this is null, no text input enter events will be sent.
 input_method: ?*wlr.InputMethodV2 = null,
 /// The currently enabled text input for the currently focused surface.
+/// Always null if there is no input method.
 text_input: ?*TextInput = null,
 
 input_method_commit: wl.Listener(*wlr.InputMethodV2) =
@@ -53,19 +54,44 @@ input_method_destroy: wl.Listener(*wlr.InputMethodV2) =
 grab_keyboard_destroy: wl.Listener(*wlr.InputMethodV2.KeyboardGrab) =
     wl.Listener(*wlr.InputMethodV2.KeyboardGrab).init(handleInputMethodGrabKeyboardDestroy),
 
-pub fn init(self: *Self, seat: *Seat) void {
-    self.* = .{ .seat = seat };
+pub fn init(relay: *InputRelay) void {
+    relay.* = .{ .text_inputs = undefined };
+
+    relay.text_inputs.init();
+}
+
+pub fn newInputMethod(relay: *InputRelay, input_method: *wlr.InputMethodV2) void {
+    const seat = @fieldParentPtr(Seat, "relay", relay);
+
+    log.debug("new input method on seat {s}", .{seat.wlr_seat.name});
+
+    // Only one input_method can be bound to a seat.
+    if (relay.input_method != null) {
+        log.info("seat {s} already has an input method", .{seat.wlr_seat.name});
+        input_method.sendUnavailable();
+        return;
+    }
+
+    relay.input_method = input_method;
+
+    input_method.events.commit.add(&relay.input_method_commit);
+    input_method.events.grab_keyboard.add(&relay.grab_keyboard);
+    input_method.events.destroy.add(&relay.input_method_destroy);
+
+    if (seat.focused.surface()) |surface| {
+        relay.focus(surface);
+    }
 }
 
 fn handleInputMethodCommit(
     listener: *wl.Listener(*wlr.InputMethodV2),
     input_method: *wlr.InputMethodV2,
 ) void {
-    const self = @fieldParentPtr(Self, "input_method_commit", listener);
-    assert(input_method == self.input_method);
+    const relay = @fieldParentPtr(InputRelay, "input_method_commit", listener);
+    assert(input_method == relay.input_method);
 
     if (!input_method.client_active) return;
-    const text_input = self.text_input orelse return;
+    const text_input = relay.text_input orelse return;
 
     if (input_method.current.preedit.text) |preedit_text| {
         text_input.wlr_text_input.sendPreeditString(
@@ -95,56 +121,59 @@ fn handleInputMethodDestroy(
     listener: *wl.Listener(*wlr.InputMethodV2),
     input_method: *wlr.InputMethodV2,
 ) void {
-    const self = @fieldParentPtr(Self, "input_method_destroy", listener);
-    assert(input_method == self.input_method);
+    const relay = @fieldParentPtr(InputRelay, "input_method_destroy", listener);
+    assert(input_method == relay.input_method);
 
-    self.input_method_commit.link.remove();
-    self.grab_keyboard.link.remove();
-    self.input_method_destroy.link.remove();
+    relay.input_method_commit.link.remove();
+    relay.grab_keyboard.link.remove();
+    relay.input_method_destroy.link.remove();
 
-    self.input_method = null;
+    relay.input_method = null;
 
-    self.focus(null);
+    relay.focus(null);
+
+    assert(relay.text_input == null);
 }
 
 fn handleInputMethodGrabKeyboard(
     listener: *wl.Listener(*wlr.InputMethodV2.KeyboardGrab),
     keyboard_grab: *wlr.InputMethodV2.KeyboardGrab,
 ) void {
-    const self = @fieldParentPtr(Self, "grab_keyboard", listener);
+    const relay = @fieldParentPtr(InputRelay, "grab_keyboard", listener);
+    const seat = @fieldParentPtr(Seat, "relay", relay);
 
-    const active_keyboard = self.seat.wlr_seat.getKeyboard();
+    const active_keyboard = seat.wlr_seat.getKeyboard();
     keyboard_grab.setKeyboard(active_keyboard);
 
-    keyboard_grab.events.destroy.add(&self.grab_keyboard_destroy);
+    keyboard_grab.events.destroy.add(&relay.grab_keyboard_destroy);
 }
 
 fn handleInputMethodGrabKeyboardDestroy(
     listener: *wl.Listener(*wlr.InputMethodV2.KeyboardGrab),
     keyboard_grab: *wlr.InputMethodV2.KeyboardGrab,
 ) void {
-    const self = @fieldParentPtr(Self, "grab_keyboard_destroy", listener);
-    self.grab_keyboard_destroy.link.remove();
+    const relay = @fieldParentPtr(InputRelay, "grab_keyboard_destroy", listener);
+    relay.grab_keyboard_destroy.link.remove();
 
     if (keyboard_grab.keyboard) |keyboard| {
         keyboard_grab.input_method.seat.keyboardNotifyModifiers(&keyboard.modifiers);
     }
 }
 
-pub fn disableTextInput(self: *Self) void {
-    assert(self.text_input != null);
+pub fn disableTextInput(relay: *InputRelay) void {
+    assert(relay.text_input != null);
 
-    if (self.input_method) |input_method| {
+    if (relay.input_method) |input_method| {
         input_method.sendDeactivate();
         input_method.sendDone();
     }
 
-    self.text_input = null;
+    relay.text_input = null;
 }
 
-pub fn sendInputMethodState(self: *Self) void {
-    const input_method = self.input_method.?;
-    const wlr_text_input = self.text_input.?.wlr_text_input;
+pub fn sendInputMethodState(relay: *InputRelay) void {
+    const input_method = relay.input_method.?;
+    const wlr_text_input = relay.text_input.?.wlr_text_input;
 
     // TODO Send these events only if something changed.
     // On activation all events must be sent for all active features.
@@ -171,13 +200,11 @@ pub fn sendInputMethodState(self: *Self) void {
     input_method.sendDone();
 }
 
-pub fn focus(self: *Self, new_focus: ?*wlr.Surface) void {
+pub fn focus(relay: *InputRelay, new_focus: ?*wlr.Surface) void {
     // Send leave events
     {
-        var it = self.text_inputs.first;
-        while (it) |node| : (it = node.next) {
-            const text_input = &node.data;
-
+        var it = relay.text_inputs.iterator(.forward);
+        while (it.next()) |text_input| {
             if (text_input.wlr_text_input.focused_surface) |surface| {
                 // This function should not be called unless focus changes
                 assert(surface != new_focus);
@@ -187,19 +214,17 @@ pub fn focus(self: *Self, new_focus: ?*wlr.Surface) void {
     }
 
     // Clear currently enabled text input
-    if (self.text_input != null) {
-        self.disableTextInput();
+    if (relay.text_input != null) {
+        relay.disableTextInput();
     }
 
     // Send enter events if we have an input method.
     // No text input for the new surface should be enabled yet as the client
     // should wait until it receives an enter event.
     if (new_focus) |surface| {
-        if (self.input_method != null) {
-            var it = self.text_inputs.first;
-            while (it) |node| : (it = node.next) {
-                const text_input = &node.data;
-
+        if (relay.input_method != null) {
+            var it = relay.text_inputs.iterator(.forward);
+            while (it.next()) |text_input| {
                 if (text_input.wlr_text_input.resource.getClient() == surface.resource.getClient()) {
                     text_input.wlr_text_input.sendEnter(surface);
                 }

@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const Self = @This();
+const TextInput = @This();
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -29,7 +29,8 @@ const Seat = @import("Seat.zig");
 
 const log = std.log.scoped(.text_input);
 
-relay: *InputRelay,
+link: wl.list.Link,
+
 wlr_text_input: *wlr.TextInputV3,
 
 enable: wl.Listener(*wlr.TextInputV3) =
@@ -41,68 +42,79 @@ disable: wl.Listener(*wlr.TextInputV3) =
 destroy: wl.Listener(*wlr.TextInputV3) =
     wl.Listener(*wlr.TextInputV3).init(handleDestroy),
 
-pub fn init(self: *Self, relay: *InputRelay, wlr_text_input: *wlr.TextInputV3) void {
-    self.* = .{
-        .relay = relay,
+pub fn create(wlr_text_input: *wlr.TextInputV3) !void {
+    const seat: *Seat = @ptrFromInt(wlr_text_input.seat.data);
+
+    const text_input = try util.gpa.create(TextInput);
+
+    log.debug("new text input on seat {s}", .{seat.wlr_seat.name});
+
+    text_input.* = .{
+        .link = undefined,
         .wlr_text_input = wlr_text_input,
     };
 
-    wlr_text_input.events.enable.add(&self.enable);
-    wlr_text_input.events.commit.add(&self.commit);
-    wlr_text_input.events.disable.add(&self.disable);
-    wlr_text_input.events.destroy.add(&self.destroy);
+    seat.relay.text_inputs.append(text_input);
+
+    wlr_text_input.events.enable.add(&text_input.enable);
+    wlr_text_input.events.commit.add(&text_input.commit);
+    wlr_text_input.events.disable.add(&text_input.disable);
+    wlr_text_input.events.destroy.add(&text_input.destroy);
 }
 
 fn handleEnable(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) void {
-    const self = @fieldParentPtr(Self, "enable", listener);
+    const text_input = @fieldParentPtr(TextInput, "enable", listener);
+    const seat: *Seat = @ptrFromInt(text_input.wlr_text_input.seat.data);
 
-    if (self.relay.text_input != null) {
+    if (seat.relay.text_input != null) {
         log.err("client requested to enable more than one text input on a single seat, ignoring request", .{});
         return;
     }
 
-    self.relay.text_input = self;
+    seat.relay.text_input = text_input;
 
-    if (self.relay.input_method) |input_method| {
+    if (seat.relay.input_method) |input_method| {
         input_method.sendActivate();
-        self.relay.sendInputMethodState();
+        seat.relay.sendInputMethodState();
     }
 }
 
 fn handleCommit(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) void {
-    const self = @fieldParentPtr(Self, "commit", listener);
+    const text_input = @fieldParentPtr(TextInput, "commit", listener);
+    const seat: *Seat = @ptrFromInt(text_input.wlr_text_input.seat.data);
 
-    if (self.relay.text_input != self) {
+    if (seat.relay.text_input != text_input) {
         log.err("inactive text input tried to commit an update, client bug?", .{});
         return;
     }
 
-    if (self.relay.input_method != null) {
-        self.relay.sendInputMethodState();
+    if (seat.relay.input_method != null) {
+        seat.relay.sendInputMethodState();
     }
 }
 
 fn handleDisable(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) void {
-    const self = @fieldParentPtr(Self, "disable", listener);
+    const text_input = @fieldParentPtr(TextInput, "disable", listener);
+    const seat: *Seat = @ptrFromInt(text_input.wlr_text_input.seat.data);
 
-    if (self.relay.text_input == self) {
-        self.relay.disableTextInput();
+    if (seat.relay.text_input == text_input) {
+        seat.relay.disableTextInput();
     }
 }
 
 fn handleDestroy(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) void {
-    const self = @fieldParentPtr(Self, "destroy", listener);
-    const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
+    const text_input = @fieldParentPtr(TextInput, "destroy", listener);
+    const seat: *Seat = @ptrFromInt(text_input.wlr_text_input.seat.data);
 
-    if (self.relay.text_input == self) {
-        self.relay.disableTextInput();
+    if (seat.relay.text_input == text_input) {
+        seat.relay.disableTextInput();
     }
 
-    self.enable.link.remove();
-    self.commit.link.remove();
-    self.disable.link.remove();
-    self.destroy.link.remove();
+    text_input.enable.link.remove();
+    text_input.commit.link.remove();
+    text_input.disable.link.remove();
+    text_input.destroy.link.remove();
 
-    self.relay.text_inputs.remove(node);
-    util.gpa.destroy(node);
+    text_input.link.remove();
+    util.gpa.destroy(text_input);
 }

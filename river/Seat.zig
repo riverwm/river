@@ -68,7 +68,9 @@ pub const FocusTarget = union(enum) {
 wlr_seat: *wlr.Seat,
 
 /// Multiple mice are handled by the same Cursor
-cursor: Cursor = undefined,
+cursor: Cursor,
+/// Input Method handling
+relay: InputRelay,
 
 /// ID of the current keymap mode
 mode_id: u32 = 0,
@@ -99,9 +101,6 @@ drag: enum {
     touch,
 } = .none,
 
-/// Relay for communication between text_input and input_method.
-relay: InputRelay = undefined,
-
 request_set_selection: wl.Listener(*wlr.Seat.event.RequestSetSelection) =
     wl.Listener(*wlr.Seat.event.RequestSetSelection).init(handleRequestSetSelection),
 request_start_drag: wl.Listener(*wlr.Seat.event.RequestStartDrag) =
@@ -119,12 +118,14 @@ pub fn init(self: *Self, name: [*:0]const u8) !void {
     self.* = .{
         // This will be automatically destroyed when the display is destroyed
         .wlr_seat = try wlr.Seat.create(server.wl_server, name),
+        .cursor = undefined,
+        .relay = undefined,
         .mapping_repeat_timer = mapping_repeat_timer,
     };
     self.wlr_seat.data = @intFromPtr(self);
 
     try self.cursor.init(self);
-    self.relay.init(self);
+    self.relay.init();
 
     self.wlr_seat.events.request_set_selection.add(&self.request_set_selection);
     self.wlr_seat.events.request_start_drag.add(&self.request_start_drag);
