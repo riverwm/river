@@ -66,9 +66,14 @@ fn handleEnable(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) v
     const text_input = @fieldParentPtr(TextInput, "enable", listener);
     const seat: *Seat = @ptrFromInt(text_input.wlr_text_input.seat.data);
 
-    if (seat.relay.text_input != null) {
-        log.err("client requested to enable more than one text input on a single seat, ignoring request", .{});
-        return;
+    // The same text_input object may be enabled multiple times consecutively
+    // without first disabling it. Enabling a different text input object without
+    // first disabling the current one is disallowed by the protocol however.
+    if (seat.relay.text_input) |currently_enabled| {
+        if (text_input != currently_enabled) {
+            log.err("client requested to enable more than one text input on a single seat, ignoring request", .{});
+            return;
+        }
     }
 
     seat.relay.text_input = text_input;
