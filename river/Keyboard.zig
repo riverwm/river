@@ -102,38 +102,36 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
         }
     }
 
-    // Handle builtin mapping, only when keys are pressed
     for (keysyms) |sym| {
         if (!released and handleBuiltinMapping(sym)) return;
     }
 
-    // Handle user-defined mappings
-    const mapped = self.device.seat.hasMapping(keycode, modifiers, released, xkb_state);
-    if (mapped) {
+    // If we sent a pressed event to the client we should send the matching release event as well,
+    // even if the release event triggers a mapping or would otherwise be sent to an input method.
+    const sent_to_client = blk: {
+        if (released and !self.eaten_keycodes.remove(event.keycode)) {
+            const wlr_seat = self.device.seat.wlr_seat;
+            wlr_seat.setKeyboard(self.device.wlr_device.toKeyboard());
+            wlr_seat.keyboardNotifyKey(event.time_msec, event.keycode, event.state);
+            break :blk true;
+        } else {
+            break :blk false;
+        }
+    };
+
+    if (self.device.seat.hasMapping(keycode, modifiers, released, xkb_state)) {
         if (!released) self.eaten_keycodes.add(event.keycode);
 
         const handled = self.device.seat.handleMapping(keycode, modifiers, released, xkb_state);
         assert(handled);
-    }
+    } else if (self.getInputMethodGrab()) |keyboard_grab| {
+        if (!released) self.eaten_keycodes.add(event.keycode);
 
-    // Handle IM grab
-    const keyboard_grab = self.getInputMethodGrab();
-    const grabbed = !mapped and (keyboard_grab != null);
-    if (grabbed) ungrab: {
-        if (!released) {
-            self.eaten_keycodes.add(event.keycode);
-        } else if (!self.eaten_keycodes.present(event.keycode)) {
-            break :ungrab;
+        if (!sent_to_client) {
+            keyboard_grab.setKeyboard(keyboard_grab.keyboard);
+            keyboard_grab.sendKey(event.time_msec, event.keycode, event.state);
         }
-
-        keyboard_grab.?.setKeyboard(keyboard_grab.?.keyboard);
-        keyboard_grab.?.sendKey(event.time_msec, event.keycode, event.state);
-    }
-
-    const eaten = if (released) self.eaten_keycodes.remove(event.keycode) else (mapped or grabbed);
-
-    if (!eaten) {
-        // If key was not handled, we pass it along to the client.
+    } else if (!sent_to_client) {
         const wlr_seat = self.device.seat.wlr_seat;
         wlr_seat.setKeyboard(self.device.wlr_device.toKeyboard());
         wlr_seat.keyboardNotifyKey(event.time_msec, event.keycode, event.state);
@@ -179,15 +177,18 @@ fn handleBuiltinMapping(keysym: xkb.Keysym) bool {
 }
 
 /// Returns null if the keyboard is not grabbed by an input method,
-/// or if event is from virtual keyboard of the same client as grab.
+/// or if event is from a virtual keyboard of the same client as the grab.
 /// TODO: see https://gitlab.freedesktop.org/wlroots/wlroots/-/issues/2322
 fn getInputMethodGrab(self: Self) ?*wlr.InputMethodV2.KeyboardGrab {
-    const input_method = self.device.seat.relay.input_method;
-    const virtual_keyboard = self.device.wlr_device.getVirtualKeyboard();
-    if (input_method == null or input_method.?.keyboard_grab == null or
-        (virtual_keyboard != null and
-        virtual_keyboard.?.resource.getClient() == input_method.?.keyboard_grab.?.resource.getClient()))
-    {
-        return null;
-    } else return input_method.?.keyboard_grab;
+    if (self.device.seat.relay.input_method) |input_method| {
+        if (input_method.keyboard_grab) |keyboard_grab| {
+            if (self.device.wlr_device.getVirtualKeyboard()) |virtual_keyboard| {
+                if (virtual_keyboard.resource.getClient() == keyboard_grab.resource.getClient()) {
+                    return null;
+                }
+            }
+            return keyboard_grab;
+        }
+    }
+    return null;
 }
