@@ -36,7 +36,7 @@ tasks:
       cd ..
 
       cd wlroots
-      git checkout 0.17.0
+      git checkout 0.17.1
       meson setup build --auto-features=enabled -Drenderers=gles2 -Dexamples=false \
             -Dwerror=false -Db_ndebug=false --prefix /usr
       sudo ninja -C build/ install
