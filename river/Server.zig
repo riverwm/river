@@ -145,6 +145,7 @@ pub fn init(self: *Self) !void {
     _ = try wlr.ScreencopyManagerV1.create(self.wl_server);
     _ = try wlr.SinglePixelBufferManagerV1.create(self.wl_server);
     _ = try wlr.Viewporter.create(self.wl_server);
+    _ = try wlr.FractionalScaleManagerV1.create(self.wl_server, 1);
 }
 
 /// Free allocated memory and clean up. Note: order is important here
