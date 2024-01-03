@@ -289,7 +289,7 @@ fn handleRequestActivate(
 
     const node_data = SceneNodeData.fromSurface(event.surface) orelse return;
     switch (node_data.data) {
-        .view => |view| if (view.current.focus == 0) {
+        .view => |view| if (view.pending.focus == 0) {
             view.pending.urgent = true;
             server.root.applyPending();
         },
