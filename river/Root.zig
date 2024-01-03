@@ -129,6 +129,8 @@ pub fn init(self: *Self) !void {
     const scene = try wlr.Scene.create();
     errdefer scene.tree.node.destroy();
 
+    scene.setLinuxDmabufV1(server.linux_dmabuf);
+
     const interactive_content = try scene.tree.createSceneTree();
     const drag_icons = try scene.tree.createSceneTree();
     const hidden_tree = try scene.tree.createSceneTree();
