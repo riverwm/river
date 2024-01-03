@@ -1,6 +1,6 @@
 // This file is part of river, a dynamic tiling wayland compositor.
 //
-// Copyright 2020 The River Developers
+// Copyright 2020 - 2024 The River Developers
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -51,6 +51,16 @@ pub fn init(self: *Self, seat: *Seat, wlr_device: *wlr.InputDevice) !void {
 
     // wlroots will log a more detailed error if this fails.
     if (!wlr_keyboard.setKeymap(server.config.keymap)) return error.OutOfMemory;
+
+    // Add to keyboard group, if applicable.
+    var it = seat.keyboard_groups.first;
+    while (it) |node| : (it = node.next) {
+        if (node.data.identifiers.contains(self.device.identifier)) {
+            // wlroots will log an error if this fails explaining the reason.
+            _ = node.data.wlr_group.addKeyboard(wlr_keyboard);
+            break;
+        }
+    }
 
     wlr_keyboard.setRepeatInfo(server.config.repeat_rate, server.config.repeat_delay);
 
