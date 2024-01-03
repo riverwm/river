@@ -442,7 +442,8 @@ matches everything while _\*\*_ and the empty string are invalid.
 *keyboard-group-add* _group_name_ _input_device_name_
 	Add a keyboard to a keyboard group, identified by the keyboard's
 	input device name. Any currently connected and future keyboards with
-	the given name will be added to the group.
+	the given name will be added to the group. Simple globbing patterns are
+	supported, see the rules section for further information on globs.
 
 *keyboard-group-remove* _group_name_ _input_device_name_
 	Remove a keyboard from a keyboard group, identified by the keyboard's

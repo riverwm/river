@@ -17,6 +17,8 @@
 const std = @import("std");
 const mem = std.mem;
 
+const globber = @import("globber");
+
 const server = &@import("../main.zig").server;
 const util = @import("../util.zig");
 
@@ -69,6 +71,7 @@ pub fn keyboardGroupAdd(
         out.* = msg;
         return;
     };
+    try globber.validate(args[2]);
     try group.addIdentifier(args[2]);
 }
 

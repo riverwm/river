@@ -20,6 +20,7 @@ const std = @import("std");
 const assert = std.debug.assert;
 const mem = std.mem;
 
+const globber = @import("globber");
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 const xkb = @import("xkbcommon");
@@ -35,7 +36,7 @@ const Keyboard = @import("Keyboard.zig");
 seat: *Seat,
 wlr_group: *wlr.KeyboardGroup,
 name: []const u8,
-identifiers: std.StringHashMapUnmanaged(void) = .{},
+globs: std.ArrayListUnmanaged([]const u8) = .{},
 
 pub fn create(seat: *Seat, name: []const u8) !void {
     log.debug("new keyboard group: '{s}'", .{name});
@@ -63,11 +64,11 @@ pub fn destroy(group: *KeyboardGroup) void {
     log.debug("destroying keyboard group: '{s}'", .{group.name});
 
     util.gpa.free(group.name);
-    {
-        var it = group.identifiers.keyIterator();
-        while (it.next()) |id| util.gpa.free(id.*);
+
+    for (group.globs.items) |glob| {
+        util.gpa.free(glob);
     }
-    group.identifiers.deinit(util.gpa);
+    group.globs.deinit(util.gpa);
 
     group.wlr_group.destroy();
 
@@ -77,14 +78,23 @@ pub fn destroy(group: *KeyboardGroup) void {
 }
 
 pub fn addIdentifier(group: *KeyboardGroup, new_id: []const u8) !void {
-    if (group.identifiers.contains(new_id)) return;
+    for (group.globs.items) |glob| {
+        if (mem.eql(u8, glob, new_id)) return;
+    }
 
     log.debug("keyboard group '{s}' adding identifier: '{s}'", .{ group.name, new_id });
 
     const owned_id = try util.gpa.dupe(u8, new_id);
     errdefer util.gpa.free(owned_id);
 
-    try group.identifiers.put(util.gpa, owned_id, {});
+    // Glob is validated in the command handler.
+    try group.globs.append(util.gpa, owned_id);
+    errdefer {
+        // Not used now, but if at any point this function is modified to that
+        // it may return an error after the glob pattern is added to the list,
+        // the list will have a pointer to freed memory in its last position.
+        _ = group.globs.pop();
+    }
 
     // Add any existing matching keyboards to the group.
     var it = server.input_manager.devices.iterator(.forward);
@@ -92,7 +102,7 @@ pub fn addIdentifier(group: *KeyboardGroup, new_id: []const u8) !void {
         if (device.seat != group.seat) continue;
         if (device.wlr_device.type != .keyboard) continue;
 
-        if (mem.eql(u8, new_id, device.identifier)) {
+        if (globber.match(device.identifier, new_id)) {
             log.debug("found existing matching keyboard; adding to group", .{});
 
             if (!group.wlr_group.addKeyboard(device.wlr_device.toKeyboard())) {
@@ -108,8 +118,13 @@ pub fn addIdentifier(group: *KeyboardGroup, new_id: []const u8) !void {
 }
 
 pub fn removeIdentifier(group: *KeyboardGroup, id: []const u8) !void {
-    if (group.identifiers.fetchRemove(id)) |kv| {
-        util.gpa.free(kv.key);
+    for (group.globs.items, 0..) |glob, index| {
+        if (mem.eql(u8, glob, id)) {
+            _ = group.globs.orderedRemove(index);
+            break;
+        }
+    } else {
+        return;
     }
 
     var it = server.input_manager.devices.iterator(.forward);
@@ -117,7 +132,7 @@ pub fn removeIdentifier(group: *KeyboardGroup, id: []const u8) !void {
         if (device.seat != group.seat) continue;
         if (device.wlr_device.type != .keyboard) continue;
 
-        if (mem.eql(u8, device.identifier, id)) {
+        if (globber.match(device.identifier, id)) {
             const wlr_keyboard = device.wlr_device.toKeyboard();
             assert(wlr_keyboard.group == group.wlr_group);
             group.wlr_group.removeKeyboard(wlr_keyboard);
