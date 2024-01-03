@@ -94,7 +94,12 @@ pub fn init(self: *Self) !void {
 
     self.renderer = try wlr.Renderer.autocreate(self.backend);
     errdefer self.renderer.destroy();
-    try self.renderer.initServer(self.wl_server);
+
+    try self.renderer.initWlShm(self.wl_server);
+
+    if (self.renderer.getDmabufFormats() != null and self.renderer.getDrmFd() >= 0) {
+        _ = try wlr.LinuxDmabufV1.createWithRenderer(self.wl_server, 4, self.renderer);
+    }
 
     self.allocator = try wlr.Allocator.autocreate(self.backend, self.renderer);
     errdefer self.allocator.destroy();
