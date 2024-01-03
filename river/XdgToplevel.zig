@@ -79,9 +79,20 @@ pub fn create(xdg_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
     } });
     errdefer view.destroy();
 
-    _ = try view.surface_tree.createSceneXdgSurface(xdg_toplevel.base);
-
     const self = &view.impl.xdg_toplevel;
+
+    // This listener must be added before the scene xdg surface is created.
+    // Otherwise, the scene surface nodes will already be disabled by the unmap
+    // listeners in the scene xdg surface and scene subsurface tree helpers
+    // before our unmap listener is called.
+    // However, we need the surface tree to be unchanged in our unmap listener
+    // so that we can save the buffers for frame perfection.
+    // TODO(wlroots) This is fragile, it would be good if wlroots gave us a
+    // better alternative here.
+    xdg_toplevel.base.surface.events.unmap.add(&self.unmap);
+    errdefer self.unmap.link.remove();
+
+    _ = try view.surface_tree.createSceneXdgSurface(xdg_toplevel.base);
 
     self.view = view;
 
@@ -91,7 +102,6 @@ pub fn create(xdg_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
     // Add listeners that are active over the toplevel's entire lifetime
     xdg_toplevel.base.events.destroy.add(&self.destroy);
     xdg_toplevel.base.surface.events.map.add(&self.map);
-    xdg_toplevel.base.surface.events.unmap.add(&self.unmap);
     xdg_toplevel.base.events.new_popup.add(&self.new_popup);
 
     _ = xdg_toplevel.setWmCapabilities(.{ .fullscreen = true });
@@ -253,17 +263,7 @@ fn handleUnmap(listener: *wl.Listener(void)) void {
     self.set_title.link.remove();
     self.set_app_id.link.remove();
 
-    // TODO(wlroots): This enable/disable dance is a workaround for an signal
-    // ordering issue with the scene xdg surface helper's unmap handler that
-    // disables the node. We however need the node enabled for View.unmap()
-    // so that we can save buffers for frame perfection.
-    var it = self.view.surface_tree.children.iterator(.forward);
-    const xdg_surface_tree_node = it.next().?;
-    xdg_surface_tree_node.setEnabled(true);
-
     self.view.unmap();
-
-    xdg_surface_tree_node.setEnabled(false);
 }
 
 fn handleNewPopup(listener: *wl.Listener(*wlr.XdgPopup), wlr_xdg_popup: *wlr.XdgPopup) void {
