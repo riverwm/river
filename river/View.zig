@@ -33,6 +33,7 @@ const SceneNodeData = @import("SceneNodeData.zig");
 const Seat = @import("Seat.zig");
 const XdgToplevel = @import("XdgToplevel.zig");
 const XwaylandView = @import("XwaylandView.zig");
+const PendingState = @import("Output.zig").PendingState;
 
 const log = std.log.scoped(.view);
 
@@ -418,9 +419,10 @@ pub fn setPendingOutput(view: *Self, output: *Output) void {
     view.pending_wm_stack_link.remove();
     view.pending_focus_stack_link.remove();
 
-    switch (server.config.attach_mode) {
+    switch (output.attachMode()) {
         .top => output.pending.wm_stack.prepend(view),
         .bottom => output.pending.wm_stack.append(view),
+        .after => |n| view.attach_after(&output.pending, n),
     }
     output.pending.focus_stack.prepend(view);
 
@@ -474,6 +476,20 @@ pub fn getAppId(self: Self) ?[*:0]const u8 {
 pub fn applyConstraints(self: *Self, box: *wlr.Box) void {
     box.width = math.clamp(box.width, self.constraints.min_width, self.constraints.max_width);
     box.height = math.clamp(box.height, self.constraints.min_height, self.constraints.max_height);
+}
+
+/// Attach current view after n Views on the pending wm_stack
+pub fn attach_after(view: *Self, pending_state: *PendingState, n: usize) void {
+    var nvisible: u32 = 0;
+    var it = pending_state.wm_stack.iterator(.forward);
+
+    while (it.next()) |cur_view| {
+        if (nvisible >= n) break;
+        if (!cur_view.pending.float // ignore floating views
+        and cur_view.pending.tags & pending_state.tags != 0) nvisible += 1;
+    }
+
+    it.current.prev.?.insert(&view.pending_wm_stack_link);
 }
 
 /// Called by the impl when the surface is ready to be displayed
@@ -530,9 +546,10 @@ pub fn map(view: *Self) !void {
         view.pending_wm_stack_link.remove();
         view.pending_focus_stack_link.remove();
 
-        switch (server.config.attach_mode) {
+        switch (server.config.default_attach_mode) {
             .top => server.root.fallback_pending.wm_stack.prepend(view),
             .bottom => server.root.fallback_pending.wm_stack.append(view),
+            .after => |n| view.attach_after(&server.root.fallback_pending, n),
         }
         server.root.fallback_pending.focus_stack.prepend(view);
 

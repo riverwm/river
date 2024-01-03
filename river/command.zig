@@ -40,7 +40,7 @@ pub const Orientation = enum {
 const command_impls = std.ComptimeStringMap(
     *const fn (*Seat, []const [:0]const u8, *?[]const u8) Error!void,
     .{
-        .{ "attach-mode",               @import("command/attach_mode.zig").attachMode },
+        .{ "attach-mode",               @import("command/attach_mode.zig").defaultAttachMode },
         .{ "background-color",          @import("command/config.zig").backgroundColor },
         .{ "border-color-focused",      @import("command/config.zig").borderColorFocused },
         .{ "border-color-unfocused",    @import("command/config.zig").borderColorUnfocused },
@@ -48,6 +48,7 @@ const command_impls = std.ComptimeStringMap(
         .{ "border-width",              @import("command/config.zig").borderWidth },
         .{ "close",                     @import("command/close.zig").close },
         .{ "declare-mode",              @import("command/declare_mode.zig").declareMode },
+        .{ "default-attach-mode",       @import("command/attach_mode.zig").defaultAttachMode },
         .{ "default-layout",            @import("command/layout.zig").defaultLayout },
         .{ "enter-mode",                @import("command/enter_mode.zig").enterMode },
         .{ "exit",                      @import("command/exit.zig").exit },
@@ -70,6 +71,7 @@ const command_impls = std.ComptimeStringMap(
         .{ "map-pointer",               @import("command/map.zig").mapPointer },
         .{ "map-switch",                @import("command/map.zig").mapSwitch },
         .{ "move",                      @import("command/move.zig").move },
+        .{ "output-attach-mode",        @import("command/attach_mode.zig").outputAttachMode },
         .{ "output-layout",             @import("command/layout.zig").outputLayout },
         .{ "resize",                    @import("command/move.zig").resize },
         .{ "rule-add",                  @import("command/rule.zig").ruleAdd },

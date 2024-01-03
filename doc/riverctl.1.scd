@@ -347,8 +347,20 @@ matches everything while _\*\*_ and the empty string are invalid.
 
 ## CONFIGURATION
 
-*attach-mode* *top*|*bottom*
-	Configure where new views should attach to the view stack.
+*attach-mode* *top*|*bottom*|*after <N>*
+	Set the attach mode to be used by all outputs by default.
+
+	Possible values:
+	- top: Prepends the newly spawned view at the top of the stack.
+	- bottom: Appends the newly spawned view at the bottom of the stack.
+	- after <N>: Inserts the newly spawned view after N views in the stack.
+
+*default-attach-mode* *top*|*bottom*|*after <N>*
+	Alias to attach-mode.
+
+*output-attach-mode* *top*|*bottom*|*after <N>*
+	Set the attach mode of the currently focused output, overriding the value of
+	default-attach-mode if any.
 
 *background-color* _0xRRGGBB_|_0xRRGGBBAA_
 	Set the background color.

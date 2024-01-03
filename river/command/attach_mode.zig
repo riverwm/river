@@ -21,20 +21,36 @@ const server = &@import("../main.zig").server;
 
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
+const AttachMode = @import("../Config.zig").AttachMode;
 
-pub fn attachMode(
+fn parseAttachMode(args: []const [:0]const u8) Error!AttachMode {
+    if (args.len < 2) return Error.NotEnoughArguments;
+
+    if (mem.eql(u8, "top", args[1])) {
+        return if (args.len > 2) Error.TooManyArguments else .top;
+    } else if (mem.eql(u8, "bottom", args[1])) {
+        return if (args.len > 2) Error.TooManyArguments else .bottom;
+    } else if (mem.eql(u8, "after", args[1])) {
+        if (args.len < 3) return Error.NotEnoughArguments;
+        if (args.len > 3) return Error.TooManyArguments;
+        return .{ .after = try std.fmt.parseInt(usize, args[2], 10) };
+    }
+    return Error.UnknownOption;
+}
+
+pub fn outputAttachMode(
+    seat: *Seat,
+    args: []const [:0]const u8,
+    _: *?[]const u8,
+) Error!void {
+    const output = seat.focused_output orelse return;
+    output.attach_mode = try parseAttachMode(args);
+}
+
+pub fn defaultAttachMode(
     _: *Seat,
     args: []const [:0]const u8,
     _: *?[]const u8,
 ) Error!void {
-    if (args.len < 2) return Error.NotEnoughArguments;
-    if (args.len > 2) return Error.TooManyArguments;
-
-    if (mem.eql(u8, "top", args[1])) {
-        server.config.attach_mode = .top;
-    } else if (mem.eql(u8, "bottom", args[1])) {
-        server.config.attach_mode = .bottom;
-    } else {
-        return Error.UnknownOption;
-    }
+    server.config.default_attach_mode = try parseAttachMode(args);
 }

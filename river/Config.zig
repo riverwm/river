@@ -31,9 +31,10 @@ const Mode = @import("Mode.zig");
 const RuleList = @import("rule_list.zig").RuleList;
 const View = @import("View.zig");
 
-pub const AttachMode = enum {
-    top,
-    bottom,
+pub const AttachMode = union(enum) {
+    top: void,
+    bottom: void,
+    after: usize,
 };
 
 pub const FocusFollowsCursorMode = enum {
@@ -112,7 +113,7 @@ default_layout_namespace: []const u8 = &[0]u8{},
 spawn_tagmask: u32 = std.math.maxInt(u32),
 
 /// Determines where new views will be attached to the view stack.
-attach_mode: AttachMode = .top,
+default_attach_mode: AttachMode = .top,
 
 /// Keyboard repeat rate in characters per second
 repeat_rate: u31 = 25,
