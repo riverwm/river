@@ -306,15 +306,6 @@ pub fn create(wlr_output: *wlr.Output) !void {
     wlr_output.events.frame.add(&output.frame);
     wlr_output.events.present.add(&output.present);
 
-    // Ensure that a cursor image at the output's scale factor is loaded
-    // for each seat.
-    var it = server.input_manager.seats.first;
-    while (it) |seat_node| : (it = seat_node.next) {
-        const seat = &seat_node.data;
-        seat.cursor.xcursor_manager.load(wlr_output.scale) catch
-            log.err("failed to load xcursor theme at scale {}", .{wlr_output.scale});
-    }
-
     output.setTitle();
 
     output.active_link.init();

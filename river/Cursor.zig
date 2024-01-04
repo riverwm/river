@@ -237,20 +237,11 @@ pub fn deinit(self: *Self) void {
 pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
     const size = _size orelse default_size;
 
-    self.xcursor_manager.destroy();
-    self.xcursor_manager = try wlr.XcursorManager.create(theme, size);
-
-    // For each output, ensure a theme of the proper scale is loaded
-    var it = server.root.active_outputs.iterator(.forward);
-    while (it.next()) |output| {
-        const wlr_output = output.wlr_output;
-        self.xcursor_manager.load(wlr_output.scale) catch
-            log.err("failed to load xcursor theme '{?s}' at scale {}", .{ theme, wlr_output.scale });
-    }
+    const xcursor_manager = try wlr.XcursorManager.create(theme, size);
+    errdefer xcursor_manager.destroy();
 
     // If this cursor belongs to the default seat, set the xcursor environment
-    // variables as well as the xwayland cursor theme and update the cursor
-    // image if necessary.
+    // variables as well as the xwayland cursor theme.
     if (self.seat == server.input_manager.defaultSeat()) {
         const size_str = try std.fmt.allocPrintZ(util.gpa, "{}", .{size});
         defer util.gpa.free(size_str);
@@ -258,11 +249,8 @@ pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
         if (theme) |t| if (c.setenv("XCURSOR_THEME", t, 1) < 0) return error.OutOfMemory;
 
         if (build_options.xwayland) {
-            self.xcursor_manager.load(1) catch {
-                log.err("failed to load xcursor theme '{?s}' at scale 1", .{theme});
-                return;
-            };
-            const wlr_xcursor = self.xcursor_manager.getXcursor("left_ptr", 1).?;
+            try xcursor_manager.load(1);
+            const wlr_xcursor = xcursor_manager.getXcursor("left_ptr", 1).?;
             const image = wlr_xcursor.images[0];
             server.xwayland.setCursor(
                 image.buffer,
@@ -274,6 +262,10 @@ pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
             );
         }
     }
+
+    // Everything fallible is now done so the the old xcursor_manager can be destroyed.
+    self.xcursor_manager.destroy();
+    self.xcursor_manager = xcursor_manager;
 
     if (self.xcursor_name) |name| {
         self.setXcursor(name);
