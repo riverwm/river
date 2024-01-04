@@ -33,6 +33,7 @@ const LayoutManager = @import("LayoutManager.zig");
 const LockManager = @import("LockManager.zig");
 const Output = @import("Output.zig");
 const Root = @import("Root.zig");
+const Seat = @import("Seat.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
 const StatusManager = @import("StatusManager.zig");
 const XdgDecoration = @import("XdgDecoration.zig");
@@ -70,6 +71,8 @@ foreign_toplevel_manager: *wlr.ForeignToplevelManagerV1,
 
 xdg_activation: *wlr.XdgActivationV1,
 request_activate: wl.Listener(*wlr.XdgActivationV1.event.RequestActivate),
+
+request_set_cursor_shape: wl.Listener(*wlr.CursorShapeManagerV1.event.RequestSetShape),
 
 input_manager: InputManager,
 root: Root,
@@ -143,6 +146,10 @@ pub fn init(self: *Self) !void {
     try self.layout_manager.init();
     try self.idle_inhibitor_manager.init();
     try self.lock_manager.init();
+
+    const cursor_shape_manager = try wlr.CursorShapeManagerV1.create(self.wl_server, 1);
+    self.request_set_cursor_shape.setNotify(handleRequestSetCursorShape);
+    cursor_shape_manager.events.request_set_shape.add(&self.request_set_cursor_shape);
 
     // These all free themselves when the wl_server is destroyed
     _ = try wlr.DataDeviceManager.create(self.wl_server);
@@ -296,5 +303,20 @@ fn handleRequestActivate(
         else => |tag| {
             log.info("ignoring xdg-activation-v1 activate request of {s} surface", .{@tagName(tag)});
         },
+    }
+}
+
+fn handleRequestSetCursorShape(
+    _: *wl.Listener(*wlr.CursorShapeManagerV1.event.RequestSetShape),
+    event: *wlr.CursorShapeManagerV1.event.RequestSetShape,
+) void {
+    const focused_client = event.seat_client.seat.pointer_state.focused_client;
+
+    // This can be sent by any client, so we check to make sure this one is
+    // actually has pointer focus first.
+    if (focused_client == event.seat_client) {
+        const seat: *Seat = @ptrFromInt(event.seat_client.seat.data);
+        const name = wlr.CursorShapeManagerV1.shapeName(event.shape);
+        seat.cursor.setXcursor(name);
     }
 }
