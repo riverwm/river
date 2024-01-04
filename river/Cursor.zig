@@ -276,12 +276,17 @@ pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
     }
 
     if (self.xcursor_name) |name| {
-        self.wlr_cursor.setXcursor(self.xcursor_manager, name);
+        self.setXcursor(name);
     }
 }
 
+pub fn setXcursor(self: *Self, name: [*:0]const u8) void {
+    self.wlr_cursor.setXcursor(self.xcursor_manager, name);
+    self.xcursor_name = name;
+}
+
 fn clearFocus(self: *Self) void {
-    self.wlr_cursor.setXcursor(self.xcursor_manager, "left_ptr");
+    self.setXcursor("left_ptr");
     self.seat.wlr_seat.pointerNotifyClearFocus();
 }
 
@@ -775,7 +780,7 @@ fn enterMode(cursor: *Self, mode: Mode, view: *View, xcursor_name: [*:0]const u8
     }
 
     cursor.seat.wlr_seat.pointerNotifyClearFocus();
-    cursor.wlr_cursor.setXcursor(cursor.xcursor_manager, xcursor_name);
+    cursor.setXcursor(xcursor_name);
 
     server.root.applyPending();
 }
