@@ -856,7 +856,8 @@ fn handleSetGamma(
     _: *wl.Listener(*wlr.GammaControlManagerV1.event.SetGamma),
     event: *wlr.GammaControlManagerV1.event.SetGamma,
 ) void {
-    const output: *Output = @ptrFromInt(event.output.data);
+    // The output may have been destroyed, in which case there is nothing to do
+    const output = @as(?*Output, @ptrFromInt(event.output.data)) orelse return;
 
     std.log.debug("client requested to set gamma", .{});
 
