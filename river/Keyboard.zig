@@ -129,11 +129,8 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
         }
     };
 
-    if (self.device.seat.hasMapping(keycode, modifiers, released, xkb_state)) {
+    if (self.device.seat.handleMapping(keycode, modifiers, released, xkb_state)) {
         if (!released) self.eaten_keycodes.add(event.keycode);
-
-        const handled = self.device.seat.handleMapping(keycode, modifiers, released, xkb_state);
-        assert(handled);
     } else if (self.getInputMethodGrab()) |keyboard_grab| {
         if (!released) self.eaten_keycodes.add(event.keycode);
 

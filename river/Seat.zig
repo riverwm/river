@@ -358,23 +358,6 @@ pub fn enterMode(self: *Self, mode_id: u32) void {
     }
 }
 
-/// Is there a user-defined mapping for passed keycode, modifiers and keyboard state?
-pub fn hasMapping(
-    self: *Self,
-    keycode: xkb.Keycode,
-    modifiers: wlr.Keyboard.ModifierMask,
-    released: bool,
-    xkb_state: *xkb.State,
-) bool {
-    const modes = &server.config.modes;
-    for (modes.items[self.mode_id].mappings.items) |*mapping| {
-        if (mapping.match(keycode, modifiers, released, xkb_state)) {
-            return true;
-        }
-    }
-    return false;
-}
-
 /// Handle any user-defined mapping for passed keycode, modifiers and keyboard state
 /// Returns true if at least one mapping was run
 pub fn handleMapping(
