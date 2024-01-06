@@ -909,6 +909,9 @@ pub fn checkFocusFollowsCursor(self: *Self) void {
             self.seat.focus(view);
             server.root.applyPending();
         }
+    } else {
+        // The output doesn't contain any views, just focus the output.
+        self.updateOutputFocus(self.wlr_cursor.x, self.wlr_cursor.y);
     }
 }
 
