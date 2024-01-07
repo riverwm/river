@@ -102,6 +102,12 @@ pub fn init(self: *Self) !void {
     try self.renderer.initWlShm(self.wl_server);
 
     if (self.renderer.getDmabufFormats() != null and self.renderer.getDrmFd() >= 0) {
+        // wl_drm is a legacy interface and all clients should switch to linux_dmabuf.
+        // However, enough widely used clients still rely on wl_drm that the pragmatic option
+        // is to keep it around for the near future.
+        // TODO remove wl_drm support
+        _ = try wlr.Drm.create(self.wl_server, self.renderer);
+
         self.linux_dmabuf = try wlr.LinuxDmabufV1.createWithRenderer(self.wl_server, 4, self.renderer);
     }
 
