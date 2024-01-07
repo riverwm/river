@@ -22,6 +22,8 @@ const ascii = std.ascii;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
+const globber = @import("globber");
+
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
@@ -82,7 +84,7 @@ pub fn init(device: *InputDevice, seat: *Seat, wlr_device: *wlr.InputDevice) !vo
     if (!isKeyboardGroup(wlr_device)) {
         // Apply any matching input device configuration.
         for (server.input_manager.configs.items) |*input_config| {
-            if (mem.eql(u8, input_config.identifier, identifier)) {
+            if (globber.match(identifier, input_config.glob)) {
                 input_config.apply(device);
             }
         }

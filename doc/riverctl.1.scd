@@ -465,6 +465,8 @@ The _input_ command can be used to create a configuration rule for an input
 device identified by its _name_.
 The _name_ of an input device consists of its type, its numerical vendor id,
 its numerical product id and finally its self-advertised name, separated by -.
+Simple globbing patterns are supported, see the rules section for further
+information on globs.
 
 A list of all device properties that can be configured may be found below.
 However note that not every input device supports every property.

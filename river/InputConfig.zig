@@ -262,7 +262,7 @@ pub const ScrollButton = struct {
     }
 };
 
-identifier: []const u8,
+glob: []const u8,
 
 // Note: Field names equal name of the setting in the 'input' command.
 events: ?EventState = null,
@@ -281,15 +281,15 @@ tap: ?TapState = null,
 @"scroll-button": ?ScrollButton = null,
 
 pub fn deinit(self: *Self) void {
-    util.gpa.free(self.identifier);
+    util.gpa.free(self.glob);
 }
 
-pub fn apply(self: *Self, device: *InputDevice) void {
+pub fn apply(self: *const Self, device: *InputDevice) void {
     const libinput_device: *c.libinput_device = @ptrCast(device.wlr_device.getLibinputDevice() orelse return);
-    log.debug("applying input configuration to device: {s}", .{device.identifier});
+    log.debug("applying input configuration '{s}' to device '{s}'.", .{ self.glob, device.identifier });
 
     inline for (@typeInfo(Self).Struct.fields) |field| {
-        if (comptime mem.eql(u8, field.name, "identifier")) continue;
+        if (comptime mem.eql(u8, field.name, "glob")) continue;
 
         if (@field(self, field.name)) |setting| {
             log.debug("applying setting: {s}", .{field.name});
@@ -300,7 +300,7 @@ pub fn apply(self: *Self, device: *InputDevice) void {
 
 pub fn parse(self: *Self, setting: []const u8, value: []const u8) !void {
     inline for (@typeInfo(Self).Struct.fields) |field| {
-        if (comptime mem.eql(u8, field.name, "identifier")) continue;
+        if (comptime mem.eql(u8, field.name, "glob")) continue;
 
         if (mem.eql(u8, setting, field.name)) {
             // Special-case the settings which are not enums.
@@ -329,10 +329,10 @@ pub fn parse(self: *Self, setting: []const u8, value: []const u8) !void {
 }
 
 pub fn write(self: *Self, writer: anytype) !void {
-    try writer.print("{s}\n", .{self.identifier});
+    try writer.print("{s}\n", .{self.glob});
 
     inline for (@typeInfo(Self).Struct.fields) |field| {
-        if (comptime mem.eql(u8, field.name, "identifier")) continue;
+        if (comptime mem.eql(u8, field.name, "glob")) continue;
         if (@field(self, field.name)) |setting| {
             // Special-case the settings which are not enums.
             if (comptime mem.eql(u8, field.name, "pointer-accel")) {

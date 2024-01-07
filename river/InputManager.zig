@@ -49,7 +49,10 @@ pointer_constraints: *wlr.PointerConstraintsV1,
 input_method_manager: *wlr.InputMethodManagerV2,
 text_input_manager: *wlr.TextInputManagerV3,
 
+/// List of input device configurations. Ordered by glob generality, with
+/// the most general towards the start and the most specific towards the end.
 configs: std.ArrayList(InputConfig),
+
 devices: wl.list.Head(InputDevice, .link),
 seats: std.TailQueue(Seat) = .{},
 
