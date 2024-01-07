@@ -257,6 +257,26 @@ fn parseKeysym(name: [:0]const u8, out: *?[]const u8) !xkb.Keysym {
         out.* = try fmt.allocPrint(util.gpa, "invalid keysym '{s}'", .{name});
         return Error.Other;
     }
+
+    // The case insensitive matching done by xkbcommon returns the first
+    // lowercase match found if there are multiple matches that differ only in
+    // case. This works great for alphabetic keys for example but there is one
+    // problematic exception we handle specially here. For some reason there
+    // exist both uppercase and lowercase versions of XF86ScreenSaver with
+    // different keysym values for example. Switching to a case-sensitive match
+    // would be too much of a breaking change at this point so fix this by
+    // special-casing this exception.
+    if (@intFromEnum(keysym) == xkb.Keysym.XF86Screensaver) {
+        if (mem.eql(u8, name, "XF86Screensaver")) {
+            return keysym;
+        } else if (mem.eql(u8, name, "XF86ScreenSaver")) {
+            return @enumFromInt(xkb.Keysym.XF86ScreenSaver);
+        } else {
+            out.* = try fmt.allocPrint(util.gpa, "ambiguous keysym name '{s}'", .{name});
+            return Error.Other;
+        }
+    }
+
     return keysym;
 }
 
