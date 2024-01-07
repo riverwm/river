@@ -368,21 +368,34 @@ pub fn handleMapping(
     xkb_state: *xkb.State,
 ) bool {
     const modes = &server.config.modes;
-    // In case more than one mapping matches, all of them are activated
-    var handled = false;
+    // It is possible for more than one mapping to be matched due to the existence of
+    // layout-independent mappings. In this case run the first match and log a warning
+    // if there are other matches.
+    var found: ?*Mapping = null;
     for (modes.items[self.mode_id].mappings.items) |*mapping| {
         if (mapping.match(keycode, modifiers, released, xkb_state)) {
-            if (mapping.options.repeat) {
-                self.repeating_mapping = mapping;
-                self.mapping_repeat_timer.timerUpdate(server.config.repeat_delay) catch {
-                    log.err("failed to update mapping repeat timer", .{});
-                };
+            if (found == null) {
+                found = mapping;
+            } else {
+                log.warn("already found a matching mapping, ignoring additional match", .{});
             }
-            self.runCommand(mapping.command_args);
-            handled = true;
         }
     }
-    return handled;
+
+    // The mapped command must be run outside of the loop above as it may modify
+    // the list of mappings we are iterating through, possibly causing it to be re-allocated.
+    if (found) |mapping| {
+        if (mapping.options.repeat) {
+            self.repeating_mapping = mapping;
+            self.mapping_repeat_timer.timerUpdate(server.config.repeat_delay) catch {
+                log.err("failed to update mapping repeat timer", .{});
+            };
+        }
+        self.runCommand(mapping.command_args);
+        return true;
+    }
+
+    return false;
 }
 
 /// Handle any user-defined mapping for switches
