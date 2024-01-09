@@ -71,17 +71,15 @@ hidden: struct {
 /// This is used to store views and tags when no actual outputs are available.
 /// This must be separate from hidden to ensure we don't mix views that are
 /// in the process of being mapped/unmapped with the mapped views in these lists.
+/// There is no need for inflight lists, instead the inflight links of views are
+/// remove()'d from their current list and init()'d so they may be remove()'d again
+/// when an output becomes available and they are moved to the output's inflight lists.
 fallback: struct {
     tags: u32 = 1 << 0,
 
     pending: struct {
         focus_stack: wl.list.Head(View, .pending_focus_stack_link),
         wm_stack: wl.list.Head(View, .pending_wm_stack_link),
-    },
-
-    inflight: struct {
-        focus_stack: wl.list.Head(View, .inflight_focus_stack_link),
-        wm_stack: wl.list.Head(View, .inflight_wm_stack_link),
     },
 },
 
@@ -172,10 +170,6 @@ pub fn init(self: *Self) !void {
                 .focus_stack = undefined,
                 .wm_stack = undefined,
             },
-            .inflight = .{
-                .focus_stack = undefined,
-                .wm_stack = undefined,
-            },
         },
         .views = undefined,
         .output_layout = output_layout,
@@ -193,8 +187,6 @@ pub fn init(self: *Self) !void {
 
     self.fallback.pending.focus_stack.init();
     self.fallback.pending.wm_stack.init();
-    self.fallback.inflight.focus_stack.init();
-    self.fallback.inflight.wm_stack.init();
 
     self.views.init();
     self.all_outputs.init();
@@ -284,15 +276,20 @@ pub fn deactivateOutput(root: *Self, output: *Output) void {
     output.active_link.init();
 
     {
-        var it = output.inflight.focus_stack.iterator(.forward);
+        var it = output.inflight.focus_stack.safeIterator(.forward);
         while (it.next()) |view| {
             view.inflight.output = null;
             view.current.output = null;
+
             view.tree.node.reparent(root.hidden.tree);
             view.popup_tree.node.reparent(root.hidden.tree);
+
+            view.inflight_focus_stack_link.remove();
+            view.inflight_focus_stack_link.init();
+
+            view.inflight_wm_stack_link.remove();
+            view.inflight_wm_stack_link.init();
         }
-        root.fallback.inflight.focus_stack.prependList(&output.inflight.focus_stack);
-        root.fallback.inflight.wm_stack.prependList(&output.inflight.wm_stack);
     }
     // Use the first output in the list as fallback. If the last real output
     // is being removed, store the views in Root.fallback.

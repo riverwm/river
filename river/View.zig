@@ -529,21 +529,18 @@ pub fn map(view: *Self) !void {
 
         view.pending_wm_stack_link.remove();
         view.pending_focus_stack_link.remove();
-        view.inflight_wm_stack_link.remove();
-        view.inflight_focus_stack_link.remove();
 
         switch (server.config.attach_mode) {
-            .top => {
-                server.root.fallback.pending.wm_stack.prepend(view);
-                server.root.fallback.inflight.wm_stack.prepend(view);
-            },
-            .bottom => {
-                server.root.fallback.pending.wm_stack.append(view);
-                server.root.fallback.inflight.wm_stack.append(view);
-            },
+            .top => server.root.fallback.pending.wm_stack.prepend(view),
+            .bottom => server.root.fallback.pending.wm_stack.append(view),
         }
         server.root.fallback.pending.focus_stack.prepend(view);
-        server.root.fallback.inflight.focus_stack.prepend(view);
+
+        view.inflight_wm_stack_link.remove();
+        view.inflight_wm_stack_link.init();
+
+        view.inflight_focus_stack_link.remove();
+        view.inflight_focus_stack_link.init();
     }
 
     view.float_box = view.pending.box;
