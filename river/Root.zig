@@ -379,7 +379,7 @@ pub fn activateOutput(root: *Self, output: *Output) void {
 
         output.pending.tags = root.fallback.tags;
         {
-            var it = root.fallback.pending.focus_stack.safeIterator(.reverse);
+            var it = root.fallback.pending.wm_stack.safeIterator(.reverse);
             while (it.next()) |view| view.setPendingOutput(output);
         }
         {
