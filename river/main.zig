@@ -109,7 +109,7 @@ pub fn main() anyerror!void {
     };
     try os.sigaction(os.SIG.PIPE, &sig_ign, null);
 
-    std.log.info("initializing server", .{});
+    std.log.info("river version {s}, initializing server", .{build_options.version});
     try server.init();
     defer server.deinit();
 
