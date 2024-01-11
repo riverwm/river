@@ -19,6 +19,7 @@ const std = @import("std");
 const mem = std.mem;
 const fs = std.fs;
 const io = std.io;
+const log = std.log;
 const os = std.os;
 const builtin = @import("builtin");
 const wlr = @import("wlroots");
@@ -62,7 +63,7 @@ pub fn main() anyerror!void {
         os.exit(0);
     }
     if (result.args.len != 0) {
-        std.log.err("unknown option '{s}'", .{result.args[0]});
+        log.err("unknown option '{s}'", .{result.args[0]});
         try io.getStdErr().writeAll(usage);
         os.exit(1);
     }
@@ -72,16 +73,16 @@ pub fn main() anyerror!void {
         os.exit(0);
     }
     if (result.flags.@"log-level") |level| {
-        if (mem.eql(u8, level, std.log.Level.err.asText())) {
+        if (mem.eql(u8, level, "error")) {
             runtime_log_level = .err;
-        } else if (mem.eql(u8, level, std.log.Level.warn.asText())) {
+        } else if (mem.eql(u8, level, "warning")) {
             runtime_log_level = .warn;
-        } else if (mem.eql(u8, level, std.log.Level.info.asText())) {
+        } else if (mem.eql(u8, level, "info")) {
             runtime_log_level = .info;
-        } else if (mem.eql(u8, level, std.log.Level.debug.asText())) {
+        } else if (mem.eql(u8, level, "debug")) {
             runtime_log_level = .debug;
         } else {
-            std.log.err("invalid log level '{s}'", .{level});
+            log.err("invalid log level '{s}'", .{level});
             try io.getStdErr().writeAll(usage);
             os.exit(1);
         }
@@ -109,7 +110,7 @@ pub fn main() anyerror!void {
     };
     try os.sigaction(os.SIG.PIPE, &sig_ign, null);
 
-    std.log.info("river version {s}, initializing server", .{build_options.version});
+    log.info("river version {s}, initializing server", .{build_options.version});
     try server.init();
     defer server.deinit();
 
@@ -118,7 +119,7 @@ pub fn main() anyerror!void {
     // Run the child in a new process group so that we can send SIGTERM to all
     // descendants on exit.
     const child_pgid = if (startup_command) |cmd| blk: {
-        std.log.info("running init executable '{s}'", .{cmd});
+        log.info("running init executable '{s}'", .{cmd});
         const child_args = [_:null]?[*:0]const u8{ "/bin/sh", "-c", cmd, null };
         const pid = try os.fork();
         if (pid == 0) {
@@ -130,14 +131,14 @@ pub fn main() anyerror!void {
         break :blk pid;
     } else null;
     defer if (child_pgid) |pgid| os.kill(-pgid, os.SIG.TERM) catch |err| {
-        std.log.err("failed to kill init process group: {s}", .{@errorName(err)});
+        log.err("failed to kill init process group: {s}", .{@errorName(err)});
     };
 
-    std.log.info("running server", .{});
+    log.info("running server", .{});
 
     server.wl_server.run();
 
-    std.log.info("shutting down", .{});
+    log.info("shutting down", .{});
 }
 
 fn defaultInitPath() !?[:0]const u8 {
@@ -154,11 +155,11 @@ fn defaultInitPath() !?[:0]const u8 {
     os.accessZ(path, os.X_OK) catch |err| {
         if (err == error.PermissionDenied) {
             if (os.accessZ(path, os.R_OK)) {
-                std.log.err("failed to run init executable {s}: the file is not executable", .{path});
+                log.err("failed to run init executable {s}: the file is not executable", .{path});
                 os.exit(1);
             } else |_| {}
         }
-        std.log.err("failed to run init executable {s}: {s}", .{ path, @errorName(err) });
+        log.err("failed to run init executable {s}: {s}", .{ path, @errorName(err) });
         util.gpa.free(path);
         return null;
     };
@@ -166,36 +167,39 @@ fn defaultInitPath() !?[:0]const u8 {
     return path;
 }
 
-/// Tell std.log to leave all log level filtering to us.
-pub const log_level: std.log.Level = .debug;
-
 /// Set the default log level based on the build mode.
-var runtime_log_level: std.log.Level = switch (builtin.mode) {
+var runtime_log_level: log.Level = switch (builtin.mode) {
     .Debug => .debug,
     .ReleaseSafe, .ReleaseFast, .ReleaseSmall => .info,
 };
 
-pub fn log(
-    comptime level: std.log.Level,
-    comptime scope: @TypeOf(.EnumLiteral),
-    comptime format: []const u8,
-    args: anytype,
-) void {
-    if (@intFromEnum(level) > @intFromEnum(runtime_log_level)) return;
+pub const std_options = struct {
+    /// Tell std.log to leave all log level filtering to us.
+    pub const log_level: log.Level = .debug;
 
-    const scope_prefix = if (scope == .default) ": " else "(" ++ @tagName(scope) ++ "): ";
+    pub fn logFn(
+        comptime level: log.Level,
+        comptime scope: @TypeOf(.EnumLiteral),
+        comptime format: []const u8,
+        args: anytype,
+    ) void {
+        if (@intFromEnum(level) > @intFromEnum(runtime_log_level)) return;
 
-    const stderr = io.getStdErr().writer();
-    stderr.print(level.asText() ++ scope_prefix ++ format ++ "\n", args) catch {};
-}
+        const scope_prefix = if (scope == .default) ": " else "(" ++ @tagName(scope) ++ "): ";
+
+        const stderr = io.getStdErr().writer();
+        stderr.print(level.asText() ++ scope_prefix ++ format ++ "\n", args) catch {};
+    }
+};
 
 /// See wlroots_log_wrapper.c
 extern fn river_init_wlroots_log(importance: wlr.log.Importance) void;
 export fn river_wlroots_log_callback(importance: wlr.log.Importance, ptr: [*:0]const u8, len: usize) void {
+    const wlr_log = log.scoped(.wlroots);
     switch (importance) {
-        .err => log(.err, .wlroots, "{s}", .{ptr[0..len]}),
-        .info => log(.info, .wlroots, "{s}", .{ptr[0..len]}),
-        .debug => log(.debug, .wlroots, "{s}", .{ptr[0..len]}),
+        .err => wlr_log.err("{s}", .{ptr[0..len]}),
+        .info => wlr_log.info("{s}", .{ptr[0..len]}),
+        .debug => wlr_log.debug("{s}", .{ptr[0..len]}),
         .silent, .last => unreachable,
     }
 }
