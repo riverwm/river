@@ -359,7 +359,7 @@ pub fn enterMode(self: *Self, mode_id: u32) void {
 }
 
 /// Handle any user-defined mapping for passed keycode, modifiers and keyboard state
-/// Returns true if at least one mapping was run
+/// Returns true if a mapping was run
 pub fn handleMapping(
     self: *Self,
     keycode: xkb.Keycode,
@@ -368,16 +368,40 @@ pub fn handleMapping(
     xkb_state: *xkb.State,
 ) bool {
     const modes = &server.config.modes;
-    // It is possible for more than one mapping to be matched due to the existence of
-    // layout-independent mappings. In this case run the first match and log a warning
-    // if there are other matches.
+
+    // It is possible for more than one mapping to be matched due to the
+    // existence of layout-independent mappings. It is also possible due to
+    // translation by xkbcommon consuming modifiers. On the swedish layout
+    // for example, translating Super+Shift+Space may consume the Shift
+    // modifier and confict with a mapping for Super+Space. For this reason,
+    // matching wihout xkbcommon translation is done first and after a match
+    // has been found all further matches are ignored.
     var found: ?*Mapping = null;
+
+    // First check for matches without translating keysyms with xkbcommon.
+    // That is, if the physical keys Mod+Shift+1 are pressed on a US layout don't
+    // translate the keysym 1 to an exclamation mark. This behavior is generally
+    // what is desired.
     for (modes.items[self.mode_id].mappings.items) |*mapping| {
-        if (mapping.match(keycode, modifiers, released, xkb_state)) {
+        if (mapping.match(keycode, modifiers, released, xkb_state, .no_translate)) {
             if (found == null) {
                 found = mapping;
             } else {
-                log.warn("already found a matching mapping, ignoring additional match", .{});
+                log.debug("already found a matching mapping, ignoring additional match", .{});
+            }
+        }
+    }
+
+    // There are however some cases where it is necessary to translate keysyms
+    // with xkbcommon for intuitive behavior. For example, layouts may require
+    // translation with the numlock modifier to obtain keypad number keysyms
+    // (e.g. KP_1).
+    for (modes.items[self.mode_id].mappings.items) |*mapping| {
+        if (mapping.match(keycode, modifiers, released, xkb_state, .translate)) {
+            if (found == null) {
+                found = mapping;
+            } else {
+                log.debug("already found a matching mapping, ignoring additional match", .{});
             }
         }
     }

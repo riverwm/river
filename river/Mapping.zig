@@ -69,6 +69,7 @@ pub fn match(
     modifiers: wlr.Keyboard.ModifierMask,
     released: bool,
     xkb_state: *xkb.State,
+    method: enum { no_translate, translate },
 ) bool {
     if (released != self.options.release) return false;
 
@@ -79,28 +80,46 @@ pub fn match(
     // will fall back to the active layout if so.
     const layout_index = self.options.layout_index orelse xkb_state.keyGetLayout(keycode);
 
-    // Get keysyms from the base layer, as if modifiers didn't change keysyms.
-    // E.g. pressing `Super+Shift 1` does not translate to `Super Exclam`.
-    const keysyms = keymap.keyGetSymsByLevel(
-        keycode,
-        layout_index,
-        0,
-    );
+    switch (method) {
+        .no_translate => {
+            // Get keysyms from the base layer, as if modifiers didn't change keysyms.
+            // E.g. pressing `Super+Shift 1` does not translate to `Super Exclam`.
+            const keysyms = keymap.keyGetSymsByLevel(
+                keycode,
+                layout_index,
+                0,
+            );
 
-    if (std.meta.eql(modifiers, self.modifiers)) {
-        for (keysyms) |sym| {
-            if (sym == self.keysym) {
-                return true;
+            if (@as(u32, @bitCast(modifiers)) == @as(u32, @bitCast(self.modifiers))) {
+                for (keysyms) |sym| {
+                    if (sym == self.keysym) {
+                        return true;
+                    }
+                }
             }
-        }
-    }
+        },
+        .translate => {
+            // Keysyms and modifiers as translated by xkb.
+            // Modifiers used to translate the key are consumed.
+            // E.g. pressing `Super+Shift 1` translates to `Super Exclam`.
+            const keysyms_translated = keymap.keyGetSymsByLevel(
+                keycode,
+                layout_index,
+                xkb_state.keyGetLevel(keycode, layout_index),
+            );
 
-    // We deliberately choose not to translate keysyms and modifiers with xkb,
-    // because of strange behavior that xkb shows for some layouts and keys.
-    // When pressing `Shift Space` on some layouts (Swedish among others),
-    // xkb reports `Shift` as consumed. This leads to the case that we cannot
-    // distinguish between `Space` and `Shift Space` presses when doing a
-    // correct translation with xkb.
+            const consumed = xkb_state.keyGetConsumedMods2(keycode, .xkb);
+            const modifiers_translated = @as(u32, @bitCast(modifiers)) & ~consumed;
+
+            if (modifiers_translated == @as(u32, @bitCast(self.modifiers))) {
+                for (keysyms_translated) |sym| {
+                    if (sym == self.keysym) {
+                        return true;
+                    }
+                }
+            }
+        },
+    }
 
     return false;
 }
