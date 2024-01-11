@@ -75,7 +75,23 @@ pub fn deinit(self: *Self) void {
     self.key.link.remove();
     self.modifiers.link.remove();
 
+    const seat = self.device.seat;
+    const wlr_keyboard = self.device.wlr_device.toKeyboard();
+
     self.device.deinit();
+
+    // If the currently active keyboard of a seat is destroyed we need to set
+    // a new active keyboard. Otherwise wlroots may send an enter event without
+    // first having sent a keymap event if Seat.keyboardNotifyEnter() is called
+    // before a new active keyboard is set.
+    if (seat.wlr_seat.getKeyboard() == wlr_keyboard) {
+        var it = server.input_manager.devices.iterator(.forward);
+        while (it.next()) |device| {
+            if (device.seat == seat and device.wlr_device.type == .keyboard) {
+                seat.wlr_seat.setKeyboard(device.wlr_device.toKeyboard());
+            }
+        }
+    }
 
     self.* = undefined;
 }
