@@ -513,7 +513,7 @@ pub fn map(view: *Self) !void {
     }
 
     view.pending.tags = blk: {
-        const default = if (output) |o| o.pending.tags else server.root.fallback.tags;
+        const default = if (output) |o| o.pending.tags else server.root.fallback_pending.tags;
         if (server.config.rules.tags.match(view)) |tags| break :blk tags;
         const tags = default & server.config.spawn_tagmask;
         break :blk if (tags != 0) tags else default;
@@ -531,10 +531,10 @@ pub fn map(view: *Self) !void {
         view.pending_focus_stack_link.remove();
 
         switch (server.config.attach_mode) {
-            .top => server.root.fallback.pending.wm_stack.prepend(view),
-            .bottom => server.root.fallback.pending.wm_stack.append(view),
+            .top => server.root.fallback_pending.wm_stack.prepend(view),
+            .bottom => server.root.fallback_pending.wm_stack.append(view),
         }
-        server.root.fallback.pending.focus_stack.prepend(view);
+        server.root.fallback_pending.focus_stack.prepend(view);
 
         view.inflight_wm_stack_link.remove();
         view.inflight_wm_stack_link.init();

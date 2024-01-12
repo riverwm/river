@@ -74,14 +74,7 @@ hidden: struct {
 /// There is no need for inflight lists, instead the inflight links of views are
 /// remove()'d from their current list and init()'d so they may be remove()'d again
 /// when an output becomes available and they are moved to the output's inflight lists.
-fallback: struct {
-    tags: u32 = 1 << 0,
-
-    pending: struct {
-        focus_stack: wl.list.Head(View, .pending_focus_stack_link),
-        wm_stack: wl.list.Head(View, .pending_wm_stack_link),
-    },
-},
+fallback_pending: Output.PendingState,
 
 views: wl.list.Head(View, .link),
 
@@ -165,11 +158,9 @@ pub fn init(self: *Self) !void {
                 .wm_stack = undefined,
             },
         },
-        .fallback = .{
-            .pending = .{
-                .focus_stack = undefined,
-                .wm_stack = undefined,
-            },
+        .fallback_pending = .{
+            .focus_stack = undefined,
+            .wm_stack = undefined,
         },
         .views = undefined,
         .output_layout = output_layout,
@@ -185,8 +176,8 @@ pub fn init(self: *Self) !void {
     self.hidden.inflight.focus_stack.init();
     self.hidden.inflight.wm_stack.init();
 
-    self.fallback.pending.focus_stack.init();
-    self.fallback.pending.wm_stack.init();
+    self.fallback_pending.focus_stack.init();
+    self.fallback_pending.wm_stack.init();
 
     self.views.init();
     self.all_outputs.init();
@@ -292,7 +283,7 @@ pub fn deactivateOutput(root: *Self, output: *Output) void {
         }
     }
     // Use the first output in the list as fallback. If the last real output
-    // is being removed, store the views in Root.fallback.
+    // is being removed, store the views in Root.fallback_pending.
     const fallback_output = blk: {
         var it = root.active_outputs.iterator(.forward);
         if (it.next()) |o| break :blk o;
@@ -305,11 +296,11 @@ pub fn deactivateOutput(root: *Self, output: *Output) void {
     } else {
         var it = output.pending.focus_stack.iterator(.forward);
         while (it.next()) |view| view.pending.output = null;
-        root.fallback.pending.focus_stack.prependList(&output.pending.focus_stack);
-        root.fallback.pending.wm_stack.prependList(&output.pending.wm_stack);
+        root.fallback_pending.focus_stack.prependList(&output.pending.focus_stack);
+        root.fallback_pending.wm_stack.prependList(&output.pending.wm_stack);
         // Store the focused output tags if we are hotplugged down to
         // 0 real outputs so they can be restored on gaining a new output.
-        root.fallback.tags = output.pending.tags;
+        root.fallback_pending.tags = output.pending.tags;
     }
 
     // Close all layer surfaces on the removed output
@@ -377,9 +368,9 @@ pub fn activateOutput(root: *Self, output: *Output) void {
         const log = std.log.scoped(.output_manager);
         log.debug("moving views from fallback stacks to new output", .{});
 
-        output.pending.tags = root.fallback.tags;
+        output.pending.tags = root.fallback_pending.tags;
         {
-            var it = root.fallback.pending.wm_stack.safeIterator(.reverse);
+            var it = root.fallback_pending.wm_stack.safeIterator(.reverse);
             while (it.next()) |view| view.setPendingOutput(output);
         }
         {
@@ -391,8 +382,8 @@ pub fn activateOutput(root: *Self, output: *Output) void {
             }
         }
     }
-    assert(root.fallback.pending.focus_stack.empty());
-    assert(root.fallback.pending.wm_stack.empty());
+    assert(root.fallback_pending.focus_stack.empty());
+    assert(root.fallback_pending.wm_stack.empty());
 }
 
 /// Trigger asynchronous application of pending state for all outputs and views.

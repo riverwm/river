@@ -39,6 +39,28 @@ const View = @import("View.zig");
 
 const log = std.log.scoped(.output);
 
+pub const PendingState = struct {
+    /// A bit field of focused tags
+    tags: u32 = 1 << 0,
+    /// The stack of views in focus/rendering order.
+    ///
+    /// This contains views that aren't currently visible because they do not
+    /// match the tags of the output.
+    ///
+    /// This list is used to update the rendering order of nodes in the scene
+    /// graph when the pending state is committed.
+    focus_stack: wl.list.Head(View, .pending_focus_stack_link),
+    /// The stack of views acted upon by window management commands such
+    /// as focus-view, zoom, etc.
+    ///
+    /// This contains views that aren't currently visible because they do not
+    /// match the tags of the output. This means that a filtered version of the
+    /// list must be used for window management commands.
+    ///
+    /// This includes both floating/fullscreen views and those arranged in the layout.
+    wm_stack: wl.list.Head(View, .pending_wm_stack_link),
+};
+
 wlr_output: *wlr.Output,
 scene_output: *wlr.SceneOutput,
 
@@ -113,27 +135,7 @@ gamma_dirty: bool = false,
 ///
 /// Any time pending state is modified Root.applyPending() must be called
 /// before yielding back to the event loop.
-pending: struct {
-    /// A bit field of focused tags
-    tags: u32 = 1 << 0,
-    /// The stack of views in focus/rendering order.
-    ///
-    /// This contains views that aren't currently visible because they do not
-    /// match the tags of the output.
-    ///
-    /// This list is used to update the rendering order of nodes in the scene
-    /// graph when the pending state is committed.
-    focus_stack: wl.list.Head(View, .pending_focus_stack_link),
-    /// The stack of views acted upon by window management commands such
-    /// as focus-view, zoom, etc.
-    ///
-    /// This contains views that aren't currently visible because they do not
-    /// match the tags of the output. This means that a filtered version of the
-    /// list must be used for window management commands.
-    ///
-    /// This includes both floating/fullscreen views and those arranged in the layout.
-    wm_stack: wl.list.Head(View, .pending_wm_stack_link),
-},
+pending: PendingState,
 
 /// The state most recently sent to the layout generator and clients.
 /// This state is immutable until all clients have replied and the transaction
