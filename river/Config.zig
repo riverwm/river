@@ -32,9 +32,9 @@ const RuleList = @import("rule_list.zig").RuleList;
 const View = @import("View.zig");
 
 pub const AttachMode = union(enum) {
-    top: void,
-    bottom: void,
-    after: usize,
+    top,
+    bottom,
+    after: u32,
 };
 
 pub const FocusFollowsCursorMode = enum {

@@ -36,7 +36,7 @@ const LockSurface = @import("LockSurface.zig");
 const OutputStatus = @import("OutputStatus.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
 const View = @import("View.zig");
-const AttachMode = @import("Config.zig").AttachMode;
+const Config = @import("Config.zig");
 
 const log = std.log.scoped(.output);
 
@@ -167,7 +167,7 @@ current: struct {
 /// Remembered version of tags (from last run)
 previous_tags: u32 = 1 << 0,
 
-attach_mode: ?AttachMode = null,
+attach_mode: ?Config.AttachMode = null,
 
 /// List of all layouts
 layouts: std.TailQueue(Layout) = .{},
@@ -612,6 +612,6 @@ pub fn layoutNamespace(self: Self) []const u8 {
     return self.layout_namespace orelse server.config.default_layout_namespace;
 }
 
-pub fn attachMode(self: Self) AttachMode {
+pub fn attachMode(self: Self) Config.AttachMode {
     return self.attach_mode orelse server.config.default_attach_mode;
 }

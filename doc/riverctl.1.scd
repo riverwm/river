@@ -347,7 +347,7 @@ matches everything while _\*\*_ and the empty string are invalid.
 
 ## CONFIGURATION
 
-*attach-mode* *top*|*bottom*|*after <N>*
+*default-attach-mode* *top*|*bottom*|*after <N>*
 	Set the attach mode to be used by all outputs by default.
 
 	Possible values:
@@ -355,8 +355,8 @@ matches everything while _\*\*_ and the empty string are invalid.
 	- bottom: Appends the newly spawned view at the bottom of the stack.
 	- after <N>: Inserts the newly spawned view after N views in the stack.
 
-*default-attach-mode* *top*|*bottom*|*after <N>*
-	Alias to attach-mode.
+	Note that the deprecated *attach-mode* command is aliased to
+	*default-attach-mode* for backwards compatibility.
 
 *output-attach-mode* *top*|*bottom*|*after <N>*
 	Set the attach mode of the currently focused output, overriding the value of

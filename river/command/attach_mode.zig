@@ -16,26 +16,31 @@
 
 const std = @import("std");
 const mem = std.mem;
+const meta = std.meta;
 
 const server = &@import("../main.zig").server;
 
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
-const AttachMode = @import("../Config.zig").AttachMode;
+const Config = @import("../Config.zig");
 
-fn parseAttachMode(args: []const [:0]const u8) Error!AttachMode {
+fn parseAttachMode(args: []const [:0]const u8) Error!Config.AttachMode {
     if (args.len < 2) return Error.NotEnoughArguments;
 
-    if (mem.eql(u8, "top", args[1])) {
-        return if (args.len > 2) Error.TooManyArguments else .top;
-    } else if (mem.eql(u8, "bottom", args[1])) {
-        return if (args.len > 2) Error.TooManyArguments else .bottom;
-    } else if (mem.eql(u8, "after", args[1])) {
-        if (args.len < 3) return Error.NotEnoughArguments;
-        if (args.len > 3) return Error.TooManyArguments;
-        return .{ .after = try std.fmt.parseInt(usize, args[2], 10) };
+    const tag = meta.stringToEnum(meta.Tag(Config.AttachMode), args[1]) orelse return Error.UnknownOption;
+    switch (tag) {
+        inline .top, .bottom => |mode| {
+            if (args.len > 2) return Error.TooManyArguments;
+
+            return mode;
+        },
+        .after => {
+            if (args.len < 3) return Error.NotEnoughArguments;
+            if (args.len > 3) return Error.TooManyArguments;
+
+            return .{ .after = try std.fmt.parseInt(u32, args[2], 10) };
+        },
     }
-    return Error.UnknownOption;
 }
 
 pub fn outputAttachMode(
