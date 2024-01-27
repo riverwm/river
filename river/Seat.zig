@@ -307,6 +307,7 @@ fn keyboardNotifyEnter(self: *Self, wlr_surface: *wlr.Surface) void {
     if (self.wlr_seat.getKeyboard()) |wlr_keyboard| {
         var keycodes = KeycodeSet{
             .items = wlr_keyboard.keycodes,
+            .reason = .{.none} ** 32,
             .len = wlr_keyboard.num_keycodes,
         };
 

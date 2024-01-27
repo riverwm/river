@@ -135,33 +135,38 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
         if (!released and handleBuiltinMapping(sym)) return;
     }
 
-    // If we sent a pressed event to the client we should send the matching release event as well,
-    // even if the release event triggers a mapping or would otherwise be sent to an input method.
-    const sent_to_client = blk: {
-        if (released and !self.eaten_keycodes.remove(event.keycode)) {
+    // Every sent press event, to a regular client or the IM, should have
+    // the corresponding release event sent to the same client.
+    // Similarly, no press event means no release event.
+
+    const eat_reason = blk: {
+        // We can only eat a key on press; never on release
+        if (released) break :blk self.eaten_keycodes.remove(event.keycode);
+
+        if (self.device.seat.handleMapping(keycode, modifiers, released, xkb_state)) {
+            break :blk self.eaten_keycodes.add(event.keycode, .mapping);
+        } else if (self.getInputMethodGrab() != null) {
+            break :blk self.eaten_keycodes.add(event.keycode, .im_grab);
+        }
+
+        break :blk .none;
+    };
+
+    switch (eat_reason) {
+        .none => {
             const wlr_seat = self.device.seat.wlr_seat;
             wlr_seat.setKeyboard(self.device.wlr_device.toKeyboard());
             wlr_seat.keyboardNotifyKey(event.time_msec, event.keycode, event.state);
-            break :blk true;
-        } else {
-            break :blk false;
-        }
-    };
-
-    if (self.device.seat.handleMapping(keycode, modifiers, released, xkb_state)) {
-        if (!released) self.eaten_keycodes.add(event.keycode);
-    } else if (self.getInputMethodGrab()) |keyboard_grab| {
-        if (!released) self.eaten_keycodes.add(event.keycode);
-
-        if (!sent_to_client) {
+        },
+        .mapping => {},
+        .im_grab => if (self.getInputMethodGrab()) |keyboard_grab| {
             keyboard_grab.setKeyboard(keyboard_grab.keyboard);
             keyboard_grab.sendKey(event.time_msec, event.keycode, event.state);
-        }
-    } else if (!sent_to_client) {
-        const wlr_seat = self.device.seat.wlr_seat;
-        wlr_seat.setKeyboard(self.device.wlr_device.toKeyboard());
-        wlr_seat.keyboardNotifyKey(event.time_msec, event.keycode, event.state);
+        },
     }
+
+    // Release mappings don't interact with anything
+    if (released) _ = self.device.seat.handleMapping(keycode, modifiers, released, xkb_state);
 }
 
 fn isModifier(keysym: xkb.Keysym) bool {
