@@ -498,10 +498,12 @@ pub fn applyPending(root: *Self) void {
                     }
                 }
 
-                if (layout_count > 0) {
-                    // TODO don't do this if the count has not changed
-                    layout.startLayoutDemand(layout_count);
-                }
+                // This needs to be done if:
+                // - the count has changed
+                // - the layout name has changed due to:
+                //      - the current tag changing
+                //      - the layout changing from a command
+                layout.startLayoutDemand(layout_count);
             }
         }
     }
