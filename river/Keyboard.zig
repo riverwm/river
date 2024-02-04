@@ -143,7 +143,10 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
         // We can only eat a key on press; never on release
         if (released) break :blk self.eaten_keycodes.remove(event.keycode);
 
-        if (self.device.seat.handleMapping(keycode, modifiers, released, xkb_state)) {
+        if (self.device.seat.hasMapping(keycode, modifiers, released, xkb_state)) {
+            // The key needs to be eaten before the mapping is run
+            // Otherwise the mapping may e.g. trigger a focus change which sends an incorrect
+            // wl_keyboard.enter event since eaten_keycodes has not yet been updated.
             break :blk self.eaten_keycodes.add(event.keycode, .mapping);
         } else if (self.getInputMethodGrab() != null) {
             break :blk self.eaten_keycodes.add(event.keycode, .im_grab);
@@ -158,7 +161,11 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
             wlr_seat.setKeyboard(self.device.wlr_device.toKeyboard());
             wlr_seat.keyboardNotifyKey(event.time_msec, event.keycode, event.state);
         },
-        .mapping => {},
+        .mapping => if (!released) {
+            // We handle release mappings separately, regardless of whether press mapping exists
+            const handled = self.device.seat.handleMapping(keycode, modifiers, released, xkb_state);
+            assert(handled);
+        },
         .im_grab => if (self.getInputMethodGrab()) |keyboard_grab| {
             keyboard_grab.setKeyboard(keyboard_grab.keyboard);
             keyboard_grab.sendKey(event.time_msec, event.keycode, event.state);
