@@ -193,6 +193,11 @@ pub fn destroyPopups(self: Self) void {
 fn handleDestroy(listener: *wl.Listener(void)) void {
     const self = @fieldParentPtr(Self, "destroy", listener);
 
+    // This can be be non-null here if the client commits a protocol error or
+    // if it exits without destroying its wayland objects.
+    if (self.decoration) |*decoration| {
+        decoration.deinit();
+    }
     assert(self.decoration == null);
 
     // Remove listeners that are active for the entire lifetime of the view

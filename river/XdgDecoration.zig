@@ -52,11 +52,7 @@ pub fn init(wlr_decoration: *wlr.XdgToplevelDecorationV1) void {
     xdg_toplevel.view.pending.ssd = ssd;
 }
 
-fn handleDestroy(
-    listener: *wl.Listener(*wlr.XdgToplevelDecorationV1),
-    _: *wlr.XdgToplevelDecorationV1,
-) void {
-    const decoration = @fieldParentPtr(XdgDecoration, "destroy", listener);
+pub fn deinit(decoration: *XdgDecoration) void {
     const xdg_toplevel: *XdgToplevel = @ptrFromInt(decoration.wlr_decoration.toplevel.base.data);
 
     decoration.destroy.link.remove();
@@ -64,6 +60,15 @@ fn handleDestroy(
 
     assert(xdg_toplevel.decoration != null);
     xdg_toplevel.decoration = null;
+}
+
+fn handleDestroy(
+    listener: *wl.Listener(*wlr.XdgToplevelDecorationV1),
+    _: *wlr.XdgToplevelDecorationV1,
+) void {
+    const decoration = @fieldParentPtr(XdgDecoration, "destroy", listener);
+
+    decoration.deinit();
 }
 
 fn handleRequestMode(
