@@ -76,6 +76,10 @@ pub fn zoom(
         target.pending_wm_stack_link.remove();
         output.pending.wm_stack.prepend(target);
         seat.focus(target);
+        // Focus may not actually change here so seat.focus() may not automatically warp the cursor.
+        // Nevertheless, a cursor warp seems to be what users expect with `set-cursor-warp on-focus`
+        // configured, especially in combination with focus-follows-cursor.
+        seat.cursor.may_need_warp = true;
         server.root.applyPending();
     }
 }
