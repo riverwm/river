@@ -123,12 +123,8 @@ link: wl.list.Link,
 tree: *wlr.SceneTree,
 surface_tree: *wlr.SceneTree,
 saved_surface_tree: *wlr.SceneTree,
-borders: struct {
-    left: *wlr.SceneRect,
-    right: *wlr.SceneRect,
-    top: *wlr.SceneRect,
-    bottom: *wlr.SceneRect,
-},
+/// Order is left, right, top, bottom
+borders: [4]*wlr.SceneRect,
 popup_tree: *wlr.SceneTree,
 
 /// Bounds on the width/height of the view, set by the xdg_toplevel/xwayland_view implementation.
@@ -190,10 +186,10 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Self {
         .surface_tree = try tree.createSceneTree(),
         .saved_surface_tree = try tree.createSceneTree(),
         .borders = .{
-            .left = try tree.createSceneRect(0, 0, &server.config.border_color_unfocused),
-            .right = try tree.createSceneRect(0, 0, &server.config.border_color_unfocused),
-            .top = try tree.createSceneRect(0, 0, &server.config.border_color_unfocused),
-            .bottom = try tree.createSceneRect(0, 0, &server.config.border_color_unfocused),
+            try tree.createSceneRect(0, 0, &server.config.border_color_unfocused),
+            try tree.createSceneRect(0, 0, &server.config.border_color_unfocused),
+            try tree.createSceneRect(0, 0, &server.config.border_color_unfocused),
+            try tree.createSceneRect(0, 0, &server.config.border_color_unfocused),
         },
         .popup_tree = popup_tree,
 
@@ -317,38 +313,86 @@ pub fn updateCurrent(view: *Self) void {
     view.current = view.inflight;
     view.dropSavedSurfaceTree();
 
-    const color = blk: {
-        if (view.current.urgent) break :blk &config.border_color_urgent;
-        if (view.current.focus != 0) break :blk &config.border_color_focused;
-        break :blk &config.border_color_unfocused;
-    };
-
     const box = &view.current.box;
     view.tree.node.setPosition(box.x, box.y);
     view.popup_tree.node.setPosition(box.x, box.y);
 
-    const enable_borders = view.current.ssd and !view.current.fullscreen;
+    var output_box: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 };
+    if (view.current.output) |output| {
+        output.wlr_output.effectiveResolution(&output_box.width, &output_box.height);
+    }
 
-    const border_width: c_int = config.border_width;
-    view.borders.left.node.setEnabled(enable_borders);
-    view.borders.left.node.setPosition(-border_width, -border_width);
-    view.borders.left.setSize(border_width, box.height + 2 * border_width);
-    view.borders.left.setColor(color);
+    {
+        var surface_clip: wlr.Box = undefined;
+        _ = surface_clip.intersection(box, &output_box);
 
-    view.borders.right.node.setEnabled(enable_borders);
-    view.borders.right.node.setPosition(box.width, -border_width);
-    view.borders.right.setSize(border_width, box.height + 2 * border_width);
-    view.borders.right.setColor(color);
+        // The clip is applied relative to the root node of the subsurface tree.
+        surface_clip.x -= box.x;
+        surface_clip.y -= box.y;
 
-    view.borders.top.node.setEnabled(enable_borders);
-    view.borders.top.node.setPosition(0, -border_width);
-    view.borders.top.setSize(box.width, border_width);
-    view.borders.top.setColor(color);
+        switch (view.impl) {
+            .xdg_toplevel => |xdg_toplevel| {
+                surface_clip.x += xdg_toplevel.geometry.x;
+                surface_clip.y += xdg_toplevel.geometry.y;
+            },
+            .xwayland_view, .none => {},
+        }
 
-    view.borders.bottom.node.setEnabled(enable_borders);
-    view.borders.bottom.node.setPosition(0, box.height);
-    view.borders.bottom.setSize(box.width, border_width);
-    view.borders.bottom.setColor(color);
+        if (!view.surface_tree.children.empty()) {
+            view.surface_tree.node.subsurfaceTreeSetClip(&surface_clip);
+        }
+    }
+
+    {
+        const border_width: c_int = config.border_width;
+        const border_color = blk: {
+            if (view.current.urgent) break :blk &config.border_color_urgent;
+            if (view.current.focus != 0) break :blk &config.border_color_focused;
+            break :blk &config.border_color_unfocused;
+        };
+
+        // Order is left, right, top, bottom
+        // left and right borders include the corners, top and bottom do not.
+        var border_boxes = [4]wlr.Box{
+            .{
+                .x = -border_width,
+                .y = -border_width,
+                .width = border_width,
+                .height = box.height + 2 * border_width,
+            },
+            .{
+                .x = box.width,
+                .y = -border_width,
+                .width = border_width,
+                .height = box.height + 2 * border_width,
+            },
+            .{
+                .x = 0,
+                .y = -border_width,
+                .width = box.width,
+                .height = border_width,
+            },
+            .{
+                .x = 0,
+                .y = box.height,
+                .width = box.width,
+                .height = border_width,
+            },
+        };
+
+        for (&view.borders, &border_boxes) |border, *border_box| {
+            border_box.x += box.x;
+            border_box.y += box.y;
+            _ = border_box.intersection(border_box, &output_box);
+            border_box.x -= box.x;
+            border_box.y -= box.y;
+
+            border.node.setEnabled(view.current.ssd and !view.current.fullscreen);
+            border.node.setPosition(border_box.x, border_box.y);
+            border.setSize(border_box.width, border_box.height);
+            border.setColor(border_color);
+        }
+    }
 }
 
 /// Returns true if the configure should be waited for by the transaction system.
