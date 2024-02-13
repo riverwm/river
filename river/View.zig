@@ -272,26 +272,32 @@ pub fn resizeUpdatePosition(view: *Self, width: i32, height: i32) void {
     }
 }
 
-pub fn updateCurrent(view: *Self) void {
-    const config = &server.config;
+pub fn commitTransaction(view: *Self) void {
+    view.foreign_toplevel_handle.update();
+
+    // Tag and output changes must be applied immediately even if the configure sequence times out.
+    // This allows Root.commitTransaction() to rely on the fact that all tag and output changes
+    // are applied directly by this function.
+    view.current.tags = view.inflight.tags;
+    view.current.output = view.inflight.output;
+
+    view.dropSavedSurfaceTree();
 
     switch (view.impl) {
         .xdg_toplevel => |*xdg_toplevel| {
             switch (xdg_toplevel.configure_state) {
-                // If the configure timed out, don't update current to dimensions
-                // that have not been committed by the client.
-                .inflight, .acked => {
-                    if (view.inflight.resizing) {
-                        view.resizeUpdatePosition(view.current.box.width, view.current.box.height);
-                    }
-                    view.inflight.box.width = view.current.box.width;
-                    view.inflight.box.height = view.current.box.height;
-                    view.pending.box.width = view.current.box.width;
-                    view.pending.box.height = view.current.box.height;
+                .inflight => |serial| {
+                    xdg_toplevel.configure_state = .{ .timed_out = serial };
                 },
-                .idle, .committed => {},
+                .acked => {
+                    xdg_toplevel.configure_state = .timed_out_acked;
+                },
+                .idle, .committed => {
+                    xdg_toplevel.configure_state = .idle;
+                    view.updateCurrent();
+                },
+                .timed_out, .timed_out_acked => unreachable,
             }
-            xdg_toplevel.configure_state = .idle;
         },
         .xwayland_view => |xwayland_view| {
             if (view.inflight.resizing) {
@@ -300,18 +306,24 @@ pub fn updateCurrent(view: *Self) void {
                     xwayland_view.xwayland_surface.height,
                 );
             }
+
             view.inflight.box.width = xwayland_view.xwayland_surface.width;
             view.inflight.box.height = xwayland_view.xwayland_surface.height;
             view.pending.box.width = xwayland_view.xwayland_surface.width;
             view.pending.box.height = xwayland_view.xwayland_surface.height;
+
+            view.updateCurrent();
         },
         .none => {},
     }
+}
 
-    view.foreign_toplevel_handle.update();
+pub fn updateCurrent(view: *Self) void {
+    // Applied already in View.commitTransaction()
+    assert(view.current.tags == view.inflight.tags);
+    assert(view.current.output == view.inflight.output);
 
     view.current = view.inflight;
-    view.dropSavedSurfaceTree();
 
     const box = &view.current.box;
     view.tree.node.setPosition(box.x, box.y);
@@ -344,6 +356,7 @@ pub fn updateCurrent(view: *Self) void {
     }
 
     {
+        const config = &server.config;
         const border_width: c_int = config.border_width;
         const border_color = blk: {
             if (view.current.urgent) break :blk &config.border_color_urgent;

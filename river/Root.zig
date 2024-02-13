@@ -620,7 +620,7 @@ fn commitTransaction(root: *Self) void {
             view.tree.node.reparent(root.hidden.tree);
             view.popup_tree.node.reparent(root.hidden.tree);
 
-            view.updateCurrent();
+            view.commitTransaction();
         }
     }
 
@@ -657,7 +657,7 @@ fn commitTransaction(root: *Self) void {
                 }
             }
 
-            view.updateCurrent();
+            view.commitTransaction();
 
             const enabled = view.current.tags & output.current.tags != 0;
             view.tree.node.setEnabled(enabled);
