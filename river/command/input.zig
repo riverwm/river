@@ -16,11 +16,9 @@
 
 const std = @import("std");
 const mem = std.mem;
-const meta = std.meta;
 
 const server = &@import("../main.zig").server;
 const util = @import("../util.zig");
-const c = @import("../c.zig");
 
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
@@ -69,54 +67,8 @@ pub fn listInputConfigs(
     const writer = input_list.writer();
 
     for (server.input_manager.configs.items, 0..) |*input_config, i| {
-        if (i > 0) try input_list.appendSlice("\n");
-
-        try writer.print("{s}\n", .{input_config.identifier});
-
-        if (input_config.event_state) |event_state| {
-            try writer.print("\tevents: {s}\n", .{@tagName(event_state)});
-        }
-        if (input_config.accel_profile) |accel_profile| {
-            try writer.print("\taccel-profile: {s}\n", .{@tagName(accel_profile)});
-        }
-        if (input_config.click_method) |click_method| {
-            try writer.print("\tclick-method: {s}\n", .{@tagName(click_method)});
-        }
-        if (input_config.drag_state) |drag_state| {
-            try writer.print("\tdrag: {s}\n", .{@tagName(drag_state)});
-        }
-        if (input_config.drag_lock) |drag_lock| {
-            try writer.print("\tdrag-lock: {s}\n", .{@tagName(drag_lock)});
-        }
-        if (input_config.dwt_state) |dwt_state| {
-            try writer.print("\tdisable-while-typing: {s}\n", .{@tagName(dwt_state)});
-        }
-        if (input_config.middle_emulation) |middle_emulation| {
-            try writer.print("\tmiddle-emulation: {s}\n", .{@tagName(middle_emulation)});
-        }
-        if (input_config.natural_scroll) |natural_scroll| {
-            try writer.print("\tnatural-scroll: {s}\n", .{@tagName(natural_scroll)});
-        }
-        if (input_config.left_handed) |left_handed| {
-            try writer.print("\tleft-handed: {s}\n", .{@tagName(left_handed)});
-        }
-        if (input_config.tap_state) |tap_state| {
-            try writer.print("\ttap: {s}\n", .{@tagName(tap_state)});
-        }
-        if (input_config.tap_button_map) |tap_button_map| {
-            try writer.print("\ttap-button-map: {s}\n", .{@tagName(tap_button_map)});
-        }
-        if (input_config.pointer_accel) |pointer_accel| {
-            try writer.print("\tpointer-accel: {d}\n", .{pointer_accel.value});
-        }
-        if (input_config.scroll_method) |scroll_method| {
-            try writer.print("\tscroll-method: {s}\n", .{@tagName(scroll_method)});
-        }
-        if (input_config.scroll_button) |scroll_button| {
-            try writer.print("\tscroll-button: {s}\n", .{
-                mem.sliceTo(c.libevdev_event_code_get_name(c.EV_KEY, scroll_button.button), 0),
-            });
-        }
+        if (i > 0) try writer.writeByte('\n');
+        try input_config.write(writer);
     }
 
     out.* = try input_list.toOwnedSlice();
@@ -132,75 +84,26 @@ pub fn input(
 
     // Try to find an existing InputConfig with matching identifier, or create
     // a new one if none was found.
-    var new = false;
     const input_config = for (server.input_manager.configs.items) |*input_config| {
-        if (mem.eql(u8, input_config.identifier, args[1])) break input_config;
-    } else blk: {
-        try server.input_manager.configs.ensureUnusedCapacity(1);
-        server.input_manager.configs.appendAssumeCapacity(.{
-            .identifier = try util.gpa.dupe(u8, args[1]),
-        });
-        new = true;
-        break :blk &server.input_manager.configs.items[server.input_manager.configs.items.len - 1];
-    };
-    errdefer {
-        if (new) {
-            var cfg = server.input_manager.configs.pop();
-            cfg.deinit();
+        if (mem.eql(u8, input_config.identifier, args[1])) {
+            try input_config.parse(args[2], args[3]);
+            break input_config;
         }
-    }
+    } else blk: {
+        const identifier_owned = try util.gpa.dupe(u8, args[1]);
+        errdefer util.gpa.free(identifier_owned);
 
-    if (mem.eql(u8, "events", args[2])) {
-        input_config.event_state = meta.stringToEnum(InputConfig.EventState, args[3]) orelse
-            return Error.UnknownOption;
-    } else if (mem.eql(u8, "accel-profile", args[2])) {
-        input_config.accel_profile = meta.stringToEnum(InputConfig.AccelProfile, args[3]) orelse
-            return Error.UnknownOption;
-    } else if (mem.eql(u8, "click-method", args[2])) {
-        input_config.click_method = meta.stringToEnum(InputConfig.ClickMethod, args[3]) orelse
-            return Error.UnknownOption;
-    } else if (mem.eql(u8, "drag", args[2])) {
-        input_config.drag_state = meta.stringToEnum(InputConfig.DragState, args[3]) orelse
-            return Error.UnknownOption;
-    } else if (mem.eql(u8, "drag-lock", args[2])) {
-        input_config.drag_lock = meta.stringToEnum(InputConfig.DragLock, args[3]) orelse
-            return Error.UnknownOption;
-    } else if (mem.eql(u8, "disable-while-typing", args[2])) {
-        input_config.dwt_state = meta.stringToEnum(InputConfig.DwtState, args[3]) orelse
-            return Error.UnknownOption;
-    } else if (mem.eql(u8, "middle-emulation", args[2])) {
-        input_config.middle_emulation = meta.stringToEnum(InputConfig.MiddleEmulation, args[3]) orelse
-            return Error.UnknownOption;
-    } else if (mem.eql(u8, "natural-scroll", args[2])) {
-        input_config.natural_scroll = meta.stringToEnum(InputConfig.NaturalScroll, args[3]) orelse
-            return Error.UnknownOption;
-    } else if (mem.eql(u8, "left-handed", args[2])) {
-        input_config.left_handed = meta.stringToEnum(InputConfig.LeftHanded, args[3]) orelse
-            return Error.UnknownOption;
-    } else if (mem.eql(u8, "tap", args[2])) {
-        input_config.tap_state = meta.stringToEnum(InputConfig.TapState, args[3]) orelse
-            return Error.UnknownOption;
-    } else if (mem.eql(u8, "tap-button-map", args[2])) {
-        input_config.tap_button_map = meta.stringToEnum(InputConfig.TapButtonMap, args[3]) orelse
-            return Error.UnknownOption;
-    } else if (mem.eql(u8, "pointer-accel", args[2])) {
-        input_config.pointer_accel = InputConfig.PointerAccel{
-            .value = std.math.clamp(
-                try std.fmt.parseFloat(f32, args[3]),
-                @as(f32, -1.0),
-                @as(f32, 1.0),
-            ),
+        try server.input_manager.configs.ensureUnusedCapacity(1);
+        const input_config = server.input_manager.configs.addOneAssumeCapacity();
+        errdefer _ = server.input_manager.configs.pop();
+
+        input_config.* = .{
+            .identifier = identifier_owned,
         };
-    } else if (mem.eql(u8, "scroll-method", args[2])) {
-        input_config.scroll_method = meta.stringToEnum(InputConfig.ScrollMethod, args[3]) orelse
-            return Error.UnknownOption;
-    } else if (mem.eql(u8, "scroll-button", args[2])) {
-        const ret = c.libevdev_event_code_from_name(c.EV_KEY, args[3].ptr);
-        if (ret < 1) return Error.InvalidButton;
-        input_config.scroll_button = InputConfig.ScrollButton{ .button = @intCast(ret) };
-    } else {
-        return Error.UnknownCommand;
-    }
+        try input_config.parse(args[2], args[3]);
+
+        break :blk input_config;
+    };
 
     // Update matching existing input devices.
     var it = server.input_manager.devices.iterator(.forward);

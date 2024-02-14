@@ -1,6 +1,6 @@
 // This file is part of river, a dynamic tiling wayland compositor.
 //
-// Copyright 2021 The River Developers
+// Copyright 2021 - 2024 The River Developers
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -18,6 +18,9 @@ const Self = @This();
 
 const build_options = @import("build_options");
 const std = @import("std");
+const mem = std.mem;
+const math = std.math;
+const meta = std.meta;
 const wlr = @import("wlroots");
 
 const log = std.log.scoped(.input_config);
@@ -261,20 +264,20 @@ pub const ScrollButton = struct {
 
 identifier: []const u8,
 
-event_state: ?EventState = null,
-accel_profile: ?AccelProfile = null,
-click_method: ?ClickMethod = null,
-drag_state: ?DragState = null,
-drag_lock: ?DragLock = null,
-dwt_state: ?DwtState = null,
-middle_emulation: ?MiddleEmulation = null,
-natural_scroll: ?NaturalScroll = null,
-left_handed: ?LeftHanded = null,
-tap_state: ?TapState = null,
-tap_button_map: ?TapButtonMap = null,
-pointer_accel: ?PointerAccel = null,
-scroll_method: ?ScrollMethod = null,
-scroll_button: ?ScrollButton = null,
+@"event-state": ?EventState = null,
+@"accel-profile": ?AccelProfile = null,
+@"click-method": ?ClickMethod = null,
+@"drag-state": ?DragState = null,
+@"drag-lock": ?DragLock = null,
+@"dwt-state": ?DwtState = null,
+@"middle-emulation": ?MiddleEmulation = null,
+@"natural-scroll": ?NaturalScroll = null,
+@"left-handed": ?LeftHanded = null,
+@"tap-state": ?TapState = null,
+@"tap-button-map": ?TapButtonMap = null,
+@"pointer-accel": ?PointerAccel = null,
+@"scroll-method": ?ScrollMethod = null,
+@"scroll-button": ?ScrollButton = null,
 
 pub fn deinit(self: *Self) void {
     util.gpa.free(self.identifier);
@@ -283,18 +286,67 @@ pub fn deinit(self: *Self) void {
 pub fn apply(self: *Self, device: *InputDevice) void {
     const libinput_device: *c.libinput_device = @ptrCast(device.wlr_device.getLibinputDevice() orelse return);
     log.debug("applying input configuration to device: {s}", .{device.identifier});
-    if (self.event_state) |setting| setting.apply(libinput_device);
-    if (self.accel_profile) |setting| setting.apply(libinput_device);
-    if (self.click_method) |setting| setting.apply(libinput_device);
-    if (self.drag_state) |setting| setting.apply(libinput_device);
-    if (self.drag_lock) |setting| setting.apply(libinput_device);
-    if (self.dwt_state) |setting| setting.apply(libinput_device);
-    if (self.middle_emulation) |setting| setting.apply(libinput_device);
-    if (self.natural_scroll) |setting| setting.apply(libinput_device);
-    if (self.left_handed) |setting| setting.apply(libinput_device);
-    if (self.pointer_accel) |setting| setting.apply(libinput_device);
-    if (self.scroll_button) |setting| setting.apply(libinput_device);
-    if (self.scroll_method) |setting| setting.apply(libinput_device);
-    if (self.tap_state) |setting| setting.apply(libinput_device);
-    if (self.tap_button_map) |setting| setting.apply(libinput_device);
+
+    inline for (@typeInfo(Self).Struct.fields) |field| {
+        if (comptime mem.eql(u8, field.name, "identifier")) continue;
+
+        if (@field(self, field.name)) |setting| {
+            log.debug("applying setting: {s}", .{field.name});
+            setting.apply(libinput_device);
+        }
+    }
+}
+
+pub fn parse(self: *Self, setting: []const u8, value: []const u8) !void {
+    inline for (@typeInfo(Self).Struct.fields) |field| {
+        if (comptime mem.eql(u8, field.name, "identifier")) continue;
+
+        if (mem.eql(u8, setting, field.name)) {
+            // Special-case the settings which are not enums.
+            if (comptime mem.eql(u8, field.name, "pointer-accel")) {
+                self.@"pointer-accel" = PointerAccel{
+                    .value = math.clamp(try std.fmt.parseFloat(f32, value), -1.0, 1.0),
+                };
+            } else if (comptime mem.eql(u8, field.name, "scroll-button")) {
+                const ret = c.libevdev_event_code_from_name(c.EV_KEY, value.ptr);
+                if (ret < 1) return error.InvalidButton;
+                self.@"scroll-button" = ScrollButton{ .button = @intCast(ret) };
+            } else {
+                const T = @typeInfo(field.type).Optional.child;
+                if (@typeInfo(T) != .Enum) {
+                    @compileError("You forgot to implement parsing for an input configuration setting.");
+                }
+                @field(self, field.name) = meta.stringToEnum(T, value) orelse
+                    return error.UnknownOption;
+            }
+
+            return;
+        }
+    }
+
+    return error.UnknownCommand;
+}
+
+pub fn write(self: *Self, writer: anytype) !void {
+    try writer.print("{s}\n", .{self.identifier});
+
+    inline for (@typeInfo(Self).Struct.fields) |field| {
+        if (comptime mem.eql(u8, field.name, "identifier")) continue;
+        if (@field(self, field.name)) |setting| {
+            // Special-case the settings which are not enums.
+            if (comptime mem.eql(u8, field.name, "pointer-accel")) {
+                try writer.print("\tpointer-accel: {d}\n", .{setting.value});
+            } else if (comptime mem.eql(u8, field.name, "scroll-button")) {
+                try writer.print("\tscroll-button: {s}\n", .{
+                    mem.sliceTo(c.libevdev_event_code_get_name(c.EV_KEY, setting.button), 0),
+                });
+            } else {
+                const T = @typeInfo(field.type).Optional.child;
+                if (@typeInfo(T) != .Enum) {
+                    @compileError("You forgot to implement listing for an input configuration setting.");
+                }
+                try writer.print("\t{s}: {s}\n", .{ field.name, @tagName(setting) });
+            }
+        }
+    }
 }
