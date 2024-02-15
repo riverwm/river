@@ -264,16 +264,17 @@ pub const ScrollButton = struct {
 
 identifier: []const u8,
 
-@"event-state": ?EventState = null,
+// Note: Field names equal name of the setting in the 'input' command.
+events: ?EventState = null,
 @"accel-profile": ?AccelProfile = null,
 @"click-method": ?ClickMethod = null,
-@"drag-state": ?DragState = null,
+drag: ?DragState = null,
 @"drag-lock": ?DragLock = null,
-@"dwt-state": ?DwtState = null,
+@"disable-while-typing": ?DwtState = null,
 @"middle-emulation": ?MiddleEmulation = null,
 @"natural-scroll": ?NaturalScroll = null,
 @"left-handed": ?LeftHanded = null,
-@"tap-state": ?TapState = null,
+tap: ?TapState = null,
 @"tap-button-map": ?TapButtonMap = null,
 @"pointer-accel": ?PointerAccel = null,
 @"scroll-method": ?ScrollMethod = null,
