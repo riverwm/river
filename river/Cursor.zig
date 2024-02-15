@@ -130,6 +130,7 @@ xcursor_name: ?[*:0]const u8 = null,
 pressed_count: u32 = 0,
 
 hide_cursor_timer: *wl.EventSource,
+focus_cursor_timer: *wl.EventSource,
 
 hidden: bool = false,
 may_need_warp: bool = false,
@@ -195,9 +196,12 @@ pub fn init(self: *Self, seat: *Seat) !void {
         .pointer_gestures = try wlr.PointerGesturesV1.create(server.wl_server),
         .xcursor_manager = xcursor_manager,
         .hide_cursor_timer = try event_loop.addTimer(*Self, handleHideCursorTimeout, self),
+        .focus_cursor_timer = try event_loop.addTimer(*Self, handleFocusCursorTimeout, self),
     };
     errdefer self.hide_cursor_timer.remove();
+    errdefer self.focus_cursor_timer.remove();
     try self.hide_cursor_timer.timerUpdate(server.config.cursor_hide_timeout);
+    try self.focus_cursor_timer.timerUpdate(0);
     try self.setTheme(null, null);
 
     // wlr_cursor *only* displays an image on screen. It does not move around
@@ -227,6 +231,7 @@ pub fn init(self: *Self, seat: *Seat) !void {
 
 pub fn deinit(self: *Self) void {
     self.hide_cursor_timer.remove();
+    self.focus_cursor_timer.remove();
     self.xcursor_manager.destroy();
     self.wlr_cursor.destroy();
 }
@@ -905,14 +910,35 @@ pub fn checkFocusFollowsCursor(self: *Self) void {
         if (server.config.focus_follows_cursor == .normal and
             last_target == view) return;
         if (self.seat.focused != .view or self.seat.focused.view != view) {
-            self.seat.focusOutput(view.current.output.?);
-            self.seat.focus(view);
-            server.root.applyPending();
+            if (server.config.focus_follows_cursor_timeout > 0) {
+                self.focus_cursor_timer.timerUpdate(server.config.focus_follows_cursor_timeout) catch {
+                    log.err("failed to update cursor focus timeout", .{});
+                };
+            } else {
+                self.seat.focusOutput(view.current.output.?);
+                self.seat.focus(view);
+                server.root.applyPending();
+            }
         }
     } else {
         // The output doesn't contain any views, just focus the output.
         self.updateOutputFocus(self.wlr_cursor.x, self.wlr_cursor.y);
     }
+}
+
+fn handleFocusCursorTimeout(self: *Self) c_int {
+    log.debug("focus cursor timeout", .{});
+    self.focus_cursor_timer.timerUpdate(0) catch {
+        log.err("failed to update cursor focus timeout", .{});
+    };
+    if (self.focus_follows_cursor_target) |view| {
+        if (self.seat.focused != .view or self.seat.focused.view != view) {
+            self.seat.focusOutput(view.current.output.?);
+            self.seat.focus(view);
+            server.root.applyPending();
+        }
+    }
+    return 0;
 }
 
 fn updateFocusFollowsCursorTarget(self: *Self) void {

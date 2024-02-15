@@ -101,6 +101,9 @@ rules: struct {
 /// The selected focus_follows_cursor mode
 focus_follows_cursor: FocusFollowsCursorMode = .disabled,
 
+/// Moves focus after timeout in milliseconds
+focus_follows_cursor_timeout: u31 = 0,
+
 /// If true, the cursor warps to the center of the focused output
 warp_cursor: WarpCursorMode = .disabled,
 

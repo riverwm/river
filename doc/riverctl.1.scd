@@ -391,6 +391,11 @@ matches everything while _\*\*_ and the empty string are invalid.
 	If the view to be focused is on an output that does not have focus,
 	focus is switched to that output.
 
+*focus-follows-cursor* *timeout* _timeout_
+	Delays focus change _timeout_ milliseconds after:
+	- cursor remains over a single view (if _normal_ mode is used)
+	- cursor stops moving (if _always_ mode is used)
+
 *hide-cursor* *timeout* _timeout_
 	Hide the cursor if it wasn't moved in the last _timeout_ milliseconds
 	until it is moved again. The default value is 0, which disables

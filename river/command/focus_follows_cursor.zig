@@ -28,7 +28,17 @@ pub fn focusFollowsCursor(
     _: *?[]const u8,
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
-    if (args.len > 2) return Error.TooManyArguments;
+    if (args.len > 2) {
+        if (args.len > 3) return Error.TooManyArguments;
+        if (std.mem.eql(u8, "timeout", args[1])) {
+            if (args.len < 3) return Error.NotEnoughArguments;
+            if (args.len > 3) return Error.TooManyArguments;
+            server.config.focus_follows_cursor_timeout = try std.fmt.parseInt(u31, args[2], 10);
+        } else {
+            return Error.UnknownOption;
+        }
+        return;
+    }
 
     server.config.focus_follows_cursor =
         std.meta.stringToEnum(Config.FocusFollowsCursorMode, args[1]) orelse return Error.UnknownOption;
