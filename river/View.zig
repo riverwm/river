@@ -335,8 +335,7 @@ pub fn updateCurrent(view: *Self) void {
     }
 
     {
-        var surface_clip: wlr.Box = undefined;
-        _ = surface_clip.intersection(box, &output_box);
+        var surface_clip: wlr.Box = output_box;
 
         // The clip is applied relative to the root node of the subsurface tree.
         surface_clip.x -= box.x;
