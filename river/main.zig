@@ -41,7 +41,7 @@ const usage: []const u8 =
     \\
     \\  -h                 Print this help message and exit.
     \\  -version           Print the version number and exit.
-    \\  -c <command>       Run `sh -c <command>` on startup.
+    \\  -c <command>       Run `sh -c <command>` on startup instead of the default init executable.
     \\  -log-level <level> Set the log level to error, warning, info, or debug.
     \\  -no-xwayland       Disable xwayland even if built with support.
     \\
