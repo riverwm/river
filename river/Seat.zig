@@ -304,18 +304,16 @@ pub fn keyboardEnterOrLeave(self: *Self, target_surface: ?*wlr.Surface) void {
 
 fn keyboardNotifyEnter(self: *Self, wlr_surface: *wlr.Surface) void {
     if (self.wlr_seat.getKeyboard()) |wlr_keyboard| {
-        var keycodes = Keyboard.KeycodeSet{
-            .items = wlr_keyboard.keycodes,
-            .reason = .{.none} ** 32,
-            .len = wlr_keyboard.num_keycodes,
-        };
-
         const keyboard: *Keyboard = @ptrFromInt(wlr_keyboard.data);
-        keycodes.subtract(keyboard.eaten_keycodes);
+
+        var keycodes: std.BoundedArray(u32, 32) = .{};
+        for (keyboard.keycodes.items.constSlice()) |item| {
+            if (item.consumer == .focus) keycodes.appendAssumeCapacity(item.code);
+        }
 
         self.wlr_seat.keyboardNotifyEnter(
             wlr_surface,
-            &keycodes.items,
+            &keycodes.buffer,
             keycodes.len,
             &wlr_keyboard.modifiers,
         );

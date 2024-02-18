@@ -31,63 +31,52 @@ const InputDevice = @import("InputDevice.zig");
 
 const log = std.log.scoped(.keyboard);
 
-const EatReason = enum {
-    /// Not eaten
-    none,
+const KeyConsumer = enum {
     mapping,
     im_grab,
+    /// Seat's focused client (xdg or layer shell)
+    focus,
 };
 
-pub const KeycodeSet = struct {
-    items: [32]u32 = undefined,
-    reason: [32]EatReason = undefined,
-    len: usize = 0,
+const KeySet = struct {
+    const Key = struct {
+        code: u32,
+        consumer: KeyConsumer,
+    };
 
-    pub fn add(set: *KeycodeSet, new: u32, reason: EatReason) EatReason {
-        for (set.items[0..set.len]) |item| assert(new != item);
+    items: std.BoundedArray(Key, 32) = .{},
 
-        comptime assert(@typeInfo(std.meta.fieldInfo(KeycodeSet, .items).type).Array.len ==
+    comptime {
+        // The same magic number is also used in Seat.keyboardNotifyEnter()
+        assert(@typeInfo(std.meta.fieldInfo(
+            std.meta.fieldInfo(KeySet, .items).type,
+            .buffer,
+        ).type).Array.len ==
             @typeInfo(std.meta.fieldInfo(wlr.Keyboard, .keycodes).type).Array.len);
-
-        if (set.len == set.items.len) {
-            log.err("KeycodeSet limit reached, code {d} omitted", .{new});
-            // We can't eat the release, don't eat the press
-            return .none;
-        }
-
-        set.items[set.len] = new;
-        set.reason[set.len] = reason;
-        set.len += 1;
-
-        return reason;
     }
 
-    pub fn remove(set: *KeycodeSet, old: u32) EatReason {
-        for (set.items[0..set.len], set.reason[0..set.len], 0..) |item, reason, idx| {
-            if (old == item) {
-                set.len -= 1;
-                if (set.len > 0) {
-                    set.items[idx] = set.items[set.len];
-                    set.reason[idx] = set.reason[set.len];
-                }
+    pub fn add(keyset: *KeySet, new: Key) error{Overflow}!void {
+        for (keyset.items.constSlice()) |item| assert(new.code != item.code);
 
-                return reason;
-            }
-        }
-
-        return .none;
+        keyset.items.append(new) catch |err| {
+            log.err("KeySet limit reached, code {d} omitted", .{new.code});
+            return err;
+        };
     }
 
-    /// Removes other's contents from set (if present), regardless of reason
-    pub fn subtract(set: *KeycodeSet, other: KeycodeSet) void {
-        for (other.items[0..other.len]) |item| _ = set.remove(item);
+    pub fn remove(keyset: *KeySet, code: u32) ?KeyConsumer {
+        for (keyset.items.constSlice(), 0..) |item, idx| {
+            if (item.code == code) return keyset.items.swapRemove(idx).consumer;
+        }
+
+        return null;
     }
 };
 
 device: InputDevice,
 
-/// Pressed keys for which a mapping was triggered on press
-eaten_keycodes: KeycodeSet = .{},
+/// Pressed keys along with where they've been sent
+keycodes: KeySet = .{},
 
 key: wl.Listener(*wlr.Keyboard.event.Key) = wl.Listener(*wlr.Keyboard.event.Key).init(handleKey),
 modifiers: wl.Listener(*wlr.Keyboard) = wl.Listener(*wlr.Keyboard).init(handleModifiers),
@@ -191,28 +180,29 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
     // the corresponding release event sent to the same client.
     // Similarly, no press event means no release event.
 
-    const eat_reason = blk: {
-        // We can only eat a key on press; never on release
-        if (released) break :blk self.eaten_keycodes.remove(event.keycode);
+    const consumer: KeyConsumer = blk: {
+        // Decision is made on press; release only follows it
+        if (released) break :blk self.keycodes.remove(event.keycode) orelse unreachable;
 
         if (self.device.seat.hasMapping(keycode, modifiers, released, xkb_state)) {
-            // The key needs to be eaten before the mapping is run
-            // Otherwise the mapping may e.g. trigger a focus change which sends an incorrect
-            // wl_keyboard.enter event since eaten_keycodes has not yet been updated.
-            break :blk self.eaten_keycodes.add(event.keycode, .mapping);
+            // We cannot handle the mapping before we know if the key gets saved,
+            // in order to pair press/release mappings as expected (and for
+            // consistency and code simplicity)
+            break :blk .mapping;
         } else if (self.getInputMethodGrab() != null) {
-            break :blk self.eaten_keycodes.add(event.keycode, .im_grab);
+            break :blk .im_grab;
         }
 
-        break :blk .none;
+        break :blk .focus;
     };
 
-    switch (eat_reason) {
-        .none => {
-            const wlr_seat = self.device.seat.wlr_seat;
-            wlr_seat.setKeyboard(self.device.wlr_device.toKeyboard());
-            wlr_seat.keyboardNotifyKey(event.time_msec, event.keycode, event.state);
-        },
+    if (!released) self.keycodes.add(.{ .code = event.keycode, .consumer = consumer }) catch {
+        // We've run out of capacity and cannot process the key correctly.
+        // If wlroots hasn't failed on a similar assertion, this logic needs to be updated.
+        unreachable;
+    };
+
+    switch (consumer) {
         .mapping => if (!released) {
             // We handle release mappings separately, regardless of whether press mapping exists
             const handled = self.device.seat.handleMapping(keycode, modifiers, released, xkb_state);
@@ -221,6 +211,11 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
         .im_grab => if (self.getInputMethodGrab()) |keyboard_grab| {
             keyboard_grab.setKeyboard(keyboard_grab.keyboard);
             keyboard_grab.sendKey(event.time_msec, event.keycode, event.state);
+        },
+        .focus => {
+            const wlr_seat = self.device.seat.wlr_seat;
+            wlr_seat.setKeyboard(self.device.wlr_device.toKeyboard());
+            wlr_seat.keyboardNotifyKey(event.time_msec, event.keycode, event.state);
         },
     }
 
