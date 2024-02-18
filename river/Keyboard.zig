@@ -38,35 +38,30 @@ const KeyConsumer = enum {
     focus,
 };
 
-const KeySet = struct {
+pub const Pressed = struct {
     const Key = struct {
         code: u32,
         consumer: KeyConsumer,
     };
 
-    items: std.BoundedArray(Key, 32) = .{},
+    pub const capacity = 32;
 
     comptime {
-        // The same magic number is also used in Seat.keyboardNotifyEnter()
-        assert(@typeInfo(std.meta.fieldInfo(
-            std.meta.fieldInfo(KeySet, .items).type,
-            .buffer,
-        ).type).Array.len ==
-            @typeInfo(std.meta.fieldInfo(wlr.Keyboard, .keycodes).type).Array.len);
+        // wlroots uses a buffer of length 32 for pressed keys and asserts that it does not overflow.
+        assert(capacity == @typeInfo(std.meta.fieldInfo(wlr.Keyboard, .keycodes).type).Array.len);
     }
 
-    pub fn add(keyset: *KeySet, new: Key) error{Overflow}!void {
-        for (keyset.items.constSlice()) |item| assert(new.code != item.code);
+    keys: std.BoundedArray(Key, capacity) = .{},
 
-        keyset.items.append(new) catch |err| {
-            log.err("KeySet limit reached, code {d} omitted", .{new.code});
-            return err;
-        };
+    pub fn add(pressed: *Pressed, new: Key) void {
+        for (pressed.keys.constSlice()) |item| assert(new.code != item.code);
+
+        pressed.keys.append(new) catch unreachable; // see comptime assert above
     }
 
-    pub fn remove(keyset: *KeySet, code: u32) ?KeyConsumer {
-        for (keyset.items.constSlice(), 0..) |item, idx| {
-            if (item.code == code) return keyset.items.swapRemove(idx).consumer;
+    pub fn remove(pressed: *Pressed, code: u32) ?KeyConsumer {
+        for (pressed.keys.constSlice(), 0..) |item, idx| {
+            if (item.code == code) return pressed.keys.swapRemove(idx).consumer;
         }
 
         return null;
@@ -75,8 +70,8 @@ const KeySet = struct {
 
 device: InputDevice,
 
-/// Pressed keys along with where they've been sent
-keycodes: KeySet = .{},
+/// Pressed keys along with where their press event has been sent
+pressed: Pressed = .{},
 
 key: wl.Listener(*wlr.Keyboard.event.Key) = wl.Listener(*wlr.Keyboard.event.Key).init(handleKey),
 modifiers: wl.Listener(*wlr.Keyboard) = wl.Listener(*wlr.Keyboard).init(handleModifiers),
@@ -176,18 +171,18 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
         if (!released and handleBuiltinMapping(sym)) return;
     }
 
-    // Every sent press event, to a regular client or the IM, should have
+    // Every sent press event, to a regular client or the input method, should have
     // the corresponding release event sent to the same client.
     // Similarly, no press event means no release event.
 
     const consumer: KeyConsumer = blk: {
         // Decision is made on press; release only follows it
-        if (released) break :blk self.keycodes.remove(event.keycode) orelse unreachable;
+        if (released) break :blk self.pressed.remove(event.keycode).?;
 
         if (self.device.seat.hasMapping(keycode, modifiers, released, xkb_state)) {
-            // We cannot handle the mapping before we know if the key gets saved,
-            // in order to pair press/release mappings as expected (and for
-            // consistency and code simplicity)
+            // The key must be added to the set of pressed keys with the correct consumer before
+            // the mapping is run. Otherwise, the mapping may, for example, trigger a focus change
+            // which sends an incorrect wl_keyboard.enter event.
             break :blk .mapping;
         } else if (self.getInputMethodGrab() != null) {
             break :blk .im_grab;
@@ -196,11 +191,7 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
         break :blk .focus;
     };
 
-    if (!released) self.keycodes.add(.{ .code = event.keycode, .consumer = consumer }) catch {
-        // We've run out of capacity and cannot process the key correctly.
-        // If wlroots hasn't failed on a similar assertion, this logic needs to be updated.
-        unreachable;
-    };
+    if (!released) self.pressed.add(.{ .code = event.keycode, .consumer = consumer });
 
     switch (consumer) {
         .mapping => if (!released) {

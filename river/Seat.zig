@@ -306,8 +306,8 @@ fn keyboardNotifyEnter(self: *Self, wlr_surface: *wlr.Surface) void {
     if (self.wlr_seat.getKeyboard()) |wlr_keyboard| {
         const keyboard: *Keyboard = @ptrFromInt(wlr_keyboard.data);
 
-        var keycodes: std.BoundedArray(u32, 32) = .{};
-        for (keyboard.keycodes.items.constSlice()) |item| {
+        var keycodes: std.BoundedArray(u32, Keyboard.Pressed.capacity) = .{};
+        for (keyboard.pressed.keys.constSlice()) |item| {
             if (item.consumer == .focus) keycodes.appendAssumeCapacity(item.code);
         }
 
