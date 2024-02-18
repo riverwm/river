@@ -1,6 +1,6 @@
 // This file is part of river, a dynamic tiling wayland compositor.
 //
-// Copyright 2020 The River Developers
+// Copyright 2020 - 2024 The River Developers
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -34,7 +34,6 @@ const InputManager = @import("InputManager.zig");
 const InputRelay = @import("InputRelay.zig");
 const Keyboard = @import("Keyboard.zig");
 const KeyboardGroup = @import("KeyboardGroup.zig");
-const KeycodeSet = @import("KeycodeSet.zig");
 const LayerSurface = @import("LayerSurface.zig");
 const LockSurface = @import("LockSurface.zig");
 const Mapping = @import("Mapping.zig");
@@ -305,7 +304,7 @@ pub fn keyboardEnterOrLeave(self: *Self, target_surface: ?*wlr.Surface) void {
 
 fn keyboardNotifyEnter(self: *Self, wlr_surface: *wlr.Surface) void {
     if (self.wlr_seat.getKeyboard()) |wlr_keyboard| {
-        var keycodes = KeycodeSet{
+        var keycodes = Keyboard.KeycodeSet{
             .items = wlr_keyboard.keycodes,
             .reason = .{.none} ** 32,
             .len = wlr_keyboard.num_keycodes,

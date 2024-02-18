@@ -26,11 +26,63 @@ const globber = @import("globber");
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
-const KeycodeSet = @import("KeycodeSet.zig");
 const Seat = @import("Seat.zig");
 const InputDevice = @import("InputDevice.zig");
 
 const log = std.log.scoped(.keyboard);
+
+const EatReason = enum {
+    /// Not eaten
+    none,
+    mapping,
+    im_grab,
+};
+
+pub const KeycodeSet = struct {
+    items: [32]u32 = undefined,
+    reason: [32]EatReason = undefined,
+    len: usize = 0,
+
+    pub fn add(set: *KeycodeSet, new: u32, reason: EatReason) EatReason {
+        for (set.items[0..set.len]) |item| assert(new != item);
+
+        comptime assert(@typeInfo(std.meta.fieldInfo(KeycodeSet, .items).type).Array.len ==
+            @typeInfo(std.meta.fieldInfo(wlr.Keyboard, .keycodes).type).Array.len);
+
+        if (set.len == set.items.len) {
+            log.err("KeycodeSet limit reached, code {d} omitted", .{new});
+            // We can't eat the release, don't eat the press
+            return .none;
+        }
+
+        set.items[set.len] = new;
+        set.reason[set.len] = reason;
+        set.len += 1;
+
+        return reason;
+    }
+
+    pub fn remove(set: *KeycodeSet, old: u32) EatReason {
+        for (set.items[0..set.len], set.reason[0..set.len], 0..) |item, reason, idx| {
+            if (old == item) {
+                set.len -= 1;
+                if (set.len > 0) {
+                    set.items[idx] = set.items[set.len];
+                    set.reason[idx] = set.reason[set.len];
+                }
+
+                return reason;
+            }
+        }
+
+        return .none;
+    }
+
+    /// Removes other's contents from set (if present), regardless of reason
+    pub fn subtract(set: *KeycodeSet, other: KeycodeSet) void {
+        for (other.items[0..other.len]) |item| _ = set.remove(item);
+    }
+};
 
 device: InputDevice,
 
