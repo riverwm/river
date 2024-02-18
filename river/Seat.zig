@@ -313,12 +313,11 @@ fn keyboardNotifyEnter(self: *Self, wlr_surface: *wlr.Surface) void {
 
         self.wlr_seat.keyboardNotifyEnter(
             wlr_surface,
-            &keycodes.buffer,
-            keycodes.len,
+            keycodes.constSlice(),
             &wlr_keyboard.modifiers,
         );
     } else {
-        self.wlr_seat.keyboardNotifyEnter(wlr_surface, null, 0, null);
+        self.wlr_seat.keyboardNotifyEnter(wlr_surface, &.{}, null);
     }
 }
 
