@@ -82,8 +82,8 @@ pub fn init(device: *InputDevice, seat: *Seat, wlr_device: *wlr.InputDevice) !vo
     // Keyboard groups are implemented as "virtual" input devices which we don't want to expose
     // in riverctl list-inputs as they can't be configured.
     if (!isKeyboardGroup(wlr_device)) {
-        // Apply any matching input device configuration.
-        for (server.input_manager.configs.items) |*input_config| {
+        // Apply all matching input device configuration.
+        for (server.input_manager.configs.items) |input_config| {
             if (globber.match(identifier, input_config.glob)) {
                 input_config.apply(device);
             }

@@ -16,8 +16,6 @@
 
 const std = @import("std");
 const mem = std.mem;
-const meta = std.meta;
-const math = std.math;
 const sort = std.sort;
 
 const globber = @import("globber");
@@ -28,7 +26,6 @@ const util = @import("../util.zig");
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 const InputConfig = @import("../InputConfig.zig");
-const InputManager = @import("../InputManager.zig");
 
 pub fn listInputs(
     _: *Seat,
@@ -96,20 +93,19 @@ pub fn input(
             try input_config.parse(args[2], args[3]);
         }
     } else {
-        const glob_owned = try util.gpa.dupe(u8, args[1]);
-        errdefer util.gpa.free(glob_owned);
+        var input_config: InputConfig = .{
+            .glob = try util.gpa.dupe(u8, args[1]),
+        };
+        errdefer util.gpa.free(input_config.glob);
 
         try server.input_manager.configs.ensureUnusedCapacity(1);
-        const input_config = server.input_manager.configs.addOneAssumeCapacity();
-        errdefer _ = server.input_manager.configs.pop();
 
-        input_config.* = .{
-            .glob = glob_owned,
-        };
         try input_config.parse(args[2], args[3]);
+
+        server.input_manager.configs.appendAssumeCapacity(input_config);
     }
 
-    // Sort input configs by generality.
+    // Sort input configs from most general to least general
     sort.insertion(InputConfig, server.input_manager.configs.items, {}, lessThan);
 
     // We need to update all input device matching the glob. The user may
@@ -123,9 +119,9 @@ pub fn input(
         // the same.
         if (!globber.match(device.identifier, args[1])) continue;
 
-        for (server.input_manager.configs.items) |ic| {
-            if (globber.match(device.identifier, ic.glob)) {
-                ic.apply(device);
+        for (server.input_manager.configs.items) |config| {
+            if (globber.match(device.identifier, config.glob)) {
+                config.apply(device);
             }
         }
     }
