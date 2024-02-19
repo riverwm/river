@@ -47,19 +47,25 @@ pub const Pressed = struct {
     pub const capacity = 32;
 
     comptime {
-        // wlroots uses a buffer of length 32 for pressed keys and asserts that it does not overflow.
+        // wlroots uses a buffer of length 32 to track pressed keys and does not track pressed
+        // keys beyond that limit. It seems likely that this can cause some inconsistency within
+        // wlroots in the case that someone has 32 fingers and the hardware supports N-key rollover.
+        //
+        // Furthermore, wlroots will continue to forward key press/release events to river if more
+        // than 32 keys are pressed. Therefore river chooses to ignore keypresses that would take
+        // the keyboard beyond 32 simultaneously pressed keys.
         assert(capacity == @typeInfo(std.meta.fieldInfo(wlr.Keyboard, .keycodes).type).Array.len);
     }
 
     keys: std.BoundedArray(Key, capacity) = .{},
 
-    pub fn add(pressed: *Pressed, new: Key) void {
+    fn addAssumeCapacity(pressed: *Pressed, new: Key) void {
         for (pressed.keys.constSlice()) |item| assert(new.code != item.code);
 
-        pressed.keys.append(new) catch unreachable; // see comptime assert above
+        pressed.keys.appendAssumeCapacity(new);
     }
 
-    pub fn remove(pressed: *Pressed, code: u32) ?KeyConsumer {
+    fn remove(pressed: *Pressed, code: u32) ?KeyConsumer {
         for (pressed.keys.constSlice(), 0..) |item, idx| {
             if (item.code == code) return pressed.keys.swapRemove(idx).consumer;
         }
@@ -177,15 +183,18 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
 
     const consumer: KeyConsumer = blk: {
         // Decision is made on press; release only follows it
-        if (released) break :blk self.pressed.remove(event.keycode) orelse {
-            // This can happen for example when switching from a different tty
-            return;
-        };
+        if (released) {
+            // The released key might not be in the pressed set when switching from a different tty
+            // or if the press was ignored due to >32 keys being pressed simultaneously.
+            break :blk self.pressed.remove(event.keycode) orelse return;
+        }
 
-        if (self.device.seat.hasMapping(keycode, modifiers, released, xkb_state)) {
-            // The key must be added to the set of pressed keys with the correct consumer before
-            // the mapping is run. Otherwise, the mapping may, for example, trigger a focus change
-            // which sends an incorrect wl_keyboard.enter event.
+        // Ignore key presses beyond 32 simultaneously pressed keys (see comments in Pressed).
+        // We must ensure capacity before calling handleMapping() to ensure that we either run
+        // both the press and release mapping for certain key or neither mapping.
+        self.pressed.keys.ensureUnusedCapacity(1) catch return;
+
+        if (self.device.seat.handleMapping(keycode, modifiers, released, xkb_state)) {
             break :blk .mapping;
         } else if (self.getInputMethodGrab() != null) {
             break :blk .im_grab;
@@ -194,14 +203,14 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
         break :blk .focus;
     };
 
-    if (!released) self.pressed.add(.{ .code = event.keycode, .consumer = consumer });
+    if (!released) {
+        self.pressed.addAssumeCapacity(.{ .code = event.keycode, .consumer = consumer });
+    }
 
     switch (consumer) {
-        .mapping => if (!released) {
-            // We handle release mappings separately, regardless of whether press mapping exists
-            const handled = self.device.seat.handleMapping(keycode, modifiers, released, xkb_state);
-            assert(handled);
-        },
+        // Press mappings are handled above when determining the consumer of the press
+        // Release mappings are handled separately as they are executed independent of the consumer.
+        .mapping => {},
         .im_grab => if (self.getInputMethodGrab()) |keyboard_grab| {
             keyboard_grab.setKeyboard(keyboard_grab.keyboard);
             keyboard_grab.sendKey(event.time_msec, event.keycode, event.state);
