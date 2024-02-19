@@ -88,7 +88,11 @@ pub fn init(self: *Self) !void {
     self.seats.prepend(seat_node);
     try seat_node.data.init(default_seat_name);
 
-    if (build_options.xwayland) server.xwayland.setSeat(self.defaultSeat().wlr_seat);
+    if (build_options.xwayland) {
+        if (server.xwayland) |xwayland| {
+            xwayland.setSeat(self.defaultSeat().wlr_seat);
+        }
+    }
 
     server.backend.events.new_input.add(&self.new_input);
     self.virtual_pointer_manager.events.new_virtual_pointer.add(&self.new_virtual_pointer);

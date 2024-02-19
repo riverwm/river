@@ -43,6 +43,7 @@ const usage: []const u8 =
     \\  -version           Print the version number and exit.
     \\  -c <command>       Run `sh -c <command>` on startup.
     \\  -log-level <level> Set the log level to error, warning, info, or debug.
+    \\  -no-xwayland       Disable xwayland even if built with support.
     \\
 ;
 
@@ -54,6 +55,7 @@ pub fn main() anyerror!void {
         .{ .name = "version", .kind = .boolean },
         .{ .name = "c", .kind = .arg },
         .{ .name = "log-level", .kind = .arg },
+        .{ .name = "no-xwayland", .kind = .boolean },
     }).parse(os.argv[1..]) catch {
         try io.getStdErr().writeAll(usage);
         os.exit(1);
@@ -87,6 +89,7 @@ pub fn main() anyerror!void {
             os.exit(1);
         }
     }
+    const enable_xwayland = !result.flags.@"no-xwayland";
     const startup_command = blk: {
         if (result.flags.c) |command| {
             break :blk try util.gpa.dupeZ(u8, command);
@@ -111,7 +114,7 @@ pub fn main() anyerror!void {
     try os.sigaction(os.SIG.PIPE, &sig_ign, null);
 
     log.info("river version {s}, initializing server", .{build_options.version});
-    try server.init();
+    try server.init(enable_xwayland);
     defer server.deinit();
 
     try server.start();

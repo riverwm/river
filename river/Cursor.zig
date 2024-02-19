@@ -249,17 +249,19 @@ pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
         if (theme) |t| if (c.setenv("XCURSOR_THEME", t, 1) < 0) return error.OutOfMemory;
 
         if (build_options.xwayland) {
-            try xcursor_manager.load(1);
-            const wlr_xcursor = xcursor_manager.getXcursor("left_ptr", 1).?;
-            const image = wlr_xcursor.images[0];
-            server.xwayland.setCursor(
-                image.buffer,
-                image.width * 4,
-                image.width,
-                image.height,
-                @intCast(image.hotspot_x),
-                @intCast(image.hotspot_y),
-            );
+            if (server.xwayland) |xwayland| {
+                try xcursor_manager.load(1);
+                const wlr_xcursor = xcursor_manager.getXcursor("left_ptr", 1).?;
+                const image = wlr_xcursor.images[0];
+                xwayland.setCursor(
+                    image.buffer,
+                    image.width * 4,
+                    image.width,
+                    image.height,
+                    @intCast(image.hotspot_x),
+                    @intCast(image.hotspot_y),
+                );
+            }
         }
     }
 
@@ -937,6 +939,7 @@ fn updateFocusFollowsCursorTarget(self: *Self) void {
             },
             .xwayland_override_redirect => {
                 assert(build_options.xwayland);
+                assert(server.xwayland != null);
                 self.focus_follows_cursor_target = null;
             },
         }

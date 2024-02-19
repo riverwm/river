@@ -36,6 +36,9 @@ utility may be used to communicate with river over these protocols.
 	are logged.  At the *debug* log level, everything is logged including
 	verbose debug messages.
 
+*-no-xwayland*
+	Disable xwayland at runtime even if river has been built with support.
+
 # CONFIGURATION
 
 On startup river will run an executable file at $XDG_CONFIG_HOME/river/init if

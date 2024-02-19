@@ -64,7 +64,7 @@ new_toplevel_decoration: wl.Listener(*wlr.XdgToplevelDecorationV1),
 layer_shell: *wlr.LayerShellV1,
 new_layer_surface: wl.Listener(*wlr.LayerSurfaceV1),
 
-xwayland: if (build_options.xwayland) *wlr.Xwayland else void,
+xwayland: if (build_options.xwayland) ?*wlr.Xwayland else void,
 new_xwayland_surface: if (build_options.xwayland) wl.Listener(*wlr.XwaylandSurface) else void,
 
 foreign_toplevel_manager: *wlr.ForeignToplevelManagerV1,
@@ -83,7 +83,7 @@ layout_manager: LayoutManager,
 idle_inhibitor_manager: IdleInhibitorManager,
 lock_manager: LockManager,
 
-pub fn init(self: *Self) !void {
+pub fn init(self: *Self, runtime_xwayland: bool) !void {
     self.wl_server = try wl.Server.create();
     errdefer self.wl_server.destroy();
 
@@ -130,9 +130,13 @@ pub fn init(self: *Self) !void {
     self.layer_shell.events.new_surface.add(&self.new_layer_surface);
 
     if (build_options.xwayland) {
-        self.xwayland = try wlr.Xwayland.create(self.wl_server, compositor, false);
-        self.new_xwayland_surface.setNotify(handleNewXwaylandSurface);
-        self.xwayland.events.new_surface.add(&self.new_xwayland_surface);
+        if (runtime_xwayland) {
+            self.xwayland = try wlr.Xwayland.create(self.wl_server, compositor, false);
+            self.new_xwayland_surface.setNotify(handleNewXwaylandSurface);
+            self.xwayland.?.events.new_surface.add(&self.new_xwayland_surface);
+        } else {
+            self.xwayland = null;
+        }
     }
 
     self.foreign_toplevel_manager = try wlr.ForeignToplevelManagerV1.create(self.wl_server);
@@ -177,8 +181,10 @@ pub fn deinit(self: *Self) void {
     self.request_activate.link.remove();
 
     if (build_options.xwayland) {
-        self.new_xwayland_surface.link.remove();
-        self.xwayland.destroy();
+        if (self.xwayland) |xwayland| {
+            self.new_xwayland_surface.link.remove();
+            xwayland.destroy();
+        }
     }
 
     self.wl_server.destroyClients();
@@ -205,7 +211,9 @@ pub fn start(self: Self) !void {
     // TODO: don't use libc's setenv
     if (c.setenv("WAYLAND_DISPLAY", socket.ptr, 1) < 0) return error.SetenvError;
     if (build_options.xwayland) {
-        if (c.setenv("DISPLAY", self.xwayland.display_name, 1) < 0) return error.SetenvError;
+        if (self.xwayland) |xwayland| {
+            if (c.setenv("DISPLAY", xwayland.display_name, 1) < 0) return error.SetenvError;
+        }
     }
 }
 
