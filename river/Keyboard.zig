@@ -177,7 +177,10 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
 
     const consumer: KeyConsumer = blk: {
         // Decision is made on press; release only follows it
-        if (released) break :blk self.pressed.remove(event.keycode).?;
+        if (released) break :blk self.pressed.remove(event.keycode) orelse {
+            // This can happen for example when switching from a different tty
+            return;
+        };
 
         if (self.device.seat.hasMapping(keycode, modifiers, released, xkb_state)) {
             // The key must be added to the set of pressed keys with the correct consumer before
