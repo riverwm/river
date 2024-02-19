@@ -286,9 +286,7 @@ pub fn deactivateOutput(root: *Self, output: *Output) void {
     // is being removed, store the views in Root.fallback_pending.
     const fallback_output = blk: {
         var it = root.active_outputs.iterator(.forward);
-        if (it.next()) |o| break :blk o;
-
-        break :blk null;
+        break :blk it.next();
     };
     if (fallback_output) |fallback| {
         var it = output.pending.focus_stack.safeIterator(.reverse);
