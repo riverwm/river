@@ -37,16 +37,12 @@ pub const EventState = enum {
     disabled,
     @"disabled-on-external-mouse",
 
-    pub fn apply(event_state: EventState, device: *c.libinput_device) void {
-        const want: u32 = switch (event_state) {
+    fn apply(event_state: EventState, device: *c.libinput_device) void {
+        _ = c.libinput_device_config_send_events_set_mode(device, switch (event_state) {
             .enabled => c.LIBINPUT_CONFIG_SEND_EVENTS_ENABLED,
             .disabled => c.LIBINPUT_CONFIG_SEND_EVENTS_DISABLED,
             .@"disabled-on-external-mouse" => c.LIBINPUT_CONFIG_SEND_EVENTS_DISABLED_ON_EXTERNAL_MOUSE,
-        };
-        const current = c.libinput_device_config_send_events_get_mode(device);
-        if (want != current) {
-            _ = c.libinput_device_config_send_events_set_mode(device, want);
-        }
+        });
     }
 };
 
@@ -55,17 +51,12 @@ pub const AccelProfile = enum {
     flat,
     adaptive,
 
-    pub fn apply(accel_profile: AccelProfile, device: *c.libinput_device) void {
-        const want = @as(c_uint, switch (accel_profile) {
+    fn apply(accel_profile: AccelProfile, device: *c.libinput_device) void {
+        _ = c.libinput_device_config_accel_set_profile(device, switch (accel_profile) {
             .none => c.LIBINPUT_CONFIG_ACCEL_PROFILE_NONE,
             .flat => c.LIBINPUT_CONFIG_ACCEL_PROFILE_FLAT,
             .adaptive => c.LIBINPUT_CONFIG_ACCEL_PROFILE_ADAPTIVE,
         });
-        if (c.libinput_device_config_accel_is_available(device) == 0) return;
-        const current = c.libinput_device_config_accel_get_profile(device);
-        if (want != current) {
-            _ = c.libinput_device_config_accel_set_profile(device, want);
-        }
     }
 };
 
@@ -74,15 +65,12 @@ pub const ClickMethod = enum {
     @"button-areas",
     clickfinger,
 
-    pub fn apply(click_method: ClickMethod, device: *c.libinput_device) void {
-        const want = @as(c_uint, switch (click_method) {
+    fn apply(click_method: ClickMethod, device: *c.libinput_device) void {
+        _ = c.libinput_device_config_click_set_method(device, switch (click_method) {
             .none => c.LIBINPUT_CONFIG_CLICK_METHOD_NONE,
             .@"button-areas" => c.LIBINPUT_CONFIG_CLICK_METHOD_BUTTON_AREAS,
             .clickfinger => c.LIBINPUT_CONFIG_CLICK_METHOD_CLICKFINGER,
         });
-        const supports = c.libinput_device_config_click_get_methods(device);
-        if (supports & want == 0) return;
-        _ = c.libinput_device_config_click_set_method(device, want);
     }
 };
 
@@ -90,16 +78,11 @@ pub const DragState = enum {
     disabled,
     enabled,
 
-    pub fn apply(drag_state: DragState, device: *c.libinput_device) void {
-        const want = @as(c_uint, switch (drag_state) {
+    fn apply(drag_state: DragState, device: *c.libinput_device) void {
+        _ = c.libinput_device_config_tap_set_drag_enabled(device, switch (drag_state) {
             .disabled => c.LIBINPUT_CONFIG_DRAG_DISABLED,
             .enabled => c.LIBINPUT_CONFIG_DRAG_ENABLED,
         });
-        if (c.libinput_device_config_tap_get_finger_count(device) <= 0) return;
-        const current = c.libinput_device_config_tap_get_drag_enabled(device);
-        if (want != current) {
-            _ = c.libinput_device_config_tap_set_drag_enabled(device, want);
-        }
     }
 };
 
@@ -107,16 +90,11 @@ pub const DragLock = enum {
     disabled,
     enabled,
 
-    pub fn apply(drag_lock: DragLock, device: *c.libinput_device) void {
-        const want = @as(c_uint, switch (drag_lock) {
+    fn apply(drag_lock: DragLock, device: *c.libinput_device) void {
+        _ = c.libinput_device_config_tap_set_drag_lock_enabled(device, switch (drag_lock) {
             .disabled => c.LIBINPUT_CONFIG_DRAG_LOCK_DISABLED,
             .enabled => c.LIBINPUT_CONFIG_DRAG_LOCK_ENABLED,
         });
-        if (c.libinput_device_config_tap_get_finger_count(device) <= 0) return;
-        const current = c.libinput_device_config_tap_get_drag_lock_enabled(device);
-        if (want != current) {
-            _ = c.libinput_device_config_tap_set_drag_lock_enabled(device, want);
-        }
     }
 };
 
@@ -124,16 +102,11 @@ pub const DwtState = enum {
     disabled,
     enabled,
 
-    pub fn apply(dwt_state: DwtState, device: *c.libinput_device) void {
-        const want = @as(c_uint, switch (dwt_state) {
+    fn apply(dwt_state: DwtState, device: *c.libinput_device) void {
+        _ = c.libinput_device_config_dwt_set_enabled(device, switch (dwt_state) {
             .disabled => c.LIBINPUT_CONFIG_DWT_DISABLED,
             .enabled => c.LIBINPUT_CONFIG_DWT_ENABLED,
         });
-        if (c.libinput_device_config_dwt_is_available(device) == 0) return;
-        const current = c.libinput_device_config_dwt_get_enabled(device);
-        if (want != current) {
-            _ = c.libinput_device_config_dwt_set_enabled(device, want);
-        }
     }
 };
 
@@ -141,16 +114,11 @@ pub const DwtpState = enum {
     disabled,
     enabled,
 
-    pub fn apply(dwtp_state: DwtpState, device: *c.libinput_device) void {
-        const want = @as(c_uint, switch (dwtp_state) {
+    fn apply(dwtp_state: DwtpState, device: *c.libinput_device) void {
+        _ = c.libinput_device_config_dwtp_set_enabled(device, switch (dwtp_state) {
             .disabled => c.LIBINPUT_CONFIG_DWTP_DISABLED,
             .enabled => c.LIBINPUT_CONFIG_DWTP_ENABLED,
         });
-        if (c.libinput_device_config_dwtp_is_available(device) == 0) return;
-        const current = c.libinput_device_config_dwtp_get_enabled(device);
-        if (want != current) {
-            _ = c.libinput_device_config_dwtp_set_enabled(device, want);
-        }
     }
 };
 
@@ -158,16 +126,11 @@ pub const MiddleEmulation = enum {
     disabled,
     enabled,
 
-    pub fn apply(middle_emulation: MiddleEmulation, device: *c.libinput_device) void {
-        const want = @as(c_uint, switch (middle_emulation) {
+    fn apply(middle_emulation: MiddleEmulation, device: *c.libinput_device) void {
+        _ = c.libinput_device_config_middle_emulation_set_enabled(device, switch (middle_emulation) {
             .disabled => c.LIBINPUT_CONFIG_MIDDLE_EMULATION_DISABLED,
             .enabled => c.LIBINPUT_CONFIG_MIDDLE_EMULATION_ENABLED,
         });
-        if (c.libinput_device_config_middle_emulation_is_available(device) == 0) return;
-        const current = c.libinput_device_config_middle_emulation_get_enabled(device);
-        if (want != current) {
-            _ = c.libinput_device_config_middle_emulation_set_enabled(device, want);
-        }
     }
 };
 
@@ -175,16 +138,11 @@ pub const NaturalScroll = enum {
     disabled,
     enabled,
 
-    pub fn apply(natural_scroll: NaturalScroll, device: *c.libinput_device) void {
-        const want: c_int = switch (natural_scroll) {
+    fn apply(natural_scroll: NaturalScroll, device: *c.libinput_device) void {
+        _ = c.libinput_device_config_scroll_set_natural_scroll_enabled(device, switch (natural_scroll) {
             .disabled => 0,
             .enabled => 1,
-        };
-        if (c.libinput_device_config_scroll_has_natural_scroll(device) == 0) return;
-        const current = c.libinput_device_config_scroll_get_natural_scroll_enabled(device);
-        if (want != current) {
-            _ = c.libinput_device_config_scroll_set_natural_scroll_enabled(device, want);
-        }
+        });
     }
 };
 
@@ -192,16 +150,11 @@ pub const LeftHanded = enum {
     disabled,
     enabled,
 
-    pub fn apply(left_handed: LeftHanded, device: *c.libinput_device) void {
-        const want: c_int = switch (left_handed) {
+    fn apply(left_handed: LeftHanded, device: *c.libinput_device) void {
+        _ = c.libinput_device_config_left_handed_set(device, switch (left_handed) {
             .disabled => 0,
             .enabled => 1,
-        };
-        if (c.libinput_device_config_left_handed_is_available(device) == 0) return;
-        const current = c.libinput_device_config_left_handed_get(device);
-        if (want != current) {
-            _ = c.libinput_device_config_left_handed_set(device, want);
-        }
+        });
     }
 };
 
@@ -209,16 +162,11 @@ pub const TapState = enum {
     disabled,
     enabled,
 
-    pub fn apply(tap_state: TapState, device: *c.libinput_device) void {
-        const want = @as(c_uint, switch (tap_state) {
+    fn apply(tap_state: TapState, device: *c.libinput_device) void {
+        _ = c.libinput_device_config_tap_set_enabled(device, switch (tap_state) {
             .disabled => c.LIBINPUT_CONFIG_TAP_DISABLED,
             .enabled => c.LIBINPUT_CONFIG_TAP_ENABLED,
         });
-        if (c.libinput_device_config_tap_get_finger_count(device) <= 0) return;
-        const current = c.libinput_device_config_tap_get_enabled(device);
-        if (want != current) {
-            _ = c.libinput_device_config_tap_set_enabled(device, want);
-        }
     }
 };
 
@@ -226,27 +174,19 @@ pub const TapButtonMap = enum {
     @"left-middle-right",
     @"left-right-middle",
 
-    pub fn apply(tap_button_map: TapButtonMap, device: *c.libinput_device) void {
-        const want = @as(c_uint, switch (tap_button_map) {
+    fn apply(tap_button_map: TapButtonMap, device: *c.libinput_device) void {
+        _ = c.libinput_device_config_tap_set_button_map(device, switch (tap_button_map) {
             .@"left-right-middle" => c.LIBINPUT_CONFIG_TAP_MAP_LRM,
             .@"left-middle-right" => c.LIBINPUT_CONFIG_TAP_MAP_LMR,
         });
-        if (c.libinput_device_config_tap_get_finger_count(device) <= 0) return;
-        const current = c.libinput_device_config_tap_get_button_map(device);
-        if (want != current) {
-            _ = c.libinput_device_config_tap_set_button_map(device, want);
-        }
     }
 };
 
 pub const PointerAccel = struct {
     value: f32,
 
-    pub fn apply(pointer_accel: PointerAccel, device: *c.libinput_device) void {
-        if (c.libinput_device_config_accel_is_available(device) == 0) return;
-        if (c.libinput_device_config_accel_get_speed(device) != pointer_accel.value) {
-            _ = c.libinput_device_config_accel_set_speed(device, pointer_accel.value);
-        }
+    fn apply(pointer_accel: PointerAccel, device: *c.libinput_device) void {
+        _ = c.libinput_device_config_accel_set_speed(device, pointer_accel.value);
     }
 };
 
@@ -256,25 +196,20 @@ pub const ScrollMethod = enum {
     edge,
     button,
 
-    pub fn apply(scroll_method: ScrollMethod, device: *c.libinput_device) void {
-        const want = @as(c_uint, switch (scroll_method) {
+    fn apply(scroll_method: ScrollMethod, device: *c.libinput_device) void {
+        _ = c.libinput_device_config_scroll_set_method(device, switch (scroll_method) {
             .none => c.LIBINPUT_CONFIG_SCROLL_NO_SCROLL,
             .@"two-finger" => c.LIBINPUT_CONFIG_SCROLL_2FG,
             .edge => c.LIBINPUT_CONFIG_SCROLL_EDGE,
             .button => c.LIBINPUT_CONFIG_SCROLL_ON_BUTTON_DOWN,
         });
-        const supports = c.libinput_device_config_scroll_get_methods(device);
-        if (supports & want == 0) return;
-        _ = c.libinput_device_config_scroll_set_method(device, want);
     }
 };
 
 pub const ScrollButton = struct {
     button: u32,
 
-    pub fn apply(scroll_button: ScrollButton, device: *c.libinput_device) void {
-        const supports = c.libinput_device_config_scroll_get_methods(device);
-        if (supports & ~@as(u32, c.LIBINPUT_CONFIG_SCROLL_NO_SCROLL) == 0) return;
+    fn apply(scroll_button: ScrollButton, device: *c.libinput_device) void {
         _ = c.libinput_device_config_scroll_set_button(device, scroll_button.button);
     }
 };
