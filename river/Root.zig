@@ -192,7 +192,6 @@ pub fn init(self: *Self) !void {
 }
 
 pub fn deinit(self: *Self) void {
-    self.scene.tree.node.destroy();
     self.output_layout.destroy();
     self.transaction_timeout.remove();
 }

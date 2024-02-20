@@ -190,6 +190,12 @@ pub fn deinit(self: *Self) void {
     self.wl_server.destroyClients();
 
     self.backend.destroy();
+
+    // The scene graph needs to be destroyed after the backend but before the renderer
+    // Output destruction requires the scene graph to still be around while the scene
+    // graph may require the renderer to still be around to destroy textures it seems.
+    self.root.scene.tree.node.destroy();
+
     self.renderer.destroy();
     self.allocator.destroy();
 
