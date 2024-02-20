@@ -112,19 +112,7 @@ pub fn input(
     // add an input configuration at an arbitrary position in the generality
     // ordered list, so the simplest way to ensure the device is configured
     // correctly is to apply all input configurations again, in order.
-    var it = server.input_manager.devices.iterator(.forward);
-    while (it.next()) |device| {
-        // Device does not match the glob given in the command, so its
-        // configuration state after applying all configs again would be
-        // the same.
-        if (!globber.match(device.identifier, args[1])) continue;
-
-        for (server.input_manager.configs.items) |config| {
-            if (globber.match(device.identifier, config.glob)) {
-                config.apply(device);
-            }
-        }
-    }
+    server.input_manager.reconfigureDevices();
 }
 
 fn lessThan(_: void, a: InputConfig, b: InputConfig) bool {

@@ -527,6 +527,11 @@ However note that not every input device supports every property.
 	Set the scroll button of an input device. _button_ is the name of a Linux
 	input event code.
 
+*input* _name_ *map-to-output* _output_|*disabled*
+	Maps the input to a given output. This is valid even if the output isn't
+	currently active and will lead to the device being mapped once it is
+	connected.
+
 # EXAMPLES
 
 Bind Super+Return in normal mode to spawn a *foot*(1) terminal:

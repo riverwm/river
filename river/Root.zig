@@ -246,6 +246,8 @@ fn handleNewOutput(_: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
         }
         wlr_output.destroy();
     };
+
+    server.input_manager.reconfigureDevices();
 }
 
 /// Remove the output from root.active_outputs and the output layout.
@@ -334,6 +336,10 @@ pub fn deactivateOutput(root: *Self, output: *Output) void {
         root.notifyLayoutDemandDone();
     }
     while (output.layouts.first) |node| node.data.destroy();
+
+    // We must call reconfigureDevices here to unmap devices that might be mapped to this output
+    // in order to prevent a segfault in wlroots.
+    server.input_manager.reconfigureDevices();
 }
 
 /// Add the output to root.active_outputs and the output layout if it has not

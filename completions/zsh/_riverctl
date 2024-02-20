@@ -123,6 +123,7 @@ _riverctl()
                                 'tap-button-map:Configure the button mapping for tapping'
                                 'scroll-method:Set the scroll method'
                                 'scroll-button:Set the scroll button'
+                                'map-to-output:Map to a given output'
                             )
 
                         _describe -t command 'command' input_subcommands

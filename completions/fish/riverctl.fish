@@ -116,6 +116,7 @@ complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 3' -a 'tap-button-map'       -d 'Configure the button mapping for tapping'
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 3' -a 'scroll-method'        -d 'Set the scroll method'
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 3' -a 'scroll-button'        -d 'Set the scroll button'
+complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 3' -a 'map-to-output'        -d 'Map to a given output'
 
 # Subcommands for the subcommands of 'input'
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 4; and __fish_seen_subcommand_from drag drag-lock disable-while-typing disable-while-trackpointing middle-emulation natural-scroll left-handed tap' -a 'enabled disabled'
