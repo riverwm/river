@@ -131,6 +131,8 @@ popup_tree: *wlr.SceneTree,
 constraints: Constraints = .{},
 
 mapped: bool = false,
+/// This is true if the View is involved in the currently inflight transaction.
+inflight_transaction: bool = false,
 /// This indicates that the view should be destroyed when the current
 /// transaction completes. See View.destroy()
 destroying: bool = false,
@@ -273,6 +275,9 @@ pub fn resizeUpdatePosition(view: *Self, width: i32, height: i32) void {
 }
 
 pub fn commitTransaction(view: *Self) void {
+    assert(view.inflight_transaction);
+    view.inflight_transaction = false;
+
     view.foreign_toplevel_handle.update();
 
     // Tag and output changes must be applied immediately even if the configure sequence times out.
