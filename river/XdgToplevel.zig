@@ -118,6 +118,11 @@ pub fn configure(self: *Self) bool {
         .inflight, .acked, .committed => unreachable,
     }
 
+    defer switch (self.configure_state) {
+        .idle, .inflight, .acked => {},
+        .timed_out, .timed_out_acked, .committed => unreachable,
+    };
+
     const inflight = &self.view.inflight;
     const current = &self.view.current;
 
@@ -135,7 +140,20 @@ pub fn configure(self: *Self) bool {
         inflight.ssd == current.ssd and
         inflight.resizing == current.resizing)
     {
-        return false;
+        // If no new configure is required, continue to track a timed out configure
+        // from the previous transaction if any.
+        switch (self.configure_state) {
+            .idle => return false,
+            .timed_out => |serial| {
+                self.configure_state = .{ .inflight = serial };
+                return true;
+            },
+            .timed_out_acked => {
+                self.configure_state = .acked;
+                return true;
+            },
+            .inflight, .acked, .committed => unreachable,
+        }
     }
 
     _ = self.xdg_toplevel.setActivated(inflight.focus != 0);
@@ -160,8 +178,11 @@ pub fn configure(self: *Self) bool {
     const configure_serial = self.xdg_toplevel.setSize(inflight.box.width, inflight.box.height);
 
     // Only track configures with the transaction system if they affect the dimensions of the view.
+    // If the configure state is not idle this means we are currently tracking a timed out
+    // configure from a previous transaction and should instead track the newly sent configure.
     if (inflight.box.width == current.box.width and
-        inflight.box.height == current.box.height)
+        inflight.box.height == current.box.height and
+        self.configure_state == .idle)
     {
         return false;
     }
