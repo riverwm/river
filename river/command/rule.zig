@@ -183,6 +183,8 @@ pub fn ruleDel(_: *Seat, args: []const [:0]const u8, _: *?[]const u8) Error!void
 fn apply_ssd_rules() void {
     var it = server.root.views.iterator(.forward);
     while (it.next()) |view| {
+        if (view.destroying) continue;
+
         if (server.config.rules.ssd.match(view)) |ssd| {
             view.pending.ssd = ssd;
         }

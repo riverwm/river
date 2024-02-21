@@ -15,6 +15,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
+const assert = std.debug.assert;
 const mem = std.mem;
 
 const globber = @import("globber");
@@ -98,6 +99,7 @@ pub fn RuleList(comptime T: type) type {
         /// Returns the value of the most specific rule matching the view.
         /// Returns null if no rule matches.
         pub fn match(list: *Self, view: *View) ?T {
+            assert(!view.destroying);
             const app_id = mem.sliceTo(view.getAppId(), 0) orelse "";
             const title = mem.sliceTo(view.getTitle(), 0) orelse "";
 
