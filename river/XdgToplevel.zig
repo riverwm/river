@@ -348,19 +348,28 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
             const no_layout = view.current.output != null and view.current.output.?.layout == null;
 
             if (size_changed) {
-                log.info(
+                log.debug(
                     "client initiated size change: {}x{} -> {}x{}",
                     .{ old_geometry.width, old_geometry.height, self.geometry.width, self.geometry.height },
                 );
-                if ((view.current.float or no_layout) and !view.current.fullscreen) {
-                    view.current.box.width = self.geometry.width;
-                    view.current.box.height = self.geometry.height;
-                    view.pending.box.width = self.geometry.width;
-                    view.pending.box.height = self.geometry.height;
-                    server.root.applyPending();
-                } else {
-                    log.err("client is buggy and initiated size change while tiled or fullscreen", .{});
+                if (!(view.current.float or no_layout) and !view.current.fullscreen) {
+                    // It seems that a disappointingly high number of clients have a buggy
+                    // response to configure events. They ack the configure immediately but then
+                    // proceed to make one or more wl_surface.commit requests with the old size
+                    // before updating the size of the surface. This obviously makes river's
+                    // efforts towards frame perfection futile for such clients. However, in the
+                    // interest of best serving river's users we will fix up their size here after
+                    // logging a shame message.
+                    log.err("client with app-id '{s}' is buggy and initiated size change while tiled or fullscreen, shame on it", .{
+                        view.getAppId() orelse "",
+                    });
                 }
+
+                view.inflight.box.width = self.geometry.width;
+                view.inflight.box.height = self.geometry.height;
+                view.pending.box.width = self.geometry.width;
+                view.pending.box.height = self.geometry.height;
+                view.updateCurrent();
             }
         },
         // If the client has not yet acked our configure, we need to send a

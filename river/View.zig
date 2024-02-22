@@ -324,10 +324,6 @@ pub fn commitTransaction(view: *Self) void {
 }
 
 pub fn updateCurrent(view: *Self) void {
-    // Applied already in View.commitTransaction()
-    assert(view.current.tags == view.inflight.tags);
-    assert(view.current.output == view.inflight.output);
-
     view.current = view.inflight;
 
     const box = &view.current.box;
