@@ -218,28 +218,28 @@ pub const MapToOutput = struct {
     output_name: ?[]const u8,
 
     fn apply(map_to_output: MapToOutput, device: *wlr.InputDevice) void {
-        const output = out: {
+        const wlr_output = blk: {
             if (map_to_output.output_name) |name| {
                 var it = server.root.active_outputs.iterator(.forward);
-                while (it.next()) |outp| {
-                    if (mem.eql(u8, mem.span(outp.wlr_output.name), name)) {
-                        break :out outp.wlr_output;
+                while (it.next()) |output| {
+                    if (mem.eql(u8, mem.span(output.wlr_output.name), name)) {
+                        break :blk output.wlr_output;
                     }
                 }
             }
-
-            break :out null;
+            break :blk null;
         };
 
         switch (device.type) {
             .pointer, .touch, .tablet_tool => {
                 log.debug("mapping input '{s}' -> '{s}'", .{
                     device.name,
-                    if (output) |o| o.name else "<no output>",
+                    if (wlr_output) |o| o.name else "<no output>",
                 });
 
                 // TODO: support multiple seats
-                server.input_manager.defaultSeat().cursor.wlr_cursor.mapInputToOutput(device, output);
+                const seat = server.input_manager.defaultSeat();
+                seat.cursor.wlr_cursor.mapInputToOutput(device, wlr_output);
             },
 
             // These devices do not support being mapped to outputs.
@@ -270,8 +270,9 @@ tap: ?TapState = null,
 
 pub fn deinit(self: *Self) void {
     util.gpa.free(self.glob);
-    if (self.@"map-to-output".output_name) |name|
-        util.gpa.free(name);
+    if (self.@"map-to-output".output_name) |output_name| {
+        util.gpa.free(output_name);
+    }
 }
 
 pub fn apply(self: *const Self, device: *InputDevice) void {
@@ -281,17 +282,11 @@ pub fn apply(self: *const Self, device: *InputDevice) void {
     inline for (@typeInfo(Self).Struct.fields) |field| {
         if (comptime mem.eql(u8, field.name, "glob")) continue;
 
-        if (@as(if (@typeInfo(field.type) == .Optional)
-            field.type
-        else
-            ?field.type, @field(self, field.name))) |setting|
-        {
+        if (comptime mem.eql(u8, field.name, "map-to-output")) {
+            @field(self, field.name).apply(device.wlr_device);
+        } else if (@field(self, field.name)) |setting| {
             log.debug("applying setting: {s}", .{field.name});
-            if (comptime mem.eql(u8, field.name, "map-to-output")) {
-                setting.apply(device.wlr_device);
-            } else {
-                setting.apply(libinput_device);
-            }
+            setting.apply(libinput_device);
         }
     }
 }
@@ -311,12 +306,16 @@ pub fn parse(self: *Self, setting: []const u8, value: []const u8) !void {
                 if (ret < 1) return error.InvalidButton;
                 self.@"scroll-button" = ScrollButton{ .button = @intCast(ret) };
             } else if (comptime mem.eql(u8, field.name, "map-to-output")) {
-                if (self.@"map-to-output".output_name) |name|
-                    util.gpa.free(name);
-
-                self.@"map-to-output" = MapToOutput{
-                    .output_name = if (std.mem.eql(u8, value, "disabled")) null else try util.gpa.dupe(u8, value),
+                const output_name_owned = blk: {
+                    if (mem.eql(u8, value, "disabled")) {
+                        break :blk null;
+                    } else {
+                        break :blk try util.gpa.dupe(u8, value);
+                    }
                 };
+
+                if (self.@"map-to-output".output_name) |old| util.gpa.free(old);
+                self.@"map-to-output" = .{ .output_name = output_name_owned };
             } else {
                 const T = @typeInfo(field.type).Optional.child;
                 if (@typeInfo(T) != .Enum) {
@@ -338,11 +337,12 @@ pub fn write(self: *Self, writer: anytype) !void {
 
     inline for (@typeInfo(Self).Struct.fields) |field| {
         if (comptime mem.eql(u8, field.name, "glob")) continue;
-        if (@as(if (@typeInfo(field.type) == .Optional)
-            field.type
-        else
-            ?field.type, @field(self, field.name))) |setting|
-        {
+
+        if (comptime mem.eql(u8, field.name, "map-to-output")) {
+            if (@field(self, field.name).output_name) |output_name| {
+                try writer.print("\tmap-to-output: {s}\n", .{output_name});
+            }
+        } else if (@field(self, field.name)) |setting| {
             // Special-case the settings which are not enums.
             if (comptime mem.eql(u8, field.name, "pointer-accel")) {
                 try writer.print("\tpointer-accel: {d}\n", .{setting.value});
@@ -350,9 +350,6 @@ pub fn write(self: *Self, writer: anytype) !void {
                 try writer.print("\tscroll-button: {s}\n", .{
                     mem.sliceTo(c.libevdev_event_code_get_name(c.EV_KEY, setting.button), 0),
                 });
-            } else if (comptime mem.eql(u8, field.name, "map-to-output")) {
-                if (setting.output_name) |outp|
-                    try writer.print("\tmap-to-output: {s}\n", .{outp});
             } else {
                 const T = @typeInfo(field.type).Optional.child;
                 if (@typeInfo(T) != .Enum) {

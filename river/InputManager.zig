@@ -23,6 +23,8 @@ const mem = std.mem;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
+const globber = @import("globber");
+
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
@@ -144,7 +146,7 @@ pub fn reconfigureDevices(self: *Self) void {
     var it = self.devices.iterator(.forward);
     while (it.next()) |device| {
         for (self.configs.items) |config| {
-            if (@import("globber").match(device.identifier, config.glob)) {
+            if (globber.match(device.identifier, config.glob)) {
                 config.apply(device);
             }
         }
