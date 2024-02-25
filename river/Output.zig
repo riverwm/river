@@ -409,6 +409,8 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
 
     util.gpa.destroy(output);
 
+    server.root.sendOutputManagerConfig();
+
     server.root.applyPending();
 }
 

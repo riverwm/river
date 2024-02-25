@@ -81,7 +81,6 @@ views: wl.list.Head(View, .link),
 new_output: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleNewOutput),
 
 output_layout: *wlr.OutputLayout,
-layout_change: wl.Listener(*wlr.OutputLayout) = wl.Listener(*wlr.OutputLayout).init(handleLayoutChange),
 
 output_manager: *wlr.OutputManagerV1,
 manager_apply: wl.Listener(*wlr.OutputConfigurationV1) =
@@ -186,7 +185,6 @@ pub fn init(self: *Self) !void {
     server.backend.events.new_output.add(&self.new_output);
     self.output_manager.events.apply.add(&self.manager_apply);
     self.output_manager.events.@"test".add(&self.manager_test);
-    self.output_layout.events.change.add(&self.layout_change);
     self.power_manager.events.set_mode.add(&self.power_manager_set_mode);
     self.gamma_control_manager.events.set_gamma.add(&self.gamma_control_set_gamma);
 }
@@ -245,7 +243,10 @@ fn handleNewOutput(_: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
             error.InitRenderFailed => log.err("failed to initialize renderer for output {s}", .{wlr_output.name}),
         }
         wlr_output.destroy();
+        return;
     };
+
+    server.root.sendOutputManagerConfig();
 
     server.input_manager.reconfigureDevices();
 }
@@ -711,10 +712,8 @@ fn commitTransaction(root: *Self) void {
     }
 }
 
-/// Send the new output configuration to all wlr-output-manager clients
-fn handleLayoutChange(listener: *wl.Listener(*wlr.OutputLayout), _: *wlr.OutputLayout) void {
-    const self = @fieldParentPtr(Self, "layout_change", listener);
-
+/// Send the current output configuration to all wlr-output-manager clients
+pub fn sendOutputManagerConfig(self: *Self) void {
     const config = self.currentOutputConfig() catch {
         std.log.scoped(.output_manager).err("out of memory", .{});
         return;
@@ -734,11 +733,7 @@ fn handleManagerApply(
     self.processOutputConfig(config, .apply);
 
     // Send the config that was actually applied
-    const applied_config = self.currentOutputConfig() catch {
-        std.log.scoped(.output_manager).err("out of memory", .{});
-        return;
-    };
-    self.output_manager.setConfiguration(applied_config);
+    self.sendOutputManagerConfig();
 }
 
 fn handleManagerTest(
@@ -756,10 +751,6 @@ fn processOutputConfig(
     config: *wlr.OutputConfigurationV1,
     action: enum { test_only, apply },
 ) void {
-    // Ignore layout change events this function generates while applying the config
-    self.layout_change.link.remove();
-    defer self.output_layout.events.change.add(&self.layout_change);
-
     var success = true;
 
     var it = config.heads.iterator(.forward);
