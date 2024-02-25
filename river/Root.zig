@@ -81,6 +81,7 @@ views: wl.list.Head(View, .link),
 new_output: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleNewOutput),
 
 output_layout: *wlr.OutputLayout,
+layout_change: wl.Listener(*wlr.OutputLayout) = wl.Listener(*wlr.OutputLayout).init(handleLayoutChange),
 
 output_manager: *wlr.OutputManagerV1,
 manager_apply: wl.Listener(*wlr.OutputConfigurationV1) =
@@ -185,6 +186,7 @@ pub fn init(self: *Self) !void {
     server.backend.events.new_output.add(&self.new_output);
     self.output_manager.events.apply.add(&self.manager_apply);
     self.output_manager.events.@"test".add(&self.manager_test);
+    self.output_layout.events.change.add(&self.layout_change);
     self.power_manager.events.set_mode.add(&self.power_manager_set_mode);
     self.gamma_control_manager.events.set_gamma.add(&self.gamma_control_set_gamma);
 }
@@ -246,7 +248,7 @@ fn handleNewOutput(_: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
         return;
     };
 
-    server.root.sendOutputManagerConfig();
+    server.root.handleOutputConfigChange() catch log.err("out of memory", .{});
 
     server.input_manager.reconfigureDevices();
 }
@@ -359,7 +361,7 @@ pub fn activateOutput(root: *Self, output: *Output) void {
     // This arranges outputs from left-to-right in the order they appear. The
     // wlr-output-management protocol may be used to modify this arrangement.
     // This also creates a wl_output global which is advertised to clients.
-    const layout_output = root.output_layout.addAuto(output.wlr_output) catch {
+    _ = root.output_layout.addAuto(output.wlr_output) catch {
         // This would currently be very awkward to handle well and this output
         // handling code needs to be heavily refactored soon anyways for double
         // buffered state application as part of the transaction system.
@@ -367,9 +369,6 @@ pub fn activateOutput(root: *Self, output: *Output) void {
         // possible to handle after updating to 0.17.
         @panic("TODO handle allocation failure here");
     };
-    output.tree.node.setEnabled(true);
-    output.tree.node.setPosition(layout_output.x, layout_output.y);
-    output.scene_output.setPosition(layout_output.x, layout_output.y);
 
     // If we previously had no outputs, move all views to the new output and focus it.
     if (first) {
@@ -712,12 +711,37 @@ fn commitTransaction(root: *Self) void {
     }
 }
 
-/// Send the current output configuration to all wlr-output-manager clients
-pub fn sendOutputManagerConfig(self: *Self) void {
-    const config = self.currentOutputConfig() catch {
-        std.log.scoped(.output_manager).err("out of memory", .{});
-        return;
-    };
+// We need this listener to deal with outputs that have their position auto-configured
+// by the wlr_output_layout.
+fn handleLayoutChange(listener: *wl.Listener(*wlr.OutputLayout), _: *wlr.OutputLayout) void {
+    const self = @fieldParentPtr(Self, "layout_change", listener);
+
+    self.handleOutputConfigChange() catch std.log.err("out of memory", .{});
+}
+
+/// Sync up the output scene node state with the output_layout and
+/// send the current output configuration to all wlr-output-manager clients.
+pub fn handleOutputConfigChange(self: *Self) !void {
+    const config = try wlr.OutputConfigurationV1.create();
+    // this destroys all associated config heads as well
+    errdefer config.destroy();
+
+    var it = self.all_outputs.iterator(.forward);
+    while (it.next()) |output| {
+        // If the output is not part of the layout (and thus disabled)
+        // the box will be zeroed out.
+        var box: wlr.Box = undefined;
+        self.output_layout.getBox(output.wlr_output, &box);
+
+        output.tree.node.setEnabled(!box.empty());
+        output.tree.node.setPosition(box.x, box.y);
+        output.scene_output.setPosition(box.x, box.y);
+
+        const head = try wlr.OutputConfigurationV1.Head.create(config, output.wlr_output);
+        head.state.x = box.x;
+        head.state.y = box.y;
+    }
+
     self.output_manager.setConfiguration(config);
 }
 
@@ -732,8 +756,7 @@ fn handleManagerApply(
 
     self.processOutputConfig(config, .apply);
 
-    // Send the config that was actually applied
-    self.sendOutputManagerConfig();
+    self.handleOutputConfigChange() catch std.log.err("out of memory", .{});
 }
 
 fn handleManagerTest(
@@ -751,6 +774,10 @@ fn processOutputConfig(
     config: *wlr.OutputConfigurationV1,
     action: enum { test_only, apply },
 ) void {
+    // Ignore layout change events this function generates while applying the config
+    self.layout_change.link.remove();
+    defer self.output_layout.events.change.add(&self.layout_change);
+
     var success = true;
 
     var it = config.heads.iterator(.forward);
@@ -787,8 +814,6 @@ fn processOutputConfig(
                     // applyState() will always add the output to the layout on success, which means
                     // that this function cannot fail as it does not need to allocate a new layout output.
                     _ = self.output_layout.add(output.wlr_output, head.state.x, head.state.y) catch unreachable;
-                    output.tree.node.setPosition(head.state.x, head.state.y);
-                    output.scene_output.setPosition(head.state.x, head.state.y);
                 }
             },
         }
@@ -801,26 +826,6 @@ fn processOutputConfig(
     } else {
         config.sendFailed();
     }
-}
-
-fn currentOutputConfig(self: *Self) !*wlr.OutputConfigurationV1 {
-    const config = try wlr.OutputConfigurationV1.create();
-    // this destroys all associated config heads as well
-    errdefer config.destroy();
-
-    var it = self.all_outputs.iterator(.forward);
-    while (it.next()) |output| {
-        const head = try wlr.OutputConfigurationV1.Head.create(config, output.wlr_output);
-
-        // If the output is not part of the layout (and thus disabled)
-        // the box will be zeroed out.
-        var box: wlr.Box = undefined;
-        self.output_layout.getBox(output.wlr_output, &box);
-        head.state.x = box.x;
-        head.state.y = box.y;
-    }
-
-    return config;
 }
 
 fn handlePowerManagerSetMode(
