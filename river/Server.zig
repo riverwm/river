@@ -52,7 +52,6 @@ backend: *wlr.Backend,
 session: ?*wlr.Session,
 
 renderer: *wlr.Renderer,
-linux_dmabuf: *wlr.LinuxDmabufV1,
 allocator: *wlr.Allocator,
 
 xdg_shell: *wlr.XdgShell,
@@ -108,7 +107,7 @@ pub fn init(self: *Self, runtime_xwayland: bool) !void {
         // TODO remove wl_drm support
         _ = try wlr.Drm.create(self.wl_server, self.renderer);
 
-        self.linux_dmabuf = try wlr.LinuxDmabufV1.createWithRenderer(self.wl_server, 4, self.renderer);
+        _ = try wlr.LinuxDmabufV1.createWithRenderer(self.wl_server, 4, self.renderer);
     }
 
     self.allocator = try wlr.Allocator.autocreate(self.backend, self.renderer);
