@@ -217,7 +217,7 @@ pub const ScrollButton = struct {
 pub const MapToOutput = struct {
     output_name: ?[]const u8,
 
-    fn apply(map_to_output: MapToOutput, device: *wlr.InputDevice) void {
+    fn apply(map_to_output: MapToOutput, device: *InputDevice) void {
         const wlr_output = blk: {
             if (map_to_output.output_name) |name| {
                 var it = server.root.active_outputs.iterator(.forward);
@@ -230,16 +230,14 @@ pub const MapToOutput = struct {
             break :blk null;
         };
 
-        switch (device.type) {
+        switch (device.wlr_device.type) {
             .pointer, .touch, .tablet_tool => {
                 log.debug("mapping input '{s}' -> '{s}'", .{
-                    device.name,
+                    device.identifier,
                     if (wlr_output) |o| o.name else "<no output>",
                 });
 
-                // TODO: support multiple seats
-                const seat = server.input_manager.defaultSeat();
-                seat.cursor.wlr_cursor.mapInputToOutput(device, wlr_output);
+                device.seat.cursor.wlr_cursor.mapInputToOutput(device.wlr_device, wlr_output);
             },
 
             // These devices do not support being mapped to outputs.
@@ -283,7 +281,7 @@ pub fn apply(self: *const Self, device: *InputDevice) void {
         if (comptime mem.eql(u8, field.name, "glob")) continue;
 
         if (comptime mem.eql(u8, field.name, "map-to-output")) {
-            @field(self, field.name).apply(device.wlr_device);
+            @field(self, field.name).apply(device);
         } else if (@field(self, field.name)) |setting| {
             log.debug("applying setting: {s}", .{field.name});
             setting.apply(libinput_device);

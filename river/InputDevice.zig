@@ -59,7 +59,7 @@ pub fn init(device: *InputDevice, seat: *Seat, wlr_device: *wlr.InputDevice) !vo
             device_type,
             wlr_device.vendor,
             wlr_device.product,
-            mem.trim(u8, mem.sliceTo(wlr_device.name, 0), &ascii.whitespace),
+            mem.trim(u8, mem.sliceTo(wlr_device.name orelse "unknown", 0), &ascii.whitespace),
         },
     );
     errdefer util.gpa.free(identifier);
