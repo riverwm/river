@@ -50,7 +50,8 @@ _riverctl_commands()
         'rule-del:Delete a rule added with rule-add'
         'list-rules:Print rules in a given list'
         # Configuration
-        'attach-mode:Configure where new views should attach to the view stack'
+        'default-attach-mode:Configure where new views should attach to the view stack'
+        'output-attach-mode:Configure where new views should attach to the view stack of the currently focuesed output'
         'background-color:Set the background color'
         'border-color-focused:Set the border color of focused views'
         'border-color-unfocused:Set the border color of unfocused views'
@@ -155,7 +156,8 @@ _riverctl()
                 swap) _alternative 'arguments:args:(next previous up down left right)' ;;
                 map) _alternative 'arguments:optional:(-release -repeat -layout)' ;;
                 unmap) _alternative 'arguments:optional:(-release)' ;;
-                attach-mode) _alternative 'arguments:args:(top bottom)' ;;
+                default-attach-mode) _alternative 'arguments:args:(top bottom above below after)' ;;
+                output-attach-mode) _alternative 'arguments:args:(top bottom above below after)' ;;
                 focus-follows-cursor) _alternative 'arguments:args:(disabled normal always)' ;;
                 set-cursor-warp) _alternative 'arguments:args:(disabled on-output-change on-focus-change)' ;;
                 hide-cursor)
