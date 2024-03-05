@@ -54,6 +54,11 @@ const Impl = union(enum) {
     none,
 };
 
+const AttachRelativeMode = enum {
+    above,
+    below,
+};
+
 pub const State = struct {
     /// The output the view is currently assigned to.
     /// May be null if there are no outputs or for newly created views.
@@ -479,14 +484,8 @@ pub fn setPendingOutput(view: *Self, output: *Output) void {
         .top => output.pending.wm_stack.prepend(view),
         .bottom => output.pending.wm_stack.append(view),
         .after => |n| view.attachAfter(&output.pending, n),
-        .above => view.attachAfter(
-            &output.pending,
-            output.pending.focusedIndex() orelse 0,
-        ),
-        .below => view.attachAfter(
-            &output.pending,
-            (output.pending.focusedIndex() orelse 0) + 1,
-        ),
+        .above => view.attachRelative(&output.pending, .above),
+        .below => view.attachRelative(&output.pending, .below),
     }
     output.pending.focus_stack.prepend(view);
 
@@ -557,6 +556,28 @@ pub fn attachAfter(view: *Self, pending_state: *Output.PendingState, n: usize) v
     it.current.prev.?.insert(&view.pending_wm_stack_link);
 }
 
+/// Attach above or below the currently focused view
+pub fn attachRelative(view: *Self, pending_state: *Output.PendingState, mode: AttachRelativeMode) void {
+    var focus_stack_it = pending_state.focus_stack.iterator(.forward);
+    const focused_view = focus_stack_it.next();
+
+    if (focused_view == null) {
+        pending_state.wm_stack.append(view);
+        return;
+    }
+
+    var it = pending_state.wm_stack.iterator(.forward);
+    while (it.next()) |other| {
+        if (other == focused_view) {
+            switch (mode) {
+                .above => it.current.prev.?.insert(&view.pending_wm_stack_link),
+                .below => it.current.insert(&view.pending_wm_stack_link),
+            }
+            return;
+        }
+    }
+}
+
 /// Called by the impl when the surface is ready to be displayed
 pub fn map(view: *Self) !void {
     log.debug("view '{?s}' mapped", .{view.getTitle()});
@@ -615,14 +636,8 @@ pub fn map(view: *Self) !void {
             .top => server.root.fallback_pending.wm_stack.prepend(view),
             .bottom => server.root.fallback_pending.wm_stack.append(view),
             .after => |n| view.attachAfter(&server.root.fallback_pending, n),
-            .above => view.attachAfter(
-                &server.root.fallback_pending,
-                server.root.fallback_pending.focusedIndex() orelse 0,
-            ),
-            .below => view.attachAfter(
-                &server.root.fallback_pending,
-                (server.root.fallback_pending.focusedIndex() orelse 0) + 1,
-            ),
+            .above => view.attachRelative(&server.root.fallback_pending, .above),
+            .below => view.attachRelative(&server.root.fallback_pending, .below),
         }
         server.root.fallback_pending.focus_stack.prepend(view);
 
