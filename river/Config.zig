@@ -35,6 +35,8 @@ pub const AttachMode = union(enum) {
     top,
     bottom,
     after: u32,
+    above,
+    below,
 };
 
 pub const FocusFollowsCursorMode = enum {

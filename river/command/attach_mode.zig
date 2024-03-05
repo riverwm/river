@@ -29,7 +29,7 @@ fn parseAttachMode(args: []const [:0]const u8) Error!Config.AttachMode {
 
     const tag = meta.stringToEnum(meta.Tag(Config.AttachMode), args[1]) orelse return Error.UnknownOption;
     switch (tag) {
-        inline .top, .bottom => |mode| {
+        inline .top, .bottom, .above, .below => |mode| {
             if (args.len > 2) return Error.TooManyArguments;
 
             return mode;

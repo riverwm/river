@@ -479,6 +479,14 @@ pub fn setPendingOutput(view: *Self, output: *Output) void {
         .top => output.pending.wm_stack.prepend(view),
         .bottom => output.pending.wm_stack.append(view),
         .after => |n| view.attachAfter(&output.pending, n),
+        .above => view.attachAfter(
+            &output.pending,
+            output.pending.focusedIndex() orelse 0,
+        ),
+        .below => view.attachAfter(
+            &output.pending,
+            (output.pending.focusedIndex() orelse 0) + 1,
+        ),
     }
     output.pending.focus_stack.prepend(view);
 
@@ -607,6 +615,14 @@ pub fn map(view: *Self) !void {
             .top => server.root.fallback_pending.wm_stack.prepend(view),
             .bottom => server.root.fallback_pending.wm_stack.append(view),
             .after => |n| view.attachAfter(&server.root.fallback_pending, n),
+            .above => view.attachAfter(
+                &server.root.fallback_pending,
+                server.root.fallback_pending.focusedIndex() orelse 0,
+            ),
+            .below => view.attachAfter(
+                &server.root.fallback_pending,
+                (server.root.fallback_pending.focusedIndex() orelse 0) + 1,
+            ),
         }
         server.root.fallback_pending.focus_stack.prepend(view);
 
