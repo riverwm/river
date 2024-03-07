@@ -19,6 +19,11 @@ pub fn build(b: *Build) !void {
     const strip = b.option(bool, "strip", "Omit debug information") orelse false;
     const pie = b.option(bool, "pie", "Build a Position Independent Executable") orelse false;
 
+    const omit_frame_pointer = switch (optimize) {
+        .Debug, .ReleaseSafe => false,
+        .ReleaseFast, .ReleaseSmall => true,
+    };
+
     const man_pages = b.option(
         bool,
         "man-pages",
@@ -180,6 +185,7 @@ pub fn build(b: *Build) !void {
 
         river.strip = strip;
         river.pie = pie;
+        river.omit_frame_pointer = omit_frame_pointer;
 
         b.installArtifact(river);
     }
@@ -202,6 +208,7 @@ pub fn build(b: *Build) !void {
 
         riverctl.strip = strip;
         riverctl.pie = pie;
+        riverctl.omit_frame_pointer = omit_frame_pointer;
 
         b.installArtifact(riverctl);
     }
@@ -224,6 +231,7 @@ pub fn build(b: *Build) !void {
 
         rivertile.strip = strip;
         rivertile.pie = pie;
+        rivertile.omit_frame_pointer = omit_frame_pointer;
 
         b.installArtifact(rivertile);
     }
