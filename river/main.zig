@@ -176,24 +176,25 @@ var runtime_log_level: log.Level = switch (builtin.mode) {
     .ReleaseSafe, .ReleaseFast, .ReleaseSmall => .info,
 };
 
-pub const std_options = struct {
-    /// Tell std.log to leave all log level filtering to us.
-    pub const log_level: log.Level = .debug;
-
-    pub fn logFn(
-        comptime level: log.Level,
-        comptime scope: @TypeOf(.EnumLiteral),
-        comptime format: []const u8,
-        args: anytype,
-    ) void {
-        if (@intFromEnum(level) > @intFromEnum(runtime_log_level)) return;
-
-        const scope_prefix = if (scope == .default) ": " else "(" ++ @tagName(scope) ++ "): ";
-
-        const stderr = io.getStdErr().writer();
-        stderr.print(level.asText() ++ scope_prefix ++ format ++ "\n", args) catch {};
-    }
+pub const std_options: std.Options = .{
+    // Tell std.log to leave all log level filtering to us.
+    .log_level = .debug,
+    .logFn = logFn,
 };
+
+pub fn logFn(
+    comptime level: log.Level,
+    comptime scope: @TypeOf(.EnumLiteral),
+    comptime format: []const u8,
+    args: anytype,
+) void {
+    if (@intFromEnum(level) > @intFromEnum(runtime_log_level)) return;
+
+    const scope_prefix = if (scope == .default) ": " else "(" ++ @tagName(scope) ++ "): ";
+
+    const stderr = io.getStdErr().writer();
+    stderr.print(level.asText() ++ scope_prefix ++ format ++ "\n", args) catch {};
+}
 
 /// See wlroots_log_wrapper.c
 extern fn river_init_wlroots_log(importance: wlr.log.Importance) void;
