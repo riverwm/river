@@ -39,7 +39,7 @@ const std = @import("std");
 const fmt = std.fmt;
 const mem = std.mem;
 const math = std.math;
-const os = std.os;
+const posix = std.posix;
 const assert = std.debug.assert;
 
 const wayland = @import("wayland");
@@ -311,19 +311,19 @@ pub fn main() !void {
         .{ .name = "main-location", .kind = .arg },
         .{ .name = "main-count", .kind = .arg },
         .{ .name = "main-ratio", .kind = .arg },
-    }).parse(os.argv[1..]) catch {
+    }).parse(std.os.argv[1..]) catch {
         try std.io.getStdErr().writeAll(usage);
-        os.exit(1);
+        posix.exit(1);
     };
     if (result.flags.h) {
         try std.io.getStdOut().writeAll(usage);
-        os.exit(0);
+        posix.exit(0);
     }
     if (result.args.len != 0) fatalPrintUsage("unknown option '{s}'", .{result.args[0]});
 
     if (result.flags.version) {
         try std.io.getStdOut().writeAll(@import("build_options").version ++ "\n");
-        os.exit(0);
+        posix.exit(0);
     }
     if (result.flags.@"view-padding") |raw| {
         view_padding = fmt.parseUnsigned(u31, raw, 10) catch
@@ -352,7 +352,7 @@ pub fn main() !void {
 
     const display = wl.Display.connect(null) catch {
         std.debug.print("Unable to connect to Wayland server.\n", .{});
-        os.exit(1);
+        posix.exit(1);
     };
     defer display.disconnect();
 
@@ -405,13 +405,13 @@ fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, context: *
 
 fn fatal(comptime format: []const u8, args: anytype) noreturn {
     std.log.err(format, args);
-    os.exit(1);
+    posix.exit(1);
 }
 
 fn fatalPrintUsage(comptime format: []const u8, args: anytype) noreturn {
     std.log.err(format, args);
     std.io.getStdErr().writeAll(usage) catch {};
-    os.exit(1);
+    posix.exit(1);
 }
 
 fn saturatingCast(comptime T: type, x: anytype) T {

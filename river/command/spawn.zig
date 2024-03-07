@@ -15,7 +15,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
-const os = std.os;
+const posix = std.posix;
 
 const c = @import("../c.zig");
 const util = @import("../util.zig");
@@ -35,23 +35,26 @@ pub fn spawn(
 
     const child_args = [_:null]?[*:0]const u8{ "/bin/sh", "-c", args[1], null };
 
-    const pid = os.fork() catch {
+    const pid = posix.fork() catch {
         out.* = try std.fmt.allocPrint(util.gpa, "fork/execve failed", .{});
         return Error.Other;
     };
 
     if (pid == 0) {
         process.cleanupChild();
-        const pid2 = os.fork() catch c._exit(1);
-        if (pid2 == 0) os.execveZ("/bin/sh", &child_args, std.c.environ) catch c._exit(1);
+
+        const pid2 = posix.fork() catch c._exit(1);
+        if (pid2 == 0) {
+            posix.execveZ("/bin/sh", &child_args, std.c.environ) catch c._exit(1);
+        }
 
         c._exit(0);
     }
 
     // Wait the intermediate child.
-    const ret = os.waitpid(pid, 0);
-    if (!os.W.IFEXITED(ret.status) or
-        (os.W.IFEXITED(ret.status) and os.W.EXITSTATUS(ret.status) != 0))
+    const ret = posix.waitpid(pid, 0);
+    if (!posix.W.IFEXITED(ret.status) or
+        (posix.W.IFEXITED(ret.status) and posix.W.EXITSTATUS(ret.status) != 0))
     {
         out.* = try std.fmt.allocPrint(util.gpa, "fork/execve failed", .{});
         return Error.Other;

@@ -46,7 +46,7 @@ pub fn init(status_manager: *StatusManager) !void {
 }
 
 fn handleServerDestroy(listener: *wl.Listener(*wl.Server), _: *wl.Server) void {
-    const status_manager = @fieldParentPtr(StatusManager, "server_destroy", listener);
+    const status_manager: *StatusManager = @fieldParentPtr("server_destroy", listener);
     status_manager.global.destroy();
 }
 

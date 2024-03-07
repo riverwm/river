@@ -61,7 +61,7 @@ pub fn create(wlr_popup: *wlr.InputPopupSurfaceV2, input_relay: *InputRelay) !vo
 }
 
 fn handleDestroy(listener: *wl.Listener(void)) void {
-    const input_popup = @fieldParentPtr(InputPopup, "destroy", listener);
+    const input_popup: *InputPopup = @fieldParentPtr("destroy", listener);
 
     input_popup.destroy.link.remove();
     input_popup.map.link.remove();
@@ -74,19 +74,19 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
 }
 
 fn handleMap(listener: *wl.Listener(void)) void {
-    const input_popup = @fieldParentPtr(InputPopup, "map", listener);
+    const input_popup: *InputPopup = @fieldParentPtr("map", listener);
 
     input_popup.update();
 }
 
 fn handleUnmap(listener: *wl.Listener(void)) void {
-    const input_popup = @fieldParentPtr(InputPopup, "unmap", listener);
+    const input_popup: *InputPopup = @fieldParentPtr("unmap", listener);
 
     input_popup.surface_tree.node.reparent(server.root.hidden.tree);
 }
 
 fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
-    const input_popup = @fieldParentPtr(InputPopup, "commit", listener);
+    const input_popup: *InputPopup = @fieldParentPtr("commit", listener);
 
     input_popup.update();
 }

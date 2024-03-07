@@ -71,7 +71,7 @@ pub fn deinit(switch_device: *Switch) void {
 }
 
 fn handleToggle(listener: *wl.Listener(*wlr.Switch.event.Toggle), event: *wlr.Switch.event.Toggle) void {
-    const switch_device = @fieldParentPtr(Switch, "toggle", listener);
+    const switch_device: *Switch = @fieldParentPtr("toggle", listener);
 
     switch_device.device.seat.handleActivity();
 

@@ -125,13 +125,13 @@ fn isKeyboardGroup(wlr_device: *wlr.InputDevice) bool {
 }
 
 fn handleDestroy(listener: *wl.Listener(*wlr.InputDevice), _: *wlr.InputDevice) void {
-    const device = @fieldParentPtr(InputDevice, "destroy", listener);
+    const device: *InputDevice = @fieldParentPtr("destroy", listener);
 
     log.debug("removed input device: {s}", .{device.identifier});
 
     switch (device.wlr_device.type) {
         .keyboard => {
-            const keyboard = @fieldParentPtr(Keyboard, "device", device);
+            const keyboard: *Keyboard = @fieldParentPtr("device", device);
             keyboard.deinit();
             util.gpa.destroy(keyboard);
         },
@@ -140,11 +140,11 @@ fn handleDestroy(listener: *wl.Listener(*wlr.InputDevice), _: *wlr.InputDevice) 
             util.gpa.destroy(device);
         },
         .tablet_tool => {
-            const tablet = @fieldParentPtr(Tablet, "device", device);
+            const tablet: *Tablet = @fieldParentPtr("device", device);
             tablet.destroy();
         },
         .switch_device => {
-            const switch_device = @fieldParentPtr(Switch, "device", device);
+            const switch_device: *Switch = @fieldParentPtr("device", device);
             switch_device.deinit();
             util.gpa.destroy(switch_device);
         },

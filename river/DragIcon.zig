@@ -71,7 +71,7 @@ pub fn updatePosition(drag_icon: *DragIcon, cursor: *Cursor) void {
 }
 
 fn handleDestroy(listener: *wl.Listener(*wlr.Drag.Icon), _: *wlr.Drag.Icon) void {
-    const drag_icon = @fieldParentPtr(DragIcon, "destroy", listener);
+    const drag_icon: *DragIcon = @fieldParentPtr("destroy", listener);
 
     drag_icon.destroy.link.remove();
 

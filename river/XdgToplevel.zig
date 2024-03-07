@@ -200,7 +200,7 @@ pub fn destroyPopups(toplevel: XdgToplevel) void {
 }
 
 fn handleDestroy(listener: *wl.Listener(void)) void {
-    const toplevel = @fieldParentPtr(XdgToplevel, "destroy", listener);
+    const toplevel: *XdgToplevel = @fieldParentPtr("destroy", listener);
 
     // This can be be non-null here if the client commits a protocol error or
     // if it exits without destroying its wayland objects.
@@ -223,7 +223,7 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
 }
 
 fn handleMap(listener: *wl.Listener(void)) void {
-    const toplevel = @fieldParentPtr(XdgToplevel, "map", listener);
+    const toplevel: *XdgToplevel = @fieldParentPtr("map", listener);
     const view = toplevel.view;
 
     // Add listeners that are only active while mapped
@@ -266,7 +266,7 @@ fn handleMap(listener: *wl.Listener(void)) void {
 
 /// Called when the surface is unmapped and will no longer be displayed.
 fn handleUnmap(listener: *wl.Listener(void)) void {
-    const toplevel = @fieldParentPtr(XdgToplevel, "unmap", listener);
+    const toplevel: *XdgToplevel = @fieldParentPtr("unmap", listener);
 
     // Remove listeners that are only active while mapped
     toplevel.ack_configure.link.remove();
@@ -281,7 +281,7 @@ fn handleUnmap(listener: *wl.Listener(void)) void {
 }
 
 fn handleNewPopup(listener: *wl.Listener(*wlr.XdgPopup), wlr_xdg_popup: *wlr.XdgPopup) void {
-    const toplevel = @fieldParentPtr(XdgToplevel, "new_popup", listener);
+    const toplevel: *XdgToplevel = @fieldParentPtr("new_popup", listener);
 
     XdgPopup.create(wlr_xdg_popup, toplevel.view.popup_tree, toplevel.view.popup_tree) catch {
         wlr_xdg_popup.resource.postNoMemory();
@@ -293,7 +293,7 @@ fn handleAckConfigure(
     listener: *wl.Listener(*wlr.XdgSurface.Configure),
     acked_configure: *wlr.XdgSurface.Configure,
 ) void {
-    const toplevel = @fieldParentPtr(XdgToplevel, "ack_configure", listener);
+    const toplevel: *XdgToplevel = @fieldParentPtr("ack_configure", listener);
     switch (toplevel.configure_state) {
         .inflight => |serial| if (acked_configure.serial == serial) {
             toplevel.configure_state = .acked;
@@ -306,7 +306,7 @@ fn handleAckConfigure(
 }
 
 fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
-    const toplevel = @fieldParentPtr(XdgToplevel, "commit", listener);
+    const toplevel: *XdgToplevel = @fieldParentPtr("commit", listener);
     const view = toplevel.view;
 
     {
@@ -395,7 +395,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
 /// Called when the client asks to be fullscreened. We always honor the request
 /// for now, perhaps it should be denied in some cases in the future.
 fn handleRequestFullscreen(listener: *wl.Listener(void)) void {
-    const toplevel = @fieldParentPtr(XdgToplevel, "request_fullscreen", listener);
+    const toplevel: *XdgToplevel = @fieldParentPtr("request_fullscreen", listener);
     if (toplevel.view.pending.fullscreen != toplevel.wlr_toplevel.requested.fullscreen) {
         toplevel.view.pending.fullscreen = toplevel.wlr_toplevel.requested.fullscreen;
         server.root.applyPending();
@@ -406,7 +406,7 @@ fn handleRequestMove(
     listener: *wl.Listener(*wlr.XdgToplevel.event.Move),
     event: *wlr.XdgToplevel.event.Move,
 ) void {
-    const toplevel = @fieldParentPtr(XdgToplevel, "request_move", listener);
+    const toplevel: *XdgToplevel = @fieldParentPtr("request_move", listener);
     const seat: *Seat = @ptrFromInt(event.seat.seat.data);
     const view = toplevel.view;
 
@@ -429,7 +429,7 @@ fn handleRequestMove(
 }
 
 fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), event: *wlr.XdgToplevel.event.Resize) void {
-    const toplevel = @fieldParentPtr(XdgToplevel, "request_resize", listener);
+    const toplevel: *XdgToplevel = @fieldParentPtr("request_resize", listener);
     const seat: *Seat = @ptrFromInt(event.seat.seat.data);
     const view = toplevel.view;
 
@@ -453,12 +453,12 @@ fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), ev
 
 /// Called when the client sets / updates its title
 fn handleSetTitle(listener: *wl.Listener(void)) void {
-    const toplevel = @fieldParentPtr(XdgToplevel, "set_title", listener);
+    const toplevel: *XdgToplevel = @fieldParentPtr("set_title", listener);
     toplevel.view.notifyTitle();
 }
 
 /// Called when the client sets / updates its app_id
 fn handleSetAppId(listener: *wl.Listener(void)) void {
-    const toplevel = @fieldParentPtr(XdgToplevel, "set_app_id", listener);
+    const toplevel: *XdgToplevel = @fieldParentPtr("set_app_id", listener);
     toplevel.view.notifyAppId();
 }

@@ -78,7 +78,7 @@ pub fn checkActive(inhibit_manager: *IdleInhibitManager) void {
 }
 
 fn handleNewIdleInhibitor(listener: *wl.Listener(*wlr.IdleInhibitorV1), inhibitor: *wlr.IdleInhibitorV1) void {
-    const inhibit_manager = @fieldParentPtr(IdleInhibitManager, "new_idle_inhibitor", listener);
+    const inhibit_manager: *IdleInhibitManager = @fieldParentPtr("new_idle_inhibitor", listener);
     const inhibitor_node = util.gpa.create(std.TailQueue(IdleInhibitor).Node) catch return;
     inhibitor_node.data.init(inhibitor, inhibit_manager) catch {
         util.gpa.destroy(inhibitor_node);

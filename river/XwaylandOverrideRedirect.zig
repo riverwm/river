@@ -78,7 +78,7 @@ fn handleRequestConfigure(
 }
 
 fn handleDestroy(listener: *wl.Listener(void)) void {
-    const override_redirect = @fieldParentPtr(XwaylandOverrideRedirect, "destroy", listener);
+    const override_redirect: *XwaylandOverrideRedirect = @fieldParentPtr("destroy", listener);
 
     override_redirect.request_configure.link.remove();
     override_redirect.destroy.link.remove();
@@ -90,21 +90,21 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
 }
 
 fn handleAssociate(listener: *wl.Listener(void)) void {
-    const override_redirect = @fieldParentPtr(XwaylandOverrideRedirect, "associate", listener);
+    const override_redirect: *XwaylandOverrideRedirect = @fieldParentPtr("associate", listener);
 
     override_redirect.xwayland_surface.surface.?.events.map.add(&override_redirect.map);
     override_redirect.xwayland_surface.surface.?.events.unmap.add(&override_redirect.unmap);
 }
 
 fn handleDissociate(listener: *wl.Listener(void)) void {
-    const override_redirect = @fieldParentPtr(XwaylandOverrideRedirect, "dissociate", listener);
+    const override_redirect: *XwaylandOverrideRedirect = @fieldParentPtr("dissociate", listener);
 
     override_redirect.map.link.remove();
     override_redirect.unmap.link.remove();
 }
 
 pub fn handleMap(listener: *wl.Listener(void)) void {
-    const override_redirect = @fieldParentPtr(XwaylandOverrideRedirect, "map", listener);
+    const override_redirect: *XwaylandOverrideRedirect = @fieldParentPtr("map", listener);
 
     override_redirect.mapImpl() catch {
         log.err("out of memory", .{});
@@ -155,7 +155,7 @@ pub fn focusIfDesired(override_redirect: *XwaylandOverrideRedirect) void {
 }
 
 fn handleUnmap(listener: *wl.Listener(void)) void {
-    const override_redirect = @fieldParentPtr(XwaylandOverrideRedirect, "unmap", listener);
+    const override_redirect: *XwaylandOverrideRedirect = @fieldParentPtr("unmap", listener);
 
     override_redirect.set_geometry.link.remove();
 
@@ -180,7 +180,7 @@ fn handleUnmap(listener: *wl.Listener(void)) void {
 }
 
 fn handleSetGeometry(listener: *wl.Listener(void)) void {
-    const override_redirect = @fieldParentPtr(XwaylandOverrideRedirect, "set_geometry", listener);
+    const override_redirect: *XwaylandOverrideRedirect = @fieldParentPtr("set_geometry", listener);
 
     override_redirect.surface_tree.?.node.setPosition(
         override_redirect.xwayland_surface.x,
@@ -189,7 +189,7 @@ fn handleSetGeometry(listener: *wl.Listener(void)) void {
 }
 
 fn handleSetOverrideRedirect(listener: *wl.Listener(void)) void {
-    const override_redirect = @fieldParentPtr(XwaylandOverrideRedirect, "set_override_redirect", listener);
+    const override_redirect: *XwaylandOverrideRedirect = @fieldParentPtr("set_override_redirect", listener);
     const xwayland_surface = override_redirect.xwayland_surface;
 
     log.debug("xwayland surface unset override redirect", .{});

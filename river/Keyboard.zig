@@ -146,7 +146,7 @@ pub fn deinit(keyboard: *Keyboard) void {
 
 fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboard.event.Key) void {
     // This event is raised when a key is pressed or released.
-    const keyboard = @fieldParentPtr(Keyboard, "key", listener);
+    const keyboard: *Keyboard = @fieldParentPtr("key", listener);
     const wlr_keyboard = keyboard.device.wlr_device.toKeyboard();
 
     // If the keyboard is in a group, this event will be handled by the group's Keyboard instance.
@@ -247,7 +247,7 @@ fn isModifier(keysym: xkb.Keysym) bool {
 }
 
 fn handleModifiers(listener: *wl.Listener(*wlr.Keyboard), _: *wlr.Keyboard) void {
-    const keyboard = @fieldParentPtr(Keyboard, "modifiers", listener);
+    const keyboard: *Keyboard = @fieldParentPtr("modifiers", listener);
     const wlr_keyboard = keyboard.device.wlr_device.toKeyboard();
 
     // If the keyboard is in a group, this event will be handled by the group's Keyboard instance.

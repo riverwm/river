@@ -19,7 +19,7 @@ const Cursor = @This();
 const build_options = @import("build_options");
 const std = @import("std");
 const assert = std.debug.assert;
-const os = std.os;
+const posix = std.posix;
 const math = std.math;
 const wlr = @import("wlroots");
 const wayland = @import("wayland");
@@ -303,7 +303,7 @@ fn clearFocus(cursor: *Cursor) void {
 
 /// Axis event is a scroll wheel or similiar
 fn handleAxis(listener: *wl.Listener(*wlr.Pointer.event.Axis), event: *wlr.Pointer.event.Axis) void {
-    const cursor = @fieldParentPtr(Cursor, "axis", listener);
+    const cursor: *Cursor = @fieldParentPtr("axis", listener);
     const device: *InputDevice = @ptrFromInt(event.device.data);
 
     cursor.seat.handleActivity();
@@ -328,7 +328,7 @@ fn handleAxis(listener: *wl.Listener(*wlr.Pointer.event.Axis), event: *wlr.Point
 }
 
 fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.Pointer.event.Button) void {
-    const cursor = @fieldParentPtr(Cursor, "button", listener);
+    const cursor: *Cursor = @fieldParentPtr("button", listener);
 
     cursor.seat.handleActivity();
     cursor.unhide();
@@ -432,7 +432,7 @@ fn handlePinchBegin(
     listener: *wl.Listener(*wlr.Pointer.event.PinchBegin),
     event: *wlr.Pointer.event.PinchBegin,
 ) void {
-    const cursor = @fieldParentPtr(Cursor, "pinch_begin", listener);
+    const cursor: *Cursor = @fieldParentPtr("pinch_begin", listener);
     server.input_manager.pointer_gestures.sendPinchBegin(
         cursor.seat.wlr_seat,
         event.time_msec,
@@ -444,7 +444,7 @@ fn handlePinchUpdate(
     listener: *wl.Listener(*wlr.Pointer.event.PinchUpdate),
     event: *wlr.Pointer.event.PinchUpdate,
 ) void {
-    const cursor = @fieldParentPtr(Cursor, "pinch_update", listener);
+    const cursor: *Cursor = @fieldParentPtr("pinch_update", listener);
     server.input_manager.pointer_gestures.sendPinchUpdate(
         cursor.seat.wlr_seat,
         event.time_msec,
@@ -459,7 +459,7 @@ fn handlePinchEnd(
     listener: *wl.Listener(*wlr.Pointer.event.PinchEnd),
     event: *wlr.Pointer.event.PinchEnd,
 ) void {
-    const cursor = @fieldParentPtr(Cursor, "pinch_end", listener);
+    const cursor: *Cursor = @fieldParentPtr("pinch_end", listener);
     server.input_manager.pointer_gestures.sendPinchEnd(
         cursor.seat.wlr_seat,
         event.time_msec,
@@ -471,7 +471,7 @@ fn handleSwipeBegin(
     listener: *wl.Listener(*wlr.Pointer.event.SwipeBegin),
     event: *wlr.Pointer.event.SwipeBegin,
 ) void {
-    const cursor = @fieldParentPtr(Cursor, "swipe_begin", listener);
+    const cursor: *Cursor = @fieldParentPtr("swipe_begin", listener);
     server.input_manager.pointer_gestures.sendSwipeBegin(
         cursor.seat.wlr_seat,
         event.time_msec,
@@ -483,7 +483,7 @@ fn handleSwipeUpdate(
     listener: *wl.Listener(*wlr.Pointer.event.SwipeUpdate),
     event: *wlr.Pointer.event.SwipeUpdate,
 ) void {
-    const cursor = @fieldParentPtr(Cursor, "swipe_update", listener);
+    const cursor: *Cursor = @fieldParentPtr("swipe_update", listener);
     server.input_manager.pointer_gestures.sendSwipeUpdate(
         cursor.seat.wlr_seat,
         event.time_msec,
@@ -496,7 +496,7 @@ fn handleSwipeEnd(
     listener: *wl.Listener(*wlr.Pointer.event.SwipeEnd),
     event: *wlr.Pointer.event.SwipeEnd,
 ) void {
-    const cursor = @fieldParentPtr(Cursor, "swipe_end", listener);
+    const cursor: *Cursor = @fieldParentPtr("swipe_end", listener);
     server.input_manager.pointer_gestures.sendSwipeEnd(
         cursor.seat.wlr_seat,
         event.time_msec,
@@ -508,7 +508,7 @@ fn handleTouchDown(
     listener: *wl.Listener(*wlr.Touch.event.Down),
     event: *wlr.Touch.event.Down,
 ) void {
-    const cursor = @fieldParentPtr(Cursor, "touch_down", listener);
+    const cursor: *Cursor = @fieldParentPtr("touch_down", listener);
 
     cursor.seat.handleActivity();
 
@@ -544,7 +544,7 @@ fn handleTouchMotion(
     listener: *wl.Listener(*wlr.Touch.event.Motion),
     event: *wlr.Touch.event.Motion,
 ) void {
-    const cursor = @fieldParentPtr(Cursor, "touch_motion", listener);
+    const cursor: *Cursor = @fieldParentPtr("touch_motion", listener);
 
     cursor.seat.handleActivity();
 
@@ -563,7 +563,7 @@ fn handleTouchUp(
     listener: *wl.Listener(*wlr.Touch.event.Up),
     event: *wlr.Touch.event.Up,
 ) void {
-    const cursor = @fieldParentPtr(Cursor, "touch_up", listener);
+    const cursor: *Cursor = @fieldParentPtr("touch_up", listener);
 
     cursor.seat.handleActivity();
 
@@ -576,7 +576,7 @@ fn handleTouchCancel(
     listener: *wl.Listener(*wlr.Touch.event.Cancel),
     _: *wlr.Touch.event.Cancel,
 ) void {
-    const cursor = @fieldParentPtr(Cursor, "touch_cancel", listener);
+    const cursor: *Cursor = @fieldParentPtr("touch_cancel", listener);
 
     cursor.seat.handleActivity();
 
@@ -612,7 +612,7 @@ fn handleTouchCancel(
 }
 
 fn handleTouchFrame(listener: *wl.Listener(void)) void {
-    const cursor = @fieldParentPtr(Cursor, "touch_frame", listener);
+    const cursor: *Cursor = @fieldParentPtr("touch_frame", listener);
 
     cursor.seat.handleActivity();
 
@@ -624,7 +624,7 @@ fn handleTabletToolAxis(
     event: *wlr.Tablet.event.Axis,
 ) void {
     const device: *InputDevice = @ptrFromInt(event.device.data);
-    const tablet = @fieldParentPtr(Tablet, "device", device);
+    const tablet: *Tablet = @fieldParentPtr("device", device);
 
     device.seat.handleActivity();
 
@@ -638,7 +638,7 @@ fn handleTabletToolProximity(
     event: *wlr.Tablet.event.Proximity,
 ) void {
     const device: *InputDevice = @ptrFromInt(event.device.data);
-    const tablet = @fieldParentPtr(Tablet, "device", device);
+    const tablet: *Tablet = @fieldParentPtr("device", device);
 
     device.seat.handleActivity();
 
@@ -652,7 +652,7 @@ fn handleTabletToolTip(
     event: *wlr.Tablet.event.Tip,
 ) void {
     const device: *InputDevice = @ptrFromInt(event.device.data);
-    const tablet = @fieldParentPtr(Tablet, "device", device);
+    const tablet: *Tablet = @fieldParentPtr("device", device);
 
     device.seat.handleActivity();
 
@@ -666,7 +666,7 @@ fn handleTabletToolButton(
     event: *wlr.Tablet.event.Button,
 ) void {
     const device: *InputDevice = @ptrFromInt(event.device.data);
-    const tablet = @fieldParentPtr(Tablet, "device", device);
+    const tablet: *Tablet = @fieldParentPtr("device", device);
 
     device.seat.handleActivity();
 
@@ -706,7 +706,7 @@ fn handlePointerMapping(cursor: *Cursor, event: *wlr.Pointer.event.Button, view:
 /// events together. For instance, two axis events may happen at the same
 /// time, in which case a frame event won't be sent in between.
 fn handleFrame(listener: *wl.Listener(*wlr.Cursor), _: *wlr.Cursor) void {
-    const cursor = @fieldParentPtr(Cursor, "frame", listener);
+    const cursor: *Cursor = @fieldParentPtr("frame", listener);
     cursor.seat.wlr_seat.pointerNotifyFrame();
 }
 
@@ -720,7 +720,7 @@ fn handleMotionAbsolute(
     listener: *wl.Listener(*wlr.Pointer.event.MotionAbsolute),
     event: *wlr.Pointer.event.MotionAbsolute,
 ) void {
-    const cursor = @fieldParentPtr(Cursor, "motion_absolute", listener);
+    const cursor: *Cursor = @fieldParentPtr("motion_absolute", listener);
 
     cursor.seat.handleActivity();
 
@@ -739,7 +739,7 @@ fn handleMotion(
     listener: *wl.Listener(*wlr.Pointer.event.Motion),
     event: *wlr.Pointer.event.Motion,
 ) void {
-    const cursor = @fieldParentPtr(Cursor, "motion", listener);
+    const cursor: *Cursor = @fieldParentPtr("motion", listener);
 
     cursor.seat.handleActivity();
 
@@ -751,7 +751,7 @@ fn handleRequestSetCursor(
     event: *wlr.Seat.event.RequestSetCursor,
 ) void {
     // This event is rasied by the seat when a client provides a cursor image
-    const cursor = @fieldParentPtr(Cursor, "request_set_cursor", listener);
+    const cursor: *Cursor = @fieldParentPtr("request_set_cursor", listener);
     const focused_client = cursor.seat.wlr_seat.pointer_state.focused_client;
 
     // This can be sent by any client, so we check to make sure this one is
@@ -1111,8 +1111,8 @@ pub fn updateState(cursor: *Cursor) void {
         .passthrough => {
             cursor.updateFocusFollowsCursorTarget();
             if (!cursor.hidden) {
-                var now: os.timespec = undefined;
-                os.clock_gettime(os.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
+                var now: posix.timespec = undefined;
+                posix.clock_gettime(posix.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
                 const msec: u32 = @intCast(now.tv_sec * std.time.ms_per_s +
                     @divTrunc(now.tv_nsec, std.time.ns_per_ms));
                 cursor.passthrough(msec);

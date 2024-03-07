@@ -15,21 +15,21 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
-const os = std.os;
+const posix = std.posix;
 
 const c = @import("c.zig");
 
-var original_rlimit: ?os.rlimit = null;
+var original_rlimit: ?posix.rlimit = null;
 
 pub fn setup() void {
     // Ignore SIGPIPE so we don't get killed when writing to a socket that
     // has had its read end closed by another process.
-    const sig_ign = os.Sigaction{
-        .handler = .{ .handler = os.SIG.IGN },
-        .mask = os.empty_sigset,
+    const sig_ign = posix.Sigaction{
+        .handler = .{ .handler = posix.SIG.IGN },
+        .mask = posix.empty_sigset,
         .flags = 0,
     };
-    os.sigaction(os.SIG.PIPE, &sig_ign, null) catch unreachable;
+    posix.sigaction(posix.SIG.PIPE, &sig_ign, null) catch unreachable;
 
     // Most unix systems have a default limit of 1024 file descriptors and it
     // seems unlikely for this default to be universally raised due to the
@@ -41,13 +41,13 @@ pub fn setup() void {
     // to catch any fd leaks. Therefore, don't use some crazy high limit that
     // can never be reached before the system runs out of memory. This can be
     // raised further if anyone reaches it in practice.
-    if (os.getrlimit(.NOFILE)) |original| {
+    if (posix.getrlimit(.NOFILE)) |original| {
         original_rlimit = original;
-        const new: os.rlimit = .{
+        const new: posix.rlimit = .{
             .cur = @min(4096, original.max),
             .max = original.max,
         };
-        if (os.setrlimit(.NOFILE, new)) {
+        if (posix.setrlimit(.NOFILE, new)) {
             std.log.info("raised file descriptor limit of the river process to {d}", .{new.cur});
         } else |_| {
             std.log.err("setrlimit failed, using system default file descriptor limit of {d}", .{
@@ -61,17 +61,17 @@ pub fn setup() void {
 
 pub fn cleanupChild() void {
     if (c.setsid() < 0) unreachable;
-    if (os.system.sigprocmask(os.SIG.SETMASK, &os.empty_sigset, null) < 0) unreachable;
+    if (posix.system.sigprocmask(posix.SIG.SETMASK, &posix.empty_sigset, null) < 0) unreachable;
 
-    const sig_dfl = os.Sigaction{
-        .handler = .{ .handler = os.SIG.DFL },
-        .mask = os.empty_sigset,
+    const sig_dfl = posix.Sigaction{
+        .handler = .{ .handler = posix.SIG.DFL },
+        .mask = posix.empty_sigset,
         .flags = 0,
     };
-    os.sigaction(os.SIG.PIPE, &sig_dfl, null) catch unreachable;
+    posix.sigaction(posix.SIG.PIPE, &sig_dfl, null) catch unreachable;
 
     if (original_rlimit) |original| {
-        os.setrlimit(.NOFILE, original) catch {
+        posix.setrlimit(.NOFILE, original) catch {
             std.log.err("failed to restore original file descriptor limit for " ++
                 "child process, setrlimit failed", .{});
         };

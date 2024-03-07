@@ -73,7 +73,7 @@ pub fn fromSurface(surface: *wlr.Surface) ?*SceneNodeData {
 }
 
 fn handleDestroy(listener: *wl.Listener(void)) void {
-    const scene_node_data = @fieldParentPtr(SceneNodeData, "destroy", listener);
+    const scene_node_data: *SceneNodeData = @fieldParentPtr("destroy", listener);
 
     scene_node_data.destroy.link.remove();
     scene_node_data.node.data = 0;

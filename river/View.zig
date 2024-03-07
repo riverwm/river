@@ -20,7 +20,7 @@ const build_options = @import("build_options");
 const std = @import("std");
 const assert = std.debug.assert;
 const math = std.math;
-const os = std.os;
+const posix = std.posix;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
@@ -472,8 +472,9 @@ pub fn rootSurface(view: View) ?*wlr.Surface {
 
 pub fn sendFrameDone(view: View) void {
     assert(view.mapped and !view.destroying);
-    var now: os.timespec = undefined;
-    os.clock_gettime(os.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
+
+    var now: posix.timespec = undefined;
+    posix.clock_gettime(posix.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
     view.rootSurface().?.sendFrameDone(&now);
 }
 

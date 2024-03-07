@@ -48,7 +48,7 @@ pub fn init(control: *Control) !void {
 }
 
 fn handleServerDestroy(listener: *wl.Listener(*wl.Server), _: *wl.Server) void {
-    const control = @fieldParentPtr(Control, "server_destroy", listener);
+    const control: *Control = @fieldParentPtr("server_destroy", listener);
     control.global.destroy();
     control.args_map.deinit();
 }

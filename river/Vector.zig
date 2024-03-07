@@ -44,7 +44,7 @@ pub fn direction(v: Vector) ?wlr.OutputLayout.Direction {
     // A zero length vector has no direction
     if (v.x == 0 and v.y == 0) return null;
 
-    if ((math.absInt(v.y) catch return null) > (math.absInt(v.x) catch return null)) {
+    if (@abs(v.y) > @abs(v.x)) {
         // Careful: We are operating in a Y-inverted coordinate system.
         return if (v.y > 0) .down else .up;
     } else {

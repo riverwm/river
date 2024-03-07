@@ -61,7 +61,7 @@ pub fn create(
 }
 
 fn handleDestroy(listener: *wl.Listener(void)) void {
-    const xdg_popup = @fieldParentPtr(XdgPopup, "destroy", listener);
+    const xdg_popup: *XdgPopup = @fieldParentPtr("destroy", listener);
 
     xdg_popup.destroy.link.remove();
     xdg_popup.new_popup.link.remove();
@@ -71,7 +71,7 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
 }
 
 fn handleNewPopup(listener: *wl.Listener(*wlr.XdgPopup), wlr_xdg_popup: *wlr.XdgPopup) void {
-    const xdg_popup = @fieldParentPtr(XdgPopup, "new_popup", listener);
+    const xdg_popup: *XdgPopup = @fieldParentPtr("new_popup", listener);
 
     XdgPopup.create(
         wlr_xdg_popup,
@@ -84,7 +84,7 @@ fn handleNewPopup(listener: *wl.Listener(*wlr.XdgPopup), wlr_xdg_popup: *wlr.Xdg
 }
 
 fn handleReposition(listener: *wl.Listener(void)) void {
-    const xdg_popup = @fieldParentPtr(XdgPopup, "reposition", listener);
+    const xdg_popup: *XdgPopup = @fieldParentPtr("reposition", listener);
 
     const output = switch (SceneNodeData.fromNode(&xdg_popup.root.node).?.data) {
         .view => |view| view.current.output orelse return,
