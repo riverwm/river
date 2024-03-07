@@ -182,14 +182,14 @@ fn warpToHintIfSet(constraint: *PointerConstraint) void {
 }
 
 fn handleNodeDestroy(listener: *wl.Listener(void)) void {
-    const constraint = @fieldParentPtr(PointerConstraint, "node_destroy", listener);
+    const constraint: *PointerConstraint = @fieldParentPtr("node_destroy", listener);
 
     log.info("deactivating pointer constraint, scene node destroyed", .{});
     constraint.deactivate();
 }
 
 fn handleDestroy(listener: *wl.Listener(*wlr.PointerConstraintV1), _: *wlr.PointerConstraintV1) void {
-    const constraint = @fieldParentPtr(PointerConstraint, "destroy", listener);
+    const constraint: *PointerConstraint = @fieldParentPtr("destroy", listener);
     const seat: *Seat = @ptrFromInt(constraint.wlr_constraint.seat.data);
 
     if (constraint.state == .active) {
@@ -211,7 +211,7 @@ fn handleDestroy(listener: *wl.Listener(*wlr.PointerConstraintV1), _: *wlr.Point
 }
 
 fn handleSetRegion(listener: *wl.Listener(void)) void {
-    const constraint = @fieldParentPtr(PointerConstraint, "set_region", listener);
+    const constraint: *PointerConstraint = @fieldParentPtr("set_region", listener);
     const seat: *Seat = @ptrFromInt(constraint.wlr_constraint.seat.data);
 
     switch (constraint.state) {

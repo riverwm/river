@@ -85,7 +85,7 @@ pub fn deinit(manager: *LockManager) void {
 }
 
 fn handleLock(listener: *wl.Listener(*wlr.SessionLockV1), lock: *wlr.SessionLockV1) void {
-    const manager = @fieldParentPtr(LockManager, "new_lock", listener);
+    const manager: *LockManager = @fieldParentPtr("new_lock", listener);
 
     if (manager.lock != null) {
         log.info("denying new session lock client, an active one already exists", .{});
@@ -191,7 +191,7 @@ pub fn maybeLock(manager: *LockManager) void {
 }
 
 fn handleUnlock(listener: *wl.Listener(void)) void {
-    const manager = @fieldParentPtr(LockManager, "unlock", listener);
+    const manager: *LockManager = @fieldParentPtr("unlock", listener);
 
     manager.state = .unlocked;
 
@@ -229,7 +229,7 @@ fn handleUnlock(listener: *wl.Listener(void)) void {
 }
 
 fn handleDestroy(listener: *wl.Listener(void)) void {
-    const manager = @fieldParentPtr(LockManager, "destroy", listener);
+    const manager: *LockManager = @fieldParentPtr("destroy", listener);
 
     log.debug("ext_session_lock_v1 destroyed", .{});
 
@@ -248,7 +248,7 @@ fn handleSurface(
     listener: *wl.Listener(*wlr.SessionLockSurfaceV1),
     wlr_lock_surface: *wlr.SessionLockSurfaceV1,
 ) void {
-    const manager = @fieldParentPtr(LockManager, "new_surface", listener);
+    const manager: *LockManager = @fieldParentPtr("new_surface", listener);
 
     log.debug("new ext_session_lock_surface_v1 created", .{});
 

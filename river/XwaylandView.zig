@@ -131,7 +131,7 @@ fn setActivated(xwayland_view: XwaylandView, activated: bool) void {
 }
 
 fn handleDestroy(listener: *wl.Listener(void)) void {
-    const xwayland_view = @fieldParentPtr(XwaylandView, "destroy", listener);
+    const xwayland_view: *XwaylandView = @fieldParentPtr("destroy", listener);
 
     // Remove listeners that are active for the entire lifetime of the view
     xwayland_view.destroy.link.remove();
@@ -146,20 +146,20 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
 }
 
 fn handleAssociate(listener: *wl.Listener(void)) void {
-    const xwayland_view = @fieldParentPtr(XwaylandView, "associate", listener);
+    const xwayland_view: *XwaylandView = @fieldParentPtr("associate", listener);
 
     xwayland_view.xwayland_surface.surface.?.events.map.add(&xwayland_view.map);
     xwayland_view.xwayland_surface.surface.?.events.unmap.add(&xwayland_view.unmap);
 }
 
 fn handleDissociate(listener: *wl.Listener(void)) void {
-    const xwayland_view = @fieldParentPtr(XwaylandView, "dissociate", listener);
+    const xwayland_view: *XwaylandView = @fieldParentPtr("dissociate", listener);
     xwayland_view.map.link.remove();
     xwayland_view.unmap.link.remove();
 }
 
 pub fn handleMap(listener: *wl.Listener(void)) void {
-    const xwayland_view = @fieldParentPtr(XwaylandView, "map", listener);
+    const xwayland_view: *XwaylandView = @fieldParentPtr("map", listener);
     const view = xwayland_view.view;
 
     const xwayland_surface = xwayland_view.xwayland_surface;
@@ -213,7 +213,7 @@ pub fn handleMap(listener: *wl.Listener(void)) void {
 }
 
 fn handleUnmap(listener: *wl.Listener(void)) void {
-    const xwayland_view = @fieldParentPtr(XwaylandView, "unmap", listener);
+    const xwayland_view: *XwaylandView = @fieldParentPtr("unmap", listener);
 
     xwayland_view.xwayland_surface.surface.?.data = 0;
 
@@ -235,7 +235,7 @@ fn handleRequestConfigure(
     listener: *wl.Listener(*wlr.XwaylandSurface.event.Configure),
     event: *wlr.XwaylandSurface.event.Configure,
 ) void {
-    const xwayland_view = @fieldParentPtr(XwaylandView, "request_configure", listener);
+    const xwayland_view: *XwaylandView = @fieldParentPtr("request_configure", listener);
 
     // If unmapped, let the client do whatever it wants
     if (xwayland_view.xwayland_surface.surface == null or
@@ -254,7 +254,7 @@ fn handleRequestConfigure(
 }
 
 fn handleSetOverrideRedirect(listener: *wl.Listener(void)) void {
-    const xwayland_view = @fieldParentPtr(XwaylandView, "set_override_redirect", listener);
+    const xwayland_view: *XwaylandView = @fieldParentPtr("set_override_redirect", listener);
     const xwayland_surface = xwayland_view.xwayland_surface;
 
     log.debug("xwayland surface set override redirect", .{});
@@ -276,17 +276,17 @@ fn handleSetOverrideRedirect(listener: *wl.Listener(void)) void {
 }
 
 fn handleSetTitle(listener: *wl.Listener(void)) void {
-    const xwayland_view = @fieldParentPtr(XwaylandView, "set_title", listener);
+    const xwayland_view: *XwaylandView = @fieldParentPtr("set_title", listener);
     xwayland_view.view.notifyTitle();
 }
 
 fn handleSetClass(listener: *wl.Listener(void)) void {
-    const xwayland_view = @fieldParentPtr(XwaylandView, "set_class", listener);
+    const xwayland_view: *XwaylandView = @fieldParentPtr("set_class", listener);
     xwayland_view.view.notifyAppId();
 }
 
 fn handleSetDecorations(listener: *wl.Listener(void)) void {
-    const xwayland_view = @fieldParentPtr(XwaylandView, "set_decorations", listener);
+    const xwayland_view: *XwaylandView = @fieldParentPtr("set_decorations", listener);
     const view = xwayland_view.view;
 
     const ssd = server.config.rules.ssd.match(view) orelse
@@ -299,7 +299,7 @@ fn handleSetDecorations(listener: *wl.Listener(void)) void {
 }
 
 fn handleRequestFullscreen(listener: *wl.Listener(void)) void {
-    const xwayland_view = @fieldParentPtr(XwaylandView, "request_fullscreen", listener);
+    const xwayland_view: *XwaylandView = @fieldParentPtr("request_fullscreen", listener);
     if (xwayland_view.view.pending.fullscreen != xwayland_view.xwayland_surface.fullscreen) {
         xwayland_view.view.pending.fullscreen = xwayland_view.xwayland_surface.fullscreen;
         server.root.applyPending();
@@ -314,6 +314,6 @@ fn handleRequestMinimize(
     listener: *wl.Listener(*wlr.XwaylandSurface.event.Minimize),
     event: *wlr.XwaylandSurface.event.Minimize,
 ) void {
-    const xwayland_view = @fieldParentPtr(XwaylandView, "request_minimize", listener);
+    const xwayland_view: *XwaylandView = @fieldParentPtr("request_minimize", listener);
     xwayland_view.xwayland_surface.setMinimized(event.minimize);
 }

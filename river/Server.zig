@@ -19,6 +19,7 @@ const Server = @This();
 const build_options = @import("build_options");
 const std = @import("std");
 const assert = std.debug.assert;
+const posix = std.posix;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
@@ -122,8 +123,8 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
     const loop = wl_server.getEventLoop();
     server.* = .{
         .wl_server = wl_server,
-        .sigint_source = try loop.addSignal(*wl.Server, std.os.SIG.INT, terminate, wl_server),
-        .sigterm_source = try loop.addSignal(*wl.Server, std.os.SIG.TERM, terminate, wl_server),
+        .sigint_source = try loop.addSignal(*wl.Server, posix.SIG.INT, terminate, wl_server),
+        .sigterm_source = try loop.addSignal(*wl.Server, posix.SIG.TERM, terminate, wl_server),
 
         .backend = backend,
         .session = session,
@@ -371,7 +372,7 @@ fn handleNewToplevelDecoration(
 }
 
 fn handleNewLayerSurface(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wlr.LayerSurfaceV1) void {
-    const server = @fieldParentPtr(Server, "new_layer_surface", listener);
+    const server: *Server = @fieldParentPtr("new_layer_surface", listener);
 
     log.debug(
         "new layer surface: namespace {s}, layer {s}, anchor {b:0>4}, size {},{}, margin {},{},{},{}, exclusive_zone {}",
@@ -431,7 +432,7 @@ fn handleRequestActivate(
     listener: *wl.Listener(*wlr.XdgActivationV1.event.RequestActivate),
     event: *wlr.XdgActivationV1.event.RequestActivate,
 ) void {
-    const server = @fieldParentPtr(Server, "request_activate", listener);
+    const server: *Server = @fieldParentPtr("request_activate", listener);
 
     const node_data = SceneNodeData.fromSurface(event.surface) orelse return;
     switch (node_data.data) {

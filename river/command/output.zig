@@ -109,7 +109,7 @@ fn getOutput(seat: *Seat, str: []const u8) !?*Output {
                 .previous => link.prev.?,
             };
         }
-        return @fieldParentPtr(Output, "active_link", link);
+        return @as(*Output, @fieldParentPtr("active_link", link));
     } else if (std.meta.stringToEnum(wlr.OutputLayout.Direction, str)) |direction| { // Spacial direction
         var focus_box: wlr.Box = undefined;
         server.root.output_layout.getBox(seat.focused_output.?.wlr_output, &focus_box);

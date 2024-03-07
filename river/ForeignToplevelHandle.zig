@@ -36,7 +36,7 @@ foreign_close: wl.Listener(*wlr.ForeignToplevelHandleV1) =
     wl.Listener(*wlr.ForeignToplevelHandleV1).init(handleForeignClose),
 
 pub fn map(handle: *ForeignToplevelHandle) void {
-    const view = @fieldParentPtr(View, "foreign_toplevel_handle", handle);
+    const view: *View = @fieldParentPtr("foreign_toplevel_handle", handle);
 
     assert(handle.wlr_handle == null);
 
@@ -67,7 +67,7 @@ pub fn unmap(handle: *ForeignToplevelHandle) void {
 
 /// Must be called just before the view's inflight state is made current.
 pub fn update(handle: *ForeignToplevelHandle) void {
-    const view = @fieldParentPtr(View, "foreign_toplevel_handle", handle);
+    const view: *View = @fieldParentPtr("foreign_toplevel_handle", handle);
 
     const wlr_handle = handle.wlr_handle orelse return;
 
@@ -87,8 +87,8 @@ fn handleForeignActivate(
     listener: *wl.Listener(*wlr.ForeignToplevelHandleV1.event.Activated),
     event: *wlr.ForeignToplevelHandleV1.event.Activated,
 ) void {
-    const handle = @fieldParentPtr(ForeignToplevelHandle, "foreign_activate", listener);
-    const view = @fieldParentPtr(View, "foreign_toplevel_handle", handle);
+    const handle: *ForeignToplevelHandle = @fieldParentPtr("foreign_activate", listener);
+    const view: *View = @fieldParentPtr("foreign_toplevel_handle", handle);
     const seat: *Seat = @ptrFromInt(event.seat.data);
 
     seat.focus(view);
@@ -99,8 +99,8 @@ fn handleForeignFullscreen(
     listener: *wl.Listener(*wlr.ForeignToplevelHandleV1.event.Fullscreen),
     event: *wlr.ForeignToplevelHandleV1.event.Fullscreen,
 ) void {
-    const handle = @fieldParentPtr(ForeignToplevelHandle, "foreign_fullscreen", listener);
-    const view = @fieldParentPtr(View, "foreign_toplevel_handle", handle);
+    const handle: *ForeignToplevelHandle = @fieldParentPtr("foreign_fullscreen", listener);
+    const view: *View = @fieldParentPtr("foreign_toplevel_handle", handle);
 
     view.pending.fullscreen = event.fullscreen;
     server.root.applyPending();
@@ -110,8 +110,8 @@ fn handleForeignClose(
     listener: *wl.Listener(*wlr.ForeignToplevelHandleV1),
     _: *wlr.ForeignToplevelHandleV1,
 ) void {
-    const handle = @fieldParentPtr(ForeignToplevelHandle, "foreign_close", listener);
-    const view = @fieldParentPtr(View, "foreign_toplevel_handle", handle);
+    const handle: *ForeignToplevelHandle = @fieldParentPtr("foreign_close", listener);
+    const view: *View = @fieldParentPtr("foreign_toplevel_handle", handle);
 
     view.close();
 }

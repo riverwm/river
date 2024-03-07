@@ -63,7 +63,7 @@ pub fn create(wlr_text_input: *wlr.TextInputV3) !void {
 }
 
 fn handleEnable(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) void {
-    const text_input = @fieldParentPtr(TextInput, "enable", listener);
+    const text_input: *TextInput = @fieldParentPtr("enable", listener);
     const seat: *Seat = @ptrFromInt(text_input.wlr_text_input.seat.data);
 
     if (text_input.wlr_text_input.focused_surface == null) {
@@ -90,7 +90,7 @@ fn handleEnable(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) v
 }
 
 fn handleCommit(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) void {
-    const text_input = @fieldParentPtr(TextInput, "commit", listener);
+    const text_input: *TextInput = @fieldParentPtr("commit", listener);
     const seat: *Seat = @ptrFromInt(text_input.wlr_text_input.seat.data);
 
     if (seat.relay.text_input != text_input) {
@@ -104,7 +104,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) v
 }
 
 fn handleDisable(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) void {
-    const text_input = @fieldParentPtr(TextInput, "disable", listener);
+    const text_input: *TextInput = @fieldParentPtr("disable", listener);
     const seat: *Seat = @ptrFromInt(text_input.wlr_text_input.seat.data);
 
     if (seat.relay.text_input == text_input) {
@@ -113,7 +113,7 @@ fn handleDisable(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) 
 }
 
 fn handleDestroy(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) void {
-    const text_input = @fieldParentPtr(TextInput, "destroy", listener);
+    const text_input: *TextInput = @fieldParentPtr("destroy", listener);
     const seat: *Seat = @ptrFromInt(text_input.wlr_text_input.seat.data);
 
     if (seat.relay.text_input == text_input) {

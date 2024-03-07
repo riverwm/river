@@ -540,7 +540,7 @@ fn handleRequestSetSelection(
     listener: *wl.Listener(*wlr.Seat.event.RequestSetSelection),
     event: *wlr.Seat.event.RequestSetSelection,
 ) void {
-    const seat = @fieldParentPtr(Seat, "request_set_selection", listener);
+    const seat: *Seat = @fieldParentPtr("request_set_selection", listener);
     seat.wlr_seat.setSelection(event.source, event.serial);
 }
 
@@ -548,7 +548,7 @@ fn handleRequestStartDrag(
     listener: *wl.Listener(*wlr.Seat.event.RequestStartDrag),
     event: *wlr.Seat.event.RequestStartDrag,
 ) void {
-    const seat = @fieldParentPtr(Seat, "request_start_drag", listener);
+    const seat: *Seat = @fieldParentPtr("request_start_drag", listener);
 
     // The start_drag request is ignored by wlroots if a drag is currently in progress.
     assert(seat.drag == .none);
@@ -572,7 +572,7 @@ fn handleRequestStartDrag(
 }
 
 fn handleStartDrag(listener: *wl.Listener(*wlr.Drag), wlr_drag: *wlr.Drag) void {
-    const seat = @fieldParentPtr(Seat, "start_drag", listener);
+    const seat: *Seat = @fieldParentPtr("start_drag", listener);
 
     assert(seat.drag == .none);
     switch (wlr_drag.grab_type) {
@@ -595,7 +595,7 @@ fn handleStartDrag(listener: *wl.Listener(*wlr.Drag), wlr_drag: *wlr.Drag) void 
 }
 
 fn handleDragDestroy(listener: *wl.Listener(*wlr.Drag), _: *wlr.Drag) void {
-    const seat = @fieldParentPtr(Seat, "drag_destroy", listener);
+    const seat: *Seat = @fieldParentPtr("drag_destroy", listener);
     seat.drag_destroy.link.remove();
 
     switch (seat.drag) {
@@ -613,6 +613,6 @@ fn handleRequestSetPrimarySelection(
     listener: *wl.Listener(*wlr.Seat.event.RequestSetPrimarySelection),
     event: *wlr.Seat.event.RequestSetPrimarySelection,
 ) void {
-    const seat = @fieldParentPtr(Seat, "request_set_primary_selection", listener);
+    const seat: *Seat = @fieldParentPtr("request_set_primary_selection", listener);
     seat.wlr_seat.setPrimarySelection(event.source, event.serial);
 }

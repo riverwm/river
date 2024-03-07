@@ -66,7 +66,7 @@ pub fn init(relay: *InputRelay) void {
 }
 
 pub fn newInputMethod(relay: *InputRelay, input_method: *wlr.InputMethodV2) void {
-    const seat = @fieldParentPtr(Seat, "relay", relay);
+    const seat: *Seat = @fieldParentPtr("relay", relay);
 
     log.debug("new input method on seat {s}", .{seat.wlr_seat.name});
 
@@ -93,7 +93,7 @@ fn handleInputMethodCommit(
     listener: *wl.Listener(*wlr.InputMethodV2),
     input_method: *wlr.InputMethodV2,
 ) void {
-    const relay = @fieldParentPtr(InputRelay, "input_method_commit", listener);
+    const relay: *InputRelay = @fieldParentPtr("input_method_commit", listener);
     assert(input_method == relay.input_method);
 
     if (!input_method.client_active) return;
@@ -127,7 +127,7 @@ fn handleInputMethodDestroy(
     listener: *wl.Listener(*wlr.InputMethodV2),
     input_method: *wlr.InputMethodV2,
 ) void {
-    const relay = @fieldParentPtr(InputRelay, "input_method_destroy", listener);
+    const relay: *InputRelay = @fieldParentPtr("input_method_destroy", listener);
     assert(input_method == relay.input_method);
 
     relay.input_method_commit.link.remove();
@@ -145,8 +145,8 @@ fn handleInputMethodGrabKeyboard(
     listener: *wl.Listener(*wlr.InputMethodV2.KeyboardGrab),
     keyboard_grab: *wlr.InputMethodV2.KeyboardGrab,
 ) void {
-    const relay = @fieldParentPtr(InputRelay, "grab_keyboard", listener);
-    const seat = @fieldParentPtr(Seat, "relay", relay);
+    const relay: *InputRelay = @fieldParentPtr("grab_keyboard", listener);
+    const seat: *Seat = @fieldParentPtr("relay", relay);
 
     const active_keyboard = seat.wlr_seat.getKeyboard();
     keyboard_grab.setKeyboard(active_keyboard);
@@ -158,7 +158,7 @@ fn handleInputMethodNewPopup(
     listener: *wl.Listener(*wlr.InputPopupSurfaceV2),
     wlr_popup: *wlr.InputPopupSurfaceV2,
 ) void {
-    const relay = @fieldParentPtr(InputRelay, "input_method_new_popup", listener);
+    const relay: *InputRelay = @fieldParentPtr("input_method_new_popup", listener);
 
     InputPopup.create(wlr_popup, relay) catch {
         log.err("out of memory", .{});
@@ -170,7 +170,7 @@ fn handleInputMethodGrabKeyboardDestroy(
     listener: *wl.Listener(*wlr.InputMethodV2.KeyboardGrab),
     keyboard_grab: *wlr.InputMethodV2.KeyboardGrab,
 ) void {
-    const relay = @fieldParentPtr(InputRelay, "grab_keyboard_destroy", listener);
+    const relay: *InputRelay = @fieldParentPtr("grab_keyboard_destroy", listener);
     relay.grab_keyboard_destroy.link.remove();
 
     if (keyboard_grab.keyboard) |keyboard| {

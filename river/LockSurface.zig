@@ -100,7 +100,7 @@ pub fn configure(lock_surface: *LockSurface) void {
 }
 
 fn handleMap(listener: *wl.Listener(void)) void {
-    const lock_surface = @fieldParentPtr(LockSurface, "map", listener);
+    const lock_surface: *LockSurface = @fieldParentPtr("map", listener);
     const output = lock_surface.getOutput();
 
     output.normal_content.node.setEnabled(false);
@@ -132,7 +132,7 @@ fn updateFocus(lock_surface: *LockSurface) void {
 }
 
 fn handleDestroy(listener: *wl.Listener(void)) void {
-    const lock_surface = @fieldParentPtr(LockSurface, "surface_destroy", listener);
+    const lock_surface: *LockSurface = @fieldParentPtr("surface_destroy", listener);
 
     lock_surface.destroy();
 }

@@ -241,7 +241,7 @@ pub const MapToOutput = struct {
                 device.seat.cursor.wlr_cursor.mapInputToOutput(device.wlr_device, wlr_output);
 
                 if (device.wlr_device.type == .tablet_tool) {
-                    const tablet = @fieldParentPtr(Tablet, "device", device);
+                    const tablet: *Tablet = @fieldParentPtr("device", device);
                     tablet.output_mapping = wlr_output;
                 }
             },

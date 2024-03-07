@@ -740,7 +740,7 @@ fn commitTransaction(root: *Root) void {
 // We need this listener to deal with outputs that have their position auto-configured
 // by the wlr_output_layout.
 fn handleLayoutChange(listener: *wl.Listener(*wlr.OutputLayout), _: *wlr.OutputLayout) void {
-    const root = @fieldParentPtr(Root, "layout_change", listener);
+    const root: *Root = @fieldParentPtr("layout_change", listener);
 
     root.handleOutputConfigChange() catch std.log.err("out of memory", .{});
 }
@@ -775,7 +775,7 @@ fn handleManagerApply(
     listener: *wl.Listener(*wlr.OutputConfigurationV1),
     config: *wlr.OutputConfigurationV1,
 ) void {
-    const root = @fieldParentPtr(Root, "manager_apply", listener);
+    const root: *Root = @fieldParentPtr("manager_apply", listener);
     defer config.destroy();
 
     std.log.scoped(.output_manager).info("applying output configuration", .{});
@@ -789,7 +789,7 @@ fn handleManagerTest(
     listener: *wl.Listener(*wlr.OutputConfigurationV1),
     config: *wlr.OutputConfigurationV1,
 ) void {
-    const root = @fieldParentPtr(Root, "manager_test", listener);
+    const root: *Root = @fieldParentPtr("manager_test", listener);
     defer config.destroy();
 
     root.processOutputConfig(config, .test_only);

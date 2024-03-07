@@ -20,7 +20,7 @@ const mem = std.mem;
 const fs = std.fs;
 const io = std.io;
 const log = std.log;
-const os = std.os;
+const posix = std.posix;
 const builtin = @import("builtin");
 const wlr = @import("wlroots");
 const flags = @import("flags");
@@ -57,23 +57,23 @@ pub fn main() anyerror!void {
         .{ .name = "c", .kind = .arg },
         .{ .name = "log-level", .kind = .arg },
         .{ .name = "no-xwayland", .kind = .boolean },
-    }).parse(os.argv[1..]) catch {
+    }).parse(std.os.argv[1..]) catch {
         try io.getStdErr().writeAll(usage);
-        os.exit(1);
+        posix.exit(1);
     };
     if (result.flags.h) {
         try io.getStdOut().writeAll(usage);
-        os.exit(0);
+        posix.exit(0);
     }
     if (result.args.len != 0) {
         log.err("unknown option '{s}'", .{result.args[0]});
         try io.getStdErr().writeAll(usage);
-        os.exit(1);
+        posix.exit(1);
     }
 
     if (result.flags.version) {
         try io.getStdOut().writeAll(build_options.version ++ "\n");
-        os.exit(0);
+        posix.exit(0);
     }
     if (result.flags.@"log-level") |level| {
         if (mem.eql(u8, level, "error")) {
@@ -87,7 +87,7 @@ pub fn main() anyerror!void {
         } else {
             log.err("invalid log level '{s}'", .{level});
             try io.getStdErr().writeAll(usage);
-            os.exit(1);
+            posix.exit(1);
         }
     }
     const enable_xwayland = !result.flags.@"no-xwayland";
@@ -119,16 +119,16 @@ pub fn main() anyerror!void {
     const child_pgid = if (startup_command) |cmd| blk: {
         log.info("running init executable '{s}'", .{cmd});
         const child_args = [_:null]?[*:0]const u8{ "/bin/sh", "-c", cmd, null };
-        const pid = try os.fork();
+        const pid = try posix.fork();
         if (pid == 0) {
             process.cleanupChild();
-            os.execveZ("/bin/sh", &child_args, std.c.environ) catch c._exit(1);
+            posix.execveZ("/bin/sh", &child_args, std.c.environ) catch c._exit(1);
         }
         util.gpa.free(cmd);
         // Since the child has called setsid, the pid is the pgid
         break :blk pid;
     } else null;
-    defer if (child_pgid) |pgid| os.kill(-pgid, os.SIG.TERM) catch |err| {
+    defer if (child_pgid) |pgid| posix.kill(-pgid, posix.SIG.TERM) catch |err| {
         log.err("failed to kill init process group: {s}", .{@errorName(err)});
     };
 
@@ -141,20 +141,20 @@ pub fn main() anyerror!void {
 
 fn defaultInitPath() !?[:0]const u8 {
     const path = blk: {
-        if (os.getenv("XDG_CONFIG_HOME")) |xdg_config_home| {
+        if (posix.getenv("XDG_CONFIG_HOME")) |xdg_config_home| {
             break :blk try fs.path.joinZ(util.gpa, &[_][]const u8{ xdg_config_home, "river/init" });
-        } else if (os.getenv("HOME")) |home| {
+        } else if (posix.getenv("HOME")) |home| {
             break :blk try fs.path.joinZ(util.gpa, &[_][]const u8{ home, ".config/river/init" });
         } else {
             return null;
         }
     };
 
-    os.accessZ(path, os.X_OK) catch |err| {
+    posix.accessZ(path, posix.X_OK) catch |err| {
         if (err == error.PermissionDenied) {
-            if (os.accessZ(path, os.R_OK)) {
+            if (posix.accessZ(path, posix.R_OK)) {
                 log.err("failed to run init executable {s}: the file is not executable", .{path});
-                os.exit(1);
+                posix.exit(1);
             } else |_| {}
         }
         log.err("failed to run init executable {s}: {s}", .{ path, @errorName(err) });
@@ -171,24 +171,25 @@ var runtime_log_level: log.Level = switch (builtin.mode) {
     .ReleaseSafe, .ReleaseFast, .ReleaseSmall => .info,
 };
 
-pub const std_options = struct {
-    /// Tell std.log to leave all log level filtering to us.
-    pub const log_level: log.Level = .debug;
-
-    pub fn logFn(
-        comptime level: log.Level,
-        comptime scope: @TypeOf(.EnumLiteral),
-        comptime format: []const u8,
-        args: anytype,
-    ) void {
-        if (@intFromEnum(level) > @intFromEnum(runtime_log_level)) return;
-
-        const scope_prefix = if (scope == .default) ": " else "(" ++ @tagName(scope) ++ "): ";
-
-        const stderr = io.getStdErr().writer();
-        stderr.print(level.asText() ++ scope_prefix ++ format ++ "\n", args) catch {};
-    }
+pub const std_options: std.Options = .{
+    // Tell std.log to leave all log level filtering to us.
+    .log_level = .debug,
+    .logFn = logFn,
 };
+
+pub fn logFn(
+    comptime level: log.Level,
+    comptime scope: @TypeOf(.EnumLiteral),
+    comptime format: []const u8,
+    args: anytype,
+) void {
+    if (@intFromEnum(level) > @intFromEnum(runtime_log_level)) return;
+
+    const scope_prefix = if (scope == .default) ": " else "(" ++ @tagName(scope) ++ "): ";
+
+    const stderr = io.getStdErr().writer();
+    stderr.print(level.asText() ++ scope_prefix ++ format ++ "\n", args) catch {};
+}
 
 /// See wlroots_log_wrapper.c
 extern fn river_init_wlroots_log(importance: wlr.log.Importance) void;

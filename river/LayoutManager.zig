@@ -44,7 +44,7 @@ pub fn init(layout_manager: *LayoutManager) !void {
 }
 
 fn handleServerDestroy(listener: *wl.Listener(*wl.Server), _: *wl.Server) void {
-    const layout_manager = @fieldParentPtr(LayoutManager, "server_destroy", listener);
+    const layout_manager: *LayoutManager = @fieldParentPtr("server_destroy", listener);
     layout_manager.global.destroy();
 }
 

@@ -64,7 +64,7 @@ pub fn build(b: *Build) !void {
         if (mem.endsWith(u8, version, "-dev")) {
             var ret: u8 = undefined;
 
-            const git_describe_long = b.execAllowFail(
+            const git_describe_long = b.runAllowFail(
                 &.{ "git", "-C", b.build_root.path orelse ".", "describe", "--long" },
                 &ret,
                 .Inherit,
@@ -91,12 +91,12 @@ pub fn build(b: *Build) !void {
     const scanner = Scanner.create(b, .{});
 
     scanner.addSystemProtocol("stable/xdg-shell/xdg-shell.xml");
-    scanner.addSystemProtocol("staging/ext-session-lock/ext-session-lock-v1.xml");
-    scanner.addSystemProtocol("unstable/pointer-gestures/pointer-gestures-unstable-v1.xml");
-    scanner.addSystemProtocol("unstable/pointer-constraints/pointer-constraints-unstable-v1.xml");
-    scanner.addSystemProtocol("unstable/xdg-decoration/xdg-decoration-unstable-v1.xml");
-    scanner.addSystemProtocol("unstable/tablet/tablet-unstable-v2.xml");
     scanner.addSystemProtocol("staging/cursor-shape/cursor-shape-v1.xml");
+    scanner.addSystemProtocol("staging/ext-session-lock/ext-session-lock-v1.xml");
+    scanner.addSystemProtocol("unstable/pointer-constraints/pointer-constraints-unstable-v1.xml");
+    scanner.addSystemProtocol("unstable/pointer-gestures/pointer-gestures-unstable-v1.xml");
+    scanner.addSystemProtocol("unstable/tablet/tablet-unstable-v2.xml");
+    scanner.addSystemProtocol("unstable/xdg-decoration/xdg-decoration-unstable-v1.xml");
 
     scanner.addCustomProtocol("protocol/river-control-unstable-v1.xml");
     scanner.addCustomProtocol("protocol/river-status-unstable-v1.xml");
@@ -131,24 +131,36 @@ pub fn build(b: *Build) !void {
     scanner.generate("zwlr_layer_shell_v1", 4);
     scanner.generate("zwlr_output_power_manager_v1", 1);
 
-    const wayland = b.createModule(.{ .source_file = scanner.result });
+    const wayland = b.createModule(.{
+        .root_source_file = scanner.result,
+        .target = target,
+    });
+
     const xkbcommon = b.createModule(.{
-        .source_file = .{ .path = "deps/zig-xkbcommon/src/xkbcommon.zig" },
+        .root_source_file = .{ .path = "deps/zig-xkbcommon/src/xkbcommon.zig" },
+        .target = target,
     });
+    xkbcommon.linkSystemLibrary("xkbcommon", .{});
+
     const pixman = b.createModule(.{
-        .source_file = .{ .path = "deps/zig-pixman/pixman.zig" },
+        .root_source_file = .{ .path = "deps/zig-pixman/pixman.zig" },
+        .target = target,
     });
+    pixman.linkSystemLibrary("pixman-1", .{});
+
     const wlroots = b.createModule(.{
-        .source_file = .{ .path = "deps/zig-wlroots/src/wlroots.zig" },
-        .dependencies = &.{
+        .root_source_file = .{ .path = "deps/zig-wlroots/src/wlroots.zig" },
+        .imports = &.{
             .{ .name = "wayland", .module = wayland },
             .{ .name = "xkbcommon", .module = xkbcommon },
             .{ .name = "pixman", .module = pixman },
         },
+        .target = target,
     });
+    wlroots.linkSystemLibrary("wlroots", .{});
 
-    const flags = b.createModule(.{ .source_file = .{ .path = "common/flags.zig" } });
-    const globber = b.createModule(.{ .source_file = .{ .path = "common/globber.zig" } });
+    const flags = b.createModule(.{ .root_source_file = .{ .path = "common/flags.zig" } });
+    const globber = b.createModule(.{ .root_source_file = .{ .path = "common/globber.zig" } });
 
     {
         const river = b.addExecutable(.{
@@ -156,38 +168,33 @@ pub fn build(b: *Build) !void {
             .root_source_file = .{ .path = "river/main.zig" },
             .target = target,
             .optimize = optimize,
+            .strip = strip,
         });
-        river.addOptions("build_options", options);
+        river.root_module.addOptions("build_options", options);
 
         river.linkLibC();
         river.linkSystemLibrary("libevdev");
         river.linkSystemLibrary("libinput");
-
-        river.addModule("wayland", wayland);
         river.linkSystemLibrary("wayland-server");
 
-        river.addModule("xkbcommon", xkbcommon);
-        river.linkSystemLibrary("xkbcommon");
+        river.root_module.addImport("wayland", wayland);
+        river.root_module.addImport("xkbcommon", xkbcommon);
+        river.root_module.addImport("pixman", pixman);
+        river.root_module.addImport("wlroots", wlroots);
+        river.root_module.addImport("flags", flags);
+        river.root_module.addImport("globber", globber);
 
-        river.addModule("pixman", pixman);
-        river.linkSystemLibrary("pixman-1");
-
-        river.addModule("wlroots", wlroots);
-        river.linkSystemLibrary("wlroots");
-
-        river.addModule("flags", flags);
-        river.addModule("globber", globber);
         river.addCSourceFile(.{
             .file = .{ .path = "river/wlroots_log_wrapper.c" },
             .flags = &.{ "-std=c99", "-O2" },
         });
+        river.linkSystemLibrary("wlroots");
 
         // TODO: remove when zig issue #131 is implemented
         scanner.addCSource(river);
 
-        river.strip = strip;
         river.pie = pie;
-        river.omit_frame_pointer = omit_frame_pointer;
+        river.root_module.omit_frame_pointer = omit_frame_pointer;
 
         b.installArtifact(river);
     }
@@ -198,19 +205,19 @@ pub fn build(b: *Build) !void {
             .root_source_file = .{ .path = "riverctl/main.zig" },
             .target = target,
             .optimize = optimize,
+            .strip = strip,
         });
-        riverctl.addOptions("build_options", options);
+        riverctl.root_module.addOptions("build_options", options);
 
-        riverctl.addModule("flags", flags);
-        riverctl.addModule("wayland", wayland);
+        riverctl.root_module.addImport("flags", flags);
+        riverctl.root_module.addImport("wayland", wayland);
         riverctl.linkLibC();
         riverctl.linkSystemLibrary("wayland-client");
 
         scanner.addCSource(riverctl);
 
-        riverctl.strip = strip;
         riverctl.pie = pie;
-        riverctl.omit_frame_pointer = omit_frame_pointer;
+        riverctl.root_module.omit_frame_pointer = omit_frame_pointer;
 
         b.installArtifact(riverctl);
     }
@@ -221,19 +228,19 @@ pub fn build(b: *Build) !void {
             .root_source_file = .{ .path = "rivertile/main.zig" },
             .target = target,
             .optimize = optimize,
+            .strip = strip,
         });
-        rivertile.addOptions("build_options", options);
+        rivertile.root_module.addOptions("build_options", options);
 
-        rivertile.addModule("flags", flags);
-        rivertile.addModule("wayland", wayland);
+        rivertile.root_module.addImport("flags", flags);
+        rivertile.root_module.addImport("wayland", wayland);
         rivertile.linkLibC();
         rivertile.linkSystemLibrary("wayland-client");
 
         scanner.addCSource(rivertile);
 
-        rivertile.strip = strip;
         rivertile.pie = pie;
-        rivertile.omit_frame_pointer = omit_frame_pointer;
+        rivertile.root_module.omit_frame_pointer = omit_frame_pointer;
 
         b.installArtifact(rivertile);
     }

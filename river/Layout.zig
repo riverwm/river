@@ -186,7 +186,7 @@ pub fn destroy(layout: *Layout) void {
     );
 
     // Remove layout from the list
-    const node = @fieldParentPtr(std.TailQueue(Layout).Node, "data", layout);
+    const node: *std.TailQueue(Layout).Node = @fieldParentPtr("data", layout);
     layout.output.layouts.remove(node);
 
     // If we are the currently active layout of an output, clean up.

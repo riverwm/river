@@ -90,7 +90,7 @@ fn create(wlr_seat: *wlr.Seat, wlr_tool: *wlr.TabletTool) error{OutOfMemory}!*Ta
 }
 
 fn handleDestroy(listener: *wl.Listener(*wlr.TabletTool), _: *wlr.TabletTool) void {
-    const tool = @fieldParentPtr(TabletTool, "destroy", listener);
+    const tool: *TabletTool = @fieldParentPtr("destroy", listener);
 
     tool.wp_tool.wlr_tool.data = 0;
 
@@ -106,7 +106,7 @@ fn handleSetCursor(
     listener: *wl.Listener(*wlr.TabletV2TabletTool.event.SetCursor),
     event: *wlr.TabletV2TabletTool.event.SetCursor,
 ) void {
-    const tool = @fieldParentPtr(TabletTool, "set_cursor", listener);
+    const tool: *TabletTool = @fieldParentPtr("set_cursor", listener);
 
     if (tool.wp_tool.focused_surface == null or
         tool.wp_tool.focused_surface.?.resource.getClient() != event.seat_client.client)

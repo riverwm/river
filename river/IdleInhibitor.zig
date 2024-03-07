@@ -45,11 +45,11 @@ pub fn init(
 }
 
 fn handleDestroy(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
-    const inhibitor = @fieldParentPtr(IdleInhibitor, "destroy", listener);
+    const inhibitor: *IdleInhibitor = @fieldParentPtr("destroy", listener);
 
     inhibitor.destroy.link.remove();
 
-    const node = @fieldParentPtr(std.TailQueue(IdleInhibitor).Node, "data", inhibitor);
+    const node: *std.TailQueue(IdleInhibitor).Node = @fieldParentPtr("data", inhibitor);
     server.idle_inhibit_manager.inhibitors.remove(node);
 
     inhibitor.inhibit_manager.checkActive();

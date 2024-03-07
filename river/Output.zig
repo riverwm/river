@@ -20,6 +20,7 @@ const std = @import("std");
 const assert = std.debug.assert;
 const math = std.math;
 const mem = std.mem;
+const posix = std.posix;
 const fmt = std.fmt;
 const wlr = @import("wlroots");
 const wayland = @import("wayland");
@@ -401,7 +402,7 @@ fn sendLayerConfigures(
 }
 
 fn handleDestroy(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
-    const output = @fieldParentPtr(Output, "destroy", listener);
+    const output: *Output = @fieldParentPtr("destroy", listener);
 
     log.debug("output '{s}' destroyed", .{output.wlr_output.name});
 
@@ -436,7 +437,7 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
 }
 
 fn handleRequestState(listener: *wl.Listener(*wlr.Output.event.RequestState), event: *wlr.Output.event.RequestState) void {
-    const output = @fieldParentPtr(Output, "request_state", listener);
+    const output: *Output = @fieldParentPtr("request_state", listener);
 
     output.applyState(event.state) catch {
         log.err("failed to commit requested state", .{});
@@ -514,12 +515,12 @@ pub fn updateBackgroundRect(output: *Output) void {
     output.layers.background_color_rect.setSize(width, height);
 
     var it = output.layers.fullscreen.children.iterator(.forward);
-    const fullscreen_background = @fieldParentPtr(wlr.SceneRect, "node", it.next().?);
+    const fullscreen_background: *wlr.SceneRect = @fieldParentPtr("node", it.next().?);
     fullscreen_background.setSize(width, height);
 }
 
 fn handleFrame(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
-    const output = @fieldParentPtr(Output, "frame", listener);
+    const output: *Output = @fieldParentPtr("frame", listener);
     const scene_output = server.root.scene.getSceneOutput(output.wlr_output).?;
 
     // TODO this should probably be retried on failure
@@ -528,8 +529,8 @@ fn handleFrame(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
         error.CommitFailed => log.err("output commit failed for {s}", .{output.wlr_output.name}),
     };
 
-    var now: std.os.timespec = undefined;
-    std.os.clock_gettime(std.os.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
+    var now: posix.timespec = undefined;
+    posix.clock_gettime(posix.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
     scene_output.sendFrameDone(&now);
 }
 
@@ -591,7 +592,7 @@ fn handlePresent(
     listener: *wl.Listener(*wlr.Output.event.Present),
     event: *wlr.Output.event.Present,
 ) void {
-    const output = @fieldParentPtr(Output, "present", listener);
+    const output: *Output = @fieldParentPtr("present", listener);
 
     if (!event.presented) {
         return;

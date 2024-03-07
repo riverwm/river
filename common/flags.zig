@@ -18,7 +18,7 @@ const std = @import("std");
 const mem = std.mem;
 
 pub const Flag = struct {
-    name: []const u8,
+    name: [:0]const u8,
     kind: enum { boolean, arg },
 };
 
@@ -37,7 +37,7 @@ pub fn parser(comptime Arg: type, comptime flags: []const Flag) type {
 
             pub const Flags = flags_type: {
                 var fields: []const std.builtin.Type.StructField = &.{};
-                inline for (flags) |flag| {
+                for (flags) |flag| {
                     const field: std.builtin.Type.StructField = switch (flag.kind) {
                         .boolean => .{
                             .name = flag.name,
@@ -57,7 +57,7 @@ pub fn parser(comptime Arg: type, comptime flags: []const Flag) type {
                     fields = fields ++ [_]std.builtin.Type.StructField{field};
                 }
                 break :flags_type @Type(.{ .Struct = .{
-                    .layout = .Auto,
+                    .layout = .auto,
                     .fields = fields,
                     .decls = &.{},
                     .is_tuple = false,

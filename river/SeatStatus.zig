@@ -49,7 +49,7 @@ fn handleRequest(seat_status_v1: *zriver.SeatStatusV1, request: zriver.SeatStatu
 }
 
 fn handleDestroy(_: *zriver.SeatStatusV1, seat_status: *SeatStatus) void {
-    const node = @fieldParentPtr(std.SinglyLinkedList(SeatStatus).Node, "data", seat_status);
+    const node: *std.SinglyLinkedList(SeatStatus).Node = @fieldParentPtr("data", seat_status);
     seat_status.seat.status_trackers.remove(node);
     util.gpa.destroy(node);
 }

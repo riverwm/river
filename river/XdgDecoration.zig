@@ -66,7 +66,7 @@ fn handleDestroy(
     listener: *wl.Listener(*wlr.XdgToplevelDecorationV1),
     _: *wlr.XdgToplevelDecorationV1,
 ) void {
-    const decoration = @fieldParentPtr(XdgDecoration, "destroy", listener);
+    const decoration: *XdgDecoration = @fieldParentPtr("destroy", listener);
 
     decoration.deinit();
 }
@@ -75,7 +75,7 @@ fn handleRequestMode(
     listener: *wl.Listener(*wlr.XdgToplevelDecorationV1),
     _: *wlr.XdgToplevelDecorationV1,
 ) void {
-    const decoration = @fieldParentPtr(XdgDecoration, "request_mode", listener);
+    const decoration: *XdgDecoration = @fieldParentPtr("request_mode", listener);
 
     const toplevel: *XdgToplevel = @ptrFromInt(decoration.wlr_decoration.toplevel.base.data);
     const view = toplevel.view;

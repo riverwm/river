@@ -17,7 +17,7 @@
 const std = @import("std");
 const mem = std.mem;
 const io = std.io;
-const os = std.os;
+const posix = std.posix;
 const assert = std.debug.assert;
 const builtin = @import("builtin");
 
@@ -57,7 +57,7 @@ pub fn main() !void {
             , .{}),
             error.ConnectFailed => {
                 std.log.err("Unable to connect to the Wayland server.", .{});
-                if (os.getenvZ("WAYLAND_DISPLAY") == null) {
+                if (posix.getenvZ("WAYLAND_DISPLAY") == null) {
                     fatal("WAYLAND_DISPLAY is not set.", .{});
                 } else {
                     fatal("Does WAYLAND_DISPLAY contain the socket name of a running server?", .{});
@@ -72,17 +72,17 @@ fn _main() !void {
     const result = flags.parser([*:0]const u8, &.{
         .{ .name = "h", .kind = .boolean },
         .{ .name = "version", .kind = .boolean },
-    }).parse(os.argv[1..]) catch {
+    }).parse(std.os.argv[1..]) catch {
         try io.getStdErr().writeAll(usage);
-        os.exit(1);
+        posix.exit(1);
     };
     if (result.flags.h) {
         try io.getStdOut().writeAll(usage);
-        os.exit(0);
+        posix.exit(0);
     }
     if (result.flags.version) {
         try io.getStdOut().writeAll(@import("build_options").version ++ "\n");
-        os.exit(0);
+        posix.exit(0);
     }
 
     const display = try wl.Display.connect(null);
@@ -128,14 +128,14 @@ fn callbackListener(_: *zriver.CommandCallbackV1, event: zriver.CommandCallbackV
                 const stdout = io.getStdOut().writer();
                 stdout.print("{s}\n", .{success.output}) catch @panic("failed to write to stdout");
             }
-            os.exit(0);
+            posix.exit(0);
         },
         .failure => |failure| {
             // A small hack to provide usage text when river reports an unknown command.
             if (mem.orderZ(u8, failure.failure_message, "unknown command") == .eq) {
                 std.log.err("unknown command", .{});
                 io.getStdErr().writeAll(usage) catch {};
-                os.exit(1);
+                posix.exit(1);
             }
             fatal("{s}", .{failure.failure_message});
         },
@@ -144,5 +144,5 @@ fn callbackListener(_: *zriver.CommandCallbackV1, event: zriver.CommandCallbackV
 
 fn fatal(comptime format: []const u8, args: anytype) noreturn {
     std.log.err(format, args);
-    os.exit(1);
+    posix.exit(1);
 }

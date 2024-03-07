@@ -158,7 +158,7 @@ pub fn reconfigureDevices(input_manager: *InputManager) void {
 }
 
 fn handleNewInput(listener: *wl.Listener(*wlr.InputDevice), wlr_device: *wlr.InputDevice) void {
-    const input_manager = @fieldParentPtr(InputManager, "new_input", listener);
+    const input_manager: *InputManager = @fieldParentPtr("new_input", listener);
 
     input_manager.defaultSeat().addDevice(wlr_device);
 }
@@ -167,7 +167,7 @@ fn handleNewVirtualPointer(
     listener: *wl.Listener(*wlr.VirtualPointerManagerV1.event.NewPointer),
     event: *wlr.VirtualPointerManagerV1.event.NewPointer,
 ) void {
-    const input_manager = @fieldParentPtr(InputManager, "new_virtual_pointer", listener);
+    const input_manager: *InputManager = @fieldParentPtr("new_virtual_pointer", listener);
 
     // TODO Support multiple seats and don't ignore
     if (event.suggested_seat != null) {
