@@ -542,13 +542,13 @@ pub fn applyConstraints(self: *Self, box: *wlr.Box) void {
 }
 
 /// Attach after n visible, not-floating views in the pending wm_stack
-pub fn attachAfter(view: *Self, pending_state: *Output.PendingState, n: usize) void {
+pub fn attachAfter(view: *Self, output_pending: *Output.PendingState, n: usize) void {
     var visible: u32 = 0;
-    var it = pending_state.wm_stack.iterator(.forward);
+    var it = output_pending.wm_stack.iterator(.forward);
 
     while (it.next()) |other| {
         if (visible >= n) break;
-        if (!other.pending.float and other.pending.tags & pending_state.tags != 0) {
+        if (!other.pending.float and other.pending.tags & output_pending.tags != 0) {
             visible += 1;
         }
     }
@@ -557,21 +557,33 @@ pub fn attachAfter(view: *Self, pending_state: *Output.PendingState, n: usize) v
 }
 
 /// Attach above or below the currently focused view
-pub fn attachRelative(view: *Self, pending_state: *Output.PendingState, mode: AttachRelativeMode) void {
-    var focus_stack_it = pending_state.focus_stack.iterator(.forward);
-    const focused_view = focus_stack_it.next();
+pub fn attachRelative(view: *Self, output_pending: *Output.PendingState, mode: AttachRelativeMode) void {
+    var focus_stack_it = output_pending.focus_stack.iterator(.forward);
 
-    if (focused_view == null) {
-        pending_state.wm_stack.append(view);
+    const focus_stack_head = focus_stack_it.next() orelse {
+        output_pending.wm_stack.append(view);
         return;
-    }
+    };
 
-    var it = pending_state.wm_stack.iterator(.forward);
+    // There are two cases to consider here:
+    //
+    // 1. The first view in the focus stack is visible given the currently focused tags.
+    // In this case, inserting directly before/after that view in the wm_stack is correct.
+    //
+    // 2. There are no views visible given the currently focused tags. In this case it
+    // doesn't matter where in the wm_stack the new view is inserted as it will be the only
+    // view visible.
+    //
+    // Assert that exactly one of these cases is true
+    assert((focus_stack_head.pending.tags & output_pending.tags != 0) !=
+        (focus_stack_head.pending.focus == 0));
+
+    var it = output_pending.wm_stack.iterator(.forward);
     while (it.next()) |other| {
-        if (other == focused_view) {
+        if (other == focus_stack_head) {
             switch (mode) {
-                .above => it.current.prev.?.insert(&view.pending_wm_stack_link),
-                .below => it.current.insert(&view.pending_wm_stack_link),
+                .above => other.pending_wm_stack_link.prev.?.insert(&view.pending_wm_stack_link),
+                .below => other.pending_wm_stack_link.insert(&view.pending_wm_stack_link),
             }
             return;
         }
