@@ -1,6 +1,6 @@
 function __riverctl_completion ()
 {
-	local rule_actions="float no-float ssd csd tag output position dimensions fullscreen no-fullscreen"
+	local rule_actions="float no-float ssd csd tags output position dimensions fullscreen no-fullscreen"
 	if [ "${COMP_CWORD}" -eq 1 ]
 	then
 		OPTS=" \
@@ -10,6 +10,7 @@ function __riverctl_completion ()
 			keyboard-group-remove \
 			keyboard-layout \
 			keyboard-layout-file \
+			close \
 			exit \
 			focus-output \
 			focus-view \
@@ -46,7 +47,8 @@ function __riverctl_completion ()
 			unmap \
 			unmap-pointer \
 			unmap-switch \
-			attach-mode \
+			default-attach-mode \
+			output-attach-mode \
 			background-color \
 			border-color-focused \
 			border-color-unfocused \
@@ -61,16 +63,16 @@ function __riverctl_completion ()
 	elif [ "${COMP_CWORD}" -eq 2 ]
 	then
 		case "${COMP_WORDS[1]}" in
-			"focus-output"|"send-to-output") OPTS="next previous" ;;
+			"focus-output"|"send-to-output") OPTS="next previous up right down left" ;;
 			"focus-view"|"swap") OPTS="next previous up down left right" ;;
 			"input") OPTS="$(riverctl list-inputs | sed '/configured:/d')" ;;
 			"move"|"snap") OPTS="up down left right" ;;
 			"resize") OPTS="horizontal vertical" ;;
 			"rule-add"|"rule-del") OPTS="-app-id -title $rule_actions" ;;
-			"list-rules") OPTS="float ssd tag output position dimensions fullscreen" ;;
+			"list-rules") OPTS="float ssd tags output position dimensions fullscreen" ;;
 			"map") OPTS="-release -repeat -layout" ;;
 			"unmap") OPTS="-release" ;;
-			"attach-mode") OPTS="top bottom" ;;
+			"default-attach-mode"|"output-attach-mode") OPTS="top bottom above below after" ;;
 			"focus-follows-cursor") OPTS="disabled normal always" ;;
 			"set-cursor-warp") OPTS="disabled on-output-change on-focus-change" ;;
 			"hide-cursor") OPTS="timeout when-typing" ;;

@@ -99,8 +99,9 @@ _riverctl()
         commands) _alternative 'common-commands:common:_riverctl_commands' ;;
         args)
             case "$line[1]" in
-                focus-output) _alternative 'arguments:args:(next previous)' ;;
+                focus-output) _alternative 'arguments:args:(next previous up right down left)' ;;
                 focus-view) _alternative 'arguments:args:(next previous up down left right)' ;;
+                keyboard-layout) _arguments '*::optional:(-rules -model -variant -options)' ;;
                 input)
                     _arguments '1: :->name' '2: :->commands' ':: :->args'
 
@@ -152,10 +153,24 @@ _riverctl()
                 move) _alternative 'arguments:args:(up down left right)' ;;
                 resize) _alternative 'arguments:args:(horizontal vertical)' ;;
                 snap) _alternative 'arguments:args:(up down left right)' ;;
-                send-to-output) _alternative 'arguments:args:(next previous)' ;;
+                send-to-output) _arguments \
+                                    '1::optional:(-current-tag)' \
+                                    '::args:(next previous up right down left)'
+                ;;
                 swap) _alternative 'arguments:args:(next previous up down left right)' ;;
                 map) _alternative 'arguments:optional:(-release -repeat -layout)' ;;
                 unmap) _alternative 'arguments:optional:(-release)' ;;
+                map-switch | unmap-switch)
+                    _arguments '1: :' '2:args:(lid tablet)' '3:args:->args'
+                    case "$state" in
+                        args)
+                            case "$line[2]" in
+                                lid) _alternative 'arguments:args:(close open)' ;;
+                                tablet) _alternative 'arguments:args:(on off)' ;;
+                            esac
+                        ;;
+                    esac
+                ;;
                 default-attach-mode) _alternative 'arguments:args:(top bottom above below after)' ;;
                 output-attach-mode) _alternative 'arguments:args:(top bottom above below after)' ;;
                 focus-follows-cursor) _alternative 'arguments:args:(disabled normal always)' ;;
@@ -189,9 +204,9 @@ _riverctl()
                     # In case of a new rule added in river, we just need
                     # to add it to the third option between '()',
                     # i.e (float no-float <new-option>)
-                    _arguments '1: :(-app-id -title)' '2: : ' ':: :(float no-float ssd csd tag output position dimensions fullscreen no-fullscreen)'
+                    _arguments '1: :(-app-id -title)' '2: : ' ':: :(float no-float ssd csd tags output position dimensions fullscreen no-fullscreen)'
                 ;;
-                list-rules) _alternative 'arguments:args:(float ssd tag output position dimensions fullscreen)' ;;
+                list-rules) _alternative 'arguments:args:(float ssd tags output position dimensions fullscreen)' ;;
                 *) return 0 ;;
             esac
         ;;
