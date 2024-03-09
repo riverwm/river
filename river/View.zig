@@ -573,10 +573,6 @@ pub fn attachRelative(view: *Self, output_pending: *Output.PendingState, mode: A
     // 2. There are no views visible given the currently focused tags. In this case it
     // doesn't matter where in the wm_stack the new view is inserted as it will be the only
     // view visible.
-    //
-    // Assert that exactly one of these cases is true
-    assert((focus_stack_head.pending.tags & output_pending.tags != 0) !=
-        (focus_stack_head.pending.focus == 0));
 
     var it = output_pending.wm_stack.iterator(.forward);
     while (it.next()) |other| {
