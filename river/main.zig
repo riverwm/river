@@ -31,8 +31,8 @@ const util = @import("util.zig");
 const Server = @import("Server.zig");
 
 comptime {
-    if (wlr.version.major != 0 or wlr.version.minor != 17 or wlr.version.micro < 1) {
-        @compileError("river requires at least wlroots version 0.17.1 due to bugs in wlroots 0.17.0");
+    if (wlr.version.major != 0 or wlr.version.minor != 17 or wlr.version.micro < 2) {
+        @compileError("river requires at least wlroots version 0.17.2 due to bugs in wlroots 0.17.0/0.17.1");
     }
 }
 
