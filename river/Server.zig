@@ -347,6 +347,10 @@ fn handleRequestSetCursorShape(
     _: *wl.Listener(*wlr.CursorShapeManagerV1.event.RequestSetShape),
     event: *wlr.CursorShapeManagerV1.event.RequestSetShape,
 ) void {
+    // Ignore requests to set a tablet tool's cursor shape for now
+    // TODO(wlroots): https://gitlab.freedesktop.org/wlroots/wlroots/-/issues/3821
+    if (event.device_type == .tablet_tool) return;
+
     const focused_client = event.seat_client.seat.pointer_state.focused_client;
 
     // This can be sent by any client, so we check to make sure this one is

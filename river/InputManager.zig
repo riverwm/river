@@ -50,6 +50,7 @@ virtual_keyboard_manager: *wlr.VirtualKeyboardManagerV1,
 pointer_constraints: *wlr.PointerConstraintsV1,
 input_method_manager: *wlr.InputMethodManagerV2,
 text_input_manager: *wlr.TextInputManagerV3,
+tablet_manager: *wlr.TabletManagerV2,
 
 /// List of input device configurations. Ordered by glob generality, with
 /// the most general towards the start and the most specific towards the end.
@@ -84,6 +85,7 @@ pub fn init(self: *Self) !void {
         .pointer_constraints = try wlr.PointerConstraintsV1.create(server.wl_server),
         .input_method_manager = try wlr.InputMethodManagerV2.create(server.wl_server),
         .text_input_manager = try wlr.TextInputManagerV3.create(server.wl_server),
+        .tablet_manager = try wlr.TabletManagerV2.create(server.wl_server),
         .configs = std.ArrayList(InputConfig).init(util.gpa),
 
         .devices = undefined,

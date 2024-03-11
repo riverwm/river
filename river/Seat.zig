@@ -41,6 +41,7 @@ const Output = @import("Output.zig");
 const PointerConstraint = @import("PointerConstraint.zig");
 const SeatStatus = @import("SeatStatus.zig");
 const Switch = @import("Switch.zig");
+const Tablet = @import("Tablet.zig");
 const View = @import("View.zig");
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
@@ -500,6 +501,10 @@ fn tryAddDevice(self: *Self, wlr_device: *wlr.InputDevice) !void {
 
             self.cursor.wlr_cursor.attachInputDevice(wlr_device);
         },
+        .tablet_tool => {
+            try Tablet.create(self, wlr_device);
+            self.cursor.wlr_cursor.attachInputDevice(wlr_device);
+        },
         .switch_device => {
             const switch_device = try util.gpa.create(Switch);
             errdefer util.gpa.destroy(switch_device);
@@ -508,7 +513,7 @@ fn tryAddDevice(self: *Self, wlr_device: *wlr.InputDevice) !void {
         },
 
         // TODO Support these types of input devices.
-        .tablet_tool, .tablet_pad => return,
+        .tablet_pad => {},
     }
 }
 
@@ -523,8 +528,8 @@ pub fn updateCapabilities(self: *Self) void {
             switch (device.wlr_device.type) {
                 .keyboard => capabilities.keyboard = true,
                 .touch => capabilities.touch = true,
-                .pointer, .switch_device => {},
-                .tablet_tool, .tablet_pad => unreachable,
+                .pointer, .switch_device, .tablet_tool => {},
+                .tablet_pad => unreachable,
             }
         }
     }

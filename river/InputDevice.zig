@@ -30,6 +30,7 @@ const util = @import("util.zig");
 const Seat = @import("Seat.zig");
 const Keyboard = @import("Keyboard.zig");
 const Switch = @import("Switch.zig");
+const Tablet = @import("Tablet.zig");
 
 const log = std.log.scoped(.input_manager);
 
@@ -49,6 +50,7 @@ link: wl.list.Link,
 pub fn init(device: *InputDevice, seat: *Seat, wlr_device: *wlr.InputDevice) !void {
     const device_type: []const u8 = switch (wlr_device.type) {
         .switch_device => "switch",
+        .tablet_tool => "tablet",
         else => @tagName(wlr_device.type),
     };
 
@@ -76,6 +78,8 @@ pub fn init(device: *InputDevice, seat: *Seat, wlr_device: *wlr.InputDevice) !vo
         .identifier = identifier,
         .link = undefined,
     };
+
+    wlr_device.data = @intFromPtr(device);
 
     wlr_device.events.destroy.add(&device.destroy);
 
@@ -106,6 +110,8 @@ pub fn deinit(device: *InputDevice) void {
         device.seat.updateCapabilities();
     }
 
+    device.wlr_device.data = 0;
+
     device.* = undefined;
 }
 
@@ -129,11 +135,15 @@ fn handleDestroy(listener: *wl.Listener(*wlr.InputDevice), _: *wlr.InputDevice) 
             device.deinit();
             util.gpa.destroy(device);
         },
+        .tablet_tool => {
+            const tablet = @fieldParentPtr(Tablet, "device", device);
+            tablet.destroy();
+        },
         .switch_device => {
             const switch_device = @fieldParentPtr(Switch, "device", device);
             switch_device.deinit();
             util.gpa.destroy(switch_device);
         },
-        .tablet_tool, .tablet_pad => unreachable,
+        .tablet_pad => unreachable,
     }
 }

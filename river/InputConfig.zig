@@ -31,6 +31,7 @@ const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const InputDevice = @import("InputDevice.zig");
+const Tablet = @import("Tablet.zig");
 
 pub const EventState = enum {
     enabled,
@@ -238,6 +239,11 @@ pub const MapToOutput = struct {
                 });
 
                 device.seat.cursor.wlr_cursor.mapInputToOutput(device.wlr_device, wlr_output);
+
+                if (device.wlr_device.type == .tablet_tool) {
+                    const tablet = @fieldParentPtr(Tablet, "device", device);
+                    tablet.output_mapping = wlr_output;
+                }
             },
 
             // These devices do not support being mapped to outputs.

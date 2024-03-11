@@ -32,12 +32,15 @@ const util = @import("util.zig");
 
 const Config = @import("Config.zig");
 const DragIcon = @import("DragIcon.zig");
+const InputDevice = @import("InputDevice.zig");
 const LayerSurface = @import("LayerSurface.zig");
 const LockSurface = @import("LockSurface.zig");
 const Output = @import("Output.zig");
 const PointerConstraint = @import("PointerConstraint.zig");
 const Root = @import("Root.zig");
 const Seat = @import("Seat.zig");
+const Tablet = @import("Tablet.zig");
+const TabletTool = @import("TabletTool.zig");
 const View = @import("View.zig");
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
@@ -177,6 +180,15 @@ touch_motion: wl.Listener(*wlr.Touch.event.Motion) =
     wl.Listener(*wlr.Touch.event.Motion).init(handleTouchMotion),
 touch_frame: wl.Listener(void) = wl.Listener(void).init(handleTouchFrame),
 
+tablet_tool_axis: wl.Listener(*wlr.Tablet.event.Axis) =
+    wl.Listener(*wlr.Tablet.event.Axis).init(handleTabletToolAxis),
+tablet_tool_proximity: wl.Listener(*wlr.Tablet.event.Proximity) =
+    wl.Listener(*wlr.Tablet.event.Proximity).init(handleTabletToolProximity),
+tablet_tool_tip: wl.Listener(*wlr.Tablet.event.Tip) =
+    wl.Listener(*wlr.Tablet.event.Tip).init(handleTabletToolTip),
+tablet_tool_button: wl.Listener(*wlr.Tablet.event.Button) =
+    wl.Listener(*wlr.Tablet.event.Button).init(handleTabletToolButton),
+
 pub fn init(self: *Self, seat: *Seat) !void {
     const wlr_cursor = try wlr.Cursor.create();
     errdefer wlr_cursor.destroy();
@@ -204,8 +216,7 @@ pub fn init(self: *Self, seat: *Seat) !void {
     // when the pointer moves. However, we can attach input devices to it, and
     // it will generate aggregate events for all of them. In these events, we
     // can choose how we want to process them, forwarding them to clients and
-    // moving the cursor around. See following post for more detail:
-    // https://drewdevault.com/2018/07/17/Input-handling-in-wlroots.html
+    // moving the cursor around.
     wlr_cursor.events.axis.add(&self.axis);
     wlr_cursor.events.button.add(&self.button);
     wlr_cursor.events.frame.add(&self.frame);
@@ -223,6 +234,11 @@ pub fn init(self: *Self, seat: *Seat) !void {
     wlr_cursor.events.touch_down.add(&self.touch_down);
     wlr_cursor.events.touch_motion.add(&self.touch_motion);
     wlr_cursor.events.touch_frame.add(&self.touch_frame);
+
+    wlr_cursor.events.tablet_tool_axis.add(&self.tablet_tool_axis);
+    wlr_cursor.events.tablet_tool_proximity.add(&self.tablet_tool_proximity);
+    wlr_cursor.events.tablet_tool_tip.add(&self.tablet_tool_tip);
+    wlr_cursor.events.tablet_tool_button.add(&self.tablet_tool_button);
 }
 
 pub fn deinit(self: *Self) void {
@@ -251,7 +267,7 @@ pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
         if (build_options.xwayland) {
             if (server.xwayland) |xwayland| {
                 try xcursor_manager.load(1);
-                const wlr_xcursor = xcursor_manager.getXcursor("left_ptr", 1).?;
+                const wlr_xcursor = xcursor_manager.getXcursor("default", 1).?;
                 const image = wlr_xcursor.images[0];
                 xwayland.setCursor(
                     image.buffer,
@@ -280,7 +296,7 @@ pub fn setXcursor(self: *Self, name: [*:0]const u8) void {
 }
 
 fn clearFocus(self: *Self) void {
-    self.setXcursor("left_ptr");
+    self.setXcursor("default");
     self.seat.wlr_seat.pointerNotifyClearFocus();
 }
 
@@ -555,6 +571,62 @@ fn handleTouchFrame(listener: *wl.Listener(void)) void {
     self.seat.handleActivity();
 
     self.seat.wlr_seat.touchNotifyFrame();
+}
+
+fn handleTabletToolAxis(
+    _: *wl.Listener(*wlr.Tablet.event.Axis),
+    event: *wlr.Tablet.event.Axis,
+) void {
+    const device: *InputDevice = @ptrFromInt(event.device.data);
+    const tablet = @fieldParentPtr(Tablet, "device", device);
+
+    device.seat.handleActivity();
+
+    const tool = TabletTool.get(device.seat.wlr_seat, event.tool) catch return;
+
+    tool.axis(tablet, event);
+}
+
+fn handleTabletToolProximity(
+    _: *wl.Listener(*wlr.Tablet.event.Proximity),
+    event: *wlr.Tablet.event.Proximity,
+) void {
+    const device: *InputDevice = @ptrFromInt(event.device.data);
+    const tablet = @fieldParentPtr(Tablet, "device", device);
+
+    device.seat.handleActivity();
+
+    const tool = TabletTool.get(device.seat.wlr_seat, event.tool) catch return;
+
+    tool.proximity(tablet, event);
+}
+
+fn handleTabletToolTip(
+    _: *wl.Listener(*wlr.Tablet.event.Tip),
+    event: *wlr.Tablet.event.Tip,
+) void {
+    const device: *InputDevice = @ptrFromInt(event.device.data);
+    const tablet = @fieldParentPtr(Tablet, "device", device);
+
+    device.seat.handleActivity();
+
+    const tool = TabletTool.get(device.seat.wlr_seat, event.tool) catch return;
+
+    tool.tip(tablet, event);
+}
+
+fn handleTabletToolButton(
+    _: *wl.Listener(*wlr.Tablet.event.Button),
+    event: *wlr.Tablet.event.Button,
+) void {
+    const device: *InputDevice = @ptrFromInt(event.device.data);
+    const tablet = @fieldParentPtr(Tablet, "device", device);
+
+    device.seat.handleActivity();
+
+    const tool = TabletTool.get(device.seat.wlr_seat, event.tool) catch return;
+
+    tool.button(tablet, event);
 }
 
 /// Handle the mapping for the passed button if any. Returns true if there
