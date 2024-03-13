@@ -285,26 +285,28 @@ pub fn commitTransaction(view: *Self) void {
 
     view.foreign_toplevel_handle.update();
 
-    // Tag and output changes must be applied immediately even if the configure sequence times out.
-    // This allows Root.commitTransaction() to rely on the fact that all tag and output changes
-    // are applied directly by this function.
-    view.current.tags = view.inflight.tags;
-    view.current.output = view.inflight.output;
-
     view.dropSavedSurfaceTree();
 
     switch (view.impl) {
         .xdg_toplevel => |*xdg_toplevel| {
             switch (xdg_toplevel.configure_state) {
-                .inflight => |serial| {
-                    xdg_toplevel.configure_state = .{ .timed_out = serial };
-                },
-                .acked => {
-                    xdg_toplevel.configure_state = .timed_out_acked;
+                .inflight, .acked => {
+                    switch (xdg_toplevel.configure_state) {
+                        .inflight => |serial| xdg_toplevel.configure_state = .{ .timed_out = serial },
+                        .acked => xdg_toplevel.configure_state = .timed_out_acked,
+                        else => unreachable,
+                    }
+                    // The width and height cannot be updated until the client has
+                    // committed a new buffer in response to the configure.
+                    const old_width = view.current.box.width;
+                    const old_height = view.current.box.height;
+                    view.current = view.inflight;
+                    view.current.box.width = old_width;
+                    view.current.box.height = old_height;
                 },
                 .idle, .committed => {
                     xdg_toplevel.configure_state = .idle;
-                    view.updateCurrent();
+                    view.current = view.inflight;
                 },
                 .timed_out, .timed_out_acked => unreachable,
             }
@@ -322,15 +324,15 @@ pub fn commitTransaction(view: *Self) void {
             view.pending.box.width = xwayland_view.xwayland_surface.width;
             view.pending.box.height = xwayland_view.xwayland_surface.height;
 
-            view.updateCurrent();
+            view.current = view.inflight;
         },
         .none => {},
     }
+
+    view.updateSceneState();
 }
 
-pub fn updateCurrent(view: *Self) void {
-    view.current = view.inflight;
-
+pub fn updateSceneState(view: *Self) void {
     const box = &view.current.box;
     view.tree.node.setPosition(box.x, box.y);
     view.popup_tree.node.setPosition(box.x, box.y);

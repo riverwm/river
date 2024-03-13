@@ -369,7 +369,8 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
                 view.inflight.box.height = self.geometry.height;
                 view.pending.box.width = self.geometry.width;
                 view.pending.box.height = self.geometry.height;
-                view.updateCurrent();
+                view.current = view.inflight;
+                view.updateSceneState();
             }
         },
         // If the client has not yet acked our configure, we need to send a
@@ -377,7 +378,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
         // buffers won't be rendered since we are still rendering our
         // stashed buffer from when the transaction started.
         .inflight => view.sendFrameDone(),
-        inline .acked, .timed_out_acked => |_, tag| {
+        .acked, .timed_out_acked => {
             if (view.inflight.resizing) {
                 view.resizeUpdatePosition(self.geometry.width, self.geometry.height);
             }
@@ -387,14 +388,15 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
             view.pending.box.width = self.geometry.width;
             view.pending.box.height = self.geometry.height;
 
-            switch (tag) {
+            switch (self.configure_state) {
                 .acked => {
                     self.configure_state = .committed;
                     server.root.notifyConfigured();
                 },
                 .timed_out_acked => {
                     self.configure_state = .idle;
-                    view.updateCurrent();
+                    view.current = view.inflight;
+                    view.updateSceneState();
                 },
                 else => unreachable,
             }
