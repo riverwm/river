@@ -296,13 +296,32 @@ pub fn commitTransaction(view: *Self) void {
                         .acked => xdg_toplevel.configure_state = .timed_out_acked,
                         else => unreachable,
                     }
-                    // The width and height cannot be updated until the client has
-                    // committed a new buffer in response to the configure.
-                    const old_width = view.current.box.width;
-                    const old_height = view.current.box.height;
+
+                    // The transaction has timed out for the xdg toplevel, which means a commit
+                    // in response to the configure with the inflight width/height has not yet
+                    // been made. It may seem that we should therefore leave the current.box
+                    // width/height unchanged. However, this would in fact cause visual glitches.
+                    //
+                    // We must update the dimensions to the current geometry of the
+                    // xdg toplevel here in order to handle the following series of events:
+                    //
+                    // 0. initial state: client has dimensions X
+                    // 1. transaction A sends a configure of size Y
+                    // 2. transaction A times out - saved surfaces are dropped
+                    // 3. transaction B sends a configure of size Z
+                    // 4. client commits buffer of size Y
+                    // 5. transaction B times out - saved surfaces are dropped
+                    //
+                    // If we did not use the current geometry of the toplevel at this point
+                    // we would be rendering the SSD border at initial size X but the surface
+                    // would be rendered at size Y.
+                    if (view.inflight.resizing) {
+                        view.resizeUpdatePosition(xdg_toplevel.geometry.width, xdg_toplevel.geometry.height);
+                    }
+
                     view.current = view.inflight;
-                    view.current.box.width = old_width;
-                    view.current.box.height = old_height;
+                    view.current.box.width = xdg_toplevel.geometry.width;
+                    view.current.box.height = xdg_toplevel.geometry.height;
                 },
                 .idle, .committed => {
                     xdg_toplevel.configure_state = .idle;
