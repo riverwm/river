@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const Self = @This();
+const LayoutManager = @This();
 
 const std = @import("std");
 const mem = std.mem;
@@ -35,35 +35,35 @@ const log = std.log.scoped(.layout);
 global: *wl.Global,
 server_destroy: wl.Listener(*wl.Server) = wl.Listener(*wl.Server).init(handleServerDestroy),
 
-pub fn init(self: *Self) !void {
-    self.* = .{
+pub fn init(layout_manager: *LayoutManager) !void {
+    layout_manager.* = .{
         .global = try wl.Global.create(server.wl_server, river.LayoutManagerV3, 2, ?*anyopaque, null, bind),
     };
 
-    server.wl_server.addDestroyListener(&self.server_destroy);
+    server.wl_server.addDestroyListener(&layout_manager.server_destroy);
 }
 
 fn handleServerDestroy(listener: *wl.Listener(*wl.Server), _: *wl.Server) void {
-    const self = @fieldParentPtr(Self, "server_destroy", listener);
-    self.global.destroy();
+    const layout_manager = @fieldParentPtr(LayoutManager, "server_destroy", listener);
+    layout_manager.global.destroy();
 }
 
 fn bind(client: *wl.Client, _: ?*anyopaque, version: u32, id: u32) void {
-    const layout_manager = river.LayoutManagerV3.create(client, version, id) catch {
+    const layout_manager_v3 = river.LayoutManagerV3.create(client, version, id) catch {
         client.postNoMemory();
         log.err("out of memory", .{});
         return;
     };
-    layout_manager.setHandler(?*anyopaque, handleRequest, null, null);
+    layout_manager_v3.setHandler(?*anyopaque, handleRequest, null, null);
 }
 
 fn handleRequest(
-    layout_manager: *river.LayoutManagerV3,
+    layout_manager_v3: *river.LayoutManagerV3,
     request: river.LayoutManagerV3.Request,
     _: ?*anyopaque,
 ) void {
     switch (request) {
-        .destroy => layout_manager.destroy(),
+        .destroy => layout_manager_v3.destroy(),
 
         .get_layout => |req| {
             // Ignore if the output is inert
@@ -73,13 +73,13 @@ fn handleRequest(
             log.debug("bind layout '{s}' on output '{s}'", .{ req.namespace, output.wlr_output.name });
 
             Layout.create(
-                layout_manager.getClient(),
-                layout_manager.getVersion(),
+                layout_manager_v3.getClient(),
+                layout_manager_v3.getVersion(),
                 req.id,
                 output,
                 mem.sliceTo(req.namespace, 0),
             ) catch {
-                layout_manager.getClient().postNoMemory();
+                layout_manager_v3.getClient().postNoMemory();
                 log.err("out of memory", .{});
                 return;
             };
