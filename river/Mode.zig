@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const Self = @This();
+const Mode = @This();
 
 const std = @import("std");
 const util = @import("util.zig");
@@ -28,11 +28,11 @@ mappings: std.ArrayListUnmanaged(Mapping) = .{},
 pointer_mappings: std.ArrayListUnmanaged(PointerMapping) = .{},
 switch_mappings: std.ArrayListUnmanaged(SwitchMapping) = .{},
 
-pub fn deinit(self: *Self) void {
-    util.gpa.free(self.name);
-    for (self.mappings.items) |m| m.deinit();
-    self.mappings.deinit(util.gpa);
-    for (self.pointer_mappings.items) |*m| m.deinit();
-    self.pointer_mappings.deinit(util.gpa);
-    self.switch_mappings.deinit(util.gpa);
+pub fn deinit(mode: *Mode) void {
+    util.gpa.free(mode.name);
+    for (mode.mappings.items) |m| m.deinit();
+    mode.mappings.deinit(util.gpa);
+    for (mode.pointer_mappings.items) |*m| m.deinit();
+    mode.pointer_mappings.deinit(util.gpa);
+    mode.switch_mappings.deinit(util.gpa);
 }
