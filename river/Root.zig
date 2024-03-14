@@ -725,7 +725,7 @@ fn commitTransaction(root: *Root) void {
         }
     }
 
-    server.idle_inhibitor_manager.idleInhibitCheckActive();
+    server.idle_inhibit_manager.checkActive();
 
     if (root.pending_state_dirty) {
         root.applyPending();

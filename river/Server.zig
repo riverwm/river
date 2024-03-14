@@ -26,7 +26,7 @@ const util = @import("util.zig");
 
 const Config = @import("Config.zig");
 const Control = @import("Control.zig");
-const IdleInhibitorManager = @import("IdleInhibitorManager.zig");
+const IdleInhibitManager = @import("IdleInhibitManager.zig");
 const InputManager = @import("InputManager.zig");
 const LayerSurface = @import("LayerSurface.zig");
 const LayoutManager = @import("LayoutManager.zig");
@@ -88,7 +88,7 @@ config: Config,
 control: Control,
 status_manager: StatusManager,
 layout_manager: LayoutManager,
-idle_inhibitor_manager: IdleInhibitorManager,
+idle_inhibit_manager: IdleInhibitManager,
 lock_manager: LockManager,
 
 pub fn init(server: *Server, runtime_xwayland: bool) !void {
@@ -130,7 +130,7 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
         .control = undefined,
         .status_manager = undefined,
         .layout_manager = undefined,
-        .idle_inhibitor_manager = undefined,
+        .idle_inhibit_manager = undefined,
         .lock_manager = undefined,
     };
 
@@ -165,7 +165,7 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
     try server.control.init();
     try server.status_manager.init();
     try server.layout_manager.init();
-    try server.idle_inhibitor_manager.init();
+    try server.idle_inhibit_manager.init();
     try server.lock_manager.init();
 
     server.xdg_shell.events.new_surface.add(&server.new_xdg_surface);
@@ -207,7 +207,7 @@ pub fn deinit(server: *Server) void {
 
     server.root.deinit();
     server.input_manager.deinit();
-    server.idle_inhibitor_manager.deinit();
+    server.idle_inhibit_manager.deinit();
     server.lock_manager.deinit();
 
     server.wl_server.destroy();

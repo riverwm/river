@@ -1,4 +1,20 @@
-const Self = @This();
+// This file is part of river, a dynamic tiling wayland compositor.
+//
+// Copyright 2022 The River Developers
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 3.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+const IdleInhibitManager = @This();
 
 const std = @import("std");
 const wlr = @import("wlroots");
@@ -11,31 +27,31 @@ const IdleInhibitor = @import("IdleInhibitor.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
 const View = @import("View.zig");
 
-idle_inhibit_manager: *wlr.IdleInhibitManagerV1,
+wlr_manager: *wlr.IdleInhibitManagerV1,
 new_idle_inhibitor: wl.Listener(*wlr.IdleInhibitorV1) =
     wl.Listener(*wlr.IdleInhibitorV1).init(handleNewIdleInhibitor),
 inhibitors: std.TailQueue(IdleInhibitor) = .{},
 
-pub fn init(self: *Self) !void {
-    self.* = .{
-        .idle_inhibit_manager = try wlr.IdleInhibitManagerV1.create(server.wl_server),
+pub fn init(inhibit_manager: *IdleInhibitManager) !void {
+    inhibit_manager.* = .{
+        .wlr_manager = try wlr.IdleInhibitManagerV1.create(server.wl_server),
     };
-    self.idle_inhibit_manager.events.new_inhibitor.add(&self.new_idle_inhibitor);
+    inhibit_manager.wlr_manager.events.new_inhibitor.add(&inhibit_manager.new_idle_inhibitor);
 }
 
-pub fn deinit(self: *Self) void {
-    while (self.inhibitors.pop()) |inhibitor| {
+pub fn deinit(inhibit_manager: *IdleInhibitManager) void {
+    while (inhibit_manager.inhibitors.pop()) |inhibitor| {
         inhibitor.data.destroy.link.remove();
         util.gpa.destroy(inhibitor);
     }
-    self.new_idle_inhibitor.link.remove();
+    inhibit_manager.new_idle_inhibitor.link.remove();
 }
 
-pub fn idleInhibitCheckActive(self: *Self) void {
+pub fn checkActive(inhibit_manager: *IdleInhibitManager) void {
     var inhibited = false;
-    var it = self.inhibitors.first;
+    var it = inhibit_manager.inhibitors.first;
     while (it) |node| : (it = node.next) {
-        const node_data = SceneNodeData.fromSurface(node.data.inhibitor.surface) orelse continue;
+        const node_data = SceneNodeData.fromSurface(node.data.wlr_inhibitor.surface) orelse continue;
         switch (node_data.data) {
             .view => |view| {
                 if (view.current.output != null and
@@ -62,14 +78,14 @@ pub fn idleInhibitCheckActive(self: *Self) void {
 }
 
 fn handleNewIdleInhibitor(listener: *wl.Listener(*wlr.IdleInhibitorV1), inhibitor: *wlr.IdleInhibitorV1) void {
-    const self = @fieldParentPtr(Self, "new_idle_inhibitor", listener);
+    const inhibit_manager = @fieldParentPtr(IdleInhibitManager, "new_idle_inhibitor", listener);
     const inhibitor_node = util.gpa.create(std.TailQueue(IdleInhibitor).Node) catch return;
-    inhibitor_node.data.init(inhibitor, self) catch {
+    inhibitor_node.data.init(inhibitor, inhibit_manager) catch {
         util.gpa.destroy(inhibitor_node);
         return;
     };
 
-    self.inhibitors.append(inhibitor_node);
+    inhibit_manager.inhibitors.append(inhibitor_node);
 
-    self.idleInhibitCheckActive();
+    inhibit_manager.checkActive();
 }

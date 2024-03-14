@@ -1,4 +1,20 @@
-const Self = @This();
+// This file is part of river, a dynamic tiling wayland compositor.
+//
+// Copyright 2022 The River Developers
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 3.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+const IdleInhibitor = @This();
 
 const std = @import("std");
 const wlr = @import("wlroots");
@@ -7,29 +23,36 @@ const wl = @import("wayland").server.wl;
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
-const IdleInhibitorManager = @import("IdleInhibitorManager.zig");
+const IdleInhibitManager = @import("IdleInhibitManager.zig");
 
-inhibitor_manager: *IdleInhibitorManager,
-inhibitor: *wlr.IdleInhibitorV1,
+inhibit_manager: *IdleInhibitManager,
+wlr_inhibitor: *wlr.IdleInhibitorV1,
+
 destroy: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleDestroy),
 
-pub fn init(self: *Self, inhibitor: *wlr.IdleInhibitorV1, inhibitor_manager: *IdleInhibitorManager) !void {
-    self.inhibitor_manager = inhibitor_manager;
-    self.inhibitor = inhibitor;
-    self.destroy.setNotify(handleDestroy);
-    inhibitor.events.destroy.add(&self.destroy);
+pub fn init(
+    inhibitor: *IdleInhibitor,
+    wlr_inhibitor: *wlr.IdleInhibitorV1,
+    inhibit_manager: *IdleInhibitManager,
+) !void {
+    inhibitor.* = .{
+        .inhibit_manager = inhibit_manager,
+        .wlr_inhibitor = wlr_inhibitor,
+    };
+    wlr_inhibitor.events.destroy.add(&inhibitor.destroy);
 
-    inhibitor_manager.idleInhibitCheckActive();
+    inhibit_manager.checkActive();
 }
 
 fn handleDestroy(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
-    const self = @fieldParentPtr(Self, "destroy", listener);
-    self.destroy.link.remove();
+    const inhibitor = @fieldParentPtr(IdleInhibitor, "destroy", listener);
 
-    const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-    server.idle_inhibitor_manager.inhibitors.remove(node);
+    inhibitor.destroy.link.remove();
 
-    self.inhibitor_manager.idleInhibitCheckActive();
+    const node = @fieldParentPtr(std.TailQueue(IdleInhibitor).Node, "data", inhibitor);
+    server.idle_inhibit_manager.inhibitors.remove(node);
+
+    inhibitor.inhibit_manager.checkActive();
 
     util.gpa.destroy(node);
 }
