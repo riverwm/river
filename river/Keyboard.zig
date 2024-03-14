@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const Self = @This();
+const Keyboard = @This();
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -82,15 +82,15 @@ pressed: Pressed = .{},
 key: wl.Listener(*wlr.Keyboard.event.Key) = wl.Listener(*wlr.Keyboard.event.Key).init(handleKey),
 modifiers: wl.Listener(*wlr.Keyboard) = wl.Listener(*wlr.Keyboard).init(handleModifiers),
 
-pub fn init(self: *Self, seat: *Seat, wlr_device: *wlr.InputDevice) !void {
-    self.* = .{
+pub fn init(keyboard: *Keyboard, seat: *Seat, wlr_device: *wlr.InputDevice) !void {
+    keyboard.* = .{
         .device = undefined,
     };
-    try self.device.init(seat, wlr_device);
-    errdefer self.device.deinit();
+    try keyboard.device.init(seat, wlr_device);
+    errdefer keyboard.device.deinit();
 
-    const wlr_keyboard = self.device.wlr_device.toKeyboard();
-    wlr_keyboard.data = @intFromPtr(self);
+    const wlr_keyboard = keyboard.device.wlr_device.toKeyboard();
+    wlr_keyboard.data = @intFromPtr(keyboard);
 
     // wlroots will log a more detailed error if this fails.
     if (!wlr_keyboard.setKeymap(server.config.keymap)) return error.OutOfMemory;
@@ -99,7 +99,7 @@ pub fn init(self: *Self, seat: *Seat, wlr_device: *wlr.InputDevice) !void {
     var group_it = seat.keyboard_groups.first;
     outer: while (group_it) |group_node| : (group_it = group_node.next) {
         for (group_node.data.globs.items) |glob| {
-            if (globber.match(glob, self.device.identifier)) {
+            if (globber.match(glob, keyboard.device.identifier)) {
                 // wlroots will log an error if this fails explaining the reason.
                 _ = group_node.data.wlr_group.addKeyboard(wlr_keyboard);
                 break :outer;
@@ -109,18 +109,18 @@ pub fn init(self: *Self, seat: *Seat, wlr_device: *wlr.InputDevice) !void {
 
     wlr_keyboard.setRepeatInfo(server.config.repeat_rate, server.config.repeat_delay);
 
-    wlr_keyboard.events.key.add(&self.key);
-    wlr_keyboard.events.modifiers.add(&self.modifiers);
+    wlr_keyboard.events.key.add(&keyboard.key);
+    wlr_keyboard.events.modifiers.add(&keyboard.modifiers);
 }
 
-pub fn deinit(self: *Self) void {
-    self.key.link.remove();
-    self.modifiers.link.remove();
+pub fn deinit(keyboard: *Keyboard) void {
+    keyboard.key.link.remove();
+    keyboard.modifiers.link.remove();
 
-    const seat = self.device.seat;
-    const wlr_keyboard = self.device.wlr_device.toKeyboard();
+    const seat = keyboard.device.seat;
+    const wlr_keyboard = keyboard.device.wlr_device.toKeyboard();
 
-    self.device.deinit();
+    keyboard.device.deinit();
 
     // If the currently active keyboard of a seat is destroyed we need to set
     // a new active keyboard. Otherwise wlroots may send an enter event without
@@ -135,20 +135,20 @@ pub fn deinit(self: *Self) void {
         }
     }
 
-    self.* = undefined;
+    keyboard.* = undefined;
 }
 
 fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboard.event.Key) void {
     // This event is raised when a key is pressed or released.
-    const self = @fieldParentPtr(Self, "key", listener);
-    const wlr_keyboard = self.device.wlr_device.toKeyboard();
+    const keyboard = @fieldParentPtr(Keyboard, "key", listener);
+    const wlr_keyboard = keyboard.device.wlr_device.toKeyboard();
 
     // If the keyboard is in a group, this event will be handled by the group's Keyboard instance.
     if (wlr_keyboard.group != null) return;
 
-    self.device.seat.handleActivity();
+    keyboard.device.seat.handleActivity();
 
-    self.device.seat.clearRepeatingMapping();
+    keyboard.device.seat.clearRepeatingMapping();
 
     // Translate libinput keycode -> xkbcommon
     const keycode = event.keycode + 8;
@@ -168,7 +168,7 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
             !released and
             !isModifier(sym))
         {
-            self.device.seat.cursor.hide();
+            keyboard.device.seat.cursor.hide();
             break;
         }
     }
@@ -186,17 +186,17 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
         if (released) {
             // The released key might not be in the pressed set when switching from a different tty
             // or if the press was ignored due to >32 keys being pressed simultaneously.
-            break :blk self.pressed.remove(event.keycode) orelse return;
+            break :blk keyboard.pressed.remove(event.keycode) orelse return;
         }
 
         // Ignore key presses beyond 32 simultaneously pressed keys (see comments in Pressed).
         // We must ensure capacity before calling handleMapping() to ensure that we either run
         // both the press and release mapping for certain key or neither mapping.
-        self.pressed.keys.ensureUnusedCapacity(1) catch return;
+        keyboard.pressed.keys.ensureUnusedCapacity(1) catch return;
 
-        if (self.device.seat.handleMapping(keycode, modifiers, released, xkb_state)) {
+        if (keyboard.device.seat.handleMapping(keycode, modifiers, released, xkb_state)) {
             break :blk .mapping;
-        } else if (self.getInputMethodGrab() != null) {
+        } else if (keyboard.getInputMethodGrab() != null) {
             break :blk .im_grab;
         }
 
@@ -204,26 +204,26 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
     };
 
     if (!released) {
-        self.pressed.addAssumeCapacity(.{ .code = event.keycode, .consumer = consumer });
+        keyboard.pressed.addAssumeCapacity(.{ .code = event.keycode, .consumer = consumer });
     }
 
     switch (consumer) {
         // Press mappings are handled above when determining the consumer of the press
         // Release mappings are handled separately as they are executed independent of the consumer.
         .mapping => {},
-        .im_grab => if (self.getInputMethodGrab()) |keyboard_grab| {
+        .im_grab => if (keyboard.getInputMethodGrab()) |keyboard_grab| {
             keyboard_grab.setKeyboard(keyboard_grab.keyboard);
             keyboard_grab.sendKey(event.time_msec, event.keycode, event.state);
         },
         .focus => {
-            const wlr_seat = self.device.seat.wlr_seat;
-            wlr_seat.setKeyboard(self.device.wlr_device.toKeyboard());
+            const wlr_seat = keyboard.device.seat.wlr_seat;
+            wlr_seat.setKeyboard(keyboard.device.wlr_device.toKeyboard());
             wlr_seat.keyboardNotifyKey(event.time_msec, event.keycode, event.state);
         },
     }
 
     // Release mappings don't interact with anything
-    if (released) _ = self.device.seat.handleMapping(keycode, modifiers, released, xkb_state);
+    if (released) _ = keyboard.device.seat.handleMapping(keycode, modifiers, released, xkb_state);
 }
 
 fn isModifier(keysym: xkb.Keysym) bool {
@@ -231,18 +231,18 @@ fn isModifier(keysym: xkb.Keysym) bool {
 }
 
 fn handleModifiers(listener: *wl.Listener(*wlr.Keyboard), _: *wlr.Keyboard) void {
-    const self = @fieldParentPtr(Self, "modifiers", listener);
-    const wlr_keyboard = self.device.wlr_device.toKeyboard();
+    const keyboard = @fieldParentPtr(Keyboard, "modifiers", listener);
+    const wlr_keyboard = keyboard.device.wlr_device.toKeyboard();
 
     // If the keyboard is in a group, this event will be handled by the group's Keyboard instance.
     if (wlr_keyboard.group != null) return;
 
-    if (self.getInputMethodGrab()) |keyboard_grab| {
+    if (keyboard.getInputMethodGrab()) |keyboard_grab| {
         keyboard_grab.setKeyboard(keyboard_grab.keyboard);
         keyboard_grab.sendModifiers(&wlr_keyboard.modifiers);
     } else {
-        self.device.seat.wlr_seat.setKeyboard(self.device.wlr_device.toKeyboard());
-        self.device.seat.wlr_seat.keyboardNotifyModifiers(&wlr_keyboard.modifiers);
+        keyboard.device.seat.wlr_seat.setKeyboard(keyboard.device.wlr_device.toKeyboard());
+        keyboard.device.seat.wlr_seat.keyboardNotifyModifiers(&wlr_keyboard.modifiers);
     }
 }
 
@@ -267,10 +267,10 @@ fn handleBuiltinMapping(keysym: xkb.Keysym) bool {
 /// Returns null if the keyboard is not grabbed by an input method,
 /// or if event is from a virtual keyboard of the same client as the grab.
 /// TODO: see https://gitlab.freedesktop.org/wlroots/wlroots/-/issues/2322
-fn getInputMethodGrab(self: Self) ?*wlr.InputMethodV2.KeyboardGrab {
-    if (self.device.seat.relay.input_method) |input_method| {
+fn getInputMethodGrab(keyboard: Keyboard) ?*wlr.InputMethodV2.KeyboardGrab {
+    if (keyboard.device.seat.relay.input_method) |input_method| {
         if (input_method.keyboard_grab) |keyboard_grab| {
-            if (self.device.wlr_device.getVirtualKeyboard()) |virtual_keyboard| {
+            if (keyboard.device.wlr_device.getVirtualKeyboard()) |virtual_keyboard| {
                 if (virtual_keyboard.resource.getClient() == keyboard_grab.resource.getClient()) {
                     return null;
                 }
