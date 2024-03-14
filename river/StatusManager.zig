@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const Self = @This();
+const StatusManager = @This();
 
 const std = @import("std");
 const wlr = @import("wlroots");
@@ -37,46 +37,46 @@ global: *wl.Global,
 
 server_destroy: wl.Listener(*wl.Server) = wl.Listener(*wl.Server).init(handleServerDestroy),
 
-pub fn init(self: *Self) !void {
-    self.* = .{
+pub fn init(status_manager: *StatusManager) !void {
+    status_manager.* = .{
         .global = try wl.Global.create(server.wl_server, zriver.StatusManagerV1, 4, ?*anyopaque, null, bind),
     };
 
-    server.wl_server.addDestroyListener(&self.server_destroy);
+    server.wl_server.addDestroyListener(&status_manager.server_destroy);
 }
 
 fn handleServerDestroy(listener: *wl.Listener(*wl.Server), _: *wl.Server) void {
-    const self = @fieldParentPtr(Self, "server_destroy", listener);
-    self.global.destroy();
+    const status_manager = @fieldParentPtr(StatusManager, "server_destroy", listener);
+    status_manager.global.destroy();
 }
 
 fn bind(client: *wl.Client, _: ?*anyopaque, version: u32, id: u32) void {
-    const status_manager = zriver.StatusManagerV1.create(client, version, id) catch {
+    const status_manager_v1 = zriver.StatusManagerV1.create(client, version, id) catch {
         client.postNoMemory();
         log.err("out of memory", .{});
         return;
     };
-    status_manager.setHandler(?*anyopaque, handleRequest, null, null);
+    status_manager_v1.setHandler(?*anyopaque, handleRequest, null, null);
 }
 
 fn handleRequest(
-    status_manager: *zriver.StatusManagerV1,
+    status_manager_v1: *zriver.StatusManagerV1,
     request: zriver.StatusManagerV1.Request,
     _: ?*anyopaque,
 ) void {
     switch (request) {
-        .destroy => status_manager.destroy(),
+        .destroy => status_manager_v1.destroy(),
         .get_river_output_status => |req| {
             // ignore if the output is inert
             const wlr_output = wlr.Output.fromWlOutput(req.output) orelse return;
             const output: *Output = @ptrFromInt(wlr_output.data);
 
             const resource = zriver.OutputStatusV1.create(
-                status_manager.getClient(),
-                status_manager.getVersion(),
+                status_manager_v1.getClient(),
+                status_manager_v1.getVersion(),
                 req.id,
             ) catch {
-                status_manager.getClient().postNoMemory();
+                status_manager_v1.getClient().postNoMemory();
                 log.err("out of memory", .{});
                 return;
             };
@@ -89,17 +89,17 @@ fn handleRequest(
             const seat: *Seat = @ptrFromInt(wlr_seat.seat.data);
 
             const node = util.gpa.create(std.SinglyLinkedList(SeatStatus).Node) catch {
-                status_manager.getClient().postNoMemory();
+                status_manager_v1.getClient().postNoMemory();
                 log.err("out of memory", .{});
                 return;
             };
 
             const seat_status = zriver.SeatStatusV1.create(
-                status_manager.getClient(),
-                status_manager.getVersion(),
+                status_manager_v1.getClient(),
+                status_manager_v1.getVersion(),
                 req.id,
             ) catch {
-                status_manager.getClient().postNoMemory();
+                status_manager_v1.getClient().postNoMemory();
                 util.gpa.destroy(node);
                 log.err("out of memory", .{});
                 return;
