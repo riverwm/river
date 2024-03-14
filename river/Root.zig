@@ -49,7 +49,7 @@ layers: struct {
     /// Xwayland override redirect windows are a legacy wart that decide where
     /// to place themselves in layout coordinates. Unfortunately this is how
     /// X11 decided to make dropdown menus and the like possible.
-    xwayland_override_redirect: if (build_options.xwayland) *wlr.SceneTree else void,
+    override_redirect: if (build_options.xwayland) *wlr.SceneTree else void,
 },
 
 /// This is kind of like an imaginary output where views start and end their life.
@@ -126,7 +126,7 @@ pub fn init(root: *Root) !void {
     hidden_tree.node.setEnabled(false);
 
     const outputs = try interactive_content.createSceneTree();
-    const xwayland_override_redirect = if (build_options.xwayland) try interactive_content.createSceneTree();
+    const override_redirect = if (build_options.xwayland) try interactive_content.createSceneTree();
 
     _ = try wlr.XdgOutputManagerV1.create(server.wl_server, output_layout);
 
@@ -143,7 +143,7 @@ pub fn init(root: *Root) !void {
         .drag_icons = drag_icons,
         .layers = .{
             .outputs = outputs,
-            .xwayland_override_redirect = xwayland_override_redirect,
+            .override_redirect = override_redirect,
         },
         .hidden = .{
             .tree = hidden_tree,

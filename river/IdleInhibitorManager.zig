@@ -51,7 +51,7 @@ pub fn idleInhibitCheckActive(self: *Self) void {
                     break;
                 }
             },
-            .lock_surface, .xwayland_override_redirect => {
+            .lock_surface, .override_redirect => {
                 inhibited = true;
                 break;
             },

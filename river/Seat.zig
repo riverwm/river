@@ -49,7 +49,7 @@ const log = std.log.scoped(.seat);
 
 pub const FocusTarget = union(enum) {
     view: *View,
-    xwayland_override_redirect: if (build_options.xwayland) *XwaylandOverrideRedirect else noreturn,
+    override_redirect: if (build_options.xwayland) *XwaylandOverrideRedirect else noreturn,
     layer: *LayerSurface,
     lock_surface: *LockSurface,
     none: void,
@@ -57,7 +57,7 @@ pub const FocusTarget = union(enum) {
     pub fn surface(target: FocusTarget) ?*wlr.Surface {
         return switch (target) {
             .view => |view| view.rootSurface(),
-            .xwayland_override_redirect => |xwayland_or| xwayland_or.xwayland_surface.surface,
+            .override_redirect => |override_redirect| override_redirect.xwayland_surface.surface,
             .layer => |layer| layer.wlr_layer_surface.surface,
             .lock_surface => |lock_surface| lock_surface.wlr_lock_surface.surface,
             .none => null,
@@ -238,7 +238,7 @@ pub fn setFocusRaw(seat: *Seat, new_focus: FocusTarget) void {
         .layer => |layer_surface| {
             layer_surface.destroyPopups();
         },
-        .xwayland_override_redirect, .lock_surface, .none => {},
+        .override_redirect, .lock_surface, .none => {},
     }
 
     // Set the new focus
@@ -254,7 +254,7 @@ pub fn setFocusRaw(seat: *Seat, new_focus: FocusTarget) void {
             assert(seat.focused_output == target_layer.output);
         },
         .lock_surface => assert(server.lock_manager.state != .unlocked),
-        .xwayland_override_redirect, .none => {},
+        .override_redirect, .none => {},
     }
     seat.focused = new_focus;
 

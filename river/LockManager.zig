@@ -97,7 +97,7 @@ fn handleLock(listener: *wl.Listener(*wlr.SessionLockV1), lock: *wlr.SessionLock
         manager.state = .waiting_for_lock_surfaces;
 
         if (build_options.xwayland) {
-            server.root.layers.xwayland_override_redirect.node.setEnabled(false);
+            server.root.layers.override_redirect.node.setEnabled(false);
         }
 
         manager.lock_surfaces_timer.timerUpdate(200) catch {
@@ -207,7 +207,7 @@ fn handleUnlock(listener: *wl.Listener(void)) void {
     }
 
     if (build_options.xwayland) {
-        server.root.layers.xwayland_override_redirect.node.setEnabled(true);
+        server.root.layers.override_redirect.node.setEnabled(true);
     }
 
     {

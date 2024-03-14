@@ -402,7 +402,7 @@ fn updateKeyboardFocus(cursor: Cursor, result: Root.AtResult) void {
             assert(server.lock_manager.state != .unlocked);
             cursor.seat.setFocusRaw(.{ .lock_surface = lock_surface });
         },
-        .xwayland_override_redirect => |override_redirect| {
+        .override_redirect => |override_redirect| {
             assert(server.lock_manager.state != .locked);
             override_redirect.focusIfDesired();
         },
@@ -1009,7 +1009,7 @@ fn updateFocusFollowsCursorTarget(cursor: *Cursor) void {
             .layer_surface, .lock_surface => {
                 cursor.focus_follows_cursor_target = null;
             },
-            .xwayland_override_redirect => {
+            .override_redirect => {
                 assert(build_options.xwayland);
                 assert(server.xwayland != null);
                 cursor.focus_follows_cursor_target = null;
@@ -1139,11 +1139,11 @@ fn warp(cursor: *Cursor) void {
                 .width = view.current.box.width,
                 .height = view.current.box.height,
             },
-            .xwayland_override_redirect => |or_window| wlr.Box{
-                .x = or_window.xwayland_surface.x,
-                .y = or_window.xwayland_surface.y,
-                .width = or_window.xwayland_surface.width,
-                .height = or_window.xwayland_surface.height,
+            .override_redirect => |override_redirect| wlr.Box{
+                .x = override_redirect.xwayland_surface.x,
+                .y = override_redirect.xwayland_surface.y,
+                .width = override_redirect.xwayland_surface.width,
+                .height = override_redirect.xwayland_surface.height,
             },
         },
     };
