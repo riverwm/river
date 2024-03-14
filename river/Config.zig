@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const Self = @This();
+const Config = @This();
 
 const std = @import("std");
 const fmt = std.fmt;
@@ -133,7 +133,7 @@ xkb_context: *xkb.Context,
 /// The xkb keymap used for all keyboards
 keymap: *xkb.Keymap,
 
-pub fn init() !Self {
+pub fn init() !Config {
     const xkb_context = xkb.Context.new(.no_flags) orelse return error.XkbContextFailed;
     defer xkb_context.unref();
 
@@ -142,55 +142,55 @@ pub fn init() !Self {
     const keymap = xkb.Keymap.newFromNames(xkb_context, null, .no_flags) orelse return error.XkbKeymapFailed;
     defer keymap.unref();
 
-    var self = Self{
+    var config = Config{
         .mode_to_id = std.StringHashMap(u32).init(util.gpa),
         .modes = try std.ArrayListUnmanaged(Mode).initCapacity(util.gpa, 2),
         .xkb_context = xkb_context.ref(),
         .keymap = keymap.ref(),
     };
-    errdefer self.deinit();
+    errdefer config.deinit();
 
     // Start with two empty modes, "normal" and "locked"
     {
         // Normal mode, id 0
         const owned_slice = try util.gpa.dupeZ(u8, "normal");
-        try self.mode_to_id.putNoClobber(owned_slice, 0);
-        self.modes.appendAssumeCapacity(.{ .name = owned_slice });
+        try config.mode_to_id.putNoClobber(owned_slice, 0);
+        config.modes.appendAssumeCapacity(.{ .name = owned_slice });
     }
     {
         // Locked mode, id 1
         const owned_slice = try util.gpa.dupeZ(u8, "locked");
-        try self.mode_to_id.putNoClobber(owned_slice, 1);
-        self.modes.appendAssumeCapacity(.{ .name = owned_slice });
+        try config.mode_to_id.putNoClobber(owned_slice, 1);
+        config.modes.appendAssumeCapacity(.{ .name = owned_slice });
     }
 
-    return self;
+    return config;
 }
 
-pub fn deinit(self: *Self) void {
-    self.mode_to_id.deinit();
-    for (self.modes.items) |*mode| mode.deinit();
-    self.modes.deinit(util.gpa);
+pub fn deinit(config: *Config) void {
+    config.mode_to_id.deinit();
+    for (config.modes.items) |*mode| mode.deinit();
+    config.modes.deinit(util.gpa);
 
-    self.rules.float.deinit();
-    self.rules.ssd.deinit();
-    self.rules.tags.deinit();
-    for (self.rules.output.rules.items) |rule| {
+    config.rules.float.deinit();
+    config.rules.ssd.deinit();
+    config.rules.tags.deinit();
+    for (config.rules.output.rules.items) |rule| {
         util.gpa.free(rule.value);
     }
-    self.rules.output.deinit();
-    self.rules.position.deinit();
-    self.rules.dimensions.deinit();
-    self.rules.fullscreen.deinit();
+    config.rules.output.deinit();
+    config.rules.position.deinit();
+    config.rules.dimensions.deinit();
+    config.rules.fullscreen.deinit();
 
-    util.gpa.free(self.default_layout_namespace);
+    util.gpa.free(config.default_layout_namespace);
 
-    self.keymap.unref();
-    self.xkb_context.unref();
+    config.keymap.unref();
+    config.xkb_context.unref();
 }
 
-pub fn outputRuleMatch(self: *Self, view: *View) !?*Output {
-    const output_name = self.rules.output.match(view) orelse return null;
+pub fn outputRuleMatch(config: *Config, view: *View) !?*Output {
+    const output_name = config.rules.output.match(view) orelse return null;
     var it = server.root.active_outputs.iterator(.forward);
     while (it.next()) |output| {
         const wlr_output = output.wlr_output;
