@@ -183,8 +183,10 @@ pub fn deinit(server: *Server) void {
     server.sigterm_source.remove();
 
     server.new_xdg_surface.link.remove();
+    server.new_toplevel_decoration.link.remove();
     server.new_layer_surface.link.remove();
     server.request_activate.link.remove();
+    server.request_set_cursor_shape.link.remove();
 
     if (build_options.xwayland) {
         if (server.xwayland) |xwayland| {
