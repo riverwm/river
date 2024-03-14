@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const Self = @This();
+const Root = @This();
 
 const build_options = @import("build_options");
 const std = @import("std");
@@ -113,7 +113,7 @@ transaction_timeout: *wl.EventSource,
 /// If true when a transaction completes, causes applyPending() to be called again.
 pending_state_dirty: bool = false,
 
-pub fn init(self: *Self) !void {
+pub fn init(root: *Root) !void {
     const output_layout = try wlr.OutputLayout.create();
     errdefer output_layout.destroy();
 
@@ -134,10 +134,10 @@ pub fn init(self: *Self) !void {
     scene.setPresentation(presentation);
 
     const event_loop = server.wl_server.getEventLoop();
-    const transaction_timeout = try event_loop.addTimer(*Self, handleTransactionTimeout, self);
+    const transaction_timeout = try event_loop.addTimer(*Root, handleTransactionTimeout, root);
     errdefer transaction_timeout.remove();
 
-    self.* = .{
+    root.* = .{
         .scene = scene,
         .interactive_content = interactive_content,
         .drag_icons = drag_icons,
@@ -169,29 +169,29 @@ pub fn init(self: *Self) !void {
         .gamma_control_manager = try wlr.GammaControlManagerV1.create(server.wl_server),
         .transaction_timeout = transaction_timeout,
     };
-    self.hidden.pending.focus_stack.init();
-    self.hidden.pending.wm_stack.init();
-    self.hidden.inflight.focus_stack.init();
-    self.hidden.inflight.wm_stack.init();
+    root.hidden.pending.focus_stack.init();
+    root.hidden.pending.wm_stack.init();
+    root.hidden.inflight.focus_stack.init();
+    root.hidden.inflight.wm_stack.init();
 
-    self.fallback_pending.focus_stack.init();
-    self.fallback_pending.wm_stack.init();
+    root.fallback_pending.focus_stack.init();
+    root.fallback_pending.wm_stack.init();
 
-    self.views.init();
-    self.all_outputs.init();
-    self.active_outputs.init();
+    root.views.init();
+    root.all_outputs.init();
+    root.active_outputs.init();
 
-    server.backend.events.new_output.add(&self.new_output);
-    self.output_manager.events.apply.add(&self.manager_apply);
-    self.output_manager.events.@"test".add(&self.manager_test);
-    self.output_layout.events.change.add(&self.layout_change);
-    self.power_manager.events.set_mode.add(&self.power_manager_set_mode);
-    self.gamma_control_manager.events.set_gamma.add(&self.gamma_control_set_gamma);
+    server.backend.events.new_output.add(&root.new_output);
+    root.output_manager.events.apply.add(&root.manager_apply);
+    root.output_manager.events.@"test".add(&root.manager_test);
+    root.output_layout.events.change.add(&root.layout_change);
+    root.power_manager.events.set_mode.add(&root.power_manager_set_mode);
+    root.gamma_control_manager.events.set_gamma.add(&root.gamma_control_set_gamma);
 }
 
-pub fn deinit(self: *Self) void {
-    self.output_layout.destroy();
-    self.transaction_timeout.remove();
+pub fn deinit(root: *Root) void {
+    root.output_layout.destroy();
+    root.transaction_timeout.remove();
 }
 
 pub const AtResult = struct {
@@ -204,10 +204,10 @@ pub const AtResult = struct {
 
 /// Return information about what is currently rendered in the interactive_content
 /// tree at the given layout coordinates, taking surface input regions into account.
-pub fn at(self: Self, lx: f64, ly: f64) ?AtResult {
+pub fn at(root: Root, lx: f64, ly: f64) ?AtResult {
     var sx: f64 = undefined;
     var sy: f64 = undefined;
-    const node = self.interactive_content.node.at(lx, ly, &sx, &sy) orelse return null;
+    const node = root.interactive_content.node.at(lx, ly, &sx, &sy) orelse return null;
 
     const surface: ?*wlr.Surface = blk: {
         if (node.type == .buffer) {
@@ -253,7 +253,7 @@ fn handleNewOutput(_: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
 
 /// Remove the output from root.active_outputs and the output layout.
 /// Evacuate views if necessary.
-pub fn deactivateOutput(root: *Self, output: *Output) void {
+pub fn deactivateOutput(root: *Root, output: *Output) void {
     {
         // If the output has already been removed, do nothing
         var it = root.active_outputs.iterator(.forward);
@@ -354,7 +354,7 @@ pub fn deactivateOutput(root: *Self, output: *Output) void {
 
 /// Add the output to root.active_outputs and the output layout if it has not
 /// already been added.
-pub fn activateOutput(root: *Self, output: *Output) void {
+pub fn activateOutput(root: *Root, output: *Output) void {
     {
         // If we have already added the output, do nothing and return
         var it = root.active_outputs.iterator(.forward);
@@ -418,7 +418,7 @@ pub fn activateOutput(root: *Self, output: *Output) void {
 /// Changes will not be applied to the scene graph until the layout generator
 /// generates a new layout for all outputs and all affected clients ack a
 /// configure and commit a new buffer.
-pub fn applyPending(root: *Self) void {
+pub fn applyPending(root: *Root) void {
     {
         // Changes to the pending state may require a focus update to keep
         // state consistent. Instead of having focus(null) calls spread all
@@ -566,14 +566,14 @@ pub fn applyPending(root: *Self) void {
 /// This function is used to inform the transaction system that a layout demand
 /// has either been completed or timed out. If it was the last pending layout
 /// demand in the current sequence, a transaction is started.
-pub fn notifyLayoutDemandDone(root: *Self) void {
+pub fn notifyLayoutDemandDone(root: *Root) void {
     root.inflight_layout_demands -= 1;
     if (root.inflight_layout_demands == 0) {
         root.sendConfigures();
     }
 }
 
-fn sendConfigures(root: *Self) void {
+fn sendConfigures(root: *Root) void {
     assert(root.inflight_layout_demands == 0);
     assert(root.inflight_configures == 0);
 
@@ -612,25 +612,25 @@ fn sendConfigures(root: *Self) void {
     }
 }
 
-fn handleTransactionTimeout(self: *Self) c_int {
-    assert(self.inflight_layout_demands == 0);
+fn handleTransactionTimeout(root: *Root) c_int {
+    assert(root.inflight_layout_demands == 0);
 
     std.log.scoped(.transaction).err("timeout occurred, some imperfect frames may be shown", .{});
 
-    self.inflight_configures = 0;
-    self.commitTransaction();
+    root.inflight_configures = 0;
+    root.commitTransaction();
 
     return 0;
 }
 
-pub fn notifyConfigured(self: *Self) void {
-    assert(self.inflight_layout_demands == 0);
+pub fn notifyConfigured(root: *Root) void {
+    assert(root.inflight_layout_demands == 0);
 
-    self.inflight_configures -= 1;
-    if (self.inflight_configures == 0) {
+    root.inflight_configures -= 1;
+    if (root.inflight_configures == 0) {
         // Disarm the timer, as we didn't timeout
-        self.transaction_timeout.timerUpdate(0) catch std.log.scoped(.transaction).err("error disarming timer", .{});
-        self.commitTransaction();
+        root.transaction_timeout.timerUpdate(0) catch std.log.scoped(.transaction).err("error disarming timer", .{});
+        root.commitTransaction();
     }
 }
 
@@ -638,7 +638,7 @@ pub fn notifyConfigured(self: *Self) void {
 /// the next frame drawn will be the post-transaction state of the
 /// layout. Should only be called after all clients have configured for
 /// the new layout. If called early imperfect frames may be drawn.
-fn commitTransaction(root: *Self) void {
+fn commitTransaction(root: *Root) void {
     assert(root.inflight_layout_demands == 0);
     assert(root.inflight_configures == 0);
 
@@ -735,24 +735,24 @@ fn commitTransaction(root: *Self) void {
 // We need this listener to deal with outputs that have their position auto-configured
 // by the wlr_output_layout.
 fn handleLayoutChange(listener: *wl.Listener(*wlr.OutputLayout), _: *wlr.OutputLayout) void {
-    const self = @fieldParentPtr(Self, "layout_change", listener);
+    const root = @fieldParentPtr(Root, "layout_change", listener);
 
-    self.handleOutputConfigChange() catch std.log.err("out of memory", .{});
+    root.handleOutputConfigChange() catch std.log.err("out of memory", .{});
 }
 
 /// Sync up the output scene node state with the output_layout and
 /// send the current output configuration to all wlr-output-manager clients.
-pub fn handleOutputConfigChange(self: *Self) !void {
+pub fn handleOutputConfigChange(root: *Root) !void {
     const config = try wlr.OutputConfigurationV1.create();
     // this destroys all associated config heads as well
     errdefer config.destroy();
 
-    var it = self.all_outputs.iterator(.forward);
+    var it = root.all_outputs.iterator(.forward);
     while (it.next()) |output| {
         // If the output is not part of the layout (and thus disabled)
         // the box will be zeroed out.
         var box: wlr.Box = undefined;
-        self.output_layout.getBox(output.wlr_output, &box);
+        root.output_layout.getBox(output.wlr_output, &box);
 
         output.tree.node.setEnabled(!box.empty());
         output.tree.node.setPosition(box.x, box.y);
@@ -763,41 +763,41 @@ pub fn handleOutputConfigChange(self: *Self) !void {
         head.state.y = box.y;
     }
 
-    self.output_manager.setConfiguration(config);
+    root.output_manager.setConfiguration(config);
 }
 
 fn handleManagerApply(
     listener: *wl.Listener(*wlr.OutputConfigurationV1),
     config: *wlr.OutputConfigurationV1,
 ) void {
-    const self = @fieldParentPtr(Self, "manager_apply", listener);
+    const root = @fieldParentPtr(Root, "manager_apply", listener);
     defer config.destroy();
 
     std.log.scoped(.output_manager).info("applying output configuration", .{});
 
-    self.processOutputConfig(config, .apply);
+    root.processOutputConfig(config, .apply);
 
-    self.handleOutputConfigChange() catch std.log.err("out of memory", .{});
+    root.handleOutputConfigChange() catch std.log.err("out of memory", .{});
 }
 
 fn handleManagerTest(
     listener: *wl.Listener(*wlr.OutputConfigurationV1),
     config: *wlr.OutputConfigurationV1,
 ) void {
-    const self = @fieldParentPtr(Self, "manager_test", listener);
+    const root = @fieldParentPtr(Root, "manager_test", listener);
     defer config.destroy();
 
-    self.processOutputConfig(config, .test_only);
+    root.processOutputConfig(config, .test_only);
 }
 
 fn processOutputConfig(
-    self: *Self,
+    root: *Root,
     config: *wlr.OutputConfigurationV1,
     action: enum { test_only, apply },
 ) void {
     // Ignore layout change events this function generates while applying the config
-    self.layout_change.link.remove();
-    defer self.output_layout.events.change.add(&self.layout_change);
+    root.layout_change.link.remove();
+    defer root.output_layout.events.change.add(&root.layout_change);
 
     var success = true;
 
@@ -823,13 +823,13 @@ fn processOutputConfig(
                 if (output.wlr_output.enabled) {
                     // applyState() will always add the output to the layout on success, which means
                     // that this function cannot fail as it does not need to allocate a new layout output.
-                    _ = self.output_layout.add(output.wlr_output, head.state.x, head.state.y) catch unreachable;
+                    _ = root.output_layout.add(output.wlr_output, head.state.x, head.state.y) catch unreachable;
                 }
             },
         }
     }
 
-    if (action == .apply) self.applyPending();
+    if (action == .apply) root.applyPending();
 
     if (success) {
         config.sendSucceeded();
