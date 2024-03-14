@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const Self = @This();
+const PointerMapping = @This();
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -39,7 +39,7 @@ pub fn init(
     modifiers: wlr.Keyboard.ModifierMask,
     action_type: std.meta.Tag(Action),
     command_args: []const [:0]const u8,
-) !Self {
+) !PointerMapping {
     assert(action_type == .command or command_args.len == 1);
 
     var arena = std.heap.ArenaAllocator.init(util.gpa);
@@ -60,7 +60,7 @@ pub fn init(
         },
     };
 
-    return Self{
+    return PointerMapping{
         .event_code = event_code,
         .modifiers = modifiers,
         .action = action,
@@ -68,7 +68,7 @@ pub fn init(
     };
 }
 
-pub fn deinit(self: *Self) void {
-    self.arena_state.promote(util.gpa).deinit();
-    self.* = undefined;
+pub fn deinit(pointer_mapping: *PointerMapping) void {
+    pointer_mapping.arena_state.promote(util.gpa).deinit();
+    pointer_mapping.* = undefined;
 }
