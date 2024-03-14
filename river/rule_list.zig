@@ -30,7 +30,7 @@ pub const MaxGlobLen = struct {
 
 pub fn RuleList(comptime T: type) type {
     return struct {
-        const Self = @This();
+        const List = @This();
 
         const Rule = struct {
             app_id_glob: []const u8,
@@ -42,7 +42,7 @@ pub fn RuleList(comptime T: type) type {
         /// Ordered first by app-id generality then by title generality.
         rules: std.ArrayListUnmanaged(Rule) = .{},
 
-        pub fn deinit(list: *Self) void {
+        pub fn deinit(list: *List) void {
             for (list.rules.items) |rule| {
                 util.gpa.free(rule.app_id_glob);
                 util.gpa.free(rule.title_glob);
@@ -50,7 +50,7 @@ pub fn RuleList(comptime T: type) type {
             list.rules.deinit(util.gpa);
         }
 
-        pub fn add(list: *Self, rule: Rule) error{OutOfMemory}!void {
+        pub fn add(list: *List, rule: Rule) error{OutOfMemory}!void {
             const index = for (list.rules.items, 0..) |*existing, i| {
                 if (mem.eql(u8, rule.app_id_glob, existing.app_id_glob) and
                     mem.eql(u8, rule.title_glob, existing.title_glob))
@@ -83,7 +83,7 @@ pub fn RuleList(comptime T: type) type {
             });
         }
 
-        pub fn del(list: *Self, rule: struct { app_id_glob: []const u8, title_glob: []const u8 }) ?T {
+        pub fn del(list: *List, rule: struct { app_id_glob: []const u8, title_glob: []const u8 }) ?T {
             for (list.rules.items, 0..) |existing, i| {
                 if (mem.eql(u8, rule.app_id_glob, existing.app_id_glob) and
                     mem.eql(u8, rule.title_glob, existing.title_glob))
@@ -98,7 +98,7 @@ pub fn RuleList(comptime T: type) type {
 
         /// Returns the value of the most specific rule matching the view.
         /// Returns null if no rule matches.
-        pub fn match(list: *Self, view: *View) ?T {
+        pub fn match(list: *List, view: *View) ?T {
             assert(!view.destroying);
             const app_id = mem.sliceTo(view.getAppId(), 0) orelse "";
             const title = mem.sliceTo(view.getTitle(), 0) orelse "";
@@ -115,10 +115,10 @@ pub fn RuleList(comptime T: type) type {
         }
 
         /// Returns the length of the longest globs.
-        pub fn getMaxGlobLen(self: *const Self) MaxGlobLen {
+        pub fn getMaxGlobLen(list: *const List) MaxGlobLen {
             var app_id_len: usize = 0;
             var title_len: usize = 0;
-            for (self.rules.items) |rule| {
+            for (list.rules.items) |rule| {
                 app_id_len = @max(app_id_len, rule.app_id_glob.len);
                 title_len = @max(title_len, rule.title_glob.len);
             }
