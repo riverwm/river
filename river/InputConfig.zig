@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const Self = @This();
+const InputConfig = @This();
 
 const build_options = @import("build_options");
 const std = @import("std");
@@ -272,43 +272,43 @@ tap: ?TapState = null,
 @"scroll-button": ?ScrollButton = null,
 @"map-to-output": MapToOutput = .{ .output_name = null },
 
-pub fn deinit(self: *Self) void {
-    util.gpa.free(self.glob);
-    if (self.@"map-to-output".output_name) |output_name| {
+pub fn deinit(config: *InputConfig) void {
+    util.gpa.free(config.glob);
+    if (config.@"map-to-output".output_name) |output_name| {
         util.gpa.free(output_name);
     }
 }
 
-pub fn apply(self: *const Self, device: *InputDevice) void {
+pub fn apply(config: *const InputConfig, device: *InputDevice) void {
     const libinput_device: *c.libinput_device = @ptrCast(device.wlr_device.getLibinputDevice() orelse return);
-    log.debug("applying input configuration '{s}' to device '{s}'.", .{ self.glob, device.identifier });
+    log.debug("applying input configuration '{s}' to device '{s}'.", .{ config.glob, device.identifier });
 
-    inline for (@typeInfo(Self).Struct.fields) |field| {
+    inline for (@typeInfo(InputConfig).Struct.fields) |field| {
         if (comptime mem.eql(u8, field.name, "glob")) continue;
 
         if (comptime mem.eql(u8, field.name, "map-to-output")) {
-            @field(self, field.name).apply(device);
-        } else if (@field(self, field.name)) |setting| {
+            @field(config, field.name).apply(device);
+        } else if (@field(config, field.name)) |setting| {
             log.debug("applying setting: {s}", .{field.name});
             setting.apply(libinput_device);
         }
     }
 }
 
-pub fn parse(self: *Self, setting: []const u8, value: []const u8) !void {
-    inline for (@typeInfo(Self).Struct.fields) |field| {
+pub fn parse(config: *InputConfig, setting: []const u8, value: []const u8) !void {
+    inline for (@typeInfo(InputConfig).Struct.fields) |field| {
         if (comptime mem.eql(u8, field.name, "glob")) continue;
 
         if (mem.eql(u8, setting, field.name)) {
             // Special-case the settings which are not enums.
             if (comptime mem.eql(u8, field.name, "pointer-accel")) {
-                self.@"pointer-accel" = PointerAccel{
+                config.@"pointer-accel" = PointerAccel{
                     .value = math.clamp(try std.fmt.parseFloat(f32, value), -1.0, 1.0),
                 };
             } else if (comptime mem.eql(u8, field.name, "scroll-button")) {
                 const ret = c.libevdev_event_code_from_name(c.EV_KEY, value.ptr);
                 if (ret < 1) return error.InvalidButton;
-                self.@"scroll-button" = ScrollButton{ .button = @intCast(ret) };
+                config.@"scroll-button" = ScrollButton{ .button = @intCast(ret) };
             } else if (comptime mem.eql(u8, field.name, "map-to-output")) {
                 const output_name_owned = blk: {
                     if (mem.eql(u8, value, "disabled")) {
@@ -318,14 +318,14 @@ pub fn parse(self: *Self, setting: []const u8, value: []const u8) !void {
                     }
                 };
 
-                if (self.@"map-to-output".output_name) |old| util.gpa.free(old);
-                self.@"map-to-output" = .{ .output_name = output_name_owned };
+                if (config.@"map-to-output".output_name) |old| util.gpa.free(old);
+                config.@"map-to-output" = .{ .output_name = output_name_owned };
             } else {
                 const T = @typeInfo(field.type).Optional.child;
                 if (@typeInfo(T) != .Enum) {
                     @compileError("You forgot to implement parsing for an input configuration setting.");
                 }
-                @field(self, field.name) = meta.stringToEnum(T, value) orelse
+                @field(config, field.name) = meta.stringToEnum(T, value) orelse
                     return error.UnknownOption;
             }
 
@@ -336,17 +336,17 @@ pub fn parse(self: *Self, setting: []const u8, value: []const u8) !void {
     return error.UnknownCommand;
 }
 
-pub fn write(self: *Self, writer: anytype) !void {
-    try writer.print("{s}\n", .{self.glob});
+pub fn write(config: *InputConfig, writer: anytype) !void {
+    try writer.print("{s}\n", .{config.glob});
 
-    inline for (@typeInfo(Self).Struct.fields) |field| {
+    inline for (@typeInfo(InputConfig).Struct.fields) |field| {
         if (comptime mem.eql(u8, field.name, "glob")) continue;
 
         if (comptime mem.eql(u8, field.name, "map-to-output")) {
-            if (@field(self, field.name).output_name) |output_name| {
+            if (@field(config, field.name).output_name) |output_name| {
                 try writer.print("\tmap-to-output: {s}\n", .{output_name});
             }
-        } else if (@field(self, field.name)) |setting| {
+        } else if (@field(config, field.name)) |setting| {
             // Special-case the settings which are not enums.
             if (comptime mem.eql(u8, field.name, "pointer-accel")) {
                 try writer.print("\tpointer-accel: {d}\n", .{setting.value});
