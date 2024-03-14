@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const Self = @This();
+const View = @This();
 
 const build_options = @import("build_options");
 const std = @import("std");
@@ -177,10 +177,10 @@ foreign_toplevel_handle: ForeignToplevelHandle = .{},
 /// Connector name of the output this view occupied before an evacuation.
 output_before_evac: ?[]const u8 = null,
 
-pub fn create(impl: Impl) error{OutOfMemory}!*Self {
+pub fn create(impl: Impl) error{OutOfMemory}!*View {
     assert(impl != .none);
 
-    const view = try util.gpa.create(Self);
+    const view = try util.gpa.create(View);
     errdefer util.gpa.destroy(view);
 
     const tree = try server.root.hidden.tree.createSceneTree();
@@ -228,7 +228,7 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Self {
 /// If saved buffers of the view are currently in use by a transaction,
 /// mark this view for destruction when the transaction completes. Otherwise
 /// destroy immediately.
-pub fn destroy(view: *Self) void {
+pub fn destroy(view: *View) void {
     assert(view.impl == .none);
 
     view.destroying = true;
@@ -256,7 +256,7 @@ pub fn destroy(view: *Self) void {
 /// until the size of the buffer actually committed is known. Clients are permitted
 /// by the protocol to take a size smaller than that requested by the compositor in
 /// order to maintain an aspect ratio or similar (mpv does this for example).
-pub fn resizeUpdatePosition(view: *Self, width: i32, height: i32) void {
+pub fn resizeUpdatePosition(view: *View, width: i32, height: i32) void {
     assert(view.inflight.resizing);
 
     const data = blk: {
@@ -284,7 +284,7 @@ pub fn resizeUpdatePosition(view: *Self, width: i32, height: i32) void {
     }
 }
 
-pub fn commitTransaction(view: *Self) void {
+pub fn commitTransaction(view: *View) void {
     assert(view.inflight_transaction);
     view.inflight_transaction = false;
 
@@ -356,7 +356,7 @@ pub fn commitTransaction(view: *Self) void {
     view.updateSceneState();
 }
 
-pub fn updateSceneState(view: *Self) void {
+pub fn updateSceneState(view: *View) void {
     const box = &view.current.box;
     view.tree.node.setPosition(box.x, box.y);
     view.popup_tree.node.setPosition(box.x, box.y);
@@ -440,49 +440,49 @@ pub fn updateSceneState(view: *Self) void {
 }
 
 /// Returns true if the configure should be waited for by the transaction system.
-pub fn configure(self: *Self) bool {
-    assert(self.mapped and !self.destroying);
-    switch (self.impl) {
+pub fn configure(view: *View) bool {
+    assert(view.mapped and !view.destroying);
+    switch (view.impl) {
         .xdg_toplevel => |*xdg_toplevel| return xdg_toplevel.configure(),
         .xwayland_view => |*xwayland_view| return xwayland_view.configure(),
         .none => unreachable,
     }
 }
 
-pub fn rootSurface(self: Self) *wlr.Surface {
-    assert(self.mapped and !self.destroying);
-    return switch (self.impl) {
+pub fn rootSurface(view: View) *wlr.Surface {
+    assert(view.mapped and !view.destroying);
+    return switch (view.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.rootSurface(),
         .xwayland_view => |xwayland_view| xwayland_view.rootSurface(),
         .none => unreachable,
     };
 }
 
-pub fn sendFrameDone(self: Self) void {
-    assert(self.mapped and !self.destroying);
+pub fn sendFrameDone(view: View) void {
+    assert(view.mapped and !view.destroying);
     var now: os.timespec = undefined;
     os.clock_gettime(os.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
-    self.rootSurface().sendFrameDone(&now);
+    view.rootSurface().sendFrameDone(&now);
 }
 
-pub fn dropSavedSurfaceTree(self: *Self) void {
-    if (!self.saved_surface_tree.node.enabled) return;
+pub fn dropSavedSurfaceTree(view: *View) void {
+    if (!view.saved_surface_tree.node.enabled) return;
 
-    var it = self.saved_surface_tree.children.safeIterator(.forward);
+    var it = view.saved_surface_tree.children.safeIterator(.forward);
     while (it.next()) |node| node.destroy();
 
-    self.saved_surface_tree.node.setEnabled(false);
-    self.surface_tree.node.setEnabled(true);
+    view.saved_surface_tree.node.setEnabled(false);
+    view.surface_tree.node.setEnabled(true);
 }
 
-pub fn saveSurfaceTree(self: *Self) void {
-    assert(!self.saved_surface_tree.node.enabled);
-    assert(self.saved_surface_tree.children.empty());
+pub fn saveSurfaceTree(view: *View) void {
+    assert(!view.saved_surface_tree.node.enabled);
+    assert(view.saved_surface_tree.children.empty());
 
-    self.surface_tree.node.forEachBuffer(*wlr.SceneTree, saveSurfaceTreeIter, self.saved_surface_tree);
+    view.surface_tree.node.forEachBuffer(*wlr.SceneTree, saveSurfaceTreeIter, view.saved_surface_tree);
 
-    self.surface_tree.node.setEnabled(false);
-    self.saved_surface_tree.node.setEnabled(true);
+    view.surface_tree.node.setEnabled(false);
+    view.saved_surface_tree.node.setEnabled(true);
 }
 
 fn saveSurfaceTreeIter(
@@ -501,7 +501,7 @@ fn saveSurfaceTreeIter(
     saved.setTransform(buffer.transform);
 }
 
-pub fn setPendingOutput(view: *Self, output: *Output) void {
+pub fn setPendingOutput(view: *View, output: *Output) void {
     view.pending.output = output;
     view.pending_wm_stack_link.remove();
     view.pending_focus_stack_link.remove();
@@ -523,18 +523,18 @@ pub fn setPendingOutput(view: *Self, output: *Output) void {
     }
 }
 
-pub fn close(self: Self) void {
-    assert(!self.destroying);
-    switch (self.impl) {
+pub fn close(view: View) void {
+    assert(!view.destroying);
+    switch (view.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.close(),
         .xwayland_view => |xwayland_view| xwayland_view.close(),
         .none => unreachable,
     }
 }
 
-pub fn destroyPopups(self: Self) void {
-    assert(!self.destroying);
-    switch (self.impl) {
+pub fn destroyPopups(view: View) void {
+    assert(!view.destroying);
+    switch (view.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.destroyPopups(),
         .xwayland_view => {},
         .none => unreachable,
@@ -542,9 +542,9 @@ pub fn destroyPopups(self: Self) void {
 }
 
 /// Return the current title of the view if any.
-pub fn getTitle(self: Self) ?[*:0]const u8 {
-    assert(!self.destroying);
-    return switch (self.impl) {
+pub fn getTitle(view: View) ?[*:0]const u8 {
+    assert(!view.destroying);
+    return switch (view.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.getTitle(),
         .xwayland_view => |xwayland_view| xwayland_view.getTitle(),
         .none => unreachable,
@@ -552,9 +552,9 @@ pub fn getTitle(self: Self) ?[*:0]const u8 {
 }
 
 /// Return the current app_id of the view if any.
-pub fn getAppId(self: Self) ?[*:0]const u8 {
-    assert(!self.destroying);
-    return switch (self.impl) {
+pub fn getAppId(view: View) ?[*:0]const u8 {
+    assert(!view.destroying);
+    return switch (view.impl) {
         .xdg_toplevel => |xdg_toplevel| xdg_toplevel.getAppId(),
         .xwayland_view => |xwayland_view| xwayland_view.getAppId(),
         .none => unreachable,
@@ -562,13 +562,13 @@ pub fn getAppId(self: Self) ?[*:0]const u8 {
 }
 
 /// Clamp the width/height of the box to the constraints of the view
-pub fn applyConstraints(self: *Self, box: *wlr.Box) void {
-    box.width = math.clamp(box.width, self.constraints.min_width, self.constraints.max_width);
-    box.height = math.clamp(box.height, self.constraints.min_height, self.constraints.max_height);
+pub fn applyConstraints(view: *View, box: *wlr.Box) void {
+    box.width = math.clamp(box.width, view.constraints.min_width, view.constraints.max_width);
+    box.height = math.clamp(box.height, view.constraints.min_height, view.constraints.max_height);
 }
 
 /// Attach after n visible, not-floating views in the pending wm_stack
-pub fn attachAfter(view: *Self, output_pending: *Output.PendingState, n: usize) void {
+pub fn attachAfter(view: *View, output_pending: *Output.PendingState, n: usize) void {
     var visible: u32 = 0;
     var it = output_pending.wm_stack.iterator(.forward);
 
@@ -583,7 +583,7 @@ pub fn attachAfter(view: *Self, output_pending: *Output.PendingState, n: usize) 
 }
 
 /// Attach above or below the currently focused view
-pub fn attachRelative(view: *Self, output_pending: *Output.PendingState, mode: AttachRelativeMode) void {
+pub fn attachRelative(view: *View, output_pending: *Output.PendingState, mode: AttachRelativeMode) void {
     var focus_stack_it = output_pending.focus_stack.iterator(.forward);
 
     const focus_stack_head = focus_stack_it.next() orelse {
@@ -613,7 +613,7 @@ pub fn attachRelative(view: *Self, output_pending: *Output.PendingState, mode: A
 }
 
 /// Called by the impl when the surface is ready to be displayed
-pub fn map(view: *Self) !void {
+pub fn map(view: *View) !void {
     log.debug("view '{?s}' mapped", .{view.getTitle()});
 
     assert(!view.mapped and !view.destroying);
@@ -688,7 +688,7 @@ pub fn map(view: *Self) !void {
 }
 
 /// Called by the impl when the surface will no longer be displayed
-pub fn unmap(view: *Self) void {
+pub fn unmap(view: *View) void {
     log.debug("view '{?s}' unmapped", .{view.getTitle()});
 
     if (!view.saved_surface_tree.node.enabled) view.saveSurfaceTree();
@@ -709,7 +709,7 @@ pub fn unmap(view: *Self) void {
     server.root.applyPending();
 }
 
-pub fn notifyTitle(view: *const Self) void {
+pub fn notifyTitle(view: *const View) void {
     if (view.foreign_toplevel_handle.wlr_handle) |wlr_handle| {
         if (view.getTitle()) |title| wlr_handle.setTitle(title);
     }
@@ -725,7 +725,7 @@ pub fn notifyTitle(view: *const Self) void {
     }
 }
 
-pub fn notifyAppId(view: Self) void {
+pub fn notifyAppId(view: View) void {
     if (view.foreign_toplevel_handle.wlr_handle) |wlr_handle| {
         if (view.getAppId()) |app_id| wlr_handle.setAppId(app_id);
     }
