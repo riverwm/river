@@ -77,9 +77,9 @@ pub fn sendLayoutCmd(
         if (mem.eql(u8, layout.namespace, target_namespace)) break layout;
     } else return;
 
-    if (layout.layout.getVersion() >= 2) {
-        layout.layout.sendUserCommandTags(output.pending.tags);
+    if (layout.layout_v3.getVersion() >= 2) {
+        layout.layout_v3.sendUserCommandTags(output.pending.tags);
     }
-    layout.layout.sendUserCommand(args[2]);
+    layout.layout_v3.sendUserCommand(args[2]);
     if (layout == output.layout) server.root.applyPending();
 }

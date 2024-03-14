@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const Self = @This();
+const Layout = @This();
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -34,29 +34,29 @@ const LayoutDemand = @import("LayoutDemand.zig");
 
 const log = std.log.scoped(.layout);
 
-layout: *river.LayoutV3,
+layout_v3: *river.LayoutV3,
 namespace: []const u8,
 output: *Output,
 
 pub fn create(client: *wl.Client, version: u32, id: u32, output: *Output, namespace: []const u8) !void {
-    const layout = try river.LayoutV3.create(client, version, id);
+    const layout_v3 = try river.LayoutV3.create(client, version, id);
 
     if (namespaceInUse(namespace, output, client)) {
-        layout.sendNamespaceInUse();
-        layout.setHandler(?*anyopaque, handleRequestInert, null, null);
+        layout_v3.sendNamespaceInUse();
+        layout_v3.setHandler(?*anyopaque, handleRequestInert, null, null);
         return;
     }
 
-    const node = try util.gpa.create(std.TailQueue(Self).Node);
+    const node = try util.gpa.create(std.TailQueue(Layout).Node);
     errdefer util.gpa.destroy(node);
     node.data = .{
-        .layout = layout,
+        .layout_v3 = layout_v3,
         .namespace = try util.gpa.dupe(u8, namespace),
         .output = output,
     };
     output.layouts.append(node);
 
-    layout.setHandler(*Self, handleRequest, handleDestroy, &node.data);
+    layout_v3.setHandler(*Layout, handleRequest, handleDestroy, &node.data);
 
     // If the namespace matches that of the output, set the layout as
     // the active one of the output and arrange it.
@@ -81,7 +81,7 @@ fn namespaceInUse(namespace: []const u8, output: *Output, client: *wl.Client) bo
             // Layouts on other outputs may share the namespace, if they come from the same client.
             while (layout_it) |layout_node| : (layout_it = layout_node.next) {
                 if (mem.eql(u8, namespace, layout_node.data.namespace) and
-                    client != layout_node.data.layout.getClient()) return true;
+                    client != layout_node.data.layout_v3.getClient()) return true;
             }
         }
     }
@@ -90,47 +90,47 @@ fn namespaceInUse(namespace: []const u8, output: *Output, client: *wl.Client) bo
 
 /// This exists to handle layouts that have been rendered inert (due to the
 /// namespace already being in use) until the client destroys them.
-fn handleRequestInert(layout: *river.LayoutV3, request: river.LayoutV3.Request, _: ?*anyopaque) void {
-    if (request == .destroy) layout.destroy();
+fn handleRequestInert(layout_v3: *river.LayoutV3, request: river.LayoutV3.Request, _: ?*anyopaque) void {
+    if (request == .destroy) layout_v3.destroy();
 }
 
 /// Send a layout demand to the client
-pub fn startLayoutDemand(self: *Self, views: u32) void {
+pub fn startLayoutDemand(layout: *Layout, views: u32) void {
     log.debug(
         "starting layout demand '{s}' on output '{s}'",
-        .{ self.namespace, self.output.wlr_output.name },
+        .{ layout.namespace, layout.output.wlr_output.name },
     );
 
-    assert(self.output.inflight.layout_demand == null);
-    self.output.inflight.layout_demand = LayoutDemand.init(self, views) catch {
+    assert(layout.output.inflight.layout_demand == null);
+    layout.output.inflight.layout_demand = LayoutDemand.init(layout, views) catch {
         log.err("failed starting layout demand", .{});
         return;
     };
 
-    self.layout.sendLayoutDemand(
+    layout.layout_v3.sendLayoutDemand(
         views,
-        @intCast(self.output.usable_box.width),
-        @intCast(self.output.usable_box.height),
-        self.output.pending.tags,
-        self.output.inflight.layout_demand.?.serial,
+        @intCast(layout.output.usable_box.width),
+        @intCast(layout.output.usable_box.height),
+        layout.output.pending.tags,
+        layout.output.inflight.layout_demand.?.serial,
     );
 
     server.root.inflight_layout_demands += 1;
 }
 
-fn handleRequest(layout: *river.LayoutV3, request: river.LayoutV3.Request, self: *Self) void {
+fn handleRequest(layout_v3: *river.LayoutV3, request: river.LayoutV3.Request, layout: *Layout) void {
     switch (request) {
-        .destroy => layout.destroy(),
+        .destroy => layout_v3.destroy(),
 
         // We receive this event when the client wants to push a view dimension proposal
         // to the layout demand matching the serial.
         .push_view_dimensions => |req| {
             log.debug(
                 "layout '{s}' on output '{s}' pushed view dimensions: {} {} {} {}",
-                .{ self.namespace, self.output.wlr_output.name, req.x, req.y, req.width, req.height },
+                .{ layout.namespace, layout.output.wlr_output.name, req.x, req.y, req.width, req.height },
             );
 
-            if (self.output.inflight.layout_demand) |*layout_demand| {
+            if (layout.output.inflight.layout_demand) |*layout_demand| {
                 // We can't raise a protocol error when the serial is old/wrong
                 // because we do not keep track of old serials server-side.
                 // Therefore, simply ignore requests with old/wrong serials.
@@ -149,64 +149,64 @@ fn handleRequest(layout: *river.LayoutV3, request: river.LayoutV3.Request, self:
         .commit => |req| {
             log.debug(
                 "layout '{s}' on output '{s}' commited",
-                .{ self.namespace, self.output.wlr_output.name },
+                .{ layout.namespace, layout.output.wlr_output.name },
             );
 
-            if (self.output.inflight.layout_demand) |*layout_demand| {
+            if (layout.output.inflight.layout_demand) |*layout_demand| {
                 // We can't raise a protocol error when the serial is old/wrong
                 // because we do not keep track of old serials server-side.
                 // Therefore, simply ignore requests with old/wrong serials.
-                if (layout_demand.serial == req.serial) layout_demand.apply(self);
+                if (layout_demand.serial == req.serial) layout_demand.apply(layout);
             }
 
             const new_name = mem.sliceTo(req.layout_name, 0);
-            if (self.output.layout_name == null or
-                !mem.eql(u8, self.output.layout_name.?, new_name))
+            if (layout.output.layout_name == null or
+                !mem.eql(u8, layout.output.layout_name.?, new_name))
             {
                 const owned = util.gpa.dupeZ(u8, new_name) catch {
                     log.err("out of memory", .{});
                     return;
                 };
-                if (self.output.layout_name) |name| util.gpa.free(name);
-                self.output.layout_name = owned;
-                self.output.status.sendLayoutName(self.output);
+                if (layout.output.layout_name) |name| util.gpa.free(name);
+                layout.output.layout_name = owned;
+                layout.output.status.sendLayoutName(layout.output);
             }
         },
     }
 }
 
-fn handleDestroy(_: *river.LayoutV3, self: *Self) void {
-    self.destroy();
+fn handleDestroy(_: *river.LayoutV3, layout: *Layout) void {
+    layout.destroy();
 }
 
-pub fn destroy(self: *Self) void {
+pub fn destroy(layout: *Layout) void {
     log.debug(
         "destroying layout '{s}' on output '{s}'",
-        .{ self.namespace, self.output.wlr_output.name },
+        .{ layout.namespace, layout.output.wlr_output.name },
     );
 
     // Remove layout from the list
-    const node = @fieldParentPtr(std.TailQueue(Self).Node, "data", self);
-    self.output.layouts.remove(node);
+    const node = @fieldParentPtr(std.TailQueue(Layout).Node, "data", layout);
+    layout.output.layouts.remove(node);
 
     // If we are the currently active layout of an output, clean up.
-    if (self.output.layout == self) {
-        self.output.layout = null;
-        if (self.output.inflight.layout_demand) |*layout_demand| {
+    if (layout.output.layout == layout) {
+        layout.output.layout = null;
+        if (layout.output.inflight.layout_demand) |*layout_demand| {
             layout_demand.deinit();
-            self.output.inflight.layout_demand = null;
+            layout.output.inflight.layout_demand = null;
             server.root.notifyLayoutDemandDone();
         }
 
-        if (self.output.layout_name) |name| {
+        if (layout.output.layout_name) |name| {
             util.gpa.free(name);
-            self.output.layout_name = null;
-            self.output.status.sendLayoutNameClear(self.output);
+            layout.output.layout_name = null;
+            layout.output.status.sendLayoutNameClear(layout.output);
         }
     }
 
-    self.layout.setHandler(?*anyopaque, handleRequestInert, null, null);
+    layout.layout_v3.setHandler(?*anyopaque, handleRequestInert, null, null);
 
-    util.gpa.free(self.namespace);
+    util.gpa.free(layout.namespace);
     util.gpa.destroy(node);
 }

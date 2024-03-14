@@ -116,7 +116,7 @@ pub fn apply(self: *Self, layout: *Layout) void {
             "proposed dimension count ({}) does not match view count ({}), aborting layout demand",
             .{ -self.views + @as(i32, @intCast(self.view_boxen.len)), self.view_boxen.len },
         );
-        layout.layout.postError(
+        layout.layout_v3.postError(
             .count_mismatch,
             "number of proposed view dimensions must match number of views",
         );
