@@ -44,12 +44,12 @@ pub const Constraints = struct {
 };
 
 const Impl = union(enum) {
-    xdg_toplevel: XdgToplevel,
+    toplevel: XdgToplevel,
     xwayland_view: if (build_options.xwayland) XwaylandView else noreturn,
     /// This state is assigned during destruction after the xdg toplevel
     /// has been destroyed but while the transaction system is still rendering
     /// saved surfaces of the view.
-    /// The xdg_toplevel could simply be set to undefined instead, but using a
+    /// The toplevel could simply be set to undefined instead, but using a
     /// tag like this gives us better safety checks.
     none,
 };
@@ -132,7 +132,7 @@ saved_surface_tree: *wlr.SceneTree,
 borders: [4]*wlr.SceneRect,
 popup_tree: *wlr.SceneTree,
 
-/// Bounds on the width/height of the view, set by the xdg_toplevel/xwayland_view implementation.
+/// Bounds on the width/height of the view, set by the toplevel/xwayland_view implementation.
 constraints: Constraints = .{},
 
 mapped: bool = false,
@@ -293,12 +293,12 @@ pub fn commitTransaction(view: *View) void {
     view.dropSavedSurfaceTree();
 
     switch (view.impl) {
-        .xdg_toplevel => |*xdg_toplevel| {
-            switch (xdg_toplevel.configure_state) {
+        .toplevel => |*toplevel| {
+            switch (toplevel.configure_state) {
                 .inflight, .acked => {
-                    switch (xdg_toplevel.configure_state) {
-                        .inflight => |serial| xdg_toplevel.configure_state = .{ .timed_out = serial },
-                        .acked => xdg_toplevel.configure_state = .timed_out_acked,
+                    switch (toplevel.configure_state) {
+                        .inflight => |serial| toplevel.configure_state = .{ .timed_out = serial },
+                        .acked => toplevel.configure_state = .timed_out_acked,
                         else => unreachable,
                     }
 
@@ -321,15 +321,15 @@ pub fn commitTransaction(view: *View) void {
                     // we would be rendering the SSD border at initial size X but the surface
                     // would be rendered at size Y.
                     if (view.inflight.resizing) {
-                        view.resizeUpdatePosition(xdg_toplevel.geometry.width, xdg_toplevel.geometry.height);
+                        view.resizeUpdatePosition(toplevel.geometry.width, toplevel.geometry.height);
                     }
 
                     view.current = view.inflight;
-                    view.current.box.width = xdg_toplevel.geometry.width;
-                    view.current.box.height = xdg_toplevel.geometry.height;
+                    view.current.box.width = toplevel.geometry.width;
+                    view.current.box.height = toplevel.geometry.height;
                 },
                 .idle, .committed => {
-                    xdg_toplevel.configure_state = .idle;
+                    toplevel.configure_state = .idle;
                     view.current = view.inflight;
                 },
                 .timed_out, .timed_out_acked => unreachable,
@@ -374,9 +374,9 @@ pub fn updateSceneState(view: *View) void {
         surface_clip.y -= box.y;
 
         switch (view.impl) {
-            .xdg_toplevel => |xdg_toplevel| {
-                surface_clip.x += xdg_toplevel.geometry.x;
-                surface_clip.y += xdg_toplevel.geometry.y;
+            .toplevel => |toplevel| {
+                surface_clip.x += toplevel.geometry.x;
+                surface_clip.y += toplevel.geometry.y;
             },
             .xwayland_view, .none => {},
         }
@@ -443,7 +443,7 @@ pub fn updateSceneState(view: *View) void {
 pub fn configure(view: *View) bool {
     assert(view.mapped and !view.destroying);
     switch (view.impl) {
-        .xdg_toplevel => |*xdg_toplevel| return xdg_toplevel.configure(),
+        .toplevel => |*toplevel| return toplevel.configure(),
         .xwayland_view => |*xwayland_view| return xwayland_view.configure(),
         .none => unreachable,
     }
@@ -452,7 +452,7 @@ pub fn configure(view: *View) bool {
 pub fn rootSurface(view: View) *wlr.Surface {
     assert(view.mapped and !view.destroying);
     return switch (view.impl) {
-        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.rootSurface(),
+        .toplevel => |toplevel| toplevel.rootSurface(),
         .xwayland_view => |xwayland_view| xwayland_view.rootSurface(),
         .none => unreachable,
     };
@@ -526,7 +526,7 @@ pub fn setPendingOutput(view: *View, output: *Output) void {
 pub fn close(view: View) void {
     assert(!view.destroying);
     switch (view.impl) {
-        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.close(),
+        .toplevel => |toplevel| toplevel.close(),
         .xwayland_view => |xwayland_view| xwayland_view.close(),
         .none => unreachable,
     }
@@ -535,7 +535,7 @@ pub fn close(view: View) void {
 pub fn destroyPopups(view: View) void {
     assert(!view.destroying);
     switch (view.impl) {
-        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.destroyPopups(),
+        .toplevel => |toplevel| toplevel.destroyPopups(),
         .xwayland_view => {},
         .none => unreachable,
     }
@@ -545,7 +545,7 @@ pub fn destroyPopups(view: View) void {
 pub fn getTitle(view: View) ?[*:0]const u8 {
     assert(!view.destroying);
     return switch (view.impl) {
-        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.getTitle(),
+        .toplevel => |toplevel| toplevel.getTitle(),
         .xwayland_view => |xwayland_view| xwayland_view.getTitle(),
         .none => unreachable,
     };
@@ -555,7 +555,7 @@ pub fn getTitle(view: View) ?[*:0]const u8 {
 pub fn getAppId(view: View) ?[*:0]const u8 {
     assert(!view.destroying);
     return switch (view.impl) {
-        .xdg_toplevel => |xdg_toplevel| xdg_toplevel.getAppId(),
+        .toplevel => |toplevel| toplevel.getAppId(),
         .xwayland_view => |xwayland_view| xwayland_view.getAppId(),
         .none => unreachable,
     };
