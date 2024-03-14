@@ -12,12 +12,14 @@ const SceneNodeData = @import("SceneNodeData.zig");
 const View = @import("View.zig");
 
 idle_inhibit_manager: *wlr.IdleInhibitManagerV1,
-new_idle_inhibitor: wl.Listener(*wlr.IdleInhibitorV1),
+new_idle_inhibitor: wl.Listener(*wlr.IdleInhibitorV1) =
+    wl.Listener(*wlr.IdleInhibitorV1).init(handleNewIdleInhibitor),
 inhibitors: std.TailQueue(IdleInhibitor) = .{},
 
 pub fn init(self: *Self) !void {
-    self.idle_inhibit_manager = try wlr.IdleInhibitManagerV1.create(server.wl_server);
-    self.new_idle_inhibitor.setNotify(handleNewIdleInhibitor);
+    self.* = .{
+        .idle_inhibit_manager = try wlr.IdleInhibitManagerV1.create(server.wl_server),
+    };
     self.idle_inhibit_manager.events.new_inhibitor.add(&self.new_idle_inhibitor);
 }
 
