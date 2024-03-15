@@ -32,6 +32,8 @@ const Output = @import("Output.zig");
 
 const log = std.log.scoped(.session_lock);
 
+wlr_manager: *wlr.SessionLockManagerV1,
+
 state: enum {
     /// No lock request has been made and the session is unlocked.
     unlocked,
@@ -66,11 +68,11 @@ pub fn init(manager: *LockManager) !void {
     errdefer timer.remove();
 
     manager.* = .{
+        .wlr_manager = try wlr.SessionLockManagerV1.create(server.wl_server),
         .lock_surfaces_timer = timer,
     };
 
-    const wlr_manager = try wlr.SessionLockManagerV1.create(server.wl_server);
-    wlr_manager.events.new_lock.add(&manager.new_lock);
+    manager.wlr_manager.events.new_lock.add(&manager.new_lock);
 }
 
 pub fn deinit(manager: *LockManager) void {

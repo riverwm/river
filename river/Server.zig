@@ -18,6 +18,7 @@ const Server = @This();
 
 const build_options = @import("build_options");
 const std = @import("std");
+const assert = std.debug.assert;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
@@ -54,33 +55,32 @@ session: ?*wlr.Session,
 renderer: *wlr.Renderer,
 allocator: *wlr.Allocator,
 
+security_context_manager: *wlr.SecurityContextManagerV1,
+
+shm: *wlr.Shm,
+drm: ?*wlr.Drm = null,
+linux_dmabuf: ?*wlr.LinuxDmabufV1 = null,
+single_pixel_buffer_manager: *wlr.SinglePixelBufferManagerV1,
+
+viewporter: *wlr.Viewporter,
+fractional_scale_manager: *wlr.FractionalScaleManagerV1,
 compositor: *wlr.Compositor,
+subcompositor: *wlr.Subcompositor,
+cursor_shape_manager: *wlr.CursorShapeManagerV1,
 
 xdg_shell: *wlr.XdgShell,
-new_xdg_surface: wl.Listener(*wlr.XdgSurface) =
-    wl.Listener(*wlr.XdgSurface).init(handleNewXdgSurface),
-
 xdg_decoration_manager: *wlr.XdgDecorationManagerV1,
-new_toplevel_decoration: wl.Listener(*wlr.XdgToplevelDecorationV1) =
-    wl.Listener(*wlr.XdgToplevelDecorationV1).init(handleNewToplevelDecoration),
-
 layer_shell: *wlr.LayerShellV1,
-new_layer_surface: wl.Listener(*wlr.LayerSurfaceV1) =
-    wl.Listener(*wlr.LayerSurfaceV1).init(handleNewLayerSurface),
+xdg_activation: *wlr.XdgActivationV1,
 
-xwayland: if (build_options.xwayland) ?*wlr.Xwayland else void = if (build_options.xwayland) null,
-new_xwayland_surface: if (build_options.xwayland) wl.Listener(*wlr.XwaylandSurface) else void =
-    if (build_options.xwayland) wl.Listener(*wlr.XwaylandSurface).init(handleNewXwaylandSurface),
+data_device_manager: *wlr.DataDeviceManager,
+primary_selection_manager: *wlr.PrimarySelectionDeviceManagerV1,
+data_control_manager: *wlr.DataControlManagerV1,
+
+export_dmabuf_manager: *wlr.ExportDmabufManagerV1,
+screencopy_manager: *wlr.ScreencopyManagerV1,
 
 foreign_toplevel_manager: *wlr.ForeignToplevelManagerV1,
-
-xdg_activation: *wlr.XdgActivationV1,
-request_activate: wl.Listener(*wlr.XdgActivationV1.event.RequestActivate) =
-    wl.Listener(*wlr.XdgActivationV1.event.RequestActivate).init(handleRequestActivate),
-
-cursor_shape_manager: *wlr.CursorShapeManagerV1,
-request_set_cursor_shape: wl.Listener(*wlr.CursorShapeManagerV1.event.RequestSetShape) =
-    wl.Listener(*wlr.CursorShapeManagerV1.event.RequestSetShape).init(handleRequestSetCursorShape),
 
 input_manager: InputManager,
 root: Root,
@@ -90,6 +90,21 @@ status_manager: StatusManager,
 layout_manager: LayoutManager,
 idle_inhibit_manager: IdleInhibitManager,
 lock_manager: LockManager,
+
+xwayland: if (build_options.xwayland) ?*wlr.Xwayland else void = if (build_options.xwayland) null,
+new_xwayland_surface: if (build_options.xwayland) wl.Listener(*wlr.XwaylandSurface) else void =
+    if (build_options.xwayland) wl.Listener(*wlr.XwaylandSurface).init(handleNewXwaylandSurface),
+
+new_xdg_surface: wl.Listener(*wlr.XdgSurface) =
+    wl.Listener(*wlr.XdgSurface).init(handleNewXdgSurface),
+new_toplevel_decoration: wl.Listener(*wlr.XdgToplevelDecorationV1) =
+    wl.Listener(*wlr.XdgToplevelDecorationV1).init(handleNewToplevelDecoration),
+new_layer_surface: wl.Listener(*wlr.LayerSurfaceV1) =
+    wl.Listener(*wlr.LayerSurfaceV1).init(handleNewLayerSurface),
+request_activate: wl.Listener(*wlr.XdgActivationV1.event.RequestActivate) =
+    wl.Listener(*wlr.XdgActivationV1.event.RequestActivate).init(handleRequestActivate),
+request_set_cursor_shape: wl.Listener(*wlr.CursorShapeManagerV1.event.RequestSetShape) =
+    wl.Listener(*wlr.CursorShapeManagerV1.event.RequestSetShape).init(handleRequestSetCursorShape),
 
 pub fn init(server: *Server, runtime_xwayland: bool) !void {
     // We intentionally don't try to prevent memory leaks on error in this function
@@ -115,13 +130,30 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
         .renderer = renderer,
         .allocator = try wlr.Allocator.autocreate(backend, renderer),
 
+        .security_context_manager = try wlr.SecurityContextManagerV1.create(wl_server),
+
+        .shm = try wlr.Shm.createWithRenderer(wl_server, 1, renderer),
+        .single_pixel_buffer_manager = try wlr.SinglePixelBufferManagerV1.create(wl_server),
+
+        .viewporter = try wlr.Viewporter.create(wl_server),
+        .fractional_scale_manager = try wlr.FractionalScaleManagerV1.create(wl_server, 1),
         .compositor = compositor,
+        .subcompositor = try wlr.Subcompositor.create(wl_server),
+        .cursor_shape_manager = try wlr.CursorShapeManagerV1.create(server.wl_server, 1),
+
         .xdg_shell = try wlr.XdgShell.create(wl_server, 5),
         .xdg_decoration_manager = try wlr.XdgDecorationManagerV1.create(wl_server),
         .layer_shell = try wlr.LayerShellV1.create(wl_server, 4),
-        .foreign_toplevel_manager = try wlr.ForeignToplevelManagerV1.create(wl_server),
         .xdg_activation = try wlr.XdgActivationV1.create(wl_server),
-        .cursor_shape_manager = try wlr.CursorShapeManagerV1.create(server.wl_server, 1),
+
+        .data_device_manager = try wlr.DataDeviceManager.create(wl_server),
+        .primary_selection_manager = try wlr.PrimarySelectionDeviceManagerV1.create(wl_server),
+        .data_control_manager = try wlr.DataControlManagerV1.create(wl_server),
+
+        .export_dmabuf_manager = try wlr.ExportDmabufManagerV1.create(wl_server),
+        .screencopy_manager = try wlr.ScreencopyManagerV1.create(wl_server),
+
+        .foreign_toplevel_manager = try wlr.ForeignToplevelManagerV1.create(wl_server),
 
         .config = try Config.init(),
 
@@ -134,26 +166,15 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
         .lock_manager = undefined,
     };
 
-    try renderer.initWlShm(wl_server);
     if (renderer.getDmabufFormats() != null and renderer.getDrmFd() >= 0) {
         // wl_drm is a legacy interface and all clients should switch to linux_dmabuf.
         // However, enough widely used clients still rely on wl_drm that the pragmatic option
         // is to keep it around for the near future.
         // TODO remove wl_drm support
-        _ = try wlr.Drm.create(wl_server, renderer);
+        server.drm = try wlr.Drm.create(wl_server, renderer);
 
-        _ = try wlr.LinuxDmabufV1.createWithRenderer(wl_server, 4, renderer);
+        server.linux_dmabuf = try wlr.LinuxDmabufV1.createWithRenderer(wl_server, 4, renderer);
     }
-
-    _ = try wlr.Subcompositor.create(wl_server);
-    _ = try wlr.PrimarySelectionDeviceManagerV1.create(wl_server);
-    _ = try wlr.DataDeviceManager.create(wl_server);
-    _ = try wlr.DataControlManagerV1.create(wl_server);
-    _ = try wlr.ExportDmabufManagerV1.create(wl_server);
-    _ = try wlr.ScreencopyManagerV1.create(wl_server);
-    _ = try wlr.SinglePixelBufferManagerV1.create(wl_server);
-    _ = try wlr.Viewporter.create(wl_server);
-    _ = try wlr.FractionalScaleManagerV1.create(wl_server, 1);
 
     if (build_options.xwayland and runtime_xwayland) {
         server.xwayland = try wlr.Xwayland.create(wl_server, compositor, false);
@@ -244,7 +265,85 @@ fn globalFilter(client: *const wl.Client, global: *const wl.Global, server: *Ser
         }
     }
 
-    return true;
+    // User-configurable allow/block lists are TODO
+    if (server.security_context_manager.lookupClient(client) != null) {
+        const allowed = server.allowlist(global);
+        const blocked = server.blocklist(global);
+        assert(allowed != blocked);
+        return allowed;
+    } else {
+        return true;
+    }
+}
+
+fn hackGlobal(ptr: *anyopaque) *wl.Global {
+    // TODO(wlroots) MR that eliminates the need for this hack:
+    // https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/4612
+    if (wlr.version.major != 0 or wlr.version.minor != 17) @compileError("FIXME");
+
+    return @as(*extern struct { global: *wl.Global }, @alignCast(@ptrCast(ptr))).global;
+}
+
+/// Returns true if the global is allowlisted for security contexts
+fn allowlist(server: *Server, global: *const wl.Global) bool {
+    if (server.drm) |drm| if (global == drm.global) return true;
+    if (server.linux_dmabuf) |linux_dmabuf| if (global == linux_dmabuf.global) return true;
+
+    {
+        var it = server.root.all_outputs.iterator(.forward);
+        while (it.next()) |output| {
+            if (global == output.wlr_output.global) return true;
+        }
+    }
+
+    {
+        var it = server.input_manager.seats.first;
+        while (it) |node| : (it = node.next) {
+            if (global == node.data.wlr_seat.global) return true;
+        }
+    }
+
+    return global == hackGlobal(server.shm) or
+        global == hackGlobal(server.single_pixel_buffer_manager) or
+        global == server.viewporter.global or
+        global == server.fractional_scale_manager.global or
+        global == server.compositor.global or
+        global == server.subcompositor.global or
+        global == server.cursor_shape_manager.global or
+        global == server.xdg_shell.global or
+        global == server.xdg_decoration_manager.global or
+        global == server.xdg_activation.global or
+        global == server.data_device_manager.global or
+        global == server.primary_selection_manager.global or
+        global == server.root.presentation.global or
+        global == server.root.xdg_output_manager.global or
+        global == server.input_manager.relative_pointer_manager.global or
+        global == server.input_manager.pointer_constraints.global or
+        global == server.input_manager.text_input_manager.global or
+        global == server.input_manager.tablet_manager.global or
+        global == server.input_manager.pointer_gestures.global or
+        global == server.idle_inhibit_manager.wlr_manager.global;
+}
+
+/// Returns true if the global is blocked for security contexts
+fn blocklist(server: *Server, global: *const wl.Global) bool {
+    return global == server.security_context_manager.global or
+        global == server.layer_shell.global or
+        global == server.foreign_toplevel_manager.global or
+        global == server.screencopy_manager.global or
+        global == server.export_dmabuf_manager.global or
+        global == server.data_control_manager.global or
+        global == server.layout_manager.global or
+        global == server.control.global or
+        global == server.status_manager.global or
+        global == server.root.output_manager.global or
+        global == server.root.power_manager.global or
+        global == server.root.gamma_control_manager.global or
+        global == hackGlobal(server.input_manager.idle_notifier) or
+        global == server.input_manager.virtual_pointer_manager.global or
+        global == server.input_manager.virtual_keyboard_manager.global or
+        global == server.input_manager.input_method_manager.global or
+        global == server.lock_manager.wlr_manager.global;
 }
 
 /// Handle SIGINT and SIGTERM by gracefully stopping the server

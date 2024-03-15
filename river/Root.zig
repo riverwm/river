@@ -83,6 +83,9 @@ new_output: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleNewOu
 output_layout: *wlr.OutputLayout,
 layout_change: wl.Listener(*wlr.OutputLayout) = wl.Listener(*wlr.OutputLayout).init(handleLayoutChange),
 
+presentation: *wlr.Presentation,
+xdg_output_manager: *wlr.XdgOutputManagerV1,
+
 output_manager: *wlr.OutputManagerV1,
 manager_apply: wl.Listener(*wlr.OutputConfigurationV1) =
     wl.Listener(*wlr.OutputConfigurationV1).init(handleManagerApply),
@@ -128,8 +131,6 @@ pub fn init(root: *Root) !void {
     const outputs = try interactive_content.createSceneTree();
     const override_redirect = if (build_options.xwayland) try interactive_content.createSceneTree();
 
-    _ = try wlr.XdgOutputManagerV1.create(server.wl_server, output_layout);
-
     const presentation = try wlr.Presentation.create(server.wl_server, server.backend);
     scene.setPresentation(presentation);
 
@@ -164,6 +165,9 @@ pub fn init(root: *Root) !void {
         .output_layout = output_layout,
         .all_outputs = undefined,
         .active_outputs = undefined,
+
+        .presentation = presentation,
+        .xdg_output_manager = try wlr.XdgOutputManagerV1.create(server.wl_server, output_layout),
         .output_manager = try wlr.OutputManagerV1.create(server.wl_server),
         .power_manager = try wlr.OutputPowerManagerV1.create(server.wl_server),
         .gamma_control_manager = try wlr.GammaControlManagerV1.create(server.wl_server),
