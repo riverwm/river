@@ -121,7 +121,6 @@ inflight_mode: Mode = .passthrough,
 
 seat: *Seat,
 wlr_cursor: *wlr.Cursor,
-pointer_gestures: *wlr.PointerGesturesV1,
 
 /// Xcursor manager for the currently configured Xcursor theme.
 xcursor_manager: *wlr.XcursorManager,
@@ -204,7 +203,6 @@ pub fn init(cursor: *Cursor, seat: *Seat) !void {
     cursor.* = .{
         .seat = seat,
         .wlr_cursor = wlr_cursor,
-        .pointer_gestures = try wlr.PointerGesturesV1.create(server.wl_server),
         .xcursor_manager = xcursor_manager,
         .hide_cursor_timer = try event_loop.addTimer(*Cursor, handleHideCursorTimeout, cursor),
     };
@@ -423,7 +421,7 @@ fn handlePinchBegin(
     event: *wlr.Pointer.event.PinchBegin,
 ) void {
     const cursor = @fieldParentPtr(Cursor, "pinch_begin", listener);
-    cursor.pointer_gestures.sendPinchBegin(
+    server.input_manager.pointer_gestures.sendPinchBegin(
         cursor.seat.wlr_seat,
         event.time_msec,
         event.fingers,
@@ -435,7 +433,7 @@ fn handlePinchUpdate(
     event: *wlr.Pointer.event.PinchUpdate,
 ) void {
     const cursor = @fieldParentPtr(Cursor, "pinch_update", listener);
-    cursor.pointer_gestures.sendPinchUpdate(
+    server.input_manager.pointer_gestures.sendPinchUpdate(
         cursor.seat.wlr_seat,
         event.time_msec,
         event.dx,
@@ -450,7 +448,7 @@ fn handlePinchEnd(
     event: *wlr.Pointer.event.PinchEnd,
 ) void {
     const cursor = @fieldParentPtr(Cursor, "pinch_end", listener);
-    cursor.pointer_gestures.sendPinchEnd(
+    server.input_manager.pointer_gestures.sendPinchEnd(
         cursor.seat.wlr_seat,
         event.time_msec,
         event.cancelled,
@@ -462,7 +460,7 @@ fn handleSwipeBegin(
     event: *wlr.Pointer.event.SwipeBegin,
 ) void {
     const cursor = @fieldParentPtr(Cursor, "swipe_begin", listener);
-    cursor.pointer_gestures.sendSwipeBegin(
+    server.input_manager.pointer_gestures.sendSwipeBegin(
         cursor.seat.wlr_seat,
         event.time_msec,
         event.fingers,
@@ -474,7 +472,7 @@ fn handleSwipeUpdate(
     event: *wlr.Pointer.event.SwipeUpdate,
 ) void {
     const cursor = @fieldParentPtr(Cursor, "swipe_update", listener);
-    cursor.pointer_gestures.sendSwipeUpdate(
+    server.input_manager.pointer_gestures.sendSwipeUpdate(
         cursor.seat.wlr_seat,
         event.time_msec,
         event.dx,
@@ -487,7 +485,7 @@ fn handleSwipeEnd(
     event: *wlr.Pointer.event.SwipeEnd,
 ) void {
     const cursor = @fieldParentPtr(Cursor, "swipe_end", listener);
-    cursor.pointer_gestures.sendSwipeEnd(
+    server.input_manager.pointer_gestures.sendSwipeEnd(
         cursor.seat.wlr_seat,
         event.time_msec,
         event.cancelled,

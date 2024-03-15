@@ -45,6 +45,7 @@ new_input: wl.Listener(*wlr.InputDevice) = wl.Listener(*wlr.InputDevice).init(ha
 
 idle_notifier: *wlr.IdleNotifierV1,
 relative_pointer_manager: *wlr.RelativePointerManagerV1,
+pointer_gestures: *wlr.PointerGesturesV1,
 virtual_pointer_manager: *wlr.VirtualPointerManagerV1,
 virtual_keyboard_manager: *wlr.VirtualKeyboardManagerV1,
 pointer_constraints: *wlr.PointerConstraintsV1,
@@ -80,6 +81,7 @@ pub fn init(input_manager: *InputManager) !void {
         // These are automatically freed when the display is destroyed
         .idle_notifier = try wlr.IdleNotifierV1.create(server.wl_server),
         .relative_pointer_manager = try wlr.RelativePointerManagerV1.create(server.wl_server),
+        .pointer_gestures = try wlr.PointerGesturesV1.create(server.wl_server),
         .virtual_pointer_manager = try wlr.VirtualPointerManagerV1.create(server.wl_server),
         .virtual_keyboard_manager = try wlr.VirtualKeyboardManagerV1.create(server.wl_server),
         .pointer_constraints = try wlr.PointerConstraintsV1.create(server.wl_server),
