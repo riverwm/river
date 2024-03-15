@@ -584,9 +584,7 @@ pub fn attachAfter(view: *View, output_pending: *Output.PendingState, n: usize) 
 
 /// Attach above or below the currently focused view
 pub fn attachRelative(view: *View, output_pending: *Output.PendingState, mode: AttachRelativeMode) void {
-    var focus_stack_it = output_pending.focus_stack.iterator(.forward);
-
-    const focus_stack_head = focus_stack_it.next() orelse {
+    const focus_stack_head = output_pending.focus_stack.first() orelse {
         output_pending.wm_stack.append(view);
         return;
     };
