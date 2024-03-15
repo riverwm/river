@@ -186,7 +186,7 @@ pub fn proximity(tool: *TabletTool, tablet: *Tablet, event: *wlr.Tablet.event.Pr
 
             tool.wlr_cursor.warpAbsolute(tablet.device.wlr_device, event.x, event.y);
 
-            tool.wlr_cursor.setXcursor(tablet.device.seat.cursor.xcursor_manager, "default");
+            tool.wlr_cursor.setXcursor(tablet.device.seat.cursor.xcursor_manager, "pencil");
 
             tool.passthrough(tablet);
         },
@@ -259,6 +259,8 @@ fn passthrough(tool: *TabletTool, tablet: *Tablet) void {
             tool.wp_tool.notifyMotion(result.sx, result.sy);
             return;
         }
+    } else {
+        tool.wlr_cursor.setXcursor(tablet.device.seat.cursor.xcursor_manager, "pencil");
     }
 
     tool.wp_tool.notifyProximityOut();
