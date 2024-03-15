@@ -427,9 +427,12 @@ fn handleRequestMove(
     if (view.pending.fullscreen) return;
     if (!(view.pending.float or view.pending.output.?.layout == null)) return;
 
-    switch (seat.cursor.mode) {
-        .passthrough, .down => seat.cursor.startMove(view),
-        .move, .resize => {},
+    // Moving windows with touch or tablet tool is not yet supported.
+    if (seat.wlr_seat.validatePointerGrabSerial(null, event.serial)) {
+        switch (seat.cursor.mode) {
+            .passthrough, .down => seat.cursor.startMove(view),
+            .move, .resize => {},
+        }
     }
 }
 
@@ -443,9 +446,12 @@ fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), ev
     if (view.pending.fullscreen) return;
     if (!(view.pending.float or view.pending.output.?.layout == null)) return;
 
-    switch (seat.cursor.mode) {
-        .passthrough, .down => seat.cursor.startResize(view, event.edges),
-        .move, .resize => {},
+    // Resizing windows with touch or tablet tool is not yet supported.
+    if (seat.wlr_seat.validatePointerGrabSerial(null, event.serial)) {
+        switch (seat.cursor.mode) {
+            .passthrough, .down => seat.cursor.startResize(view, event.edges),
+            .move, .resize => {},
+        }
     }
 }
 
