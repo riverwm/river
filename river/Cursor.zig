@@ -171,12 +171,14 @@ swipe_update: wl.Listener(*wlr.Pointer.event.SwipeUpdate) =
 swipe_end: wl.Listener(*wlr.Pointer.event.SwipeEnd) =
     wl.Listener(*wlr.Pointer.event.SwipeEnd).init(handleSwipeEnd),
 
-touch_up: wl.Listener(*wlr.Touch.event.Up) =
-    wl.Listener(*wlr.Touch.event.Up).init(handleTouchUp),
 touch_down: wl.Listener(*wlr.Touch.event.Down) =
     wl.Listener(*wlr.Touch.event.Down).init(handleTouchDown),
 touch_motion: wl.Listener(*wlr.Touch.event.Motion) =
     wl.Listener(*wlr.Touch.event.Motion).init(handleTouchMotion),
+touch_up: wl.Listener(*wlr.Touch.event.Up) =
+    wl.Listener(*wlr.Touch.event.Up).init(handleTouchUp),
+touch_cancel: wl.Listener(*wlr.Touch.event.Cancel) =
+    wl.Listener(*wlr.Touch.event.Cancel).init(handleTouchCancel),
 touch_frame: wl.Listener(void) = wl.Listener(void).init(handleTouchFrame),
 
 tablet_tool_axis: wl.Listener(*wlr.Tablet.event.Axis) =
@@ -228,9 +230,10 @@ pub fn init(cursor: *Cursor, seat: *Seat) !void {
     wlr_cursor.events.pinch_end.add(&cursor.pinch_end);
     seat.wlr_seat.events.request_set_cursor.add(&cursor.request_set_cursor);
 
-    wlr_cursor.events.touch_up.add(&cursor.touch_up);
     wlr_cursor.events.touch_down.add(&cursor.touch_down);
     wlr_cursor.events.touch_motion.add(&cursor.touch_motion);
+    wlr_cursor.events.touch_up.add(&cursor.touch_up);
+    wlr_cursor.events.touch_cancel.add(&cursor.touch_cancel);
     wlr_cursor.events.touch_frame.add(&cursor.touch_frame);
 
     wlr_cursor.events.tablet_tool_axis.add(&cursor.tablet_tool_axis);
@@ -492,19 +495,6 @@ fn handleSwipeEnd(
     );
 }
 
-fn handleTouchUp(
-    listener: *wl.Listener(*wlr.Touch.event.Up),
-    event: *wlr.Touch.event.Up,
-) void {
-    const cursor = @fieldParentPtr(Cursor, "touch_up", listener);
-
-    cursor.seat.handleActivity();
-
-    _ = cursor.touch_points.remove(event.touch_id);
-
-    cursor.seat.wlr_seat.touchNotifyUp(event.time_msec, event.touch_id);
-}
-
 fn handleTouchDown(
     listener: *wl.Listener(*wlr.Touch.event.Down),
     event: *wlr.Touch.event.Down,
@@ -519,6 +509,7 @@ fn handleTouchDown(
 
     cursor.touch_points.putNoClobber(util.gpa, event.touch_id, .{ .lx = lx, .ly = ly }) catch {
         log.err("out of memory", .{});
+        return;
     };
 
     if (server.root.at(lx, ly)) |result| {
@@ -548,18 +539,66 @@ fn handleTouchMotion(
 
     cursor.seat.handleActivity();
 
-    var lx: f64 = undefined;
-    var ly: f64 = undefined;
-    cursor.wlr_cursor.absoluteToLayoutCoords(event.device, event.x, event.y, &lx, &ly);
+    if (cursor.touch_points.getPtr(event.touch_id)) |point| {
+        cursor.wlr_cursor.absoluteToLayoutCoords(event.device, event.x, event.y, &point.lx, &point.ly);
 
-    cursor.touch_points.put(util.gpa, event.touch_id, .{ .lx = lx, .ly = ly }) catch {
-        log.err("out of memory", .{});
-    };
+        cursor.updateDragIcons();
 
-    cursor.updateDragIcons();
+        if (server.root.at(point.lx, point.ly)) |result| {
+            cursor.seat.wlr_seat.touchNotifyMotion(event.time_msec, event.touch_id, result.sx, result.sy);
+        }
+    }
+}
 
-    if (server.root.at(lx, ly)) |result| {
-        cursor.seat.wlr_seat.touchNotifyMotion(event.time_msec, event.touch_id, result.sx, result.sy);
+fn handleTouchUp(
+    listener: *wl.Listener(*wlr.Touch.event.Up),
+    event: *wlr.Touch.event.Up,
+) void {
+    const cursor = @fieldParentPtr(Cursor, "touch_up", listener);
+
+    cursor.seat.handleActivity();
+
+    if (cursor.touch_points.remove(event.touch_id)) {
+        cursor.seat.wlr_seat.touchNotifyUp(event.time_msec, event.touch_id);
+    }
+}
+
+fn handleTouchCancel(
+    listener: *wl.Listener(*wlr.Touch.event.Cancel),
+    _: *wlr.Touch.event.Cancel,
+) void {
+    const cursor = @fieldParentPtr(Cursor, "touch_cancel", listener);
+
+    cursor.seat.handleActivity();
+
+    cursor.touch_points.clearRetainingCapacity();
+
+    // We can't call touchNotifyCancel() from inside the loop over touch points as it also loops
+    // over touch points and may destroy multiple touch points in a single call.
+    //
+    // What we should do here is `while (touch_points.first()) |point| cancel()` but since the
+    // surface may be null we can't rely on the fact tha all touch points will be destroyed
+    // and risk an infinite loop if the surface of any wlr_touch_point is null.
+    //
+    // This is all really silly and totally unnecessary since all touchNotifyCancel() does with
+    // the surface argument is obtain a seat client and touch_point.seat_client is never null.
+    // TODO(wlroots) clean this up after the wlroots MR fixing this is merged:
+    // https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/4613
+
+    // The upper bound of 32 comes from an implementation detail of libinput which uses
+    // a 32-bit integer as a map to keep track of touch points.
+    var surfaces: std.BoundedArray(*wlr.Surface, 32) = .{};
+    {
+        var it = cursor.seat.wlr_seat.touch_state.touch_points.iterator(.forward);
+        while (it.next()) |touch_point| {
+            if (touch_point.surface) |surface| {
+                surfaces.append(surface) catch break;
+            }
+        }
+    }
+
+    for (surfaces.slice()) |surface| {
+        cursor.seat.wlr_seat.touchNotifyCancel(surface);
     }
 }
 
