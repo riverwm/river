@@ -40,19 +40,19 @@ pub fn diff(a: Vector, b: Vector) Vector {
 }
 
 /// Returns the direction of the vector.
-pub fn direction(self: Vector) ?wlr.OutputLayout.Direction {
+pub fn direction(v: Vector) ?wlr.OutputLayout.Direction {
     // A zero length vector has no direction
-    if (self.x == 0 and self.y == 0) return null;
+    if (v.x == 0 and v.y == 0) return null;
 
-    if ((math.absInt(self.y) catch return null) > (math.absInt(self.x) catch return null)) {
+    if ((math.absInt(v.y) catch return null) > (math.absInt(v.x) catch return null)) {
         // Careful: We are operating in a Y-inverted coordinate system.
-        return if (self.y > 0) .down else .up;
+        return if (v.y > 0) .down else .up;
     } else {
-        return if (self.x > 0) .right else .left;
+        return if (v.x > 0) .right else .left;
     }
 }
 
 /// Returns the length of the vector.
-pub fn length(self: Vector) u31 {
-    return math.sqrt(@as(u31, @intCast((self.x *| self.x) +| (self.y *| self.y))));
+pub fn length(v: Vector) u31 {
+    return math.sqrt(@as(u31, @intCast((v.x *| v.x) +| (v.y *| v.y))));
 }

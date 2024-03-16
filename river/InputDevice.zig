@@ -22,12 +22,15 @@ const ascii = std.ascii;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
+const globber = @import("globber");
+
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Seat = @import("Seat.zig");
 const Keyboard = @import("Keyboard.zig");
 const Switch = @import("Switch.zig");
+const Tablet = @import("Tablet.zig");
 
 const log = std.log.scoped(.input_manager);
 
@@ -47,6 +50,7 @@ link: wl.list.Link,
 pub fn init(device: *InputDevice, seat: *Seat, wlr_device: *wlr.InputDevice) !void {
     const device_type: []const u8 = switch (wlr_device.type) {
         .switch_device => "switch",
+        .tablet_tool => "tablet",
         else => @tagName(wlr_device.type),
     };
 
@@ -57,7 +61,7 @@ pub fn init(device: *InputDevice, seat: *Seat, wlr_device: *wlr.InputDevice) !vo
             device_type,
             wlr_device.vendor,
             wlr_device.product,
-            mem.trim(u8, mem.sliceTo(wlr_device.name, 0), &ascii.whitespace),
+            mem.trim(u8, mem.sliceTo(wlr_device.name orelse "unknown", 0), &ascii.whitespace),
         },
     );
     errdefer util.gpa.free(identifier);
@@ -75,14 +79,16 @@ pub fn init(device: *InputDevice, seat: *Seat, wlr_device: *wlr.InputDevice) !vo
         .link = undefined,
     };
 
+    wlr_device.data = @intFromPtr(device);
+
     wlr_device.events.destroy.add(&device.destroy);
 
     // Keyboard groups are implemented as "virtual" input devices which we don't want to expose
     // in riverctl list-inputs as they can't be configured.
     if (!isKeyboardGroup(wlr_device)) {
-        // Apply any matching input device configuration.
-        for (server.input_manager.configs.items) |*input_config| {
-            if (mem.eql(u8, input_config.identifier, identifier)) {
+        // Apply all matching input device configuration.
+        for (server.input_manager.configs.items) |input_config| {
+            if (globber.match(identifier, input_config.glob)) {
                 input_config.apply(device);
             }
         }
@@ -103,6 +109,8 @@ pub fn deinit(device: *InputDevice) void {
         device.link.remove();
         device.seat.updateCapabilities();
     }
+
+    device.wlr_device.data = 0;
 
     device.* = undefined;
 }
@@ -127,11 +135,15 @@ fn handleDestroy(listener: *wl.Listener(*wlr.InputDevice), _: *wlr.InputDevice) 
             device.deinit();
             util.gpa.destroy(device);
         },
+        .tablet_tool => {
+            const tablet = @fieldParentPtr(Tablet, "device", device);
+            tablet.destroy();
+        },
         .switch_device => {
             const switch_device = @fieldParentPtr(Switch, "device", device);
             switch_device.deinit();
             util.gpa.destroy(switch_device);
         },
-        .tablet_tool, .tablet_pad => unreachable,
+        .tablet_pad => unreachable,
     }
 }

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const Self = @This();
+const Output = @This();
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -199,7 +199,7 @@ frame: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleFrame),
 present: wl.Listener(*wlr.Output.event.Present) = wl.Listener(*wlr.Output.event.Present).init(handlePresent),
 
 pub fn create(wlr_output: *wlr.Output) !void {
-    const output = try util.gpa.create(Self);
+    const output = try util.gpa.create(Output);
     errdefer util.gpa.destroy(output);
 
     if (!wlr_output.initRender(server.allocator, server.renderer)) return error.InitRenderFailed;
@@ -319,12 +319,12 @@ pub fn create(wlr_output: *wlr.Output) !void {
     output.handleEnableDisable();
 }
 
-pub fn layerSurfaceTree(self: Self, layer: zwlr.LayerShellV1.Layer) *wlr.SceneTree {
+pub fn layerSurfaceTree(output: Output, layer: zwlr.LayerShellV1.Layer) *wlr.SceneTree {
     const trees = [_]*wlr.SceneTree{
-        self.layers.background,
-        self.layers.bottom,
-        self.layers.top,
-        self.layers.overlay,
+        output.layers.background,
+        output.layers.bottom,
+        output.layers.top,
+        output.layers.overlay,
     };
     return trees[@intCast(@intFromEnum(layer))];
 }
@@ -332,7 +332,7 @@ pub fn layerSurfaceTree(self: Self, layer: zwlr.LayerShellV1.Layer) *wlr.SceneTr
 /// Arrange all layer surfaces of this output and adjust the usable area.
 /// Will arrange views as well if the usable area changes.
 /// Requires a call to Root.applyPending()
-pub fn arrangeLayers(output: *Self) void {
+pub fn arrangeLayers(output: *Output) void {
     var full_box: wlr.Box = .{
         .x = 0,
         .y = 0,
@@ -353,7 +353,7 @@ pub fn arrangeLayers(output: *Self) void {
 }
 
 fn sendLayerConfigures(
-    output: *Self,
+    output: *Output,
     full_box: wlr.Box,
     usable_box: *wlr.Box,
     mode: enum { exclusive, non_exclusive },
@@ -380,7 +380,7 @@ fn sendLayerConfigures(
 }
 
 fn handleDestroy(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
-    const output = @fieldParentPtr(Self, "destroy", listener);
+    const output = @fieldParentPtr(Output, "destroy", listener);
 
     log.debug("output '{s}' destroyed", .{output.wlr_output.name});
 
@@ -409,11 +409,13 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
 
     util.gpa.destroy(output);
 
+    server.root.handleOutputConfigChange() catch std.log.err("out of memory", .{});
+
     server.root.applyPending();
 }
 
 fn handleRequestState(listener: *wl.Listener(*wlr.Output.event.RequestState), event: *wlr.Output.event.RequestState) void {
-    const output = @fieldParentPtr(Self, "request_state", listener);
+    const output = @fieldParentPtr(Output, "request_state", listener);
 
     output.applyState(event.state) catch {
         log.err("failed to commit requested state", .{});
@@ -426,7 +428,7 @@ fn handleRequestState(listener: *wl.Listener(*wlr.Output.event.RequestState), ev
 // TODO double buffer output state changes for frame perfection and cleaner code.
 // Schedule a frame and commit in the frame handler.
 // Get rid of this function.
-pub fn applyState(output: *Self, state: *wlr.Output.State) error{CommitFailed}!void {
+pub fn applyState(output: *Output, state: *wlr.Output.State) error{CommitFailed}!void {
 
     // We need to be precise about this state change to make assertions
     // in handleEnableDisable() possible.
@@ -448,7 +450,7 @@ pub fn applyState(output: *Self, state: *wlr.Output.State) error{CommitFailed}!v
     }
 }
 
-fn handleEnableDisable(output: *Self) void {
+fn handleEnableDisable(output: *Output) void {
     // We can't assert the current state of normal_content/locked_content
     // here as this output may be newly created.
     if (output.wlr_output.enabled) {
@@ -477,7 +479,7 @@ fn handleEnableDisable(output: *Self) void {
     }
 }
 
-pub fn updateBackgroundRect(output: *Self) void {
+pub fn updateBackgroundRect(output: *Output) void {
     var width: c_int = undefined;
     var height: c_int = undefined;
     output.wlr_output.effectiveResolution(&width, &height);
@@ -489,7 +491,7 @@ pub fn updateBackgroundRect(output: *Self) void {
 }
 
 fn handleFrame(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
-    const output = @fieldParentPtr(Self, "frame", listener);
+    const output = @fieldParentPtr(Output, "frame", listener);
     const scene_output = server.root.scene.getSceneOutput(output.wlr_output).?;
 
     // TODO this should probably be retried on failure
@@ -503,7 +505,7 @@ fn handleFrame(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
     scene_output.sendFrameDone(&now);
 }
 
-fn renderAndCommit(output: *Self, scene_output: *wlr.SceneOutput) !void {
+fn renderAndCommit(output: *Output, scene_output: *wlr.SceneOutput) !void {
     if (output.gamma_dirty) {
         var state = wlr.Output.State.init();
         defer state.finish();
@@ -561,7 +563,7 @@ fn handlePresent(
     listener: *wl.Listener(*wlr.Output.event.Present),
     event: *wlr.Output.event.Present,
 ) void {
-    const output = @fieldParentPtr(Self, "present", listener);
+    const output = @fieldParentPtr(Output, "present", listener);
 
     if (!event.presented) {
         return;
@@ -588,30 +590,30 @@ fn handlePresent(
     }
 }
 
-fn setTitle(self: Self) void {
-    const title = fmt.allocPrintZ(util.gpa, "river - {s}", .{self.wlr_output.name}) catch return;
+fn setTitle(output: Output) void {
+    const title = fmt.allocPrintZ(util.gpa, "river - {s}", .{output.wlr_output.name}) catch return;
     defer util.gpa.free(title);
-    if (self.wlr_output.isWl()) {
-        self.wlr_output.wlSetTitle(title);
-    } else if (wlr.config.has_x11_backend and self.wlr_output.isX11()) {
-        self.wlr_output.x11SetTitle(title);
+    if (output.wlr_output.isWl()) {
+        output.wlr_output.wlSetTitle(title);
+    } else if (wlr.config.has_x11_backend and output.wlr_output.isX11()) {
+        output.wlr_output.x11SetTitle(title);
     }
 }
 
-pub fn handleLayoutNamespaceChange(self: *Self) void {
+pub fn handleLayoutNamespaceChange(output: *Output) void {
     // The user changed the layout namespace of this output. Try to find a
     // matching layout.
-    var it = self.layouts.first;
-    self.layout = while (it) |node| : (it = node.next) {
-        if (mem.eql(u8, self.layoutNamespace(), node.data.namespace)) break &node.data;
+    var it = output.layouts.first;
+    output.layout = while (it) |node| : (it = node.next) {
+        if (mem.eql(u8, output.layoutNamespace(), node.data.namespace)) break &node.data;
     } else null;
     server.root.applyPending();
 }
 
-pub fn layoutNamespace(self: Self) []const u8 {
-    return self.layout_namespace orelse server.config.default_layout_namespace;
+pub fn layoutNamespace(output: Output) []const u8 {
+    return output.layout_namespace orelse server.config.default_layout_namespace;
 }
 
-pub fn attachMode(self: Self) Config.AttachMode {
-    return self.attach_mode orelse server.config.default_attach_mode;
+pub fn attachMode(output: Output) Config.AttachMode {
+    return output.attach_mode orelse server.config.default_attach_mode;
 }

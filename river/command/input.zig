@@ -16,6 +16,9 @@
 
 const std = @import("std");
 const mem = std.mem;
+const sort = std.sort;
+
+const globber = @import("globber");
 
 const server = &@import("../main.zig").server;
 const util = @import("../util.zig");
@@ -23,7 +26,6 @@ const util = @import("../util.zig");
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 const InputConfig = @import("../InputConfig.zig");
-const InputManager = @import("../InputManager.zig");
 
 pub fn listInputs(
     _: *Seat,
@@ -39,7 +41,7 @@ pub fn listInputs(
     var it = server.input_manager.devices.iterator(.forward);
     while (it.next()) |device| {
         const configured = for (server.input_manager.configs.items) |*input_config| {
-            if (mem.eql(u8, input_config.identifier, device.identifier)) {
+            if (globber.match(device.identifier, input_config.glob)) {
                 break true;
             }
         } else false;
@@ -82,36 +84,37 @@ pub fn input(
     if (args.len < 4) return Error.NotEnoughArguments;
     if (args.len > 4) return Error.TooManyArguments;
 
-    // Try to find an existing InputConfig with matching identifier, or create
+    try globber.validate(args[1]);
+
+    // Try to find an existing InputConfig with matching glob pattern, or create
     // a new one if none was found.
-    const input_config = for (server.input_manager.configs.items) |*input_config| {
-        if (mem.eql(u8, input_config.identifier, args[1])) {
+    for (server.input_manager.configs.items) |*input_config| {
+        if (mem.eql(u8, input_config.glob, args[1])) {
             try input_config.parse(args[2], args[3]);
-            break input_config;
         }
-    } else blk: {
-        const identifier_owned = try util.gpa.dupe(u8, args[1]);
-        errdefer util.gpa.free(identifier_owned);
+    } else {
+        var input_config: InputConfig = .{
+            .glob = try util.gpa.dupe(u8, args[1]),
+        };
+        errdefer util.gpa.free(input_config.glob);
 
         try server.input_manager.configs.ensureUnusedCapacity(1);
-        const input_config = server.input_manager.configs.addOneAssumeCapacity();
-        errdefer _ = server.input_manager.configs.pop();
 
-        input_config.* = .{
-            .identifier = identifier_owned,
-        };
         try input_config.parse(args[2], args[3]);
 
-        break :blk input_config;
-    };
-
-    // Update matching existing input devices.
-    var it = server.input_manager.devices.iterator(.forward);
-    while (it.next()) |device| {
-        if (mem.eql(u8, device.identifier, args[1])) {
-            input_config.apply(device);
-            // We don't break here because it is common to have multiple input
-            // devices with the same identifier.
-        }
+        server.input_manager.configs.appendAssumeCapacity(input_config);
     }
+
+    // Sort input configs from most general to least general
+    sort.insertion(InputConfig, server.input_manager.configs.items, {}, lessThan);
+
+    // We need to update all input device matching the glob. The user may
+    // add an input configuration at an arbitrary position in the generality
+    // ordered list, so the simplest way to ensure the device is configured
+    // correctly is to apply all input configurations again, in order.
+    server.input_manager.reconfigureDevices();
+}
+
+fn lessThan(_: void, a: InputConfig, b: InputConfig) bool {
+    return globber.order(a.glob, b.glob) == .gt;
 }

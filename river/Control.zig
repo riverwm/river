@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const Self = @This();
+const Control = @This();
 
 const std = @import("std");
 const mem = std.mem;
@@ -38,47 +38,47 @@ args_map: ArgMap,
 
 server_destroy: wl.Listener(*wl.Server) = wl.Listener(*wl.Server).init(handleServerDestroy),
 
-pub fn init(self: *Self) !void {
-    self.* = .{
-        .global = try wl.Global.create(server.wl_server, zriver.ControlV1, 1, *Self, self, bind),
+pub fn init(control: *Control) !void {
+    control.* = .{
+        .global = try wl.Global.create(server.wl_server, zriver.ControlV1, 1, *Control, control, bind),
         .args_map = ArgMap.init(util.gpa),
     };
 
-    server.wl_server.addDestroyListener(&self.server_destroy);
+    server.wl_server.addDestroyListener(&control.server_destroy);
 }
 
 fn handleServerDestroy(listener: *wl.Listener(*wl.Server), _: *wl.Server) void {
-    const self = @fieldParentPtr(Self, "server_destroy", listener);
-    self.global.destroy();
-    self.args_map.deinit();
+    const control = @fieldParentPtr(Control, "server_destroy", listener);
+    control.global.destroy();
+    control.args_map.deinit();
 }
 
 /// Called when a client binds our global
-fn bind(client: *wl.Client, self: *Self, version: u32, id: u32) void {
-    const control = zriver.ControlV1.create(client, version, id) catch {
+fn bind(client: *wl.Client, control: *Control, version: u32, id: u32) void {
+    const control_v1 = zriver.ControlV1.create(client, version, id) catch {
         client.postNoMemory();
         return;
     };
-    self.args_map.putNoClobber(.{ .client = client, .id = id }, .{}) catch {
-        control.destroy();
+    control.args_map.putNoClobber(.{ .client = client, .id = id }, .{}) catch {
+        control_v1.destroy();
         client.postNoMemory();
         return;
     };
-    control.setHandler(*Self, handleRequest, handleDestroy, self);
+    control_v1.setHandler(*Control, handleRequest, handleDestroy, control);
 }
 
-fn handleRequest(control: *zriver.ControlV1, request: zriver.ControlV1.Request, self: *Self) void {
+fn handleRequest(control_v1: *zriver.ControlV1, request: zriver.ControlV1.Request, control: *Control) void {
     switch (request) {
-        .destroy => control.destroy(),
+        .destroy => control_v1.destroy(),
         .add_argument => |add_argument| {
             const owned_slice = util.gpa.dupeZ(u8, mem.sliceTo(add_argument.argument, 0)) catch {
-                control.getClient().postNoMemory();
+                control_v1.getClient().postNoMemory();
                 return;
             };
 
-            const args = self.args_map.getPtr(.{ .client = control.getClient(), .id = control.getId() }).?;
+            const args = control.args_map.getPtr(.{ .client = control_v1.getClient(), .id = control_v1.getId() }).?;
             args.append(util.gpa, owned_slice) catch {
-                control.getClient().postNoMemory();
+                control_v1.getClient().postNoMemory();
                 util.gpa.free(owned_slice);
                 return;
             };
@@ -87,15 +87,15 @@ fn handleRequest(control: *zriver.ControlV1, request: zriver.ControlV1.Request, 
             const seat: *Seat = @ptrFromInt(wlr.Seat.Client.fromWlSeat(run_command.seat).?.seat.data);
 
             const callback = zriver.CommandCallbackV1.create(
-                control.getClient(),
-                control.getVersion(),
+                control_v1.getClient(),
+                control_v1.getVersion(),
                 run_command.callback,
             ) catch {
-                control.getClient().postNoMemory();
+                control_v1.getClient().postNoMemory();
                 return;
             };
 
-            const args = self.args_map.getPtr(.{ .client = control.getClient(), .id = control.getId() }).?;
+            const args = control.args_map.getPtr(.{ .client = control_v1.getClient(), .id = control_v1.getId() }).?;
             defer {
                 for (args.items) |arg| util.gpa.free(arg);
                 args.items.len = 0;
@@ -134,9 +134,9 @@ fn handleRequest(control: *zriver.ControlV1, request: zriver.ControlV1.Request, 
 }
 
 /// Remove the resource from the hash map and free all stored args
-fn handleDestroy(control: *zriver.ControlV1, self: *Self) void {
-    var args = self.args_map.fetchRemove(
-        .{ .client = control.getClient(), .id = control.getId() },
+fn handleDestroy(control_v1: *zriver.ControlV1, control: *Control) void {
+    var args = control.args_map.fetchRemove(
+        .{ .client = control_v1.getClient(), .id = control_v1.getId() },
     ).?.value;
     for (args.items) |arg| util.gpa.free(arg);
     args.deinit(util.gpa);

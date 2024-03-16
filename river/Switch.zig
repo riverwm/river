@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const Self = @This();
+const Switch = @This();
 
 const std = @import("std");
 const wlr = @import("wlroots");
@@ -52,28 +52,28 @@ device: InputDevice,
 
 toggle: wl.Listener(*wlr.Switch.event.Toggle) = wl.Listener(*wlr.Switch.event.Toggle).init(handleToggle),
 
-pub fn init(self: *Self, seat: *Seat, wlr_device: *wlr.InputDevice) !void {
-    self.* = .{
+pub fn init(switch_device: *Switch, seat: *Seat, wlr_device: *wlr.InputDevice) !void {
+    switch_device.* = .{
         .device = undefined,
     };
-    try self.device.init(seat, wlr_device);
-    errdefer self.device.deinit();
+    try switch_device.device.init(seat, wlr_device);
+    errdefer switch_device.device.deinit();
 
-    wlr_device.toSwitch().events.toggle.add(&self.toggle);
+    wlr_device.toSwitch().events.toggle.add(&switch_device.toggle);
 }
 
-pub fn deinit(self: *Self) void {
-    self.toggle.link.remove();
+pub fn deinit(switch_device: *Switch) void {
+    switch_device.toggle.link.remove();
 
-    self.device.deinit();
+    switch_device.device.deinit();
 
-    self.* = undefined;
+    switch_device.* = undefined;
 }
 
 fn handleToggle(listener: *wl.Listener(*wlr.Switch.event.Toggle), event: *wlr.Switch.event.Toggle) void {
-    const self = @fieldParentPtr(Self, "toggle", listener);
+    const switch_device = @fieldParentPtr(Switch, "toggle", listener);
 
-    self.device.seat.handleActivity();
+    switch_device.device.seat.handleActivity();
 
     var switch_type: Type = undefined;
     var switch_state: State = undefined;
@@ -94,5 +94,5 @@ fn handleToggle(listener: *wl.Listener(*wlr.Switch.event.Toggle), event: *wlr.Sw
         },
     }
 
-    self.device.seat.handleSwitchMapping(switch_type, switch_state);
+    switch_device.device.seat.handleSwitchMapping(switch_type, switch_state);
 }

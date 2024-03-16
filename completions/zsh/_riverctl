@@ -50,7 +50,8 @@ _riverctl_commands()
         'rule-del:Delete a rule added with rule-add'
         'list-rules:Print rules in a given list'
         # Configuration
-        'attach-mode:Configure where new views should attach to the view stack'
+        'default-attach-mode:Configure where new views should attach to the view stack'
+        'output-attach-mode:Configure where new views should attach to the view stack of the currently focuesed output'
         'background-color:Set the background color'
         'border-color-focused:Set the border color of focused views'
         'border-color-unfocused:Set the border color of unfocused views'
@@ -98,8 +99,9 @@ _riverctl()
         commands) _alternative 'common-commands:common:_riverctl_commands' ;;
         args)
             case "$line[1]" in
-                focus-output) _alternative 'arguments:args:(next previous)' ;;
+                focus-output) _alternative 'arguments:args:(next previous up right down left)' ;;
                 focus-view) _alternative 'arguments:args:(next previous up down left right)' ;;
+                keyboard-layout) _arguments '*::optional:(-rules -model -variant -options)' ;;
                 input)
                     _arguments '1: :->name' '2: :->commands' ':: :->args'
 
@@ -115,6 +117,7 @@ _riverctl()
                                 'drag:Enable or disable the tap-and-drag functionality'
                                 'drag-lock:Enable or disable the drag lock functionality'
                                 'disable-while-typing:Enable or disable the disable-while-typing functionality'
+                                'disable-while-trackpointing:Enable or disable the disable-while-trackpointing functionality'
                                 'middle-emulation:Enable or disable the middle click emulation functionality'
                                 'natural-scroll:Enable or disable the natural scroll functionality'
                                 'left-handed:Enable or disable the left handed mode'
@@ -122,6 +125,7 @@ _riverctl()
                                 'tap-button-map:Configure the button mapping for tapping'
                                 'scroll-method:Set the scroll method'
                                 'scroll-button:Set the scroll button'
+                                'map-to-output:Map to a given output'
                             )
 
                         _describe -t command 'command' input_subcommands
@@ -134,6 +138,7 @@ _riverctl()
                                 drag) _alternative 'input-cmds:args:(enabled disabled)' ;;
                                 drag-lock) _alternative 'input-cmds:args:(enabled disabled)' ;;
                                 disable-while-typing) _alternative 'input-cmds:args:(enabled disabled)' ;;
+                                disable-while-trackpointing) _alternative 'input-cmds:args:(enabled disabled)' ;;
                                 middle-emulation) _alternative 'input-cmds:args:(enabled disabled)' ;;
                                 natural-scroll) _alternative 'input-cmds:args:(enabled disabled)' ;;
                                 left-handed) _alternative 'input-cmds:args:(enabled disabled)' ;;
@@ -148,11 +153,26 @@ _riverctl()
                 move) _alternative 'arguments:args:(up down left right)' ;;
                 resize) _alternative 'arguments:args:(horizontal vertical)' ;;
                 snap) _alternative 'arguments:args:(up down left right)' ;;
-                send-to-output) _alternative 'arguments:args:(next previous)' ;;
+                send-to-output) _arguments \
+                                    '1::optional:(-current-tag)' \
+                                    '::args:(next previous up right down left)'
+                ;;
                 swap) _alternative 'arguments:args:(next previous up down left right)' ;;
                 map) _alternative 'arguments:optional:(-release -repeat -layout)' ;;
                 unmap) _alternative 'arguments:optional:(-release)' ;;
-                attach-mode) _alternative 'arguments:args:(top bottom)' ;;
+                map-switch | unmap-switch)
+                    _arguments '1: :' '2:args:(lid tablet)' '3:args:->args'
+                    case "$state" in
+                        args)
+                            case "$line[2]" in
+                                lid) _alternative 'arguments:args:(close open)' ;;
+                                tablet) _alternative 'arguments:args:(on off)' ;;
+                            esac
+                        ;;
+                    esac
+                ;;
+                default-attach-mode) _alternative 'arguments:args:(top bottom above below after)' ;;
+                output-attach-mode) _alternative 'arguments:args:(top bottom above below after)' ;;
                 focus-follows-cursor) _alternative 'arguments:args:(disabled normal always)' ;;
                 set-cursor-warp) _alternative 'arguments:args:(disabled on-output-change on-focus-change)' ;;
                 hide-cursor)
@@ -184,9 +204,9 @@ _riverctl()
                     # In case of a new rule added in river, we just need
                     # to add it to the third option between '()',
                     # i.e (float no-float <new-option>)
-                    _arguments '1: :(-app-id -title)' '2: : ' ':: :(float no-float ssd csd tag output position dimensions fullscreen no-fullscreen)'
+                    _arguments '1: :(-app-id -title)' '2: : ' ':: :(float no-float ssd csd tags output position dimensions fullscreen no-fullscreen)'
                 ;;
-                list-rules) _alternative 'arguments:args:(float ssd tag output position dimensions fullscreen)' ;;
+                list-rules) _alternative 'arguments:args:(float ssd tags output position dimensions fullscreen)' ;;
                 *) return 0 ;;
             esac
         ;;

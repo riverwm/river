@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const Self = @This();
+const Cursor = @This();
 
 const build_options = @import("build_options");
 const std = @import("std");
@@ -32,12 +32,15 @@ const util = @import("util.zig");
 
 const Config = @import("Config.zig");
 const DragIcon = @import("DragIcon.zig");
+const InputDevice = @import("InputDevice.zig");
 const LayerSurface = @import("LayerSurface.zig");
 const LockSurface = @import("LockSurface.zig");
 const Output = @import("Output.zig");
 const PointerConstraint = @import("PointerConstraint.zig");
 const Root = @import("Root.zig");
 const Seat = @import("Seat.zig");
+const Tablet = @import("Tablet.zig");
+const TabletTool = @import("TabletTool.zig");
 const View = @import("View.zig");
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
@@ -118,7 +121,6 @@ inflight_mode: Mode = .passthrough,
 
 seat: *Seat,
 wlr_cursor: *wlr.Cursor,
-pointer_gestures: *wlr.PointerGesturesV1,
 
 /// Xcursor manager for the currently configured Xcursor theme.
 xcursor_manager: *wlr.XcursorManager,
@@ -170,76 +172,91 @@ swipe_update: wl.Listener(*wlr.Pointer.event.SwipeUpdate) =
 swipe_end: wl.Listener(*wlr.Pointer.event.SwipeEnd) =
     wl.Listener(*wlr.Pointer.event.SwipeEnd).init(handleSwipeEnd),
 
-touch_up: wl.Listener(*wlr.Touch.event.Up) =
-    wl.Listener(*wlr.Touch.event.Up).init(handleTouchUp),
 touch_down: wl.Listener(*wlr.Touch.event.Down) =
     wl.Listener(*wlr.Touch.event.Down).init(handleTouchDown),
 touch_motion: wl.Listener(*wlr.Touch.event.Motion) =
     wl.Listener(*wlr.Touch.event.Motion).init(handleTouchMotion),
+touch_up: wl.Listener(*wlr.Touch.event.Up) =
+    wl.Listener(*wlr.Touch.event.Up).init(handleTouchUp),
+touch_cancel: wl.Listener(*wlr.Touch.event.Cancel) =
+    wl.Listener(*wlr.Touch.event.Cancel).init(handleTouchCancel),
 touch_frame: wl.Listener(void) = wl.Listener(void).init(handleTouchFrame),
 
-pub fn init(self: *Self, seat: *Seat) !void {
+tablet_tool_axis: wl.Listener(*wlr.Tablet.event.Axis) =
+    wl.Listener(*wlr.Tablet.event.Axis).init(handleTabletToolAxis),
+tablet_tool_proximity: wl.Listener(*wlr.Tablet.event.Proximity) =
+    wl.Listener(*wlr.Tablet.event.Proximity).init(handleTabletToolProximity),
+tablet_tool_tip: wl.Listener(*wlr.Tablet.event.Tip) =
+    wl.Listener(*wlr.Tablet.event.Tip).init(handleTabletToolTip),
+tablet_tool_button: wl.Listener(*wlr.Tablet.event.Button) =
+    wl.Listener(*wlr.Tablet.event.Button).init(handleTabletToolButton),
+
+pub fn init(cursor: *Cursor, seat: *Seat) !void {
     const wlr_cursor = try wlr.Cursor.create();
     errdefer wlr_cursor.destroy();
     wlr_cursor.attachOutputLayout(server.root.output_layout);
 
-    // This is here so that self.xcursor_manager doesn't need to be an
+    // This is here so that cursor.xcursor_manager doesn't need to be an
     // optional pointer. This isn't optimal as it does a needless allocation,
     // but this is not a hot path.
     const xcursor_manager = try wlr.XcursorManager.create(null, default_size);
     errdefer xcursor_manager.destroy();
 
     const event_loop = server.wl_server.getEventLoop();
-    self.* = .{
+    cursor.* = .{
         .seat = seat,
         .wlr_cursor = wlr_cursor,
-        .pointer_gestures = try wlr.PointerGesturesV1.create(server.wl_server),
         .xcursor_manager = xcursor_manager,
-        .hide_cursor_timer = try event_loop.addTimer(*Self, handleHideCursorTimeout, self),
-        .focus_cursor_timer = try event_loop.addTimer(*Self, handleFocusCursorTimeout, self),
+        .hide_cursor_timer = try event_loop.addTimer(*Cursor, handleHideCursorTimeout, cursor),
+        .focus_cursor_timer = try event_loop.addTimer(*Cursor, handleFocusCursorTimeout, cursor),
     };
-    errdefer self.hide_cursor_timer.remove();
-    errdefer self.focus_cursor_timer.remove();
-    try self.hide_cursor_timer.timerUpdate(server.config.cursor_hide_timeout);
-    try self.focus_cursor_timer.timerUpdate(0);
-    try self.setTheme(null, null);
+    errdefer cursor.hide_cursor_timer.remove();
+    errdefer cursor.focus_cursor_timer.remove();
+    try cursor.hide_cursor_timer.timerUpdate(server.config.cursor_hide_timeout);
+    try cursor.focus_cursor_timer.timerUpdate(0);
+    try cursor.setTheme(null, null);
 
     // wlr_cursor *only* displays an image on screen. It does not move around
     // when the pointer moves. However, we can attach input devices to it, and
     // it will generate aggregate events for all of them. In these events, we
     // can choose how we want to process them, forwarding them to clients and
-    // moving the cursor around. See following post for more detail:
-    // https://drewdevault.com/2018/07/17/Input-handling-in-wlroots.html
-    wlr_cursor.events.axis.add(&self.axis);
-    wlr_cursor.events.button.add(&self.button);
-    wlr_cursor.events.frame.add(&self.frame);
-    wlr_cursor.events.motion_absolute.add(&self.motion_absolute);
-    wlr_cursor.events.motion.add(&self.motion);
-    wlr_cursor.events.swipe_begin.add(&self.swipe_begin);
-    wlr_cursor.events.swipe_update.add(&self.swipe_update);
-    wlr_cursor.events.swipe_end.add(&self.swipe_end);
-    wlr_cursor.events.pinch_begin.add(&self.pinch_begin);
-    wlr_cursor.events.pinch_update.add(&self.pinch_update);
-    wlr_cursor.events.pinch_end.add(&self.pinch_end);
-    seat.wlr_seat.events.request_set_cursor.add(&self.request_set_cursor);
+    // moving the cursor around.
+    wlr_cursor.events.axis.add(&cursor.axis);
+    wlr_cursor.events.button.add(&cursor.button);
+    wlr_cursor.events.frame.add(&cursor.frame);
+    wlr_cursor.events.motion_absolute.add(&cursor.motion_absolute);
+    wlr_cursor.events.motion.add(&cursor.motion);
+    wlr_cursor.events.swipe_begin.add(&cursor.swipe_begin);
+    wlr_cursor.events.swipe_update.add(&cursor.swipe_update);
+    wlr_cursor.events.swipe_end.add(&cursor.swipe_end);
+    wlr_cursor.events.pinch_begin.add(&cursor.pinch_begin);
+    wlr_cursor.events.pinch_update.add(&cursor.pinch_update);
+    wlr_cursor.events.pinch_end.add(&cursor.pinch_end);
+    seat.wlr_seat.events.request_set_cursor.add(&cursor.request_set_cursor);
 
-    wlr_cursor.events.touch_up.add(&self.touch_up);
-    wlr_cursor.events.touch_down.add(&self.touch_down);
-    wlr_cursor.events.touch_motion.add(&self.touch_motion);
-    wlr_cursor.events.touch_frame.add(&self.touch_frame);
+    wlr_cursor.events.touch_down.add(&cursor.touch_down);
+    wlr_cursor.events.touch_motion.add(&cursor.touch_motion);
+    wlr_cursor.events.touch_up.add(&cursor.touch_up);
+    wlr_cursor.events.touch_cancel.add(&cursor.touch_cancel);
+    wlr_cursor.events.touch_frame.add(&cursor.touch_frame);
+
+    wlr_cursor.events.tablet_tool_axis.add(&cursor.tablet_tool_axis);
+    wlr_cursor.events.tablet_tool_proximity.add(&cursor.tablet_tool_proximity);
+    wlr_cursor.events.tablet_tool_tip.add(&cursor.tablet_tool_tip);
+    wlr_cursor.events.tablet_tool_button.add(&cursor.tablet_tool_button);
 }
 
-pub fn deinit(self: *Self) void {
-    self.hide_cursor_timer.remove();
-    self.focus_cursor_timer.remove();
-    self.xcursor_manager.destroy();
-    self.wlr_cursor.destroy();
+pub fn deinit(cursor: *Cursor) void {
+    cursor.hide_cursor_timer.remove();
+    cursor.focus_cursor_timer.remove();
+    cursor.xcursor_manager.destroy();
+    cursor.wlr_cursor.destroy();
 }
 
 /// Set the cursor theme for the given seat, as well as the xwayland theme if
 /// this is the default seat. Either argument may be null, in which case a
 /// default will be used.
-pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
+pub fn setTheme(cursor: *Cursor, theme: ?[*:0]const u8, _size: ?u32) !void {
     const size = _size orelse default_size;
 
     const xcursor_manager = try wlr.XcursorManager.create(theme, size);
@@ -247,55 +264,57 @@ pub fn setTheme(self: *Self, theme: ?[*:0]const u8, _size: ?u32) !void {
 
     // If this cursor belongs to the default seat, set the xcursor environment
     // variables as well as the xwayland cursor theme.
-    if (self.seat == server.input_manager.defaultSeat()) {
+    if (cursor.seat == server.input_manager.defaultSeat()) {
         const size_str = try std.fmt.allocPrintZ(util.gpa, "{}", .{size});
         defer util.gpa.free(size_str);
         if (c.setenv("XCURSOR_SIZE", size_str.ptr, 1) < 0) return error.OutOfMemory;
         if (theme) |t| if (c.setenv("XCURSOR_THEME", t, 1) < 0) return error.OutOfMemory;
 
         if (build_options.xwayland) {
-            try xcursor_manager.load(1);
-            const wlr_xcursor = xcursor_manager.getXcursor("left_ptr", 1).?;
-            const image = wlr_xcursor.images[0];
-            server.xwayland.setCursor(
-                image.buffer,
-                image.width * 4,
-                image.width,
-                image.height,
-                @intCast(image.hotspot_x),
-                @intCast(image.hotspot_y),
-            );
+            if (server.xwayland) |xwayland| {
+                try xcursor_manager.load(1);
+                const wlr_xcursor = xcursor_manager.getXcursor("default", 1).?;
+                const image = wlr_xcursor.images[0];
+                xwayland.setCursor(
+                    image.buffer,
+                    image.width * 4,
+                    image.width,
+                    image.height,
+                    @intCast(image.hotspot_x),
+                    @intCast(image.hotspot_y),
+                );
+            }
         }
     }
 
     // Everything fallible is now done so the the old xcursor_manager can be destroyed.
-    self.xcursor_manager.destroy();
-    self.xcursor_manager = xcursor_manager;
+    cursor.xcursor_manager.destroy();
+    cursor.xcursor_manager = xcursor_manager;
 
-    if (self.xcursor_name) |name| {
-        self.setXcursor(name);
+    if (cursor.xcursor_name) |name| {
+        cursor.setXcursor(name);
     }
 }
 
-pub fn setXcursor(self: *Self, name: [*:0]const u8) void {
-    self.wlr_cursor.setXcursor(self.xcursor_manager, name);
-    self.xcursor_name = name;
+pub fn setXcursor(cursor: *Cursor, name: [*:0]const u8) void {
+    cursor.wlr_cursor.setXcursor(cursor.xcursor_manager, name);
+    cursor.xcursor_name = name;
 }
 
-fn clearFocus(self: *Self) void {
-    self.setXcursor("left_ptr");
-    self.seat.wlr_seat.pointerNotifyClearFocus();
+fn clearFocus(cursor: *Cursor) void {
+    cursor.setXcursor("default");
+    cursor.seat.wlr_seat.pointerNotifyClearFocus();
 }
 
 /// Axis event is a scroll wheel or similiar
 fn handleAxis(listener: *wl.Listener(*wlr.Pointer.event.Axis), event: *wlr.Pointer.event.Axis) void {
-    const self = @fieldParentPtr(Self, "axis", listener);
+    const cursor = @fieldParentPtr(Cursor, "axis", listener);
 
-    self.seat.handleActivity();
-    self.unhide();
+    cursor.seat.handleActivity();
+    cursor.unhide();
 
     // Notify the client with pointer focus of the axis event.
-    self.seat.wlr_seat.pointerNotifyAxis(
+    cursor.seat.wlr_seat.pointerNotifyAxis(
         event.time_msec,
         event.orientation,
         event.delta,
@@ -305,91 +324,91 @@ fn handleAxis(listener: *wl.Listener(*wlr.Pointer.event.Axis), event: *wlr.Point
 }
 
 fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.Pointer.event.Button) void {
-    const self = @fieldParentPtr(Self, "button", listener);
+    const cursor = @fieldParentPtr(Cursor, "button", listener);
 
-    self.seat.handleActivity();
-    self.unhide();
+    cursor.seat.handleActivity();
+    cursor.unhide();
 
     if (event.state == .released) {
-        assert(self.pressed_count > 0);
-        self.pressed_count -= 1;
-        if (self.pressed_count == 0 and self.mode != .passthrough) {
-            log.debug("leaving {s} mode", .{@tagName(self.mode)});
+        assert(cursor.pressed_count > 0);
+        cursor.pressed_count -= 1;
+        if (cursor.pressed_count == 0 and cursor.mode != .passthrough) {
+            log.debug("leaving {s} mode", .{@tagName(cursor.mode)});
 
-            switch (self.mode) {
+            switch (cursor.mode) {
                 .passthrough => unreachable,
                 .down => {
                     // If we were in down mode, we need pass along the release event
-                    _ = self.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
+                    _ = cursor.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
                 },
                 .move => {},
                 .resize => |data| data.view.pending.resizing = false,
             }
 
-            self.mode = .passthrough;
-            self.passthrough(event.time_msec);
+            cursor.mode = .passthrough;
+            cursor.passthrough(event.time_msec);
 
             server.root.applyPending();
         } else {
-            _ = self.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
+            _ = cursor.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
         }
         return;
     }
 
     assert(event.state == .pressed);
-    self.pressed_count += 1;
+    cursor.pressed_count += 1;
 
-    if (self.pressed_count > 1) {
-        _ = self.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
+    if (cursor.pressed_count > 1) {
+        _ = cursor.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
         return;
     }
 
-    if (server.root.at(self.wlr_cursor.x, self.wlr_cursor.y)) |result| {
-        if (result.data == .view and self.handlePointerMapping(event, result.data.view)) {
+    if (server.root.at(cursor.wlr_cursor.x, cursor.wlr_cursor.y)) |result| {
+        if (result.data == .view and cursor.handlePointerMapping(event, result.data.view)) {
             // If a mapping is triggered don't send events to clients.
             return;
         }
 
-        self.updateKeyboardFocus(result);
+        cursor.updateKeyboardFocus(result);
 
-        _ = self.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
+        _ = cursor.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
 
         if (result.surface != null) {
-            self.mode = .{
+            cursor.mode = .{
                 .down = .{
-                    .lx = self.wlr_cursor.x,
-                    .ly = self.wlr_cursor.y,
+                    .lx = cursor.wlr_cursor.x,
+                    .ly = cursor.wlr_cursor.y,
                     .sx = result.sx,
                     .sy = result.sy,
                 },
             };
         }
     } else {
-        self.updateOutputFocus(self.wlr_cursor.x, self.wlr_cursor.y);
+        cursor.updateOutputFocus(cursor.wlr_cursor.x, cursor.wlr_cursor.y);
     }
 
     server.root.applyPending();
 }
 
 /// Requires a call to Root.applyPending()
-fn updateKeyboardFocus(self: Self, result: Root.AtResult) void {
+fn updateKeyboardFocus(cursor: Cursor, result: Root.AtResult) void {
     switch (result.data) {
         .view => |view| {
-            self.seat.focus(view);
+            cursor.seat.focus(view);
         },
         .layer_surface => |layer_surface| {
-            self.seat.focusOutput(layer_surface.output);
+            cursor.seat.focusOutput(layer_surface.output);
             // If a keyboard inteactive layer surface has been clicked on,
             // give it keyboard focus.
             if (layer_surface.wlr_layer_surface.current.keyboard_interactive != .none) {
-                self.seat.setFocusRaw(.{ .layer = layer_surface });
+                cursor.seat.setFocusRaw(.{ .layer = layer_surface });
             }
         },
         .lock_surface => |lock_surface| {
             assert(server.lock_manager.state != .unlocked);
-            self.seat.setFocusRaw(.{ .lock_surface = lock_surface });
+            cursor.seat.setFocusRaw(.{ .lock_surface = lock_surface });
         },
-        .xwayland_override_redirect => |override_redirect| {
+        .override_redirect => |override_redirect| {
             assert(server.lock_manager.state != .locked);
             override_redirect.focusIfDesired();
         },
@@ -398,10 +417,10 @@ fn updateKeyboardFocus(self: Self, result: Root.AtResult) void {
 
 /// Focus the output at the given layout coordinates, if any
 /// Requires a call to Root.applyPending()
-fn updateOutputFocus(self: Self, lx: f64, ly: f64) void {
+fn updateOutputFocus(cursor: Cursor, lx: f64, ly: f64) void {
     if (server.root.output_layout.outputAt(lx, ly)) |wlr_output| {
         const output: *Output = @ptrFromInt(wlr_output.data);
-        self.seat.focusOutput(output);
+        cursor.seat.focusOutput(output);
     }
 }
 
@@ -409,9 +428,9 @@ fn handlePinchBegin(
     listener: *wl.Listener(*wlr.Pointer.event.PinchBegin),
     event: *wlr.Pointer.event.PinchBegin,
 ) void {
-    const self = @fieldParentPtr(Self, "pinch_begin", listener);
-    self.pointer_gestures.sendPinchBegin(
-        self.seat.wlr_seat,
+    const cursor = @fieldParentPtr(Cursor, "pinch_begin", listener);
+    server.input_manager.pointer_gestures.sendPinchBegin(
+        cursor.seat.wlr_seat,
         event.time_msec,
         event.fingers,
     );
@@ -421,9 +440,9 @@ fn handlePinchUpdate(
     listener: *wl.Listener(*wlr.Pointer.event.PinchUpdate),
     event: *wlr.Pointer.event.PinchUpdate,
 ) void {
-    const self = @fieldParentPtr(Self, "pinch_update", listener);
-    self.pointer_gestures.sendPinchUpdate(
-        self.seat.wlr_seat,
+    const cursor = @fieldParentPtr(Cursor, "pinch_update", listener);
+    server.input_manager.pointer_gestures.sendPinchUpdate(
+        cursor.seat.wlr_seat,
         event.time_msec,
         event.dx,
         event.dy,
@@ -436,9 +455,9 @@ fn handlePinchEnd(
     listener: *wl.Listener(*wlr.Pointer.event.PinchEnd),
     event: *wlr.Pointer.event.PinchEnd,
 ) void {
-    const self = @fieldParentPtr(Self, "pinch_end", listener);
-    self.pointer_gestures.sendPinchEnd(
-        self.seat.wlr_seat,
+    const cursor = @fieldParentPtr(Cursor, "pinch_end", listener);
+    server.input_manager.pointer_gestures.sendPinchEnd(
+        cursor.seat.wlr_seat,
         event.time_msec,
         event.cancelled,
     );
@@ -448,9 +467,9 @@ fn handleSwipeBegin(
     listener: *wl.Listener(*wlr.Pointer.event.SwipeBegin),
     event: *wlr.Pointer.event.SwipeBegin,
 ) void {
-    const self = @fieldParentPtr(Self, "swipe_begin", listener);
-    self.pointer_gestures.sendSwipeBegin(
-        self.seat.wlr_seat,
+    const cursor = @fieldParentPtr(Cursor, "swipe_begin", listener);
+    server.input_manager.pointer_gestures.sendSwipeBegin(
+        cursor.seat.wlr_seat,
         event.time_msec,
         event.fingers,
     );
@@ -460,9 +479,9 @@ fn handleSwipeUpdate(
     listener: *wl.Listener(*wlr.Pointer.event.SwipeUpdate),
     event: *wlr.Pointer.event.SwipeUpdate,
 ) void {
-    const self = @fieldParentPtr(Self, "swipe_update", listener);
-    self.pointer_gestures.sendSwipeUpdate(
-        self.seat.wlr_seat,
+    const cursor = @fieldParentPtr(Cursor, "swipe_update", listener);
+    server.input_manager.pointer_gestures.sendSwipeUpdate(
+        cursor.seat.wlr_seat,
         event.time_msec,
         event.dx,
         event.dy,
@@ -473,48 +492,36 @@ fn handleSwipeEnd(
     listener: *wl.Listener(*wlr.Pointer.event.SwipeEnd),
     event: *wlr.Pointer.event.SwipeEnd,
 ) void {
-    const self = @fieldParentPtr(Self, "swipe_end", listener);
-    self.pointer_gestures.sendSwipeEnd(
-        self.seat.wlr_seat,
+    const cursor = @fieldParentPtr(Cursor, "swipe_end", listener);
+    server.input_manager.pointer_gestures.sendSwipeEnd(
+        cursor.seat.wlr_seat,
         event.time_msec,
         event.cancelled,
     );
-}
-
-fn handleTouchUp(
-    listener: *wl.Listener(*wlr.Touch.event.Up),
-    event: *wlr.Touch.event.Up,
-) void {
-    const self = @fieldParentPtr(Self, "touch_up", listener);
-
-    self.seat.handleActivity();
-
-    _ = self.touch_points.remove(event.touch_id);
-
-    self.seat.wlr_seat.touchNotifyUp(event.time_msec, event.touch_id);
 }
 
 fn handleTouchDown(
     listener: *wl.Listener(*wlr.Touch.event.Down),
     event: *wlr.Touch.event.Down,
 ) void {
-    const self = @fieldParentPtr(Self, "touch_down", listener);
+    const cursor = @fieldParentPtr(Cursor, "touch_down", listener);
 
-    self.seat.handleActivity();
+    cursor.seat.handleActivity();
 
     var lx: f64 = undefined;
     var ly: f64 = undefined;
-    self.wlr_cursor.absoluteToLayoutCoords(event.device, event.x, event.y, &lx, &ly);
+    cursor.wlr_cursor.absoluteToLayoutCoords(event.device, event.x, event.y, &lx, &ly);
 
-    self.touch_points.putNoClobber(util.gpa, event.touch_id, .{ .lx = lx, .ly = ly }) catch {
+    cursor.touch_points.putNoClobber(util.gpa, event.touch_id, .{ .lx = lx, .ly = ly }) catch {
         log.err("out of memory", .{});
+        return;
     };
 
     if (server.root.at(lx, ly)) |result| {
-        self.updateKeyboardFocus(result);
+        cursor.updateKeyboardFocus(result);
 
         if (result.surface) |surface| {
-            _ = self.seat.wlr_seat.touchNotifyDown(
+            _ = cursor.seat.wlr_seat.touchNotifyDown(
                 surface,
                 event.time_msec,
                 event.touch_id,
@@ -523,7 +530,7 @@ fn handleTouchDown(
             );
         }
     } else {
-        self.updateOutputFocus(lx, ly);
+        cursor.updateOutputFocus(lx, ly);
     }
 
     server.root.applyPending();
@@ -533,49 +540,153 @@ fn handleTouchMotion(
     listener: *wl.Listener(*wlr.Touch.event.Motion),
     event: *wlr.Touch.event.Motion,
 ) void {
-    const self = @fieldParentPtr(Self, "touch_motion", listener);
+    const cursor = @fieldParentPtr(Cursor, "touch_motion", listener);
 
-    self.seat.handleActivity();
+    cursor.seat.handleActivity();
 
-    var lx: f64 = undefined;
-    var ly: f64 = undefined;
-    self.wlr_cursor.absoluteToLayoutCoords(event.device, event.x, event.y, &lx, &ly);
+    if (cursor.touch_points.getPtr(event.touch_id)) |point| {
+        cursor.wlr_cursor.absoluteToLayoutCoords(event.device, event.x, event.y, &point.lx, &point.ly);
 
-    self.touch_points.put(util.gpa, event.touch_id, .{ .lx = lx, .ly = ly }) catch {
-        log.err("out of memory", .{});
-    };
+        cursor.updateDragIcons();
 
-    self.updateDragIcons();
+        if (server.root.at(point.lx, point.ly)) |result| {
+            cursor.seat.wlr_seat.touchNotifyMotion(event.time_msec, event.touch_id, result.sx, result.sy);
+        }
+    }
+}
 
-    if (server.root.at(lx, ly)) |result| {
-        self.seat.wlr_seat.touchNotifyMotion(event.time_msec, event.touch_id, result.sx, result.sy);
+fn handleTouchUp(
+    listener: *wl.Listener(*wlr.Touch.event.Up),
+    event: *wlr.Touch.event.Up,
+) void {
+    const cursor = @fieldParentPtr(Cursor, "touch_up", listener);
+
+    cursor.seat.handleActivity();
+
+    if (cursor.touch_points.remove(event.touch_id)) {
+        cursor.seat.wlr_seat.touchNotifyUp(event.time_msec, event.touch_id);
+    }
+}
+
+fn handleTouchCancel(
+    listener: *wl.Listener(*wlr.Touch.event.Cancel),
+    _: *wlr.Touch.event.Cancel,
+) void {
+    const cursor = @fieldParentPtr(Cursor, "touch_cancel", listener);
+
+    cursor.seat.handleActivity();
+
+    cursor.touch_points.clearRetainingCapacity();
+
+    // We can't call touchNotifyCancel() from inside the loop over touch points as it also loops
+    // over touch points and may destroy multiple touch points in a single call.
+    //
+    // What we should do here is `while (touch_points.first()) |point| cancel()` but since the
+    // surface may be null we can't rely on the fact tha all touch points will be destroyed
+    // and risk an infinite loop if the surface of any wlr_touch_point is null.
+    //
+    // This is all really silly and totally unnecessary since all touchNotifyCancel() does with
+    // the surface argument is obtain a seat client and touch_point.seat_client is never null.
+    // TODO(wlroots) clean this up after the wlroots MR fixing this is merged:
+    // https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/4613
+
+    // The upper bound of 32 comes from an implementation detail of libinput which uses
+    // a 32-bit integer as a map to keep track of touch points.
+    var surfaces: std.BoundedArray(*wlr.Surface, 32) = .{};
+    {
+        var it = cursor.seat.wlr_seat.touch_state.touch_points.iterator(.forward);
+        while (it.next()) |touch_point| {
+            if (touch_point.surface) |surface| {
+                surfaces.append(surface) catch break;
+            }
+        }
+    }
+
+    for (surfaces.slice()) |surface| {
+        cursor.seat.wlr_seat.touchNotifyCancel(surface);
     }
 }
 
 fn handleTouchFrame(listener: *wl.Listener(void)) void {
-    const self = @fieldParentPtr(Self, "touch_frame", listener);
+    const cursor = @fieldParentPtr(Cursor, "touch_frame", listener);
 
-    self.seat.handleActivity();
+    cursor.seat.handleActivity();
 
-    self.seat.wlr_seat.touchNotifyFrame();
+    cursor.seat.wlr_seat.touchNotifyFrame();
+}
+
+fn handleTabletToolAxis(
+    _: *wl.Listener(*wlr.Tablet.event.Axis),
+    event: *wlr.Tablet.event.Axis,
+) void {
+    const device: *InputDevice = @ptrFromInt(event.device.data);
+    const tablet = @fieldParentPtr(Tablet, "device", device);
+
+    device.seat.handleActivity();
+
+    const tool = TabletTool.get(device.seat.wlr_seat, event.tool) catch return;
+
+    tool.axis(tablet, event);
+}
+
+fn handleTabletToolProximity(
+    _: *wl.Listener(*wlr.Tablet.event.Proximity),
+    event: *wlr.Tablet.event.Proximity,
+) void {
+    const device: *InputDevice = @ptrFromInt(event.device.data);
+    const tablet = @fieldParentPtr(Tablet, "device", device);
+
+    device.seat.handleActivity();
+
+    const tool = TabletTool.get(device.seat.wlr_seat, event.tool) catch return;
+
+    tool.proximity(tablet, event);
+}
+
+fn handleTabletToolTip(
+    _: *wl.Listener(*wlr.Tablet.event.Tip),
+    event: *wlr.Tablet.event.Tip,
+) void {
+    const device: *InputDevice = @ptrFromInt(event.device.data);
+    const tablet = @fieldParentPtr(Tablet, "device", device);
+
+    device.seat.handleActivity();
+
+    const tool = TabletTool.get(device.seat.wlr_seat, event.tool) catch return;
+
+    tool.tip(tablet, event);
+}
+
+fn handleTabletToolButton(
+    _: *wl.Listener(*wlr.Tablet.event.Button),
+    event: *wlr.Tablet.event.Button,
+) void {
+    const device: *InputDevice = @ptrFromInt(event.device.data);
+    const tablet = @fieldParentPtr(Tablet, "device", device);
+
+    device.seat.handleActivity();
+
+    const tool = TabletTool.get(device.seat.wlr_seat, event.tool) catch return;
+
+    tool.button(tablet, event);
 }
 
 /// Handle the mapping for the passed button if any. Returns true if there
 /// was a mapping and the button was handled.
-fn handlePointerMapping(self: *Self, event: *wlr.Pointer.event.Button, view: *View) bool {
-    const wlr_keyboard = self.seat.wlr_seat.getKeyboard() orelse return false;
+fn handlePointerMapping(cursor: *Cursor, event: *wlr.Pointer.event.Button, view: *View) bool {
+    const wlr_keyboard = cursor.seat.wlr_seat.getKeyboard() orelse return false;
     const modifiers = wlr_keyboard.getModifiers();
 
     const fullscreen = view.current.fullscreen or view.pending.fullscreen;
 
-    return for (server.config.modes.items[self.seat.mode_id].pointer_mappings.items) |mapping| {
+    return for (server.config.modes.items[cursor.seat.mode_id].pointer_mappings.items) |mapping| {
         if (event.button == mapping.event_code and std.meta.eql(modifiers, mapping.modifiers)) {
             switch (mapping.action) {
-                .move => if (!fullscreen) self.startMove(view),
-                .resize => if (!fullscreen) self.startResize(view, null),
+                .move => if (!fullscreen) cursor.startMove(view),
+                .resize => if (!fullscreen) cursor.startResize(view, null),
                 .command => |args| {
-                    self.seat.focus(view);
-                    self.seat.runCommand(args);
+                    cursor.seat.focus(view);
+                    cursor.seat.runCommand(args);
                     // This is mildly inefficient as running the command may have already
                     // started a transaction. However we need to start one after the Seat.focus()
                     // call in the case where it didn't.
@@ -591,8 +702,8 @@ fn handlePointerMapping(self: *Self, event: *wlr.Pointer.event.Button, view: *Vi
 /// events together. For instance, two axis events may happen at the same
 /// time, in which case a frame event won't be sent in between.
 fn handleFrame(listener: *wl.Listener(*wlr.Cursor), _: *wlr.Cursor) void {
-    const self = @fieldParentPtr(Self, "frame", listener);
-    self.seat.wlr_seat.pointerNotifyFrame();
+    const cursor = @fieldParentPtr(Cursor, "frame", listener);
+    cursor.seat.wlr_seat.pointerNotifyFrame();
 }
 
 /// This event is forwarded by the cursor when a pointer emits an _absolute_
@@ -605,17 +716,17 @@ fn handleMotionAbsolute(
     listener: *wl.Listener(*wlr.Pointer.event.MotionAbsolute),
     event: *wlr.Pointer.event.MotionAbsolute,
 ) void {
-    const self = @fieldParentPtr(Self, "motion_absolute", listener);
+    const cursor = @fieldParentPtr(Cursor, "motion_absolute", listener);
 
-    self.seat.handleActivity();
+    cursor.seat.handleActivity();
 
     var lx: f64 = undefined;
     var ly: f64 = undefined;
-    self.wlr_cursor.absoluteToLayoutCoords(event.device, event.x, event.y, &lx, &ly);
+    cursor.wlr_cursor.absoluteToLayoutCoords(event.device, event.x, event.y, &lx, &ly);
 
-    const dx = lx - self.wlr_cursor.x;
-    const dy = ly - self.wlr_cursor.y;
-    self.processMotion(event.device, event.time_msec, dx, dy, dx, dy);
+    const dx = lx - cursor.wlr_cursor.x;
+    const dy = ly - cursor.wlr_cursor.y;
+    cursor.processMotion(event.device, event.time_msec, dx, dy, dx, dy);
 }
 
 /// This event is forwarded by the cursor when a pointer emits a _relative_
@@ -624,11 +735,11 @@ fn handleMotion(
     listener: *wl.Listener(*wlr.Pointer.event.Motion),
     event: *wlr.Pointer.event.Motion,
 ) void {
-    const self = @fieldParentPtr(Self, "motion", listener);
+    const cursor = @fieldParentPtr(Cursor, "motion", listener);
 
-    self.seat.handleActivity();
+    cursor.seat.handleActivity();
 
-    self.processMotion(event.device, event.time_msec, event.delta_x, event.delta_y, event.unaccel_dx, event.unaccel_dy);
+    cursor.processMotion(event.device, event.time_msec, event.delta_x, event.delta_y, event.unaccel_dx, event.unaccel_dy);
 }
 
 fn handleRequestSetCursor(
@@ -636,8 +747,8 @@ fn handleRequestSetCursor(
     event: *wlr.Seat.event.RequestSetCursor,
 ) void {
     // This event is rasied by the seat when a client provides a cursor image
-    const self = @fieldParentPtr(Self, "request_set_cursor", listener);
-    const focused_client = self.seat.wlr_seat.pointer_state.focused_client;
+    const cursor = @fieldParentPtr(Cursor, "request_set_cursor", listener);
+    const focused_client = cursor.seat.wlr_seat.pointer_state.focused_client;
 
     // This can be sent by any client, so we check to make sure this one is
     // actually has pointer focus first.
@@ -647,38 +758,38 @@ fn handleRequestSetCursor(
         // on the output that it's currently on and continue to do so as the
         // cursor moves between outputs.
         log.debug("focused client set cursor", .{});
-        self.wlr_cursor.setSurface(event.surface, event.hotspot_x, event.hotspot_y);
-        self.xcursor_name = null;
+        cursor.wlr_cursor.setSurface(event.surface, event.hotspot_x, event.hotspot_y);
+        cursor.xcursor_name = null;
     }
 }
 
-pub fn hide(self: *Self) void {
-    if (self.pressed_count > 0) return;
-    self.hidden = true;
-    self.wlr_cursor.unsetImage();
-    self.xcursor_name = null;
-    self.seat.wlr_seat.pointerNotifyClearFocus();
-    self.hide_cursor_timer.timerUpdate(0) catch {
+pub fn hide(cursor: *Cursor) void {
+    if (cursor.pressed_count > 0) return;
+    cursor.hidden = true;
+    cursor.wlr_cursor.unsetImage();
+    cursor.xcursor_name = null;
+    cursor.seat.wlr_seat.pointerNotifyClearFocus();
+    cursor.hide_cursor_timer.timerUpdate(0) catch {
         log.err("failed to update cursor hide timeout", .{});
     };
 }
 
-pub fn unhide(self: *Self) void {
-    self.hide_cursor_timer.timerUpdate(server.config.cursor_hide_timeout) catch {
+pub fn unhide(cursor: *Cursor) void {
+    cursor.hide_cursor_timer.timerUpdate(server.config.cursor_hide_timeout) catch {
         log.err("failed to update cursor hide timeout", .{});
     };
-    if (!self.hidden) return;
-    self.hidden = false;
-    self.updateState();
+    if (!cursor.hidden) return;
+    cursor.hidden = false;
+    cursor.updateState();
 }
 
-fn handleHideCursorTimeout(self: *Self) c_int {
+fn handleHideCursorTimeout(cursor: *Cursor) c_int {
     log.debug("hide cursor timeout", .{});
-    self.hide();
+    cursor.hide();
     return 0;
 }
 
-pub fn startMove(cursor: *Self, view: *View) void {
+pub fn startMove(cursor: *Cursor, view: *View) void {
     if (cursor.constraint) |constraint| {
         if (constraint.state == .active) constraint.deactivate();
     }
@@ -691,7 +802,7 @@ pub fn startMove(cursor: *Self, view: *View) void {
     cursor.enterMode(new_mode, view, "move");
 }
 
-pub fn startResize(cursor: *Self, view: *View, proposed_edges: ?wlr.Edges) void {
+pub fn startResize(cursor: *Cursor, view: *View, proposed_edges: ?wlr.Edges) void {
     if (cursor.constraint) |constraint| {
         if (constraint.state == .active) constraint.deactivate();
     }
@@ -724,7 +835,7 @@ pub fn startResize(cursor: *Self, view: *View, proposed_edges: ?wlr.Edges) void 
     cursor.enterMode(new_mode, view, wlr.Xcursor.getResizeName(edges));
 }
 
-fn computeEdges(cursor: *const Self, view: *const View) wlr.Edges {
+fn computeEdges(cursor: *const Cursor, view: *const View) wlr.Edges {
     const min_handle_size = 20;
     const box = &view.current.box;
 
@@ -761,7 +872,7 @@ fn computeEdges(cursor: *const Self, view: *const View) wlr.Edges {
     }
 }
 
-fn enterMode(cursor: *Self, mode: Mode, view: *View, xcursor_name: [*:0]const u8) void {
+fn enterMode(cursor: *Cursor, mode: Mode, view: *View, xcursor_name: [*:0]const u8) void {
     assert(cursor.mode == .passthrough or cursor.mode == .down);
     assert(mode == .move or mode == .resize);
 
@@ -782,11 +893,11 @@ fn enterMode(cursor: *Self, mode: Mode, view: *View, xcursor_name: [*:0]const u8
     server.root.applyPending();
 }
 
-fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64, delta_y: f64, unaccel_dx: f64, unaccel_dy: f64) void {
-    self.unhide();
+fn processMotion(cursor: *Cursor, device: *wlr.InputDevice, time: u32, delta_x: f64, delta_y: f64, unaccel_dx: f64, unaccel_dy: f64) void {
+    cursor.unhide();
 
     server.input_manager.relative_pointer_manager.sendRelativeMotion(
-        self.seat.wlr_seat,
+        cursor.seat.wlr_seat,
         @as(u64, time) * 1000,
         delta_x,
         delta_y,
@@ -797,7 +908,7 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
     var dx: f64 = delta_x;
     var dy: f64 = delta_y;
 
-    if (self.constraint) |constraint| {
+    if (cursor.constraint) |constraint| {
         if (constraint.state == .active) {
             switch (constraint.wlr_constraint.type) {
                 .locked => return,
@@ -806,28 +917,28 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
         }
     }
 
-    switch (self.mode) {
+    switch (cursor.mode) {
         .passthrough, .down => {
-            self.wlr_cursor.move(device, dx, dy);
+            cursor.wlr_cursor.move(device, dx, dy);
 
-            switch (self.mode) {
+            switch (cursor.mode) {
                 .passthrough => {
-                    self.checkFocusFollowsCursor();
-                    self.passthrough(time);
+                    cursor.checkFocusFollowsCursor();
+                    cursor.passthrough(time);
                 },
                 .down => |data| {
-                    self.seat.wlr_seat.pointerNotifyMotion(
+                    cursor.seat.wlr_seat.pointerNotifyMotion(
                         time,
-                        data.sx + (self.wlr_cursor.x - data.lx),
-                        data.sy + (self.wlr_cursor.y - data.ly),
+                        data.sx + (cursor.wlr_cursor.x - data.lx),
+                        data.sy + (cursor.wlr_cursor.y - data.ly),
                     );
                 },
                 else => unreachable,
             }
 
-            self.updateDragIcons();
+            cursor.updateDragIcons();
 
-            if (self.constraint) |constraint| {
+            if (cursor.constraint) |constraint| {
                 constraint.maybeActivate();
             }
         },
@@ -897,52 +1008,52 @@ fn processMotion(self: *Self, device: *wlr.InputDevice, time: u32, delta_x: f64,
     }
 }
 
-pub fn checkFocusFollowsCursor(self: *Self) void {
+pub fn checkFocusFollowsCursor(cursor: *Cursor) void {
     // Don't do focus-follows-cursor if a pointer drag is in progress as focus
     // change can't occur.
-    if (self.seat.drag == .pointer) return;
+    if (cursor.seat.drag == .pointer) return;
     if (server.config.focus_follows_cursor == .disabled) return;
 
-    const last_target = self.focus_follows_cursor_target;
-    self.updateFocusFollowsCursorTarget();
-    if (self.focus_follows_cursor_target) |view| {
+    const last_target = cursor.focus_follows_cursor_target;
+    cursor.updateFocusFollowsCursorTarget();
+    if (cursor.focus_follows_cursor_target) |view| {
         // In .normal mode, only entering a view changes focus
         if (server.config.focus_follows_cursor == .normal and
             last_target == view) return;
-        if (self.seat.focused != .view or self.seat.focused.view != view) {
+        if (cursor.seat.focused != .view or cursor.seat.focused.view != view) {
             if (server.config.focus_follows_cursor_timeout > 0) {
-                self.focus_cursor_timer.timerUpdate(server.config.focus_follows_cursor_timeout) catch {
+                cursor.focus_cursor_timer.timerUpdate(server.config.focus_follows_cursor_timeout) catch {
                     log.err("failed to update cursor focus timeout", .{});
                 };
             } else {
-                self.seat.focusOutput(view.current.output.?);
-                self.seat.focus(view);
+                cursor.seat.focusOutput(view.current.output.?);
+                cursor.seat.focus(view);
                 server.root.applyPending();
             }
         }
     } else {
         // The output doesn't contain any views, just focus the output.
-        self.updateOutputFocus(self.wlr_cursor.x, self.wlr_cursor.y);
+        cursor.updateOutputFocus(cursor.wlr_cursor.x, cursor.wlr_cursor.y);
     }
 }
 
-fn handleFocusCursorTimeout(self: *Self) c_int {
+fn handleFocusCursorTimeout(cursor: *Cursor) c_int {
     log.debug("focus cursor timeout", .{});
-    self.focus_cursor_timer.timerUpdate(0) catch {
+    cursor.focus_cursor_timer.timerUpdate(0) catch {
         log.err("failed to update cursor focus timeout", .{});
     };
-    if (self.focus_follows_cursor_target) |view| {
-        if (self.seat.focused != .view or self.seat.focused.view != view) {
-            self.seat.focusOutput(view.current.output.?);
-            self.seat.focus(view);
+    if (cursor.focus_follows_cursor_target) |view| {
+        if (cursor.seat.focused != .view or cursor.seat.focused.view != view) {
+            cursor.seat.focusOutput(view.current.output.?);
+            cursor.seat.focus(view);
             server.root.applyPending();
         }
     }
     return 0;
 }
 
-fn updateFocusFollowsCursorTarget(self: *Self) void {
-    if (server.root.at(self.wlr_cursor.x, self.wlr_cursor.y)) |result| {
+fn updateFocusFollowsCursorTarget(cursor: *Cursor) void {
+    if (server.root.at(cursor.wlr_cursor.x, cursor.wlr_cursor.y)) |result| {
         switch (result.data) {
             .view => |view| {
                 // Some windows have an input region bigger than their window
@@ -952,51 +1063,52 @@ fn updateFocusFollowsCursorTarget(self: *Self) void {
                 var output_layout_box: wlr.Box = undefined;
                 server.root.output_layout.getBox(view.current.output.?.wlr_output, &output_layout_box);
 
-                const cursor_ox = self.wlr_cursor.x - @as(f64, @floatFromInt(output_layout_box.x));
-                const cursor_oy = self.wlr_cursor.y - @as(f64, @floatFromInt(output_layout_box.y));
+                const cursor_ox = cursor.wlr_cursor.x - @as(f64, @floatFromInt(output_layout_box.x));
+                const cursor_oy = cursor.wlr_cursor.y - @as(f64, @floatFromInt(output_layout_box.y));
                 if (view.current.box.containsPoint(cursor_ox, cursor_oy)) {
-                    self.focus_follows_cursor_target = view;
+                    cursor.focus_follows_cursor_target = view;
                 }
             },
             .layer_surface, .lock_surface => {
-                self.focus_follows_cursor_target = null;
+                cursor.focus_follows_cursor_target = null;
             },
-            .xwayland_override_redirect => {
+            .override_redirect => {
                 assert(build_options.xwayland);
-                self.focus_follows_cursor_target = null;
+                assert(server.xwayland != null);
+                cursor.focus_follows_cursor_target = null;
             },
         }
     } else {
         // The cursor is not above any view
-        self.focus_follows_cursor_target = null;
+        cursor.focus_follows_cursor_target = null;
     }
 }
 
 /// Handle potential change in location of views on the output, as well as
 /// the target view of a cursor operation potentially being moved to a non-visible tag,
 /// becoming fullscreen, etc.
-pub fn updateState(self: *Self) void {
-    if (self.may_need_warp) {
-        self.warp();
+pub fn updateState(cursor: *Cursor) void {
+    if (cursor.may_need_warp) {
+        cursor.warp();
     }
 
-    if (self.constraint) |constraint| {
+    if (cursor.constraint) |constraint| {
         constraint.updateState();
     }
 
-    switch (self.mode) {
+    switch (cursor.mode) {
         .passthrough => {
-            self.updateFocusFollowsCursorTarget();
-            if (!self.hidden) {
+            cursor.updateFocusFollowsCursorTarget();
+            if (!cursor.hidden) {
                 var now: os.timespec = undefined;
                 os.clock_gettime(os.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
                 const msec: u32 = @intCast(now.tv_sec * std.time.ms_per_s +
                     @divTrunc(now.tv_nsec, std.time.ns_per_ms));
-                self.passthrough(msec);
+                cursor.passthrough(msec);
             }
         },
         // TODO: Leave down mode if the target surface is no longer visible.
-        .down => assert(!self.hidden),
+        .down => assert(!cursor.hidden),
         .move, .resize => {
             // Moving and resizing of views is handled through the transaction system. Therefore,
             // we must inspect the inflight_mode instead if a move or a resize is in progress.
@@ -1012,10 +1124,10 @@ pub fn updateState(self: *Self) void {
             // transaction carrying out the final size/position change is still inflight.
             // Therefore, the user already expects the cursor to be free from the view and
             // we should not warp it back to the fixed offset of the move/resize.
-            switch (self.inflight_mode) {
+            switch (cursor.inflight_mode) {
                 .passthrough, .down => {},
                 inline .move, .resize => |data, mode| {
-                    assert(!self.hidden);
+                    assert(!cursor.hidden);
 
                     // These conditions are checked in Root.applyPending()
                     assert(data.view.current.tags & data.view.current.output.?.current.tags != 0);
@@ -1030,7 +1142,7 @@ pub fn updateState(self: *Self) void {
                         } else if (data.edges.right) {
                             break :blk @floatFromInt(box.x + box.width - data.offset_x);
                         } else {
-                            break :blk self.wlr_cursor.x;
+                            break :blk cursor.wlr_cursor.x;
                         }
                     };
                     const new_y: f64 = blk: {
@@ -1039,11 +1151,11 @@ pub fn updateState(self: *Self) void {
                         } else if (data.edges.bottom) {
                             break :blk @floatFromInt(box.y + box.height - data.offset_y);
                         } else {
-                            break :blk self.wlr_cursor.y;
+                            break :blk cursor.wlr_cursor.y;
                         }
                     };
 
-                    self.wlr_cursor.warpClosest(null, new_x, new_y);
+                    cursor.wlr_cursor.warpClosest(null, new_x, new_y);
                 },
             }
         },
@@ -1051,10 +1163,10 @@ pub fn updateState(self: *Self) void {
 }
 
 /// Pass an event on to the surface under the cursor, if any.
-fn passthrough(self: *Self, time: u32) void {
-    assert(self.mode == .passthrough);
+fn passthrough(cursor: *Cursor, time: u32) void {
+    assert(cursor.mode == .passthrough);
 
-    if (server.root.at(self.wlr_cursor.x, self.wlr_cursor.y)) |result| {
+    if (server.root.at(cursor.wlr_cursor.x, cursor.wlr_cursor.y)) |result| {
         if (result.data == .lock_surface) {
             assert(server.lock_manager.state != .unlocked);
         } else {
@@ -1062,19 +1174,19 @@ fn passthrough(self: *Self, time: u32) void {
         }
 
         if (result.surface) |surface| {
-            self.seat.wlr_seat.pointerNotifyEnter(surface, result.sx, result.sy);
-            self.seat.wlr_seat.pointerNotifyMotion(time, result.sx, result.sy);
+            cursor.seat.wlr_seat.pointerNotifyEnter(surface, result.sx, result.sy);
+            cursor.seat.wlr_seat.pointerNotifyMotion(time, result.sx, result.sy);
             return;
         }
     }
 
-    self.clearFocus();
+    cursor.clearFocus();
 }
 
-fn warp(self: *Self) void {
-    self.may_need_warp = false;
+fn warp(cursor: *Cursor) void {
+    cursor.may_need_warp = false;
 
-    const focused_output = self.seat.focused_output orelse return;
+    const focused_output = cursor.seat.focused_output orelse return;
 
     // Warp pointer to center of the focused view/output (In layout coordinates) if enabled.
     var output_layout_box: wlr.Box = undefined;
@@ -1082,7 +1194,7 @@ fn warp(self: *Self) void {
     const target_box = switch (server.config.warp_cursor) {
         .disabled => return,
         .@"on-output-change" => output_layout_box,
-        .@"on-focus-change" => switch (self.seat.focused) {
+        .@"on-focus-change" => switch (cursor.seat.focused) {
             .layer, .lock_surface, .none => output_layout_box,
             .view => |view| wlr.Box{
                 .x = output_layout_box.x + view.current.box.x,
@@ -1090,11 +1202,11 @@ fn warp(self: *Self) void {
                 .width = view.current.box.width,
                 .height = view.current.box.height,
             },
-            .xwayland_override_redirect => |or_window| wlr.Box{
-                .x = or_window.xwayland_surface.x,
-                .y = or_window.xwayland_surface.y,
-                .width = or_window.xwayland_surface.width,
-                .height = or_window.xwayland_surface.height,
+            .override_redirect => |override_redirect| wlr.Box{
+                .x = override_redirect.xwayland_surface.x,
+                .y = override_redirect.xwayland_surface.y,
+                .width = override_redirect.xwayland_surface.width,
+                .height = override_redirect.xwayland_surface.height,
             },
         },
     };
@@ -1107,25 +1219,25 @@ fn warp(self: *Self) void {
         .width = usable_box.width,
         .height = usable_box.height,
     };
-    if (!output_layout_box.containsPoint(self.wlr_cursor.x, self.wlr_cursor.y) or
-        (usable_layout_box.containsPoint(self.wlr_cursor.x, self.wlr_cursor.y) and
-        !target_box.containsPoint(self.wlr_cursor.x, self.wlr_cursor.y)))
+    if (!output_layout_box.containsPoint(cursor.wlr_cursor.x, cursor.wlr_cursor.y) or
+        (usable_layout_box.containsPoint(cursor.wlr_cursor.x, cursor.wlr_cursor.y) and
+        !target_box.containsPoint(cursor.wlr_cursor.x, cursor.wlr_cursor.y)))
     {
         const lx: f64 = @floatFromInt(target_box.x + @divTrunc(target_box.width, 2));
         const ly: f64 = @floatFromInt(target_box.y + @divTrunc(target_box.height, 2));
-        if (!self.wlr_cursor.warp(null, lx, ly)) {
+        if (!cursor.wlr_cursor.warp(null, lx, ly)) {
             log.err("failed to warp cursor on focus change", .{});
         }
     }
 }
 
-fn updateDragIcons(self: *Self) void {
+fn updateDragIcons(cursor: *Cursor) void {
     var it = server.root.drag_icons.children.iterator(.forward);
     while (it.next()) |node| {
         const icon = @as(*DragIcon, @ptrFromInt(node.data));
 
-        if (icon.wlr_drag_icon.drag.seat == self.seat.wlr_seat) {
-            icon.updatePosition(self);
+        if (icon.wlr_drag_icon.drag.seat == cursor.seat.wlr_seat) {
+            icon.updatePosition(cursor);
         }
     }
 }

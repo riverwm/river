@@ -60,7 +60,8 @@ complete -c riverctl -n '__fish_riverctl_complete_arg 1' -a 'rule-add'          
 complete -c riverctl -n '__fish_riverctl_complete_arg 1' -a 'rule-del'               -d 'Delete a rule added with rule-add'
 complete -c riverctl -n '__fish_riverctl_complete_arg 1' -a 'list-rules'             -d 'Print rules in a given list'
 # Configuration
-complete -c riverctl -n '__fish_riverctl_complete_arg 1' -a 'attach-mode'            -d 'Configure where new views should attach to the view stack'
+complete -c riverctl -n '__fish_riverctl_complete_arg 1' -a 'default-attach-mode'    -d 'Set the attach mode to be used by all outputs by default'
+complete -c riverctl -n '__fish_riverctl_complete_arg 1' -a 'output-attach-mode'     -d 'Set the attach mode of the currently focused output'
 complete -c riverctl -n '__fish_riverctl_complete_arg 1' -a 'background-color'       -d 'Set the background color'
 complete -c riverctl -n '__fish_riverctl_complete_arg 1' -a 'border-color-focused'   -d 'Set the border color of focused views'
 complete -c riverctl -n '__fish_riverctl_complete_arg 1' -a 'border-color-unfocused' -d 'Set the border color of unfocused views'
@@ -80,19 +81,20 @@ complete -c riverctl -n '__fish_riverctl_complete_arg 1' -a 'keyboard-layout'   
 complete -c riverctl -n '__fish_riverctl_complete_arg 1' -a 'keyboard-layout-file'   -d 'Set the keyboard layout from a file.'
 
 # Subcommands
-complete -c riverctl -n '__fish_seen_subcommand_from focus-output send-to-output' -n '__fish_riverctl_complete_arg 2' -a 'next previous'
+complete -c riverctl -n '__fish_seen_subcommand_from focus-output send-to-output' -n '__fish_riverctl_complete_arg 2' -a 'next previous up right down left'
 complete -c riverctl -n '__fish_seen_subcommand_from focus-view swap'             -n '__fish_riverctl_complete_arg 2' -a 'next previous up down left right'
 complete -c riverctl -n '__fish_seen_subcommand_from move snap'                   -n '__fish_riverctl_complete_arg 2' -a 'up down left right'
 complete -c riverctl -n '__fish_seen_subcommand_from resize'                      -n '__fish_riverctl_complete_arg 2' -a 'horizontal vertical'
 complete -c riverctl -n '__fish_seen_subcommand_from map'                                                             -o 'release' -o 'repeat' -o 'layout'
 complete -c riverctl -n '__fish_seen_subcommand_from unmap'                       -n '__fish_riverctl_complete_arg 2' -o 'release'
-complete -c riverctl -n '__fish_seen_subcommand_from attach-mode'                 -n '__fish_riverctl_complete_arg 2' -a 'top bottom'
+complete -c riverctl -n '__fish_seen_subcommand_from default-attach-mode'         -n '__fish_riverctl_complete_arg 2' -a 'top bottom above below after'
+complete -c riverctl -n '__fish_seen_subcommand_from output-attach-mode'          -n '__fish_riverctl_complete_arg 2' -a 'top bottom above below after'
 complete -c riverctl -n '__fish_seen_subcommand_from focus-follows-cursor'        -n '__fish_riverctl_complete_arg 2' -a 'disabled normal always'
 complete -c riverctl -n '__fish_seen_subcommand_from set-cursor-warp'             -n '__fish_riverctl_complete_arg 2' -a 'disabled on-output-change on-focus-change'
-complete -c riverctl -n '__fish_seen_subcommand_from list-rules'                  -n '__fish_riverctl_complete_arg 2' -a 'float ssd tag output position dimensions fullscreen'
+complete -c riverctl -n '__fish_seen_subcommand_from list-rules'                  -n '__fish_riverctl_complete_arg 2' -a 'float ssd tags output position dimensions fullscreen'
 
 # Options and subcommands for 'rule-add' and 'rule-del'
-set -l rule_actions float no-float ssd csd tag output position dimensions fullscreen no-fullscreen
+set -l rule_actions float no-float ssd csd tags output position dimensions fullscreen no-fullscreen
 complete -c riverctl -n '__fish_seen_subcommand_from rule-add rule-del' -n "not __fish_seen_subcommand_from $rule_actions" -n 'not __fish_seen_argument -o app-id' -o 'app-id' -r
 complete -c riverctl -n '__fish_seen_subcommand_from rule-add rule-del' -n "not __fish_seen_subcommand_from $rule_actions" -n 'not __fish_seen_argument -o title'  -o 'title' -r
 complete -c riverctl -n '__fish_seen_subcommand_from rule-add rule-del' -n "not __fish_seen_subcommand_from $rule_actions" -n 'test (math (count (commandline -opc)) % 2) -eq 0' -a "$rule_actions"
@@ -108,6 +110,7 @@ complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 3' -a 'drag'                 -d 'Enable or disable the tap-and-drag functionality'
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 3' -a 'drag-lock'            -d 'Enable or disable the drag lock functionality'
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 3' -a 'disable-while-typing' -d 'Enable or disable the disable-while-typing functionality'
+complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 3' -a 'disable-while-trackpointing' -d 'Enable or disable the disable-while-trackpointing functionality'
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 3' -a 'middle-emulation'     -d 'Enable or disable the middle-emulation functionality'
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 3' -a 'natural-scroll'       -d 'Enable or disable the natural-scroll functionality'
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 3' -a 'left-handed'          -d 'Enable or disable the left handed mode'
@@ -115,9 +118,10 @@ complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 3' -a 'tap-button-map'       -d 'Configure the button mapping for tapping'
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 3' -a 'scroll-method'        -d 'Set the scroll method'
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 3' -a 'scroll-button'        -d 'Set the scroll button'
+complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 3' -a 'map-to-output'        -d 'Map to a given output'
 
 # Subcommands for the subcommands of 'input'
-complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 4; and __fish_seen_subcommand_from drag drag-lock disable-while-typing middle-emulation natural-scroll left-handed tap' -a 'enabled disabled'
+complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 4; and __fish_seen_subcommand_from drag drag-lock disable-while-typing disable-while-trackpointing middle-emulation natural-scroll left-handed tap' -a 'enabled disabled'
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 4; and __fish_seen_subcommand_from events'         -a 'enabled disabled disabled-on-external-mouse'
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 4; and __fish_seen_subcommand_from accel-profile'  -a 'none flat adaptive'
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 4; and __fish_seen_subcommand_from click-method'   -a 'none button-areas clickfinger'

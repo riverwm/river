@@ -162,17 +162,15 @@ a screenlocker). It cannot be entered or exited manually.
 The following modifiers are available for use in mappings:
 
 	- Shift
-	- Lock
 	- Control
 	- Mod1 (Alt)
-	- Mod2
 	- Mod3
 	- Mod4 (Super)
 	- Mod5
 	- None
 
 Alt and Super are aliases for Mod1 and Mod4 respectively. None allows creating
-a mapping without modifiers
+a mapping without modifiers.
 
 Keys are specified by their XKB keysym name. See
 _/usr/include/xkbcommon/xkbcommon-keysyms.h_ for the complete list.
@@ -347,18 +345,20 @@ matches everything while _\*\*_ and the empty string are invalid.
 
 ## CONFIGURATION
 
-*default-attach-mode* *top*|*bottom*|*after <N>*
+*default-attach-mode* *top*|*bottom*|*above*|*below*|*after <N>*
 	Set the attach mode to be used by all outputs by default.
 
 	Possible values:
 	- top: Prepends the newly spawned view at the top of the stack.
 	- bottom: Appends the newly spawned view at the bottom of the stack.
+	- above: Inserts the newly spawned view above the currently focused view.
+	- below: Inserts the newly spawned view below the currently focused view.
 	- after <N>: Inserts the newly spawned view after N views in the stack.
 
 	Note that the deprecated *attach-mode* command is aliased to
 	*default-attach-mode* for backwards compatibility.
 
-*output-attach-mode* *top*|*bottom*|*after <N>*
+*output-attach-mode* *top*|*bottom*|*above*|*below*|*after <N>*
 	Set the attach mode of the currently focused output, overriding the value of
 	default-attach-mode if any.
 
@@ -470,6 +470,8 @@ The _input_ command can be used to create a configuration rule for an input
 device identified by its _name_.
 The _name_ of an input device consists of its type, its numerical vendor id,
 its numerical product id and finally its self-advertised name, separated by -.
+Simple globbing patterns are supported, see the rules section for further
+information on globs.
 
 A list of all device properties that can be configured may be found below.
 However note that not every input device supports every property.
@@ -495,6 +497,9 @@ However note that not every input device supports every property.
 
 *input* _name_ *disable-while-typing* *enabled*|*disabled*
 	Enable or disable the disable-while-typing functionality of the input device.
+
+*input* _name_ *disable-while-trackpointing* *enabled*|*disabled*
+	Enable or disable the disable-while-trackpointing functionality of the input device.
 
 *input* _name_ *middle-emulation* *enabled*|*disabled*
 	Enable or disable the middle click emulation functionality of the input device.
@@ -528,6 +533,11 @@ However note that not every input device supports every property.
 *input* _name_ *scroll-button* _button_
 	Set the scroll button of an input device. _button_ is the name of a Linux
 	input event code.
+
+*input* _name_ *map-to-output* _output_|*disabled*
+	Maps the input to a given output. This is valid even if the output isn't
+	currently active and will lead to the device being mapped once it is
+	connected.
 
 # EXAMPLES
 

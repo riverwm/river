@@ -32,6 +32,8 @@ const Output = @import("Output.zig");
 
 const log = std.log.scoped(.session_lock);
 
+wlr_manager: *wlr.SessionLockManagerV1,
+
 state: enum {
     /// No lock request has been made and the session is unlocked.
     unlocked,
@@ -66,11 +68,11 @@ pub fn init(manager: *LockManager) !void {
     errdefer timer.remove();
 
     manager.* = .{
+        .wlr_manager = try wlr.SessionLockManagerV1.create(server.wl_server),
         .lock_surfaces_timer = timer,
     };
 
-    const wlr_manager = try wlr.SessionLockManagerV1.create(server.wl_server);
-    wlr_manager.events.new_lock.add(&manager.new_lock);
+    manager.wlr_manager.events.new_lock.add(&manager.new_lock);
 }
 
 pub fn deinit(manager: *LockManager) void {
@@ -97,7 +99,7 @@ fn handleLock(listener: *wl.Listener(*wlr.SessionLockV1), lock: *wlr.SessionLock
         manager.state = .waiting_for_lock_surfaces;
 
         if (build_options.xwayland) {
-            server.root.layers.xwayland_override_redirect.node.setEnabled(false);
+            server.root.layers.override_redirect.node.setEnabled(false);
         }
 
         manager.lock_surfaces_timer.timerUpdate(200) catch {
@@ -207,7 +209,7 @@ fn handleUnlock(listener: *wl.Listener(void)) void {
     }
 
     if (build_options.xwayland) {
-        server.root.layers.xwayland_override_redirect.node.setEnabled(true);
+        server.root.layers.override_redirect.node.setEnabled(true);
     }
 
     {

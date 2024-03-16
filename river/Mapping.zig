@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const Self = @This();
+const Mapping = @This();
 
 const std = @import("std");
 const wlr = @import("wlroots");
@@ -42,14 +42,14 @@ pub fn init(
     modifiers: wlr.Keyboard.ModifierMask,
     command_args: []const []const u8,
     options: Options,
-) !Self {
+) !Mapping {
     const owned_args = try util.gpa.alloc([:0]u8, command_args.len);
     errdefer util.gpa.free(owned_args);
     for (command_args, 0..) |arg, i| {
         errdefer for (owned_args[0..i]) |a| util.gpa.free(a);
         owned_args[i] = try util.gpa.dupeZ(u8, arg);
     }
-    return Self{
+    return Mapping{
         .keysym = keysym,
         .modifiers = modifiers,
         .command_args = owned_args,
@@ -57,28 +57,28 @@ pub fn init(
     };
 }
 
-pub fn deinit(self: Self) void {
-    for (self.command_args) |arg| util.gpa.free(arg);
-    util.gpa.free(self.command_args);
+pub fn deinit(mapping: Mapping) void {
+    for (mapping.command_args) |arg| util.gpa.free(arg);
+    util.gpa.free(mapping.command_args);
 }
 
 /// Compare mapping with given keycode, modifiers and keyboard state
 pub fn match(
-    self: Self,
+    mapping: Mapping,
     keycode: xkb.Keycode,
     modifiers: wlr.Keyboard.ModifierMask,
     released: bool,
     xkb_state: *xkb.State,
     method: enum { no_translate, translate },
 ) bool {
-    if (released != self.options.release) return false;
+    if (released != mapping.options.release) return false;
 
     const keymap = xkb_state.getKeymap();
 
     // If the mapping has no pinned layout, use the active layout.
     // It doesn't matter if the index is out of range, since xkbcommon
     // will fall back to the active layout if so.
-    const layout_index = self.options.layout_index orelse xkb_state.keyGetLayout(keycode);
+    const layout_index = mapping.options.layout_index orelse xkb_state.keyGetLayout(keycode);
 
     switch (method) {
         .no_translate => {
@@ -90,9 +90,9 @@ pub fn match(
                 0,
             );
 
-            if (@as(u32, @bitCast(modifiers)) == @as(u32, @bitCast(self.modifiers))) {
+            if (@as(u32, @bitCast(modifiers)) == @as(u32, @bitCast(mapping.modifiers))) {
                 for (keysyms) |sym| {
-                    if (sym == self.keysym) {
+                    if (sym == mapping.keysym) {
                         return true;
                     }
                 }
@@ -111,9 +111,9 @@ pub fn match(
             const consumed = xkb_state.keyGetConsumedMods2(keycode, .xkb);
             const modifiers_translated = @as(u32, @bitCast(modifiers)) & ~consumed;
 
-            if (modifiers_translated == @as(u32, @bitCast(self.modifiers))) {
+            if (modifiers_translated == @as(u32, @bitCast(mapping.modifiers))) {
                 for (keysyms_translated) |sym| {
-                    if (sym == self.keysym) {
+                    if (sym == mapping.keysym) {
                         return true;
                     }
                 }

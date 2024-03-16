@@ -22,6 +22,7 @@ const wlr = @import("wlroots");
 const flags = @import("flags");
 
 const server = &@import("../main.zig").server;
+const util = @import("../util.zig");
 
 const Direction = @import("../command.zig").Direction;
 const PhysicalDirectionDirection = @import("../command.zig").PhysicalDirection;
@@ -78,6 +79,14 @@ pub fn sendToOutput(
         }
 
         seat.focused.view.setPendingOutput(destination_output);
+
+        // When explicitly sending a view to an output, the user likely
+        // does not expect a previously evacuated view moved back to a
+        // re-connecting output.
+        if (seat.focused.view.output_before_evac) |name| {
+            util.gpa.free(name);
+            seat.focused.view.output_before_evac = null;
+        }
 
         server.root.applyPending();
     }

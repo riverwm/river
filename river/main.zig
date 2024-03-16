@@ -31,8 +31,8 @@ const util = @import("util.zig");
 const Server = @import("Server.zig");
 
 comptime {
-    if (wlr.version.major != 0 or wlr.version.minor != 17 or wlr.version.micro < 1) {
-        @compileError("river requires at least wlroots version 0.17.1 due to bugs in wlroots 0.17.0");
+    if (wlr.version.major != 0 or wlr.version.minor != 17 or wlr.version.micro < 2) {
+        @compileError("river requires at least wlroots version 0.17.2 due to bugs in wlroots 0.17.0/0.17.1");
     }
 }
 
@@ -41,8 +41,9 @@ const usage: []const u8 =
     \\
     \\  -h                 Print this help message and exit.
     \\  -version           Print the version number and exit.
-    \\  -c <command>       Run `sh -c <command>` on startup.
+    \\  -c <command>       Run `sh -c <command>` on startup instead of the default init executable.
     \\  -log-level <level> Set the log level to error, warning, info, or debug.
+    \\  -no-xwayland       Disable xwayland even if built with support.
     \\
 ;
 
@@ -54,6 +55,7 @@ pub fn main() anyerror!void {
         .{ .name = "version", .kind = .boolean },
         .{ .name = "c", .kind = .arg },
         .{ .name = "log-level", .kind = .arg },
+        .{ .name = "no-xwayland", .kind = .boolean },
     }).parse(os.argv[1..]) catch {
         try io.getStdErr().writeAll(usage);
         os.exit(1);
@@ -87,6 +89,7 @@ pub fn main() anyerror!void {
             os.exit(1);
         }
     }
+    const enable_xwayland = !result.flags.@"no-xwayland";
     const startup_command = blk: {
         if (result.flags.c) |command| {
             break :blk try util.gpa.dupeZ(u8, command);
@@ -111,7 +114,7 @@ pub fn main() anyerror!void {
     try os.sigaction(os.SIG.PIPE, &sig_ign, null);
 
     log.info("river version {s}, initializing server", .{build_options.version});
-    try server.init();
+    try server.init(enable_xwayland);
     defer server.deinit();
 
     try server.start();

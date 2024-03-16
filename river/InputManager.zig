@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const Self = @This();
+const InputManager = @This();
 
 const build_options = @import("build_options");
 const std = @import("std");
@@ -22,6 +22,8 @@ const assert = std.debug.assert;
 const mem = std.mem;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
+
+const globber = @import("globber");
 
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
@@ -43,13 +45,18 @@ new_input: wl.Listener(*wlr.InputDevice) = wl.Listener(*wlr.InputDevice).init(ha
 
 idle_notifier: *wlr.IdleNotifierV1,
 relative_pointer_manager: *wlr.RelativePointerManagerV1,
+pointer_gestures: *wlr.PointerGesturesV1,
 virtual_pointer_manager: *wlr.VirtualPointerManagerV1,
 virtual_keyboard_manager: *wlr.VirtualKeyboardManagerV1,
 pointer_constraints: *wlr.PointerConstraintsV1,
 input_method_manager: *wlr.InputMethodManagerV2,
 text_input_manager: *wlr.TextInputManagerV3,
+tablet_manager: *wlr.TabletManagerV2,
 
+/// List of input device configurations. Ordered by glob generality, with
+/// the most general towards the start and the most specific towards the end.
 configs: std.ArrayList(InputConfig),
+
 devices: wl.list.Head(InputDevice, .link),
 seats: std.TailQueue(Seat) = .{},
 
@@ -66,82 +73,101 @@ new_input_method: wl.Listener(*wlr.InputMethodV2) =
 new_text_input: wl.Listener(*wlr.TextInputV3) =
     wl.Listener(*wlr.TextInputV3).init(handleNewTextInput),
 
-pub fn init(self: *Self) !void {
+pub fn init(input_manager: *InputManager) !void {
     const seat_node = try util.gpa.create(std.TailQueue(Seat).Node);
     errdefer util.gpa.destroy(seat_node);
 
-    self.* = .{
+    input_manager.* = .{
         // These are automatically freed when the display is destroyed
         .idle_notifier = try wlr.IdleNotifierV1.create(server.wl_server),
         .relative_pointer_manager = try wlr.RelativePointerManagerV1.create(server.wl_server),
+        .pointer_gestures = try wlr.PointerGesturesV1.create(server.wl_server),
         .virtual_pointer_manager = try wlr.VirtualPointerManagerV1.create(server.wl_server),
         .virtual_keyboard_manager = try wlr.VirtualKeyboardManagerV1.create(server.wl_server),
         .pointer_constraints = try wlr.PointerConstraintsV1.create(server.wl_server),
         .input_method_manager = try wlr.InputMethodManagerV2.create(server.wl_server),
         .text_input_manager = try wlr.TextInputManagerV3.create(server.wl_server),
+        .tablet_manager = try wlr.TabletManagerV2.create(server.wl_server),
         .configs = std.ArrayList(InputConfig).init(util.gpa),
 
         .devices = undefined,
     };
-    self.devices.init();
+    input_manager.devices.init();
 
-    self.seats.prepend(seat_node);
+    input_manager.seats.prepend(seat_node);
     try seat_node.data.init(default_seat_name);
 
-    if (build_options.xwayland) server.xwayland.setSeat(self.defaultSeat().wlr_seat);
+    if (build_options.xwayland) {
+        if (server.xwayland) |xwayland| {
+            xwayland.setSeat(input_manager.defaultSeat().wlr_seat);
+        }
+    }
 
-    server.backend.events.new_input.add(&self.new_input);
-    self.virtual_pointer_manager.events.new_virtual_pointer.add(&self.new_virtual_pointer);
-    self.virtual_keyboard_manager.events.new_virtual_keyboard.add(&self.new_virtual_keyboard);
-    self.pointer_constraints.events.new_constraint.add(&self.new_constraint);
-    self.input_method_manager.events.input_method.add(&self.new_input_method);
-    self.text_input_manager.events.text_input.add(&self.new_text_input);
+    server.backend.events.new_input.add(&input_manager.new_input);
+    input_manager.virtual_pointer_manager.events.new_virtual_pointer.add(&input_manager.new_virtual_pointer);
+    input_manager.virtual_keyboard_manager.events.new_virtual_keyboard.add(&input_manager.new_virtual_keyboard);
+    input_manager.pointer_constraints.events.new_constraint.add(&input_manager.new_constraint);
+    input_manager.input_method_manager.events.input_method.add(&input_manager.new_input_method);
+    input_manager.text_input_manager.events.text_input.add(&input_manager.new_text_input);
 }
 
-pub fn deinit(self: *Self) void {
+pub fn deinit(input_manager: *InputManager) void {
     // This function must be called after the backend has been destroyed
-    assert(self.devices.empty());
+    assert(input_manager.devices.empty());
 
-    self.new_virtual_pointer.link.remove();
-    self.new_virtual_keyboard.link.remove();
-    self.new_constraint.link.remove();
-    self.new_input_method.link.remove();
-    self.new_text_input.link.remove();
+    input_manager.new_virtual_pointer.link.remove();
+    input_manager.new_virtual_keyboard.link.remove();
+    input_manager.new_constraint.link.remove();
+    input_manager.new_input_method.link.remove();
+    input_manager.new_text_input.link.remove();
 
-    while (self.seats.pop()) |seat_node| {
+    while (input_manager.seats.pop()) |seat_node| {
         seat_node.data.deinit();
         util.gpa.destroy(seat_node);
     }
 
-    for (self.configs.items) |*config| {
+    for (input_manager.configs.items) |*config| {
         config.deinit();
     }
-    self.configs.deinit();
+    input_manager.configs.deinit();
 }
 
-pub fn defaultSeat(self: Self) *Seat {
-    return &self.seats.first.?.data;
+pub fn defaultSeat(input_manager: InputManager) *Seat {
+    return &input_manager.seats.first.?.data;
 }
 
 /// Returns true if input is currently allowed on the passed surface.
-pub fn inputAllowed(self: Self, wlr_surface: *wlr.Surface) bool {
-    return if (self.exclusive_client) |exclusive_client|
+pub fn inputAllowed(input_manager: InputManager, wlr_surface: *wlr.Surface) bool {
+    return if (input_manager.exclusive_client) |exclusive_client|
         exclusive_client == wlr_surface.resource.getClient()
     else
         true;
 }
 
-fn handleNewInput(listener: *wl.Listener(*wlr.InputDevice), wlr_device: *wlr.InputDevice) void {
-    const self = @fieldParentPtr(Self, "new_input", listener);
+/// Reconfigures all devices' libinput configuration as well as their output mapping.
+/// This is called on outputs being added or removed and on the input configuration being changed.
+pub fn reconfigureDevices(input_manager: *InputManager) void {
+    var it = input_manager.devices.iterator(.forward);
+    while (it.next()) |device| {
+        for (input_manager.configs.items) |config| {
+            if (globber.match(device.identifier, config.glob)) {
+                config.apply(device);
+            }
+        }
+    }
+}
 
-    self.defaultSeat().addDevice(wlr_device);
+fn handleNewInput(listener: *wl.Listener(*wlr.InputDevice), wlr_device: *wlr.InputDevice) void {
+    const input_manager = @fieldParentPtr(InputManager, "new_input", listener);
+
+    input_manager.defaultSeat().addDevice(wlr_device);
 }
 
 fn handleNewVirtualPointer(
     listener: *wl.Listener(*wlr.VirtualPointerManagerV1.event.NewPointer),
     event: *wlr.VirtualPointerManagerV1.event.NewPointer,
 ) void {
-    const self = @fieldParentPtr(Self, "new_virtual_pointer", listener);
+    const input_manager = @fieldParentPtr(InputManager, "new_virtual_pointer", listener);
 
     // TODO Support multiple seats and don't ignore
     if (event.suggested_seat != null) {
@@ -152,7 +178,7 @@ fn handleNewVirtualPointer(
         log.debug("Ignoring output suggestion from virtual pointer", .{});
     }
 
-    self.defaultSeat().addDevice(&event.new_pointer.pointer.base);
+    input_manager.defaultSeat().addDevice(&event.new_pointer.pointer.base);
 }
 
 fn handleNewVirtualKeyboard(

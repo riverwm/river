@@ -31,7 +31,7 @@ pub const Data = union(enum) {
     view: *View,
     lock_surface: *LockSurface,
     layer_surface: *LayerSurface,
-    xwayland_override_redirect: if (build_options.xwayland) *XwaylandOverrideRedirect else noreturn,
+    override_redirect: if (build_options.xwayland) *XwaylandOverrideRedirect else noreturn,
 };
 
 node: *wlr.SceneNode,

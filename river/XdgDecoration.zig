@@ -34,32 +34,32 @@ request_mode: wl.Listener(*wlr.XdgToplevelDecorationV1) =
     wl.Listener(*wlr.XdgToplevelDecorationV1).init(handleRequestMode),
 
 pub fn init(wlr_decoration: *wlr.XdgToplevelDecorationV1) void {
-    const xdg_toplevel: *XdgToplevel = @ptrFromInt(wlr_decoration.toplevel.base.data);
+    const toplevel: *XdgToplevel = @ptrFromInt(wlr_decoration.toplevel.base.data);
 
-    xdg_toplevel.decoration = .{ .wlr_decoration = wlr_decoration };
-    const decoration = &xdg_toplevel.decoration.?;
+    toplevel.decoration = .{ .wlr_decoration = wlr_decoration };
+    const decoration = &toplevel.decoration.?;
 
     wlr_decoration.events.destroy.add(&decoration.destroy);
     wlr_decoration.events.request_mode.add(&decoration.request_mode);
 
-    const ssd = server.config.rules.ssd.match(xdg_toplevel.view) orelse
+    const ssd = server.config.rules.ssd.match(toplevel.view) orelse
         (decoration.wlr_decoration.requested_mode != .client_side);
 
     // TODO(wlroots): make sure this is properly batched in a single configure
     // with all other initial state when wlroots makes this possible.
     _ = wlr_decoration.setMode(if (ssd) .server_side else .client_side);
 
-    xdg_toplevel.view.pending.ssd = ssd;
+    toplevel.view.pending.ssd = ssd;
 }
 
 pub fn deinit(decoration: *XdgDecoration) void {
-    const xdg_toplevel: *XdgToplevel = @ptrFromInt(decoration.wlr_decoration.toplevel.base.data);
+    const toplevel: *XdgToplevel = @ptrFromInt(decoration.wlr_decoration.toplevel.base.data);
 
     decoration.destroy.link.remove();
     decoration.request_mode.link.remove();
 
-    assert(xdg_toplevel.decoration != null);
-    xdg_toplevel.decoration = null;
+    assert(toplevel.decoration != null);
+    toplevel.decoration = null;
 }
 
 fn handleDestroy(
@@ -77,10 +77,10 @@ fn handleRequestMode(
 ) void {
     const decoration = @fieldParentPtr(XdgDecoration, "request_mode", listener);
 
-    const xdg_toplevel: *XdgToplevel = @ptrFromInt(decoration.wlr_decoration.toplevel.base.data);
-    const view = xdg_toplevel.view;
+    const toplevel: *XdgToplevel = @ptrFromInt(decoration.wlr_decoration.toplevel.base.data);
+    const view = toplevel.view;
 
-    const ssd = server.config.rules.ssd.match(xdg_toplevel.view) orelse
+    const ssd = server.config.rules.ssd.match(toplevel.view) orelse
         (decoration.wlr_decoration.requested_mode != .client_side);
 
     if (view.pending.ssd != ssd) {

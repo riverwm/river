@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const Self = @This();
+const LayoutDemand = @This();
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -44,13 +44,13 @@ views: i32,
 view_boxen: []wlr.Box,
 timeout_timer: *wl.EventSource,
 
-pub fn init(layout: *Layout, views: u32) !Self {
+pub fn init(layout: *Layout, views: u32) !LayoutDemand {
     const event_loop = server.wl_server.getEventLoop();
     const timeout_timer = try event_loop.addTimer(*Layout, handleTimeout, layout);
     errdefer timeout_timer.remove();
     try timeout_timer.timerUpdate(timeout_ms);
 
-    return Self{
+    return LayoutDemand{
         .serial = server.wl_server.nextSerial(),
         .views = @intCast(views),
         .view_boxen = try util.gpa.alloc(wlr.Box, views),
@@ -58,9 +58,9 @@ pub fn init(layout: *Layout, views: u32) !Self {
     };
 }
 
-pub fn deinit(self: *const Self) void {
-    self.timeout_timer.remove();
-    util.gpa.free(self.view_boxen);
+pub fn deinit(demand: *const LayoutDemand) void {
+    demand.timeout_timer.remove();
+    util.gpa.free(demand.view_boxen);
 }
 
 /// Destroy the LayoutDemand on timeout.
@@ -79,25 +79,25 @@ fn handleTimeout(layout: *Layout) c_int {
 }
 
 /// Push a set of proposed view dimensions and position to the list
-pub fn pushViewDimensions(self: *Self, x: i32, y: i32, width: u31, height: u31) void {
+pub fn pushViewDimensions(demand: *LayoutDemand, x: i32, y: i32, width: u31, height: u31) void {
     // The client pushed too many dimensions
-    if (self.views <= 0) {
-        self.views -= 1;
+    if (demand.views <= 0) {
+        demand.views -= 1;
         return;
     }
 
-    self.view_boxen[self.view_boxen.len - @as(usize, @intCast(self.views))] = .{
+    demand.view_boxen[demand.view_boxen.len - @as(usize, @intCast(demand.views))] = .{
         .x = x,
         .y = y,
         .width = width,
         .height = height,
     };
 
-    self.views -= 1;
+    demand.views -= 1;
 }
 
 /// Apply the proposed layout to the output
-pub fn apply(self: *Self, layout: *Layout) void {
+pub fn apply(demand: *LayoutDemand, layout: *Layout) void {
     // Note: output.layout may not be equal to layout here if the layout
     // namespace changes while a transactions is inflight.
     const output = layout.output;
@@ -111,12 +111,12 @@ pub fn apply(self: *Self, layout: *Layout) void {
     }
 
     // Check that the number of proposed dimensions is correct.
-    if (self.views != 0) {
+    if (demand.views != 0) {
         log.err(
             "proposed dimension count ({}) does not match view count ({}), aborting layout demand",
-            .{ -self.views + @as(i32, @intCast(self.view_boxen.len)), self.view_boxen.len },
+            .{ -demand.views + @as(i32, @intCast(demand.view_boxen.len)), demand.view_boxen.len },
         );
-        layout.layout.postError(
+        layout.layout_v3.postError(
             .count_mismatch,
             "number of proposed view dimensions must match number of views",
         );
@@ -130,7 +130,7 @@ pub fn apply(self: *Self, layout: *Layout) void {
         if (!view.inflight.float and !view.inflight.fullscreen and
             view.inflight.tags & output.inflight.tags != 0)
         {
-            const proposed = &self.view_boxen[i];
+            const proposed = &demand.view_boxen[i];
 
             // Here we apply the offset to align the coords with the origin of the
             // usable area and shrink the dimensions to accommodate the border size.
@@ -153,5 +153,5 @@ pub fn apply(self: *Self, layout: *Layout) void {
             i += 1;
         }
     }
-    assert(i == self.view_boxen.len);
+    assert(i == demand.view_boxen.len);
 }

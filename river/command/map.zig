@@ -287,11 +287,9 @@ fn parseModifiers(modifiers_str: []const u8, out: *?[]const u8) !wlr.Keyboard.Mo
         if (mem.eql(u8, mod_name, "None")) continue;
         inline for ([_]struct { name: []const u8, field_name: []const u8 }{
             .{ .name = "Shift", .field_name = "shift" },
-            .{ .name = "Lock", .field_name = "caps" },
             .{ .name = "Control", .field_name = "ctrl" },
             .{ .name = "Mod1", .field_name = "alt" },
             .{ .name = "Alt", .field_name = "alt" },
-            .{ .name = "Mod2", .field_name = "mod2" },
             .{ .name = "Mod3", .field_name = "mod3" },
             .{ .name = "Mod4", .field_name = "logo" },
             .{ .name = "Super", .field_name = "logo" },
