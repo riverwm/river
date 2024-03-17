@@ -607,7 +607,7 @@ fn sendConfigures(root: *Root) void {
             root.inflight_configures,
         });
 
-        root.transaction_timeout.timerUpdate(50) catch {
+        root.transaction_timeout.timerUpdate(100) catch {
             std.log.scoped(.transaction).err("failed to update timer", .{});
             root.commitTransaction();
         };
