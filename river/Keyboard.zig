@@ -59,9 +59,15 @@ pub const Pressed = struct {
 
     keys: std.BoundedArray(Key, capacity) = .{},
 
-    fn addAssumeCapacity(pressed: *Pressed, new: Key) void {
-        for (pressed.keys.constSlice()) |item| assert(new.code != item.code);
+    fn contains(pressed: *Pressed, code: u32) bool {
+        for (pressed.keys.constSlice()) |item| {
+            if (item.code == code) return true;
+        }
+        return false;
+    }
 
+    fn addAssumeCapacity(pressed: *Pressed, new: Key) void {
+        assert(!pressed.contains(new.code));
         pressed.keys.appendAssumeCapacity(new);
     }
 
@@ -175,6 +181,16 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
 
     for (keysyms) |sym| {
         if (!released and handleBuiltinMapping(sym)) return;
+    }
+
+    // Some virtual_keyboard clients are buggy and press a key twice without
+    // releasing it in between. There is no good way for river to handle this
+    // other than to ignore any newer presses. No need to worry about pairing
+    // the correct release, as the client is unlikely to send all of them
+    // (and we already ignore releasing keys we don't know were pressed).
+    if (!released and keyboard.pressed.contains(event.keycode)) {
+        log.err("key pressed again without release, virtual-keyboard client bug?", .{});
+        return;
     }
 
     // Every sent press event, to a regular client or the input method, should have
