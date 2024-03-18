@@ -350,7 +350,11 @@ pub fn commitTransaction(view: *View) void {
 
             view.current = view.inflight;
         },
-        .none => {},
+        // This may seem pointless at first glance, but is in fact necessary
+        // to prevent an assertion failure in Root.commitTransaction() as that
+        // function assumes that the inflight tags/output will be applied by
+        // View.commitTransaction() even for views being destroyed.
+        .none => view.current = view.inflight,
     }
 
     view.updateSceneState();
