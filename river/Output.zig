@@ -374,6 +374,7 @@ fn sendLayerConfigures(
                     layer_surface.scene_layer_surface.tree.node.x,
                     layer_surface.scene_layer_surface.tree.node.y,
                 );
+                layer_surface.scene_layer_surface.tree.node.subsurfaceTreeSetClip(&full_box);
             }
         }
     }
