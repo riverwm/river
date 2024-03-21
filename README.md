@@ -1,4 +1,8 @@
-# river
+<div align="center">
+  <img src="logo/logo_text_background.svg" width="50%">
+</div>
+
+## Overview
 
 River is a dynamic tiling Wayland compositor with flexible runtime
 configuration.
@@ -88,3 +92,6 @@ various parties. You should refer to the copyright block of each protocol for
 the licensing information. The protocols prefixed with `river` and developed by
 this project are released under the ISC license (as stated in their copyright
 blocks).
+
+The river logo is licensed under the CC BY-SA 4.0 license, see the
+[license](logo/LICENSE) in the logo directory.
