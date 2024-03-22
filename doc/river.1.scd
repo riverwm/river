@@ -1,4 +1,4 @@
-RIVER(1) "github.com/riverwm/river" "General Commands Manual"
+RIVER(1) "codeberg.org/river/river" "General Commands Manual"
 
 # NAME
 
@@ -57,7 +57,7 @@ perform other configuration.
 
 Maintained by Isaac Freund <mail@isaacfreund.com> who is assisted by open
 source contributors. For more information about river's development, see
-<https://github.com/riverwm/river>.
+<https://codeberg.org/river/river>.
 
 # SEE ALSO
 

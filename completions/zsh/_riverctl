@@ -1,6 +1,6 @@
 #compdef riverctl
 #
-# Completion script for riverctl, part of river <https://github.com/riverwm/river>
+# Completion script for riverctl, part of river <https://codeberg.org/river/river>
 
 # This is the list of all riverctl first argument, i.e `riverctl <first_arg>`.
 # If a command doesn't need completion for subcommands then you just need

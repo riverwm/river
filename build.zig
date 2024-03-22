@@ -246,7 +246,7 @@ pub fn build(b: *Build) !void {
             \\pkgdatadir=${{datadir}}/river-protocols
             \\
             \\Name: river-protocols
-            \\URL: https://github.com/riverwm/river
+            \\URL: https://codeberg.org/river/river
             \\Description: protocol files for the river wayland compositor
             \\Version: {s}
         , .{ b.install_prefix, full_version }));

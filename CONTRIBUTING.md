@@ -1,9 +1,10 @@
 ## Contributing to river
 
-Contributing is as simple as opening a pull request on github. You'll
-likely have more success with your contribution if you visit
-[#river](https://web.libera.chat/?channels=#river) on irc.libera.chat to
-discuss your plans first.
+Contributing is as simple as opening a pull request on
+[codeberg](https://codeberg.org/river/river).
+You'll likely have more success with your contribution if you visit
+[#river](https://web.libera.chat/?channels=#river) on irc.libera.chat to discuss
+your plans first.
 
 ## Commit messages
 
@@ -26,7 +27,7 @@ river-status: send view_tags on view map/unmap
 
 In addition to the summary, feel free to add any other details you want preceded
 by a blank line. A good rule of thumb is that anything you would write in a pull
-request description on github has a place in the commit message as well.
+request description on codeberg has a place in the commit message as well.
 
 For further details regarding commit style and git history see
 [weston's contributing guidelines](https://gitlab.freedesktop.org/wayland/weston/-/blob/master/CONTRIBUTING.md#formatting-and-separating-commits).
