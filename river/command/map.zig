@@ -266,6 +266,10 @@ fn parseKeysym(name: [:0]const u8, out: *?[]const u8) !xkb.Keysym {
     // different keysym values for example. Switching to a case-sensitive match
     // would be too much of a breaking change at this point so fix this by
     // special-casing this exception.
+    //
+    // This has been fixed upstream in libxkbcommon 1.7.0
+    // https://github.com/xkbcommon/libxkbcommon/pull/465
+    // TODO remove the workaround once libxkbcommon 1.7.0 is widely distributed.
     if (@intFromEnum(keysym) == xkb.Keysym.XF86Screensaver) {
         if (mem.eql(u8, name, "XF86Screensaver")) {
             return keysym;
