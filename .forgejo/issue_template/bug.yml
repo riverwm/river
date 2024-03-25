@@ -1,0 +1,55 @@
+name: Bug Report
+description: File a bug report
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please provide as many details as possible, we must be able to
+        understand the bug in order to fix it.
+
+        Don't forget to search the issue tracker in case there is
+        already an open issue for the bug you found.
+  - type: input
+    id: version
+    attributes:
+      label: river Version
+      description: "The output of `river -version`"
+      placeholder: "0.3.0-dev.293+b77b42f"
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Description of Bug and Steps to Reproduce
+      description: Exactly what steps can someone else take to see the bug themselves? What happens?
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |
+        Please provide as many details as possible, we must be able to
+        understand the bug in order to fix it.
+
+        Use a debug build of river if possible to get a better quality
+        stacktrace in the case of a crash:
+        ```
+        zig build -Doptimize=Debug <other desired options>
+        ```
+
+        Set the log level to debug and redirect river's stderr to a file:
+        ```
+        river -log-level debug 2> river.log
+        ```
+        Reproduce your problem and exit river.
+
+        If the issue is with a specific Wayland client (e.g. firefox) a log of the
+        Wayland protocol messages between the client and river is often very helpful.
+        Obtain one by setting WAYLAND_DEBUG=1 and redirecting stderr to a file.
+        ```
+        WAYLAND_DEBUG=1 firefox 2> firefox.log
+        ```
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs, Stacktraces, etc.
