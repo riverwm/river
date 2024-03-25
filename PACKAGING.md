@@ -8,14 +8,14 @@ despite the drawbacks of depending on a relatively immature language/toolchain.
 ## Source tarballs
 
 Source tarballs with stable checksums and git submodule sources included may
-be found on the [github releases](https://github.com/riverwm/river/releases)
-page. These tarballs are signed with the PGP key available on my website at
+be found on the [codeberg releases page](https://codeberg.org/river/river/releases).
+These tarballs are signed with the PGP key available on my website at
 <https://isaacfreund.com/public_key.txt>.
 
 For the 0.1.3 release for example, the tarball and signature URLs are:
 ```
-https://github.com/riverwm/river/releases/download/v0.1.3/river-0.1.3.tar.gz
-https://github.com/riverwm/river/releases/download/v0.1.3/river-0.1.3.tar.gz.sig
+https://codeberg.org/river/river/releases/download/v0.1.3/river-0.1.3.tar.gz
+https://codeberg.org/river/river/releases/download/v0.1.3/river-0.1.3.tar.gz.sig
 ```
 
 ## Zig version
