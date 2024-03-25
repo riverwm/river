@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: IRC
+    url: https://web.libera.chat/?channels=#river
+    about: Join the IRC channel for river-related discussion and support
