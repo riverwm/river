@@ -17,10 +17,11 @@ which is where the issue tracker may be found and where contributions are accept
 Read-only mirrors exist on [sourcehut](https://git.sr.ht/~ifreund/river)
 and [github](https://github.com/riverwm/river).
 
-*Note: river is currently early in development. Expect breaking
-changes and missing features. Bugs should however be rare at
-this point, if you run into one don't hesitate to [open an
-issue](https://codeberg.org/river/river/issues/new)*
+*Note: river has not yet seen a stable 1.0 release. It will be necessary to
+make significant breaking before 1.0 to realize my longer term plans. That said,
+I do my best to avoid gratuitous breaking changes and bugs/crashes should be rare.
+If you find a bug don't hesitate to
+[open an issue](https://codeberg.org/river/river/issues/new/choose).*
 
 ## Design goals
 
