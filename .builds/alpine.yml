@@ -22,7 +22,7 @@ packages:
   - wget
   - xz
 sources:
-  - https://github.com/riverwm/river
+  - https://codeberg.org/river/river
   - https://gitlab.freedesktop.org/wayland/wayland.git
   - https://gitlab.freedesktop.org/wlroots/wlroots.git
 tasks:
@@ -34,7 +34,7 @@ tasks:
       cd ..
 
       cd wlroots
-      git checkout 0.17.1
+      git checkout 0.17.2
       meson setup build --auto-features=enabled -Drenderers=gles2 -Dexamples=false \
             -Dwerror=false -Db_ndebug=false -Dxcb-errors=disabled --prefix /usr
       sudo ninja -C build/ install
