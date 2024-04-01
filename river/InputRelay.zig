@@ -26,6 +26,7 @@ const wl = @import("wayland").server.wl;
 const util = @import("util.zig");
 
 const TextInput = @import("TextInput.zig");
+const InputMethodPopup = @import("InputMethodPopup.zig");
 const Seat = @import("Seat.zig");
 
 const log = std.log.scoped(.input_relay);
@@ -40,6 +41,7 @@ text_inputs: wl.list.Head(TextInput, .link),
 /// already in use new input methods are ignored.
 /// If this is null, no text input enter events will be sent.
 input_method: ?*wlr.InputMethodV2 = null,
+input_method_popups: wl.list.Head(InputMethodPopup, .link),
 /// The currently enabled text input for the currently focused surface.
 /// Always null if there is no input method.
 text_input: ?*TextInput = null,
@@ -50,14 +52,17 @@ grab_keyboard: wl.Listener(*wlr.InputMethodV2.KeyboardGrab) =
     wl.Listener(*wlr.InputMethodV2.KeyboardGrab).init(handleInputMethodGrabKeyboard),
 input_method_destroy: wl.Listener(*wlr.InputMethodV2) =
     wl.Listener(*wlr.InputMethodV2).init(handleInputMethodDestroy),
+input_method_new_popup_surface: wl.Listener(*wlr.InputPopupSurfaceV2) =
+    wl.Listener(*wlr.InputPopupSurfaceV2).init(handleInputMethodNewPopupSurface),
 
 grab_keyboard_destroy: wl.Listener(*wlr.InputMethodV2.KeyboardGrab) =
     wl.Listener(*wlr.InputMethodV2.KeyboardGrab).init(handleInputMethodGrabKeyboardDestroy),
 
 pub fn init(relay: *InputRelay) void {
-    relay.* = .{ .text_inputs = undefined };
+    relay.* = .{ .text_inputs = undefined, .input_method_popups = undefined };
 
     relay.text_inputs.init();
+    relay.input_method_popups.init();
 }
 
 pub fn newInputMethod(relay: *InputRelay, input_method: *wlr.InputMethodV2) void {
@@ -77,6 +82,7 @@ pub fn newInputMethod(relay: *InputRelay, input_method: *wlr.InputMethodV2) void
     input_method.events.commit.add(&relay.input_method_commit);
     input_method.events.grab_keyboard.add(&relay.grab_keyboard);
     input_method.events.destroy.add(&relay.input_method_destroy);
+    input_method.events.new_popup_surface.add(&relay.input_method_new_popup_surface);
 
     if (seat.focused.surface()) |surface| {
         relay.focus(surface);
@@ -127,7 +133,7 @@ fn handleInputMethodDestroy(
     relay.input_method_commit.link.remove();
     relay.grab_keyboard.link.remove();
     relay.input_method_destroy.link.remove();
-
+    relay.input_method_new_popup_surface.link.remove();
     relay.input_method = null;
 
     relay.focus(null);
@@ -146,6 +152,18 @@ fn handleInputMethodGrabKeyboard(
     keyboard_grab.setKeyboard(active_keyboard);
 
     keyboard_grab.events.destroy.add(&relay.grab_keyboard_destroy);
+}
+
+fn handleInputMethodNewPopupSurface(
+    listener: *wl.Listener(*wlr.InputPopupSurfaceV2),
+    input_method_new_popup_surface: *wlr.InputPopupSurfaceV2,
+) void {
+    log.debug("new input_method_popup_surface", .{});
+    const relay = @fieldParentPtr(InputRelay, "input_method_new_popup_surface", listener);
+    InputMethodPopup.create(input_method_new_popup_surface, relay) catch {
+        log.err("out of memory", .{});
+        return;
+    };
 }
 
 fn handleInputMethodGrabKeyboardDestroy(
@@ -197,6 +215,11 @@ pub fn sendInputMethodState(relay: *InputRelay) void {
         );
     }
 
+    // Update input popups
+    var it = relay.input_method_popups.iterator(.forward);
+    while (it.next()) |popup| {
+        popup.updatePopup();
+    }
     input_method.sendDone();
 }
 

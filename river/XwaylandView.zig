@@ -163,6 +163,7 @@ pub fn handleMap(listener: *wl.Listener(void)) void {
     const view = xwayland_view.view;
 
     const xwayland_surface = xwayland_view.xwayland_surface;
+    xwayland_surface.data = @intFromPtr(xwayland_view);
     const surface = xwayland_surface.surface.?;
     surface.data = @intFromPtr(&view.tree.node);
 
