@@ -422,10 +422,14 @@ fn handleRequestMove(
     const seat: *Seat = @ptrFromInt(event.seat.seat.data);
     const view = toplevel.view;
 
-    if (view.current.output == null or view.pending.output == null) return;
-    if (view.current.tags & view.current.output.?.current.tags == 0) return;
     if (view.pending.fullscreen) return;
-    if (!(view.pending.float or view.pending.output.?.layout == null)) return;
+
+    if (view.current.output) |current_output| {
+        if (view.current.tags & current_output.current.tags == 0) return;
+    }
+    if (view.pending.output) |pending_output| {
+        if (!(view.pending.float or pending_output.layout == null)) return;
+    }
 
     // Moving windows with touch or tablet tool is not yet supported.
     if (seat.wlr_seat.validatePointerGrabSerial(null, event.serial)) {
@@ -441,10 +445,14 @@ fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), ev
     const seat: *Seat = @ptrFromInt(event.seat.seat.data);
     const view = toplevel.view;
 
-    if (view.current.output == null or view.pending.output == null) return;
-    if (view.current.tags & view.current.output.?.current.tags == 0) return;
     if (view.pending.fullscreen) return;
-    if (!(view.pending.float or view.pending.output.?.layout == null)) return;
+
+    if (view.current.output) |current_output| {
+        if (view.current.tags & current_output.current.tags == 0) return;
+    }
+    if (view.pending.output) |pending_output| {
+        if (!(view.pending.float or pending_output.layout == null)) return;
+    }
 
     // Resizing windows with touch or tablet tool is not yet supported.
     if (seat.wlr_seat.validatePointerGrabSerial(null, event.serial)) {

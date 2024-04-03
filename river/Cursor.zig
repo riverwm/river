@@ -785,6 +785,9 @@ fn handleHideCursorTimeout(cursor: *Cursor) c_int {
 }
 
 pub fn startMove(cursor: *Cursor, view: *View) void {
+    // Guard against assertion in enterMode()
+    if (view.current.output == null) return;
+
     if (cursor.constraint) |constraint| {
         if (constraint.state == .active) constraint.deactivate();
     }
@@ -798,6 +801,9 @@ pub fn startMove(cursor: *Cursor, view: *View) void {
 }
 
 pub fn startResize(cursor: *Cursor, view: *View, proposed_edges: ?wlr.Edges) void {
+    // Guard against assertions in computeEdges() and enterMode()
+    if (view.current.output == null) return;
+
     if (cursor.constraint) |constraint| {
         if (constraint.state == .active) constraint.deactivate();
     }
@@ -961,9 +967,19 @@ fn processMotion(cursor: *Cursor, device: *wlr.InputDevice, time: u32, delta_x: 
             // based on the dimensions actually committed by the client.
             const border_width = if (data.view.pending.ssd) server.config.border_width else 0;
 
+            const output = data.view.current.output orelse {
+                data.view.pending.resizing = false;
+
+                cursor.mode = .passthrough;
+                cursor.passthrough(time);
+
+                server.root.applyPending();
+                return;
+            };
+
             var output_width: i32 = undefined;
             var output_height: i32 = undefined;
-            data.view.current.output.?.wlr_output.effectiveResolution(&output_width, &output_height);
+            output.wlr_output.effectiveResolution(&output_width, &output_height);
 
             const constraints = &data.view.constraints;
             const box = &data.view.pending.box;
@@ -1016,9 +1032,11 @@ pub fn checkFocusFollowsCursor(cursor: *Cursor) void {
         if (server.config.focus_follows_cursor == .normal and
             last_target == view) return;
         if (cursor.seat.focused != .view or cursor.seat.focused.view != view) {
-            cursor.seat.focusOutput(view.current.output.?);
-            cursor.seat.focus(view);
-            server.root.applyPending();
+            if (view.current.output) |output| {
+                cursor.seat.focusOutput(output);
+                cursor.seat.focus(view);
+                server.root.applyPending();
+            }
         }
     } else {
         // The output doesn't contain any views, just focus the output.
@@ -1034,13 +1052,15 @@ fn updateFocusFollowsCursorTarget(cursor: *Cursor) void {
                 // geometry, we only want to update this when the cursor
                 // properly enters the window (the box that we draw borders around)
                 // in order to avoid clashes with cursor warping on focus change.
-                var output_layout_box: wlr.Box = undefined;
-                server.root.output_layout.getBox(view.current.output.?.wlr_output, &output_layout_box);
+                if (view.current.output) |output| {
+                    var output_layout_box: wlr.Box = undefined;
+                    server.root.output_layout.getBox(output.wlr_output, &output_layout_box);
 
-                const cursor_ox = cursor.wlr_cursor.x - @as(f64, @floatFromInt(output_layout_box.x));
-                const cursor_oy = cursor.wlr_cursor.y - @as(f64, @floatFromInt(output_layout_box.y));
-                if (view.current.box.containsPoint(cursor_ox, cursor_oy)) {
-                    cursor.focus_follows_cursor_target = view;
+                    const cursor_ox = cursor.wlr_cursor.x - @as(f64, @floatFromInt(output_layout_box.x));
+                    const cursor_oy = cursor.wlr_cursor.y - @as(f64, @floatFromInt(output_layout_box.y));
+                    if (view.current.box.containsPoint(cursor_ox, cursor_oy)) {
+                        cursor.focus_follows_cursor_target = view;
+                    }
                 }
             },
             .layer_surface, .lock_surface => {
@@ -1104,8 +1124,9 @@ pub fn updateState(cursor: *Cursor) void {
                     assert(!cursor.hidden);
 
                     // These conditions are checked in Root.applyPending()
-                    assert(data.view.current.tags & data.view.current.output.?.current.tags != 0);
-                    assert(data.view.current.float or data.view.current.output.?.layout == null);
+                    const output = data.view.current.output orelse return;
+                    assert(data.view.current.tags & output.current.tags != 0);
+                    assert(data.view.current.float or output.layout == null);
                     assert(!data.view.current.fullscreen);
 
                     // Keep the cursor locked to the original offset from the edges of the view.
