@@ -119,15 +119,6 @@ pub fn configure(xwayland_view: XwaylandView) bool {
     return false;
 }
 
-pub fn rootSurface(xwayland_view: XwaylandView) *wlr.Surface {
-    return xwayland_view.xwayland_surface.surface.?;
-}
-
-/// Close the view. This will lead to the unmap and destroy events being sent
-pub fn close(xwayland_view: XwaylandView) void {
-    xwayland_view.xwayland_surface.close();
-}
-
 fn setActivated(xwayland_view: XwaylandView, activated: bool) void {
     // See comment on handleRequestMinimize() for details
     if (activated and xwayland_view.xwayland_surface.minimized) {
@@ -137,16 +128,6 @@ fn setActivated(xwayland_view: XwaylandView, activated: bool) void {
     if (activated) {
         xwayland_view.xwayland_surface.restack(null, .above);
     }
-}
-
-/// Get the current title of the xwayland surface if any.
-pub fn getTitle(xwayland_view: XwaylandView) ?[*:0]const u8 {
-    return xwayland_view.xwayland_surface.title;
-}
-/// X11 clients don't have an app_id but the class serves a similar role.
-/// Get the current class of the xwayland surface if any.
-pub fn getAppId(xwayland_view: XwaylandView) ?[*:0]const u8 {
-    return xwayland_view.xwayland_surface.class;
 }
 
 fn handleDestroy(listener: *wl.Listener(void)) void {

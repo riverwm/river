@@ -194,25 +194,6 @@ pub fn configure(toplevel: *XdgToplevel) bool {
     return true;
 }
 
-pub fn rootSurface(toplevel: XdgToplevel) *wlr.Surface {
-    return toplevel.wlr_toplevel.base.surface;
-}
-
-/// Close the view. This will lead to the unmap and destroy events being sent
-pub fn close(toplevel: XdgToplevel) void {
-    toplevel.wlr_toplevel.sendClose();
-}
-
-/// Return the current title of the toplevel if any.
-pub fn getTitle(toplevel: XdgToplevel) ?[*:0]const u8 {
-    return toplevel.wlr_toplevel.title;
-}
-
-/// Return the current app_id of the toplevel if any .
-pub fn getAppId(toplevel: XdgToplevel) ?[*:0]const u8 {
-    return toplevel.wlr_toplevel.app_id;
-}
-
 pub fn destroyPopups(toplevel: XdgToplevel) void {
     var it = toplevel.wlr_toplevel.base.popups.safeIterator(.forward);
     while (it.next()) |wlr_xdg_popup| wlr_xdg_popup.destroy();
