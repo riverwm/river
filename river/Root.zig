@@ -725,6 +725,7 @@ fn commitTransaction(root: *Root) void {
         // This must be done after updating cursor state in case the view was the target of move/resize.
         var it = root.hidden.inflight.focus_stack.safeIterator(.forward);
         while (it.next()) |view| {
+            view.dropSavedSurfaceTree();
             if (view.destroying) view.destroy();
         }
     }
