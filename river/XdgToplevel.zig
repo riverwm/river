@@ -81,7 +81,7 @@ pub fn create(wlr_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
         .view = undefined,
         .wlr_toplevel = wlr_toplevel,
     } });
-    errdefer view.destroy();
+    errdefer view.destroy(.assert);
 
     const toplevel = &view.impl.toplevel;
 
@@ -219,7 +219,7 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
 
     const view = toplevel.view;
     view.impl = .none;
-    view.destroy();
+    view.destroy(.lazy);
 }
 
 fn handleMap(listener: *wl.Listener(void)) void {

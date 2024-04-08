@@ -726,7 +726,7 @@ fn commitTransaction(root: *Root) void {
         var it = root.hidden.inflight.focus_stack.safeIterator(.forward);
         while (it.next()) |view| {
             view.dropSavedSurfaceTree();
-            if (view.destroying) view.destroy();
+            if (view.destroying) view.destroy(.assert);
         }
     }
 

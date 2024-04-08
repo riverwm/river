@@ -64,7 +64,7 @@ pub fn create(xwayland_surface: *wlr.XwaylandSurface) error{OutOfMemory}!void {
         .view = undefined,
         .xwayland_surface = xwayland_surface,
     } });
-    errdefer view.destroy();
+    errdefer view.destroy(.assert);
 
     const xwayland_view = &view.impl.xwayland_view;
     xwayland_view.view = view;
@@ -142,7 +142,7 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
 
     const view = xwayland_view.view;
     view.impl = .none;
-    view.destroy();
+    view.destroy(.lazy);
 }
 
 fn handleAssociate(listener: *wl.Listener(void)) void {

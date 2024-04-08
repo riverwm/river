@@ -228,8 +228,9 @@ pub fn create(impl: Impl) error{OutOfMemory}!*View {
 /// If saved buffers of the view are currently in use by a transaction,
 /// mark this view for destruction when the transaction completes. Otherwise
 /// destroy immediately.
-pub fn destroy(view: *View) void {
+pub fn destroy(view: *View, when: enum { lazy, assert }) void {
     assert(view.impl == .none);
+    assert(!view.mapped);
 
     view.destroying = true;
 
@@ -249,6 +250,11 @@ pub fn destroy(view: *View) void {
         if (view.output_before_evac) |name| util.gpa.free(name);
 
         util.gpa.destroy(view);
+    } else {
+        switch (when) {
+            .lazy => {},
+            .assert => unreachable,
+        }
     }
 }
 
