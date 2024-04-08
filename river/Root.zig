@@ -846,18 +846,37 @@ fn handlePowerManagerSetMode(
     _: *wl.Listener(*wlr.OutputPowerManagerV1.event.SetMode),
     event: *wlr.OutputPowerManagerV1.event.SetMode,
 ) void {
-    const enable = event.mode == .on;
+    // The output may have been destroyed, in which case there is nothing to do
+    const output = @as(?*Output, @ptrFromInt(event.output.data)) orelse return;
 
-    const log_text = if (enable) "Enabling" else "Disabling";
-    std.log.scoped(.output_manager).debug(
-        "{s} dpms for output {s}",
-        .{ log_text, event.output.name },
-    );
+    std.log.debug("client requested dpms {s} for output {s}", .{
+        @tagName(event.mode),
+        event.output.name,
+    });
 
-    event.output.enable(enable);
-    event.output.commit() catch {
-        std.log.scoped(.server).err("output commit failed for {s}", .{event.output.name});
-    };
+    const requested = event.mode == .on;
+
+    if (output.wlr_output.enabled == requested) {
+        std.log.debug("output {s} dpms is already {s}, ignoring request", .{
+            event.output.name,
+            @tagName(event.mode),
+        });
+        return;
+    }
+
+    {
+        var state = wlr.Output.State.init();
+        defer state.finish();
+
+        state.setEnabled(requested);
+
+        if (!output.wlr_output.commitState(&state)) {
+            std.log.scoped(.server).err("output commit failed for {s}", .{output.wlr_output.name});
+            return;
+        }
+    }
+
+    output.updateLockRenderStateOnEnableDisable();
 }
 
 fn handleSetGamma(

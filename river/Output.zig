@@ -432,7 +432,7 @@ fn handleRequestState(listener: *wl.Listener(*wlr.Output.event.RequestState), ev
 pub fn applyState(output: *Output, state: *wlr.Output.State) error{CommitFailed}!void {
 
     // We need to be precise about this state change to make assertions
-    // in handleEnableDisable() possible.
+    // in updateLockRenderStateOnEnableDisable() possible.
     const enable_state_change = state.committed.enabled and
         (state.enabled != output.wlr_output.enabled);
 
@@ -452,6 +452,18 @@ pub fn applyState(output: *Output, state: *wlr.Output.State) error{CommitFailed}
 }
 
 fn handleEnableDisable(output: *Output) void {
+    output.updateLockRenderStateOnEnableDisable();
+
+    if (output.wlr_output.enabled) {
+        // Add the output to root.active_outputs and the output layout if it has not
+        // already been added.
+        server.root.activateOutput(output);
+    } else {
+        server.root.deactivateOutput(output);
+    }
+}
+
+pub fn updateLockRenderStateOnEnableDisable(output: *Output) void {
     // We can't assert the current state of normal_content/locked_content
     // here as this output may be newly created.
     if (output.wlr_output.enabled) {
@@ -467,16 +479,11 @@ fn handleEnableDisable(output: *Output) void {
                 output.locked_content.node.setEnabled(true);
             },
         }
-        // Add the output to root.active_outputs and the output layout if it has not
-        // already been added.
-        server.root.activateOutput(output);
     } else {
         // Disabling and re-enabling an output always blanks it.
         output.lock_render_state = .blanked;
         output.normal_content.node.setEnabled(false);
         output.locked_content.node.setEnabled(true);
-
-        server.root.deactivateOutput(output);
     }
 }
 
