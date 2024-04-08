@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="logo/logo_text_background.svg" width="50%">
+  <img src="logo/logo_text_adaptive_color.svg" width="50%">
 </div>
 
 ## Overview
