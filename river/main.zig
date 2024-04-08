@@ -27,6 +27,7 @@ const flags = @import("flags");
 
 const c = @import("c.zig");
 const util = @import("util.zig");
+const process = @import("process.zig");
 
 const Server = @import("Server.zig");
 
@@ -98,22 +99,16 @@ pub fn main() anyerror!void {
         }
     };
 
+    log.info("river version {s}, initializing server", .{build_options.version});
+
+    process.setup();
+
     river_init_wlroots_log(switch (runtime_log_level) {
         .debug => .debug,
         .info => .info,
         .warn, .err => .err,
     });
 
-    // Ignore SIGPIPE so we don't get killed when writing to a socket that
-    // has had its read end closed by another process.
-    const sig_ign = os.Sigaction{
-        .handler = .{ .handler = os.SIG.IGN },
-        .mask = os.empty_sigset,
-        .flags = 0,
-    };
-    try os.sigaction(os.SIG.PIPE, &sig_ign, null);
-
-    log.info("river version {s}, initializing server", .{build_options.version});
     try server.init(enable_xwayland);
     defer server.deinit();
 
@@ -126,7 +121,7 @@ pub fn main() anyerror!void {
         const child_args = [_:null]?[*:0]const u8{ "/bin/sh", "-c", cmd, null };
         const pid = try os.fork();
         if (pid == 0) {
-            util.post_fork_pre_execve();
+            process.cleanupChild();
             os.execveZ("/bin/sh", &child_args, std.c.environ) catch c._exit(1);
         }
         util.gpa.free(cmd);

@@ -15,22 +15,6 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
-const os = std.os;
-
-const xkb = @import("xkbcommon");
-
-const c = @import("c.zig");
 
 /// The global general-purpose allocator used throughout river's code
 pub const gpa = std.heap.c_allocator;
-
-pub fn post_fork_pre_execve() void {
-    if (c.setsid() < 0) unreachable;
-    if (os.system.sigprocmask(os.SIG.SETMASK, &os.empty_sigset, null) < 0) unreachable;
-    const sig_dfl = os.Sigaction{
-        .handler = .{ .handler = os.SIG.DFL },
-        .mask = os.empty_sigset,
-        .flags = 0,
-    };
-    os.sigaction(os.SIG.PIPE, &sig_dfl, null) catch @panic("sigaction before fork failed");
-}

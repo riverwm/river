@@ -19,6 +19,7 @@ const os = std.os;
 
 const c = @import("../c.zig");
 const util = @import("../util.zig");
+const process = @import("../process.zig");
 
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
@@ -40,7 +41,7 @@ pub fn spawn(
     };
 
     if (pid == 0) {
-        util.post_fork_pre_execve();
+        process.cleanupChild();
         const pid2 = os.fork() catch c._exit(1);
         if (pid2 == 0) os.execveZ("/bin/sh", &child_args, std.c.environ) catch c._exit(1);
 
