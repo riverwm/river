@@ -9,7 +9,8 @@ configuration.
 
 Install from your [package manager](https://repology.org/project/river/versions) —
 Join us at [#river](https://web.libera.chat/?channels=#river) on irc.libera.chat —
-Read our man pages and [wiki](https://codeberg.org/river/wiki)
+Read our man pages, [wiki](https://codeberg.org/river/wiki), and
+[Code of Conduct](CODE_OF_CONDUCT.md)
 
 The main repository is on [codeberg](https://codeberg.org/river/river),
 which is where the issue tracker may be found and where contributions are accepted.
