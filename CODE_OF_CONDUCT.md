@@ -50,11 +50,12 @@ decisions when appropriate.
 
 ## Scope
 
-This Code of Conduct applies within all community spaces, and also applies when
-an individual is officially representing the community in public spaces.
-Examples of representing our community include using an official email address,
-posting via an official social media account, or acting as an appointed
-representative at an online or offline event.
+Participants in the river community are expected to uphold the described
+standards not only in official community spaces (issue trackers, IRC channels,
+etc.) but in all public spaces. The Code of Conduct however does acknowledge
+that people are fallible and that it is possible to truely correct a past
+pattern of unacceptable behavior. That is to say, the scope of the Code of
+Conduct does not necessarily extend into the distant past.
 
 ## Enforcement
 
@@ -69,6 +70,10 @@ reporter of any incident.
 The consequences for Code of Conduct violations will be decided upon and
 enforced by community leaders. These may include a formal warning, a temporary
 ban from community spaces, a permanent ban from community spaces, etc.
+
+There are no hard and fast rules for exactly what behavior in which space will
+result in what consequences, it is up to the community leaders to enforce the
+Code of Conduct in a way that they believe best promotes a healthy community.
 
 ## Attribution
 
