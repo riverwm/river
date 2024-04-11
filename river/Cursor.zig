@@ -304,6 +304,7 @@ fn clearFocus(cursor: *Cursor) void {
 /// Axis event is a scroll wheel or similiar
 fn handleAxis(listener: *wl.Listener(*wlr.Pointer.event.Axis), event: *wlr.Pointer.event.Axis) void {
     const cursor = @fieldParentPtr(Cursor, "axis", listener);
+    const device: *InputDevice = @ptrFromInt(event.device.data);
 
     cursor.seat.handleActivity();
     cursor.unhide();
@@ -312,8 +313,8 @@ fn handleAxis(listener: *wl.Listener(*wlr.Pointer.event.Axis), event: *wlr.Point
     cursor.seat.wlr_seat.pointerNotifyAxis(
         event.time_msec,
         event.orientation,
-        event.delta,
-        event.delta_discrete,
+        event.delta * device.scroll_factor,
+        @intFromFloat(@as(f32, @floatFromInt(event.delta_discrete)) * device.scroll_factor),
         event.source,
     );
 }

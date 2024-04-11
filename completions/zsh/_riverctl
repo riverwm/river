@@ -120,6 +120,7 @@ _riverctl()
                                 'disable-while-trackpointing:Enable or disable the disable-while-trackpointing functionality'
                                 'middle-emulation:Enable or disable the middle click emulation functionality'
                                 'natural-scroll:Enable or disable the natural scroll functionality'
+                                'scroll-factor:Set the scroll factor'
                                 'left-handed:Enable or disable the left handed mode'
                                 'tap:Enable or disable the tap functionality'
                                 'tap-button-map:Configure the button mapping for tapping'

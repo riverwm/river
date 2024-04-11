@@ -93,6 +93,7 @@ function __riverctl_completion ()
 				disable-while-trackpointing \
 				middle-emulation \
 				natural-scroll \
+				scroll-factor \
 				left-handed \
 				tap \
 				tap-button-map \

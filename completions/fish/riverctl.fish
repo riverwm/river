@@ -113,6 +113,7 @@ complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 3' -a 'disable-while-trackpointing' -d 'Enable or disable the disable-while-trackpointing functionality'
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 3' -a 'middle-emulation'     -d 'Enable or disable the middle-emulation functionality'
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 3' -a 'natural-scroll'       -d 'Enable or disable the natural-scroll functionality'
+complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 3' -a 'scroll-factor'        -d 'Set the scroll factor'
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 3' -a 'left-handed'          -d 'Enable or disable the left handed mode'
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 3' -a 'tap'                  -d 'Enable or disable the tap functionality'
 complete -c riverctl -n '__fish_seen_subcommand_from input; and __fish_riverctl_complete_arg 3' -a 'tap-button-map'       -d 'Configure the button mapping for tapping'

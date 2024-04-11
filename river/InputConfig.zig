@@ -252,6 +252,14 @@ pub const MapToOutput = struct {
     }
 };
 
+pub const ScrollFactor = struct {
+    value: ?f32,
+
+    fn apply(scroll_factor: ScrollFactor, device: *InputDevice) void {
+        device.scroll_factor = scroll_factor.value orelse 1.0;
+    }
+};
+
 glob: []const u8,
 
 // Note: Field names equal name of the setting in the 'input' command.
@@ -264,6 +272,7 @@ drag: ?DragState = null,
 @"disable-while-trackpointing": ?DwtpState = null,
 @"middle-emulation": ?MiddleEmulation = null,
 @"natural-scroll": ?NaturalScroll = null,
+@"scroll-factor": ScrollFactor = .{ .value = 1.0 },
 @"left-handed": ?LeftHanded = null,
 tap: ?TapState = null,
 @"tap-button-map": ?TapButtonMap = null,
@@ -288,6 +297,8 @@ pub fn apply(config: *const InputConfig, device: *InputDevice) void {
 
         if (comptime mem.eql(u8, field.name, "map-to-output")) {
             @field(config, field.name).apply(device);
+        } else if (comptime mem.eql(u8, field.name, "scroll-factor")) {
+            @field(config, field.name).apply(device);
         } else if (@field(config, field.name)) |setting| {
             log.debug("applying setting: {s}", .{field.name});
             setting.apply(libinput_device);
@@ -304,6 +315,10 @@ pub fn parse(config: *InputConfig, setting: []const u8, value: []const u8) !void
             if (comptime mem.eql(u8, field.name, "pointer-accel")) {
                 config.@"pointer-accel" = PointerAccel{
                     .value = math.clamp(try std.fmt.parseFloat(f32, value), -1.0, 1.0),
+                };
+            } else if (comptime mem.eql(u8, field.name, "scroll-factor")) {
+                config.@"scroll-factor" = ScrollFactor{
+                    .value = @max(try std.fmt.parseFloat(f32, value), 0.0),
                 };
             } else if (comptime mem.eql(u8, field.name, "scroll-button")) {
                 const ret = c.libevdev_event_code_from_name(c.EV_KEY, value.ptr);
@@ -345,6 +360,10 @@ pub fn write(config: *InputConfig, writer: anytype) !void {
         if (comptime mem.eql(u8, field.name, "map-to-output")) {
             if (@field(config, field.name).output_name) |output_name| {
                 try writer.print("\tmap-to-output: {s}\n", .{output_name});
+            }
+        } else if (comptime mem.eql(u8, field.name, "scroll-factor")) {
+            if (@field(config, field.name).value) |value| {
+                try writer.print("\tscroll-factor: {d}\n", .{value});
             }
         } else if (@field(config, field.name)) |setting| {
             // Special-case the settings which are not enums.

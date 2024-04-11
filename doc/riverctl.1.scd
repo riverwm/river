@@ -505,6 +505,9 @@ However note that not every input device supports every property.
 	Enable or disable the natural scroll functionality of the input device. If
 	active, the scroll direction is inverted.
 
+*input* _name_ *scroll-factor* _factor_
+	Set the scroll factor of the input device. Needs a non-negative float.
+
 *input* _name_ *left-handed* *enabled*|*disabled*
 	Enable or disable the left handed mode of the input device.
 
