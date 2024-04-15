@@ -1,4 +1,4 @@
-RIVERTILE(1) "codeberg.org/river/river" "General Commands Manual"
+RIVERTILE(1)
 
 # NAME
 
@@ -81,7 +81,7 @@ Set the main count to 3 at runtime:
 
 Maintained by Isaac Freund <mail@isaacfreund.com> who is assisted by open
 source contributors. For more information about river's development, see
-<https://codeberg.org/river/river>.
+<https://isaacfreund.com/software/river>.
 
 # SEE ALSO
 

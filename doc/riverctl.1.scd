@@ -1,4 +1,4 @@
-RIVERCTL(1) "codeberg.org/river/river" "General Commands Manual"
+RIVERCTL(1)
 
 # NAME
 
@@ -550,7 +550,7 @@ Bind Super+Shift+J to swap the focused view with the next visible view:
 
 Maintained by Isaac Freund <mail@isaacfreund.com> who is assisted by open
 source contributors. For more information about river's development, see
-<https://codeberg.org/river/river>.
+<https://isaacfreund.com/software/river>.
 
 # SEE ALSO
 
