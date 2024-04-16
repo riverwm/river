@@ -360,16 +360,36 @@ fn sendLayerConfigures(
 ) void {
     for ([_]zwlr.LayerShellV1.Layer{ .background, .bottom, .top, .overlay }) |layer| {
         const tree = output.layerSurfaceTree(layer);
-        var it = tree.children.iterator(.forward);
+        var it = tree.children.safeIterator(.forward);
         while (it.next()) |node| {
             assert(node.type == .tree);
             if (@as(?*SceneNodeData, @ptrFromInt(node.data))) |node_data| {
                 const layer_surface = node_data.data.layer_surface;
 
                 const exclusive = layer_surface.wlr_layer_surface.current.exclusive_zone > 0;
-                if (exclusive != (mode == .exclusive)) continue;
+                if (exclusive != (mode == .exclusive)) {
+                    continue;
+                }
 
-                layer_surface.scene_layer_surface.configure(&full_box, usable_box);
+                {
+                    var new_usable_box = usable_box.*;
+
+                    layer_surface.scene_layer_surface.configure(&full_box, &new_usable_box);
+
+                    // Clients can request bogus exclusive zones larger than the output
+                    // dimensions and river must handle this gracefully. It seems reasonable
+                    // to close layer shell clients that would cause the usable area of the
+                    // output to become less than half the width/height of its full dimensions.
+                    if (new_usable_box.width < @divTrunc(full_box.width, 2) or
+                        new_usable_box.height < @divTrunc(full_box.height, 2))
+                    {
+                        layer_surface.wlr_layer_surface.destroy();
+                        continue;
+                    }
+
+                    usable_box.* = new_usable_box;
+                }
+
                 layer_surface.popup_tree.node.setPosition(
                     layer_surface.scene_layer_surface.tree.node.x,
                     layer_surface.scene_layer_surface.tree.node.y,
