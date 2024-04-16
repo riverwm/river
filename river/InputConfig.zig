@@ -253,10 +253,10 @@ pub const MapToOutput = struct {
 };
 
 pub const ScrollFactor = struct {
-    value: ?f32,
+    value: ?f32 = null,
 
     fn apply(scroll_factor: ScrollFactor, device: *InputDevice) void {
-        device.scroll_factor = scroll_factor.value orelse 1.0;
+        device.config.scroll_factor = scroll_factor.value orelse 1.0;
     }
 };
 
@@ -272,7 +272,7 @@ drag: ?DragState = null,
 @"disable-while-trackpointing": ?DwtpState = null,
 @"middle-emulation": ?MiddleEmulation = null,
 @"natural-scroll": ?NaturalScroll = null,
-@"scroll-factor": ScrollFactor = .{ .value = 1.0 },
+@"scroll-factor": ScrollFactor = .{},
 @"left-handed": ?LeftHanded = null,
 tap: ?TapState = null,
 @"tap-button-map": ?TapButtonMap = null,
@@ -317,9 +317,12 @@ pub fn parse(config: *InputConfig, setting: []const u8, value: []const u8) !void
                     .value = math.clamp(try std.fmt.parseFloat(f32, value), -1.0, 1.0),
                 };
             } else if (comptime mem.eql(u8, field.name, "scroll-factor")) {
-                config.@"scroll-factor" = ScrollFactor{
-                    .value = @max(try std.fmt.parseFloat(f32, value), 0.0),
-                };
+                const unvalidated = try std.fmt.parseFloat(f32, value);
+                if (unvalidated > 0) {
+                    config.@"scroll-factor" = ScrollFactor{ .value = unvalidated };
+                } else {
+                    return error.OutOfBounds;
+                }
             } else if (comptime mem.eql(u8, field.name, "scroll-button")) {
                 const ret = c.libevdev_event_code_from_name(c.EV_KEY, value.ptr);
                 if (ret < 1) return error.InvalidButton;

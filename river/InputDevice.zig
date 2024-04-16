@@ -34,7 +34,6 @@ const Tablet = @import("Tablet.zig");
 
 const log = std.log.scoped(.input_manager);
 
-scroll_factor: f32,
 seat: *Seat,
 wlr_device: *wlr.InputDevice,
 
@@ -44,6 +43,10 @@ destroy: wl.Listener(*wlr.InputDevice) = wl.Listener(*wlr.InputDevice).init(hand
 /// multiple logical input devices with the exact same vendor id, product id
 /// and name. However identifiers of InputConfigs are unique.
 identifier: []const u8,
+
+config: struct {
+    scroll_factor: f32 = 1.0,
+} = .{},
 
 /// InputManager.devices
 link: wl.list.Link,
@@ -74,7 +77,6 @@ pub fn init(device: *InputDevice, seat: *Seat, wlr_device: *wlr.InputDevice) !vo
     }
 
     device.* = .{
-        .scroll_factor = 1.0,
         .seat = seat,
         .wlr_device = wlr_device,
         .identifier = identifier,

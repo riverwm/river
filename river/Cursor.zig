@@ -313,8 +313,16 @@ fn handleAxis(listener: *wl.Listener(*wlr.Pointer.event.Axis), event: *wlr.Point
     cursor.seat.wlr_seat.pointerNotifyAxis(
         event.time_msec,
         event.orientation,
-        event.delta * device.scroll_factor,
-        @intFromFloat(@as(f32, @floatFromInt(event.delta_discrete)) * device.scroll_factor),
+        event.delta * device.config.scroll_factor,
+        @intFromFloat(math.clamp(
+            @round(@as(f32, @floatFromInt(event.delta_discrete)) * device.config.scroll_factor),
+            // It seems that clamping to exactly the bounds of an i32 is insufficient to make the
+            // @intFromFloat() call safe due to the max/min i32 not being exactly representable
+            // by an f32. Dividing by 2 is a low effort way to ensure the value is in bounds and
+            // allow users to set their scroll-factor to inf without crashing river.
+            math.minInt(i32) / 2,
+            math.maxInt(i32) / 2,
+        )),
         event.source,
     );
 }
