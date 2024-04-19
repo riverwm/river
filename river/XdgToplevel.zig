@@ -352,6 +352,11 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
                 view.pending.box.height = toplevel.geometry.height;
                 view.current = view.inflight;
                 view.updateSceneState();
+            } else if (old_geometry.x != toplevel.geometry.x or
+                old_geometry.y != toplevel.geometry.y)
+            {
+                // We need to update the surface clip box to reflect the geometry change.
+                view.updateSceneState();
             }
         },
         // If the client has not yet acked our configure, we need to send a
