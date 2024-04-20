@@ -18,6 +18,7 @@ pub fn build(b: *Build) !void {
 
     const strip = b.option(bool, "strip", "Omit debug information") orelse false;
     const pie = b.option(bool, "pie", "Build a Position Independent Executable") orelse false;
+    const llvm = !(b.option(bool, "no-llvm", "(expirimental) Use non-LLVM x86 Zig backend") orelse false);
 
     const omit_frame_pointer = switch (optimize) {
         .Debug, .ReleaseSafe => false,
@@ -169,6 +170,8 @@ pub fn build(b: *Build) !void {
             .target = target,
             .optimize = optimize,
             .strip = strip,
+            .use_llvm = llvm,
+            .use_lld = llvm,
         });
         river.root_module.addOptions("build_options", options);
 
@@ -206,6 +209,8 @@ pub fn build(b: *Build) !void {
             .target = target,
             .optimize = optimize,
             .strip = strip,
+            .use_llvm = llvm,
+            .use_lld = llvm,
         });
         riverctl.root_module.addOptions("build_options", options);
 
@@ -229,6 +234,8 @@ pub fn build(b: *Build) !void {
             .target = target,
             .optimize = optimize,
             .strip = strip,
+            .use_llvm = llvm,
+            .use_lld = llvm,
         });
         rivertile.root_module.addOptions("build_options", options);
 
