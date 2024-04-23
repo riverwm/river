@@ -1,0 +1,300 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="river_window_management_v1">
+  <copyright>
+    Copyright 2024 The River Developers
+
+    Permission to use, copy, modify, and/or distribute this software for any
+    purpose with or without fee is hereby granted, provided that the above
+    copyright notice and this permission notice appear in all copies.
+
+    THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+    WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+    MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+    SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
+    OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
+    CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  </copyright>
+
+  <description summary="frame-perfect window management">
+    This protocol allows a single "window manager" client to determine the
+    window management policy of the compositor. State is globally
+    double-buffered allowing for frame perfect state changes involving multiple
+    windows.
+
+    The key words "must", "must not", "required", "shall", "shall not",
+    "should", "should not", "recommended", "may", and "optional" in this
+    document are to be interpreted as described in IETF RFC 2119.
+
+    Warning! The protocol described in this file is currently in the testing
+    phase. Backward compatible changes may be added together with the
+    corresponding interface version bump. Backward incompatible changes can only
+    be done by creating a new major version of the extension.
+  </description>
+
+  <interface name="river_window_manager_v1" version="1">
+    <description summary="TODO">
+      TODO:
+       - trees
+       - surfaces
+       - rendering order
+       - input
+         - keybindings
+         - interactive resize axes
+       - more
+    </description>
+
+    <request name="stop">
+      <description summary="stop sending events">
+        This request indicates that the client no longer wishes to receive
+        events on this object.
+
+        The Wayland protocol is asynchronous, which means the server may send
+        further events until the stop request is processed. The client must wait
+        for a river_window_manager_v1.finished event before destroying this
+        object.
+      </description>
+    </request>
+
+    <event name="finished">
+      <description summary="the server has finished with the window manager">
+        This event indicates that the server will send no further events on this
+        object. The client should destroy the object. See
+        river_window_manager_v1.destroy for more information.
+      </description>
+    </event>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the river_window_manager_v1 object">
+        This request should be called after the finished event has been received
+        to complete destruction of the object.
+
+        If a client wishes to destroy this object it should send a
+        river_window_manager_v1.stop request and wait for a
+        river_window_manager_v1.finished event. Once the finished event is
+        received it is safe to destroy this object and any other objects created
+        through this interface.
+      </description>
+    </request>
+
+    <event name="done">
+      <description summary="all new state has been sent">
+        This event is used to group state update events sent to the client into
+        a single, atomic update.
+      </description>
+    </event>
+
+    <request name="commit">
+      <description summary="commit double-buffered requested state">
+        This request is used to group state update requests sent to the server
+        into a single, atomic update.
+      </description>
+    </request>
+
+    <event name="window">
+      <description summary="new logical window">
+        TODO
+      </description>
+      <arg name="window" type="new_id" interface="river_window_v1"/>
+    </event>
+
+    <event name="output">
+      <description summary="new logical output">
+        TODO
+      </description>
+      <arg name="output" type="new_id" interface="river_output_v1"/>
+    </event>
+  </interface>
+
+  <interface name="river_window_v1" version="1">
+    <description summary="a logical window">
+      This represents a logical window. For example, a window may correspond to
+      an xdg_toplevel or Xwayland window.
+
+      A newly created window will not be displayed until the window manager
+      client makes a river_window_v1.propose_dimensions request and the
+      following river_window_manager_v1.commit request.
+    </description>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the window object">
+        This request indicates that the client will no longer use the window
+        object and that it may be safely destroyed.
+
+        This request should be made by the client after the
+        river_window_v1.closed event is received to complete destruction of the
+        window.
+      </description>
+    </request>
+
+    <event name="closed">
+      <description summary="the window has been closed">
+        The window has been closed by the server, perhaps due to an
+        xdg_toplevel.close request or similar.
+
+        The server will send no further events on this object and ignore any
+        request other than river_window_v1.destroy made after this event is
+        sent. The client should destroy this object with the
+        river_window_v1.destroy request to free up resources.
+
+        This event is double-buffered state and will be followed by a
+        river_window_manager_v1.done event.
+      </description>
+    </event>
+
+    <request name="close">
+      <description summary="request that the window be closed">
+        Request that the window be closed. The server will send a
+        river_window_v1.closed event when the window has been closed and it is
+        safe to destroy this object.
+
+        This request is double-buffered state and will not be applied until the
+        next river_window_manager_v1.commit request.
+      </description>
+    </request>
+
+    <event name="position">
+      <description summary="window position">
+        This event indicates the position of the window in the compositor's
+        logical coordinate space. The x and y coordinates may be positive or
+        negative.
+
+        This event is double-buffered state and will be followed by a
+        river_window_manager_v1.done event.
+      </description>
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
+    </event>
+
+    <event name="dimensions">
+      <description summary="window dimensions">
+        This event indicates the dimensions of the window in the compositor's
+        logical coordinate space. The width and height will always be strictly
+        greater than zero.
+
+        This event is double-buffered state and will be followed by a
+        river_window_manager_v1.done event.
+      </description>
+      <arg name="width" type="int"/>
+      <arg name="height" type="int"/>
+    </event>
+
+    <request name="set_position">
+      <description summary="set window position">
+        This request sets the position of the window in the compositor's logical
+        coordinate space. The x/y coordinates may be positive or negative.
+
+        This request is double-buffered state and will not be applied until the
+        next river_window_manager_v1.commit request.
+      </description>
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
+    </request>
+
+    <request name="propose_dimensions">
+      <description summary="propose window dimensions">
+        This request proposes dimensions for the window in the compositor's
+        logical coordinate space.
+
+        The width/height must be greater than or equal to zero. If the width or
+        height is zero the window will be allowed to decide its own dimensions.
+
+        The window may not take the exact dimensions proposed. The actual
+        dimensions taken by the window will be sent in a subsequent
+        river_window_v1.dimensions event. For example, a terminal emulator may
+        only allow dimensions that are multiple of the cell size.
+
+        This request is double-buffered state and will not be applied until the
+        next river_window_manager_v1.commit request.
+      </description>
+      <arg name="width" type="int"/>
+      <arg name="height" type="int"/>
+    </request>
+  </interface>
+
+  <interface name="river_output_v1" version="1">
+    <description summary="a logical output">
+      TODO
+    </description>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the output object">
+        This request indicates that the client will no longer use the output
+        object and that it may be safely destroyed.
+
+        This request should be made by the client after the
+        river_output_v1.removed event is received to complete destruction of the
+        window.
+      </description>
+    </request>
+
+    <event name="removed">
+      <description summary="the output is removed">
+        This event indicates that logical output is no longer conceptually part
+        of window management space.
+
+        The server will send no further events on this object and ignore any
+        request other than river_output_v1.destroy made after this event is
+        sent. The client should destroy this object with the
+        river_output_v1.destroy request to free up resources.
+
+        This event may be sent because a corresponding physical output has been
+        physically unplugged or because some output configuration has changed.
+
+        This event is double-buffered state and will be followed by a
+        river_window_manager_v1.done event.
+      </description>
+    </event>
+
+    <event name="position">
+      <description summary="output position">
+        This event indicates the position of the output in the compositor's
+        logical coordinate space. The x/y coordinates may be positive or
+        negative.
+
+        This event is double-buffered state and will be followed by a
+        river_window_manager_v1.done event.
+
+        The server must guarantee that the position and dimensions events do not
+        cause the areas of multiple logical outputs to overlap when the
+        corresponding river_window_manager_v1.done event is received.
+      </description>
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
+    </event>
+
+    <event name="dimensions">
+      <description summary="output dimensions">
+        This event indicates the dimensions of the output in the compositor's
+        logical coordinate space. The width/height will always be strictly
+        greater than zero.
+
+        This event is double-buffered state and will be followed by a
+        river_window_manager_v1.done event.
+
+        The server must guarantee that the position and dimensions events do not
+        cause the areas of multiple logical outputs to overlap when the
+        corresponding river_window_manager_v1.done event is received.
+      </description>
+      <arg name="width" type="int"/>
+      <arg name="height" type="int"/>
+    </event>
+
+    <event name="dimensions">
+      <description summary="output dimensions">
+        This event indicates the dimensions of the output in the compositor's
+        logical coordinate space. The width/height will always be strictly
+        greater than zero.
+
+        This event is double-buffered state and will be followed by a
+        river_window_manager_v1.done event.
+
+        The server must guarantee that the position and dimensions events do not
+        cause the areas of multiple logical outputs to overlap when the
+        corresponding river_window_manager_v1.done event is received.
+      </description>
+      <arg name="width" type="int"/>
+      <arg name="height" type="int"/>
+    </event>
+  </interface>
+</protocol>
