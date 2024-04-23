@@ -91,6 +91,7 @@ pub fn input(
     for (server.input_manager.configs.items) |*input_config| {
         if (mem.eql(u8, input_config.glob, args[1])) {
             try input_config.parse(args[2], args[3]);
+            break;
         }
     } else {
         var input_config: InputConfig = .{
