@@ -256,7 +256,9 @@ pub const ScrollFactor = struct {
     value: ?f32 = null,
 
     fn apply(scroll_factor: ScrollFactor, device: *InputDevice) void {
-        device.config.scroll_factor = scroll_factor.value orelse 1.0;
+        if (scroll_factor.value) |value| {
+            device.config.scroll_factor = value;
+        }
     }
 };
 
