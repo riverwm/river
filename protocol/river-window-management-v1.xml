@@ -35,13 +35,17 @@
   <interface name="river_window_manager_v1" version="1">
     <description summary="TODO">
       TODO:
-       - trees
-       - surfaces
+       - handle frame-perfect interactive resize where committed window
+         dimensions don't match the requested ones exactly. Probably need a serial for done and an ack_done or similar.
+         In particular, window decoration surfaces need to be synced up to match what the client comitted.
+       - shell surfaces, placed below or above all windows, configurable
+         stacking order relative to each other
        - rendering order
        - input
          - keybindings
          - interactive resize axes
        - more
+
     </description>
 
     <request name="stop">
@@ -95,14 +99,14 @@
       <description summary="new logical window">
         TODO
       </description>
-      <arg name="window" type="new_id" interface="river_window_v1"/>
+      <arg name="id" type="new_id" interface="river_window_v1"/>
     </event>
 
     <event name="output">
       <description summary="new logical output">
         TODO
       </description>
-      <arg name="output" type="new_id" interface="river_output_v1"/>
+      <arg name="id" type="new_id" interface="river_output_v1"/>
     </event>
   </interface>
 
@@ -155,6 +159,9 @@
 
     <event name="position">
       <description summary="window position">
+        TODO: does this make sense with the node abstraction? Maybe needed to
+        handle interactive resize.
+
         This event indicates the position of the window in the compositor's
         logical coordinate space. The x and y coordinates may be positive or
         negative.
@@ -164,19 +171,6 @@
       </description>
       <arg name="x" type="int"/>
       <arg name="y" type="int"/>
-    </event>
-
-    <event name="dimensions">
-      <description summary="window dimensions">
-        This event indicates the dimensions of the window in the compositor's
-        logical coordinate space. The width and height will always be strictly
-        greater than zero.
-
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.done event.
-      </description>
-      <arg name="width" type="int"/>
-      <arg name="height" type="int"/>
     </event>
 
     <request name="set_position">
@@ -190,6 +184,19 @@
       <arg name="x" type="int"/>
       <arg name="y" type="int"/>
     </request>
+
+    <event name="dimensions">
+      <description summary="window dimensions">
+        This event indicates the dimensions of the window in the compositor's
+        logical coordinate space. The width and height will always be strictly
+        greater than zero.
+
+        This event is double-buffered state and will be followed by a
+        river_window_manager_v1.done event.
+      </description>
+      <arg name="width" type="int"/>
+      <arg name="height" type="int"/>
+    </event>
 
     <request name="propose_dimensions">
       <description summary="propose window dimensions">
@@ -209,6 +216,125 @@
       </description>
       <arg name="width" type="int"/>
       <arg name="height" type="int"/>
+    </request>
+
+    <request name="place_above">
+      <description summary="place window above another window">
+        This request places the window above another window.
+
+        This request is double-buffered state and will not be applied until the
+        next river_window_manager_v1.commit request.
+      </description>
+      <arg name="other" type="object" interface="river_node_v1"/>
+    </request>
+
+    <request name="hide">
+      <description summary="request that the window be hidden">
+        Request that the window be hidden. Has no effect if the window is already
+        hidden. Hides any window borders and decorations as well.
+
+        This request is double-buffered state and will not be applied until the
+        next river_window_manager_v1.commit request.
+      </description>
+    </request>
+
+    <request name="show">
+      <description summary="request that the window be shown">
+        Request that the window be shown. Has no effect if the window is not
+        hidden. Does not guarantee that the window is visible as it may be
+        completely obscured by other windows placed above it for example.
+
+        This request is double-buffered state and will not be applied until the
+        next river_window_manager_v1.commit request.
+      </description>
+    </request>
+
+    <enum name="border_edges" bitfield="true">
+      <entry name="none" value="0"/>
+      <entry name="top" value="1"/>
+      <entry name="bottom" value="2"/>
+      <entry name="left" value="4"/>
+      <entry name="right" value="8"/>
+    </enum>
+
+    <request name="set_borders">
+      <description summary="set window borders">
+        This request decorates the window with borders drawn by the compositor
+        on the specified edges of the window. Borders are drawn above the window
+        content.
+
+        The color is defined by four 32-bit RGBA values. Unless specified in
+        another protocol extension, the RGBA values use pre-multiplied alpha.
+
+        Setting the edges to none or the width to 0 disables the borders.
+        Setting a negative width is a protocol error.
+
+        This request is double-buffered state and will not be applied until the
+        next river_window_manager_v1.commit request.
+      </description>
+      <arg name="edges" type="uint" enum="border_edges"/>
+      <arg name="width" type="int"/>
+      <arg name="r" type="uint"/>
+      <arg name="g" type="uint"/>
+      <arg name="b" type="uint"/>
+      <arg name="a" type="uint"/>
+    </request>
+
+    <request name="get_decoration">
+      <description summary="create a window decoration surface">
+        Create a window decoration surface for the window.
+
+        Providing a wl_surface which already has a role or already has a buffer
+        attached or committed is a protocol error, as is attaching/committing
+        a buffer before the first river_decoration_v1.configure event.
+
+        This request is double-buffered state and the new decoration will not be
+        configured by the server and rendered until the next
+        river_window_manager_v1.commit request.
+      </description>
+      <arg name="id" type="new_id" interface="river_decoration_v1"/>
+      <arg name="surface" type="object" interface="wl_surface"/>
+      <arg name="edge" type="uint" enum="decoration_edge"/>
+    </request>
+  </interface>
+
+  <interface name="river_decoration_v1" version="1">
+    <description summary="a window decoration">
+      This surface is rendered above the window's content and above the window's
+      borders.
+    </description>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the decoration object">
+        This request indicates that the client will no longer use the decoration
+        object and that it may be safely destroyed.
+      </description>
+    </request>
+
+    <request name="set_offset">
+      <description summary="set offset from the window's top left corner">
+        This request sets the offset of the decoration surface from the top left corner
+        of the window.
+
+        If this request is never sent the x and y offsets are defined to be 0.
+
+        This request is double-buffered state and will not be applied until the
+        next river_window_manager_v1.commit request.
+      </description>
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
+    </request>
+
+    <request name="sync_next_commit">
+      <description summary="sync surface commit with window manager commit">
+        Synchronize application of the next wl_surface.commit request on the
+        decoration surface with rest of the state atomically updated with the
+        next river_window_manager_v1.commit request.
+
+        The client must make a wl_surface.commit request on the decoration
+        surface after this request and before the river_window_manager_v1.commit
+        request, failure to do so is a protocol error.
+      </description>
     </request>
   </interface>
 
@@ -261,23 +387,6 @@
       </description>
       <arg name="x" type="int"/>
       <arg name="y" type="int"/>
-    </event>
-
-    <event name="dimensions">
-      <description summary="output dimensions">
-        This event indicates the dimensions of the output in the compositor's
-        logical coordinate space. The width/height will always be strictly
-        greater than zero.
-
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.done event.
-
-        The server must guarantee that the position and dimensions events do not
-        cause the areas of multiple logical outputs to overlap when the
-        corresponding river_window_manager_v1.done event is received.
-      </description>
-      <arg name="width" type="int"/>
-      <arg name="height" type="int"/>
     </event>
 
     <event name="dimensions">
