@@ -253,12 +253,10 @@ pub const MapToOutput = struct {
 };
 
 pub const ScrollFactor = struct {
-    value: ?f32 = null,
+    value: f32,
 
     fn apply(scroll_factor: ScrollFactor, device: *InputDevice) void {
-        if (scroll_factor.value) |value| {
-            device.config.scroll_factor = value;
-        }
+        device.config.scroll_factor = scroll_factor.value;
     }
 };
 
@@ -274,19 +272,21 @@ drag: ?DragState = null,
 @"disable-while-trackpointing": ?DwtpState = null,
 @"middle-emulation": ?MiddleEmulation = null,
 @"natural-scroll": ?NaturalScroll = null,
-@"scroll-factor": ScrollFactor = .{},
+@"scroll-factor": ?ScrollFactor = null,
 @"left-handed": ?LeftHanded = null,
 tap: ?TapState = null,
 @"tap-button-map": ?TapButtonMap = null,
 @"pointer-accel": ?PointerAccel = null,
 @"scroll-method": ?ScrollMethod = null,
 @"scroll-button": ?ScrollButton = null,
-@"map-to-output": MapToOutput = .{ .output_name = null },
+@"map-to-output": ?MapToOutput = null,
 
 pub fn deinit(config: *InputConfig) void {
     util.gpa.free(config.glob);
-    if (config.@"map-to-output".output_name) |output_name| {
-        util.gpa.free(output_name);
+    if (config.@"map-to-output") |@"map-to-output"| {
+        if (@"map-to-output".output_name) |output_name| {
+            util.gpa.free(output_name);
+        }
     }
 }
 
@@ -297,13 +297,15 @@ pub fn apply(config: *const InputConfig, device: *InputDevice) void {
     inline for (@typeInfo(InputConfig).Struct.fields) |field| {
         if (comptime mem.eql(u8, field.name, "glob")) continue;
 
-        if (comptime mem.eql(u8, field.name, "map-to-output")) {
-            @field(config, field.name).apply(device);
-        } else if (comptime mem.eql(u8, field.name, "scroll-factor")) {
-            @field(config, field.name).apply(device);
-        } else if (@field(config, field.name)) |setting| {
+        if (@field(config, field.name)) |setting| {
             log.debug("applying setting: {s}", .{field.name});
-            setting.apply(libinput_device);
+            if (comptime mem.eql(u8, field.name, "scroll-factor")) {
+                setting.apply(device);
+            } else if (comptime mem.eql(u8, field.name, "map-to-output")) {
+                setting.apply(device);
+            } else {
+                setting.apply(libinput_device);
+            }
         }
     }
 }
@@ -338,7 +340,9 @@ pub fn parse(config: *InputConfig, setting: []const u8, value: []const u8) !void
                     }
                 };
 
-                if (config.@"map-to-output".output_name) |old| util.gpa.free(old);
+                if (config.@"map-to-output") |@"map-to-output"| {
+                    if (@"map-to-output".output_name) |old| util.gpa.free(old);
+                }
                 config.@"map-to-output" = .{ .output_name = output_name_owned };
             } else {
                 const T = @typeInfo(field.type).Optional.child;
@@ -363,12 +367,12 @@ pub fn write(config: *InputConfig, writer: anytype) !void {
         if (comptime mem.eql(u8, field.name, "glob")) continue;
 
         if (comptime mem.eql(u8, field.name, "map-to-output")) {
-            if (@field(config, field.name).output_name) |output_name| {
-                try writer.print("\tmap-to-output: {s}\n", .{output_name});
+            if (@field(config, field.name)) |@"map-to-output"| {
+                try writer.print("\tmap-to-output: {s}\n", .{@"map-to-output".output_name orelse "disabled"});
             }
         } else if (comptime mem.eql(u8, field.name, "scroll-factor")) {
-            if (@field(config, field.name).value) |value| {
-                try writer.print("\tscroll-factor: {d}\n", .{value});
+            if (@field(config, field.name)) |@"scroll-offset"| {
+                try writer.print("\tscroll-factor: {d}\n", .{@"scroll-offset".value});
             }
         } else if (@field(config, field.name)) |setting| {
             // Special-case the settings which are not enums.
