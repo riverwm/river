@@ -81,12 +81,44 @@
       </description>
     </request>
 
-    <event name="done">
+    <event name="update">
       <description summary="all new state has been sent">
         This event is used to group state update events sent to the client into
         a single, atomic update.
+
+        Since some state changes require action from the window manager client
+        for frame perfection, the client should update the necessary state,
+        ack_update, and commit as soon as possible on receiving an update event.
+
+        For example, when the dimensions of a window change it may be necessary
+        for the window manager to resize its decoration surfaces to match. In
+        this case the compositor may wait for the window manager client to
+        adjust the decoration surface size, ack_update, and commit before
+        rendering the window at its new size to avoid imperfect frames where the
+        decoration surface size does not match the window size.
       </description>
+      <arg name="serial" type="uint"/>
     </event>
+
+    <request name="ack_update">
+      <description summary="ack an update event">
+        If a client makes a river_window_manager_v1.commit request in response
+        to a river_window_manager_v1.update event it must make an ack_update
+        request before the commit request with the serial of that update event.
+
+        If the client receives multiple update events before it can respond to
+        one, only the most recent update event must be acked.
+
+        A client may send multiple ack_update requests before committing. The
+        last request sent before a commit indicates which update event the
+        commit is in response to.
+
+        It is a protocol error to issue multiple ack_update requests referencing
+        the same update event or to issue an ack_update request referencing an
+        update event older than the last update event acked.
+      </description>
+      <arg name="serial" type="uint"/>
+    </request>
 
     <request name="commit">
       <description summary="commit double-buffered requested state">
@@ -142,7 +174,7 @@
         river_window_v1.destroy request to free up resources.
 
         This event is double-buffered state and will be followed by a
-        river_window_manager_v1.done event.
+        river_window_manager_v1.update event.
       </description>
     </event>
 
@@ -167,7 +199,7 @@
         negative.
 
         This event is double-buffered state and will be followed by a
-        river_window_manager_v1.done event.
+        river_window_manager_v1.update event.
       </description>
       <arg name="x" type="int"/>
       <arg name="y" type="int"/>
@@ -192,7 +224,7 @@
         greater than zero.
 
         This event is double-buffered state and will be followed by a
-        river_window_manager_v1.done event.
+        river_window_manager_v1.update event.
       </description>
       <arg name="width" type="int"/>
       <arg name="height" type="int"/>
@@ -326,7 +358,7 @@
     </request>
 
     <request name="sync_next_commit">
-      <description summary="sync surface commit with window manager commit">
+      <description summary="sync next surface commit to window manager commit">
         Synchronize application of the next wl_surface.commit request on the
         decoration surface with rest of the state atomically updated with the
         next river_window_manager_v1.commit request.
@@ -368,7 +400,7 @@
         physically unplugged or because some output configuration has changed.
 
         This event is double-buffered state and will be followed by a
-        river_window_manager_v1.done event.
+        river_window_manager_v1.update event.
       </description>
     </event>
 
@@ -379,11 +411,11 @@
         negative.
 
         This event is double-buffered state and will be followed by a
-        river_window_manager_v1.done event.
+        river_window_manager_v1.update event.
 
         The server must guarantee that the position and dimensions events do not
         cause the areas of multiple logical outputs to overlap when the
-        corresponding river_window_manager_v1.done event is received.
+        corresponding river_window_manager_v1.update event is received.
       </description>
       <arg name="x" type="int"/>
       <arg name="y" type="int"/>
@@ -396,11 +428,11 @@
         greater than zero.
 
         This event is double-buffered state and will be followed by a
-        river_window_manager_v1.done event.
+        river_window_manager_v1.update event.
 
         The server must guarantee that the position and dimensions events do not
         cause the areas of multiple logical outputs to overlap when the
-        corresponding river_window_manager_v1.done event is received.
+        corresponding river_window_manager_v1.update event is received.
       </description>
       <arg name="width" type="int"/>
       <arg name="height" type="int"/>
