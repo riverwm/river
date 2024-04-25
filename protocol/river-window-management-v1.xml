@@ -35,15 +35,10 @@
   <interface name="river_window_manager_v1" version="1">
     <description summary="TODO">
       TODO:
-       - handle frame-perfect interactive resize where committed window
-         dimensions don't match the requested ones exactly. Probably need a serial for done and an ack_done or similar.
-         In particular, window decoration surfaces need to be synced up to match what the client comitted.
-       - shell surfaces, placed below or above all windows, configurable
-         stacking order relative to each other
-       - rendering order
        - input
          - keybindings
          - interactive resize axes
+       - focus handling
        - more
 
     </description>
@@ -140,6 +135,17 @@
       </description>
       <arg name="id" type="new_id" interface="river_output_v1"/>
     </event>
+
+    <request name="get_shell_surface">
+      <description summary="create a shell surface for window manager UI">
+        Create a new shell surface for window manager UI.
+
+        Providing a wl_surface which already has a role or already has a buffer
+        attached or committed is a protocol error.
+      </description>
+      <arg name="id" type="new_id" interface="river_decoration_v1"/>
+      <arg name="surface" type="object" interface="wl_surface"/>
+    </request>
   </interface>
 
   <interface name="river_window_v1" version="1">
@@ -189,32 +195,11 @@
       </description>
     </request>
 
-    <event name="position">
-      <description summary="window position">
-        TODO: does this make sense with the node abstraction? Maybe needed to
-        handle interactive resize.
-
-        This event indicates the position of the window in the compositor's
-        logical coordinate space. The x and y coordinates may be positive or
-        negative.
-
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+    <request name="get_node">
+      <description summary="get the window's render list node">
+        Get the node in the render list corresponding to the window.
       </description>
-      <arg name="x" type="int"/>
-      <arg name="y" type="int"/>
-    </event>
-
-    <request name="set_position">
-      <description summary="set window position">
-        This request sets the position of the window in the compositor's logical
-        coordinate space. The x/y coordinates may be positive or negative.
-
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
-      </description>
-      <arg name="x" type="int"/>
-      <arg name="y" type="int"/>
+      <arg name="id" type="new_id" interface="river_node_v1"/>
     </request>
 
     <event name="dimensions">
@@ -248,16 +233,6 @@
       </description>
       <arg name="width" type="int"/>
       <arg name="height" type="int"/>
-    </request>
-
-    <request name="place_above">
-      <description summary="place window above another window">
-        This request places the window above another window.
-
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
-      </description>
-      <arg name="other" type="object" interface="river_node_v1"/>
     </request>
 
     <request name="hide">
@@ -317,12 +292,7 @@
         Create a window decoration surface for the window.
 
         Providing a wl_surface which already has a role or already has a buffer
-        attached or committed is a protocol error, as is attaching/committing
-        a buffer before the first river_decoration_v1.configure event.
-
-        This request is double-buffered state and the new decoration will not be
-        configured by the server and rendered until the next
-        river_window_manager_v1.commit request.
+        attached or committed is a protocol error.
       </description>
       <arg name="id" type="new_id" interface="river_decoration_v1"/>
       <arg name="surface" type="object" interface="wl_surface"/>
@@ -333,7 +303,8 @@
   <interface name="river_decoration_v1" version="1">
     <description summary="a window decoration">
       This surface is rendered above the window's content and above the window's
-      borders.
+      borders. The relative ordering of multiple decoration surfaces for the
+      same window is undefined by this protocol and left up to the compositor.
     </description>
 
     <request name="destroy" type="destructor">
@@ -345,10 +316,11 @@
 
     <request name="set_offset">
       <description summary="set offset from the window's top left corner">
-        This request sets the offset of the decoration surface from the top left corner
-        of the window.
+        This request sets the offset of the decoration surface from the top left
+        corner of the window.
 
-        If this request is never sent the x and y offsets are defined to be 0.
+        If this request is never sent, the x and y offsets are undefined by this
+        protocol and left up to the compositor.
 
         This request is double-buffered state and will not be applied until the
         next river_window_manager_v1.commit request.
@@ -367,6 +339,108 @@
         surface after this request and before the river_window_manager_v1.commit
         request, failure to do so is a protocol error.
       </description>
+    </request>
+  </interface>
+
+  <interface name="river_shell_surface_v1" version="1">
+    <description summary="a surface for window manager UI">
+      TODO dimensions event for interactive resize
+    </description>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the shell surface object">
+        This request indicates that the client will no longer use the shell
+        surface object and that it may be safely destroyed.
+      </description>
+    </request>
+
+    <request name="get_node">
+      <description summary="get the shell surface's render list node">
+        Get the node in the render list corresponding to the shell surface.
+      </description>
+      <arg name="id" type="new_id" interface="river_node_v1"/>
+    </request>
+
+    <request name="sync_next_commit">
+      <description summary="sync next surface commit to window manager commit">
+        Synchronize application of the next wl_surface.commit request on the
+        shell surface with rest of the state atomically updated with the next
+        river_window_manager_v1.commit request.
+
+        The client must make a wl_surface.commit request on the shell surface
+        after this request and before the river_window_manager_v1.commit
+        request, failure to do so is a protocol error.
+      </description>
+    </request>
+  </interface>
+
+  <interface name="river_node_v1" version="1">
+    <description summary="a node in the render list">
+      The render list is a list of nodes that determines the rendering order of
+      the compositor. Nodes may correspond to windows or shell surfaces. The
+      relative ordering of nodes may be changed with the place_above and
+      place_below requests, changing the rendering order.
+    </description>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the decoration object">
+        This request indicates that the client will no longer use the node
+        object and that it may be safely destroyed.
+      </description>
+    </request>
+
+    <request name="set_position">
+      <description summary="set absolute position of the node">
+        Set the absolute position of the node in the compositor's logical coordinate
+        space. The x/y coordinates may be positive or negative.
+
+        If this request is never sent, the position of the node is undefined by
+        this protocol and left up to the compositor.
+
+        This request is double-buffered state and will not be applied until the
+        next river_window_manager_v1.commit request.
+      </description>
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
+    </request>
+
+    <event name="position">
+      <description summary="the absolute position of the node has changed">
+        This event indicates the position of the node in the compositor's
+        logical coordinate space. The x and y coordinates may be positive or
+        negative.
+
+        While the window manager client usually sets the position of the node,
+        there are some cases in which the position must be modified by the
+        server in which case this event is sent to inform the client of the new
+        position. For example, this event is necessary to communicate the
+        results of interactive resize to the window manager client.
+
+        This event is double-buffered state and will be followed by a
+        river_window_manager_v1.update event.
+      </description>
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
+    </event>
+
+    <request name="place_above">
+      <description summary="place node above another node">
+        This request places the node above another node in the scene graph.
+
+        This request is double-buffered state and will not be applied until the
+        next river_window_manager_v1.commit request.
+      </description>
+      <arg name="other" type="object" interface="river_node_v1"/>
+    </request>
+
+    <request name="place_below">
+      <description summary="place node below another node">
+        This request places the node below another node in the scene graph.
+
+        This request is double-buffered state and will not be applied until the
+        next river_window_manager_v1.commit request.
+      </description>
+      <arg name="other" type="object" interface="river_node_v1"/>
     </request>
   </interface>
 
