@@ -297,7 +297,6 @@
       </description>
       <arg name="id" type="new_id" interface="river_decoration_v1"/>
       <arg name="surface" type="object" interface="wl_surface"/>
-      <arg name="edge" type="uint" enum="decoration_edge"/>
     </request>
   </interface>
 
