@@ -38,9 +38,7 @@
        - input
          - keybindings
          - interactive resize axes
-       - focus handling
        - more
-
     </description>
 
     <request name="stop">
@@ -136,6 +134,14 @@
       <arg name="id" type="new_id" interface="river_output_v1"/>
     </event>
 
+    <request name="get_seat">
+      <description summary="TODO">
+        TODO
+      </description>
+      <arg name="id" type="new_id" interface="river_seat_v1"/>
+      <arg name="seat" interface="wl_seat"/>
+    </request>
+
     <request name="get_shell_surface">
       <description summary="create a shell surface for window manager UI">
         Create a new shell surface for window manager UI.
@@ -143,7 +149,7 @@
         Providing a wl_surface which already has a role or already has a buffer
         attached or committed is a protocol error.
       </description>
-      <arg name="id" type="new_id" interface="river_decoration_v1"/>
+      <arg name="id" type="new_id" interface="river_shell_surface_v1"/>
       <arg name="surface" type="object" interface="wl_surface"/>
     </request>
   </interface>
@@ -514,6 +520,131 @@
       </description>
       <arg name="width" type="int"/>
       <arg name="height" type="int"/>
+    </event>
+  </interface>
+
+  <interface name="river_seat_v1" version="1">
+    <description summary="a extension of wl_seat for window management">
+       TODO
+       - start resize with edges
+       - start move
+    </description>
+
+    <request name="focus_window">
+      <description summary="give keyboard focus to a window">
+        Request that the compositor send keyboard input to the given window.
+
+        Despite this request, the compositor may temporarily give keyboard focus
+        to a wlr-layer-shell client requesting exclusive focus or similar if the
+        compositor supports such a protocol. In such a case, the compositor
+        should return focus to the specified window when the conditions that
+        caused the window manager's request to be overruled no longer hold.
+
+        This request is double-buffered state and will not be applied until the
+        next river_window_manager_v1.commit request.
+      </description>
+      <arg name="window" type="object" interface="river_window_v1"/>
+    </request>
+
+    <request name="focus_shell_surface">
+      <description summary="give keyboard focus to a shell_surface">
+        Request that the compositor send keyboard input to the given shell
+        surface.
+
+        Despite this request, the compositor may temporarily give keyboard focus
+        to a wlr-layer-shell client requesting exclusive focus or similar if the
+        compositor supports such a protocol. In such a case, the compositor
+        should return focus to the specified shell surface when the conditions
+        that caused the window manager's request to be overruled no longer hold.
+
+        This request is double-buffered state and will not be applied until the
+        next river_window_manager_v1.commit request.
+      </description>
+      <arg name="shell_surface" type="object" interface="river_shell_surface_v1"/>
+    </request>
+
+    <request name="clear_focus">
+      <description summary="clear keyboard focus">
+        Request that the compositor not send keyboard input to any client.
+
+        Despite this request, the compositor may temporarily give keyboard focus
+        to a wlr-layer-shell client requesting exclusive focus or similar if the
+        compositor supports such a protocol. In such a case, the compositor
+        should again clear focus when the conditions that caused the window
+        manager's request to be overruled no longer hold.
+
+        This request is double-buffered state and will not be applied until the
+        next river_window_manager_v1.commit request.
+      </description>
+    </request>
+
+    <event name="pointer_enter">
+      <description summary="pointer entered a window">
+        The seat's pointer entered the given window's area.
+
+        The area of a window is defined to include the area defined by the
+        window dimensions, borders configured using river_window_v1.set_borders,
+        and the input regions of decoration surfaces. In particular, it does not
+        include input regions of surfaces belonging to the window that extend
+        outside the window dimensions.
+
+        The pointer of a seat may only enter a single window at a time. When the
+        pointer moves between windows, the pointer_leave event for the old
+        window must be sent before the pointer_enter event for the new window.
+
+        This event is double-buffered state and will be followed by a
+        river_window_manager_v1.update event.
+      </description>
+      <arg name="window" type="object" interface="river_window_v1"/>
+    </event>
+
+    <event name="pointer_leave">
+      <description summary="pointer left a window">
+        The seat's pointer left the given window. See pointer_enter for details.
+
+        This event is double-buffered state and will be followed by a
+        river_window_manager_v1.update event.
+      </description>
+      <arg name="window" type="object" interface="river_window_v1"/>
+    </event>
+
+    <event name="pointer_motion">
+      <description summary="pointer moved">
+        The seat's pointer moved. The x and y coordinates are in the
+        compositor's logical coordinate space.
+
+        Rationale: pointer motion events in some form are necessary to implement
+        the "always" style of focus-follows-cursor. Choosing to expose global
+        pointer position/motion information to the window manager rather than
+        motion events relative to a window allows other potentially interesting
+        features, for example hot corners.
+
+        This event is double-buffered state and will be followed by a
+        river_window_manager_v1.update event.
+      </description>
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
+    </event>
+
+    <event name="window_interaction">
+      <description summary="a window has been interacted with">
+        A window has been interacted with beyond the pointer merely passing over
+        it. This event might be sent due to a pointer button press or due to a
+        touch/tablet tool interaction with the window.
+
+        There are no guarantees regarding how this event is sent in relation to
+        the pointer_enter and pointer_leave events as the interaction may use
+        touch or tablet tool input.
+
+        Rationale: this event gives window managers necessary information to
+        determine when to send keyboard focus, raise a window that already has
+        keyboard focus, etc. Rather than expose all pointer, touch, and tablet
+        events to window managers, a policy over mechanism approach is taken.
+
+        This event is double-buffered state and will be followed by a
+        river_window_manager_v1.update event.
+      </description>
+      <arg name="window" type="object" interface="river_window_v1"/>
     </event>
   </interface>
 </protocol>
