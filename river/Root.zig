@@ -814,6 +814,19 @@ fn processOutputConfig(
         var proposed_state = wlr.Output.State.init();
         head.state.apply(&proposed_state);
 
+        // Negative output coordinates currently cause Xwayland clients to not receive click events.
+        // See: https://gitlab.freedesktop.org/xorg/xserver/-/issues/899
+        if (build_options.xwayland and server.xwayland != null and
+            (head.state.x < 0 or head.state.y < 0))
+        {
+            std.log.scoped(.output_manager).err(
+                \\Attempted to set negative coordinates for output {s}.
+                \\Negative output coordinates are disallowed if Xwayland is enabled due to a limitation of Xwayland.
+            , .{output.wlr_output.name});
+            success = false;
+            continue;
+        }
+
         switch (action) {
             .test_only => {
                 if (!wlr_output.testState(&proposed_state)) success = false;
