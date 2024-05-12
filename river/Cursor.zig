@@ -769,6 +769,14 @@ fn handleRequestSetCursor(
 
 pub fn hide(cursor: *Cursor) void {
     if (cursor.pressed_count > 0) return;
+
+    // Hiding the cursor and sending wl_pointer.leave whlie a pointer constraint
+    // is active does not make much sense. In particular, doing so seems to interact
+    // poorly with Xwayland's pointer constraints implementation.
+    if (cursor.constraint) |constraint| {
+        if (constraint.state == .active) return;
+    }
+
     cursor.hidden = true;
     cursor.wlr_cursor.unsetImage();
     cursor.xcursor_name = null;
