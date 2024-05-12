@@ -489,7 +489,6 @@ fn tryAddDevice(seat: *Seat, wlr_device: *wlr.InputDevice) !void {
 
             seat.wlr_seat.setKeyboard(keyboard.device.wlr_device.toKeyboard());
             if (seat.wlr_seat.keyboard_state.focused_surface) |wlr_surface| {
-                seat.wlr_seat.keyboardNotifyClearFocus();
                 seat.keyboardNotifyEnter(wlr_surface);
             }
         },
