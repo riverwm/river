@@ -1,0 +1,18 @@
+name: Close Pull Request
+
+on:
+  pull_request_target:
+    types: [opened]
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: superbrothers/close-pull-request@v3
+      with:
+        comment: |
+          Thanks for your interest in contributing to river!
+
+          Unfortunately, you are in the wrong place. As stated in the README, this github repo is a read-only mirror and development happens on codeberg: https://codeberg.org/river/river.
+
+          Please open a pull request on codeberg instead.
