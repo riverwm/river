@@ -67,6 +67,7 @@ pub fn swap(
         assert(!target.pending.float);
         assert(!target.pending.fullscreen);
         seat.focused.view.pending_wm_stack_link.swapWith(&target.pending_wm_stack_link);
+        seat.cursor.may_need_warp = true;
         server.root.applyPending();
     }
 }
