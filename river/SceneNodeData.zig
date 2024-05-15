@@ -24,6 +24,7 @@ const util = @import("util.zig");
 
 const LayerSurface = @import("LayerSurface.zig");
 const LockSurface = @import("LockSurface.zig");
+const InputPopup = @import("InputPopup.zig");
 const View = @import("View.zig");
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
@@ -65,10 +66,8 @@ pub fn fromNode(node: *wlr.SceneNode) ?*SceneNodeData {
 }
 
 pub fn fromSurface(surface: *wlr.Surface) ?*SceneNodeData {
-    if (surface.getRootSurface()) |root_surface| {
-        if (@as(?*wlr.SceneNode, @ptrFromInt(root_surface.data))) |node| {
-            return fromNode(node);
-        }
+    if (@as(?*wlr.SceneNode, @ptrFromInt(surface.getRootSurface().data))) |node| {
+        return fromNode(node);
     }
     return null;
 }
