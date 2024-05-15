@@ -289,21 +289,17 @@ fn allowlist(server: *Server, global: *const wl.Global) bool {
     if (server.drm) |drm| if (global == drm.global) return true;
     if (server.linux_dmabuf) |linux_dmabuf| if (global == linux_dmabuf.global) return true;
 
-    {
-        var it = server.root.all_outputs.iterator(.forward);
-        while (it.next()) |output| {
-            if (global == output.wlr_output.global) return true;
-        }
-    }
-
-    {
-        var it = server.input_manager.seats.first;
-        while (it) |node| : (it = node.next) {
-            if (global == node.data.wlr_seat.global) return true;
-        }
-    }
-
-    return global == hackGlobal(server.shm) or
+    // We must use the getInterface() approach for dynamically created globals
+    // such as wl_output and wl_seat since the wl_global_create() function will
+    // advertise the global to clients and invoke this filter before returning
+    // the new global pointer.
+    //
+    // For other globals I like the current pointer comparison approach as it
+    // should catch river accidentally exposing multiple copies of e.g. wl_shm
+    // with an assertion failure.
+    return global.getInterface() == wl.Output.getInterface() or
+        global.getInterface() == wl.Seat.getInterface() or
+        global == hackGlobal(server.shm) or
         global == hackGlobal(server.single_pixel_buffer_manager) or
         global == server.viewporter.global or
         global == server.fractional_scale_manager.global or
