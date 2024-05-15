@@ -66,6 +66,11 @@ fn handleEnable(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) v
     const text_input = @fieldParentPtr(TextInput, "enable", listener);
     const seat: *Seat = @ptrFromInt(text_input.wlr_text_input.seat.data);
 
+    if (text_input.wlr_text_input.focused_surface == null) {
+        log.err("client requested to enable text input without focus, ignoring request", .{});
+        return;
+    }
+
     // The same text_input object may be enabled multiple times consecutively
     // without first disabling it. Enabling a different text input object without
     // first disabling the current one is disallowed by the protocol however.
