@@ -52,8 +52,8 @@ grab_keyboard: wl.Listener(*wlr.InputMethodV2.KeyboardGrab) =
     wl.Listener(*wlr.InputMethodV2.KeyboardGrab).init(handleInputMethodGrabKeyboard),
 input_method_destroy: wl.Listener(*wlr.InputMethodV2) =
     wl.Listener(*wlr.InputMethodV2).init(handleInputMethodDestroy),
-input_method_new_popup_surface: wl.Listener(*wlr.InputPopupSurfaceV2) =
-    wl.Listener(*wlr.InputPopupSurfaceV2).init(handleInputMethodNewPopupSurface),
+input_method_new_popup: wl.Listener(*wlr.InputPopupSurfaceV2) =
+    wl.Listener(*wlr.InputPopupSurfaceV2).init(handleInputMethodNewPopup),
 
 grab_keyboard_destroy: wl.Listener(*wlr.InputMethodV2.KeyboardGrab) =
     wl.Listener(*wlr.InputMethodV2.KeyboardGrab).init(handleInputMethodGrabKeyboardDestroy),
@@ -82,7 +82,7 @@ pub fn newInputMethod(relay: *InputRelay, input_method: *wlr.InputMethodV2) void
     input_method.events.commit.add(&relay.input_method_commit);
     input_method.events.grab_keyboard.add(&relay.grab_keyboard);
     input_method.events.destroy.add(&relay.input_method_destroy);
-    input_method.events.new_popup_surface.add(&relay.input_method_new_popup_surface);
+    input_method.events.new_popup_surface.add(&relay.input_method_new_popup);
 
     if (seat.focused.surface()) |surface| {
         relay.focus(surface);
@@ -133,7 +133,7 @@ fn handleInputMethodDestroy(
     relay.input_method_commit.link.remove();
     relay.grab_keyboard.link.remove();
     relay.input_method_destroy.link.remove();
-    relay.input_method_new_popup_surface.link.remove();
+    relay.input_method_new_popup.link.remove();
     relay.input_method = null;
 
     relay.focus(null);
@@ -154,13 +154,13 @@ fn handleInputMethodGrabKeyboard(
     keyboard_grab.events.destroy.add(&relay.grab_keyboard_destroy);
 }
 
-fn handleInputMethodNewPopupSurface(
+fn handleInputMethodNewPopup(
     listener: *wl.Listener(*wlr.InputPopupSurfaceV2),
-    input_method_new_popup_surface: *wlr.InputPopupSurfaceV2,
+    wlr_popup: *wlr.InputPopupSurfaceV2,
 ) void {
-    log.debug("new input_method_popup_surface", .{});
-    const relay = @fieldParentPtr(InputRelay, "input_method_new_popup_surface", listener);
-    InputPopup.create(input_method_new_popup_surface, relay) catch {
+    const relay = @fieldParentPtr(InputRelay, "input_method_new_popup", listener);
+
+    InputPopup.create(wlr_popup, relay) catch {
         log.err("out of memory", .{});
         return;
     };
@@ -180,13 +180,16 @@ fn handleInputMethodGrabKeyboardDestroy(
 
 pub fn disableTextInput(relay: *InputRelay) void {
     assert(relay.text_input != null);
+    relay.text_input = null;
 
     if (relay.input_method) |input_method| {
+        {
+            var it = relay.input_popups.iterator(.forward);
+            while (it.next()) |popup| popup.update();
+        }
         input_method.sendDeactivate();
         input_method.sendDone();
     }
-
-    relay.text_input = null;
 }
 
 pub fn sendInputMethodState(relay: *InputRelay) void {
@@ -215,11 +218,11 @@ pub fn sendInputMethodState(relay: *InputRelay) void {
         );
     }
 
-    // Update input popups
-    var it = relay.input_popups.iterator(.forward);
-    while (it.next()) |popup| {
-        popup.update();
+    {
+        var it = relay.input_popups.iterator(.forward);
+        while (it.next()) |popup| popup.update();
     }
+
     input_method.sendDone();
 }
 

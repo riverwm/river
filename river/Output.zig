@@ -99,7 +99,7 @@ layers: struct {
     fullscreen: *wlr.SceneTree,
     /// Overlay layer shell layer
     overlay: *wlr.SceneTree,
-    /// xdg-popups of views and layer-shell surfaces
+    /// Popups from xdg-shell and input-method-v2 clients.
     popups: *wlr.SceneTree,
 },
 

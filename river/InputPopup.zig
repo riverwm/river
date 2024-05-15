@@ -17,40 +17,27 @@
 
 const InputPopup = @This();
 
-const build_options = @import("build_options");
 const std = @import("std");
 const assert = std.debug.assert;
-const mem = std.mem;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
-const server = &@import("main.zig").server;
 
+const server = &@import("main.zig").server;
 const util = @import("util.zig");
+
 const InputRelay = @import("InputRelay.zig");
-const TextInput = @import("TextInput.zig");
-const Root = @import("Root.zig");
-const View = @import("View.zig");
-const LayerSurface = @import("LayerSurface.zig");
-const XdgToplevel = @import("XdgToplevel.zig");
-const XwaylandView = @import("XwaylandView.zig");
+const SceneNodeData = @import("SceneNodeData.zig");
 
 link: wl.list.Link,
-scene_tree: ?*wlr.SceneTree = null,
-parent_scene_tree: ?*wlr.SceneTree = null,
-scene_surface: ?*wlr.SceneTree = null,
-view: ?*View = null,
-
 input_relay: *InputRelay,
-wlr_popup: *wlr.InputPopupSurfaceV2,
 
-destroy: wl.Listener(void) =
-    wl.Listener(void).init(handleDestroy),
-map: wl.Listener(void) =
-    wl.Listener(void).init(handleMap),
-unmap: wl.Listener(void) =
-    wl.Listener(void).init(handleUnmap),
-commit: wl.Listener(*wlr.Surface) =
-    wl.Listener(*wlr.Surface).init(handleCommit),
+wlr_popup: *wlr.InputPopupSurfaceV2,
+surface_tree: *wlr.SceneTree,
+
+destroy: wl.Listener(void) = wl.Listener(void).init(handleDestroy),
+map: wl.Listener(void) = wl.Listener(void).init(handleMap),
+unmap: wl.Listener(void) = wl.Listener(void).init(handleUnmap),
+commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
 
 pub fn create(wlr_popup: *wlr.InputPopupSurfaceV2, input_relay: *InputRelay) !void {
     const input_popup = try util.gpa.create(InputPopup);
@@ -60,33 +47,30 @@ pub fn create(wlr_popup: *wlr.InputPopupSurfaceV2, input_relay: *InputRelay) !vo
         .link = undefined,
         .input_relay = input_relay,
         .wlr_popup = wlr_popup,
+        .surface_tree = try server.root.hidden.tree.createSceneSubsurfaceTree(wlr_popup.surface),
     };
+
+    input_relay.input_popups.append(input_popup);
 
     input_popup.wlr_popup.events.destroy.add(&input_popup.destroy);
     input_popup.wlr_popup.surface.events.map.add(&input_popup.map);
     input_popup.wlr_popup.surface.events.unmap.add(&input_popup.unmap);
     input_popup.wlr_popup.surface.events.commit.add(&input_popup.commit);
 
-    input_relay.input_popups.append(input_popup);
     input_popup.update();
 }
 
 fn handleDestroy(listener: *wl.Listener(void)) void {
     const input_popup = @fieldParentPtr(InputPopup, "destroy", listener);
 
+    input_popup.destroy.link.remove();
     input_popup.map.link.remove();
     input_popup.unmap.link.remove();
     input_popup.commit.link.remove();
-    input_popup.destroy.link.remove();
+
     input_popup.link.remove();
 
     util.gpa.destroy(input_popup);
-}
-
-fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
-    const input_popup = @fieldParentPtr(InputPopup, "commit", listener);
-
-    input_popup.update();
 }
 
 fn handleMap(listener: *wl.Listener(void)) void {
@@ -98,132 +82,107 @@ fn handleMap(listener: *wl.Listener(void)) void {
 fn handleUnmap(listener: *wl.Listener(void)) void {
     const input_popup = @fieldParentPtr(InputPopup, "unmap", listener);
 
-    input_popup.scene_tree.?.node.destroy();
-    input_popup.scene_tree = null;
+    input_popup.surface_tree.node.reparent(server.root.hidden.tree);
+}
+
+fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
+    const input_popup = @fieldParentPtr(InputPopup, "commit", listener);
+
+    input_popup.update();
 }
 
 pub fn update(input_popup: *InputPopup) void {
-    var text_input = input_popup.getTextInputFocused() orelse return;
+    const text_input = input_popup.input_relay.text_input orelse {
+        input_popup.surface_tree.node.reparent(server.root.hidden.tree);
+        return;
+    };
+
+    if (!input_popup.wlr_popup.surface.mapped) return;
+
+    // This seems like it could be null if the focused surface is destroyed
     const focused_surface = text_input.wlr_text_input.focused_surface orelse return;
 
-    if (!input_popup.wlr_popup.surface.mapped) {
+    // Focus should never be sent to subsurfaces
+    assert(focused_surface.getRootSurface() == focused_surface);
+
+    const focused = SceneNodeData.fromSurface(focused_surface) orelse return;
+
+    const output = switch (focused.data) {
+        .view => |view| view.current.output orelse return,
+        .layer_surface => |layer_surface| layer_surface.output,
+        .lock_surface => |lock_surface| lock_surface.getOutput(),
+        // Xwayland doesn't use the text-input protocol
+        .override_redirect => unreachable,
+    };
+
+    const popup_tree = switch (focused.data) {
+        .view => |view| view.popup_tree,
+        .layer_surface => |layer_surface| layer_surface.popup_tree,
+        .lock_surface => |lock_surface| lock_surface.getOutput().layers.popups,
+        // Xwayland doesn't use the text-input protocol
+        .override_redirect => unreachable,
+    };
+
+    input_popup.surface_tree.node.reparent(popup_tree);
+
+    if (!text_input.wlr_text_input.current.features.cursor_rectangle) {
+        // If the text-input client does not inform us where in the surface
+        // the active text input is there's not much we can do. Placing the
+        // popup at the top left corner of the window is nice and simple
+        // while not looking terrible.
+        input_popup.surface_tree.node.setPosition(0, 0);
         return;
     }
 
+    var focused_x: c_int = undefined;
+    var focused_y: c_int = undefined;
+    _ = focused.node.coords(&focused_x, &focused_y);
+
     var output_box: wlr.Box = undefined;
-    var parent: wlr.Box = undefined;
+    server.root.output_layout.getBox(output.wlr_output, &output_box);
 
-    input_popup.getParentAndOutputBox(focused_surface, &parent, &output_box);
+    // Relative to the surface with the active text input
+    var cursor_box = text_input.wlr_text_input.current.cursor_rectangle;
 
-    var cursor_rect = if (text_input.wlr_text_input.current.features.cursor_rectangle)
-        text_input.wlr_text_input.current.cursor_rectangle
-    else
-        wlr.Box{
-            .x = 0,
-            .y = 0,
-            .width = parent.width,
-            .height = parent.height,
-        };
+    // Adjust to be relative to the output
+    cursor_box.x += focused_x - output_box.x;
+    cursor_box.y += focused_y - output_box.y;
 
-    const popup_width = input_popup.wlr_popup.surface.current.width;
-    const popup_height = input_popup.wlr_popup.surface.current.height;
+    // Choose popup x/y relative to the output:
 
-    const cursor_rect_left = parent.x + cursor_rect.x;
-    const popup_anchor_left = blk: {
-        const cursor_rect_right = cursor_rect_left + cursor_rect.width;
-        const available_right_of_cursor = output_box.x + output_box.width - cursor_rect_left;
-        const available_left_of_cursor = cursor_rect_right - output_box.x;
-        if (available_right_of_cursor < popup_width and available_left_of_cursor > popup_width) {
-            break :blk cursor_rect_right - popup_width;
+    // Align the left edge of the popup with the left edge of the cursor.
+    // If the popup wouldn't fit on the output instead align the right edge
+    // of the popup with the right edge of the cursor.
+    const popup_x = blk: {
+        const popup_width = input_popup.wlr_popup.surface.current.width;
+        if (output_box.width - cursor_box.x >= popup_width) {
+            break :blk cursor_box.x;
         } else {
-            break :blk cursor_rect_left;
+            break :blk cursor_box.x + cursor_box.width - popup_width;
         }
     };
 
-    const cursor_rect_up = parent.y + cursor_rect.y;
-    const popup_anchor_up = blk: {
-        const cursor_rect_down = cursor_rect_up + cursor_rect.height;
-        const available_down_of_cursor = output_box.y + output_box.height - cursor_rect_down;
-        const available_up_of_cursor = cursor_rect_up - output_box.y;
-        if (available_down_of_cursor < popup_height and available_up_of_cursor > popup_height) {
-            break :blk cursor_rect_up - popup_height;
+    // Align the top edge of the popup with the bottom edge of the cursor.
+    // If the popup wouldn't fit on the output instead align the bottom edge
+    // of the popup with the top edge of the cursor.
+    const popup_y = blk: {
+        const popup_height = input_popup.wlr_popup.surface.current.height;
+        if (output_box.height - (cursor_box.y + cursor_box.height) >= popup_height) {
+            break :blk cursor_box.y + cursor_box.height;
         } else {
-            break :blk cursor_rect_down;
+            break :blk cursor_box.y - popup_height;
         }
     };
 
-    if (text_input.wlr_text_input.current.features.cursor_rectangle) {
-        var box = wlr.Box{
-            .x = cursor_rect_left - popup_anchor_left,
-            .y = cursor_rect_up - popup_anchor_up,
-            .width = cursor_rect.width,
-            .height = cursor_rect.height,
-        };
-        input_popup.wlr_popup.sendTextInputRectangle(&box);
-    }
+    // Scene node position is relative to the parent so adjust popup x/y to
+    // be relative to the focused surface.
+    input_popup.surface_tree.node.setPosition(
+        popup_x - focused_x + output_box.x,
+        popup_y - focused_y + output_box.y,
+    );
 
-    if (input_popup.scene_tree == null) {
-        input_popup.scene_tree = input_popup.parent_scene_tree.?.createSceneTree() catch {
-            std.log.err("out of memory", .{});
-            return;
-        };
-
-        input_popup.scene_surface = input_popup.scene_tree.?
-            .createSceneSubsurfaceTree(
-            input_popup.wlr_popup.surface,
-        ) catch {
-            std.log.err("out of memory", .{});
-            input_popup.wlr_popup.surface.resource.getClient().postNoMemory();
-            return;
-        };
-    }
-    input_popup.scene_tree.?.node.setPosition(popup_anchor_left - parent.x, popup_anchor_up - parent.y);
-}
-
-pub fn getTextInputFocused(input_popup: *InputPopup) ?*TextInput {
-    var it = input_popup.input_relay.text_inputs.iterator(.forward);
-    while (it.next()) |text_input| {
-        if (text_input.wlr_text_input.focused_surface != null) return text_input;
-    }
-    return null;
-}
-
-pub fn getParentAndOutputBox(
-    input_popup: *InputPopup,
-    focused_surface: *wlr.Surface,
-    parent: *wlr.Box,
-    output_box: *wlr.Box,
-) void {
-    if (wlr.LayerSurfaceV1.tryFromWlrSurface(focused_surface)) |wlr_layer_surface| {
-        const layer_surface: *LayerSurface = @ptrFromInt(wlr_layer_surface.data);
-        input_popup.parent_scene_tree = layer_surface.popup_tree;
-        const output = layer_surface.output.wlr_output;
-        server.root.output_layout.getBox(output, output_box);
-        _ = layer_surface.popup_tree.node.coords(&parent.x, &parent.y);
-    } else {
-        const view = getViewFromWlrSurface(focused_surface) orelse return;
-        input_popup.parent_scene_tree = view.tree;
-        _ = view.tree.node.coords(&parent.x, &parent.y);
-        const output = view.current.output orelse return;
-        server.root.output_layout.getBox(output.wlr_output, output_box);
-        parent.width = view.current.box.width;
-        parent.height = view.current.box.height;
-    }
-}
-
-fn getViewFromWlrSurface(wlr_surface: *wlr.Surface) ?*View {
-    if (wlr.XdgSurface.tryFromWlrSurface(wlr_surface)) |xdg_surface| {
-        const xdg_toplevel: *XdgToplevel = @ptrFromInt(xdg_surface.data);
-        return xdg_toplevel.view;
-    }
-    if (build_options.xwayland) {
-        if (wlr.XwaylandSurface.tryFromWlrSurface(wlr_surface)) |xwayland_surface| {
-            const xwayland_view: *XwaylandView = @ptrFromInt(xwayland_surface.data);
-            return xwayland_view.view;
-        }
-    }
-    if (wlr.Subsurface.tryFromWlrSurface(wlr_surface)) |wlr_subsurface| {
-        if (wlr_subsurface.parent) |parent| return getViewFromWlrSurface(parent);
-    }
-    return null;
+    // The text input rectangle sent to the input method is relative to the popup.
+    cursor_box.x -= popup_x;
+    cursor_box.y -= popup_y;
+    input_popup.wlr_popup.sendTextInputRectangle(&cursor_box);
 }
