@@ -26,7 +26,7 @@ const wl = @import("wayland").server.wl;
 const util = @import("util.zig");
 
 const TextInput = @import("TextInput.zig");
-const InputMethodPopup = @import("InputMethodPopup.zig");
+const InputPopup = @import("InputPopup.zig");
 const Seat = @import("Seat.zig");
 
 const log = std.log.scoped(.input_relay);
@@ -41,7 +41,7 @@ text_inputs: wl.list.Head(TextInput, .link),
 /// already in use new input methods are ignored.
 /// If this is null, no text input enter events will be sent.
 input_method: ?*wlr.InputMethodV2 = null,
-input_method_popups: wl.list.Head(InputMethodPopup, .link),
+input_popups: wl.list.Head(InputPopup, .link),
 /// The currently enabled text input for the currently focused surface.
 /// Always null if there is no input method.
 text_input: ?*TextInput = null,
@@ -59,10 +59,10 @@ grab_keyboard_destroy: wl.Listener(*wlr.InputMethodV2.KeyboardGrab) =
     wl.Listener(*wlr.InputMethodV2.KeyboardGrab).init(handleInputMethodGrabKeyboardDestroy),
 
 pub fn init(relay: *InputRelay) void {
-    relay.* = .{ .text_inputs = undefined, .input_method_popups = undefined };
+    relay.* = .{ .text_inputs = undefined, .input_popups = undefined };
 
     relay.text_inputs.init();
-    relay.input_method_popups.init();
+    relay.input_popups.init();
 }
 
 pub fn newInputMethod(relay: *InputRelay, input_method: *wlr.InputMethodV2) void {
@@ -160,7 +160,7 @@ fn handleInputMethodNewPopupSurface(
 ) void {
     log.debug("new input_method_popup_surface", .{});
     const relay = @fieldParentPtr(InputRelay, "input_method_new_popup_surface", listener);
-    InputMethodPopup.create(input_method_new_popup_surface, relay) catch {
+    InputPopup.create(input_method_new_popup_surface, relay) catch {
         log.err("out of memory", .{});
         return;
     };
@@ -216,9 +216,9 @@ pub fn sendInputMethodState(relay: *InputRelay) void {
     }
 
     // Update input popups
-    var it = relay.input_method_popups.iterator(.forward);
+    var it = relay.input_popups.iterator(.forward);
     while (it.next()) |popup| {
-        popup.updatePopup();
+        popup.update();
     }
     input_method.sendDone();
 }
