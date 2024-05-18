@@ -73,7 +73,6 @@ pub fn maybeActivate(constraint: *PointerConstraint) void {
     const seat: *Seat = @ptrFromInt(constraint.wlr_constraint.seat.data);
 
     assert(seat.cursor.constraint == constraint);
-    assert(seat.wlr_seat.keyboard_state.focused_surface == constraint.wlr_constraint.surface);
 
     if (constraint.state == .active) return;
 
