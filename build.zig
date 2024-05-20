@@ -4,7 +4,7 @@ const Build = std.Build;
 const fs = std.fs;
 const mem = std.mem;
 
-const Scanner = @import("deps/zig-wayland/build.zig").Scanner;
+const Scanner = @import("zig-wayland").Scanner;
 
 /// While a river release is in development, this string should contain the version in development
 /// with the "-dev" suffix.
@@ -132,32 +132,20 @@ pub fn build(b: *Build) !void {
     scanner.generate("zwlr_layer_shell_v1", 4);
     scanner.generate("zwlr_output_power_manager_v1", 1);
 
-    const wayland = b.createModule(.{
-        .root_source_file = scanner.result,
-        .target = target,
-    });
+    const wayland = b.createModule(.{ .root_source_file = scanner.result });
 
-    const xkbcommon = b.createModule(.{
-        .root_source_file = .{ .path = "deps/zig-xkbcommon/src/xkbcommon.zig" },
-        .target = target,
-    });
-    xkbcommon.linkSystemLibrary("xkbcommon", .{});
+    const xkbcommon = b.dependency("zig-xkbcommon", .{}).module("xkbcommon");
+    const pixman = b.dependency("zig-pixman", .{}).module("pixman");
 
-    const pixman = b.createModule(.{
-        .root_source_file = .{ .path = "deps/zig-pixman/pixman.zig" },
-        .target = target,
-    });
-    pixman.linkSystemLibrary("pixman-1", .{});
+    const wlroots = b.dependency("zig-wlroots", .{}).module("wlroots");
+    wlroots.addImport("wayland", wayland);
+    wlroots.addImport("xkbcommon", xkbcommon);
+    wlroots.addImport("pixman", pixman);
 
-    const wlroots = b.createModule(.{
-        .root_source_file = .{ .path = "deps/zig-wlroots/src/wlroots.zig" },
-        .imports = &.{
-            .{ .name = "wayland", .module = wayland },
-            .{ .name = "xkbcommon", .module = xkbcommon },
-            .{ .name = "pixman", .module = pixman },
-        },
-        .target = target,
-    });
+    // We need to ensure the wlroots include path obtained from pkg-config is
+    // exposed to the wlroots module for @cImport() to work. This seems to be
+    // the best way to do so with the current std.Build API.
+    wlroots.resolved_target = target;
     wlroots.linkSystemLibrary("wlroots", .{});
 
     const flags = b.createModule(.{ .root_source_file = .{ .path = "common/flags.zig" } });
@@ -179,6 +167,9 @@ pub fn build(b: *Build) !void {
         river.linkSystemLibrary("libevdev");
         river.linkSystemLibrary("libinput");
         river.linkSystemLibrary("wayland-server");
+        river.linkSystemLibrary("wlroots");
+        river.linkSystemLibrary("xkbcommon");
+        river.linkSystemLibrary("pixman-1");
 
         river.root_module.addImport("wayland", wayland);
         river.root_module.addImport("xkbcommon", xkbcommon);
@@ -191,7 +182,6 @@ pub fn build(b: *Build) !void {
             .file = .{ .path = "river/wlroots_log_wrapper.c" },
             .flags = &.{ "-std=c99", "-O2" },
         });
-        river.linkSystemLibrary("wlroots");
 
         // TODO: remove when zig issue #131 is implemented
         scanner.addCSource(river);
