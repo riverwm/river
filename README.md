@@ -51,12 +51,7 @@ commands to set up the user's configuration.
 
 ## Building
 
-On cloning the repository, you must init and update the submodules as well
-with e.g.
-
-```
-git submodule update --init
-```
+Note: If you are packaging river for distribution, see [PACKAGING.md](PACKAGING.md).
 
 To compile river first ensure that you have the following dependencies
 installed. The "development" versions are required if applicable to your
@@ -76,10 +71,7 @@ Then run, for example:
 ```
 zig build -Doptimize=ReleaseSafe --prefix ~/.local install
 ```
-To enable experimental Xwayland support pass the `-Dxwayland` option as well.
-
-If you are packaging river for distribution, see also
-[PACKAGING.md](PACKAGING.md).
+To enable Xwayland support pass the `-Dxwayland` option as well.
 
 ## Usage
 
