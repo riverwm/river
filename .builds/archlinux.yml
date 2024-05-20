@@ -55,3 +55,4 @@ tasks:
       zig fmt --check riverctl/
       zig fmt --check rivertile/
       zig fmt --check build.zig
+      zig fmt --check build.zig.zon
