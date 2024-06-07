@@ -36,10 +36,11 @@ pub const Orientation = enum {
     vertical,
 };
 
-// zig fmt: off
-const command_impls = std.ComptimeStringMap(
+const command_impls = std.StaticStringMap(
     *const fn (*Seat, []const [:0]const u8, *?[]const u8) Error!void,
+).initComptime(
     .{
+        // zig fmt: off
         .{ "attach-mode",               @import("command/attach_mode.zig").defaultAttachMode },
         .{ "background-color",          @import("command/config.zig").backgroundColor },
         .{ "border-color-focused",      @import("command/config.zig").borderColorFocused },
@@ -96,9 +97,9 @@ const command_impls = std.ComptimeStringMap(
         .{ "unmap-switch",              @import("command/map.zig").unmapSwitch },
         .{ "xcursor-theme",             @import("command/xcursor_theme.zig").xcursorTheme },
         .{ "zoom",                      @import("command/zoom.zig").zoom },
+        // zig fmt: on
     },
 );
-// zig fmt: on
 
 pub const Error = error{
     NoCommand,
