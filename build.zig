@@ -148,13 +148,13 @@ pub fn build(b: *Build) !void {
     wlroots.resolved_target = target;
     wlroots.linkSystemLibrary("wlroots", .{});
 
-    const flags = b.createModule(.{ .root_source_file = .{ .path = "common/flags.zig" } });
-    const globber = b.createModule(.{ .root_source_file = .{ .path = "common/globber.zig" } });
+    const flags = b.createModule(.{ .root_source_file = b.path("common/flags.zig") });
+    const globber = b.createModule(.{ .root_source_file = b.path("common/globber.zig") });
 
     {
         const river = b.addExecutable(.{
             .name = "river",
-            .root_source_file = .{ .path = "river/main.zig" },
+            .root_source_file = b.path("river/main.zig"),
             .target = target,
             .optimize = optimize,
             .strip = strip,
@@ -179,7 +179,7 @@ pub fn build(b: *Build) !void {
         river.root_module.addImport("globber", globber);
 
         river.addCSourceFile(.{
-            .file = .{ .path = "river/wlroots_log_wrapper.c" },
+            .file = b.path("river/wlroots_log_wrapper.c"),
             .flags = &.{ "-std=c99", "-O2" },
         });
 
@@ -195,7 +195,7 @@ pub fn build(b: *Build) !void {
     {
         const riverctl = b.addExecutable(.{
             .name = "riverctl",
-            .root_source_file = .{ .path = "riverctl/main.zig" },
+            .root_source_file = b.path("riverctl/main.zig"),
             .target = target,
             .optimize = optimize,
             .strip = strip,
@@ -220,7 +220,7 @@ pub fn build(b: *Build) !void {
     {
         const rivertile = b.addExecutable(.{
             .name = "rivertile",
-            .root_source_file = .{ .path = "rivertile/main.zig" },
+            .root_source_file = b.path("rivertile/main.zig"),
             .target = target,
             .optimize = optimize,
             .strip = strip,
@@ -265,7 +265,7 @@ pub fn build(b: *Build) !void {
             // Even passing a buffer to std.Build.Step.Run appears to be racy and occasionally deadlocks.
             const scdoc = b.addSystemCommand(&.{ "/bin/sh", "-c", "scdoc < doc/" ++ page ++ ".1.scd" });
             // This makes the caching work for the Workaround, and the extra argument is ignored by /bin/sh.
-            scdoc.addFileArg(.{ .path = "doc/" ++ page ++ ".1.scd" });
+            scdoc.addFileArg(b.path("doc/" ++ page ++ ".1.scd"));
 
             const stdout = scdoc.captureStdOut();
             b.getInstallStep().dependOn(&b.addInstallFile(stdout, "share/man/man1/" ++ page ++ ".1").step);
@@ -286,7 +286,7 @@ pub fn build(b: *Build) !void {
 
     {
         const globber_test = b.addTest(.{
-            .root_source_file = .{ .path = "common/globber.zig" },
+            .root_source_file = b.path("common/globber.zig"),
             .target = target,
             .optimize = optimize,
         });
