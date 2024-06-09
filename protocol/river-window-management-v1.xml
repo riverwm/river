@@ -35,10 +35,7 @@
   <interface name="river_window_manager_v1" version="1">
     <description summary="TODO">
       TODO:
-       - input
-         - keybindings
-         - interactive resize axes
-       - more
+        - fill in missing bits (maximize, fullscreen, etc)
     </description>
 
     <request name="stop">
@@ -139,7 +136,7 @@
         TODO
       </description>
       <arg name="id" type="new_id" interface="river_seat_v1"/>
-      <arg name="seat" interface="wl_seat"/>
+      <arg name="seat" type="object" interface="wl_seat"/>
     </request>
 
     <request name="get_shell_surface">
@@ -502,7 +499,7 @@
 
         This request should be made by the client after the
         river_output_v1.removed event is received to complete destruction of the
-        window.
+        output.
       </description>
     </request>
 
@@ -565,6 +562,13 @@
        - start resize with edges
        - start move
     </description>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the seat object">
+        This request indicates that the client will no longer use the seat
+        object and that it may be safely destroyed.
+      </description>
+    </request>
 
     <request name="focus_window">
       <description summary="give keyboard focus to a window">
@@ -701,8 +705,8 @@
     <request name="pointer_resize_window">
       <description summary="start interactive pointer resize of a window">
         This request causes the a window to be resized from the specified edges,
-        updating the position/dimensions of the window as while the pointer is
-        moved. Multiple windows may be interactively resized at the same time.
+        updatiag the position/dimensions of the window as the pointer is moved.
+        Multiple windows may be interactively resized at the same time.
 
         The interactive resize is ended when all pointer buttons are released.
         This request is ignored if no pointer buttons are held.

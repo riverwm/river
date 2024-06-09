@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="river_xkb_keybinds_v1">
+  <copyright>
+    Copyright 2024 The River Developers
+
+    Permission to use, copy, modify, and/or distribute this software for any
+    purpose with or without fee is hereby granted, provided that the above
+    copyright notice and this permission notice appear in all copies.
+
+    THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+    WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+    MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+    SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
+    OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
+    CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  </copyright>
+
+  <description summary="client managed xkbcommon-based keybinds">
+    This protocol allows a single "keybind manager" client to define
+    xkbcommon-based keybinds for the compositor and receive events when keybinds
+    are invoked.
+
+    The key words "must", "must not", "required", "shall", "shall not",
+    "should", "should not", "recommended", "may", and "optional" in this
+    document are to be interpreted as described in IETF RFC 2119.
+
+    Warning! The protocol described in this file is currently in the testing
+    phase. Backward compatible changes may be added together with the
+    corresponding interface version bump. Backward incompatible changes can only
+    be done by creating a new major version of the extension.
+  </description>
+
+  <interface name="river_xkb_keybind_manager_v1" version="1">
+    <request name="destroy" type="destructor">
+      <description summary="destroy the manager object">
+        This request indicates that the client will no longer use the manager
+        object and that it may be safely destroyed.
+      </description>
+    </request>
+
+    <event name="unavailable">
+      <description summary="keybind management unavailable">
+        This event indicates that keybind management is not available to the
+        client, perhaps due to another keybind management client already
+        running. The circumstances causing this event to be sent are compositor
+        policy.
+
+        The server will send no further events on this object. The client should
+        destroy this object and all objects created through this interface.
+      </description>
+    </event>
+
+    <request name="get_keybind_seat">
+      <arg name="id" type="new_id" interface="river_xkb_keybind_seat_v1"/>
+      <arg name="seat" type="object" interface="wl_seat"/>
+    </request>
+  </interface>
+
+  <interface name="river_xkb_keybind_seat_v1" version="1">
+    <description summary="define keybinds for a seat">
+      This extension of wl_seat allows the keybind manager client to define
+      arbitrary keybinds for the seat.
+    </description>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the keybind seat object">
+        This request indicates that the client will no longer use the keybind
+        seat object and that it may be safely destroyed.
+      </description>
+    </request>
+
+    <request name="get_default_mode">
+      <description summary="get the mode object for the default mode">
+        The default mode is the initial active mode.
+
+        It is a protocol error to make this request more than once.
+      </description>
+      <arg name="id" type="new_id" interface="river_xkb_keybind_mode_v1"/>
+    </request>
+
+    <request name="get_locked_mode">
+      <description summary="get the mode object for the locked mode">
+        The locked mode is automatically activated when the session is locked.
+
+        When the session is unlocked, the mode that was active prior to locking
+        will be re-activated. If that mode has been destroyed, the default mode
+        will be activated.
+
+        It is a protocol error to make this request more than once.
+      </description>
+      <arg name="id" type="new_id" interface="river_xkb_keybind_mode_v1"/>
+    </request>
+
+    <request name="create_custom_mode">
+      <description summary="create a new custom mode">
+        This request creates a new custom mode that may be activated through
+        keybinds created in the default mode, locked mode, or other custom
+        modes.
+      </description>
+      <arg name="id" type="new_id" interface="river_xkb_keybind_mode_v1"/>
+    </request>
+  </interface>
+
+  <interface name="river_xkb_keybind_mode_v1" version="1">
+    <description summary="a set of keybinds">
+      A mode is a set of keybinds that are activated/deactivated together.
+      Exactly one keybind mode is active at a time. Modes are transitioned
+      between using keybinds with a "next mode" defined through the
+      river_xkb_keybind_v1.set_next_mode request.
+
+      Modes can be seen as states in a Deterministic Finite Automaton with
+      keybinds as the transitions.
+
+      Key events that do not trigger a keybind in the currently active mode are
+      passed on to whatever client currently has keyboard focus.
+
+      Rationale: this protocol makes modes a first-class concept in order to
+      avoid the need for roundtrips when processing keybinds. If the compositor
+      process were not aware of the full, modal set of keybinds it would be
+      necessary to roundtrip with the keybind manager client after every keybind
+      trigger to allow the client to modify the active set of keybinds before
+      the next key event is processed.
+
+      It is considered acceptable that modifying modes and keybinds may race
+      with incoming keybind triggers. For this reason, modes and keybinds should
+      generally not be modified dynamically in response to keybind triggers.
+    </description>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the mode object">
+        This request indicates that the client will no longer use the mode
+        object and that it may be safely destroyed.
+
+        If the destroyed mode is currently active, either the default mode or
+        the locked mode will be activated.
+
+        The default mode and locked mode are special and should only be
+        destroyed when the keybind manager client is terminated and is cleaning
+        up resources.
+      </description>
+    </request>
+
+    <request name="create_keybind">
+      <description summary="create a new keybind">
+        Create a new keybind in the mode. The new keybind is not enabled until
+        initial configuration is completed and the river_xkb_keybind_v1.enable
+        request is made.
+      </description>
+      <arg name="id" type="new_id" interface="river_xkb_keybind_v1"/>
+      <arg name="keysym" type="uint" summary="an xkbcommon keysym"/>
+    </request>
+  </interface>
+
+  <interface name="river_xkb_keybind_v1" version="1">
+    <description summary="define a keybind and receive trigger events">
+      This object allows the keybind manager to define a keybind and receive
+      events when the keybind is triggered.
+
+      The new keybind is not enabled until initial configuration is completed
+      and the enable request is made.
+
+      If multiple keybinds with identical keysym, modifiers, trigger, and layout
+      override are enabled it is compositor policy which keybind will receive
+      trigger events or if all of the duplicate keybinds receive trigger events.
+      If the duplicate keybinds have differing next modes configured it is
+      compositor policy which mode from the set of possible next modes is
+      transitioned to.
+    </description>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the keybind object">
+        This request indicates that the client will no longer use the keybind
+        object and that it may be safely destroyed.
+      </description>
+    </request>
+
+    <enum name="modifiers" bitfield="true">
+      <description summary="a set of keyboard modifiers">
+        This enum is used to describe the modifiers that must be held down to
+        trigger a keybind.
+
+        Note that river and wlroots use the values 2 and 16 for capslock and
+        numlock internally. It doesn't make sense to use locked modifiers for
+        keybinds however so these values are not included in this enum.
+      </description>
+      <entry name="none" value="0"/>
+      <entry name="shift" value="1"/>
+      <entry name="ctrl" value="4"/>
+      <entry name="mod1" value="8" summary="commonly called alt"/>
+      <entry name="mod3" value="32"/>
+      <entry name="mod4" value="64" summary="commonly called super or logo"/>
+      <entry name="mod5" value="128"/>
+    </enum>
+
+    <request name="set_modifiers">
+      <description summary="set modifiers required to trigger keybind">
+        Set the modifiers that must be held in order to trigger the keybind.
+
+        If this request is not made before the enable request no modifiers will
+        be required (equivalent to passing none).
+
+        It is a protocol error to make this request after the enable request.
+      </description>
+      <arg name="modifiers" type="uint" enum="modifiers"/>
+    </request>
+
+    <enum name="trigger">
+      <entry name="press" value="0" summary="triggered on key press"/>
+      <entry name="release" value="1" summary="triggered on key release"/>
+      <entry name="repeat" value="2" summary="triggered repeatedly while
+        the key is held down"/>
+    </enum>
+
+    <request name="set_trigger">
+      <description summary="set event that triggers keybind">
+        Set the event that triggers the keybind.
+
+        If this request is not made before the enable request the keybind will
+        be triggered on key press.
+
+        It is a protocol error to make this request after the enable request.
+      </description>
+      <arg name="trigger" type="uint" enum="trigger"/>
+    </request>
+
+    <request name="set_layout_override">
+      <description summary="override currently active xkb layout">
+        Specify an xkb layout that should be used to translate key events for
+        the purpose of triggering this keybind irrespective of the currently
+        active xkb layout.
+
+        If this request is not made before the enable request the currently
+        active xkb layout will be used.
+
+        It is a protocol error to make this request after the enable request.
+      </description>
+      <arg name="layout" type="uint" summary="0-indexed xkbcommon layout"/>
+    </request>
+
+    <request name="set_next_mode">
+      <description summary="activate the given mode on trigger">
+        Set the mode to be activate when the keybind is triggered.
+
+        If this request is not made before the enable request the currently
+        active mode will remain active.
+
+        It is a protocol error to make this request after the enable request.
+      </description>
+      <arg name="mode" type="object" interface="river_xkb_keybind_mode_v1"/>
+    </request>
+
+    <request name="enable">
+      <description summary="enable the keybind">
+        This request should be made after all initial configuration has been
+        completed.
+
+        It is a protocol error to make this request more than once.
+      </description>
+    </request>
+
+    <event name="triggered">
+      <description summary="the keybind has been triggered">
+        This event indicates that the keybind has been triggered.
+
+        This event will not be issued until after the enable request has been
+        received by the server.
+      </description>
+    </event>
+  </interface>
+</protocol>
