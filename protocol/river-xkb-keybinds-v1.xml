@@ -70,82 +70,89 @@
       </description>
     </request>
 
-    <request name="get_default_mode">
-      <description summary="get the mode object for the default mode">
-        The default mode is the initial active mode.
+    <request name="get_initial_state">
+      <description summary="get the object for the initial state">
+        The initial state is the the state started in before any key events are
+        processed and the state transitioned to when the session is unlocked.
 
         It is a protocol error to make this request more than once.
       </description>
-      <arg name="id" type="new_id" interface="river_xkb_keybind_mode_v1"/>
+      <arg name="id" type="new_id" interface="river_xkb_keybind_state_v1"/>
     </request>
 
-    <request name="get_locked_mode">
-      <description summary="get the mode object for the locked mode">
-        The locked mode is automatically activated when the session is locked.
+    <request name="get_locked_state">
+      <description summary="get the object for the locked state">
+        The locked state is automatically transitioned to when the session is
+        locked.
 
-        When the session is unlocked, the mode that was active prior to locking
-        will be re-activated. If that mode has been destroyed, the default mode
-        will be activated.
+        When the session is unlocked, the initial state is automatically
+        transitioned to.
 
         It is a protocol error to make this request more than once.
       </description>
-      <arg name="id" type="new_id" interface="river_xkb_keybind_mode_v1"/>
+      <arg name="id" type="new_id" interface="river_xkb_keybind_state_v1"/>
     </request>
 
-    <request name="create_custom_mode">
-      <description summary="create a new custom mode">
-        This request creates a new custom mode that may be activated through
-        keybinds created in the default mode, locked mode, or other custom
-        modes.
+    <request name="create_custom_state">
+      <description summary="create a new custom state">
+        This request creates a new custom state that may be transitioned to by
+        keybinds defined in the initial state, locked state, or other custom
+        state.
       </description>
-      <arg name="id" type="new_id" interface="river_xkb_keybind_mode_v1"/>
+      <arg name="id" type="new_id" interface="river_xkb_keybind_state_v1"/>
     </request>
   </interface>
 
-  <interface name="river_xkb_keybind_mode_v1" version="1">
+  <interface name="river_xkb_keybind_state_v1" version="1">
     <description summary="a set of keybinds">
-      A mode is a set of keybinds that are activated/deactivated together.
-      Exactly one keybind mode is active at a time. Modes are transitioned
-      between using keybinds with a "next mode" defined through the
-      river_xkb_keybind_v1.set_next_mode request.
+      A keybind state is a set of keybinds that are activated/deactivated
+      together. Exactly one keybind state is active at a time. States are
+      transitioned between using keybinds with a state transition defined
+      through the river_xkb_keybind_v1.set_state_transition request.
 
-      Modes can be seen as states in a Deterministic Finite Automaton with
-      keybinds as the transitions.
+      Conceptually, keybind states are the states in a Deterministic Finite
+      Automaton or "State Machine" where keybinds are the transitions.
 
-      Key events that do not trigger a keybind in the currently active mode are
-      passed on to whatever client currently has keyboard focus.
+      Keybind states may also be thought of as "modes" similar to the modes in
+      modal text editors.
 
-      Rationale: this protocol makes modes a first-class concept in order to
-      avoid the need for roundtrips when processing keybinds. If the compositor
-      process were not aware of the full, modal set of keybinds it would be
-      necessary to roundtrip with the keybind manager client after every keybind
-      trigger to allow the client to modify the active set of keybinds before
-      the next key event is processed.
+      Key events that do not trigger a keybind defined in the active keybind
+      state are passed on to whatever client currently has keyboard focus.
 
-      It is considered acceptable that modifying modes and keybinds may race
-      with incoming keybind triggers. For this reason, modes and keybinds should
-      generally not be modified dynamically in response to keybind triggers.
+      Rationale: using a state machine to describe the key event routing done by
+      the server avoids the need for roundtrips with the keybind manager client
+      when processing keybinds. Without the ability to predefine changes in
+      routing in response to key events it would be necessary to roundtrip on
+      every keybind trigger to allow the keybind manager client to modify the
+      set of active keybinds in response before the next key event is processed.
+      This would require buffering key events on the server side during the
+      roundtrip and have higher global complexity in my opinion.
+
+      It is considered acceptable that modifying the keybind state machine may
+      race with incoming keybind triggers. For this reason, the state machine
+      should generally not be modified dynamically in response to keybind
+      triggers, only in response to manual user re-configuration.
     </description>
 
     <request name="destroy" type="destructor">
-      <description summary="destroy the mode object">
-        This request indicates that the client will no longer use the mode
-        object and that it may be safely destroyed.
+      <description summary="destroy the keybind state object">
+        This request indicates that the client will no longer use the keybind
+        state object and that it may be safely destroyed.
 
-        If the destroyed mode is currently active, either the default mode or
-        the locked mode will be activated.
+        If the destroyed keybind state is currently active, either the initial
+        state or the locked state will be activated.
 
-        The default mode and locked mode are special and should only be
+        The initial state and locked state are special and should only be
         destroyed when the keybind manager client is terminated and is cleaning
         up resources.
       </description>
     </request>
 
-    <request name="create_keybind">
-      <description summary="create a new keybind">
-        Create a new keybind in the mode. The new keybind is not enabled until
-        initial configuration is completed and the river_xkb_keybind_v1.enable
-        request is made.
+    <request name="define_keybind">
+      <description summary="define a new keybind">
+        Define a keybind in the keybind state. The new keybind is not
+        enabled until initial configuration is completed and the
+        river_xkb_keybind_v1.enable request is made.
       </description>
       <arg name="id" type="new_id" interface="river_xkb_keybind_v1"/>
       <arg name="keysym" type="uint" summary="an xkbcommon keysym"/>
@@ -153,19 +160,26 @@
   </interface>
 
   <interface name="river_xkb_keybind_v1" version="1">
-    <description summary="define a keybind and receive trigger events">
-      This object allows the keybind manager to define a keybind and receive
+    <description summary="configure a keybind and receive trigger events">
+      This object allows the keybind manager to configure a keybind and receive
       events when the keybind is triggered.
 
       The new keybind is not enabled until initial configuration is completed
       and the enable request is made.
 
-      If multiple keybinds with identical keysym, modifiers, trigger, and layout
-      override are enabled it is compositor policy which keybind will receive
-      trigger events or if all of the duplicate keybinds receive trigger events.
-      If the duplicate keybinds have differing next modes configured it is
-      compositor policy which mode from the set of possible next modes is
-      transitioned to.
+      If multiple keybinds enabled in the same keybind state would be triggered
+      by the a single physical key event on the compositor side, it is
+      compositor policy which keybind(s) will receive a trigger event or if all
+      of the matched keybinds receive trigger events.
+
+      If the keybinds matched by a single key event have differing state
+      transitions configured it is compositor policy which transition is
+      executed.
+
+      Keybinds might be matched by the same physical key event due to shared
+      keysym, modifiers, and trigger. The layout override feature may also cause
+      the same physical key event to trigger two keybinds with different keysyms
+      and different layout overrides configured.
     </description>
 
     <request name="destroy" type="destructor">
@@ -238,16 +252,16 @@
       <arg name="layout" type="uint" summary="0-indexed xkbcommon layout"/>
     </request>
 
-    <request name="set_next_mode">
-      <description summary="activate the given mode on trigger">
-        Set the mode to be activate when the keybind is triggered.
+    <request name="set_state_transition">
+      <description summary="transition to a given keybind state on trigger">
+        Transition to a given keybind state when the keybind is triggered.
 
-        If this request is not made before the enable request the currently
-        active mode will remain active.
+        If this request is not made before the enable request the current
+        keybind state will not be changed when this keybind is triggered.
 
         It is a protocol error to make this request after the enable request.
       </description>
-      <arg name="mode" type="object" interface="river_xkb_keybind_mode_v1"/>
+      <arg name="mode" type="object" interface="river_xkb_keybind_state_v1"/>
     </request>
 
     <request name="enable">
