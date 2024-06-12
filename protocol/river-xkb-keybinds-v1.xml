@@ -211,20 +211,37 @@
       <description summary="set modifiers required to trigger keybind">
         Set the modifiers that must be held in order to trigger the keybind.
 
-        Modifiers are always checked on key press regardless of the trigger
-        configured with the set_trigger request. For example, the following
-        series of physical key events would trigger a keybind with keysym "x",
-        modifiers "shift", and trigger "release":
-
-        1. shift key pressed
-        2. x key pressed (currently pressed modifiers checked here)
-        3. shift key released
-        4. x key released (trigger event sent to keybind object here)
-
         If this request is not made before the enable request no modifiers will
         be required (equivalent to passing none).
 
         It is a protocol error to make this request after the enable request.
+
+        Modifiers are always checked on key press regardless of the trigger
+        configured with the set_trigger request. Release keybinds are handled by
+        saving the set of modifiers that were held on key press and checking for
+        a matching keybind in the currently active state on release.
+
+        Here is a detailed example demonstrating this behavior:
+
+        In keybind state foo there is a keybind A defined as:
+          keysym: x, modifiers: shift, trigger: press, state_transition: bar
+
+        In keybind state bar there is a keybind B defined as:
+          keysym: x, modifiers: shift, trigger: release, state_transition: foo
+
+        0. currently in state foo
+        1. shift key pressed
+        2. x key pressed
+          - server notes that shift mod was held on press
+        3. keybind A is triggered
+          - transition to state bar
+        4. shift key released
+        5. arbitrary other key events without releasing the x key
+          - state transition away from state bar is irrelevant as long as a
+            transition back to state bar is made before releasing the x key
+        7. x key released
+        8. keybind B is triggered (despite shift no longer being held)
+          - transition to state foo
       </description>
       <arg name="modifiers" type="uint" enum="modifiers"/>
     </request>
