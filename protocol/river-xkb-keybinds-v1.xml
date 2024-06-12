@@ -211,6 +211,16 @@
       <description summary="set modifiers required to trigger keybind">
         Set the modifiers that must be held in order to trigger the keybind.
 
+        Modifiers are always checked on key press regardless of the trigger
+        configured with the set_trigger request. For example, the following
+        series of physical key events would trigger a keybind with keysym "x",
+        modifiers "shift", and trigger "release":
+
+        1. shift key pressed
+        2. x key pressed (currently pressed modifiers checked here)
+        3. shift key released
+        4. x key released (trigger event sent to keybind object here)
+
         If this request is not made before the enable request no modifiers will
         be required (equivalent to passing none).
 
