@@ -85,6 +85,9 @@ pub fn destroy(lock_surface: *LockSurface) void {
     lock_surface.map.link.remove();
     lock_surface.surface_destroy.link.remove();
 
+    // The wlr_surface may outlive the wlr_lock_surface so we must clean up the user data.
+    lock_surface.wlr_lock_surface.surface.data = 0;
+
     util.gpa.destroy(lock_surface);
 }
 

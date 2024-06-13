@@ -55,7 +55,6 @@ pub fn create(wlr_layer_surface: *wlr.LayerSurfaceV1) error{OutOfMemory}!void {
         .scene_layer_surface = try layer_tree.createSceneLayerSurfaceV1(wlr_layer_surface),
         .popup_tree = try output.layers.popups.createSceneTree(),
     };
-    wlr_layer_surface.data = @intFromPtr(layer_surface);
 
     try SceneNodeData.attach(&layer_surface.scene_layer_surface.tree.node, .{ .layer_surface = layer_surface });
     try SceneNodeData.attach(&layer_surface.popup_tree.node, .{ .layer_surface = layer_surface });
@@ -92,6 +91,9 @@ fn handleDestroy(listener: *wl.Listener(*wlr.LayerSurfaceV1), _: *wlr.LayerSurfa
     layer_surface.destroyPopups();
 
     layer_surface.popup_tree.node.destroy();
+
+    // The wlr_surface may outlive the wlr_layer_surface so we must clean up the user data.
+    layer_surface.wlr_layer_surface.surface.data = 0;
 
     util.gpa.destroy(layer_surface);
 }
