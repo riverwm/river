@@ -45,10 +45,10 @@ tasks:
       sudo mv zig-linux-x86_64-0.13.0/lib /usr/lib/zig
   - build: |
       cd river
-      zig build
+      zig build --summary all
   - build_xwayland: |
       cd river
-      zig build -Dxwayland
+      zig build --summary all -Dxwayland
   - fmt: |
       cd river
       zig fmt --check river/
