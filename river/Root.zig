@@ -416,6 +416,9 @@ pub fn activateOutput(root: *Root, output: *Output) void {
     }
     assert(root.fallback_pending.focus_stack.empty());
     assert(root.fallback_pending.wm_stack.empty());
+
+    // Enforce map-to-output configuration for the newly active output.
+    server.input_manager.reconfigureDevices();
 }
 
 /// Trigger asynchronous application of pending state for all outputs and views.
