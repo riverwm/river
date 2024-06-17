@@ -130,6 +130,27 @@
       </description>
     </request>
 
+    <event name="session_locked">
+      <description summary="the session has been locked">
+        This event indicates that the session has been locked.
+
+        The window manager may wish to restrict which key bindings are available
+        while locked or otherwise use this information.
+
+        This event is double-buffered state and will be followed by a
+        river_window_manager_v1.update event.
+      </description>
+    </event>
+
+    <event name="session_unlocked">
+      <description summary="the session has been unlocked">
+        This event indicates that the session has been unlocked.
+
+        This event is double-buffered state and will be followed by a
+        river_window_manager_v1.update event.
+      </description>
+    </event>
+
     <event name="window">
       <description summary="new logical window">
         A new window has been created by some client.
