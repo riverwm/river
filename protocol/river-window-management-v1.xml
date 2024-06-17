@@ -33,9 +33,10 @@
   </description>
 
   <interface name="river_window_manager_v1" version="1">
-    <description summary="TODO">
-      TODO:
-        - fill in missing bits (maximize, fullscreen, etc)
+    <description summary="window manager global interface">
+      This global interface should only be advertised to the window manager
+      process. Only one window management client may be active at a time. The
+      compositor should use the unavailable event if necessary to enforce this.
     </description>
 
     <event name="unavailable">
@@ -131,21 +132,22 @@
 
     <event name="window">
       <description summary="new logical window">
-        TODO
+        A new window has been created by some client.
       </description>
       <arg name="id" type="new_id" interface="river_window_v1"/>
     </event>
 
     <event name="output">
       <description summary="new logical output">
-        TODO
+        A new logical output has been created, perhaps due to a new physical
+        monitor being plugged in or perhaps due to a change in configuration.
       </description>
       <arg name="id" type="new_id" interface="river_output_v1"/>
     </event>
 
     <request name="get_seat">
-      <description summary="TODO">
-        TODO
+      <description summary="get a seat extension object">
+        Get the river_seat_v1 extension object for the given wl_seat.
       </description>
       <arg name="id" type="new_id" interface="river_seat_v1"/>
       <arg name="seat" type="object" interface="wl_seat"/>
@@ -220,8 +222,8 @@
     <event name="dimensions">
       <description summary="window dimensions">
         This event indicates the dimensions of the window in the compositor's
-        logical coordinate space. The width and height will always be strictly
-        greater than zero.
+        logical coordinate space. The width and height must be strictly greater
+        than zero.
 
         This event is double-buffered state and will be followed by a
         river_window_manager_v1.update event.
@@ -349,6 +351,115 @@
       </description>
       <arg name="edges" type="uint" enum="edges"/>
     </event>
+
+    <event name="fullscreen_requested">
+      <description summary="the window requested to be fullscreen">
+        The xdg-shell protocol for example allows windows to request that they
+        be made fullscreen and allows them to provide an output preference.
+
+        The window manager is free to honor this request using
+        river_window_v1.set_fullscreen or ignore it.
+
+        This event is double-buffered state and will be followed by a
+        river_window_manager_v1.update event.
+      </description>
+      <arg name="output" type="object" allow-null="true"
+        interface="river_output_v1" />
+    </event>
+
+    <event name="exit_fullscreen_requested">
+      <description summary="the window requested to exit fullscreen">
+        The xdg-shell protocol for example allows windows to request to exit
+        fullscreen.
+
+        The window manager is free to honor this request using
+        river_window_v1.unset_fullscreen or ignore it.
+
+        This event is double-buffered state and will be followed by a
+        river_window_manager_v1.update event.
+      </description>
+    </event>
+
+    <request name="fullscreen">
+      <description summary="make the window fullscreen">
+        Make the window fullscreen on the given output. If multiple windows are
+        fullscreen on the same output at the same time only the "top" window in
+        rendering order shall be displayed.
+
+        The compositor will handle the position and dimensions of the window
+        while it is fullscreen. The set_position and propose_dimensions requests
+        shall not affect the current position and dimensions of a fullscreen
+        window.
+
+        This request is double-buffered state and will not be applied until the
+        next river_window_manager_v1.commit request.
+      </description>
+      <arg name="output" type="object" interface="river_output_v1"/>
+    </request>
+
+    <request name="exit_fullscreen">
+      <description summary="make the window not fullscreen">
+        Make the window not fullscreen.
+
+        The new, post-fullscreen position and dimensions of the window will be
+        determined by the most recent set_position and propose_dimensions
+        requests.
+
+        This request is double-buffered state and will not be applied until the
+        next river_window_manager_v1.commit request.
+      </description>
+    </request>
+
+    <event name="maximize_requested">
+      <description summary="the window requested to maximized">
+        The xdg-shell protocol for example allows windows to request to be
+        maximized.
+
+        The window manager is free to honor this request using
+        river_window_v1.maximize or ignore it.
+
+        This event is double-buffered state and will be followed by a
+        river_window_manager_v1.update event.
+      </description>
+    </event>
+
+    <event name="unmaximize_requested">
+      <description summary="the window requested to unmaximized">
+        The xdg-shell protocol for example allows windows to request to be
+        unmaximized.
+
+        The window manager is free to honor this request using
+        river_window_v1.unmaximize or ignore it.
+
+        This event is double-buffered state and will be followed by a
+        river_window_manager_v1.update event.
+      </description>
+    </event>
+
+    <request name="maximize">
+      <description summary="inform the window it is maximized">
+        Inform the window that it is maximized. The window might use this
+        information to adapt the style of its client-side window decorations for
+        example.
+
+        The window manager remains responsible for handling the position and
+        dimensions of the window while it is maximized.
+
+        This request is double-buffered state and will not be applied until the
+        next river_window_manager_v1.commit request.
+      </description>
+    </request>
+
+    <request name="unmaximize">
+      <description summary="inform the window it is unmaximized">
+        Inform the window that it is unmaximized. The window might use this
+        information to adapt the style of its client-side window decorations for
+        example.
+
+        This request is double-buffered state and will not be applied until the
+        next river_window_manager_v1.commit request.
+      </description>
+    </request>
   </interface>
 
   <interface name="river_decoration_v1" version="1">
@@ -395,7 +506,9 @@
 
   <interface name="river_shell_surface_v1" version="1">
     <description summary="a surface for window manager UI">
-      TODO dimensions event for interactive resize
+      The window manager might use a shell surface to display a status bar,
+      background image, desktop notifications, launcher, desktop menu, or
+      whatever else it wants.
     </description>
 
     <request name="destroy" type="destructor">
@@ -570,9 +683,8 @@
 
   <interface name="river_seat_v1" version="1">
     <description summary="a extension of wl_seat for window management">
-       TODO
-       - start resize with edges
-       - start move
+      This object extends the wl_seat object with the features necessary for
+      window management.
     </description>
 
     <request name="destroy" type="destructor">
