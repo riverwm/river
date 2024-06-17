@@ -194,6 +194,13 @@
       A newly created window will not be displayed until the window manager
       client makes a river_window_v1.propose_dimensions request and the
       following river_window_manager_v1.commit request.
+
+      TODO:
+       - parent
+       - title
+       - app-id
+       - set tiled
+       - ssd/csd policy
     </description>
 
     <request name="destroy" type="destructor">
@@ -373,6 +380,105 @@
       <arg name="edges" type="uint" enum="edges"/>
     </event>
 
+    <enum name="capabilities" bitfield="true">
+      <entry name="window_menu" value="1"/>
+      <entry name="maximize" value="2"/>
+      <entry name="fullscreen" value="4"/>
+      <entry name="minimize" value="8"/>
+    </enum>
+
+    <request name="set_capabilities">
+      <description summary="inform window of supported capabilities">
+        This request informs the window of the capabilities supported by the
+        window manager. If the window manager, for example, ignores requests
+        to be maximized from the window it should not tell the window that it
+        supports the maximize capability.
+
+        The window might use this information to, for example, only show a
+        maximize button if the window manager supports the maximize capability.
+
+        The window manager client should use this request to set capabilities
+        for all new windows. If this request is never made, the compositor will
+        inform windows that all capabilities are supported.
+
+        This request is double-buffered state and will not be applied until the
+        next river_window_manager_v1.commit request.
+      </description>
+      <arg name="output" type="object" interface="river_output_v1"/>
+    </request>
+
+    <event name="show_window_menu_requested">
+      <description summary="window requested that the window menu be shown">
+        The xdg-shell protocol for example allows windows to request that a
+        window menu be shown, for example when the user right clicks on client
+        side window decorations.
+
+        A window menu might include options to maximize or minimize the window.
+
+        The window manager is free to ignore this request and decide what the
+        window menu contains if it does choose to show one.
+
+        The x and y arguments indicate where the window requested that the
+        window menu be shown.
+
+        This event is double-buffered state and will be followed by a
+        river_window_manager_v1.update event.
+      </description>
+      <arg name="x" type="int" summary="x offset from top left corner"/>
+      <arg name="y" type="int" summary="y offset from top left corner"/>
+    </event>
+
+    <event name="maximize_requested">
+      <description summary="the window requested to be maximized">
+        The xdg-shell protocol for example allows windows to request to be
+        maximized.
+
+        The window manager is free to honor this request using
+        river_window_v1.maximize or ignore it.
+
+        This event is double-buffered state and will be followed by a
+        river_window_manager_v1.update event.
+      </description>
+    </event>
+
+    <event name="unmaximize_requested">
+      <description summary="the window requested to be unmaximized">
+        The xdg-shell protocol for example allows windows to request to be
+        unmaximized.
+
+        The window manager is free to honor this request using
+        river_window_v1.unmaximize or ignore it.
+
+        This event is double-buffered state and will be followed by a
+        river_window_manager_v1.update event.
+      </description>
+    </event>
+
+    <request name="maximize">
+      <description summary="inform the window it is maximized">
+        Inform the window that it is maximized. The window might use this
+        information to adapt the style of its client-side window decorations for
+        example.
+
+        The window manager remains responsible for handling the position and
+        dimensions of the window while it is maximized.
+
+        This request is double-buffered state and will not be applied until the
+        next river_window_manager_v1.commit request.
+      </description>
+    </request>
+
+    <request name="unmaximize">
+      <description summary="inform the window it is unmaximized">
+        Inform the window that it is unmaximized. The window might use this
+        information to adapt the style of its client-side window decorations for
+        example.
+
+        This request is double-buffered state and will not be applied until the
+        next river_window_manager_v1.commit request.
+      </description>
+    </request>
+
     <event name="fullscreen_requested">
       <description summary="the window requested to be fullscreen">
         The xdg-shell protocol for example allows windows to request that they
@@ -431,56 +537,18 @@
       </description>
     </request>
 
-    <event name="maximize_requested">
-      <description summary="the window requested to maximized">
+    <event name="minimize_requested">
+      <description summary="the window requested to be minimized">
         The xdg-shell protocol for example allows windows to request to be
-        maximized.
+        minimized.
 
-        The window manager is free to honor this request using
-        river_window_v1.maximize or ignore it.
+        The window manager is free to ignore this request, hide the window, or
+        do whatever else it chooses.
 
         This event is double-buffered state and will be followed by a
         river_window_manager_v1.update event.
       </description>
     </event>
-
-    <event name="unmaximize_requested">
-      <description summary="the window requested to unmaximized">
-        The xdg-shell protocol for example allows windows to request to be
-        unmaximized.
-
-        The window manager is free to honor this request using
-        river_window_v1.unmaximize or ignore it.
-
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
-      </description>
-    </event>
-
-    <request name="maximize">
-      <description summary="inform the window it is maximized">
-        Inform the window that it is maximized. The window might use this
-        information to adapt the style of its client-side window decorations for
-        example.
-
-        The window manager remains responsible for handling the position and
-        dimensions of the window while it is maximized.
-
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
-      </description>
-    </request>
-
-    <request name="unmaximize">
-      <description summary="inform the window it is unmaximized">
-        Inform the window that it is unmaximized. The window might use this
-        information to adapt the style of its client-side window decorations for
-        example.
-
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
-      </description>
-    </request>
   </interface>
 
   <interface name="river_decoration_v1" version="1">
