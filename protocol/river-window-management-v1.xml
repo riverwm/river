@@ -196,7 +196,6 @@
       following river_window_manager_v1.commit request.
 
       TODO:
-       - parent
        - set tiled
        - ssd/csd policy
     </description>
@@ -318,6 +317,26 @@
         river_window_manager_v1.update event.
       </description>
       <arg name="title" type="string"/>
+    </event>
+
+    <event name="parent">
+      <description summary="the window set a parent">
+        The window set a parent window. If this event is never received or if
+        the parent argument is null then the window has no parent.
+
+        A surface with a parent set might be a dialog, file picker, or similar
+        for the parent window.
+
+        Child windows should generally be rendered directly above their parent.
+
+        The compositor must guarantee that there are no loops in the window
+        tree: a parent must not be the descendant of one of its children.
+
+        This event is double-buffered state and will be followed by a
+        river_window_manager_v1.update event.
+      </description>
+      <arg name="parent" type="object" allow-null="true"
+        interface="river_window_v1"/>
     </event>
 
     <enum name="edges" bitfield="true">
