@@ -194,9 +194,6 @@
       A newly created window will not be displayed until the window manager
       client makes a river_window_v1.propose_dimensions request and the
       following river_window_manager_v1.commit request.
-
-      TODO:
-       - ssd/csd policy
     </description>
 
     <request name="destroy" type="destructor">
@@ -338,6 +335,52 @@
         interface="river_window_v1"/>
     </event>
 
+    <enum name="decoration_hint">
+      <entry name="only_supports_csd" value="0"
+        summary="only supports client side decoration"/>
+      <entry name="prefers_csd" value="1"
+        summary="client side decoration preferred, both CSD and SSD supported"/>
+      <entry name="prefers_ssd" value="2"
+        summary="server side decoration preferred, both CSD and SSD supported"/>
+    </enum>
+
+    <event name="decoration_hint">
+      <description summary="supported/preferred decoration style">
+        Information from the window about the supported and preferred client
+        side/server side decoration options.
+
+        This event may be sent multiple times over the lifetime of the window if
+        the window changes its preferences.
+
+        This event is double-buffered state and will be followed by a
+        river_window_manager_v1.update event.
+      </description>
+      <arg name="hint" type="uint" enum="decoration_hint"/>
+    </event>
+
+    <request name="use_csd">
+      <description summary="tell the client to use CSD">
+        Tell the client to use client side decoration and draw its own title
+        bar, borders, etc.
+
+        This request is double-buffered state and will not be applied until the
+        next river_window_manager_v1.commit request.
+      </description>
+    </request>
+
+    <request name="use_ssd">
+      <description summary="tell the client to use SSD">
+        Tell the client to use server side decoration and not draw any client
+        side decorations.
+
+        This request will have no effect if the client only supports client side
+        decoration, see the decoration_hint event.
+
+        This request is double-buffered state and will not be applied until the
+        next river_window_manager_v1.commit request.
+      </description>
+    </request>
+
     <enum name="edges" bitfield="true">
       <entry name="none" value="0"/>
       <entry name="top" value="1"/>
@@ -388,7 +431,7 @@
       <arg name="edges" type="uint" enum="edges"/>
     </request>
 
-    <request name="get_decoration">
+    <request name="get_decoration_surface">
       <description summary="create a window decoration surface">
         Create a window decoration surface for the window.
 
@@ -1234,5 +1277,6 @@
         ack and commit as soon as possible as the capacity of the compositor to
         buffer incoming input events is finite.
       </description>
+    </event>
   </interface>
 </protocol>
