@@ -197,8 +197,6 @@
 
       TODO:
        - parent
-       - title
-       - app-id
        - set tiled
        - ssd/csd policy
     </description>
@@ -301,6 +299,26 @@
         next river_window_manager_v1.commit request.
       </description>
     </request>
+
+    <event name="app_id">
+      <description summary="the window set an application ID">
+        The window set an application ID.
+
+        This event is double-buffered state and will be followed by a
+        river_window_manager_v1.update event.
+      </description>
+      <arg name="app_id" type="string"/>
+    </event>
+
+    <event name="title">
+      <description summary="the window set a title">
+        The window set a title.
+
+        This event is double-buffered state and will be followed by a
+        river_window_manager_v1.update event.
+      </description>
+      <arg name="title" type="string"/>
+    </event>
 
     <enum name="edges" bitfield="true">
       <entry name="none" value="0"/>
