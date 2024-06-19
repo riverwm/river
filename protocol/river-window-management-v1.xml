@@ -196,7 +196,6 @@
       following river_window_manager_v1.commit request.
 
       TODO:
-       - set tiled
        - ssd/csd policy
     </description>
 
@@ -368,6 +367,25 @@
       <arg name="g" type="uint"/>
       <arg name="b" type="uint"/>
       <arg name="a" type="uint"/>
+    </request>
+
+    <request name="set_tiled">
+      <description summary="set window tiled state">
+        Inform the window that it is part of a tiled layout and adjacent to
+        other elements in the tiled layout on the given edges.
+
+        The window should use this information to change the style of its client
+        side decorations and avoid drawing e.g. drop shadows outside of the
+        window dimensions on the tiled edges.
+
+        Setting the edges argument to none informs the window that it is not
+        part of a tiled layout. If this request is never made, the window is
+        informed that it is not part of a tiled layout.
+
+        This request is double-buffered state and will not be applied until the
+        next river_window_manager_v1.commit request.
+      </description>
+      <arg name="edges" type="uint" enum="edges"/>
     </request>
 
     <request name="get_decoration">
