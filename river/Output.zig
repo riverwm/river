@@ -474,6 +474,7 @@ pub fn applyState(output: *Output, state: *wlr.Output.State) error{CommitFailed}
 
 fn handleEnableDisable(output: *Output) void {
     output.updateLockRenderStateOnEnableDisable();
+    output.gamma_dirty = true;
 
     if (output.wlr_output.enabled) {
         // Add the output to root.active_outputs and the output layout if it has not
