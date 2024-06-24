@@ -881,6 +881,7 @@ fn handlePowerManagerSetMode(
     }
 
     output.updateLockRenderStateOnEnableDisable();
+    output.gamma_dirty = true;
 }
 
 fn handleSetGamma(
