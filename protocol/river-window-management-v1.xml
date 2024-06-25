@@ -866,6 +866,31 @@
       <arg name="width" type="int"/>
       <arg name="height" type="int"/>
     </event>
+
+    <event name="usable_area_hint">
+      <description summary="output area intended for window management">
+        This event indicates the area of the output that is intended for window
+        management. This area may be smaller than the full dimensions of the
+        output if there is, for example, a layer-shell client with an exclusive
+        zone set (perhaps a status bar).
+
+        The window manager is free to ignore this hint and place windows
+        wherever it chooses.
+
+        This area will always be equal to or smaller than the full area of the
+        output. The x and y coordinates are relative to the output's position in
+        the compositor's logical coordinate space and always greater than or
+        equal to 0. The width and height are always strictly greater than zero
+        and less than or equal to the output dimensions.
+
+        This event is double-buffered state and will be followed by a
+        river_window_manager_v1.update event.
+      </description>
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
+      <arg name="width" type="int"/>
+      <arg name="height" type="int"/>
+    </event>
   </interface>
 
   <interface name="river_seat_v1" version="1">
