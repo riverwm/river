@@ -106,10 +106,10 @@ pub fn configure(xwayland_view: XwaylandView) bool {
     }
 
     xwayland_view.xwayland_surface.configure(
-        @intCast(inflight.box.x + output_box.x),
-        @intCast(inflight.box.y + output_box.y),
-        @intCast(inflight.box.width),
-        @intCast(inflight.box.height),
+        math.lossyCast(i16, inflight.box.x + output_box.x),
+        math.lossyCast(i16, inflight.box.y + output_box.y),
+        math.lossyCast(u16, inflight.box.width),
+        math.lossyCast(u16, inflight.box.height),
     );
 
     xwayland_view.setActivated(inflight.focus != 0);
