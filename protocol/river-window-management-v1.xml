@@ -1026,7 +1026,7 @@
     <request name="pointer_move_window">
       <description summary="start interactive pointer move of a window">
         This request causes the position of a window to be updated while the
-        pointer is moved. Multiple windows may be interactivey moved at the same
+        pointer is moved. Multiple windows may be interactively moved at the same
         time.
 
         The interactive move is ended when all pointer buttons are released.
@@ -1057,6 +1057,43 @@
       </description>
       <arg name="window" type="object" interface="river_window_v1"/>
       <arg name="edges" type="uint" enum="river_window_v1.edges"/>
+    </request>
+
+    <request name="pointer_confine_to_region">
+      <description summary="prevent the pointer from leaving a region">
+        This request tells the compositor to confine the movement of the pointer
+        to a given region, preventing movement of the input device from moving
+        the pointer outside the region. In addition, the pointer continues to be
+        confined to the bounds of the outputs.
+
+        If the pointer is not inside the given region when this request is made
+        it will have no effect until the pointer is moved inside the region.
+
+        If the region argument is null the compositor will only confine the
+        cursor to the bounds of the outputs. This is also the behavior if this
+        request is never made.
+
+        The region is defined in the compositor's logical coordinate space.
+
+        This request may be useful to place bounds on an interactive pointer
+        move or resize for example.
+
+        This request is double-buffered state and will not be applied until the
+        next river_window_manager_v1.commit request.
+      </description>
+      <arg name="region" type="object" allow-null="true" interface="wl_region"/>
+    </request>
+
+    <request name="pointer_warp">
+      <description summary="warp the pointer to a given position">
+        Warp the pointer to the given position in the compositor's logical
+        coordinate space.
+
+        This request is double-buffered state and will not be applied until the
+        next river_window_manager_v1.commit request.
+      </description>
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
     </request>
 
     <enum name="modifiers" bitfield="true">
