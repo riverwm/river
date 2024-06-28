@@ -24,7 +24,6 @@ const util = @import("util.zig");
 
 keysym: xkb.Keysym,
 modifiers: wlr.Keyboard.ModifierMask,
-command_args: []const [:0]const u8,
 options: Options,
 
 pub const Options = struct {
@@ -36,31 +35,6 @@ pub const Options = struct {
     // If set, the layout with this index is always used to translate the given keycode
     layout_index: ?u32,
 };
-
-pub fn init(
-    keysym: xkb.Keysym,
-    modifiers: wlr.Keyboard.ModifierMask,
-    command_args: []const []const u8,
-    options: Options,
-) !Mapping {
-    const owned_args = try util.gpa.alloc([:0]u8, command_args.len);
-    errdefer util.gpa.free(owned_args);
-    for (command_args, 0..) |arg, i| {
-        errdefer for (owned_args[0..i]) |a| util.gpa.free(a);
-        owned_args[i] = try util.gpa.dupeZ(u8, arg);
-    }
-    return Mapping{
-        .keysym = keysym,
-        .modifiers = modifiers,
-        .command_args = owned_args,
-        .options = options,
-    };
-}
-
-pub fn deinit(mapping: Mapping) void {
-    for (mapping.command_args) |arg| util.gpa.free(arg);
-    util.gpa.free(mapping.command_args);
-}
 
 /// Compare mapping with given keycode, modifiers and keyboard state
 pub fn match(

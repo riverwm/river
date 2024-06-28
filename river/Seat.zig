@@ -70,12 +70,6 @@ cursor: Cursor,
 /// Input Method handling
 relay: InputRelay,
 
-/// ID of the current keymap mode
-mode_id: u32 = 0,
-
-/// ID of previous keymap mode, used when returning from "locked" mode
-prev_mode_id: u32 = 0,
-
 /// Timer for repeating keyboard mappings
 mapping_repeat_timer: *wl.EventSource,
 
@@ -327,10 +321,6 @@ pub fn handleActivity(seat: Seat) void {
     server.input_manager.idle_notifier.notifyActivity(seat.wlr_seat);
 }
 
-pub fn enterMode(seat: *Seat, mode_id: u32) void {
-    seat.mode_id = mode_id;
-}
-
 /// Handle any user-defined mapping for passed keycode, modifiers and keyboard state
 /// Returns true if a mapping was run
 pub fn handleMapping(
@@ -340,7 +330,7 @@ pub fn handleMapping(
     released: bool,
     xkb_state: *xkb.State,
 ) bool {
-    const modes = &server.config.modes;
+    const mappings = &server.config.mappings;
 
     // It is possible for more than one mapping to be matched due to the
     // existence of layout-independent mappings. It is also possible due to
@@ -355,7 +345,7 @@ pub fn handleMapping(
     // That is, if the physical keys Mod+Shift+1 are pressed on a US layout don't
     // translate the keysym 1 to an exclamation mark. This behavior is generally
     // what is desired.
-    for (modes.items[seat.mode_id].mappings.items) |*mapping| {
+    for (mappings.items) |*mapping| {
         if (mapping.match(keycode, modifiers, released, xkb_state, .no_translate)) {
             if (found == null) {
                 found = mapping;
@@ -369,7 +359,7 @@ pub fn handleMapping(
     // with xkbcommon for intuitive behavior. For example, layouts may require
     // translation with the numlock modifier to obtain keypad number keysyms
     // (e.g. KP_1).
-    for (modes.items[seat.mode_id].mappings.items) |*mapping| {
+    for (mappings.items) |*mapping| {
         if (mapping.match(keycode, modifiers, released, xkb_state, .translate)) {
             if (found == null) {
                 found = mapping;
@@ -396,12 +386,11 @@ pub fn handleMapping(
 
 /// Handle any user-defined mapping for switches
 pub fn handleSwitchMapping(
-    seat: *Seat,
+    _: *Seat,
     switch_type: Switch.Type,
     switch_state: Switch.State,
 ) void {
-    const modes = &server.config.modes;
-    for (modes.items[seat.mode_id].switch_mappings.items) |mapping| {
+    for (server.config.switch_mappings.items) |mapping| {
         if (std.meta.eql(mapping.switch_type, switch_type) and std.meta.eql(mapping.switch_state, switch_state)) {
             // send trigger
         }

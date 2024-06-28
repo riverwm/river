@@ -640,25 +640,13 @@ fn handleTabletToolButton(
 
 /// Handle the mapping for the passed button if any. Returns true if there
 /// was a mapping and the button was handled.
-fn handlePointerMapping(cursor: *Cursor, event: *wlr.Pointer.event.Button, view: *View) bool {
+fn handlePointerMapping(cursor: *Cursor, event: *wlr.Pointer.event.Button, _: *View) bool {
     const wlr_keyboard = cursor.seat.wlr_seat.getKeyboard() orelse return false;
     const modifiers = wlr_keyboard.getModifiers();
 
-    const fullscreen = view.current.fullscreen or view.pending.fullscreen;
-
-    return for (server.config.modes.items[cursor.seat.mode_id].pointer_mappings.items) |mapping| {
+    return for (server.config.pointer_mappings.items) |mapping| {
         if (event.button == mapping.event_code and std.meta.eql(modifiers, mapping.modifiers)) {
-            switch (mapping.action) {
-                .move => if (!fullscreen) cursor.startMove(view),
-                .resize => if (!fullscreen) cursor.startResize(view, null),
-                .command => |_| {
-                    cursor.seat.focus(view);
-                    // This is mildly inefficient as running the command may have already
-                    // started a transaction. However we need to start one after the Seat.focus()
-                    // call in the case where it didn't.
-                    server.root.applyPending();
-                },
-            }
+            // trigger action
             break true;
         }
     } else false;

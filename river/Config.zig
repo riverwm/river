@@ -20,6 +20,7 @@ const std = @import("std");
 const fmt = std.fmt;
 const mem = std.mem;
 const globber = @import("globber");
+const wlr = @import("wlroots");
 const xkb = @import("xkbcommon");
 
 const server = &@import("main.zig").server;
@@ -27,7 +28,8 @@ const util = @import("util.zig");
 
 const Server = @import("Server.zig");
 const Output = @import("Output.zig");
-const Mode = @import("Mode.zig");
+const Mapping = @import("Mapping.zig");
+const Switch = @import("Switch.zig");
 const View = @import("View.zig");
 
 pub const Position = struct {
@@ -49,12 +51,15 @@ border_width: u31 = 2,
 /// Color of border in RGBA with premultiplied alpha
 border_color: [4]f32 = [_]f32{ 0.34509804, 0.43137255, 0.45882353, 1.0 }, // Solarized base01
 
-/// Map of keymap mode name to mode id
-/// Does not own the string keys. They are owned by the corresponding Mode struct.
-mode_to_id: std.StringHashMap(u32),
-
-/// All user-defined keymap modes, indexed by mode id
-modes: std.ArrayListUnmanaged(Mode),
+mappings: std.ArrayListUnmanaged(Mapping) = .{},
+pointer_mappings: std.ArrayListUnmanaged(struct {
+    event_code: u32,
+    modifiers: wlr.Keyboard.ModifierMask,
+}) = .{},
+switch_mappings: std.ArrayListUnmanaged(struct {
+    switch_type: Switch.Type,
+    switch_state: Switch.State,
+}) = .{},
 
 /// Keyboard repeat rate in characters per second
 repeat_rate: u31 = 25,
@@ -76,35 +81,15 @@ pub fn init() !Config {
     defer keymap.unref();
 
     var config = Config{
-        .mode_to_id = std.StringHashMap(u32).init(util.gpa),
-        .modes = try std.ArrayListUnmanaged(Mode).initCapacity(util.gpa, 2),
         .xkb_context = xkb_context.ref(),
         .keymap = keymap.ref(),
     };
     errdefer config.deinit();
 
-    // Start with two empty modes, "normal" and "locked"
-    {
-        // Normal mode, id 0
-        const owned_slice = try util.gpa.dupeZ(u8, "normal");
-        try config.mode_to_id.putNoClobber(owned_slice, 0);
-        config.modes.appendAssumeCapacity(.{ .name = owned_slice });
-    }
-    {
-        // Locked mode, id 1
-        const owned_slice = try util.gpa.dupeZ(u8, "locked");
-        try config.mode_to_id.putNoClobber(owned_slice, 1);
-        config.modes.appendAssumeCapacity(.{ .name = owned_slice });
-    }
-
     return config;
 }
 
 pub fn deinit(config: *Config) void {
-    config.mode_to_id.deinit();
-    for (config.modes.items) |*mode| mode.deinit();
-    config.modes.deinit(util.gpa);
-
     config.keymap.unref();
     config.xkb_context.unref();
 }

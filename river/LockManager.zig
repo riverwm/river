@@ -114,10 +114,6 @@ fn handleLock(listener: *wl.Listener(*wlr.SessionLockV1), lock: *wlr.SessionLock
             while (it) |node| : (it = node.next) {
                 const seat = &node.data;
                 seat.setFocusRaw(.none);
-
-                // Enter locked mode
-                seat.prev_mode_id = seat.mode_id;
-                seat.enterMode(1);
             }
         }
     } else {
@@ -217,9 +213,6 @@ fn handleUnlock(listener: *wl.Listener(void)) void {
         while (it) |node| : (it = node.next) {
             const seat = &node.data;
             seat.setFocusRaw(.none);
-
-            // Exit locked mode
-            seat.enterMode(seat.prev_mode_id);
         }
     }
 
