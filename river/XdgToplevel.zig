@@ -312,8 +312,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
         _ = toplevel.wlr_toplevel.setWmCapabilities(.{ .fullscreen = true });
 
         if (toplevel.decoration) |decoration| {
-            const ssd = server.config.rules.ssd.match(toplevel.view) orelse
-                (decoration.wlr_decoration.requested_mode != .client_side);
+            const ssd = true;
             _ = decoration.wlr_decoration.setMode(if (ssd) .server_side else .client_side);
             toplevel.view.pending.ssd = ssd;
         }

@@ -28,7 +28,6 @@ const util = @import("util.zig");
 const Server = @import("Server.zig");
 const Output = @import("Output.zig");
 const Mode = @import("Mode.zig");
-const RuleList = @import("rule_list.zig").RuleList;
 const View = @import("View.zig");
 
 pub const Position = struct {
@@ -62,16 +61,6 @@ mode_to_id: std.StringHashMap(u32),
 
 /// All user-defined keymap modes, indexed by mode id
 modes: std.ArrayListUnmanaged(Mode),
-
-rules: struct {
-    float: RuleList(bool) = .{},
-    ssd: RuleList(bool) = .{},
-    tags: RuleList(u32) = .{},
-    output: RuleList([]const u8) = .{},
-    position: RuleList(Position) = .{},
-    dimensions: RuleList(Dimensions) = .{},
-    fullscreen: RuleList(bool) = .{},
-} = .{},
 
 /// Bitmask restricting the tags of newly created views.
 spawn_tagmask: u32 = std.math.maxInt(u32),
@@ -125,37 +114,6 @@ pub fn deinit(config: *Config) void {
     for (config.modes.items) |*mode| mode.deinit();
     config.modes.deinit(util.gpa);
 
-    config.rules.float.deinit();
-    config.rules.ssd.deinit();
-    config.rules.tags.deinit();
-    for (config.rules.output.rules.items) |rule| {
-        util.gpa.free(rule.value);
-    }
-    config.rules.output.deinit();
-    config.rules.position.deinit();
-    config.rules.dimensions.deinit();
-    config.rules.fullscreen.deinit();
-
     config.keymap.unref();
     config.xkb_context.unref();
-}
-
-pub fn outputRuleMatch(config: *Config, view: *View) !?*Output {
-    const output_name = config.rules.output.match(view) orelse return null;
-    var it = server.root.active_outputs.iterator(.forward);
-    while (it.next()) |output| {
-        const wlr_output = output.wlr_output;
-        if (mem.eql(u8, output_name, mem.span(wlr_output.name))) return output;
-
-        // This allows matching with "Maker Model Serial" instead of "Connector"
-        const maker = wlr_output.make orelse "Unknown";
-        const model = wlr_output.model orelse "Unknown";
-        const serial = wlr_output.serial orelse "Unknown";
-        const identifier = try fmt.allocPrint(util.gpa, "{s} {s} {s}", .{ maker, model, serial });
-        defer util.gpa.free(identifier);
-
-        if (mem.eql(u8, output_name, identifier)) return output;
-    }
-
-    return null;
 }

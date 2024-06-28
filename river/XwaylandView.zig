@@ -289,8 +289,7 @@ fn handleSetDecorations(listener: *wl.Listener(void)) void {
     const xwayland_view: *XwaylandView = @fieldParentPtr("set_decorations", listener);
     const view = xwayland_view.view;
 
-    const ssd = server.config.rules.ssd.match(view) orelse
-        !xwayland_view.xwayland_surface.decorations.no_border;
+    const ssd = !xwayland_view.xwayland_surface.decorations.no_border;
 
     if (view.pending.ssd != ssd) {
         view.pending.ssd = ssd;

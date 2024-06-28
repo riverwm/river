@@ -576,28 +576,9 @@ pub fn map(view: *View) !void {
 
     view.foreign_toplevel_handle.map();
 
-    if (server.config.rules.float.match(view)) |float| {
-        view.pending.float = float;
-    }
-    if (server.config.rules.fullscreen.match(view)) |fullscreen| {
-        view.pending.fullscreen = fullscreen;
-    }
-    if (server.config.rules.ssd.match(view)) |ssd| {
-        view.pending.ssd = ssd;
-    }
+    const output = server.input_manager.defaultSeat().focused_output;
 
-    if (server.config.rules.dimensions.match(view)) |dimensions| {
-        view.pending.box.width = dimensions.width;
-        view.pending.box.height = dimensions.height;
-    }
-
-    const output = try server.config.outputRuleMatch(view) orelse
-        server.input_manager.defaultSeat().focused_output;
-
-    if (server.config.rules.position.match(view)) |position| {
-        view.pending.box.x = position.x;
-        view.pending.box.y = position.y;
-    } else if (output) |o| {
+    if (output) |o| {
         // Center the initial pending box on the output
         view.pending.box.x = @divTrunc(@max(0, o.usable_box.width - view.pending.box.width), 2);
         view.pending.box.y = @divTrunc(@max(0, o.usable_box.height - view.pending.box.height), 2);
@@ -605,7 +586,6 @@ pub fn map(view: *View) !void {
 
     view.pending.tags = blk: {
         const default = if (output) |o| o.pending.tags else server.root.fallback_pending.tags;
-        if (server.config.rules.tags.match(view)) |tags| break :blk tags;
         const tags = default & server.config.spawn_tagmask;
         break :blk if (tags != 0) tags else default;
     };

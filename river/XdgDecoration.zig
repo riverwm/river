@@ -75,8 +75,7 @@ fn handleRequestMode(
     const toplevel: *XdgToplevel = @ptrFromInt(decoration.wlr_decoration.toplevel.base.data);
     const view = toplevel.view;
 
-    const ssd = server.config.rules.ssd.match(toplevel.view) orelse
-        (decoration.wlr_decoration.requested_mode != .client_side);
+    const ssd = true;
 
     if (view.pending.ssd != ssd) {
         view.pending.ssd = ssd;
