@@ -16,13 +16,13 @@ change, followed by a brief summary.
 For example:
 
 ```
-build: scan river-status protocol
+build: add -Dxwayland option
 ```
 
 or
 
 ```
-river-status: send view_tags on view map/unmap
+Keyboard: fix redundant leave/enter on creation
 ```
 
 In addition to the summary, feel free to add any other details you want preceded

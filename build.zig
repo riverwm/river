@@ -100,7 +100,6 @@ pub fn build(b: *Build) !void {
     scanner.addSystemProtocol("unstable/xdg-decoration/xdg-decoration-unstable-v1.xml");
 
     scanner.addCustomProtocol("protocol/river-control-unstable-v1.xml");
-    scanner.addCustomProtocol("protocol/river-status-unstable-v1.xml");
     scanner.addCustomProtocol("protocol/river-layout-v3.xml");
     scanner.addCustomProtocol("protocol/wlr-layer-shell-unstable-v1.xml");
     scanner.addCustomProtocol("protocol/wlr-output-power-management-unstable-v1.xml");
@@ -126,7 +125,6 @@ pub fn build(b: *Build) !void {
     scanner.generate("wp_cursor_shape_manager_v1", 1);
 
     scanner.generate("zriver_control_v1", 1);
-    scanner.generate("zriver_status_manager_v1", 4);
     scanner.generate("river_layout_manager_v3", 2);
 
     scanner.generate("zwlr_layer_shell_v1", 4);

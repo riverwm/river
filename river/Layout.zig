@@ -169,7 +169,6 @@ fn handleRequest(layout_v3: *river.LayoutV3, request: river.LayoutV3.Request, la
                 };
                 if (layout.output.layout_name) |name| util.gpa.free(name);
                 layout.output.layout_name = owned;
-                layout.output.status.sendLayoutName(layout.output);
             }
         },
     }
@@ -201,7 +200,6 @@ pub fn destroy(layout: *Layout) void {
         if (layout.output.layout_name) |name| {
             util.gpa.free(name);
             layout.output.layout_name = null;
-            layout.output.status.sendLayoutNameClear(layout.output);
         }
     }
 

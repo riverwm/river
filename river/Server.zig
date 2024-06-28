@@ -37,7 +37,6 @@ const Output = @import("Output.zig");
 const Root = @import("Root.zig");
 const Seat = @import("Seat.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
-const StatusManager = @import("StatusManager.zig");
 const TabletTool = @import("TabletTool.zig");
 const XdgDecoration = @import("XdgDecoration.zig");
 const XdgToplevel = @import("XdgToplevel.zig");
@@ -88,7 +87,6 @@ input_manager: InputManager,
 root: Root,
 config: Config,
 control: Control,
-status_manager: StatusManager,
 layout_manager: LayoutManager,
 idle_inhibit_manager: IdleInhibitManager,
 lock_manager: LockManager,
@@ -162,7 +160,6 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
         .root = undefined,
         .input_manager = undefined,
         .control = undefined,
-        .status_manager = undefined,
         .layout_manager = undefined,
         .idle_inhibit_manager = undefined,
         .lock_manager = undefined,
@@ -186,7 +183,6 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
     try server.root.init();
     try server.input_manager.init();
     try server.control.init();
-    try server.status_manager.init();
     try server.layout_manager.init();
     try server.idle_inhibit_manager.init();
     try server.lock_manager.init();
@@ -325,7 +321,6 @@ fn blocklist(server: *Server, global: *const wl.Global) bool {
         global == server.data_control_manager.global or
         global == server.layout_manager.global or
         global == server.control.global or
-        global == server.status_manager.global or
         global == server.root.output_manager.global or
         global == server.root.power_manager.global or
         global == server.root.gamma_control_manager.global or

@@ -34,7 +34,6 @@ const LayerSurface = @import("LayerSurface.zig");
 const Layout = @import("Layout.zig");
 const LayoutDemand = @import("LayoutDemand.zig");
 const LockSurface = @import("LockSurface.zig");
-const OutputStatus = @import("OutputStatus.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
 const View = @import("View.zig");
 const Config = @import("Config.zig");
@@ -192,8 +191,6 @@ layout_name: ?[:0]const u8 = null,
 /// affect already floating views.
 layout: ?*Layout = null,
 
-status: OutputStatus,
-
 destroy: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleDestroy),
 request_state: wl.Listener(*wlr.Output.event.RequestState) = wl.Listener(*wlr.Output.event.RequestState).init(handleRequestState),
 frame: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleFrame),
@@ -293,7 +290,6 @@ pub fn create(wlr_output: *wlr.Output) !void {
             .width = width,
             .height = height,
         },
-        .status = undefined,
     };
     wlr_output.data = @intFromPtr(output);
 
@@ -301,8 +297,6 @@ pub fn create(wlr_output: *wlr.Output) !void {
     output.pending.wm_stack.init();
     output.inflight.focus_stack.init();
     output.inflight.wm_stack.init();
-
-    output.status.init();
 
     _ = try output.layers.fullscreen.createSceneRect(width, height, &[_]f32{ 0, 0, 0, 1.0 });
     output.layers.fullscreen.node.setEnabled(false);

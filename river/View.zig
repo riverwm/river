@@ -722,16 +722,6 @@ pub fn notifyTitle(view: *const View) void {
     if (view.foreign_toplevel_handle.wlr_handle) |wlr_handle| {
         if (view.getTitle()) |title| wlr_handle.setTitle(title);
     }
-    // Send title to all status listeners attached to a seat which focuses this view
-    var seat_it = server.input_manager.seats.first;
-    while (seat_it) |seat_node| : (seat_it = seat_node.next) {
-        if (seat_node.data.focused == .view and seat_node.data.focused.view == view) {
-            var client_it = seat_node.data.status_trackers.first;
-            while (client_it) |client_node| : (client_it = client_node.next) {
-                client_node.data.sendFocusedView();
-            }
-        }
-    }
 }
 
 pub fn notifyAppId(view: View) void {

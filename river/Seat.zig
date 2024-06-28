@@ -39,7 +39,6 @@ const LockSurface = @import("LockSurface.zig");
 const Mapping = @import("Mapping.zig");
 const Output = @import("Output.zig");
 const PointerConstraint = @import("PointerConstraint.zig");
-const SeatStatus = @import("SeatStatus.zig");
 const Switch = @import("Switch.zig");
 const Tablet = @import("Tablet.zig");
 const View = @import("View.zig");
@@ -90,9 +89,6 @@ keyboard_groups: std.TailQueue(KeyboardGroup) = .{},
 focused_output: ?*Output = null,
 
 focused: FocusTarget = .none,
-
-/// List of status tracking objects relaying changes to this seat to clients.
-status_trackers: std.SinglyLinkedList(SeatStatus) = .{},
 
 /// The currently in progress drag operation type.
 drag: enum {
@@ -293,10 +289,6 @@ pub fn setFocusRaw(seat: *Seat, new_focus: FocusTarget) void {
     // Depending on configuration and cursor position, changing keyboard focus
     // may cause the cursor to be warped.
     seat.cursor.may_need_warp = true;
-
-    // Inform any clients tracking status of the change
-    var it = seat.status_trackers.first;
-    while (it) |node| : (it = node.next) node.data.sendFocusedView();
 }
 
 /// Send keyboard enter/leave events and handle pointer constraints
@@ -333,17 +325,7 @@ fn keyboardNotifyEnter(seat: *Seat, wlr_surface: *wlr.Surface) void {
 pub fn focusOutput(seat: *Seat, output: ?*Output) void {
     if (seat.focused_output == output) return;
 
-    if (seat.focused_output) |old| {
-        var it = seat.status_trackers.first;
-        while (it) |node| : (it = node.next) node.data.sendOutput(old, .unfocused);
-    }
-
     seat.focused_output = output;
-
-    if (seat.focused_output) |new| {
-        var it = seat.status_trackers.first;
-        while (it) |node| : (it = node.next) node.data.sendOutput(new, .focused);
-    }
 
     // Depending on configuration and cursor position, changing output focus
     // may cause the cursor to be warped.
@@ -356,11 +338,6 @@ pub fn handleActivity(seat: Seat) void {
 
 pub fn enterMode(seat: *Seat, mode_id: u32) void {
     seat.mode_id = mode_id;
-
-    var it = seat.status_trackers.first;
-    while (it) |node| : (it = node.next) {
-        node.data.sendMode(server.config.modes.items[mode_id].name);
-    }
 }
 
 /// Handle any user-defined mapping for passed keycode, modifiers and keyboard state

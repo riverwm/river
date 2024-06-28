@@ -338,9 +338,6 @@ pub fn deactivateOutput(root: *Root, output: *Output) void {
         }
     }
 
-    output.status.deinit();
-    output.status.init();
-
     if (output.inflight.layout_demand) |layout_demand| {
         layout_demand.deinit();
         output.inflight.layout_demand = null;
@@ -712,8 +709,6 @@ fn commitTransaction(root: *Root) void {
             output.current.fullscreen = output.inflight.fullscreen;
             output.layers.fullscreen.node.setEnabled(output.current.fullscreen != null);
         }
-
-        output.status.handleTransactionCommit(output);
     }
 
     {
