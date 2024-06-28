@@ -191,10 +191,10 @@ pub fn create(impl: Impl) error{OutOfMemory}!*View {
         .surface_tree = try tree.createSceneTree(),
         .saved_surface_tree = try tree.createSceneTree(),
         .borders = .{
-            try tree.createSceneRect(0, 0, &server.config.border_color_unfocused),
-            try tree.createSceneRect(0, 0, &server.config.border_color_unfocused),
-            try tree.createSceneRect(0, 0, &server.config.border_color_unfocused),
-            try tree.createSceneRect(0, 0, &server.config.border_color_unfocused),
+            try tree.createSceneRect(0, 0, &server.config.border_color),
+            try tree.createSceneRect(0, 0, &server.config.border_color),
+            try tree.createSceneRect(0, 0, &server.config.border_color),
+            try tree.createSceneRect(0, 0, &server.config.border_color),
         },
         .popup_tree = popup_tree,
 
@@ -394,11 +394,7 @@ pub fn updateSceneState(view: *View) void {
     {
         const config = &server.config;
         const border_width: c_int = config.border_width;
-        const border_color = blk: {
-            if (view.current.urgent) break :blk &config.border_color_urgent;
-            if (view.current.focus != 0) break :blk &config.border_color_focused;
-            break :blk &config.border_color_unfocused;
-        };
+        const border_color = &config.border_color;
 
         // Order is left, right, top, bottom
         // left and right borders include the corners, top and bottom do not.
@@ -584,11 +580,7 @@ pub fn map(view: *View) !void {
         view.pending.box.y = @divTrunc(@max(0, o.usable_box.height - view.pending.box.height), 2);
     }
 
-    view.pending.tags = blk: {
-        const default = if (output) |o| o.pending.tags else server.root.fallback_pending.tags;
-        const tags = default & server.config.spawn_tagmask;
-        break :blk if (tags != 0) tags else default;
-    };
+    view.pending.tags = if (output) |o| o.pending.tags else server.root.fallback_pending.tags;
 
     if (output) |o| {
         view.setPendingOutput(o);

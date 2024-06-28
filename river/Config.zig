@@ -46,14 +46,8 @@ background_color: [4]f32 = [_]f32{ 0.0, 0.16862745, 0.21176471, 1.0 }, // Solari
 /// Width of borders in pixels
 border_width: u31 = 2,
 
-/// Color of border of focused window in RGBA with premultiplied alpha
-border_color_focused: [4]f32 = [_]f32{ 0.57647059, 0.63137255, 0.63137255, 1.0 }, // Solarized base1
-
-/// Color of border of unfocused window in RGBA with premultiplied alpha
-border_color_unfocused: [4]f32 = [_]f32{ 0.34509804, 0.43137255, 0.45882353, 1.0 }, // Solarized base01
-
-/// Color of border of urgent window in RGBA with premultiplied alpha
-border_color_urgent: [4]f32 = [_]f32{ 0.86274510, 0.19607843, 0.18431373, 1.0 }, // Solarized red
+/// Color of border in RGBA with premultiplied alpha
+border_color: [4]f32 = [_]f32{ 0.34509804, 0.43137255, 0.45882353, 1.0 }, // Solarized base01
 
 /// Map of keymap mode name to mode id
 /// Does not own the string keys. They are owned by the corresponding Mode struct.
@@ -61,9 +55,6 @@ mode_to_id: std.StringHashMap(u32),
 
 /// All user-defined keymap modes, indexed by mode id
 modes: std.ArrayListUnmanaged(Mode),
-
-/// Bitmask restricting the tags of newly created views.
-spawn_tagmask: u32 = std.math.maxInt(u32),
 
 /// Keyboard repeat rate in characters per second
 repeat_rate: u31 = 25,
