@@ -704,9 +704,6 @@ fn handleRequestSetCursor(
 }
 
 pub fn startMove(cursor: *Cursor, view: *View) void {
-    // Guard against assertion in enterMode()
-    if (view.current.output == null) return;
-
     if (cursor.constraint) |constraint| {
         if (constraint.state == .active) constraint.deactivate();
     }
@@ -720,9 +717,6 @@ pub fn startMove(cursor: *Cursor, view: *View) void {
 }
 
 pub fn startResize(cursor: *Cursor, view: *View, proposed_edges: ?wlr.Edges) void {
-    // Guard against assertions in computeEdges() and enterMode()
-    if (view.current.output == null) return;
-
     if (cursor.constraint) |constraint| {
         if (constraint.state == .active) constraint.deactivate();
     }
@@ -759,11 +753,8 @@ fn computeEdges(cursor: *const Cursor, view: *const View) wlr.Edges {
     const min_handle_size = 20;
     const box = &view.current.box;
 
-    var output_box: wlr.Box = undefined;
-    server.root.output_layout.getBox(view.current.output.?.wlr_output, &output_box);
-
-    const sx = @as(i32, @intFromFloat(cursor.wlr_cursor.x)) - output_box.x - box.x;
-    const sy = @as(i32, @intFromFloat(cursor.wlr_cursor.y)) - output_box.y - box.y;
+    const sx = @as(i32, @intFromFloat(cursor.wlr_cursor.x)) - box.x;
+    const sy = @as(i32, @intFromFloat(cursor.wlr_cursor.y)) - box.y;
 
     var edges: wlr.Edges = .{};
 
@@ -878,19 +869,9 @@ fn processMotion(cursor: *Cursor, device: *wlr.InputDevice, time: u32, delta_x: 
             // based on the dimensions actually committed by the client.
             const border_width = if (data.view.pending.ssd) server.config.border_width else 0;
 
-            const output = data.view.current.output orelse {
-                data.view.pending.resizing = false;
-
-                cursor.mode = .passthrough;
-                cursor.passthrough(time);
-
-                server.root.applyPending();
-                return;
-            };
-
-            var output_width: i32 = undefined;
-            var output_height: i32 = undefined;
-            output.wlr_output.effectiveResolution(&output_width, &output_height);
+            // TODO
+            const output_width: i32 = 1920;
+            const output_height: i32 = 1080;
 
             const constraints = &data.view.constraints;
             const box = &data.view.pending.box;

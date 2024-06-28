@@ -96,7 +96,7 @@ fn handleReposition(listener: *wl.Listener(void)) void {
     const xdg_popup: *XdgPopup = @fieldParentPtr("reposition", listener);
 
     const output = switch (SceneNodeData.fromNode(&xdg_popup.root.node).?.data) {
-        .view => |view| view.current.output orelse return,
+        .view => |_| @panic("TODO"),
         .layer_surface => |layer_surface| layer_surface.output,
         else => unreachable,
     };

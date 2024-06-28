@@ -38,12 +38,6 @@ const Config = @import("Config.zig");
 
 const log = std.log.scoped(.output);
 
-pub const PendingState = struct {
-    /// The stack of views acted upon by window management commands such
-    /// as focus-view, zoom, etc.
-    wm_stack: wl.list.Head(View, .pending_wm_stack_link),
-};
-
 wlr_output: *wlr.Output,
 scene_output: *wlr.SceneOutput,
 
@@ -108,30 +102,15 @@ lock_render_state: enum {
 /// This request is handled while rendering the next frame in handleFrame().
 gamma_dirty: bool = false,
 
-/// The state of the output that is directly acted upon/modified through user input.
-///
-/// Pending state will be copied to the inflight state and communicated to clients
-/// to be applied as a single atomic transaction across all clients as soon as any
-/// in progress transaction has been completed.
-///
-/// Any time pending state is modified Root.applyPending() must be called
-/// before yielding back to the event loop.
-pending: PendingState,
-
 /// The state most recently sent to the layout generator and clients.
 /// This state is immutable until all clients have replied and the transaction
 /// is completed, at which point this inflight state is copied to current.
 inflight: struct {
-    /// See pending.wm_stack
-    wm_stack: wl.list.Head(View, .inflight_wm_stack_link),
     /// The view to be made fullscreen, if any.
     fullscreen: ?*View = null,
-},
+} = .{},
 
 /// The current state represented by the scene graph.
-/// There is no need to have a current wm_stack copy as this
-/// information is transferred from the inflight state to the scene graph
-/// as an inflight transaction completes.
 current: struct {
     /// The currently fullscreen view, if any.
     fullscreen: ?*View = null,
@@ -221,12 +200,6 @@ pub fn create(wlr_output: *wlr.Output) !void {
             .overlay = try normal_content.createSceneTree(),
             .popups = try normal_content.createSceneTree(),
         },
-        .pending = .{
-            .wm_stack = undefined,
-        },
-        .inflight = .{
-            .wm_stack = undefined,
-        },
         .usable_box = .{
             .x = 0,
             .y = 0,
@@ -235,9 +208,6 @@ pub fn create(wlr_output: *wlr.Output) !void {
         },
     };
     wlr_output.data = @intFromPtr(output);
-
-    output.pending.wm_stack.init();
-    output.inflight.wm_stack.init();
 
     _ = try output.layers.fullscreen.createSceneRect(width, height, &[_]f32{ 0, 0, 0, 1.0 });
     output.layers.fullscreen.node.setEnabled(false);
@@ -343,9 +313,6 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
 
     // Remove the destroyed output from root if it wasn't already removed
     server.root.deactivateOutput(output);
-
-    assert(output.pending.wm_stack.empty());
-    assert(output.inflight.wm_stack.empty());
 
     output.all_link.remove();
 

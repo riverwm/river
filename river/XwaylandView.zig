@@ -86,35 +86,29 @@ pub fn create(xwayland_surface: *wlr.XwaylandSurface) error{OutOfMemory}!void {
 
 /// Always returns false as we do not care about frame perfection for Xwayland views.
 pub fn configure(xwayland_view: XwaylandView) bool {
-    const output = xwayland_view.view.inflight.output orelse return false;
-
-    var output_box: wlr.Box = undefined;
-    server.root.output_layout.getBox(output.wlr_output, &output_box);
-
     const inflight = &xwayland_view.view.inflight;
     const current = &xwayland_view.view.current;
 
-    if (xwayland_view.xwayland_surface.x == inflight.box.x + output_box.x and
-        xwayland_view.xwayland_surface.y == inflight.box.y + output_box.y and
+    if (xwayland_view.xwayland_surface.x == inflight.box.x and
+        xwayland_view.xwayland_surface.y == inflight.box.y and
         xwayland_view.xwayland_surface.width == inflight.box.width and
         xwayland_view.xwayland_surface.height == inflight.box.height and
-        (inflight.focus != 0) == (current.focus != 0) and
-        (output.inflight.fullscreen == xwayland_view.view) ==
-        (current.output != null and current.output.?.current.fullscreen == xwayland_view.view))
+        (inflight.focus != 0) == (current.focus != 0))
+        // TODO fullscreen
     {
         return false;
     }
 
     xwayland_view.xwayland_surface.configure(
-        math.lossyCast(i16, inflight.box.x + output_box.x),
-        math.lossyCast(i16, inflight.box.y + output_box.y),
+        math.lossyCast(i16, inflight.box.x),
+        math.lossyCast(i16, inflight.box.y),
         math.lossyCast(u16, inflight.box.width),
         math.lossyCast(u16, inflight.box.height),
     );
 
     xwayland_view.setActivated(inflight.focus != 0);
 
-    xwayland_view.xwayland_surface.setFullscreen(output.inflight.fullscreen == xwayland_view.view);
+    if (false) xwayland_view.xwayland_surface.setFullscreen();
 
     return false;
 }

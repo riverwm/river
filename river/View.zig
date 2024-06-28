@@ -55,11 +55,6 @@ const Impl = union(enum) {
 };
 
 pub const State = struct {
-    /// The output the view is currently assigned to.
-    /// May be null if there are no outputs or for newly created views.
-    /// Must be set using setPendingOutput()
-    output: ?*Output = null,
-
     /// The output-relative coordinates of the view and dimensions requested by river.
     box: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
 
@@ -76,11 +71,8 @@ pub const State = struct {
     pub fn move(state: *State, delta_x: i32, delta_y: i32) void {
         const border_width = if (state.ssd) server.config.border_width else 0;
 
-        var output_width: i32 = math.maxInt(i32);
-        var output_height: i32 = math.maxInt(i32);
-        if (state.output) |output| {
-            output.wlr_output.effectiveResolution(&output_width, &output_height);
-        }
+        const output_width = math.maxInt(i32);
+        const output_height = math.maxInt(i32);
 
         const max_x = output_width - state.box.width - border_width;
         state.box.x += delta_x;
@@ -142,13 +134,13 @@ destroying: bool = false,
 /// Any time pending state is modified Root.applyPending() must be called
 /// before yielding back to the event loop.
 pending: State = .{},
-pending_wm_stack_link: wl.list.Link,
+pending_render_list_link: wl.list.Link,
 
 /// The state most recently sent to the layout generator and clients.
 /// This state is immutable until all clients have replied and the transaction
 /// is completed, at which point this inflight state is copied to current.
 inflight: State = .{},
-inflight_wm_stack_link: wl.list.Link,
+inflight_render_list_link: wl.list.Link,
 
 /// The current state represented by the scene graph.
 current: State = .{},
@@ -192,13 +184,13 @@ pub fn create(impl: Impl) error{OutOfMemory}!*View {
         },
         .popup_tree = popup_tree,
 
-        .pending_wm_stack_link = undefined,
-        .inflight_wm_stack_link = undefined,
+        .pending_render_list_link = undefined,
+        .inflight_render_list_link = undefined,
     };
 
     server.root.views.prepend(view);
-    server.root.hidden.pending.wm_stack.prepend(view);
-    server.root.hidden.inflight.wm_stack.prepend(view);
+    server.root.hidden.pending.render_list.prepend(view);
+    server.root.hidden.inflight.render_list.prepend(view);
 
     view.tree.node.setEnabled(false);
     view.popup_tree.node.setEnabled(false);
@@ -227,8 +219,8 @@ pub fn destroy(view: *View, when: enum { lazy, assert }) void {
         view.popup_tree.node.destroy();
 
         view.link.remove();
-        view.pending_wm_stack_link.remove();
-        view.inflight_wm_stack_link.remove();
+        view.pending_render_list_link.remove();
+        view.inflight_render_list_link.remove();
 
         if (view.output_before_evac) |name| util.gpa.free(name);
 
@@ -354,31 +346,6 @@ pub fn updateSceneState(view: *View) void {
     view.tree.node.setPosition(box.x, box.y);
     view.popup_tree.node.setPosition(box.x, box.y);
 
-    var output_box: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 };
-    if (view.current.output) |output| {
-        output.wlr_output.effectiveResolution(&output_box.width, &output_box.height);
-    }
-
-    {
-        var surface_clip: wlr.Box = output_box;
-
-        // The clip is applied relative to the root node of the subsurface tree.
-        surface_clip.x -= box.x;
-        surface_clip.y -= box.y;
-
-        switch (view.impl) {
-            .toplevel => |toplevel| {
-                surface_clip.x += toplevel.geometry.x;
-                surface_clip.y += toplevel.geometry.y;
-            },
-            .xwayland_view, .none => {},
-        }
-
-        if (!view.surface_tree.children.empty()) {
-            view.surface_tree.node.subsurfaceTreeSetClip(&surface_clip);
-        }
-    }
-
     {
         const config = &server.config;
         const border_width: c_int = config.border_width;
@@ -414,12 +381,6 @@ pub fn updateSceneState(view: *View) void {
         };
 
         for (&view.borders, &border_boxes) |border, *border_box| {
-            border_box.x += box.x;
-            border_box.y += box.y;
-            _ = border_box.intersection(border_box, &output_box);
-            border_box.x -= box.x;
-            border_box.y -= box.y;
-
             border.node.setEnabled(view.current.ssd and !view.current.fullscreen);
             border.node.setPosition(border_box.x, border_box.y);
             border.setSize(border_box.width, border_box.height);
@@ -493,18 +454,6 @@ fn saveSurfaceTreeIter(
     saved.setTransform(buffer.transform);
 }
 
-pub fn setPendingOutput(view: *View, output: *Output) void {
-    view.pending.output = output;
-    view.pending_wm_stack_link.remove();
-
-    output.pending.wm_stack.prepend(view);
-
-    if (view.pending.fullscreen) {
-        view.pending.box = .{ .x = 0, .y = 0, .width = undefined, .height = undefined };
-        output.wlr_output.effectiveResolution(&view.pending.box.width, &view.pending.box.height);
-    }
-}
-
 pub fn close(view: View) void {
     switch (view.impl) {
         .toplevel => |toplevel| toplevel.wlr_toplevel.sendClose(),
@@ -556,31 +505,6 @@ pub fn map(view: *View) !void {
 
     view.foreign_toplevel_handle.map();
 
-    if (true) @panic("TODO");
-    const output = undefined;
-
-    if (output) |o| {
-        // Center the initial pending box on the output
-        view.pending.box.x = @divTrunc(@max(0, o.usable_box.width - view.pending.box.width), 2);
-        view.pending.box.y = @divTrunc(@max(0, o.usable_box.height - view.pending.box.height), 2);
-    }
-
-    if (output) |o| {
-        view.setPendingOutput(o);
-
-        var it = server.input_manager.seats.first;
-        while (it) |seat_node| : (it = seat_node.next) seat_node.data.focus(view);
-    } else {
-        log.debug("no output available for newly mapped view, adding to fallback stacks", .{});
-
-        view.pending_wm_stack_link.remove();
-
-        server.root.fallback_pending.wm_stack.prepend(view);
-
-        view.inflight_wm_stack_link.remove();
-        view.inflight_wm_stack_link.init();
-    }
-
     view.float_box = view.pending.box;
 
     server.root.applyPending();
@@ -593,9 +517,8 @@ pub fn unmap(view: *View) void {
     if (!view.saved_surface_tree.node.enabled) view.saveSurfaceTree();
 
     {
-        view.pending.output = null;
-        view.pending_wm_stack_link.remove();
-        server.root.hidden.pending.wm_stack.prepend(view);
+        view.pending_render_list_link.remove();
+        server.root.hidden.pending.render_list.prepend(view);
     }
 
     assert(view.mapped and !view.destroying);

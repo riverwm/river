@@ -108,7 +108,7 @@ pub fn update(input_popup: *InputPopup) void {
     const focused = SceneNodeData.fromSurface(focused_surface) orelse return;
 
     const output = switch (focused.data) {
-        .view => |view| view.current.output orelse return,
+        .view => @panic("TODO"),
         .layer_surface => |layer_surface| layer_surface.output,
         .lock_surface => |lock_surface| lock_surface.getOutput(),
         // Xwayland doesn't use the text-input protocol

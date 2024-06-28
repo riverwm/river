@@ -71,14 +71,8 @@ pub fn update(handle: *ForeignToplevelHandle) void {
 
     const wlr_handle = handle.wlr_handle orelse return;
 
-    if (view.inflight.output != view.current.output) {
-        if (view.current.output) |output| wlr_handle.outputLeave(output.wlr_output);
-        if (view.inflight.output) |output| wlr_handle.outputEnter(output.wlr_output);
-    }
-
     wlr_handle.setActivated(view.inflight.focus != 0);
-    wlr_handle.setFullscreen(view.inflight.output != null and
-        view.inflight.output.?.inflight.fullscreen == view);
+    wlr_handle.setFullscreen(view.inflight.fullscreen);
 }
 
 /// Only honors the request if the view is already visible on the seat's

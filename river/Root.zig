@@ -52,27 +52,29 @@ layers: struct {
     override_redirect: if (build_options.xwayland) *wlr.SceneTree else void,
 },
 
+wm: struct {
+    pending: struct {
+        render_list: wl.list.Head(View, .pending_render_list_link),
+    },
+
+    inflight: struct {
+        render_list: wl.list.Head(View, .inflight_render_list_link),
+    },
+},
+
 /// This is kind of like an imaginary output where views start and end their life.
 hidden: struct {
     /// This tree is always disabled.
     tree: *wlr.SceneTree,
 
     pending: struct {
-        wm_stack: wl.list.Head(View, .pending_wm_stack_link),
+        render_list: wl.list.Head(View, .pending_render_list_link),
     },
 
     inflight: struct {
-        wm_stack: wl.list.Head(View, .inflight_wm_stack_link),
+        render_list: wl.list.Head(View, .inflight_render_list_link),
     },
 },
-
-/// This is used to store views when no actual outputs are available.
-/// This must be separate from hidden to ensure we don't mix views that are
-/// in the process of being mapped/unmapped with the mapped views in these lists.
-/// There is no need for inflight lists, instead the inflight links of views are
-/// remove()'d from their current list and init()'d so they may be remove()'d again
-/// when an output becomes available and they are moved to the output's inflight lists.
-fallback_pending: Output.PendingState,
 
 views: wl.list.Head(View, .link),
 
@@ -139,17 +141,22 @@ pub fn init(root: *Root) !void {
             .outputs = outputs,
             .override_redirect = override_redirect,
         },
+        .wm = .{
+            .pending = .{
+                .render_list = undefined,
+            },
+            .inflight = .{
+                .render_list = undefined,
+            },
+        },
         .hidden = .{
             .tree = hidden_tree,
             .pending = .{
-                .wm_stack = undefined,
+                .render_list = undefined,
             },
             .inflight = .{
-                .wm_stack = undefined,
+                .render_list = undefined,
             },
-        },
-        .fallback_pending = .{
-            .wm_stack = undefined,
         },
         .views = undefined,
         .output_layout = output_layout,
@@ -163,10 +170,10 @@ pub fn init(root: *Root) !void {
         .gamma_control_manager = try wlr.GammaControlManagerV1.create(server.wl_server),
         .transaction_timeout = transaction_timeout,
     };
-    root.hidden.pending.wm_stack.init();
-    root.hidden.inflight.wm_stack.init();
-
-    root.fallback_pending.wm_stack.init();
+    root.wm.pending.render_list.init();
+    root.wm.inflight.render_list.init();
+    root.hidden.pending.render_list.init();
+    root.hidden.inflight.render_list.init();
 
     root.views.init();
     root.all_outputs.init();
@@ -259,47 +266,6 @@ pub fn deactivateOutput(root: *Root, output: *Output) void {
     output.active_link.remove();
     output.active_link.init();
 
-    {
-        var it = output.inflight.wm_stack.safeIterator(.forward);
-        while (it.next()) |view| {
-            view.inflight.output = null;
-            view.current.output = null;
-
-            view.tree.node.reparent(root.hidden.tree);
-            view.popup_tree.node.reparent(root.hidden.tree);
-
-            view.inflight_wm_stack_link.remove();
-            view.inflight_wm_stack_link.init();
-
-            if (view.inflight_transaction) {
-                view.commitTransaction();
-            }
-
-            // Store outputs connector name so that views can be moved back to
-            // reconnecting outputs. Skip if there is already a connector name
-            // stored to better handle the case of multiple outputs being
-            // removed sequentially.
-            if (view.output_before_evac == null) {
-                const name = mem.span(output.wlr_output.name);
-                view.output_before_evac = util.gpa.dupe(u8, name) catch null;
-            }
-        }
-    }
-    // Use the first output in the list as fallback. If the last real output
-    // is being removed, store the views in Root.fallback_pending.
-    const fallback_output = blk: {
-        var it = root.active_outputs.iterator(.forward);
-        break :blk it.next();
-    };
-    if (fallback_output) |fallback| {
-        var it = output.pending.wm_stack.safeIterator(.reverse);
-        while (it.next()) |view| view.setPendingOutput(fallback);
-    } else {
-        var it = output.pending.wm_stack.iterator(.forward);
-        while (it.next()) |view| view.pending.output = null;
-        root.fallback_pending.wm_stack.prependList(&output.pending.wm_stack);
-    }
-
     // Close all layer surfaces on the removed output
     for ([_]zwlr.LayerShellV1.Layer{ .overlay, .top, .bottom, .background }) |layer| {
         const tree = output.layerSurfaceTree(layer);
@@ -326,8 +292,6 @@ pub fn activateOutput(root: *Root, output: *Output) void {
         while (it.next()) |o| if (o == output) return;
     }
 
-    const first = root.active_outputs.empty();
-
     root.active_outputs.append(output);
 
     // This arranges outputs from left-to-right in the order they appear. The
@@ -341,35 +305,6 @@ pub fn activateOutput(root: *Root, output: *Output) void {
         // possible to handle after updating to 0.17.
         @panic("TODO handle allocation failure here");
     };
-
-    // If we previously had no outputs, move all views to the new output and focus it.
-    if (first) {
-        const log = std.log.scoped(.output_manager);
-        log.debug("moving views from fallback stacks to new output", .{});
-
-        {
-            var it = root.fallback_pending.wm_stack.safeIterator(.reverse);
-            while (it.next()) |view| view.setPendingOutput(output);
-        }
-    } else {
-        // Otherwise check if any views were previously evacuated from an output
-        // with the same (connector-)name and move them back.
-        var it = root.views.iterator(.forward);
-        while (it.next()) |view| {
-            const name = view.output_before_evac orelse continue;
-            if (mem.eql(u8, name, mem.span(output.wlr_output.name))) {
-                if (view.pending.output != output) {
-                    view.setPendingOutput(output);
-                }
-                util.gpa.free(name);
-                view.output_before_evac = null;
-            }
-        }
-    }
-    assert(root.fallback_pending.wm_stack.empty());
-
-    // Enforce map-to-output configuration for the newly active output.
-    server.input_manager.reconfigureDevices();
 }
 
 /// Trigger asynchronous application of pending state for all outputs and views.
@@ -394,45 +329,10 @@ pub fn applyPending(root: *Root) void {
     root.pending_state_dirty = false;
 
     {
-        var it = root.hidden.pending.wm_stack.iterator(.forward);
+        var it = root.hidden.pending.render_list.iterator(.forward);
         while (it.next()) |view| {
-            assert(view.pending.output == null);
-            view.inflight.output = null;
-            view.inflight_wm_stack_link.remove();
-            root.hidden.inflight.wm_stack.append(view);
-        }
-    }
-
-    {
-        var output_it = root.active_outputs.iterator(.forward);
-        while (output_it.next()) |output| {
-            // Iterate the focus stack in order to ensure the currently focused/most
-            // recently focused view that requests fullscreen is given fullscreen.
-            output.inflight.fullscreen = null;
-            {
-                var it = output.pending.wm_stack.iterator(.forward);
-                while (it.next()) |view| {
-                    assert(view.pending.output == output);
-
-                    if (!view.current.fullscreen and view.pending.fullscreen) {
-                        view.post_fullscreen_box = view.pending.box;
-                        view.pending.box = .{ .x = 0, .y = 0, .width = undefined, .height = undefined };
-                        output.wlr_output.effectiveResolution(&view.pending.box.width, &view.pending.box.height);
-                    } else if (view.current.fullscreen and !view.pending.fullscreen) {
-                        view.pending.box = view.post_fullscreen_box;
-                        view.pending.clampToOutput();
-                    }
-
-                    if (output.inflight.fullscreen == null and view.pending.fullscreen) {
-                        output.inflight.fullscreen = view;
-                    }
-
-                    view.inflight_wm_stack_link.remove();
-                    output.inflight.wm_stack.append(view);
-
-                    view.inflight = view.pending;
-                }
-            }
+            view.inflight_render_list_link.remove();
+            root.hidden.inflight.render_list.append(view);
         }
     }
 
@@ -444,9 +344,7 @@ pub fn applyPending(root: *Root) void {
             switch (cursor.mode) {
                 .passthrough, .down => {},
                 inline .move, .resize => |data| {
-                    if (data.view.inflight.output == null or
-                        data.view.inflight.fullscreen)
-                    {
+                    if (data.view.inflight.fullscreen) {
                         cursor.mode = .passthrough;
                         data.view.pending.resizing = false;
                         data.view.inflight.resizing = false;
@@ -464,11 +362,9 @@ pub fn applyPending(root: *Root) void {
 fn sendConfigures(root: *Root) void {
     assert(root.inflight_configures == 0);
 
-    // Iterate over all views of all outputs
-    var output_it = root.active_outputs.iterator(.forward);
-    while (output_it.next()) |output| {
-        var wm_stack_it = output.inflight.wm_stack.iterator(.forward);
-        while (wm_stack_it.next()) |view| {
+    {
+        var it = root.wm.inflight.render_list.iterator(.forward);
+        while (it.next()) |view| {
             assert(!view.inflight_transaction);
             view.inflight_transaction = true;
 
@@ -527,49 +423,20 @@ fn commitTransaction(root: *Root) void {
     std.log.scoped(.transaction).debug("commiting transaction", .{});
 
     {
-        var it = root.hidden.inflight.wm_stack.safeIterator(.forward);
+        var it = root.hidden.inflight.render_list.safeIterator(.forward);
         while (it.next()) |view| {
-            assert(view.inflight.output == null);
-            view.current.output = null;
-
             view.tree.node.reparent(root.hidden.tree);
             view.popup_tree.node.reparent(root.hidden.tree);
         }
     }
 
-    var output_it = root.active_outputs.iterator(.forward);
-    while (output_it.next()) |output| {
-        var wm_stack_it = output.inflight.wm_stack.iterator(.forward);
-        while (wm_stack_it.next()) |view| {
-            assert(view.inflight.output == output);
-
-            if (view.current.output != view.inflight.output or
-                (output.current.fullscreen == view and output.inflight.fullscreen != view))
-            {
-                view.tree.node.reparent(output.layers.wm);
-                view.popup_tree.node.reparent(output.layers.popups);
-            }
-
-            view.tree.node.reparent(output.layers.wm);
-
+    {
+        var it = root.wm.inflight.render_list.iterator(.forward);
+        while (it.next()) |view| {
             view.commitTransaction();
 
             view.tree.node.setEnabled(true);
             view.popup_tree.node.setEnabled(true);
-            if (output.inflight.fullscreen != view) {
-                // TODO this approach for syncing the order will likely cause over-damaging.
-                view.tree.node.lowerToBottom();
-            }
-        }
-
-        if (output.inflight.fullscreen != output.current.fullscreen) {
-            if (output.inflight.fullscreen) |view| {
-                assert(view.inflight.output == output);
-                assert(view.current.output == output);
-                view.tree.node.reparent(output.layers.fullscreen);
-            }
-            output.current.fullscreen = output.inflight.fullscreen;
-            output.layers.fullscreen.node.setEnabled(output.current.fullscreen != null);
         }
     }
 
@@ -580,7 +447,7 @@ fn commitTransaction(root: *Root) void {
 
     {
         // This must be done after updating cursor state in case the view was the target of move/resize.
-        var it = root.hidden.inflight.wm_stack.safeIterator(.forward);
+        var it = root.hidden.inflight.render_list.safeIterator(.forward);
         while (it.next()) |view| {
             view.dropSavedSurfaceTree();
             if (view.destroying) view.destroy(.assert);
