@@ -54,11 +54,6 @@ const Impl = union(enum) {
     none,
 };
 
-const AttachRelativeMode = enum {
-    above,
-    below,
-};
-
 pub const State = struct {
     /// The output the view is currently assigned to.
     /// May be null if there are no outputs or for newly created views.
@@ -519,13 +514,7 @@ pub fn setPendingOutput(view: *View, output: *Output) void {
     view.pending_wm_stack_link.remove();
     view.pending_focus_stack_link.remove();
 
-    switch (output.attachMode()) {
-        .top => output.pending.wm_stack.prepend(view),
-        .bottom => output.pending.wm_stack.append(view),
-        .after => |n| view.attachAfter(&output.pending, n),
-        .above => view.attachRelative(&output.pending, .above),
-        .below => view.attachRelative(&output.pending, .below),
-    }
+    output.pending.wm_stack.prepend(view);
     output.pending.focus_stack.prepend(view);
 
     if (view.pending.fullscreen) {
@@ -576,49 +565,6 @@ pub fn getAppId(view: View) ?[*:0]const u8 {
 pub fn applyConstraints(view: *View, box: *wlr.Box) void {
     box.width = math.clamp(box.width, view.constraints.min_width, view.constraints.max_width);
     box.height = math.clamp(box.height, view.constraints.min_height, view.constraints.max_height);
-}
-
-/// Attach after n visible, not-floating views in the pending wm_stack
-pub fn attachAfter(view: *View, output_pending: *Output.PendingState, n: usize) void {
-    var visible: u32 = 0;
-    var it = output_pending.wm_stack.iterator(.forward);
-
-    while (it.next()) |other| {
-        if (visible >= n) break;
-        if (!other.pending.float and other.pending.tags & output_pending.tags != 0) {
-            visible += 1;
-        }
-    }
-
-    it.current.prev.?.insert(&view.pending_wm_stack_link);
-}
-
-/// Attach above or below the currently focused view
-pub fn attachRelative(view: *View, output_pending: *Output.PendingState, mode: AttachRelativeMode) void {
-    const focus_stack_head = output_pending.focus_stack.first() orelse {
-        output_pending.wm_stack.append(view);
-        return;
-    };
-
-    // There are two cases to consider here:
-    //
-    // 1. The first view in the focus stack is visible given the currently focused tags.
-    // In this case, inserting directly before/after that view in the wm_stack is correct.
-    //
-    // 2. There are no views visible given the currently focused tags. In this case it
-    // doesn't matter where in the wm_stack the new view is inserted as it will be the only
-    // view visible.
-
-    var it = output_pending.wm_stack.iterator(.forward);
-    while (it.next()) |other| {
-        if (other == focus_stack_head) {
-            switch (mode) {
-                .above => other.pending_wm_stack_link.prev.?.insert(&view.pending_wm_stack_link),
-                .below => other.pending_wm_stack_link.insert(&view.pending_wm_stack_link),
-            }
-            return;
-        }
-    }
 }
 
 /// Called by the impl when the surface is ready to be displayed
@@ -675,13 +621,7 @@ pub fn map(view: *View) !void {
         view.pending_wm_stack_link.remove();
         view.pending_focus_stack_link.remove();
 
-        switch (server.config.default_attach_mode) {
-            .top => server.root.fallback_pending.wm_stack.prepend(view),
-            .bottom => server.root.fallback_pending.wm_stack.append(view),
-            .after => |n| view.attachAfter(&server.root.fallback_pending, n),
-            .above => view.attachRelative(&server.root.fallback_pending, .above),
-            .below => view.attachRelative(&server.root.fallback_pending, .below),
-        }
+        server.root.fallback_pending.wm_stack.prepend(view);
         server.root.fallback_pending.focus_stack.prepend(view);
 
         view.inflight_wm_stack_link.remove();

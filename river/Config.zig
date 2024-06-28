@@ -31,33 +31,6 @@ const Mode = @import("Mode.zig");
 const RuleList = @import("rule_list.zig").RuleList;
 const View = @import("View.zig");
 
-pub const AttachMode = union(enum) {
-    top,
-    bottom,
-    after: u32,
-    above,
-    below,
-};
-
-pub const FocusFollowsCursorMode = enum {
-    disabled,
-    /// Only change focus on entering a surface
-    normal,
-    /// Change focus on any cursor movement
-    always,
-};
-
-pub const WarpCursorMode = enum {
-    disabled,
-    @"on-output-change",
-    @"on-focus-change",
-};
-
-pub const HideCursorWhenTypingMode = enum {
-    disabled,
-    enabled,
-};
-
 pub const Position = struct {
     x: u31,
     y: u31,
@@ -100,34 +73,14 @@ rules: struct {
     fullscreen: RuleList(bool) = .{},
 } = .{},
 
-/// The selected focus_follows_cursor mode
-focus_follows_cursor: FocusFollowsCursorMode = .disabled,
-
-/// If true, the cursor warps to the center of the focused output
-warp_cursor: WarpCursorMode = .disabled,
-
-/// The default layout namespace for outputs which have never had a per-output
-/// value set. Call Output.handleLayoutNamespaceChange() on setting this if
-/// Output.layout_namespace is null.
-default_layout_namespace: []const u8 = &[0]u8{},
-
 /// Bitmask restricting the tags of newly created views.
 spawn_tagmask: u32 = std.math.maxInt(u32),
-
-/// Determines where new views will be attached to the view stack.
-default_attach_mode: AttachMode = .top,
 
 /// Keyboard repeat rate in characters per second
 repeat_rate: u31 = 25,
 
 /// Keyboard repeat delay in milliseconds
 repeat_delay: u31 = 600,
-
-/// Cursor hide timeout in milliseconds
-cursor_hide_timeout: u31 = 0,
-
-/// Hide the cursor while typing
-cursor_hide_when_typing: HideCursorWhenTypingMode = .disabled,
 
 xkb_context: *xkb.Context,
 /// The xkb keymap used for all keyboards
@@ -182,8 +135,6 @@ pub fn deinit(config: *Config) void {
     config.rules.position.deinit();
     config.rules.dimensions.deinit();
     config.rules.fullscreen.deinit();
-
-    util.gpa.free(config.default_layout_namespace);
 
     config.keymap.unref();
     config.xkb_context.unref();

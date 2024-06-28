@@ -164,8 +164,6 @@ current: struct {
 /// Remembered version of tags (from last run)
 previous_tags: u32 = 1 << 0,
 
-attach_mode: ?Config.AttachMode = null,
-
 destroy: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleDestroy),
 request_state: wl.Listener(*wlr.Output.event.RequestState) = wl.Listener(*wlr.Output.event.RequestState).init(handleRequestState),
 frame: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleFrame),
@@ -596,8 +594,4 @@ fn setTitle(output: Output) void {
     } else if (wlr.config.has_x11_backend and output.wlr_output.isX11()) {
         output.wlr_output.x11SetTitle(title);
     }
-}
-
-pub fn attachMode(output: Output) Config.AttachMode {
-    return output.attach_mode orelse server.config.default_attach_mode;
 }

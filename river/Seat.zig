@@ -284,10 +284,6 @@ pub fn setFocusRaw(seat: *Seat, new_focus: FocusTarget) void {
             }
         }
     }
-
-    // Depending on configuration and cursor position, changing keyboard focus
-    // may cause the cursor to be warped.
-    seat.cursor.may_need_warp = true;
 }
 
 /// Send keyboard enter/leave events and handle pointer constraints
@@ -325,10 +321,6 @@ pub fn focusOutput(seat: *Seat, output: ?*Output) void {
     if (seat.focused_output == output) return;
 
     seat.focused_output = output;
-
-    // Depending on configuration and cursor position, changing output focus
-    // may cause the cursor to be warped.
-    seat.cursor.may_need_warp = true;
 }
 
 pub fn handleActivity(seat: Seat) void {
@@ -563,7 +555,6 @@ fn handleDragDestroy(listener: *wl.Listener(*wlr.Drag), _: *wlr.Drag) void {
     switch (seat.drag) {
         .none => unreachable,
         .pointer => {
-            seat.cursor.checkFocusFollowsCursor();
             seat.cursor.updateState();
         },
         .touch => {},

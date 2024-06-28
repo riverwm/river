@@ -168,17 +168,6 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
 
     const keysyms = xkb_state.keyGetSyms(keycode);
 
-    // Hide cursor when typing
-    for (keysyms) |sym| {
-        if (server.config.cursor_hide_when_typing == .enabled and
-            !released and
-            !isModifier(sym))
-        {
-            keyboard.device.seat.cursor.hide();
-            break;
-        }
-    }
-
     for (keysyms) |sym| {
         if (!released and handleBuiltinMapping(sym)) return;
     }

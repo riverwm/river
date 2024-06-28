@@ -131,18 +131,10 @@ xcursor_name: ?[*:0]const u8 = null,
 /// Number of distinct buttons currently pressed
 pressed_count: u32 = 0,
 
-hide_cursor_timer: *wl.EventSource,
-
-hidden: bool = false,
-may_need_warp: bool = false,
-
 /// The pointer constraint for the surface that currently has keyboard focus, if any.
 /// This constraint is not necessarily active, activation only occurs once the cursor
 /// has been moved inside the constraint region.
 constraint: ?*PointerConstraint = null,
-
-/// View under the cursor, defined by view geometry rather than input region
-focus_follows_cursor_target: ?*View = null,
 
 /// Keeps track of the last known location of all touch points in layout coordinates.
 /// This information is necessary for proper touch dnd support if there are multiple touch points.
@@ -201,15 +193,11 @@ pub fn init(cursor: *Cursor, seat: *Seat) !void {
     const xcursor_manager = try wlr.XcursorManager.create(null, default_size);
     errdefer xcursor_manager.destroy();
 
-    const event_loop = server.wl_server.getEventLoop();
     cursor.* = .{
         .seat = seat,
         .wlr_cursor = wlr_cursor,
         .xcursor_manager = xcursor_manager,
-        .hide_cursor_timer = try event_loop.addTimer(*Cursor, handleHideCursorTimeout, cursor),
     };
-    errdefer cursor.hide_cursor_timer.remove();
-    try cursor.hide_cursor_timer.timerUpdate(server.config.cursor_hide_timeout);
     try cursor.setTheme(null, null);
 
     // wlr_cursor *only* displays an image on screen. It does not move around
@@ -243,7 +231,6 @@ pub fn init(cursor: *Cursor, seat: *Seat) !void {
 }
 
 pub fn deinit(cursor: *Cursor) void {
-    cursor.hide_cursor_timer.remove();
     cursor.xcursor_manager.destroy();
     cursor.wlr_cursor.destroy();
 }
@@ -307,7 +294,6 @@ fn handleAxis(listener: *wl.Listener(*wlr.Pointer.event.Axis), event: *wlr.Point
     const device: *InputDevice = @ptrFromInt(event.device.data);
 
     cursor.seat.handleActivity();
-    cursor.unhide();
 
     // Notify the client with pointer focus of the axis event.
     cursor.seat.wlr_seat.pointerNotifyAxis(
@@ -332,7 +318,6 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
     const cursor: *Cursor = @fieldParentPtr("button", listener);
 
     cursor.seat.handleActivity();
-    cursor.unhide();
 
     if (event.state == .released) {
         assert(cursor.pressed_count > 0);
@@ -744,40 +729,6 @@ fn handleRequestSetCursor(
     }
 }
 
-pub fn hide(cursor: *Cursor) void {
-    if (cursor.pressed_count > 0) return;
-
-    // Hiding the cursor and sending wl_pointer.leave whlie a pointer constraint
-    // is active does not make much sense. In particular, doing so seems to interact
-    // poorly with Xwayland's pointer constraints implementation.
-    if (cursor.constraint) |constraint| {
-        if (constraint.state == .active) return;
-    }
-
-    cursor.hidden = true;
-    cursor.wlr_cursor.unsetImage();
-    cursor.xcursor_name = null;
-    cursor.seat.wlr_seat.pointerNotifyClearFocus();
-    cursor.hide_cursor_timer.timerUpdate(0) catch {
-        log.err("failed to update cursor hide timeout", .{});
-    };
-}
-
-pub fn unhide(cursor: *Cursor) void {
-    cursor.hide_cursor_timer.timerUpdate(server.config.cursor_hide_timeout) catch {
-        log.err("failed to update cursor hide timeout", .{});
-    };
-    if (!cursor.hidden) return;
-    cursor.hidden = false;
-    cursor.updateState();
-}
-
-fn handleHideCursorTimeout(cursor: *Cursor) c_int {
-    log.debug("hide cursor timeout", .{});
-    cursor.hide();
-    return 0;
-}
-
 pub fn startMove(cursor: *Cursor, view: *View) void {
     // Guard against assertion in enterMode()
     if (view.current.output == null) return;
@@ -884,8 +835,6 @@ fn enterMode(cursor: *Cursor, mode: Mode, view: *View, xcursor_name: [*:0]const 
 }
 
 fn processMotion(cursor: *Cursor, device: *wlr.InputDevice, time: u32, delta_x: f64, delta_y: f64, unaccel_dx: f64, unaccel_dy: f64) void {
-    cursor.unhide();
-
     server.input_manager.relative_pointer_manager.sendRelativeMotion(
         cursor.seat.wlr_seat,
         @as(u64, time) * 1000,
@@ -913,7 +862,6 @@ fn processMotion(cursor: *Cursor, device: *wlr.InputDevice, time: u32, delta_x: 
 
             switch (cursor.mode) {
                 .passthrough => {
-                    cursor.checkFocusFollowsCursor();
                     cursor.passthrough(time);
                 },
                 .down => |data| {
@@ -1008,90 +956,24 @@ fn processMotion(cursor: *Cursor, device: *wlr.InputDevice, time: u32, delta_x: 
     }
 }
 
-pub fn checkFocusFollowsCursor(cursor: *Cursor) void {
-    // Don't do focus-follows-cursor if a pointer drag is in progress as focus
-    // change can't occur.
-    if (cursor.seat.drag == .pointer) return;
-    if (server.config.focus_follows_cursor == .disabled) return;
-
-    const last_target = cursor.focus_follows_cursor_target;
-    cursor.updateFocusFollowsCursorTarget();
-    if (cursor.focus_follows_cursor_target) |view| {
-        // In .normal mode, only entering a view changes focus
-        if (server.config.focus_follows_cursor == .normal and
-            last_target == view) return;
-        if (cursor.seat.focused != .view or cursor.seat.focused.view != view) {
-            if (view.current.output) |output| {
-                cursor.seat.focusOutput(output);
-                cursor.seat.focus(view);
-                server.root.applyPending();
-            }
-        }
-    } else {
-        // The output doesn't contain any views, just focus the output.
-        cursor.updateOutputFocus(cursor.wlr_cursor.x, cursor.wlr_cursor.y);
-    }
-}
-
-fn updateFocusFollowsCursorTarget(cursor: *Cursor) void {
-    if (server.root.at(cursor.wlr_cursor.x, cursor.wlr_cursor.y)) |result| {
-        switch (result.data) {
-            .view => |view| {
-                // Some windows have an input region bigger than their window
-                // geometry, we only want to update this when the cursor
-                // properly enters the window (the box that we draw borders around)
-                // in order to avoid clashes with cursor warping on focus change.
-                if (view.current.output) |output| {
-                    var output_layout_box: wlr.Box = undefined;
-                    server.root.output_layout.getBox(output.wlr_output, &output_layout_box);
-
-                    const cursor_ox = cursor.wlr_cursor.x - @as(f64, @floatFromInt(output_layout_box.x));
-                    const cursor_oy = cursor.wlr_cursor.y - @as(f64, @floatFromInt(output_layout_box.y));
-                    if (view.current.box.containsPoint(cursor_ox, cursor_oy)) {
-                        cursor.focus_follows_cursor_target = view;
-                    }
-                }
-            },
-            .layer_surface, .lock_surface => {
-                cursor.focus_follows_cursor_target = null;
-            },
-            .override_redirect => {
-                assert(build_options.xwayland);
-                assert(server.xwayland != null);
-                cursor.focus_follows_cursor_target = null;
-            },
-        }
-    } else {
-        // The cursor is not above any view
-        cursor.focus_follows_cursor_target = null;
-    }
-}
-
 /// Handle potential change in location of views on the output, as well as
 /// the target view of a cursor operation potentially being moved to a non-visible tag,
 /// becoming fullscreen, etc.
 pub fn updateState(cursor: *Cursor) void {
-    if (cursor.may_need_warp) {
-        cursor.warp();
-    }
-
     if (cursor.constraint) |constraint| {
         constraint.updateState();
     }
 
     switch (cursor.mode) {
         .passthrough => {
-            cursor.updateFocusFollowsCursorTarget();
-            if (!cursor.hidden) {
-                var now: posix.timespec = undefined;
-                posix.clock_gettime(posix.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
-                const msec: u32 = @intCast(now.tv_sec * std.time.ms_per_s +
-                    @divTrunc(now.tv_nsec, std.time.ns_per_ms));
-                cursor.passthrough(msec);
-            }
+            var now: posix.timespec = undefined;
+            posix.clock_gettime(posix.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
+            const msec: u32 = @intCast(now.tv_sec * std.time.ms_per_s +
+                @divTrunc(now.tv_nsec, std.time.ns_per_ms));
+            cursor.passthrough(msec);
         },
         // TODO: Leave down mode if the target surface is no longer visible.
-        .down => assert(!cursor.hidden),
+        .down => {},
         .move, .resize => {
             // Moving and resizing of views is handled through the transaction system. Therefore,
             // we must inspect the inflight_mode instead if a move or a resize is in progress.
@@ -1110,7 +992,6 @@ pub fn updateState(cursor: *Cursor) void {
             switch (cursor.inflight_mode) {
                 .passthrough, .down => {},
                 inline .move, .resize => |data, mode| {
-                    assert(!cursor.hidden);
 
                     // These conditions are checked in Root.applyPending()
                     const output = data.view.current.output orelse return;
@@ -1164,54 +1045,6 @@ fn passthrough(cursor: *Cursor, time: u32) void {
     }
 
     cursor.clearFocus();
-}
-
-fn warp(cursor: *Cursor) void {
-    cursor.may_need_warp = false;
-
-    const focused_output = cursor.seat.focused_output orelse return;
-
-    // Warp pointer to center of the focused view/output (In layout coordinates) if enabled.
-    var output_layout_box: wlr.Box = undefined;
-    server.root.output_layout.getBox(focused_output.wlr_output, &output_layout_box);
-    const target_box = switch (server.config.warp_cursor) {
-        .disabled => return,
-        .@"on-output-change" => output_layout_box,
-        .@"on-focus-change" => switch (cursor.seat.focused) {
-            .layer, .lock_surface, .none => output_layout_box,
-            .view => |view| wlr.Box{
-                .x = output_layout_box.x + view.current.box.x,
-                .y = output_layout_box.y + view.current.box.y,
-                .width = view.current.box.width,
-                .height = view.current.box.height,
-            },
-            .override_redirect => |override_redirect| wlr.Box{
-                .x = override_redirect.xwayland_surface.x,
-                .y = override_redirect.xwayland_surface.y,
-                .width = override_redirect.xwayland_surface.width,
-                .height = override_redirect.xwayland_surface.height,
-            },
-        },
-    };
-    // Checking against the usable box here gives much better UX when, for example,
-    // a status bar allows using the pointer to change tag/view focus.
-    const usable_box = focused_output.usable_box;
-    const usable_layout_box = wlr.Box{
-        .x = output_layout_box.x + usable_box.x,
-        .y = output_layout_box.y + usable_box.y,
-        .width = usable_box.width,
-        .height = usable_box.height,
-    };
-    if (!output_layout_box.containsPoint(cursor.wlr_cursor.x, cursor.wlr_cursor.y) or
-        (usable_layout_box.containsPoint(cursor.wlr_cursor.x, cursor.wlr_cursor.y) and
-        !target_box.containsPoint(cursor.wlr_cursor.x, cursor.wlr_cursor.y)))
-    {
-        const lx: f64 = @floatFromInt(target_box.x + @divTrunc(target_box.width, 2));
-        const ly: f64 = @floatFromInt(target_box.y + @divTrunc(target_box.height, 2));
-        if (!cursor.wlr_cursor.warp(null, lx, ly)) {
-            log.err("failed to warp cursor on focus change", .{});
-        }
-    }
 }
 
 fn updateDragIcons(cursor: *Cursor) void {
