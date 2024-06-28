@@ -107,8 +107,6 @@ all_outputs: wl.list.Head(Output, .all_link),
 /// it's turned off by dpms)
 active_outputs: wl.list.Head(Output, .active_link),
 
-/// Number of layout demands before sending configures to clients.
-inflight_layout_demands: u32 = 0,
 /// Number of inflight configures sent in the current transaction.
 inflight_configures: u32 = 0,
 transaction_timeout: *wl.EventSource,
@@ -338,13 +336,6 @@ pub fn deactivateOutput(root: *Root, output: *Output) void {
         }
     }
 
-    if (output.inflight.layout_demand) |layout_demand| {
-        layout_demand.deinit();
-        output.inflight.layout_demand = null;
-        root.notifyLayoutDemandDone();
-    }
-    while (output.layouts.first) |node| node.data.destroy();
-
     // We must call reconfigureDevices here to unmap devices that might be mapped to this output
     // in order to prevent a segfault in wlroots.
     server.input_manager.reconfigureDevices();
@@ -430,7 +421,7 @@ pub fn applyPending(root: *Root) void {
     }
 
     // If there is already a transaction inflight, wait until it completes.
-    if (root.inflight_layout_demands > 0 or root.inflight_configures > 0) {
+    if (root.inflight_configures > 0) {
         root.pending_state_dirty = true;
         return;
     }
@@ -509,33 +500,6 @@ pub fn applyPending(root: *Root) void {
     }
 
     {
-        // Layout demands can't be sent until after the inflight stacks of
-        // all outputs have been updated.
-        var output_it = root.active_outputs.iterator(.forward);
-        while (output_it.next()) |output| {
-            assert(output.inflight.layout_demand == null);
-            if (output.layout) |layout| {
-                var layout_count: u32 = 0;
-                {
-                    var it = output.inflight.wm_stack.iterator(.forward);
-                    while (it.next()) |view| {
-                        if (!view.inflight.float and !view.inflight.fullscreen and
-                            view.inflight.tags & output.inflight.tags != 0)
-                        {
-                            layout_count += 1;
-                        }
-                    }
-                }
-
-                if (layout_count > 0) {
-                    // TODO don't do this if the count has not changed
-                    layout.startLayoutDemand(layout_count);
-                }
-            }
-        }
-    }
-
-    {
         var it = server.input_manager.seats.first;
         while (it) |node| : (it = node.next) {
             const cursor = &node.data.cursor;
@@ -545,7 +509,6 @@ pub fn applyPending(root: *Root) void {
                 inline .move, .resize => |data| {
                     if (data.view.inflight.output == null or
                         data.view.inflight.tags & data.view.inflight.output.?.inflight.tags == 0 or
-                        (!data.view.inflight.float and data.view.inflight.output.?.layout != null) or
                         data.view.inflight.fullscreen)
                     {
                         cursor.mode = .passthrough;
@@ -559,23 +522,10 @@ pub fn applyPending(root: *Root) void {
         }
     }
 
-    if (root.inflight_layout_demands == 0) {
-        root.sendConfigures();
-    }
-}
-
-/// This function is used to inform the transaction system that a layout demand
-/// has either been completed or timed out. If it was the last pending layout
-/// demand in the current sequence, a transaction is started.
-pub fn notifyLayoutDemandDone(root: *Root) void {
-    root.inflight_layout_demands -= 1;
-    if (root.inflight_layout_demands == 0) {
-        root.sendConfigures();
-    }
+    root.sendConfigures();
 }
 
 fn sendConfigures(root: *Root) void {
-    assert(root.inflight_layout_demands == 0);
     assert(root.inflight_configures == 0);
 
     // Iterate over all views of all outputs
@@ -614,8 +564,6 @@ fn sendConfigures(root: *Root) void {
 }
 
 fn handleTransactionTimeout(root: *Root) c_int {
-    assert(root.inflight_layout_demands == 0);
-
     std.log.scoped(.transaction).err("timeout occurred, some imperfect frames may be shown", .{});
 
     root.inflight_configures = 0;
@@ -625,8 +573,6 @@ fn handleTransactionTimeout(root: *Root) c_int {
 }
 
 pub fn notifyConfigured(root: *Root) void {
-    assert(root.inflight_layout_demands == 0);
-
     root.inflight_configures -= 1;
     if (root.inflight_configures == 0) {
         // Disarm the timer, as we didn't timeout
@@ -640,7 +586,6 @@ pub fn notifyConfigured(root: *Root) void {
 /// layout. Should only be called after all clients have configured for
 /// the new layout. If called early imperfect frames may be drawn.
 fn commitTransaction(root: *Root) void {
-    assert(root.inflight_layout_demands == 0);
     assert(root.inflight_configures == 0);
 
     std.log.scoped(.transaction).debug("commiting transaction", .{});
@@ -675,8 +620,6 @@ fn commitTransaction(root: *Root) void {
             {
                 if (view.inflight.float) {
                     view.tree.node.reparent(output.layers.float);
-                } else {
-                    view.tree.node.reparent(output.layers.layout);
                 }
                 view.popup_tree.node.reparent(output.layers.popups);
             }
@@ -684,8 +627,6 @@ fn commitTransaction(root: *Root) void {
             if (view.current.float != view.inflight.float) {
                 if (view.inflight.float) {
                     view.tree.node.reparent(output.layers.float);
-                } else {
-                    view.tree.node.reparent(output.layers.layout);
                 }
             }
 

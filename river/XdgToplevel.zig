@@ -125,8 +125,8 @@ pub fn configure(toplevel: *XdgToplevel) bool {
     const inflight = &toplevel.view.inflight;
     const current = &toplevel.view.current;
 
-    const inflight_float = inflight.float or (inflight.output != null and inflight.output.?.layout == null);
-    const current_float = current.float or (current.output != null and current.output.?.layout == null);
+    const inflight_float = inflight.float;
+    const current_float = current.float;
 
     // We avoid a special case for newly mapped views which we have not yet
     // configured by setting the current width/height to the initial width/height
@@ -342,14 +342,13 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
 
             const size_changed = toplevel.geometry.width != old_geometry.width or
                 toplevel.geometry.height != old_geometry.height;
-            const no_layout = view.current.output != null and view.current.output.?.layout == null;
 
             if (size_changed) {
                 log.debug(
                     "client initiated size change: {}x{} -> {}x{}",
                     .{ old_geometry.width, old_geometry.height, toplevel.geometry.width, toplevel.geometry.height },
                 );
-                if (!(view.current.float or no_layout) and !view.current.fullscreen) {
+                if (!view.current.float and !view.current.fullscreen) {
                     // It seems that a disappointingly high number of clients have a buggy
                     // response to configure events. They ack the configure immediately but then
                     // proceed to make one or more wl_surface.commit requests with the old size
@@ -431,9 +430,7 @@ fn handleRequestMove(
     if (view.current.output) |current_output| {
         if (view.current.tags & current_output.current.tags == 0) return;
     }
-    if (view.pending.output) |pending_output| {
-        if (!(view.pending.float or pending_output.layout == null)) return;
-    }
+    if (!view.pending.float) return;
 
     // Moving windows with touch or tablet tool is not yet supported.
     if (seat.wlr_seat.validatePointerGrabSerial(null, event.serial)) {
@@ -454,9 +451,7 @@ fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), ev
     if (view.current.output) |current_output| {
         if (view.current.tags & current_output.current.tags == 0) return;
     }
-    if (view.pending.output) |pending_output| {
-        if (!(view.pending.float or pending_output.layout == null)) return;
-    }
+    if (!view.pending.float) return;
 
     // Resizing windows with touch or tablet tool is not yet supported.
     if (seat.wlr_seat.validatePointerGrabSerial(null, event.serial)) {

@@ -31,8 +31,6 @@ const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const LayerSurface = @import("LayerSurface.zig");
-const Layout = @import("Layout.zig");
-const LayoutDemand = @import("LayoutDemand.zig");
 const LockSurface = @import("LockSurface.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
 const View = @import("View.zig");
@@ -150,7 +148,6 @@ inflight: struct {
     wm_stack: wl.list.Head(View, .inflight_wm_stack_link),
     /// The view to be made fullscreen, if any.
     fullscreen: ?*View = null,
-    layout_demand: ?LayoutDemand = null,
 },
 
 /// The current state represented by the scene graph.
@@ -168,28 +165,6 @@ current: struct {
 previous_tags: u32 = 1 << 0,
 
 attach_mode: ?Config.AttachMode = null,
-
-/// List of all layouts
-layouts: std.TailQueue(Layout) = .{},
-
-/// The current layout namespace of the output. If null,
-/// config.default_layout_namespace should be used instead.
-/// Call handleLayoutNamespaceChange() after setting this.
-layout_namespace: ?[]const u8 = null,
-
-/// The last set layout name.
-layout_name: ?[:0]const u8 = null,
-
-/// Active layout, or null if views are un-arranged.
-///
-/// If null, views which are manually moved or resized (with the pointer or
-/// or command) will not be automatically set to floating. Everything is
-/// already floating, so this would be an unexpected change of a views state
-/// the user will only notice once a layout affects the views. So instead we
-/// "snap back" all manually moved views the next time a layout is active.
-/// This is similar to dwms behvaviour. Note that this of course does not
-/// affect already floating views.
-layout: ?*Layout = null,
 
 destroy: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleDestroy),
 request_state: wl.Listener(*wlr.Output.event.RequestState) = wl.Listener(*wlr.Output.event.RequestState).init(handleRequestState),
@@ -407,8 +382,6 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
     assert(output.pending.wm_stack.empty());
     assert(output.inflight.focus_stack.empty());
     assert(output.inflight.wm_stack.empty());
-    assert(output.inflight.layout_demand == null);
-    assert(output.layouts.len == 0);
 
     output.all_link.remove();
 
@@ -418,8 +391,6 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
     output.present.link.remove();
 
     output.tree.node.destroy();
-
-    if (output.layout_namespace) |namespace| util.gpa.free(namespace);
 
     output.wlr_output.data = 0;
 
@@ -625,20 +596,6 @@ fn setTitle(output: Output) void {
     } else if (wlr.config.has_x11_backend and output.wlr_output.isX11()) {
         output.wlr_output.x11SetTitle(title);
     }
-}
-
-pub fn handleLayoutNamespaceChange(output: *Output) void {
-    // The user changed the layout namespace of this output. Try to find a
-    // matching layout.
-    var it = output.layouts.first;
-    output.layout = while (it) |node| : (it = node.next) {
-        if (mem.eql(u8, output.layoutNamespace(), node.data.namespace)) break &node.data;
-    } else null;
-    server.root.applyPending();
-}
-
-pub fn layoutNamespace(output: Output) []const u8 {
-    return output.layout_namespace orelse server.config.default_layout_namespace;
 }
 
 pub fn attachMode(output: Output) Config.AttachMode {

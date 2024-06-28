@@ -877,11 +877,6 @@ fn enterMode(cursor: *Cursor, mode: Mode, view: *View, xcursor_name: [*:0]const 
 
     cursor.seat.focus(view);
 
-    if (view.current.output.?.layout != null) {
-        view.float_box = view.current.box;
-        view.pending.float = true;
-    }
-
     cursor.seat.wlr_seat.pointerNotifyClearFocus();
     cursor.setXcursor(xcursor_name);
 
@@ -1120,7 +1115,6 @@ pub fn updateState(cursor: *Cursor) void {
                     // These conditions are checked in Root.applyPending()
                     const output = data.view.current.output orelse return;
                     assert(data.view.current.tags & output.current.tags != 0);
-                    assert(data.view.current.float or output.layout == null);
                     assert(!data.view.current.fullscreen);
 
                     // Keep the cursor locked to the original offset from the edges of the view.

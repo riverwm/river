@@ -30,7 +30,6 @@ const Config = @import("Config.zig");
 const IdleInhibitManager = @import("IdleInhibitManager.zig");
 const InputManager = @import("InputManager.zig");
 const LayerSurface = @import("LayerSurface.zig");
-const LayoutManager = @import("LayoutManager.zig");
 const LockManager = @import("LockManager.zig");
 const Output = @import("Output.zig");
 const Root = @import("Root.zig");
@@ -85,7 +84,6 @@ foreign_toplevel_manager: *wlr.ForeignToplevelManagerV1,
 input_manager: InputManager,
 root: Root,
 config: Config,
-layout_manager: LayoutManager,
 idle_inhibit_manager: IdleInhibitManager,
 lock_manager: LockManager,
 
@@ -157,7 +155,6 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
 
         .root = undefined,
         .input_manager = undefined,
-        .layout_manager = undefined,
         .idle_inhibit_manager = undefined,
         .lock_manager = undefined,
     };
@@ -179,7 +176,6 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
 
     try server.root.init();
     try server.input_manager.init();
-    try server.layout_manager.init();
     try server.idle_inhibit_manager.init();
     try server.lock_manager.init();
 
@@ -315,7 +311,6 @@ fn blocklist(server: *Server, global: *const wl.Global) bool {
         global == server.screencopy_manager.global or
         global == server.export_dmabuf_manager.global or
         global == server.data_control_manager.global or
-        global == server.layout_manager.global or
         global == server.root.output_manager.global or
         global == server.root.power_manager.global or
         global == server.root.gamma_control_manager.global or
