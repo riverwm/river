@@ -39,22 +39,13 @@ const Config = @import("Config.zig");
 const log = std.log.scoped(.output);
 
 pub const PendingState = struct {
-    /// A bit field of focused tags
-    tags: u32 = 1 << 0,
     /// The stack of views in focus/rendering order.
-    ///
-    /// This contains views that aren't currently visible because they do not
-    /// match the tags of the output.
     ///
     /// This list is used to update the rendering order of nodes in the scene
     /// graph when the pending state is committed.
     focus_stack: wl.list.Head(View, .pending_focus_stack_link),
     /// The stack of views acted upon by window management commands such
     /// as focus-view, zoom, etc.
-    ///
-    /// This contains views that aren't currently visible because they do not
-    /// match the tags of the output. This means that a filtered version of the
-    /// list must be used for window management commands.
     ///
     /// This includes both floating/fullscreen views and those arranged in the layout.
     wm_stack: wl.list.Head(View, .pending_wm_stack_link),
@@ -140,8 +131,6 @@ pending: PendingState,
 /// This state is immutable until all clients have replied and the transaction
 /// is completed, at which point this inflight state is copied to current.
 inflight: struct {
-    /// A bit field of focused tags
-    tags: u32 = 1 << 0,
     /// See pending.focus_stack
     focus_stack: wl.list.Head(View, .inflight_focus_stack_link),
     /// See pending.wm_stack
@@ -155,14 +144,9 @@ inflight: struct {
 /// information is transferred from the inflight state to the scene graph
 /// as an inflight transaction completes.
 current: struct {
-    /// A bit field of focused tags
-    tags: u32 = 1 << 0,
     /// The currently fullscreen view, if any.
     fullscreen: ?*View = null,
 } = .{},
-
-/// Remembered version of tags (from last run)
-previous_tags: u32 = 1 << 0,
 
 destroy: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleDestroy),
 request_state: wl.Listener(*wlr.Output.event.RequestState) = wl.Listener(*wlr.Output.event.RequestState).init(handleRequestState),

@@ -982,8 +982,6 @@ pub fn updateState(cursor: *Cursor) void {
                 inline .move, .resize => |data, mode| {
 
                     // These conditions are checked in Root.applyPending()
-                    const output = data.view.current.output orelse return;
-                    assert(data.view.current.tags & output.current.tags != 0);
                     assert(!data.view.current.fullscreen);
 
                     // Keep the cursor locked to the original offset from the edges of the view.

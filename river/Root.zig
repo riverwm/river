@@ -68,7 +68,7 @@ hidden: struct {
     },
 },
 
-/// This is used to store views and tags when no actual outputs are available.
+/// This is used to store views when no actual outputs are available.
 /// This must be separate from hidden to ensure we don't mix views that are
 /// in the process of being mapped/unmapped with the mapped views in these lists.
 /// There is no need for inflight lists, instead the inflight links of views are
@@ -310,9 +310,6 @@ pub fn deactivateOutput(root: *Root, output: *Output) void {
         while (it.next()) |view| view.pending.output = null;
         root.fallback_pending.focus_stack.prependList(&output.pending.focus_stack);
         root.fallback_pending.wm_stack.prependList(&output.pending.wm_stack);
-        // Store the focused output tags if we are hotplugged down to
-        // 0 real outputs so they can be restored on gaining a new output.
-        root.fallback_pending.tags = output.pending.tags;
     }
 
     // Close all layer surfaces on the removed output
@@ -371,7 +368,6 @@ pub fn activateOutput(root: *Root, output: *Output) void {
         const log = std.log.scoped(.output_manager);
         log.debug("moving views from fallback stacks to new output", .{});
 
-        output.pending.tags = root.fallback_pending.tags;
         {
             var it = root.fallback_pending.wm_stack.safeIterator(.reverse);
             while (it.next()) |view| view.setPendingOutput(output);
@@ -474,9 +470,7 @@ pub fn applyPending(root: *Root) void {
                         view.pending.clampToOutput();
                     }
 
-                    if (output.inflight.fullscreen == null and view.pending.fullscreen and
-                        view.pending.tags & output.pending.tags != 0)
-                    {
+                    if (output.inflight.fullscreen == null and view.pending.fullscreen) {
                         output.inflight.fullscreen = view;
                     }
 
@@ -494,8 +488,6 @@ pub fn applyPending(root: *Root) void {
                     output.inflight.wm_stack.append(view);
                 }
             }
-
-            output.inflight.tags = output.pending.tags;
         }
     }
 
@@ -508,7 +500,6 @@ pub fn applyPending(root: *Root) void {
                 .passthrough, .down => {},
                 inline .move, .resize => |data| {
                     if (data.view.inflight.output == null or
-                        data.view.inflight.tags & data.view.inflight.output.?.inflight.tags == 0 or
                         data.view.inflight.fullscreen)
                     {
                         cursor.mode = .passthrough;
@@ -603,14 +594,6 @@ fn commitTransaction(root: *Root) void {
 
     var output_it = root.active_outputs.iterator(.forward);
     while (output_it.next()) |output| {
-        if (output.inflight.tags != output.current.tags) {
-            std.log.scoped(.output).debug(
-                "changing current focus: {b:0>10} to {b:0>10}",
-                .{ output.current.tags, output.inflight.tags },
-            );
-        }
-        output.current.tags = output.inflight.tags;
-
         var focus_stack_it = output.inflight.focus_stack.iterator(.forward);
         while (focus_stack_it.next()) |view| {
             assert(view.inflight.output == output);
@@ -632,9 +615,8 @@ fn commitTransaction(root: *Root) void {
 
             view.commitTransaction();
 
-            const enabled = view.current.tags & output.current.tags != 0;
-            view.tree.node.setEnabled(enabled);
-            view.popup_tree.node.setEnabled(enabled);
+            view.tree.node.setEnabled(true);
+            view.popup_tree.node.setEnabled(true);
             if (output.inflight.fullscreen != view) {
                 // TODO this approach for syncing the order will likely cause over-damaging.
                 view.tree.node.lowerToBottom();

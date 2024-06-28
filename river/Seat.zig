@@ -173,26 +173,9 @@ pub fn focus(seat: *Seat, _target: ?*View) void {
     }
 
     if (target) |view| {
-        if (view.pending.output == null or
-            view.pending.tags & view.pending.output.?.pending.tags == 0)
-        {
-            // If the view is not currently visible, behave as if null was passed
-            target = null;
-        } else if (view.pending.output.? != seat.focused_output.?) {
+        if (view.pending.output.? != seat.focused_output.?) {
             // If the view is not on the currently focused output, focus it
             seat.focusOutput(view.pending.output.?);
-        }
-    }
-
-    {
-        var it = seat.focused_output.?.pending.focus_stack.iterator(.forward);
-        while (it.next()) |view| {
-            if (view.pending.fullscreen and
-                view.pending.tags & seat.focused_output.?.pending.tags != 0)
-            {
-                target = view;
-                break;
-            }
         }
     }
 
@@ -200,9 +183,7 @@ pub fn focus(seat: *Seat, _target: ?*View) void {
     if (target == null) {
         var it = seat.focused_output.?.pending.focus_stack.iterator(.forward);
         target = while (it.next()) |view| {
-            if (view.pending.tags & seat.focused_output.?.pending.tags != 0) {
-                break view;
-            }
+            break view;
         } else null;
     }
 

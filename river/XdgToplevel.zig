@@ -426,9 +426,6 @@ fn handleRequestMove(
 
     if (view.pending.fullscreen) return;
 
-    if (view.current.output) |current_output| {
-        if (view.current.tags & current_output.current.tags == 0) return;
-    }
     if (!view.pending.float) return;
 
     // Moving windows with touch or tablet tool is not yet supported.
@@ -447,9 +444,6 @@ fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), ev
 
     if (view.pending.fullscreen) return;
 
-    if (view.current.output) |current_output| {
-        if (view.current.tags & current_output.current.tags == 0) return;
-    }
     if (!view.pending.float) return;
 
     // Resizing windows with touch or tablet tool is not yet supported.

@@ -63,9 +63,6 @@ pub const State = struct {
     /// The output-relative coordinates of the view and dimensions requested by river.
     box: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
 
-    /// The tags of the view, as a bitmask
-    tags: u32 = 0,
-
     /// Number of seats currently focusing the view
     focus: u32 = 0,
 
@@ -579,8 +576,6 @@ pub fn map(view: *View) !void {
         view.pending.box.x = @divTrunc(@max(0, o.usable_box.width - view.pending.box.width), 2);
         view.pending.box.y = @divTrunc(@max(0, o.usable_box.height - view.pending.box.height), 2);
     }
-
-    view.pending.tags = if (output) |o| o.pending.tags else server.root.fallback_pending.tags;
 
     if (output) |o| {
         view.setPendingOutput(o);

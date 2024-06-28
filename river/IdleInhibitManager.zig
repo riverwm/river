@@ -53,13 +53,9 @@ pub fn checkActive(inhibit_manager: *IdleInhibitManager) void {
     while (it) |node| : (it = node.next) {
         const node_data = SceneNodeData.fromSurface(node.data.wlr_inhibitor.surface) orelse continue;
         switch (node_data.data) {
-            .view => |view| {
-                if (view.current.output != null and
-                    view.current.tags & view.current.output.?.current.tags != 0)
-                {
-                    inhibited = true;
-                    break;
-                }
+            .view => {
+                inhibited = true;
+                break;
             },
             .layer_surface => |layer_surface| {
                 if (layer_surface.wlr_layer_surface.surface.mapped) {
