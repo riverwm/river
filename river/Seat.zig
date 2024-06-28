@@ -78,9 +78,6 @@ repeating_mapping: ?*const Mapping = null,
 
 keyboard_groups: std.TailQueue(KeyboardGroup) = .{},
 
-/// Currently focused output. Null only when there are no outputs at all.
-focused_output: ?*Output = null,
-
 focused: FocusTarget = .none,
 
 /// The currently in progress drag operation type.
@@ -145,12 +142,7 @@ pub fn deinit(seat: *Seat) void {
 /// Set the current focus. If a visible view is passed it will be focused.
 /// If null is passed, the top view in the stack of the focused output will be focused.
 /// Requires a call to Root.applyPending()
-pub fn focus(seat: *Seat, _target: ?*View) void {
-    var target = _target;
-
-    // Don't change focus if there are no outputs.
-    if (seat.focused_output == null) return;
-
+pub fn focus(seat: *Seat, target: ?*View) void {
     // Views may not receive focus while locked.
     if (server.lock_manager.state != .unlocked) return;
 
@@ -172,25 +164,8 @@ pub fn focus(seat: *Seat, _target: ?*View) void {
         }
     }
 
-    if (target) |view| {
-        if (view.pending.output.? != seat.focused_output.?) {
-            // If the view is not on the currently focused output, focus it
-            seat.focusOutput(view.pending.output.?);
-        }
-    }
-
-    // If null, set the target to the first currently visible view in the focus stack if any
-    if (target == null) {
-        var it = seat.focused_output.?.pending.focus_stack.iterator(.forward);
-        target = while (it.next()) |view| {
-            break view;
-        } else null;
-    }
-
     // Focus the target view or clear the focus if target is null
     if (target) |view| {
-        view.pending_focus_stack_link.remove();
-        seat.focused_output.?.pending.focus_stack.prepend(view);
         seat.setFocusRaw(.{ .view = view });
     } else {
         seat.setFocusRaw(.{ .none = {} });
@@ -222,14 +197,10 @@ pub fn setFocusRaw(seat: *Seat, new_focus: FocusTarget) void {
     switch (new_focus) {
         .view => |target_view| {
             assert(server.lock_manager.state != .locked);
-            assert(seat.focused_output == target_view.pending.output);
             target_view.pending.focus += 1;
             target_view.pending.urgent = false;
         },
-        .layer => |target_layer| {
-            assert(server.lock_manager.state != .locked);
-            assert(seat.focused_output == target_layer.output);
-        },
+        .layer => assert(server.lock_manager.state != .locked),
         .lock_surface => assert(server.lock_manager.state != .unlocked),
         .override_redirect, .none => {},
     }
@@ -289,13 +260,6 @@ fn keyboardNotifyEnter(seat: *Seat, wlr_surface: *wlr.Surface) void {
     } else {
         seat.wlr_seat.keyboardNotifyEnter(wlr_surface, &.{}, null);
     }
-}
-
-/// Focus the given output, notifying any listening clients of the change.
-pub fn focusOutput(seat: *Seat, output: ?*Output) void {
-    if (seat.focused_output == output) return;
-
-    seat.focused_output = output;
 }
 
 pub fn handleActivity(seat: Seat) void {

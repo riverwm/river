@@ -142,14 +142,12 @@ destroying: bool = false,
 /// Any time pending state is modified Root.applyPending() must be called
 /// before yielding back to the event loop.
 pending: State = .{},
-pending_focus_stack_link: wl.list.Link,
 pending_wm_stack_link: wl.list.Link,
 
 /// The state most recently sent to the layout generator and clients.
 /// This state is immutable until all clients have replied and the transaction
 /// is completed, at which point this inflight state is copied to current.
 inflight: State = .{},
-inflight_focus_stack_link: wl.list.Link,
 inflight_wm_stack_link: wl.list.Link,
 
 /// The current state represented by the scene graph.
@@ -195,15 +193,11 @@ pub fn create(impl: Impl) error{OutOfMemory}!*View {
         .popup_tree = popup_tree,
 
         .pending_wm_stack_link = undefined,
-        .pending_focus_stack_link = undefined,
         .inflight_wm_stack_link = undefined,
-        .inflight_focus_stack_link = undefined,
     };
 
     server.root.views.prepend(view);
-    server.root.hidden.pending.focus_stack.prepend(view);
     server.root.hidden.pending.wm_stack.prepend(view);
-    server.root.hidden.inflight.focus_stack.prepend(view);
     server.root.hidden.inflight.wm_stack.prepend(view);
 
     view.tree.node.setEnabled(false);
@@ -233,9 +227,7 @@ pub fn destroy(view: *View, when: enum { lazy, assert }) void {
         view.popup_tree.node.destroy();
 
         view.link.remove();
-        view.pending_focus_stack_link.remove();
         view.pending_wm_stack_link.remove();
-        view.inflight_focus_stack_link.remove();
         view.inflight_wm_stack_link.remove();
 
         if (view.output_before_evac) |name| util.gpa.free(name);
@@ -504,10 +496,8 @@ fn saveSurfaceTreeIter(
 pub fn setPendingOutput(view: *View, output: *Output) void {
     view.pending.output = output;
     view.pending_wm_stack_link.remove();
-    view.pending_focus_stack_link.remove();
 
     output.pending.wm_stack.prepend(view);
-    output.pending.focus_stack.prepend(view);
 
     if (view.pending.fullscreen) {
         view.pending.box = .{ .x = 0, .y = 0, .width = undefined, .height = undefined };
@@ -566,7 +556,8 @@ pub fn map(view: *View) !void {
 
     view.foreign_toplevel_handle.map();
 
-    const output = server.input_manager.defaultSeat().focused_output;
+    if (true) @panic("TODO");
+    const output = undefined;
 
     if (output) |o| {
         // Center the initial pending box on the output
@@ -583,16 +574,11 @@ pub fn map(view: *View) !void {
         log.debug("no output available for newly mapped view, adding to fallback stacks", .{});
 
         view.pending_wm_stack_link.remove();
-        view.pending_focus_stack_link.remove();
 
         server.root.fallback_pending.wm_stack.prepend(view);
-        server.root.fallback_pending.focus_stack.prepend(view);
 
         view.inflight_wm_stack_link.remove();
         view.inflight_wm_stack_link.init();
-
-        view.inflight_focus_stack_link.remove();
-        view.inflight_focus_stack_link.init();
     }
 
     view.float_box = view.pending.box;
@@ -608,9 +594,7 @@ pub fn unmap(view: *View) void {
 
     {
         view.pending.output = null;
-        view.pending_focus_stack_link.remove();
         view.pending_wm_stack_link.remove();
-        server.root.hidden.pending.focus_stack.prepend(view);
         server.root.hidden.pending.wm_stack.prepend(view);
     }
 

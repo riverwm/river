@@ -58,12 +58,10 @@ hidden: struct {
     tree: *wlr.SceneTree,
 
     pending: struct {
-        focus_stack: wl.list.Head(View, .pending_focus_stack_link),
         wm_stack: wl.list.Head(View, .pending_wm_stack_link),
     },
 
     inflight: struct {
-        focus_stack: wl.list.Head(View, .inflight_focus_stack_link),
         wm_stack: wl.list.Head(View, .inflight_wm_stack_link),
     },
 },
@@ -144,16 +142,13 @@ pub fn init(root: *Root) !void {
         .hidden = .{
             .tree = hidden_tree,
             .pending = .{
-                .focus_stack = undefined,
                 .wm_stack = undefined,
             },
             .inflight = .{
-                .focus_stack = undefined,
                 .wm_stack = undefined,
             },
         },
         .fallback_pending = .{
-            .focus_stack = undefined,
             .wm_stack = undefined,
         },
         .views = undefined,
@@ -168,12 +163,9 @@ pub fn init(root: *Root) !void {
         .gamma_control_manager = try wlr.GammaControlManagerV1.create(server.wl_server),
         .transaction_timeout = transaction_timeout,
     };
-    root.hidden.pending.focus_stack.init();
     root.hidden.pending.wm_stack.init();
-    root.hidden.inflight.focus_stack.init();
     root.hidden.inflight.wm_stack.init();
 
-    root.fallback_pending.focus_stack.init();
     root.fallback_pending.wm_stack.init();
 
     root.views.init();
@@ -268,16 +260,13 @@ pub fn deactivateOutput(root: *Root, output: *Output) void {
     output.active_link.init();
 
     {
-        var it = output.inflight.focus_stack.safeIterator(.forward);
+        var it = output.inflight.wm_stack.safeIterator(.forward);
         while (it.next()) |view| {
             view.inflight.output = null;
             view.current.output = null;
 
             view.tree.node.reparent(root.hidden.tree);
             view.popup_tree.node.reparent(root.hidden.tree);
-
-            view.inflight_focus_stack_link.remove();
-            view.inflight_focus_stack_link.init();
 
             view.inflight_wm_stack_link.remove();
             view.inflight_wm_stack_link.init();
@@ -303,12 +292,11 @@ pub fn deactivateOutput(root: *Root, output: *Output) void {
         break :blk it.next();
     };
     if (fallback_output) |fallback| {
-        var it = output.pending.focus_stack.safeIterator(.reverse);
+        var it = output.pending.wm_stack.safeIterator(.reverse);
         while (it.next()) |view| view.setPendingOutput(fallback);
     } else {
-        var it = output.pending.focus_stack.iterator(.forward);
+        var it = output.pending.wm_stack.iterator(.forward);
         while (it.next()) |view| view.pending.output = null;
-        root.fallback_pending.focus_stack.prependList(&output.pending.focus_stack);
         root.fallback_pending.wm_stack.prependList(&output.pending.wm_stack);
     }
 
@@ -321,15 +309,6 @@ pub fn deactivateOutput(root: *Root, output: *Output) void {
             if (@as(?*SceneNodeData, @ptrFromInt(scene_node.data))) |node_data| {
                 node_data.data.layer_surface.wlr_layer_surface.destroy();
             }
-        }
-    }
-
-    // If any seat has the removed output focused, focus the fallback one
-    var seat_it = server.input_manager.seats.first;
-    while (seat_it) |seat_node| : (seat_it = seat_node.next) {
-        const seat = &seat_node.data;
-        if (seat.focused_output == output) {
-            seat.focusOutput(fallback_output);
         }
     }
 
@@ -372,14 +351,6 @@ pub fn activateOutput(root: *Root, output: *Output) void {
             var it = root.fallback_pending.wm_stack.safeIterator(.reverse);
             while (it.next()) |view| view.setPendingOutput(output);
         }
-        {
-            // Focus the new output with all seats
-            var it = server.input_manager.seats.first;
-            while (it) |seat_node| : (it = seat_node.next) {
-                const seat = &seat_node.data;
-                seat.focusOutput(output);
-            }
-        }
     } else {
         // Otherwise check if any views were previously evacuated from an output
         // with the same (connector-)name and move them back.
@@ -395,7 +366,6 @@ pub fn activateOutput(root: *Root, output: *Output) void {
             }
         }
     }
-    assert(root.fallback_pending.focus_stack.empty());
     assert(root.fallback_pending.wm_stack.empty());
 
     // Enforce map-to-output configuration for the newly active output.
@@ -424,18 +394,10 @@ pub fn applyPending(root: *Root) void {
     root.pending_state_dirty = false;
 
     {
-        var it = root.hidden.pending.focus_stack.iterator(.forward);
+        var it = root.hidden.pending.wm_stack.iterator(.forward);
         while (it.next()) |view| {
             assert(view.pending.output == null);
             view.inflight.output = null;
-            view.inflight_focus_stack_link.remove();
-            root.hidden.inflight.focus_stack.append(view);
-        }
-    }
-
-    {
-        var it = root.hidden.pending.wm_stack.iterator(.forward);
-        while (it.next()) |view| {
             view.inflight_wm_stack_link.remove();
             root.hidden.inflight.wm_stack.append(view);
         }
@@ -448,7 +410,7 @@ pub fn applyPending(root: *Root) void {
             // recently focused view that requests fullscreen is given fullscreen.
             output.inflight.fullscreen = null;
             {
-                var it = output.pending.focus_stack.iterator(.forward);
+                var it = output.pending.wm_stack.iterator(.forward);
                 while (it.next()) |view| {
                     assert(view.pending.output == output);
 
@@ -465,18 +427,10 @@ pub fn applyPending(root: *Root) void {
                         output.inflight.fullscreen = view;
                     }
 
-                    view.inflight_focus_stack_link.remove();
-                    output.inflight.focus_stack.append(view);
-
-                    view.inflight = view.pending;
-                }
-            }
-
-            {
-                var it = output.pending.wm_stack.iterator(.forward);
-                while (it.next()) |view| {
                     view.inflight_wm_stack_link.remove();
                     output.inflight.wm_stack.append(view);
+
+                    view.inflight = view.pending;
                 }
             }
         }
@@ -513,8 +467,8 @@ fn sendConfigures(root: *Root) void {
     // Iterate over all views of all outputs
     var output_it = root.active_outputs.iterator(.forward);
     while (output_it.next()) |output| {
-        var focus_stack_it = output.inflight.focus_stack.iterator(.forward);
-        while (focus_stack_it.next()) |view| {
+        var wm_stack_it = output.inflight.wm_stack.iterator(.forward);
+        while (wm_stack_it.next()) |view| {
             assert(!view.inflight_transaction);
             view.inflight_transaction = true;
 
@@ -573,7 +527,7 @@ fn commitTransaction(root: *Root) void {
     std.log.scoped(.transaction).debug("commiting transaction", .{});
 
     {
-        var it = root.hidden.inflight.focus_stack.safeIterator(.forward);
+        var it = root.hidden.inflight.wm_stack.safeIterator(.forward);
         while (it.next()) |view| {
             assert(view.inflight.output == null);
             view.current.output = null;
@@ -585,8 +539,8 @@ fn commitTransaction(root: *Root) void {
 
     var output_it = root.active_outputs.iterator(.forward);
     while (output_it.next()) |output| {
-        var focus_stack_it = output.inflight.focus_stack.iterator(.forward);
-        while (focus_stack_it.next()) |view| {
+        var wm_stack_it = output.inflight.wm_stack.iterator(.forward);
+        while (wm_stack_it.next()) |view| {
             assert(view.inflight.output == output);
 
             if (view.current.output != view.inflight.output or
@@ -626,7 +580,7 @@ fn commitTransaction(root: *Root) void {
 
     {
         // This must be done after updating cursor state in case the view was the target of move/resize.
-        var it = root.hidden.inflight.focus_stack.safeIterator(.forward);
+        var it = root.hidden.inflight.wm_stack.safeIterator(.forward);
         while (it.next()) |view| {
             view.dropSavedSurfaceTree();
             if (view.destroying) view.destroy(.assert);

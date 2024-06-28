@@ -373,8 +373,6 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
                 },
             };
         }
-    } else {
-        cursor.updateOutputFocus(cursor.wlr_cursor.x, cursor.wlr_cursor.y);
     }
 
     server.root.applyPending();
@@ -387,7 +385,6 @@ fn updateKeyboardFocus(cursor: Cursor, result: Root.AtResult) void {
             cursor.seat.focus(view);
         },
         .layer_surface => |layer_surface| {
-            cursor.seat.focusOutput(layer_surface.output);
             // If a keyboard inteactive layer surface has been clicked on,
             // give it keyboard focus.
             if (layer_surface.wlr_layer_surface.current.keyboard_interactive != .none) {
@@ -402,15 +399,6 @@ fn updateKeyboardFocus(cursor: Cursor, result: Root.AtResult) void {
             assert(server.lock_manager.state != .locked);
             override_redirect.focusIfDesired();
         },
-    }
-}
-
-/// Focus the output at the given layout coordinates, if any
-/// Requires a call to Root.applyPending()
-fn updateOutputFocus(cursor: Cursor, lx: f64, ly: f64) void {
-    if (server.root.output_layout.outputAt(lx, ly)) |wlr_output| {
-        const output: *Output = @ptrFromInt(wlr_output.data);
-        cursor.seat.focusOutput(output);
     }
 }
 
@@ -519,8 +507,6 @@ fn handleTouchDown(
                 result.sy,
             );
         }
-    } else {
-        cursor.updateOutputFocus(lx, ly);
     }
 
     server.root.applyPending();

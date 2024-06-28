@@ -925,6 +925,10 @@
     <description summary="a extension of wl_seat for window management">
       This object extends the wl_seat object with the features necessary for
       window management.
+
+      TODO:
+        - touch input
+        - tablet input
     </description>
 
     <request name="destroy" type="destructor">

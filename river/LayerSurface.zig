@@ -176,7 +176,8 @@ fn handleKeyboardInteractiveExclusive(output: *Output, consider: ?*LayerSurface)
     while (it) |node| : (it = node.next) {
         const seat = &node.data;
 
-        if (seat.focused_output == output) {
+        if (true) @panic("TODO");
+        if (false) {
             if (to_focus) |s| {
                 // If we found a surface on the output that requires focus, grab the focus of all
                 // seats that are focusing that output.

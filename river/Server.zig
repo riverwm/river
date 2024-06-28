@@ -344,9 +344,7 @@ fn handleNewToplevelDecoration(
     XdgDecoration.init(wlr_decoration);
 }
 
-fn handleNewLayerSurface(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wlr.LayerSurfaceV1) void {
-    const server: *Server = @fieldParentPtr("new_layer_surface", listener);
-
+fn handleNewLayerSurface(_: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wlr.LayerSurfaceV1) void {
     log.debug(
         "new layer surface: namespace {s}, layer {s}, anchor {b:0>4}, size {},{}, margin {},{},{},{}, exclusive_zone {}",
         .{
@@ -366,7 +364,9 @@ fn handleNewLayerSurface(listener: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_
     // If the new layer surface does not have an output assigned to it, use the
     // first output or close the surface if none are available.
     if (wlr_layer_surface.output == null) {
-        const output = server.input_manager.defaultSeat().focused_output orelse {
+        if (true) @panic("TODO");
+
+        const output = null orelse {
             log.err("no output available for layer surface '{s}'", .{wlr_layer_surface.namespace});
             wlr_layer_surface.destroy();
             return;
