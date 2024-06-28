@@ -70,12 +70,6 @@ cursor: Cursor,
 /// Input Method handling
 relay: InputRelay,
 
-/// Timer for repeating keyboard mappings
-mapping_repeat_timer: *wl.EventSource,
-
-/// Currently repeating mapping, if any
-repeating_mapping: ?*const Mapping = null,
-
 keyboard_groups: std.TailQueue(KeyboardGroup) = .{},
 
 focused: FocusTarget = .none,
@@ -97,16 +91,11 @@ request_set_primary_selection: wl.Listener(*wlr.Seat.event.RequestSetPrimarySele
     wl.Listener(*wlr.Seat.event.RequestSetPrimarySelection).init(handleRequestSetPrimarySelection),
 
 pub fn init(seat: *Seat, name: [*:0]const u8) !void {
-    const event_loop = server.wl_server.getEventLoop();
-    const mapping_repeat_timer = try event_loop.addTimer(*Seat, handleMappingRepeatTimeout, seat);
-    errdefer mapping_repeat_timer.remove();
-
     seat.* = .{
         // This will be automatically destroyed when the display is destroyed
         .wlr_seat = try wlr.Seat.create(server.wl_server, name),
         .cursor = undefined,
         .relay = undefined,
-        .mapping_repeat_timer = mapping_repeat_timer,
     };
     seat.wlr_seat.data = @intFromPtr(seat);
 
@@ -126,7 +115,6 @@ pub fn deinit(seat: *Seat) void {
     }
 
     seat.cursor.deinit();
-    seat.mapping_repeat_timer.remove();
 
     while (seat.keyboard_groups.first) |node| {
         node.data.destroy();
@@ -269,7 +257,7 @@ pub fn handleActivity(seat: Seat) void {
 /// Handle any user-defined mapping for passed keycode, modifiers and keyboard state
 /// Returns true if a mapping was run
 pub fn handleMapping(
-    seat: *Seat,
+    _: *Seat,
     keycode: xkb.Keycode,
     modifiers: wlr.Keyboard.ModifierMask,
     released: bool,
@@ -316,13 +304,7 @@ pub fn handleMapping(
 
     // The mapped command must be run outside of the loop above as it may modify
     // the list of mappings we are iterating through, possibly causing it to be re-allocated.
-    if (found) |mapping| {
-        if (mapping.options.repeat) {
-            seat.repeating_mapping = mapping;
-            seat.mapping_repeat_timer.timerUpdate(server.config.repeat_delay) catch {
-                log.err("failed to update mapping repeat timer", .{});
-            };
-        }
+    if (found) |_| {
         return true;
     }
 
@@ -340,25 +322,6 @@ pub fn handleSwitchMapping(
             // send trigger
         }
     }
-}
-
-pub fn clearRepeatingMapping(seat: *Seat) void {
-    seat.mapping_repeat_timer.timerUpdate(0) catch {
-        log.err("failed to clear mapping repeat timer", .{});
-    };
-    seat.repeating_mapping = null;
-}
-
-/// Repeat key mapping
-fn handleMappingRepeatTimeout(seat: *Seat) c_int {
-    if (seat.repeating_mapping) |_| {
-        const rate = server.config.repeat_rate;
-        const ms_delay = if (rate > 0) 1000 / rate else 0;
-        seat.mapping_repeat_timer.timerUpdate(ms_delay) catch {
-            log.err("failed to update mapping repeat timer", .{});
-        };
-    }
-    return 0;
 }
 
 pub fn addDevice(seat: *Seat, wlr_device: *wlr.InputDevice) void {

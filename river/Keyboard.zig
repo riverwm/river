@@ -154,8 +154,6 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
 
     keyboard.device.seat.handleActivity();
 
-    keyboard.device.seat.clearRepeatingMapping();
-
     // Translate libinput keycode -> xkbcommon
     const keycode = event.keycode + 8;
 

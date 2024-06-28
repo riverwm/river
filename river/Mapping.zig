@@ -29,8 +29,6 @@ options: Options,
 pub const Options = struct {
     /// When set to true the mapping will be executed on key release rather than on press
     release: bool,
-    /// When set to true the mapping will be executed repeatedly while key is pressed
-    repeat: bool,
     // This is set for mappings with layout-pinning
     // If set, the layout with this index is always used to translate the given keycode
     layout_index: ?u32,
