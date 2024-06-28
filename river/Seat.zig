@@ -23,7 +23,6 @@ const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 const xkb = @import("xkbcommon");
 
-const command = @import("command.zig");
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
@@ -397,7 +396,6 @@ pub fn handleMapping(
                 log.err("failed to update mapping repeat timer", .{});
             };
         }
-        seat.runCommand(mapping.command_args);
         return true;
     }
 
@@ -413,27 +411,8 @@ pub fn handleSwitchMapping(
     const modes = &server.config.modes;
     for (modes.items[seat.mode_id].switch_mappings.items) |mapping| {
         if (std.meta.eql(mapping.switch_type, switch_type) and std.meta.eql(mapping.switch_state, switch_state)) {
-            seat.runCommand(mapping.command_args);
+            // send trigger
         }
-    }
-}
-
-pub fn runCommand(seat: *Seat, args: []const [:0]const u8) void {
-    var out: ?[]const u8 = null;
-    defer if (out) |s| util.gpa.free(s);
-    command.run(seat, args, &out) catch |err| {
-        const failure_message = switch (err) {
-            command.Error.Other => out.?,
-            else => command.errToMsg(err),
-        };
-        std.log.scoped(.command).err("{s}: {s}", .{ args[0], failure_message });
-        return;
-    };
-    if (out) |s| {
-        const stdout = std.io.getStdOut().writer();
-        stdout.print("{s}", .{s}) catch |err| {
-            std.log.scoped(.command).err("{s}: write to stdout failed {}", .{ args[0], err });
-        };
     }
 }
 
@@ -446,13 +425,12 @@ pub fn clearRepeatingMapping(seat: *Seat) void {
 
 /// Repeat key mapping
 fn handleMappingRepeatTimeout(seat: *Seat) c_int {
-    if (seat.repeating_mapping) |mapping| {
+    if (seat.repeating_mapping) |_| {
         const rate = server.config.repeat_rate;
         const ms_delay = if (rate > 0) 1000 / rate else 0;
         seat.mapping_repeat_timer.timerUpdate(ms_delay) catch {
             log.err("failed to update mapping repeat timer", .{});
         };
-        seat.runCommand(mapping.command_args);
     }
     return 0;
 }

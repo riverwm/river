@@ -666,9 +666,8 @@ fn handlePointerMapping(cursor: *Cursor, event: *wlr.Pointer.event.Button, view:
             switch (mapping.action) {
                 .move => if (!fullscreen) cursor.startMove(view),
                 .resize => if (!fullscreen) cursor.startResize(view, null),
-                .command => |args| {
+                .command => |_| {
                     cursor.seat.focus(view);
-                    cursor.seat.runCommand(args);
                     // This is mildly inefficient as running the command may have already
                     // started a transaction. However we need to start one after the Seat.focus()
                     // call in the case where it didn't.
