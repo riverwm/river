@@ -46,8 +46,6 @@ pub const PendingState = struct {
     focus_stack: wl.list.Head(View, .pending_focus_stack_link),
     /// The stack of views acted upon by window management commands such
     /// as focus-view, zoom, etc.
-    ///
-    /// This includes both floating/fullscreen views and those arranged in the layout.
     wm_stack: wl.list.Head(View, .pending_wm_stack_link),
 };
 
@@ -78,17 +76,15 @@ layers: struct {
     background: *wlr.SceneTree,
     /// Bottom layer shell layer
     bottom: *wlr.SceneTree,
-    /// Views in the layout
-    layout: *wlr.SceneTree,
-    /// Floating views
-    float: *wlr.SceneTree,
+    /// Windows and shell surfaces of the window manager
+    wm: *wlr.SceneTree,
     /// Top layer shell layer
     top: *wlr.SceneTree,
     /// Fullscreen views
     fullscreen: *wlr.SceneTree,
     /// Overlay layer shell layer
     overlay: *wlr.SceneTree,
-    /// Popups from xdg-shell and input-method-v2 clients.
+    /// Popups from xdg-shell and input-method-v2 clients
     popups: *wlr.SceneTree,
 },
 
@@ -226,8 +222,7 @@ pub fn create(wlr_output: *wlr.Output) !void {
             ),
             .background = try normal_content.createSceneTree(),
             .bottom = try normal_content.createSceneTree(),
-            .layout = try normal_content.createSceneTree(),
-            .float = try normal_content.createSceneTree(),
+            .wm = try normal_content.createSceneTree(),
             .top = try normal_content.createSceneTree(),
             .fullscreen = try normal_content.createSceneTree(),
             .overlay = try normal_content.createSceneTree(),

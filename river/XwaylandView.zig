@@ -188,19 +188,6 @@ pub fn handleMap(listener: *wl.Listener(void)) void {
     view.inflight.box = view.pending.box;
     view.current.box = view.pending.box;
 
-    // A value of -1 seems to indicate being unset for these size hints.
-    const has_fixed_size = if (xwayland_view.xwayland_surface.size_hints) |size_hints|
-        size_hints.min_width > 0 and size_hints.min_height > 0 and
-            (size_hints.min_width == size_hints.max_width or size_hints.min_height == size_hints.max_height)
-    else
-        false;
-
-    if (xwayland_view.xwayland_surface.parent != null or has_fixed_size) {
-        // If the toplevel has a parent or has a fixed size make it float by default.
-        // This will be overwritten in View.map() if the view is matched by a rule.
-        view.pending.float = true;
-    }
-
     // This will be overwritten in View.map() if the view is matched by a rule.
     view.pending.ssd = !xwayland_surface.decorations.no_border;
 
@@ -246,10 +233,8 @@ fn handleRequestConfigure(
     }
 
     // Allow xwayland views to set their own dimensions (but not position) if floating
-    if (xwayland_view.view.pending.float) {
-        xwayland_view.view.pending.box.width = event.width;
-        xwayland_view.view.pending.box.height = event.height;
-    }
+    xwayland_view.view.pending.box.width = event.width;
+    xwayland_view.view.pending.box.height = event.height;
     server.root.applyPending();
 }
 

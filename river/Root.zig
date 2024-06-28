@@ -452,15 +452,6 @@ pub fn applyPending(root: *Root) void {
                 while (it.next()) |view| {
                     assert(view.pending.output == output);
 
-                    if (view.current.float and !view.pending.float) {
-                        // If switching from float to non-float, save the dimensions.
-                        view.float_box = view.current.box;
-                    } else if (!view.current.float and view.pending.float) {
-                        // If switching from non-float to float, apply the saved float dimensions.
-                        view.pending.box = view.float_box;
-                        view.pending.clampToOutput();
-                    }
-
                     if (!view.current.fullscreen and view.pending.fullscreen) {
                         view.post_fullscreen_box = view.pending.box;
                         view.pending.box = .{ .x = 0, .y = 0, .width = undefined, .height = undefined };
@@ -601,17 +592,11 @@ fn commitTransaction(root: *Root) void {
             if (view.current.output != view.inflight.output or
                 (output.current.fullscreen == view and output.inflight.fullscreen != view))
             {
-                if (view.inflight.float) {
-                    view.tree.node.reparent(output.layers.float);
-                }
+                view.tree.node.reparent(output.layers.wm);
                 view.popup_tree.node.reparent(output.layers.popups);
             }
 
-            if (view.current.float != view.inflight.float) {
-                if (view.inflight.float) {
-                    view.tree.node.reparent(output.layers.float);
-                }
-            }
+            view.tree.node.reparent(output.layers.wm);
 
             view.commitTransaction();
 

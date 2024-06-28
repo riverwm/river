@@ -125,9 +125,6 @@ pub fn configure(toplevel: *XdgToplevel) bool {
     const inflight = &toplevel.view.inflight;
     const current = &toplevel.view.current;
 
-    const inflight_float = inflight.float;
-    const current_float = current.float;
-
     // We avoid a special case for newly mapped views which we have not yet
     // configured by setting the current width/height to the initial width/height
     // of the view in handleMap().
@@ -135,7 +132,6 @@ pub fn configure(toplevel: *XdgToplevel) bool {
         inflight.box.height == current.box.height and
         (inflight.focus != 0) == (current.focus != 0) and
         inflight.fullscreen == current.fullscreen and
-        inflight_float == current_float and
         inflight.ssd == current.ssd and
         inflight.resizing == current.resizing)
     {
@@ -161,7 +157,8 @@ pub fn configure(toplevel: *XdgToplevel) bool {
     _ = wlr_toplevel.setFullscreen(inflight.fullscreen);
     _ = wlr_toplevel.setResizing(inflight.resizing);
 
-    if (inflight_float) {
+    // TODO
+    if (true) {
         _ = wlr_toplevel.setTiled(.{ .top = false, .bottom = false, .left = false, .right = false });
     } else {
         _ = wlr_toplevel.setTiled(.{ .top = true, .bottom = true, .left = true, .right = true });
@@ -245,16 +242,6 @@ fn handleMap(listener: *wl.Listener(void)) void {
     };
     view.inflight.box = view.pending.box;
     view.current.box = view.pending.box;
-
-    const state = &toplevel.wlr_toplevel.current;
-    const has_fixed_size = state.min_width != 0 and state.min_height != 0 and
-        (state.min_width == state.max_width or state.min_height == state.max_height);
-
-    if (toplevel.wlr_toplevel.parent != null or has_fixed_size) {
-        // If the toplevel.wlr_toplevel has a parent or has a fixed size make it float.
-        // This will be overwritten in View.map() if the view is matched by a rule.
-        view.pending.float = true;
-    }
 
     toplevel.view.pending.fullscreen = toplevel.wlr_toplevel.requested.fullscreen;
 
@@ -347,7 +334,8 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
                     "client initiated size change: {}x{} -> {}x{}",
                     .{ old_geometry.width, old_geometry.height, toplevel.geometry.width, toplevel.geometry.height },
                 );
-                if (!view.current.float and !view.current.fullscreen) {
+                // TODO check tiled state
+                if (!view.current.fullscreen) {
                     // It seems that a disappointingly high number of clients have a buggy
                     // response to configure events. They ack the configure immediately but then
                     // proceed to make one or more wl_surface.commit requests with the old size
@@ -426,8 +414,6 @@ fn handleRequestMove(
 
     if (view.pending.fullscreen) return;
 
-    if (!view.pending.float) return;
-
     // Moving windows with touch or tablet tool is not yet supported.
     if (seat.wlr_seat.validatePointerGrabSerial(null, event.serial)) {
         switch (seat.cursor.mode) {
@@ -443,8 +429,6 @@ fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), ev
     const view = toplevel.view;
 
     if (view.pending.fullscreen) return;
-
-    if (!view.pending.float) return;
 
     // Resizing windows with touch or tablet tool is not yet supported.
     if (seat.wlr_seat.validatePointerGrabSerial(null, event.serial)) {

@@ -66,7 +66,6 @@ pub const State = struct {
     /// Number of seats currently focusing the view
     focus: u32 = 0,
 
-    float: bool = false,
     fullscreen: bool = false,
     urgent: bool = false,
     ssd: bool = false,
@@ -513,8 +512,6 @@ pub fn setPendingOutput(view: *View, output: *Output) void {
     if (view.pending.fullscreen) {
         view.pending.box = .{ .x = 0, .y = 0, .width = undefined, .height = undefined };
         output.wlr_output.effectiveResolution(&view.pending.box.width, &view.pending.box.height);
-    } else if (view.pending.float) {
-        view.pending.clampToOutput();
     }
 }
 
