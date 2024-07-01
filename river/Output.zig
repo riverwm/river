@@ -540,18 +540,23 @@ fn renderAndCommit(output: *Output, scene_output: *wlr.SceneOutput) !void {
         var state = wlr.Output.State.init();
         defer state.finish();
 
-        if (server.root.gamma_control_manager.getControl(output.wlr_output)) |control| {
-            log.info("applying gamma settings from client", .{});
-            if (!control.apply(&state)) return error.OutOfMemory;
-        } else {
-            log.info("clearing gamma settings from client", .{});
+        const control = server.root.gamma_control_manager.getControl(output.wlr_output);
+        if (!wlr.GammaControlV1.apply(control, &state)) return error.OutOfMemory;
+
+        if (!output.wlr_output.testState(&state)) {
+            wlr.GammaControlV1.sendFailedAndDestroy(control);
             state.clearGammaLut();
+            // If the backend does not support gamma LUTs it will reject any
+            // state with the gamma LUT committed bit set even if the state
+            // has a null LUT. The wayland backend for example has this behavior.
+            state.committed.gamma_lut = false;
         }
 
         if (!scene_output.buildState(&state, null)) return error.CommitFailed;
 
         if (!output.wlr_output.commitState(&state)) return error.CommitFailed;
 
+        // TODO(wlroots) remove this rotate() call when updating to wlroots 0.18
         scene_output.damage_ring.rotate();
         output.gamma_dirty = false;
     } else {
