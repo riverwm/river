@@ -165,14 +165,21 @@ pub fn focus(seat: *Seat, _target: ?*View) void {
     // Views may not receive focus while locked.
     if (server.lock_manager.state != .unlocked) return;
 
-    // While a layer surface is exclusively focused, views may not receive focus
+    // A layer surface with exclusive focus will prevent any view from gaining
+    // focus if it is on the top or overlay layer. Otherwise, only steal focus
+    // from a focused layer surface if there is an explicit target view.
     if (seat.focused == .layer) {
         const wlr_layer_surface = seat.focused.layer.wlr_layer_surface;
         assert(wlr_layer_surface.surface.mapped);
-        if (wlr_layer_surface.current.keyboard_interactive == .exclusive and
-            (wlr_layer_surface.current.layer == .top or wlr_layer_surface.current.layer == .overlay))
-        {
-            return;
+        switch (wlr_layer_surface.current.keyboard_interactive) {
+            .none => {},
+            .exclusive => switch (wlr_layer_surface.current.layer) {
+                .top, .overlay => return,
+                .bottom, .background => if (target == null) return,
+                _ => {},
+            },
+            .on_demand => if (target == null) return,
+            _ => {},
         }
     }
 
