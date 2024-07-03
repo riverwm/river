@@ -541,7 +541,7 @@
         maximized.
 
         The window manager is free to honor this request using
-        river_window_v1.maximize or ignore it.
+        river_window_v1.inform_maximize or ignore it.
 
         This event is double-buffered state and will be followed by a
         river_window_manager_v1.update event.
@@ -554,14 +554,14 @@
         unmaximized.
 
         The window manager is free to honor this request using
-        river_window_v1.unmaximize or ignore it.
+        river_window_v1.inform_unmaximized or ignore it.
 
         This event is double-buffered state and will be followed by a
         river_window_manager_v1.update event.
       </description>
     </event>
 
-    <request name="maximize">
+    <request name="inform_maximized">
       <description summary="inform the window it is maximized">
         Inform the window that it is maximized. The window might use this
         information to adapt the style of its client-side window decorations for
@@ -575,7 +575,7 @@
       </description>
     </request>
 
-    <request name="unmaximize">
+    <request name="inform_unmaximized">
       <description summary="inform the window it is unmaximized">
         Inform the window that it is unmaximized. The window might use this
         information to adapt the style of its client-side window decorations for
