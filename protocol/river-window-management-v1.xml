@@ -1073,6 +1073,10 @@
         If the pointer is not inside the given region when this request is made
         it will have no effect until the pointer is moved inside the region.
 
+        If the pointer is warped to a point outside of the region it will
+        (temporarily) escape confinement. Moving or warping the pointer back
+        inside the region will resume the confinement.
+
         If the region argument is null the compositor will only confine the
         cursor to the bounds of the outputs. This is also the behavior if this
         request is never made.
