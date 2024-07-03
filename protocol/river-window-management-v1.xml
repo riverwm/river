@@ -175,8 +175,9 @@
     </request>
 
     <request name="get_shell_surface">
-      <description summary="create a shell surface for window manager UI">
-        Create a new shell surface for window manager UI.
+      <description summary="assign the river_shell_surface_v1 surface role">
+        Create a new shell surface for window manager UI and assign the
+        river_shell_surface_v1 role to the surface.
 
         Providing a wl_surface which already has a role or already has a buffer
         attached or committed is a protocol error.
@@ -436,8 +437,9 @@
     </request>
 
     <request name="get_decoration_surface">
-      <description summary="create a window decoration surface">
-        Create a window decoration surface for the window.
+      <description summary="assign the river_decoration_v1 surface role">
+        Create a window decoration surface for the window and assign the
+        river_decoration_v1 role to the surface.
 
         Providing a wl_surface which already has a role or already has a buffer
         attached or committed is a protocol error.
