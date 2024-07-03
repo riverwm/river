@@ -299,6 +299,8 @@
       <description summary="the window set an application ID">
         The window set an application ID.
 
+        This event may never be sent if the window never sets an application ID.
+
         This event is double-buffered state and will be followed by a
         river_window_manager_v1.update event.
       </description>
@@ -308,6 +310,8 @@
     <event name="title">
       <description summary="the window set a title">
         The window set a title.
+
+        This event may never be sent if the window never sets a title.
 
         This event is double-buffered state and will be followed by a
         river_window_manager_v1.update event.
