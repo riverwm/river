@@ -42,7 +42,7 @@ state: union(enum) {
 } = .inactive,
 
 destroy: wl.Listener(*wlr.PointerConstraintV1) = wl.Listener(*wlr.PointerConstraintV1).init(handleDestroy),
-set_region: wl.Listener(void) = wl.Listener(void).init(handleSetRegion),
+commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
 
 node_destroy: wl.Listener(void) = wl.Listener(void).init(handleNodeDestroy),
 
@@ -58,7 +58,7 @@ pub fn create(wlr_constraint: *wlr.PointerConstraintV1) error{OutOfMemory}!void 
     wlr_constraint.data = @intFromPtr(constraint);
 
     wlr_constraint.events.destroy.add(&constraint.destroy);
-    wlr_constraint.events.set_region.add(&constraint.set_region);
+    wlr_constraint.surface.events.commit.add(&constraint.commit);
 
     if (seat.wlr_seat.keyboard_state.focused_surface) |surface| {
         if (surface == wlr_constraint.surface) {
@@ -201,7 +201,7 @@ fn handleDestroy(listener: *wl.Listener(*wlr.PointerConstraintV1), _: *wlr.Point
     }
 
     constraint.destroy.link.remove();
-    constraint.set_region.link.remove();
+    constraint.commit.link.remove();
 
     if (seat.cursor.constraint == constraint) {
         seat.cursor.constraint = null;
@@ -210,8 +210,11 @@ fn handleDestroy(listener: *wl.Listener(*wlr.PointerConstraintV1), _: *wlr.Point
     util.gpa.destroy(constraint);
 }
 
-fn handleSetRegion(listener: *wl.Listener(void)) void {
-    const constraint: *PointerConstraint = @fieldParentPtr("set_region", listener);
+// It is necessary to listen for the commit event rather than the set_region
+// event as the latter is not triggered by wlroots when the input region of
+// the surface changes.
+fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
+    const constraint: *PointerConstraint = @fieldParentPtr("commit", listener);
     const seat: *Seat = @ptrFromInt(constraint.wlr_constraint.seat.data);
 
     switch (constraint.state) {
@@ -219,7 +222,7 @@ fn handleSetRegion(listener: *wl.Listener(void)) void {
             const sx: i32 = @intFromFloat(state.sx);
             const sy: i32 = @intFromFloat(state.sy);
             if (!constraint.wlr_constraint.region.containsPoint(sx, sy, null)) {
-                log.info("deactivating pointer constraint, region change left pointer outside constraint", .{});
+                log.info("deactivating pointer constraint, (input) region change left pointer outside constraint", .{});
                 constraint.deactivate();
             }
         },
