@@ -135,7 +135,7 @@ _riverctl()
                             case "$line[2]" in
                                 events) _alternative 'input-cmds:args:(enabled disabled disabled-on-external-mouse)' ;;
                                 accel-profile) _alternative 'input-cmds:args:(none flat adaptive)' ;;
-                                click-method) _alternative 'input-cmds:args:(none button-area clickfinger)' ;;
+                                click-method) _alternative 'input-cmds:args:(none button-areas clickfinger)' ;;
                                 drag) _alternative 'input-cmds:args:(enabled disabled)' ;;
                                 drag-lock) _alternative 'input-cmds:args:(enabled disabled)' ;;
                                 disable-while-typing) _alternative 'input-cmds:args:(enabled disabled)' ;;
