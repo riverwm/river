@@ -95,11 +95,17 @@ fn handleDestroy(listener: *wl.Listener(*wlr.LayerSurfaceV1), _: *wlr.LayerSurfa
 
 fn handleMap(listener: *wl.Listener(void)) void {
     const layer_surface: *LayerSurface = @fieldParentPtr("map", listener);
+    const wlr_surface = layer_surface.wlr_layer_surface;
 
-    log.debug("layer surface '{s}' mapped", .{layer_surface.wlr_layer_surface.namespace});
+    log.debug("layer surface '{s}' mapped", .{wlr_surface.namespace});
 
     layer_surface.output.arrangeLayers();
-    handleKeyboardInteractiveExclusive(layer_surface.output);
+    const consider = (wlr_surface.current.keyboard_interactive != .none and
+        (wlr_surface.current.layer == .top or wlr_surface.current.layer == .overlay));
+    handleKeyboardInteractiveExclusive(
+        layer_surface.output,
+        if (consider) layer_surface else null,
+    );
     server.root.applyPending();
 }
 
@@ -109,7 +115,7 @@ fn handleUnmap(listener: *wl.Listener(void)) void {
     log.debug("layer surface '{s}' unmapped", .{layer_surface.wlr_layer_surface.namespace});
 
     layer_surface.output.arrangeLayers();
-    handleKeyboardInteractiveExclusive(layer_surface.output);
+    handleKeyboardInteractiveExclusive(layer_surface.output, null);
     server.root.applyPending();
 }
 
@@ -129,17 +135,19 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
         @as(u32, @bitCast(wlr_layer_surface.current.committed)) != 0)
     {
         layer_surface.output.arrangeLayers();
-        handleKeyboardInteractiveExclusive(layer_surface.output);
+        handleKeyboardInteractiveExclusive(layer_surface.output, null);
         server.root.applyPending();
     }
 }
 
+/// Focus topmost keyboard-interactivity-exclusive layer surface above normal
+/// content, or if none found, focus that given as `consider`.
 /// Requires a call to Root.applyPending()
-fn handleKeyboardInteractiveExclusive(output: *Output) void {
+fn handleKeyboardInteractiveExclusive(output: *Output, consider: ?*LayerSurface) void {
     if (server.lock_manager.state != .unlocked) return;
 
-    // Find the topmost layer surface in the top or overlay layers which
-    // requests keyboard interactivity if any.
+    // Find the topmost layer surface (if any) in the top or overlay layers which
+    // requests exclusive keyboard interactivity.
     const topmost_surface = outer: for ([_]zwlr.LayerShellV1.Layer{ .overlay, .top }) |layer| {
         const tree = output.layerSurfaceTree(layer);
         // Iterate in reverse to match rendering order.
@@ -156,7 +164,11 @@ fn handleKeyboardInteractiveExclusive(output: *Output) void {
                 }
             }
         }
-    } else null;
+    } else consider;
+
+    if (topmost_surface) |surface| {
+        assert(surface.wlr_layer_surface.current.keyboard_interactive != .none);
+    }
 
     var it = server.input_manager.seats.first;
     while (it) |node| : (it = node.next) {
