@@ -117,7 +117,7 @@ transaction_timeout: *wl.EventSource,
 pending_state_dirty: bool = false,
 
 pub fn init(root: *Root) !void {
-    const output_layout = try wlr.OutputLayout.create();
+    const output_layout = try wlr.OutputLayout.create(server.wl_server);
     errdefer output_layout.destroy();
 
     const scene = try wlr.Scene.create();
@@ -130,9 +130,6 @@ pub fn init(root: *Root) !void {
 
     const outputs = try interactive_content.createSceneTree();
     const override_redirect = if (build_options.xwayland) try interactive_content.createSceneTree();
-
-    const presentation = try wlr.Presentation.create(server.wl_server, server.backend);
-    scene.setPresentation(presentation);
 
     const event_loop = server.wl_server.getEventLoop();
     const transaction_timeout = try event_loop.addTimer(*Root, handleTransactionTimeout, root);
@@ -166,7 +163,7 @@ pub fn init(root: *Root) !void {
         .all_outputs = undefined,
         .active_outputs = undefined,
 
-        .presentation = presentation,
+        .presentation = try wlr.Presentation.create(server.wl_server, server.backend),
         .xdg_output_manager = try wlr.XdgOutputManagerV1.create(server.wl_server, output_layout),
         .output_manager = try wlr.OutputManagerV1.create(server.wl_server),
         .power_manager = try wlr.OutputPowerManagerV1.create(server.wl_server),

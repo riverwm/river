@@ -24,6 +24,7 @@ const wl = @import("wayland").server.wl;
 
 const globber = @import("globber");
 
+const c = @import("c.zig");
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
@@ -52,19 +53,21 @@ config: struct {
 link: wl.list.Link,
 
 pub fn init(device: *InputDevice, seat: *Seat, wlr_device: *wlr.InputDevice) !void {
-    const device_type: []const u8 = switch (wlr_device.type) {
-        .switch_device => "switch",
-        .tablet_tool => "tablet",
-        else => @tagName(wlr_device.type),
-    };
+    var vendor: c_uint = 0;
+    var product: c_uint = 0;
+
+    if (wlr_device.getLibinputDevice()) |d| {
+        vendor = c.libinput_device_get_id_vendor(@ptrCast(d));
+        product = c.libinput_device_get_id_product(@ptrCast(d));
+    }
 
     const identifier = try std.fmt.allocPrint(
         util.gpa,
         "{s}-{}-{}-{s}",
         .{
-            device_type,
-            wlr_device.vendor,
-            wlr_device.product,
+            @tagName(wlr_device.type),
+            vendor,
+            product,
             mem.trim(u8, mem.sliceTo(wlr_device.name orelse "unknown", 0), &ascii.whitespace),
         },
     );
@@ -139,11 +142,11 @@ fn handleDestroy(listener: *wl.Listener(*wlr.InputDevice), _: *wlr.InputDevice) 
             device.deinit();
             util.gpa.destroy(device);
         },
-        .tablet_tool => {
+        .tablet => {
             const tablet: *Tablet = @fieldParentPtr("device", device);
             tablet.destroy();
         },
-        .switch_device => {
+        .@"switch" => {
             const switch_device: *Switch = @fieldParentPtr("device", device);
             switch_device.deinit();
             util.gpa.destroy(switch_device);

@@ -507,11 +507,11 @@ fn tryAddDevice(seat: *Seat, wlr_device: *wlr.InputDevice) !void {
 
             seat.cursor.wlr_cursor.attachInputDevice(wlr_device);
         },
-        .tablet_tool => {
+        .tablet => {
             try Tablet.create(seat, wlr_device);
             seat.cursor.wlr_cursor.attachInputDevice(wlr_device);
         },
-        .switch_device => {
+        .@"switch" => {
             const switch_device = try util.gpa.create(Switch);
             errdefer util.gpa.destroy(switch_device);
 
@@ -534,7 +534,7 @@ pub fn updateCapabilities(seat: *Seat) void {
             switch (device.wlr_device.type) {
                 .keyboard => capabilities.keyboard = true,
                 .touch => capabilities.touch = true,
-                .pointer, .switch_device, .tablet_tool => {},
+                .pointer, .@"switch", .tablet => {},
                 .tablet_pad => unreachable,
             }
         }
