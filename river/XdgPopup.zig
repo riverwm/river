@@ -54,7 +54,7 @@ pub fn create(
         .tree = try parent.createSceneXdgSurface(wlr_xdg_popup.base),
     };
 
-    wlr_xdg_popup.base.events.destroy.add(&xdg_popup.destroy);
+    wlr_xdg_popup.events.destroy.add(&xdg_popup.destroy);
     wlr_xdg_popup.base.surface.events.commit.add(&xdg_popup.commit);
     wlr_xdg_popup.base.events.new_popup.add(&xdg_popup.new_popup);
     wlr_xdg_popup.events.reposition.add(&xdg_popup.reposition);

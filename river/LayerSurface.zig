@@ -66,11 +66,6 @@ pub fn create(wlr_layer_surface: *wlr.LayerSurfaceV1) error{OutOfMemory}!void {
     wlr_layer_surface.surface.events.unmap.add(&layer_surface.unmap);
     wlr_layer_surface.surface.events.commit.add(&layer_surface.commit);
     wlr_layer_surface.events.new_popup.add(&layer_surface.new_popup);
-
-    // wlroots only informs us of the new surface after the first commit,
-    // so our listener does not get called for this first commit. However,
-    // we do want our listener called in order to send the initial configure.
-    handleCommit(&layer_surface.commit, wlr_layer_surface.surface);
 }
 
 pub fn destroyPopups(layer_surface: *LayerSurface) void {

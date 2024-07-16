@@ -169,7 +169,7 @@ pub fn deactivate(constraint: *PointerConstraint) void {
 fn warpToHintIfSet(constraint: *PointerConstraint) void {
     const seat: *Seat = @ptrFromInt(constraint.wlr_constraint.seat.data);
 
-    if (constraint.wlr_constraint.current.committed.cursor_hint) {
+    if (constraint.wlr_constraint.current.cursor_hint.enabled) {
         var lx: i32 = undefined;
         var ly: i32 = undefined;
         _ = constraint.state.active.node.coords(&lx, &ly);

@@ -33,7 +33,7 @@ wp_tablet: *wlr.TabletV2Tablet,
 output_mapping: ?*wlr.Output = null,
 
 pub fn create(seat: *Seat, wlr_device: *wlr.InputDevice) !void {
-    assert(wlr_device.type == .tablet_tool);
+    assert(wlr_device.type == .tablet);
 
     const tablet = try util.gpa.create(Tablet);
     errdefer util.gpa.destroy(tablet);

@@ -62,12 +62,12 @@ configure_state: union(enum) {
 destroy: wl.Listener(void) = wl.Listener(void).init(handleDestroy),
 map: wl.Listener(void) = wl.Listener(void).init(handleMap),
 unmap: wl.Listener(void) = wl.Listener(void).init(handleUnmap),
+commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
 new_popup: wl.Listener(*wlr.XdgPopup) = wl.Listener(*wlr.XdgPopup).init(handleNewPopup),
 
 // Listeners that are only active while the view is mapped
 ack_configure: wl.Listener(*wlr.XdgSurface.Configure) =
     wl.Listener(*wlr.XdgSurface.Configure).init(handleAckConfigure),
-commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
 request_fullscreen: wl.Listener(void) = wl.Listener(void).init(handleRequestFullscreen),
 request_move: wl.Listener(*wlr.XdgToplevel.event.Move) =
     wl.Listener(*wlr.XdgToplevel.event.Move).init(handleRequestMove),
@@ -104,11 +104,10 @@ pub fn create(wlr_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
     wlr_toplevel.base.surface.data = @intFromPtr(&view.tree.node);
 
     // Add listeners that are active over the toplevel's entire lifetime
-    wlr_toplevel.base.events.destroy.add(&toplevel.destroy);
+    wlr_toplevel.events.destroy.add(&toplevel.destroy);
     wlr_toplevel.base.surface.events.map.add(&toplevel.map);
+    wlr_toplevel.base.surface.events.commit.add(&toplevel.commit);
     wlr_toplevel.base.events.new_popup.add(&toplevel.new_popup);
-
-    _ = wlr_toplevel.setWmCapabilities(.{ .fullscreen = true });
 }
 
 /// Send a configure event, applying the inflight state of the view.
@@ -213,8 +212,10 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
     toplevel.destroy.link.remove();
     toplevel.map.link.remove();
     toplevel.unmap.link.remove();
+    toplevel.commit.link.remove();
+    toplevel.new_popup.link.remove();
 
-    // The wlr_surface may outlive the wlr_xdg_surface so we must clean up the user data.
+    // The wlr_surface may outlive the wlr_xdg_toplevel so we must clean up the user data.
     toplevel.wlr_toplevel.base.surface.data = 0;
 
     const view = toplevel.view;
@@ -228,7 +229,6 @@ fn handleMap(listener: *wl.Listener(void)) void {
 
     // Add listeners that are only active while mapped
     toplevel.wlr_toplevel.base.events.ack_configure.add(&toplevel.ack_configure);
-    toplevel.wlr_toplevel.base.surface.events.commit.add(&toplevel.commit);
     toplevel.wlr_toplevel.events.request_fullscreen.add(&toplevel.request_fullscreen);
     toplevel.wlr_toplevel.events.request_move.add(&toplevel.request_move);
     toplevel.wlr_toplevel.events.request_resize.add(&toplevel.request_resize);
@@ -270,7 +270,6 @@ fn handleUnmap(listener: *wl.Listener(void)) void {
 
     // Remove listeners that are only active while mapped
     toplevel.ack_configure.link.remove();
-    toplevel.commit.link.remove();
     toplevel.request_fullscreen.link.remove();
     toplevel.request_move.link.remove();
     toplevel.request_resize.link.remove();
@@ -308,6 +307,23 @@ fn handleAckConfigure(
 fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("commit", listener);
     const view = toplevel.view;
+
+    if (toplevel.wlr_toplevel.base.initial_commit) {
+        _ = toplevel.wlr_toplevel.setWmCapabilities(.{ .fullscreen = true });
+
+        if (toplevel.decoration) |decoration| {
+            const ssd = server.config.rules.ssd.match(toplevel.view) orelse
+                (decoration.wlr_decoration.requested_mode != .client_side);
+            _ = decoration.wlr_decoration.setMode(if (ssd) .server_side else .client_side);
+            toplevel.view.pending.ssd = ssd;
+        }
+
+        return;
+    }
+
+    if (!view.mapped) {
+        return;
+    }
 
     {
         const state = &toplevel.wlr_toplevel.current;

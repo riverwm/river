@@ -102,24 +102,29 @@ fn handleDestroy(listener: *wl.Listener(*wlr.TabletTool), _: *wlr.TabletTool) vo
     util.gpa.destroy(tool);
 }
 
+pub fn allowSetCursor(tool: *TabletTool, seat_client: *wlr.Seat.Client, serial: u32) bool {
+    if (tool.wp_tool.focused_surface == null or
+        tool.wp_tool.focused_surface.?.resource.getClient() != seat_client.client)
+    {
+        log.debug("client tried to set cursor without focus", .{});
+        return false;
+    }
+    if (serial != tool.wp_tool.proximity_serial) {
+        log.debug("focused client tried to set cursor with incorrect serial", .{});
+        return false;
+    }
+    return true;
+}
+
 fn handleSetCursor(
     listener: *wl.Listener(*wlr.TabletV2TabletTool.event.SetCursor),
     event: *wlr.TabletV2TabletTool.event.SetCursor,
 ) void {
     const tool: *TabletTool = @fieldParentPtr("set_cursor", listener);
 
-    if (tool.wp_tool.focused_surface == null or
-        tool.wp_tool.focused_surface.?.resource.getClient() != event.seat_client.client)
-    {
-        log.debug("client tried to set cursor without focus", .{});
-        return;
+    if (tool.allowSetCursor(event.seat_client, event.serial)) {
+        tool.wlr_cursor.setSurface(event.surface, event.hotspot_x, event.hotspot_y);
     }
-    if (event.serial != tool.wp_tool.proximity_serial) {
-        log.debug("focused client tried to set cursor with incorrect serial", .{});
-        return;
-    }
-
-    tool.wlr_cursor.setSurface(event.surface, event.hotspot_x, event.hotspot_y);
 }
 
 pub fn axis(tool: *TabletTool, tablet: *Tablet, event: *wlr.Tablet.event.Axis) void {

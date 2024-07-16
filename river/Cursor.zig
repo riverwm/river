@@ -324,6 +324,7 @@ fn handleAxis(listener: *wl.Listener(*wlr.Pointer.event.Axis), event: *wlr.Point
             math.maxInt(i32) / 2,
         )),
         event.source,
+        event.relative_direction,
     );
 }
 
@@ -568,7 +569,7 @@ fn handleTouchUp(
     cursor.seat.handleActivity();
 
     if (cursor.touch_points.remove(event.touch_id)) {
-        cursor.seat.wlr_seat.touchNotifyUp(event.time_msec, event.touch_id);
+        _ = cursor.seat.wlr_seat.touchNotifyUp(event.time_msec, event.touch_id);
     }
 }
 
@@ -582,32 +583,9 @@ fn handleTouchCancel(
 
     cursor.touch_points.clearRetainingCapacity();
 
-    // We can't call touchNotifyCancel() from inside the loop over touch points as it also loops
-    // over touch points and may destroy multiple touch points in a single call.
-    //
-    // What we should do here is `while (touch_points.first()) |point| cancel()` but since the
-    // surface may be null we can't rely on the fact tha all touch points will be destroyed
-    // and risk an infinite loop if the surface of any wlr_touch_point is null.
-    //
-    // This is all really silly and totally unnecessary since all touchNotifyCancel() does with
-    // the surface argument is obtain a seat client and touch_point.seat_client is never null.
-    // TODO(wlroots) clean this up after the wlroots MR fixing this is merged:
-    // https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/4613
-
-    // The upper bound of 32 comes from an implementation detail of libinput which uses
-    // a 32-bit integer as a map to keep track of touch points.
-    var surfaces: std.BoundedArray(*wlr.Surface, 32) = .{};
-    {
-        var it = cursor.seat.wlr_seat.touch_state.touch_points.iterator(.forward);
-        while (it.next()) |touch_point| {
-            if (touch_point.surface) |surface| {
-                surfaces.append(surface) catch break;
-            }
-        }
-    }
-
-    for (surfaces.slice()) |surface| {
-        cursor.seat.wlr_seat.touchNotifyCancel(surface);
+    const wlr_seat = cursor.seat.wlr_seat;
+    while (wlr_seat.touch_state.touch_points.first()) |touch_point| {
+        wlr_seat.touchNotifyCancel(touch_point.client);
     }
 }
 

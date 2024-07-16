@@ -556,8 +556,6 @@ fn renderAndCommit(output: *Output, scene_output: *wlr.SceneOutput) !void {
 
         if (!output.wlr_output.commitState(&state)) return error.CommitFailed;
 
-        // TODO(wlroots) remove this rotate() call when updating to wlroots 0.18
-        scene_output.damage_ring.rotate();
         output.gamma_dirty = false;
     } else {
         if (!scene_output.commit(null)) return error.CommitFailed;

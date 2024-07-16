@@ -232,7 +232,7 @@ pub const MapToOutput = struct {
         };
 
         switch (device.wlr_device.type) {
-            .pointer, .touch, .tablet_tool => {
+            .pointer, .touch, .tablet => {
                 log.debug("mapping input '{s}' -> '{s}'", .{
                     device.identifier,
                     if (wlr_output) |o| o.name else "<no output>",
@@ -240,14 +240,14 @@ pub const MapToOutput = struct {
 
                 device.seat.cursor.wlr_cursor.mapInputToOutput(device.wlr_device, wlr_output);
 
-                if (device.wlr_device.type == .tablet_tool) {
+                if (device.wlr_device.type == .tablet) {
                     const tablet: *Tablet = @fieldParentPtr("device", device);
                     tablet.output_mapping = wlr_output;
                 }
             },
 
             // These devices do not support being mapped to outputs.
-            .keyboard, .tablet_pad, .switch_device => {},
+            .keyboard, .tablet_pad, .@"switch" => {},
         }
     }
 };

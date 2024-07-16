@@ -42,14 +42,9 @@ pub fn init(wlr_decoration: *wlr.XdgToplevelDecorationV1) void {
     wlr_decoration.events.destroy.add(&decoration.destroy);
     wlr_decoration.events.request_mode.add(&decoration.request_mode);
 
-    const ssd = server.config.rules.ssd.match(toplevel.view) orelse
-        (decoration.wlr_decoration.requested_mode != .client_side);
-
-    // TODO(wlroots): make sure this is properly batched in a single configure
-    // with all other initial state when wlroots makes this possible.
-    _ = wlr_decoration.setMode(if (ssd) .server_side else .client_side);
-
-    toplevel.view.pending.ssd = ssd;
+    if (toplevel.wlr_toplevel.base.initialized) {
+        handleRequestMode(&decoration.request_mode, wlr_decoration);
+    }
 }
 
 pub fn deinit(decoration: *XdgDecoration) void {
