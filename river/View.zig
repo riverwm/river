@@ -145,18 +145,7 @@ inflight_render_list_link: wl.list.Link,
 /// The current state represented by the scene graph.
 current: State = .{},
 
-/// The floating dimensions the view, saved so that they can be restored if the
-/// view returns to floating mode.
-float_box: wlr.Box = undefined,
-
-/// This state exists purely to allow for more intuitive behavior when
-/// exiting fullscreen if there is no active layout.
-post_fullscreen_box: wlr.Box = undefined,
-
 foreign_toplevel_handle: ForeignToplevelHandle = .{},
-
-/// Connector name of the output this view occupied before an evacuation.
-output_before_evac: ?[]const u8 = null,
 
 pub fn create(impl: Impl) error{OutOfMemory}!*View {
     assert(impl != .none);
@@ -221,8 +210,6 @@ pub fn destroy(view: *View, when: enum { lazy, assert }) void {
         view.link.remove();
         view.pending_render_list_link.remove();
         view.inflight_render_list_link.remove();
-
-        if (view.output_before_evac) |name| util.gpa.free(name);
 
         util.gpa.destroy(view);
     } else {
@@ -504,8 +491,6 @@ pub fn map(view: *View) !void {
     view.mapped = true;
 
     view.foreign_toplevel_handle.map();
-
-    view.float_box = view.pending.box;
 
     server.root.applyPending();
 }
