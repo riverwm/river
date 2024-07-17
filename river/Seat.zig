@@ -40,13 +40,13 @@ const Output = @import("Output.zig");
 const PointerConstraint = @import("PointerConstraint.zig");
 const Switch = @import("Switch.zig");
 const Tablet = @import("Tablet.zig");
-const View = @import("View.zig");
+const Window = @import("Window.zig");
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
 const log = std.log.scoped(.seat);
 
 pub const FocusTarget = union(enum) {
-    view: *View,
+    window: *Window,
     override_redirect: if (build_options.xwayland) *XwaylandOverrideRedirect else noreturn,
     layer: *LayerSurface,
     lock_surface: *LockSurface,
@@ -54,7 +54,7 @@ pub const FocusTarget = union(enum) {
 
     pub fn surface(target: FocusTarget) ?*wlr.Surface {
         return switch (target) {
-            .view => |view| view.rootSurface(),
+            .window => |window| window.rootSurface(),
             .override_redirect => |override_redirect| override_redirect.xwayland_surface.surface,
             .layer => |layer| layer.wlr_layer_surface.surface,
             .lock_surface => |lock_surface| lock_surface.wlr_lock_surface.surface,
@@ -127,16 +127,16 @@ pub fn deinit(seat: *Seat) void {
     seat.request_set_primary_selection.link.remove();
 }
 
-/// Set the current focus. If a visible view is passed it will be focused.
-/// If null is passed, the top view in the stack of the focused output will be focused.
+/// Set the current focus. If a visible window is passed it will be focused.
+/// If null is passed, the top window in the stack of the focused output will be focused.
 /// Requires a call to Root.applyPending()
-pub fn focus(seat: *Seat, target: ?*View) void {
+pub fn focus(seat: *Seat, target: ?*Window) void {
     // Views may not receive focus while locked.
     if (server.lock_manager.state != .unlocked) return;
 
-    // A layer surface with exclusive focus will prevent any view from gaining
+    // A layer surface with exclusive focus will prevent any window from gaining
     // focus if it is on the top or overlay layer. Otherwise, only steal focus
-    // from a focused layer surface if there is an explicit target view.
+    // from a focused layer surface if there is an explicit target window.
     if (seat.focused == .layer) {
         const wlr_layer_surface = seat.focused.layer.wlr_layer_surface;
         assert(wlr_layer_surface.surface.mapped);
@@ -152,9 +152,9 @@ pub fn focus(seat: *Seat, target: ?*View) void {
         }
     }
 
-    // Focus the target view or clear the focus if target is null
-    if (target) |view| {
-        seat.setFocusRaw(.{ .view = view });
+    // Focus the target window or clear the focus if target is null
+    if (target) |window| {
+        seat.setFocusRaw(.{ .window = window });
     } else {
         seat.setFocusRaw(.{ .none = {} });
     }
@@ -162,7 +162,7 @@ pub fn focus(seat: *Seat, target: ?*View) void {
 
 /// Switch focus to the target, handling unfocus and input inhibition
 /// properly. This should only be called directly if dealing with layers or
-/// override redirect xwayland views.
+/// override redirect xwayland windows.
 pub fn setFocusRaw(seat: *Seat, new_focus: FocusTarget) void {
     // If the target is already focused, do nothing
     if (std.meta.eql(new_focus, seat.focused)) return;
@@ -171,9 +171,9 @@ pub fn setFocusRaw(seat: *Seat, new_focus: FocusTarget) void {
 
     // First clear the current focus
     switch (seat.focused) {
-        .view => |view| {
-            view.pending.focus -= 1;
-            view.destroyPopups();
+        .window => |window| {
+            window.pending.focus -= 1;
+            window.destroyPopups();
         },
         .layer => |layer_surface| {
             layer_surface.destroyPopups();
@@ -183,10 +183,10 @@ pub fn setFocusRaw(seat: *Seat, new_focus: FocusTarget) void {
 
     // Set the new focus
     switch (new_focus) {
-        .view => |target_view| {
+        .window => |target_window| {
             assert(server.lock_manager.state != .locked);
-            target_view.pending.focus += 1;
-            target_view.pending.urgent = false;
+            target_window.pending.focus += 1;
+            target_window.pending.urgent = false;
         },
         .layer => assert(server.lock_manager.state != .locked),
         .lock_surface => assert(server.lock_manager.state != .unlocked),

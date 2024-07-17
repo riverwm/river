@@ -33,7 +33,7 @@ const util = @import("util.zig");
 const LayerSurface = @import("LayerSurface.zig");
 const LockSurface = @import("LockSurface.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
-const View = @import("View.zig");
+const Window = @import("Window.zig");
 const Config = @import("Config.zig");
 
 const log = std.log.scoped(.output);
@@ -47,7 +47,7 @@ all_link: wl.list.Link,
 /// For Root.active_outputs
 active_link: wl.list.Link,
 
-/// The area left for views and other layer surfaces after applying the
+/// The area left for windows and other layer surfaces after applying the
 /// exclusive zones of exclusive layer surfaces.
 /// TODO: this should be part of the output's State
 usable_box: wlr.Box,
@@ -69,7 +69,7 @@ layers: struct {
     wm: *wlr.SceneTree,
     /// Top layer shell layer
     top: *wlr.SceneTree,
-    /// Fullscreen views
+    /// Fullscreen windows
     fullscreen: *wlr.SceneTree,
     /// Overlay layer shell layer
     overlay: *wlr.SceneTree,
@@ -106,14 +106,14 @@ gamma_dirty: bool = false,
 /// This state is immutable until all clients have replied and the transaction
 /// is completed, at which point this inflight state is copied to current.
 inflight: struct {
-    /// The view to be made fullscreen, if any.
-    fullscreen: ?*View = null,
+    /// The window to be made fullscreen, if any.
+    fullscreen: ?*Window = null,
 } = .{},
 
 /// The current state represented by the scene graph.
 current: struct {
-    /// The currently fullscreen view, if any.
-    fullscreen: ?*View = null,
+    /// The currently fullscreen window, if any.
+    fullscreen: ?*Window = null,
 } = .{},
 
 destroy: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleDestroy),
@@ -236,7 +236,7 @@ pub fn layerSurfaceTree(output: Output, layer: zwlr.LayerShellV1.Layer) *wlr.Sce
 }
 
 /// Arrange all layer surfaces of this output and adjust the usable area.
-/// Will arrange views as well if the usable area changes.
+/// Will arrange windows as well if the usable area changes.
 /// Requires a call to Root.applyPending()
 pub fn arrangeLayers(output: *Output) void {
     var full_box: wlr.Box = .{

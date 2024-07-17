@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const View = @This();
+const Window = @This();
 
 const build_options = @import("build_options");
 const std = @import("std");
@@ -32,9 +32,9 @@ const Output = @import("Output.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
 const Seat = @import("Seat.zig");
 const XdgToplevel = @import("XdgToplevel.zig");
-const XwaylandView = @import("XwaylandView.zig");
+const XwaylandWindow = @import("XwaylandWindow.zig");
 
-const log = std.log.scoped(.view);
+const log = std.log.scoped(.window);
 
 pub const Constraints = struct {
     min_width: u31 = 1,
@@ -45,20 +45,20 @@ pub const Constraints = struct {
 
 const Impl = union(enum) {
     toplevel: XdgToplevel,
-    xwayland_view: if (build_options.xwayland) XwaylandView else noreturn,
+    xwayland_window: if (build_options.xwayland) XwaylandWindow else noreturn,
     /// This state is assigned during destruction after the xdg toplevel
     /// has been destroyed but while the transaction system is still rendering
-    /// saved surfaces of the view.
+    /// saved surfaces of the window.
     /// The toplevel could simply be set to undefined instead, but using a
     /// tag like this gives us better safety checks.
     none,
 };
 
 pub const State = struct {
-    /// The output-relative coordinates of the view and dimensions requested by river.
+    /// The output-relative coordinates of the window and dimensions requested by river.
     box: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
 
-    /// Number of seats currently focusing the view
+    /// Number of seats currently focusing the window
     focus: u32 = 0,
 
     fullscreen: bool = false,
@@ -102,10 +102,10 @@ pub const State = struct {
     }
 };
 
-/// The implementation of this view
+/// The implementation of this window
 impl: Impl,
 
-/// Link for Root.views
+/// Link for Root.windows
 link: wl.list.Link,
 
 tree: *wlr.SceneTree,
@@ -115,17 +115,17 @@ saved_surface_tree: *wlr.SceneTree,
 borders: [4]*wlr.SceneRect,
 popup_tree: *wlr.SceneTree,
 
-/// Bounds on the width/height of the view, set by the toplevel/xwayland_view implementation.
+/// Bounds on the width/height of the window, set by the toplevel/xwayland_window implementation.
 constraints: Constraints = .{},
 
 mapped: bool = false,
-/// This is true if the View is involved in the currently inflight transaction.
+/// This is true if the Window is involved in the currently inflight transaction.
 inflight_transaction: bool = false,
-/// This indicates that the view should be destroyed when the current
-/// transaction completes. See View.destroy()
+/// This indicates that the window should be destroyed when the current
+/// transaction completes. See Window.destroy()
 destroying: bool = false,
 
-/// The state of the view that is directly acted upon/modified through user input.
+/// The state of the window that is directly acted upon/modified through user input.
 ///
 /// Pending state will be copied to the inflight state and communicated to clients
 /// to be applied as a single atomic transaction across all clients as soon as any
@@ -147,11 +147,11 @@ current: State = .{},
 
 foreign_toplevel_handle: ForeignToplevelHandle = .{},
 
-pub fn create(impl: Impl) error{OutOfMemory}!*View {
+pub fn create(impl: Impl) error{OutOfMemory}!*Window {
     assert(impl != .none);
 
-    const view = try util.gpa.create(View);
-    errdefer util.gpa.destroy(view);
+    const window = try util.gpa.create(Window);
+    errdefer util.gpa.destroy(window);
 
     const tree = try server.root.hidden.tree.createSceneTree();
     errdefer tree.node.destroy();
@@ -159,7 +159,7 @@ pub fn create(impl: Impl) error{OutOfMemory}!*View {
     const popup_tree = try server.root.hidden.tree.createSceneTree();
     errdefer popup_tree.node.destroy();
 
-    view.* = .{
+    window.* = .{
         .impl = impl,
         .link = undefined,
         .tree = tree,
@@ -177,41 +177,41 @@ pub fn create(impl: Impl) error{OutOfMemory}!*View {
         .inflight_render_list_link = undefined,
     };
 
-    server.root.views.prepend(view);
-    server.root.hidden.pending.render_list.prepend(view);
-    server.root.hidden.inflight.render_list.prepend(view);
+    server.root.windows.prepend(window);
+    server.root.hidden.pending.render_list.prepend(window);
+    server.root.hidden.inflight.render_list.prepend(window);
 
-    view.tree.node.setEnabled(false);
-    view.popup_tree.node.setEnabled(false);
-    view.saved_surface_tree.node.setEnabled(false);
+    window.tree.node.setEnabled(false);
+    window.popup_tree.node.setEnabled(false);
+    window.saved_surface_tree.node.setEnabled(false);
 
-    try SceneNodeData.attach(&view.tree.node, .{ .view = view });
-    try SceneNodeData.attach(&view.popup_tree.node, .{ .view = view });
+    try SceneNodeData.attach(&window.tree.node, .{ .window = window });
+    try SceneNodeData.attach(&window.popup_tree.node, .{ .window = window });
 
-    return view;
+    return window;
 }
 
-/// If saved buffers of the view are currently in use by a transaction,
-/// mark this view for destruction when the transaction completes. Otherwise
+/// If saved buffers of the window are currently in use by a transaction,
+/// mark this window for destruction when the transaction completes. Otherwise
 /// destroy immediately.
-pub fn destroy(view: *View, when: enum { lazy, assert }) void {
-    assert(view.impl == .none);
-    assert(!view.mapped);
+pub fn destroy(window: *Window, when: enum { lazy, assert }) void {
+    assert(window.impl == .none);
+    assert(!window.mapped);
 
-    view.destroying = true;
+    window.destroying = true;
 
-    // If there are still saved buffers, then this view needs to be kept
+    // If there are still saved buffers, then this window needs to be kept
     // around until the current transaction completes. This function will be
     // called again in Root.commitTransaction()
-    if (!view.saved_surface_tree.node.enabled) {
-        view.tree.node.destroy();
-        view.popup_tree.node.destroy();
+    if (!window.saved_surface_tree.node.enabled) {
+        window.tree.node.destroy();
+        window.popup_tree.node.destroy();
 
-        view.link.remove();
-        view.pending_render_list_link.remove();
-        view.inflight_render_list_link.remove();
+        window.link.remove();
+        window.pending_render_list_link.remove();
+        window.inflight_render_list_link.remove();
 
-        util.gpa.destroy(view);
+        util.gpa.destroy(window);
     } else {
         switch (when) {
             .lazy => {},
@@ -220,47 +220,47 @@ pub fn destroy(view: *View, when: enum { lazy, assert }) void {
     }
 }
 
-/// The change in x/y position of the view during resize cannot be determined
+/// The change in x/y position of the window during resize cannot be determined
 /// until the size of the buffer actually committed is known. Clients are permitted
 /// by the protocol to take a size smaller than that requested by the compositor in
 /// order to maintain an aspect ratio or similar (mpv does this for example).
-pub fn resizeUpdatePosition(view: *View, width: i32, height: i32) void {
-    assert(view.inflight.resizing);
+pub fn resizeUpdatePosition(window: *Window, width: i32, height: i32) void {
+    assert(window.inflight.resizing);
 
     const data = blk: {
         var it = server.input_manager.seats.first;
         while (it) |node| : (it = node.next) {
             const cursor = &node.data.cursor;
-            if (cursor.inflight_mode == .resize and cursor.inflight_mode.resize.view == view) {
+            if (cursor.inflight_mode == .resize and cursor.inflight_mode.resize.window == window) {
                 break :blk cursor.inflight_mode.resize;
             }
         } else {
-            // The view resizing state should never be set when the view is
+            // The window resizing state should never be set when the window is
             // not the target of an interactive resize.
             unreachable;
         }
     };
 
     if (data.edges.left) {
-        view.inflight.box.x += view.current.box.width - width;
-        view.pending.box.x = view.inflight.box.x;
+        window.inflight.box.x += window.current.box.width - width;
+        window.pending.box.x = window.inflight.box.x;
     }
 
     if (data.edges.top) {
-        view.inflight.box.y += view.current.box.height - height;
-        view.pending.box.y = view.inflight.box.y;
+        window.inflight.box.y += window.current.box.height - height;
+        window.pending.box.y = window.inflight.box.y;
     }
 }
 
-pub fn commitTransaction(view: *View) void {
-    assert(view.inflight_transaction);
-    view.inflight_transaction = false;
+pub fn commitTransaction(window: *Window) void {
+    assert(window.inflight_transaction);
+    window.inflight_transaction = false;
 
-    view.foreign_toplevel_handle.update();
+    window.foreign_toplevel_handle.update();
 
-    view.dropSavedSurfaceTree();
+    window.dropSavedSurfaceTree();
 
-    switch (view.impl) {
+    switch (window.impl) {
         .toplevel => |*toplevel| {
             switch (toplevel.configure_state) {
                 .inflight, .acked => {
@@ -288,50 +288,50 @@ pub fn commitTransaction(view: *View) void {
                     // If we did not use the current geometry of the toplevel at this point
                     // we would be rendering the SSD border at initial size X but the surface
                     // would be rendered at size Y.
-                    if (view.inflight.resizing) {
-                        view.resizeUpdatePosition(toplevel.geometry.width, toplevel.geometry.height);
+                    if (window.inflight.resizing) {
+                        window.resizeUpdatePosition(toplevel.geometry.width, toplevel.geometry.height);
                     }
 
-                    view.current = view.inflight;
-                    view.current.box.width = toplevel.geometry.width;
-                    view.current.box.height = toplevel.geometry.height;
+                    window.current = window.inflight;
+                    window.current.box.width = toplevel.geometry.width;
+                    window.current.box.height = toplevel.geometry.height;
                 },
                 .idle, .committed => {
                     toplevel.configure_state = .idle;
-                    view.current = view.inflight;
+                    window.current = window.inflight;
                 },
                 .timed_out, .timed_out_acked => unreachable,
             }
         },
-        .xwayland_view => |xwayland_view| {
-            if (view.inflight.resizing) {
-                view.resizeUpdatePosition(
-                    xwayland_view.xwayland_surface.width,
-                    xwayland_view.xwayland_surface.height,
+        .xwayland_window => |xwayland_window| {
+            if (window.inflight.resizing) {
+                window.resizeUpdatePosition(
+                    xwayland_window.xwayland_surface.width,
+                    xwayland_window.xwayland_surface.height,
                 );
             }
 
-            view.inflight.box.width = xwayland_view.xwayland_surface.width;
-            view.inflight.box.height = xwayland_view.xwayland_surface.height;
-            view.pending.box.width = xwayland_view.xwayland_surface.width;
-            view.pending.box.height = xwayland_view.xwayland_surface.height;
+            window.inflight.box.width = xwayland_window.xwayland_surface.width;
+            window.inflight.box.height = xwayland_window.xwayland_surface.height;
+            window.pending.box.width = xwayland_window.xwayland_surface.width;
+            window.pending.box.height = xwayland_window.xwayland_surface.height;
 
-            view.current = view.inflight;
+            window.current = window.inflight;
         },
         // This may seem pointless at first glance, but is in fact necessary
         // to prevent an assertion failure in Root.commitTransaction() as that
         // function assumes that the inflight tags/output will be applied by
-        // View.commitTransaction() even for views being destroyed.
-        .none => view.current = view.inflight,
+        // Window.commitTransaction() even for windows being destroyed.
+        .none => window.current = window.inflight,
     }
 
-    view.updateSceneState();
+    window.updateSceneState();
 }
 
-pub fn updateSceneState(view: *View) void {
-    const box = &view.current.box;
-    view.tree.node.setPosition(box.x, box.y);
-    view.popup_tree.node.setPosition(box.x, box.y);
+pub fn updateSceneState(window: *Window) void {
+    const box = &window.current.box;
+    window.tree.node.setPosition(box.x, box.y);
+    window.popup_tree.node.setPosition(box.x, box.y);
 
     {
         const config = &server.config;
@@ -367,8 +367,8 @@ pub fn updateSceneState(view: *View) void {
             },
         };
 
-        for (&view.borders, &border_boxes) |border, *border_box| {
-            border.node.setEnabled(view.current.ssd and !view.current.fullscreen);
+        for (&window.borders, &border_boxes) |border, *border_box| {
+            border.node.setEnabled(window.current.ssd and !window.current.fullscreen);
             border.node.setPosition(border_box.x, border_box.y);
             border.setSize(border_box.width, border_box.height);
             border.setColor(border_color);
@@ -377,52 +377,52 @@ pub fn updateSceneState(view: *View) void {
 }
 
 /// Returns true if the configure should be waited for by the transaction system.
-pub fn configure(view: *View) bool {
-    assert(view.mapped and !view.destroying);
-    switch (view.impl) {
+pub fn configure(window: *Window) bool {
+    assert(window.mapped and !window.destroying);
+    switch (window.impl) {
         .toplevel => |*toplevel| return toplevel.configure(),
-        .xwayland_view => |*xwayland_view| return xwayland_view.configure(),
+        .xwayland_window => |*xwayland_window| return xwayland_window.configure(),
         .none => unreachable,
     }
 }
 
-/// Returns null if the view is currently being destroyed and no longer has
+/// Returns null if the window is currently being destroyed and no longer has
 /// an associated surface.
-/// May also return null for Xwayland views that are not currently mapped.
-pub fn rootSurface(view: View) ?*wlr.Surface {
-    return switch (view.impl) {
+/// May also return null for Xwayland windows that are not currently mapped.
+pub fn rootSurface(window: Window) ?*wlr.Surface {
+    return switch (window.impl) {
         .toplevel => |toplevel| toplevel.wlr_toplevel.base.surface,
-        .xwayland_view => |xwayland_view| xwayland_view.xwayland_surface.surface,
+        .xwayland_window => |xwayland_window| xwayland_window.xwayland_surface.surface,
         .none => null,
     };
 }
 
-pub fn sendFrameDone(view: View) void {
-    assert(view.mapped and !view.destroying);
+pub fn sendFrameDone(window: Window) void {
+    assert(window.mapped and !window.destroying);
 
     var now: posix.timespec = undefined;
     posix.clock_gettime(posix.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
-    view.rootSurface().?.sendFrameDone(&now);
+    window.rootSurface().?.sendFrameDone(&now);
 }
 
-pub fn dropSavedSurfaceTree(view: *View) void {
-    if (!view.saved_surface_tree.node.enabled) return;
+pub fn dropSavedSurfaceTree(window: *Window) void {
+    if (!window.saved_surface_tree.node.enabled) return;
 
-    var it = view.saved_surface_tree.children.safeIterator(.forward);
+    var it = window.saved_surface_tree.children.safeIterator(.forward);
     while (it.next()) |node| node.destroy();
 
-    view.saved_surface_tree.node.setEnabled(false);
-    view.surface_tree.node.setEnabled(true);
+    window.saved_surface_tree.node.setEnabled(false);
+    window.surface_tree.node.setEnabled(true);
 }
 
-pub fn saveSurfaceTree(view: *View) void {
-    assert(!view.saved_surface_tree.node.enabled);
-    assert(view.saved_surface_tree.children.empty());
+pub fn saveSurfaceTree(window: *Window) void {
+    assert(!window.saved_surface_tree.node.enabled);
+    assert(window.saved_surface_tree.children.empty());
 
-    view.surface_tree.node.forEachBuffer(*wlr.SceneTree, saveSurfaceTreeIter, view.saved_surface_tree);
+    window.surface_tree.node.forEachBuffer(*wlr.SceneTree, saveSurfaceTreeIter, window.saved_surface_tree);
 
-    view.surface_tree.node.setEnabled(false);
-    view.saved_surface_tree.node.setEnabled(true);
+    window.surface_tree.node.setEnabled(false);
+    window.saved_surface_tree.node.setEnabled(true);
 }
 
 fn saveSurfaceTreeIter(
@@ -441,87 +441,87 @@ fn saveSurfaceTreeIter(
     saved.setTransform(buffer.transform);
 }
 
-pub fn close(view: View) void {
-    switch (view.impl) {
+pub fn close(window: Window) void {
+    switch (window.impl) {
         .toplevel => |toplevel| toplevel.wlr_toplevel.sendClose(),
-        .xwayland_view => |xwayland_view| xwayland_view.xwayland_surface.close(),
+        .xwayland_window => |xwayland_window| xwayland_window.xwayland_surface.close(),
         .none => {},
     }
 }
 
-pub fn destroyPopups(view: View) void {
-    switch (view.impl) {
+pub fn destroyPopups(window: Window) void {
+    switch (window.impl) {
         .toplevel => |toplevel| toplevel.destroyPopups(),
-        .xwayland_view, .none => {},
+        .xwayland_window, .none => {},
     }
 }
 
-/// Return the current title of the view if any.
-pub fn getTitle(view: View) ?[*:0]const u8 {
-    assert(!view.destroying);
-    return switch (view.impl) {
+/// Return the current title of the window if any.
+pub fn getTitle(window: Window) ?[*:0]const u8 {
+    assert(!window.destroying);
+    return switch (window.impl) {
         .toplevel => |toplevel| toplevel.wlr_toplevel.title,
-        .xwayland_view => |xwayland_view| xwayland_view.xwayland_surface.title,
+        .xwayland_window => |xwayland_window| xwayland_window.xwayland_surface.title,
         .none => unreachable,
     };
 }
 
-/// Return the current app_id of the view if any.
-pub fn getAppId(view: View) ?[*:0]const u8 {
-    assert(!view.destroying);
-    return switch (view.impl) {
+/// Return the current app_id of the window if any.
+pub fn getAppId(window: Window) ?[*:0]const u8 {
+    assert(!window.destroying);
+    return switch (window.impl) {
         .toplevel => |toplevel| toplevel.wlr_toplevel.app_id,
         // X11 clients don't have an app_id but the class serves a similar role.
-        .xwayland_view => |xwayland_view| xwayland_view.xwayland_surface.class,
+        .xwayland_window => |xwayland_window| xwayland_window.xwayland_surface.class,
         .none => unreachable,
     };
 }
 
-/// Clamp the width/height of the box to the constraints of the view
-pub fn applyConstraints(view: *View, box: *wlr.Box) void {
-    box.width = math.clamp(box.width, view.constraints.min_width, view.constraints.max_width);
-    box.height = math.clamp(box.height, view.constraints.min_height, view.constraints.max_height);
+/// Clamp the width/height of the box to the constraints of the window
+pub fn applyConstraints(window: *Window, box: *wlr.Box) void {
+    box.width = math.clamp(box.width, window.constraints.min_width, window.constraints.max_width);
+    box.height = math.clamp(box.height, window.constraints.min_height, window.constraints.max_height);
 }
 
 /// Called by the impl when the surface is ready to be displayed
-pub fn map(view: *View) !void {
-    log.debug("view '{?s}' mapped", .{view.getTitle()});
+pub fn map(window: *Window) !void {
+    log.debug("window '{?s}' mapped", .{window.getTitle()});
 
-    assert(!view.mapped and !view.destroying);
-    view.mapped = true;
+    assert(!window.mapped and !window.destroying);
+    window.mapped = true;
 
-    view.foreign_toplevel_handle.map();
+    window.foreign_toplevel_handle.map();
 
     server.root.applyPending();
 }
 
 /// Called by the impl when the surface will no longer be displayed
-pub fn unmap(view: *View) void {
-    log.debug("view '{?s}' unmapped", .{view.getTitle()});
+pub fn unmap(window: *Window) void {
+    log.debug("window '{?s}' unmapped", .{window.getTitle()});
 
-    if (!view.saved_surface_tree.node.enabled) view.saveSurfaceTree();
+    if (!window.saved_surface_tree.node.enabled) window.saveSurfaceTree();
 
     {
-        view.pending_render_list_link.remove();
-        server.root.hidden.pending.render_list.prepend(view);
+        window.pending_render_list_link.remove();
+        server.root.hidden.pending.render_list.prepend(window);
     }
 
-    assert(view.mapped and !view.destroying);
-    view.mapped = false;
+    assert(window.mapped and !window.destroying);
+    window.mapped = false;
 
-    view.foreign_toplevel_handle.unmap();
+    window.foreign_toplevel_handle.unmap();
 
     server.root.applyPending();
 }
 
-pub fn notifyTitle(view: *const View) void {
-    if (view.foreign_toplevel_handle.wlr_handle) |wlr_handle| {
-        if (view.getTitle()) |title| wlr_handle.setTitle(title);
+pub fn notifyTitle(window: *const Window) void {
+    if (window.foreign_toplevel_handle.wlr_handle) |wlr_handle| {
+        if (window.getTitle()) |title| wlr_handle.setTitle(title);
     }
 }
 
-pub fn notifyAppId(view: View) void {
-    if (view.foreign_toplevel_handle.wlr_handle) |wlr_handle| {
-        if (view.getAppId()) |app_id| wlr_handle.setAppId(app_id);
+pub fn notifyAppId(window: Window) void {
+    if (window.foreign_toplevel_handle.wlr_handle) |wlr_handle| {
+        if (window.getAppId()) |app_id| wlr_handle.setAppId(app_id);
     }
 }

@@ -32,7 +32,7 @@ const LayerSurface = @import("LayerSurface.zig");
 const LockSurface = @import("LockSurface.zig");
 const Output = @import("Output.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
-const View = @import("View.zig");
+const Window = @import("Window.zig");
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
 scene: *wlr.Scene,
@@ -54,29 +54,29 @@ layers: struct {
 
 wm: struct {
     pending: struct {
-        render_list: wl.list.Head(View, .pending_render_list_link),
+        render_list: wl.list.Head(Window, .pending_render_list_link),
     },
 
     inflight: struct {
-        render_list: wl.list.Head(View, .inflight_render_list_link),
+        render_list: wl.list.Head(Window, .inflight_render_list_link),
     },
 },
 
-/// This is kind of like an imaginary output where views start and end their life.
+/// This is kind of like an imaginary output where windows start and end their life.
 hidden: struct {
     /// This tree is always disabled.
     tree: *wlr.SceneTree,
 
     pending: struct {
-        render_list: wl.list.Head(View, .pending_render_list_link),
+        render_list: wl.list.Head(Window, .pending_render_list_link),
     },
 
     inflight: struct {
-        render_list: wl.list.Head(View, .inflight_render_list_link),
+        render_list: wl.list.Head(Window, .inflight_render_list_link),
     },
 },
 
-views: wl.list.Head(View, .link),
+windows: wl.list.Head(Window, .link),
 
 new_output: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleNewOutput),
 
@@ -158,7 +158,7 @@ pub fn init(root: *Root) !void {
                 .render_list = undefined,
             },
         },
-        .views = undefined,
+        .windows = undefined,
         .output_layout = output_layout,
         .all_outputs = undefined,
         .active_outputs = undefined,
@@ -175,7 +175,7 @@ pub fn init(root: *Root) !void {
     root.hidden.pending.render_list.init();
     root.hidden.inflight.render_list.init();
 
-    root.views.init();
+    root.windows.init();
     root.all_outputs.init();
     root.active_outputs.init();
 
@@ -250,7 +250,7 @@ fn handleNewOutput(_: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
 }
 
 /// Remove the output from root.active_outputs and the output layout.
-/// Evacuate views if necessary.
+/// Evacuate windows if necessary.
 pub fn deactivateOutput(root: *Root, output: *Output) void {
     {
         // If the output has already been removed, do nothing
@@ -307,7 +307,7 @@ pub fn activateOutput(root: *Root, output: *Output) void {
     };
 }
 
-/// Trigger asynchronous application of pending state for all outputs and views.
+/// Trigger asynchronous application of pending state for all outputs and windows.
 /// Changes will not be applied to the scene graph until the layout generator
 /// generates a new layout for all outputs and all affected clients ack a
 /// configure and commit a new buffer.
@@ -330,9 +330,9 @@ pub fn applyPending(root: *Root) void {
 
     {
         var it = root.hidden.pending.render_list.iterator(.forward);
-        while (it.next()) |view| {
-            view.inflight_render_list_link.remove();
-            root.hidden.inflight.render_list.append(view);
+        while (it.next()) |window| {
+            window.inflight_render_list_link.remove();
+            root.hidden.inflight.render_list.append(window);
         }
     }
 
@@ -344,10 +344,10 @@ pub fn applyPending(root: *Root) void {
             switch (cursor.mode) {
                 .passthrough, .down => {},
                 inline .move, .resize => |data| {
-                    if (data.view.inflight.fullscreen) {
+                    if (data.window.inflight.fullscreen) {
                         cursor.mode = .passthrough;
-                        data.view.pending.resizing = false;
-                        data.view.inflight.resizing = false;
+                        data.window.pending.resizing = false;
+                        data.window.inflight.resizing = false;
                     }
                 },
             }
@@ -364,19 +364,19 @@ fn sendConfigures(root: *Root) void {
 
     {
         var it = root.wm.inflight.render_list.iterator(.forward);
-        while (it.next()) |view| {
-            assert(!view.inflight_transaction);
-            view.inflight_transaction = true;
+        while (it.next()) |window| {
+            assert(!window.inflight_transaction);
+            window.inflight_transaction = true;
 
-            // This can happen if a view is unmapped while a layout demand including it is inflight
-            // If a view has been unmapped, don't send it a configure.
-            if (!view.mapped) continue;
+            // This can happen if a window is unmapped while a layout demand including it is inflight
+            // If a window has been unmapped, don't send it a configure.
+            if (!window.mapped) continue;
 
-            if (view.configure()) {
+            if (window.configure()) {
                 root.inflight_configures += 1;
 
-                view.saveSurfaceTree();
-                view.sendFrameDone();
+                window.saveSurfaceTree();
+                window.sendFrameDone();
             }
         }
     }
@@ -424,19 +424,19 @@ fn commitTransaction(root: *Root) void {
 
     {
         var it = root.hidden.inflight.render_list.safeIterator(.forward);
-        while (it.next()) |view| {
-            view.tree.node.reparent(root.hidden.tree);
-            view.popup_tree.node.reparent(root.hidden.tree);
+        while (it.next()) |window| {
+            window.tree.node.reparent(root.hidden.tree);
+            window.popup_tree.node.reparent(root.hidden.tree);
         }
     }
 
     {
         var it = root.wm.inflight.render_list.iterator(.forward);
-        while (it.next()) |view| {
-            view.commitTransaction();
+        while (it.next()) |window| {
+            window.commitTransaction();
 
-            view.tree.node.setEnabled(true);
-            view.popup_tree.node.setEnabled(true);
+            window.tree.node.setEnabled(true);
+            window.popup_tree.node.setEnabled(true);
         }
     }
 
@@ -446,11 +446,11 @@ fn commitTransaction(root: *Root) void {
     }
 
     {
-        // This must be done after updating cursor state in case the view was the target of move/resize.
+        // This must be done after updating cursor state in case the window was the target of move/resize.
         var it = root.hidden.inflight.render_list.safeIterator(.forward);
-        while (it.next()) |view| {
-            view.dropSavedSurfaceTree();
-            if (view.destroying) view.destroy(.assert);
+        while (it.next()) |window| {
+            window.dropSavedSurfaceTree();
+            if (window.destroying) window.destroy(.assert);
         }
     }
 

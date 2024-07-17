@@ -23,7 +23,7 @@ const wl = @import("wayland").server.wl;
 
 const server = &@import("main.zig").server;
 
-const View = @import("View.zig");
+const Window = @import("Window.zig");
 const Seat = @import("Seat.zig");
 
 wlr_handle: ?*wlr.ForeignToplevelHandleV1 = null,
@@ -36,7 +36,7 @@ foreign_close: wl.Listener(*wlr.ForeignToplevelHandleV1) =
     wl.Listener(*wlr.ForeignToplevelHandleV1).init(handleForeignClose),
 
 pub fn map(handle: *ForeignToplevelHandle) void {
-    const view: *View = @fieldParentPtr("foreign_toplevel_handle", handle);
+    const window: *Window = @fieldParentPtr("foreign_toplevel_handle", handle);
 
     assert(handle.wlr_handle == null);
 
@@ -49,8 +49,8 @@ pub fn map(handle: *ForeignToplevelHandle) void {
     handle.wlr_handle.?.events.request_fullscreen.add(&handle.foreign_fullscreen);
     handle.wlr_handle.?.events.request_close.add(&handle.foreign_close);
 
-    if (view.getTitle()) |title| handle.wlr_handle.?.setTitle(title);
-    if (view.getAppId()) |app_id| handle.wlr_handle.?.setAppId(app_id);
+    if (window.getTitle()) |title| handle.wlr_handle.?.setTitle(title);
+    if (window.getAppId()) |app_id| handle.wlr_handle.?.setAppId(app_id);
 }
 
 pub fn unmap(handle: *ForeignToplevelHandle) void {
@@ -65,27 +65,27 @@ pub fn unmap(handle: *ForeignToplevelHandle) void {
     handle.wlr_handle = null;
 }
 
-/// Must be called just before the view's inflight state is made current.
+/// Must be called just before the window's inflight state is made current.
 pub fn update(handle: *ForeignToplevelHandle) void {
-    const view: *View = @fieldParentPtr("foreign_toplevel_handle", handle);
+    const window: *Window = @fieldParentPtr("foreign_toplevel_handle", handle);
 
     const wlr_handle = handle.wlr_handle orelse return;
 
-    wlr_handle.setActivated(view.inflight.focus != 0);
-    wlr_handle.setFullscreen(view.inflight.fullscreen);
+    wlr_handle.setActivated(window.inflight.focus != 0);
+    wlr_handle.setFullscreen(window.inflight.fullscreen);
 }
 
-/// Only honors the request if the view is already visible on the seat's
+/// Only honors the request if the window is already visible on the seat's
 /// currently focused output.
 fn handleForeignActivate(
     listener: *wl.Listener(*wlr.ForeignToplevelHandleV1.event.Activated),
     event: *wlr.ForeignToplevelHandleV1.event.Activated,
 ) void {
     const handle: *ForeignToplevelHandle = @fieldParentPtr("foreign_activate", listener);
-    const view: *View = @fieldParentPtr("foreign_toplevel_handle", handle);
+    const window: *Window = @fieldParentPtr("foreign_toplevel_handle", handle);
     const seat: *Seat = @ptrFromInt(event.seat.data);
 
-    seat.focus(view);
+    seat.focus(window);
     server.root.applyPending();
 }
 
@@ -94,9 +94,9 @@ fn handleForeignFullscreen(
     event: *wlr.ForeignToplevelHandleV1.event.Fullscreen,
 ) void {
     const handle: *ForeignToplevelHandle = @fieldParentPtr("foreign_fullscreen", listener);
-    const view: *View = @fieldParentPtr("foreign_toplevel_handle", handle);
+    const window: *Window = @fieldParentPtr("foreign_toplevel_handle", handle);
 
-    view.pending.fullscreen = event.fullscreen;
+    window.pending.fullscreen = event.fullscreen;
     server.root.applyPending();
 }
 
@@ -105,7 +105,7 @@ fn handleForeignClose(
     _: *wlr.ForeignToplevelHandleV1,
 ) void {
     const handle: *ForeignToplevelHandle = @fieldParentPtr("foreign_close", listener);
-    const view: *View = @fieldParentPtr("foreign_toplevel_handle", handle);
+    const window: *Window = @fieldParentPtr("foreign_toplevel_handle", handle);
 
-    view.close();
+    window.close();
 }

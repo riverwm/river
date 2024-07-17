@@ -108,7 +108,7 @@ pub fn update(input_popup: *InputPopup) void {
     const focused = SceneNodeData.fromSurface(focused_surface) orelse return;
 
     const output = switch (focused.data) {
-        .view => @panic("TODO"),
+        .window => @panic("TODO"),
         .layer_surface => |layer_surface| layer_surface.output,
         .lock_surface => |lock_surface| lock_surface.getOutput(),
         // Xwayland doesn't use the text-input protocol
@@ -116,7 +116,7 @@ pub fn update(input_popup: *InputPopup) void {
     };
 
     const popup_tree = switch (focused.data) {
-        .view => |view| view.popup_tree,
+        .window => |window| window.popup_tree,
         .layer_surface => |layer_surface| layer_surface.popup_tree,
         .lock_surface => |lock_surface| lock_surface.getOutput().layers.popups,
         // Xwayland doesn't use the text-input protocol

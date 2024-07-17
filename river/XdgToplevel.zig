@@ -28,13 +28,13 @@ const util = @import("util.zig");
 const Output = @import("Output.zig");
 const Seat = @import("Seat.zig");
 const XdgPopup = @import("XdgPopup.zig");
-const View = @import("View.zig");
+const Window = @import("Window.zig");
 const XdgDecoration = @import("XdgDecoration.zig");
 
 const log = std.log.scoped(.xdg_shell);
 
 /// TODO(zig): get rid of this and use @fieldParentPtr(), https://github.com/ziglang/zig/issues/6611
-view: *View,
+window: *Window,
 
 wlr_toplevel: *wlr.XdgToplevel,
 
@@ -58,14 +58,14 @@ configure_state: union(enum) {
     timed_out_acked,
 } = .idle,
 
-// Listeners that are always active over the view's lifetime
+// Listeners that are always active over the window's lifetime
 destroy: wl.Listener(void) = wl.Listener(void).init(handleDestroy),
 map: wl.Listener(void) = wl.Listener(void).init(handleMap),
 unmap: wl.Listener(void) = wl.Listener(void).init(handleUnmap),
 commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
 new_popup: wl.Listener(*wlr.XdgPopup) = wl.Listener(*wlr.XdgPopup).init(handleNewPopup),
 
-// Listeners that are only active while the view is mapped
+// Listeners that are only active while the window is mapped
 ack_configure: wl.Listener(*wlr.XdgSurface.Configure) =
     wl.Listener(*wlr.XdgSurface.Configure).init(handleAckConfigure),
 request_fullscreen: wl.Listener(void) = wl.Listener(void).init(handleRequestFullscreen),
@@ -77,13 +77,13 @@ set_title: wl.Listener(void) = wl.Listener(void).init(handleSetTitle),
 set_app_id: wl.Listener(void) = wl.Listener(void).init(handleSetAppId),
 
 pub fn create(wlr_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
-    const view = try View.create(.{ .toplevel = .{
-        .view = undefined,
+    const window = try Window.create(.{ .toplevel = .{
+        .window = undefined,
         .wlr_toplevel = wlr_toplevel,
     } });
-    errdefer view.destroy(.assert);
+    errdefer window.destroy(.assert);
 
-    const toplevel = &view.impl.toplevel;
+    const toplevel = &window.impl.toplevel;
 
     // This listener must be added before the scene xdg surface is created.
     // Otherwise, the scene surface nodes will already be disabled by the unmap
@@ -96,12 +96,12 @@ pub fn create(wlr_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
     wlr_toplevel.base.surface.events.unmap.add(&toplevel.unmap);
     errdefer toplevel.unmap.link.remove();
 
-    _ = try view.surface_tree.createSceneXdgSurface(wlr_toplevel.base);
+    _ = try window.surface_tree.createSceneXdgSurface(wlr_toplevel.base);
 
-    toplevel.view = view;
+    toplevel.window = window;
 
     wlr_toplevel.base.data = @intFromPtr(toplevel);
-    wlr_toplevel.base.surface.data = @intFromPtr(&view.tree.node);
+    wlr_toplevel.base.surface.data = @intFromPtr(&window.tree.node);
 
     // Add listeners that are active over the toplevel's entire lifetime
     wlr_toplevel.events.destroy.add(&toplevel.destroy);
@@ -110,7 +110,7 @@ pub fn create(wlr_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
     wlr_toplevel.base.events.new_popup.add(&toplevel.new_popup);
 }
 
-/// Send a configure event, applying the inflight state of the view.
+/// Send a configure event, applying the inflight state of the window.
 pub fn configure(toplevel: *XdgToplevel) bool {
     switch (toplevel.configure_state) {
         .idle, .timed_out, .timed_out_acked => {},
@@ -122,12 +122,12 @@ pub fn configure(toplevel: *XdgToplevel) bool {
         .timed_out, .timed_out_acked, .committed => unreachable,
     };
 
-    const inflight = &toplevel.view.inflight;
-    const current = &toplevel.view.current;
+    const inflight = &toplevel.window.inflight;
+    const current = &toplevel.window.current;
 
-    // We avoid a special case for newly mapped views which we have not yet
+    // We avoid a special case for newly mapped windows which we have not yet
     // configured by setting the current width/height to the initial width/height
-    // of the view in handleMap().
+    // of the window in handleMap().
     if (inflight.box.width == current.box.width and
         inflight.box.height == current.box.height and
         (inflight.focus != 0) == (current.focus != 0) and
@@ -173,7 +173,7 @@ pub fn configure(toplevel: *XdgToplevel) bool {
     // from getting out of sync in the case where a client has resized ittoplevel.
     const configure_serial = wlr_toplevel.setSize(inflight.box.width, inflight.box.height);
 
-    // Only track configures with the transaction system if they affect the dimensions of the view.
+    // Only track configures with the transaction system if they affect the dimensions of the window.
     // If the configure state is not idle this means we are currently tracking a timed out
     // configure from a previous transaction and should instead track the newly sent configure.
     if (inflight.box.width == current.box.width and
@@ -205,7 +205,7 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
     }
     assert(toplevel.decoration == null);
 
-    // Remove listeners that are active for the entire lifetime of the view
+    // Remove listeners that are active for the entire lifetime of the window
     toplevel.destroy.link.remove();
     toplevel.map.link.remove();
     toplevel.unmap.link.remove();
@@ -215,14 +215,14 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
     // The wlr_surface may outlive the wlr_xdg_toplevel so we must clean up the user data.
     toplevel.wlr_toplevel.base.surface.data = 0;
 
-    const view = toplevel.view;
-    view.impl = .none;
-    view.destroy(.lazy);
+    const window = toplevel.window;
+    window.impl = .none;
+    window.destroy(.lazy);
 }
 
 fn handleMap(listener: *wl.Listener(void)) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("map", listener);
-    const view = toplevel.view;
+    const window = toplevel.window;
 
     // Add listeners that are only active while mapped
     toplevel.wlr_toplevel.base.events.ack_configure.add(&toplevel.ack_configure);
@@ -234,18 +234,18 @@ fn handleMap(listener: *wl.Listener(void)) void {
 
     toplevel.wlr_toplevel.base.getGeometry(&toplevel.geometry);
 
-    view.pending.box = .{
+    window.pending.box = .{
         .x = 0,
         .y = 0,
         .width = toplevel.geometry.width,
         .height = toplevel.geometry.height,
     };
-    view.inflight.box = view.pending.box;
-    view.current.box = view.pending.box;
+    window.inflight.box = window.pending.box;
+    window.current.box = window.pending.box;
 
-    toplevel.view.pending.fullscreen = toplevel.wlr_toplevel.requested.fullscreen;
+    toplevel.window.pending.fullscreen = toplevel.wlr_toplevel.requested.fullscreen;
 
-    view.map() catch {
+    window.map() catch {
         log.err("out of memory", .{});
         toplevel.wlr_toplevel.resource.getClient().postNoMemory();
     };
@@ -263,13 +263,13 @@ fn handleUnmap(listener: *wl.Listener(void)) void {
     toplevel.set_title.link.remove();
     toplevel.set_app_id.link.remove();
 
-    toplevel.view.unmap();
+    toplevel.window.unmap();
 }
 
 fn handleNewPopup(listener: *wl.Listener(*wlr.XdgPopup), wlr_xdg_popup: *wlr.XdgPopup) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("new_popup", listener);
 
-    XdgPopup.create(wlr_xdg_popup, toplevel.view.popup_tree, toplevel.view.popup_tree) catch {
+    XdgPopup.create(wlr_xdg_popup, toplevel.window.popup_tree, toplevel.window.popup_tree) catch {
         wlr_xdg_popup.resource.postNoMemory();
         return;
     };
@@ -293,7 +293,7 @@ fn handleAckConfigure(
 
 fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("commit", listener);
-    const view = toplevel.view;
+    const window = toplevel.window;
 
     if (toplevel.wlr_toplevel.base.initial_commit) {
         _ = toplevel.wlr_toplevel.setWmCapabilities(.{ .fullscreen = true });
@@ -301,19 +301,19 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
         if (toplevel.decoration) |decoration| {
             const ssd = true;
             _ = decoration.wlr_decoration.setMode(if (ssd) .server_side else .client_side);
-            toplevel.view.pending.ssd = ssd;
+            toplevel.window.pending.ssd = ssd;
         }
 
         return;
     }
 
-    if (!view.mapped) {
+    if (!window.mapped) {
         return;
     }
 
     {
         const state = &toplevel.wlr_toplevel.current;
-        view.constraints = .{
+        window.constraints = .{
             .min_width = @max(state.min_width, 1),
             .max_width = if (state.max_width > 0) @intCast(state.max_width) else math.maxInt(u31),
             .min_height = @max(state.min_height, 1),
@@ -335,7 +335,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
                     .{ old_geometry.width, old_geometry.height, toplevel.geometry.width, toplevel.geometry.height },
                 );
                 // TODO check tiled state
-                if (!view.current.fullscreen) {
+                if (!window.current.fullscreen) {
                     // It seems that a disappointingly high number of clients have a buggy
                     // response to configure events. They ack the configure immediately but then
                     // proceed to make one or more wl_surface.commit requests with the old size
@@ -344,39 +344,39 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
                     // interest of best serving river's users we will fix up their size here after
                     // logging a shame message.
                     log.err("client with app-id '{s}' is buggy and initiated size change while tiled or fullscreen, shame on it", .{
-                        view.getAppId() orelse "",
+                        window.getAppId() orelse "",
                     });
                 }
 
-                view.inflight.box.width = toplevel.geometry.width;
-                view.inflight.box.height = toplevel.geometry.height;
-                view.pending.box.width = toplevel.geometry.width;
-                view.pending.box.height = toplevel.geometry.height;
-                view.current = view.inflight;
-                view.updateSceneState();
+                window.inflight.box.width = toplevel.geometry.width;
+                window.inflight.box.height = toplevel.geometry.height;
+                window.pending.box.width = toplevel.geometry.width;
+                window.pending.box.height = toplevel.geometry.height;
+                window.current = window.inflight;
+                window.updateSceneState();
             } else if (old_geometry.x != toplevel.geometry.x or
                 old_geometry.y != toplevel.geometry.y)
             {
                 // We need to update the surface clip box to reflect the geometry change.
-                view.updateSceneState();
+                window.updateSceneState();
             }
         },
         // If the client has not yet acked our configure, we need to send a
         // frame done event so that it commits another buffer. These
         // buffers won't be rendered since we are still rendering our
         // stashed buffer from when the transaction started.
-        .inflight => view.sendFrameDone(),
+        .inflight => window.sendFrameDone(),
         .acked, .timed_out_acked => {
             toplevel.wlr_toplevel.base.getGeometry(&toplevel.geometry);
 
-            if (view.inflight.resizing) {
-                view.resizeUpdatePosition(toplevel.geometry.width, toplevel.geometry.height);
+            if (window.inflight.resizing) {
+                window.resizeUpdatePosition(toplevel.geometry.width, toplevel.geometry.height);
             }
 
-            view.inflight.box.width = toplevel.geometry.width;
-            view.inflight.box.height = toplevel.geometry.height;
-            view.pending.box.width = toplevel.geometry.width;
-            view.pending.box.height = toplevel.geometry.height;
+            window.inflight.box.width = toplevel.geometry.width;
+            window.inflight.box.height = toplevel.geometry.height;
+            window.pending.box.width = toplevel.geometry.width;
+            window.pending.box.height = toplevel.geometry.height;
 
             switch (toplevel.configure_state) {
                 .acked => {
@@ -385,8 +385,8 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
                 },
                 .timed_out_acked => {
                     toplevel.configure_state = .idle;
-                    view.current = view.inflight;
-                    view.updateSceneState();
+                    window.current = window.inflight;
+                    window.updateSceneState();
                 },
                 else => unreachable,
             }
@@ -398,8 +398,8 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
 /// for now, perhaps it should be denied in some cases in the future.
 fn handleRequestFullscreen(listener: *wl.Listener(void)) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("request_fullscreen", listener);
-    if (toplevel.view.pending.fullscreen != toplevel.wlr_toplevel.requested.fullscreen) {
-        toplevel.view.pending.fullscreen = toplevel.wlr_toplevel.requested.fullscreen;
+    if (toplevel.window.pending.fullscreen != toplevel.wlr_toplevel.requested.fullscreen) {
+        toplevel.window.pending.fullscreen = toplevel.wlr_toplevel.requested.fullscreen;
         server.root.applyPending();
     }
 }
@@ -410,14 +410,14 @@ fn handleRequestMove(
 ) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("request_move", listener);
     const seat: *Seat = @ptrFromInt(event.seat.seat.data);
-    const view = toplevel.view;
+    const window = toplevel.window;
 
-    if (view.pending.fullscreen) return;
+    if (window.pending.fullscreen) return;
 
     // Moving windows with touch or tablet tool is not yet supported.
     if (seat.wlr_seat.validatePointerGrabSerial(null, event.serial)) {
         switch (seat.cursor.mode) {
-            .passthrough, .down => seat.cursor.startMove(view),
+            .passthrough, .down => seat.cursor.startMove(window),
             .move, .resize => {},
         }
     }
@@ -426,14 +426,14 @@ fn handleRequestMove(
 fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), event: *wlr.XdgToplevel.event.Resize) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("request_resize", listener);
     const seat: *Seat = @ptrFromInt(event.seat.seat.data);
-    const view = toplevel.view;
+    const window = toplevel.window;
 
-    if (view.pending.fullscreen) return;
+    if (window.pending.fullscreen) return;
 
     // Resizing windows with touch or tablet tool is not yet supported.
     if (seat.wlr_seat.validatePointerGrabSerial(null, event.serial)) {
         switch (seat.cursor.mode) {
-            .passthrough, .down => seat.cursor.startResize(view, event.edges),
+            .passthrough, .down => seat.cursor.startResize(window, event.edges),
             .move, .resize => {},
         }
     }
@@ -442,11 +442,11 @@ fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), ev
 /// Called when the client sets / updates its title
 fn handleSetTitle(listener: *wl.Listener(void)) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("set_title", listener);
-    toplevel.view.notifyTitle();
+    toplevel.window.notifyTitle();
 }
 
 /// Called when the client sets / updates its app_id
 fn handleSetAppId(listener: *wl.Listener(void)) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("set_app_id", listener);
-    toplevel.view.notifyAppId();
+    toplevel.window.notifyAppId();
 }

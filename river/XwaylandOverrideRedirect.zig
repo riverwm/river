@@ -26,8 +26,8 @@ const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const SceneNodeData = @import("SceneNodeData.zig");
-const View = @import("View.zig");
-const XwaylandView = @import("XwaylandView.zig");
+const Window = @import("Window.zig");
+const XwaylandWindow = @import("XwaylandWindow.zig");
 
 const log = std.log.scoped(.xwayland);
 
@@ -139,13 +139,13 @@ pub fn focusIfDesired(override_redirect: *XwaylandOverrideRedirect) void {
         override_redirect.xwayland_surface.icccmInputModel() != .none)
     {
         const seat = server.input_manager.defaultSeat();
-        // Keep the parent top-level Xwayland view of any override redirect surface
+        // Keep the parent top-level Xwayland window of any override redirect surface
         // activated while that override redirect surface is focused. This ensures
         // override redirect menus do not disappear as a result of deactivating
         // their parent window.
-        if (seat.focused == .view and
-            seat.focused.view.impl == .xwayland_view and
-            seat.focused.view.impl.xwayland_view.xwayland_surface.pid == override_redirect.xwayland_surface.pid)
+        if (seat.focused == .window and
+            seat.focused.window.impl == .xwayland_window and
+            seat.focused.window.impl.xwayland_window.xwayland_surface.pid == override_redirect.xwayland_surface.pid)
         {
             seat.keyboardEnterOrLeave(override_redirect.xwayland_surface.surface);
         } else {
@@ -168,11 +168,11 @@ fn handleUnmap(listener: *wl.Listener(void)) void {
     var seat_it = server.input_manager.seats.first;
     while (seat_it) |seat_node| : (seat_it = seat_node.next) {
         const seat = &seat_node.data;
-        if (seat.focused == .view and seat.focused.view.impl == .xwayland_view and
-            seat.focused.view.impl.xwayland_view.xwayland_surface.pid == override_redirect.xwayland_surface.pid and
+        if (seat.focused == .window and seat.focused.window.impl == .xwayland_window and
+            seat.focused.window.impl.xwayland_window.xwayland_surface.pid == override_redirect.xwayland_surface.pid and
             seat.wlr_seat.keyboard_state.focused_surface == override_redirect.xwayland_surface.surface)
         {
-            seat.keyboardEnterOrLeave(seat.focused.view.rootSurface());
+            seat.keyboardEnterOrLeave(seat.focused.window.rootSurface());
         }
     }
 
@@ -204,7 +204,7 @@ fn handleSetOverrideRedirect(listener: *wl.Listener(void)) void {
     }
     handleDestroy(&override_redirect.destroy);
 
-    XwaylandView.create(xwayland_surface) catch {
+    XwaylandWindow.create(xwayland_surface) catch {
         log.err("out of memory", .{});
         return;
     };

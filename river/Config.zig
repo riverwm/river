@@ -30,7 +30,7 @@ const Server = @import("Server.zig");
 const Output = @import("Output.zig");
 const Mapping = @import("Mapping.zig");
 const Switch = @import("Switch.zig");
-const View = @import("View.zig");
+const Window = @import("Window.zig");
 
 pub const Position = struct {
     x: u31,

@@ -73,12 +73,12 @@ fn handleRequestMode(
     const decoration: *XdgDecoration = @fieldParentPtr("request_mode", listener);
 
     const toplevel: *XdgToplevel = @ptrFromInt(decoration.wlr_decoration.toplevel.base.data);
-    const view = toplevel.view;
+    const window = toplevel.window;
 
     const ssd = true;
 
-    if (view.pending.ssd != ssd) {
-        view.pending.ssd = ssd;
+    if (window.pending.ssd != ssd) {
+        window.pending.ssd = ssd;
         server.root.applyPending();
     }
 }

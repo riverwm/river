@@ -41,7 +41,7 @@ const Root = @import("Root.zig");
 const Seat = @import("Seat.zig");
 const Tablet = @import("Tablet.zig");
 const TabletTool = @import("TabletTool.zig");
-const View = @import("View.zig");
+const Window = @import("Window.zig");
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
 const Mode = union(enum) {
@@ -60,9 +60,9 @@ const Mode = union(enum) {
         sy: f64,
     },
     move: struct {
-        view: *View,
+        window: *Window,
 
-        /// View coordinates are stored as i32s as they are in logical pixels.
+        /// Window coordinates are stored as i32s as they are in logical pixels.
         /// However, it is possible to move the cursor by a fraction of a
         /// logical pixel and this happens in practice with low dpi, high
         /// polling rate mice. Therefore we must accumulate the current
@@ -77,13 +77,13 @@ const Mode = union(enum) {
         offset_y: i32,
     },
     resize: struct {
-        view: *View,
+        window: *Window,
 
         delta_x: f64 = 0,
         delta_y: f64 = 0,
 
         /// Total x/y movement of the pointer device since the start of the resize,
-        /// clamped to the bounds of the resize as defined by the view min/max
+        /// clamped to the bounds of the resize as defined by the window min/max
         /// dimensions and output dimensions.
         /// This is not directly tied to the rendered cursor position.
         x: i32 = 0,
@@ -116,7 +116,7 @@ mode: Mode = .passthrough,
 /// Set to whatever the current mode is when a transaction is started.
 /// This is necessary to handle termination of move/resize modes properly
 /// since the termination is not complete until a transaction completes and
-/// View.resizeUpdatePosition() is called.
+/// Window.resizeUpdatePosition() is called.
 inflight_mode: Mode = .passthrough,
 
 seat: *Seat,
@@ -332,7 +332,7 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
                     _ = cursor.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
                 },
                 .move => {},
-                .resize => |data| data.view.pending.resizing = false,
+                .resize => |data| data.window.pending.resizing = false,
             }
 
             cursor.mode = .passthrough;
@@ -354,7 +354,7 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
     }
 
     if (server.root.at(cursor.wlr_cursor.x, cursor.wlr_cursor.y)) |result| {
-        if (result.data == .view and cursor.handlePointerMapping(event, result.data.view)) {
+        if (result.data == .window and cursor.handlePointerMapping(event, result.data.window)) {
             // If a mapping is triggered don't send events to clients.
             return;
         }
@@ -381,8 +381,8 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
 /// Requires a call to Root.applyPending()
 fn updateKeyboardFocus(cursor: Cursor, result: Root.AtResult) void {
     switch (result.data) {
-        .view => |view| {
-            cursor.seat.focus(view);
+        .window => |window| {
+            cursor.seat.focus(window);
         },
         .layer_surface => |layer_surface| {
             // If a keyboard inteactive layer surface has been clicked on,
@@ -626,7 +626,7 @@ fn handleTabletToolButton(
 
 /// Handle the mapping for the passed button if any. Returns true if there
 /// was a mapping and the button was handled.
-fn handlePointerMapping(cursor: *Cursor, event: *wlr.Pointer.event.Button, _: *View) bool {
+fn handlePointerMapping(cursor: *Cursor, event: *wlr.Pointer.event.Button, _: *Window) bool {
     const wlr_keyboard = cursor.seat.wlr_seat.getKeyboard() orelse return false;
     const modifiers = wlr_keyboard.getModifiers();
 
@@ -703,20 +703,20 @@ fn handleRequestSetCursor(
     }
 }
 
-pub fn startMove(cursor: *Cursor, view: *View) void {
+pub fn startMove(cursor: *Cursor, window: *Window) void {
     if (cursor.constraint) |constraint| {
         if (constraint.state == .active) constraint.deactivate();
     }
 
     const new_mode: Mode = .{ .move = .{
-        .view = view,
-        .offset_x = @as(i32, @intFromFloat(cursor.wlr_cursor.x)) - view.current.box.x,
-        .offset_y = @as(i32, @intFromFloat(cursor.wlr_cursor.y)) - view.current.box.y,
+        .window = window,
+        .offset_x = @as(i32, @intFromFloat(cursor.wlr_cursor.x)) - window.current.box.x,
+        .offset_y = @as(i32, @intFromFloat(cursor.wlr_cursor.y)) - window.current.box.y,
     } };
-    cursor.enterMode(new_mode, view, "move");
+    cursor.enterMode(new_mode, window, "move");
 }
 
-pub fn startResize(cursor: *Cursor, view: *View, proposed_edges: ?wlr.Edges) void {
+pub fn startResize(cursor: *Cursor, window: *Window, proposed_edges: ?wlr.Edges) void {
     if (cursor.constraint) |constraint| {
         if (constraint.state == .active) constraint.deactivate();
     }
@@ -727,31 +727,31 @@ pub fn startResize(cursor: *Cursor, view: *View, proposed_edges: ?wlr.Edges) voi
                 break :blk edges;
             }
         }
-        break :blk cursor.computeEdges(view);
+        break :blk cursor.computeEdges(window);
     };
 
-    const box = &view.current.box;
+    const box = &window.current.box;
     const lx: i32 = @intFromFloat(cursor.wlr_cursor.x);
     const ly: i32 = @intFromFloat(cursor.wlr_cursor.y);
     const offset_x = if (edges.left) lx - box.x else box.x + box.width - lx;
     const offset_y = if (edges.top) ly - box.y else box.y + box.height - ly;
 
-    view.pending.resizing = true;
+    window.pending.resizing = true;
 
     const new_mode: Mode = .{ .resize = .{
-        .view = view,
+        .window = window,
         .edges = edges,
         .offset_x = offset_x,
         .offset_y = offset_y,
         .initial_width = @intCast(box.width),
         .initial_height = @intCast(box.height),
     } };
-    cursor.enterMode(new_mode, view, wlr.Xcursor.getResizeName(edges));
+    cursor.enterMode(new_mode, window, wlr.Xcursor.getResizeName(edges));
 }
 
-fn computeEdges(cursor: *const Cursor, view: *const View) wlr.Edges {
+fn computeEdges(cursor: *const Cursor, window: *const Window) wlr.Edges {
     const min_handle_size = 20;
-    const box = &view.current.box;
+    const box = &window.current.box;
 
     const sx = @as(i32, @intFromFloat(cursor.wlr_cursor.x)) - box.x;
     const sy = @as(i32, @intFromFloat(cursor.wlr_cursor.y)) - box.y;
@@ -783,7 +783,7 @@ fn computeEdges(cursor: *const Cursor, view: *const View) wlr.Edges {
     }
 }
 
-fn enterMode(cursor: *Cursor, mode: Mode, view: *View, xcursor_name: [*:0]const u8) void {
+fn enterMode(cursor: *Cursor, mode: Mode, window: *Window, xcursor_name: [*:0]const u8) void {
     assert(cursor.mode == .passthrough or cursor.mode == .down);
     assert(mode == .move or mode == .resize);
 
@@ -791,7 +791,7 @@ fn enterMode(cursor: *Cursor, mode: Mode, view: *View, xcursor_name: [*:0]const 
 
     cursor.mode = mode;
 
-    cursor.seat.focus(view);
+    cursor.seat.focus(window);
 
     cursor.seat.wlr_seat.pointerNotifyClearFocus();
     cursor.setXcursor(xcursor_name);
@@ -851,7 +851,7 @@ fn processMotion(cursor: *Cursor, device: *wlr.InputDevice, time: u32, delta_x: 
             data.delta_x = dx - @trunc(dx);
             data.delta_y = dy - @trunc(dy);
 
-            data.view.pending.move(@intFromFloat(dx), @intFromFloat(dy));
+            data.window.pending.move(@intFromFloat(dx), @intFromFloat(dy));
 
             server.root.applyPending();
         },
@@ -865,16 +865,16 @@ fn processMotion(cursor: *Cursor, device: *wlr.InputDevice, time: u32, delta_x: 
             data.y += @intFromFloat(dy);
 
             // Modify width/height of the pending box, taking constraints into account
-            // The x/y coordinates of the view will be adjusted as needed in View.resizeCommit()
+            // The x/y coordinates of the window will be adjusted as needed in Window.resizeCommit()
             // based on the dimensions actually committed by the client.
-            const border_width = if (data.view.pending.ssd) server.config.border_width else 0;
+            const border_width = if (data.window.pending.ssd) server.config.border_width else 0;
 
             // TODO
             const output_width: i32 = 1920;
             const output_height: i32 = 1080;
 
-            const constraints = &data.view.constraints;
-            const box = &data.view.pending.box;
+            const constraints = &data.window.constraints;
+            const box = &data.window.pending.box;
 
             if (data.edges.left) {
                 const x2 = box.x + box.width;
@@ -911,8 +911,8 @@ fn processMotion(cursor: *Cursor, device: *wlr.InputDevice, time: u32, delta_x: 
     }
 }
 
-/// Handle potential change in location of views on the output, as well as
-/// the target view of a cursor operation potentially being moved to a non-visible tag,
+/// Handle potential change in location of windows on the output, as well as
+/// the target window of a cursor operation potentially being moved to a non-visible tag,
 /// becoming fullscreen, etc.
 pub fn updateState(cursor: *Cursor) void {
     if (cursor.constraint) |constraint| {
@@ -930,7 +930,7 @@ pub fn updateState(cursor: *Cursor) void {
         // TODO: Leave down mode if the target surface is no longer visible.
         .down => {},
         .move, .resize => {
-            // Moving and resizing of views is handled through the transaction system. Therefore,
+            // Moving and resizing of windows is handled through the transaction system. Therefore,
             // we must inspect the inflight_mode instead if a move or a resize is in progress.
             //
             // The cases when a move/resize is being started or ended and e.g. mode is resize
@@ -942,17 +942,17 @@ pub fn updateState(cursor: *Cursor) void {
             //
             // In the second case, a move/resize has been terminated by the user but the
             // transaction carrying out the final size/position change is still inflight.
-            // Therefore, the user already expects the cursor to be free from the view and
+            // Therefore, the user already expects the cursor to be free from the window and
             // we should not warp it back to the fixed offset of the move/resize.
             switch (cursor.inflight_mode) {
                 .passthrough, .down => {},
                 inline .move, .resize => |data, mode| {
 
                     // These conditions are checked in Root.applyPending()
-                    assert(!data.view.current.fullscreen);
+                    assert(!data.window.current.fullscreen);
 
-                    // Keep the cursor locked to the original offset from the edges of the view.
-                    const box = &data.view.current.box;
+                    // Keep the cursor locked to the original offset from the edges of the window.
+                    const box = &data.window.current.box;
                     const new_x: f64 = blk: {
                         if (mode == .move or data.edges.left) {
                             break :blk @floatFromInt(data.offset_x + box.x);

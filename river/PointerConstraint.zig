@@ -127,7 +127,7 @@ pub fn updateState(constraint: *PointerConstraint) void {
     }
 
     // It is possible for the cursor to end up outside of the constraint region despite the warp
-    // if, for example, the a keybinding is used to resize the view.
+    // if, for example, the a keybinding is used to resize the window.
     if (!constraint.wlr_constraint.region.containsPoint(@intFromFloat(sx), @intFromFloat(sy), null)) {
         log.info("deactivating pointer constraint, cursor outside region despite warp", .{});
         constraint.deactivate();

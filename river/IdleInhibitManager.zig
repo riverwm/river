@@ -25,7 +25,7 @@ const util = @import("util.zig");
 
 const IdleInhibitor = @import("IdleInhibitor.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
-const View = @import("View.zig");
+const Window = @import("Window.zig");
 
 wlr_manager: *wlr.IdleInhibitManagerV1,
 new_idle_inhibitor: wl.Listener(*wlr.IdleInhibitorV1) =
@@ -53,7 +53,7 @@ pub fn checkActive(inhibit_manager: *IdleInhibitManager) void {
     while (it) |node| : (it = node.next) {
         const node_data = SceneNodeData.fromSurface(node.data.wlr_inhibitor.surface) orelse continue;
         switch (node_data.data) {
-            .view => {
+            .window => {
                 inhibited = true;
                 break;
             },

@@ -25,11 +25,11 @@ const util = @import("util.zig");
 const LayerSurface = @import("LayerSurface.zig");
 const LockSurface = @import("LockSurface.zig");
 const InputPopup = @import("InputPopup.zig");
-const View = @import("View.zig");
+const Window = @import("Window.zig");
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
 pub const Data = union(enum) {
-    view: *View,
+    window: *Window,
     lock_surface: *LockSurface,
     layer_surface: *LayerSurface,
     override_redirect: if (build_options.xwayland) *XwaylandOverrideRedirect else noreturn,

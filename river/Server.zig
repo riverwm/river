@@ -39,7 +39,7 @@ const TabletTool = @import("TabletTool.zig");
 const XdgDecoration = @import("XdgDecoration.zig");
 const XdgToplevel = @import("XdgToplevel.zig");
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
-const XwaylandView = @import("XwaylandView.zig");
+const XwaylandWindow = @import("XwaylandWindow.zig");
 
 const log = std.log.scoped(.server);
 
@@ -394,7 +394,7 @@ fn handleNewXwaylandSurface(_: *wl.Listener(*wlr.XwaylandSurface), xwayland_surf
             return;
         };
     } else {
-        _ = XwaylandView.create(xwayland_surface) catch {
+        _ = XwaylandWindow.create(xwayland_surface) catch {
             log.err("out of memory", .{});
             return;
         };
@@ -409,8 +409,8 @@ fn handleRequestActivate(
 
     const node_data = SceneNodeData.fromSurface(event.surface) orelse return;
     switch (node_data.data) {
-        .view => |view| if (view.pending.focus == 0) {
-            view.pending.urgent = true;
+        .window => |window| if (window.pending.focus == 0) {
+            window.pending.urgent = true;
             server.root.applyPending();
         },
         else => |tag| {
