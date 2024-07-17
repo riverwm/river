@@ -100,12 +100,14 @@ fn handleMap(listener: *wl.Listener(void)) void {
     log.debug("layer surface '{s}' mapped", .{wlr_surface.namespace});
 
     layer_surface.output.arrangeLayers();
-    const consider = (wlr_surface.current.keyboard_interactive != .none and
-        (wlr_surface.current.layer == .top or wlr_surface.current.layer == .overlay));
+
+    const consider = wlr_surface.current.keyboard_interactive == .on_demand and
+        (wlr_surface.current.layer == .top or wlr_surface.current.layer == .overlay);
     handleKeyboardInteractiveExclusive(
         layer_surface.output,
         if (consider) layer_surface else null,
     );
+
     server.root.applyPending();
 }
 
@@ -141,14 +143,14 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
 }
 
 /// Focus topmost keyboard-interactivity-exclusive layer surface above normal
-/// content, or if none found, focus that given as `consider`.
+/// content, or if none found, focus the surface given as `consider`.
 /// Requires a call to Root.applyPending()
 fn handleKeyboardInteractiveExclusive(output: *Output, consider: ?*LayerSurface) void {
     if (server.lock_manager.state != .unlocked) return;
 
     // Find the topmost layer surface (if any) in the top or overlay layers which
     // requests exclusive keyboard interactivity.
-    const topmost_surface = outer: for ([_]zwlr.LayerShellV1.Layer{ .overlay, .top }) |layer| {
+    const to_focus = outer: for ([_]zwlr.LayerShellV1.Layer{ .overlay, .top }) |layer| {
         const tree = output.layerSurfaceTree(layer);
         // Iterate in reverse to match rendering order.
         var it = tree.children.iterator(.reverse);
@@ -166,8 +168,8 @@ fn handleKeyboardInteractiveExclusive(output: *Output, consider: ?*LayerSurface)
         }
     } else consider;
 
-    if (topmost_surface) |surface| {
-        assert(surface.wlr_layer_surface.current.keyboard_interactive != .none);
+    if (to_focus) |s| {
+        assert(s.wlr_layer_surface.current.keyboard_interactive != .none);
     }
 
     var it = server.input_manager.seats.first;
@@ -175,10 +177,10 @@ fn handleKeyboardInteractiveExclusive(output: *Output, consider: ?*LayerSurface)
         const seat = &node.data;
 
         if (seat.focused_output == output) {
-            if (topmost_surface) |to_focus| {
+            if (to_focus) |s| {
                 // If we found a surface on the output that requires focus, grab the focus of all
                 // seats that are focusing that output.
-                seat.setFocusRaw(.{ .layer = to_focus });
+                seat.setFocusRaw(.{ .layer = s });
                 continue;
             }
         }
