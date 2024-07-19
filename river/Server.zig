@@ -36,6 +36,7 @@ const Root = @import("Root.zig");
 const Seat = @import("Seat.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
 const TabletTool = @import("TabletTool.zig");
+const WindowManager = @import("WindowManager.zig");
 const XdgDecoration = @import("XdgDecoration.zig");
 const XdgToplevel = @import("XdgToplevel.zig");
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
@@ -86,6 +87,7 @@ root: Root,
 config: Config,
 idle_inhibit_manager: IdleInhibitManager,
 lock_manager: LockManager,
+wm: WindowManager,
 
 xwayland: if (build_options.xwayland) ?*wlr.Xwayland else void = if (build_options.xwayland) null,
 new_xwayland_surface: if (build_options.xwayland) wl.Listener(*wlr.XwaylandSurface) else void =
@@ -157,6 +159,7 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
         .input_manager = undefined,
         .idle_inhibit_manager = undefined,
         .lock_manager = undefined,
+        .wm = undefined,
     };
 
     if (renderer.getTextureFormats(@intFromEnum(wlr.BufferCap.dmabuf)) != null) {
@@ -178,6 +181,7 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
     try server.input_manager.init();
     try server.idle_inhibit_manager.init();
     try server.lock_manager.init();
+    try server.wm.init();
 
     server.xdg_shell.events.new_toplevel.add(&server.new_xdg_toplevel);
     server.xdg_decoration_manager.events.new_toplevel_decoration.add(&server.new_toplevel_decoration);
