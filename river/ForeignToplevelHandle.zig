@@ -86,7 +86,7 @@ fn handleForeignActivate(
     const seat: *Seat = @ptrFromInt(event.seat.data);
 
     seat.focus(window);
-    server.root.applyPending();
+    server.wm.applyPending();
 }
 
 fn handleForeignFullscreen(
@@ -97,7 +97,7 @@ fn handleForeignFullscreen(
     const window: *Window = @fieldParentPtr("foreign_toplevel_handle", handle);
 
     window.pending.fullscreen = event.fullscreen;
-    server.root.applyPending();
+    server.wm.applyPending();
 }
 
 fn handleForeignClose(

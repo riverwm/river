@@ -415,7 +415,7 @@ fn handleRequestActivate(
     switch (node_data.data) {
         .window => |window| if (window.pending.focus == 0) {
             window.pending.urgent = true;
-            server.root.applyPending();
+            server.wm.applyPending();
         },
         else => |tag| {
             log.info("ignoring xdg-activation-v1 activate request of {s} surface", .{@tagName(tag)});

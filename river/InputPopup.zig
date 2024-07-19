@@ -47,7 +47,7 @@ pub fn create(wlr_popup: *wlr.InputPopupSurfaceV2, input_relay: *InputRelay) !vo
         .link = undefined,
         .input_relay = input_relay,
         .wlr_popup = wlr_popup,
-        .surface_tree = try server.root.hidden.tree.createSceneSubsurfaceTree(wlr_popup.surface),
+        .surface_tree = try server.root.hidden_tree.createSceneSubsurfaceTree(wlr_popup.surface),
     };
 
     input_relay.input_popups.append(input_popup);
@@ -82,7 +82,7 @@ fn handleMap(listener: *wl.Listener(void)) void {
 fn handleUnmap(listener: *wl.Listener(void)) void {
     const input_popup: *InputPopup = @fieldParentPtr("unmap", listener);
 
-    input_popup.surface_tree.node.reparent(server.root.hidden.tree);
+    input_popup.surface_tree.node.reparent(server.root.hidden_tree);
 }
 
 fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
@@ -93,7 +93,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
 
 pub fn update(input_popup: *InputPopup) void {
     const text_input = input_popup.input_relay.text_input orelse {
-        input_popup.surface_tree.node.reparent(server.root.hidden.tree);
+        input_popup.surface_tree.node.reparent(server.root.hidden_tree);
         return;
     };
 

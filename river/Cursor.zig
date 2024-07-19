@@ -338,7 +338,7 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
             cursor.mode = .passthrough;
             cursor.passthrough(event.time_msec);
 
-            server.root.applyPending();
+            server.wm.applyPending();
         } else {
             _ = cursor.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
         }
@@ -375,10 +375,10 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
         }
     }
 
-    server.root.applyPending();
+    server.wm.applyPending();
 }
 
-/// Requires a call to Root.applyPending()
+/// Requires a call to WindowManager.applyPending()
 fn updateKeyboardFocus(cursor: Cursor, result: Root.AtResult) void {
     switch (result.data) {
         .window => |window| {
@@ -509,7 +509,7 @@ fn handleTouchDown(
         }
     }
 
-    server.root.applyPending();
+    server.wm.applyPending();
 }
 
 fn handleTouchMotion(
@@ -796,7 +796,7 @@ fn enterMode(cursor: *Cursor, mode: Mode, window: *Window, xcursor_name: [*:0]co
     cursor.seat.wlr_seat.pointerNotifyClearFocus();
     cursor.setXcursor(xcursor_name);
 
-    server.root.applyPending();
+    server.wm.applyPending();
 }
 
 fn processMotion(cursor: *Cursor, device: *wlr.InputDevice, time: u32, delta_x: f64, delta_y: f64, unaccel_dx: f64, unaccel_dy: f64) void {
@@ -853,7 +853,7 @@ fn processMotion(cursor: *Cursor, device: *wlr.InputDevice, time: u32, delta_x: 
 
             data.window.pending.move(@intFromFloat(dx), @intFromFloat(dy));
 
-            server.root.applyPending();
+            server.wm.applyPending();
         },
         .resize => |*data| {
             dx += data.delta_x;
@@ -906,7 +906,7 @@ fn processMotion(cursor: *Cursor, device: *wlr.InputDevice, time: u32, delta_x: 
                 data.y = box.height - data.initial_height;
             }
 
-            server.root.applyPending();
+            server.wm.applyPending();
         },
     }
 }
@@ -948,7 +948,7 @@ pub fn updateState(cursor: *Cursor) void {
                 .passthrough, .down => {},
                 inline .move, .resize => |data, mode| {
 
-                    // These conditions are checked in Root.applyPending()
+                    // These conditions are checked in WindowManager.applyPending()
                     assert(!data.window.current.fullscreen);
 
                     // Keep the cursor locked to the original offset from the edges of the window.

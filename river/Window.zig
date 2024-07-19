@@ -131,7 +131,7 @@ destroying: bool = false,
 /// to be applied as a single atomic transaction across all clients as soon as any
 /// in progress transaction has been completed.
 ///
-/// Any time pending state is modified Root.applyPending() must be called
+/// Any time pending state is modified WindowManager.applyPending() must be called
 /// before yielding back to the event loop.
 pending: State = .{},
 pending_render_list_link: wl.list.Link,
@@ -153,10 +153,10 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
     const window = try util.gpa.create(Window);
     errdefer util.gpa.destroy(window);
 
-    const tree = try server.root.hidden.tree.createSceneTree();
+    const tree = try server.root.hidden_tree.createSceneTree();
     errdefer tree.node.destroy();
 
-    const popup_tree = try server.root.hidden.tree.createSceneTree();
+    const popup_tree = try server.root.hidden_tree.createSceneTree();
     errdefer popup_tree.node.destroy();
 
     window.* = .{
@@ -177,9 +177,9 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
         .inflight_render_list_link = undefined,
     };
 
-    server.root.windows.prepend(window);
-    server.root.hidden.pending.render_list.prepend(window);
-    server.root.hidden.inflight.render_list.prepend(window);
+    server.wm.windows.prepend(window);
+    server.wm.pending.render_list.prepend(window);
+    server.wm.inflight.render_list.prepend(window);
 
     window.tree.node.setEnabled(false);
     window.popup_tree.node.setEnabled(false);
@@ -492,7 +492,7 @@ pub fn map(window: *Window) !void {
 
     window.foreign_toplevel_handle.map();
 
-    server.root.applyPending();
+    server.wm.applyPending();
 }
 
 /// Called by the impl when the surface will no longer be displayed
@@ -501,17 +501,15 @@ pub fn unmap(window: *Window) void {
 
     if (!window.saved_surface_tree.node.enabled) window.saveSurfaceTree();
 
-    {
-        window.pending_render_list_link.remove();
-        server.root.hidden.pending.render_list.prepend(window);
-    }
+    //window.pending_render_list_link.remove();
+    //server.root.hidden.pending.render_list.prepend(window);
 
     assert(window.mapped and !window.destroying);
     window.mapped = false;
 
     window.foreign_toplevel_handle.unmap();
 
-    server.root.applyPending();
+    server.wm.applyPending();
 }
 
 pub fn notifyTitle(window: *const Window) void {

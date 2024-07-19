@@ -52,31 +52,7 @@ layers: struct {
     override_redirect: if (build_options.xwayland) *wlr.SceneTree else void,
 },
 
-wm: struct {
-    pending: struct {
-        render_list: wl.list.Head(Window, .pending_render_list_link),
-    },
-
-    inflight: struct {
-        render_list: wl.list.Head(Window, .inflight_render_list_link),
-    },
-},
-
-/// This is kind of like an imaginary output where windows start and end their life.
-hidden: struct {
-    /// This tree is always disabled.
-    tree: *wlr.SceneTree,
-
-    pending: struct {
-        render_list: wl.list.Head(Window, .pending_render_list_link),
-    },
-
-    inflight: struct {
-        render_list: wl.list.Head(Window, .inflight_render_list_link),
-    },
-},
-
-windows: wl.list.Head(Window, .link),
+hidden_tree: *wlr.SceneTree,
 
 new_output: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleNewOutput),
 
@@ -107,13 +83,6 @@ all_outputs: wl.list.Head(Output, .all_link),
 /// it's turned off by dpms)
 active_outputs: wl.list.Head(Output, .active_link),
 
-/// Number of inflight configures sent in the current transaction.
-inflight_configures: u32 = 0,
-transaction_timeout: *wl.EventSource,
-/// Set to true if applyPending() is called while a transaction is inflight.
-/// If true when a transaction completes, causes applyPending() to be called again.
-pending_state_dirty: bool = false,
-
 pub fn init(root: *Root) !void {
     const output_layout = try wlr.OutputLayout.create(server.wl_server);
     errdefer output_layout.destroy();
@@ -129,10 +98,6 @@ pub fn init(root: *Root) !void {
     const outputs = try interactive_content.createSceneTree();
     const override_redirect = if (build_options.xwayland) try interactive_content.createSceneTree();
 
-    const event_loop = server.wl_server.getEventLoop();
-    const transaction_timeout = try event_loop.addTimer(*Root, handleTransactionTimeout, root);
-    errdefer transaction_timeout.remove();
-
     root.* = .{
         .scene = scene,
         .interactive_content = interactive_content,
@@ -141,41 +106,19 @@ pub fn init(root: *Root) !void {
             .outputs = outputs,
             .override_redirect = override_redirect,
         },
-        .wm = .{
-            .pending = .{
-                .render_list = undefined,
-            },
-            .inflight = .{
-                .render_list = undefined,
-            },
-        },
-        .hidden = .{
-            .tree = hidden_tree,
-            .pending = .{
-                .render_list = undefined,
-            },
-            .inflight = .{
-                .render_list = undefined,
-            },
-        },
-        .windows = undefined,
         .output_layout = output_layout,
         .all_outputs = undefined,
         .active_outputs = undefined,
+
+        .hidden_tree = hidden_tree,
 
         .presentation = try wlr.Presentation.create(server.wl_server, server.backend),
         .xdg_output_manager = try wlr.XdgOutputManagerV1.create(server.wl_server, output_layout),
         .output_manager = try wlr.OutputManagerV1.create(server.wl_server),
         .power_manager = try wlr.OutputPowerManagerV1.create(server.wl_server),
         .gamma_control_manager = try wlr.GammaControlManagerV1.create(server.wl_server),
-        .transaction_timeout = transaction_timeout,
     };
-    root.wm.pending.render_list.init();
-    root.wm.inflight.render_list.init();
-    root.hidden.pending.render_list.init();
-    root.hidden.inflight.render_list.init();
 
-    root.windows.init();
     root.all_outputs.init();
     root.active_outputs.init();
 
@@ -189,7 +132,6 @@ pub fn init(root: *Root) !void {
 
 pub fn deinit(root: *Root) void {
     root.output_layout.destroy();
-    root.transaction_timeout.remove();
 }
 
 pub const AtResult = struct {
@@ -307,160 +249,6 @@ pub fn activateOutput(root: *Root, output: *Output) void {
     };
 }
 
-/// Trigger asynchronous application of pending state for all outputs and windows.
-/// Changes will not be applied to the scene graph until the layout generator
-/// generates a new layout for all outputs and all affected clients ack a
-/// configure and commit a new buffer.
-pub fn applyPending(root: *Root) void {
-    {
-        // Changes to the pending state may require a focus update to keep
-        // state consistent. Instead of having focus(null) calls spread all
-        // around the codebase and risk forgetting one, always ensure focus
-        // state is synchronized here.
-        var it = server.input_manager.seats.first;
-        while (it) |node| : (it = node.next) node.data.focus(null);
-    }
-
-    // If there is already a transaction inflight, wait until it completes.
-    if (root.inflight_configures > 0) {
-        root.pending_state_dirty = true;
-        return;
-    }
-    root.pending_state_dirty = false;
-
-    {
-        var it = root.hidden.pending.render_list.iterator(.forward);
-        while (it.next()) |window| {
-            window.inflight_render_list_link.remove();
-            root.hidden.inflight.render_list.append(window);
-        }
-    }
-
-    {
-        var it = server.input_manager.seats.first;
-        while (it) |node| : (it = node.next) {
-            const cursor = &node.data.cursor;
-
-            switch (cursor.mode) {
-                .passthrough, .down => {},
-                inline .move, .resize => |data| {
-                    if (data.window.inflight.fullscreen) {
-                        cursor.mode = .passthrough;
-                        data.window.pending.resizing = false;
-                        data.window.inflight.resizing = false;
-                    }
-                },
-            }
-
-            cursor.inflight_mode = cursor.mode;
-        }
-    }
-
-    root.sendConfigures();
-}
-
-fn sendConfigures(root: *Root) void {
-    assert(root.inflight_configures == 0);
-
-    {
-        var it = root.wm.inflight.render_list.iterator(.forward);
-        while (it.next()) |window| {
-            assert(!window.inflight_transaction);
-            window.inflight_transaction = true;
-
-            // This can happen if a window is unmapped while a layout demand including it is inflight
-            // If a window has been unmapped, don't send it a configure.
-            if (!window.mapped) continue;
-
-            if (window.configure()) {
-                root.inflight_configures += 1;
-
-                window.saveSurfaceTree();
-                window.sendFrameDone();
-            }
-        }
-    }
-
-    if (root.inflight_configures > 0) {
-        std.log.scoped(.transaction).debug("started transaction with {} pending configure(s)", .{
-            root.inflight_configures,
-        });
-
-        root.transaction_timeout.timerUpdate(100) catch {
-            std.log.scoped(.transaction).err("failed to update timer", .{});
-            root.commitTransaction();
-        };
-    } else {
-        root.commitTransaction();
-    }
-}
-
-fn handleTransactionTimeout(root: *Root) c_int {
-    std.log.scoped(.transaction).err("timeout occurred, some imperfect frames may be shown", .{});
-
-    root.inflight_configures = 0;
-    root.commitTransaction();
-
-    return 0;
-}
-
-pub fn notifyConfigured(root: *Root) void {
-    root.inflight_configures -= 1;
-    if (root.inflight_configures == 0) {
-        // Disarm the timer, as we didn't timeout
-        root.transaction_timeout.timerUpdate(0) catch std.log.scoped(.transaction).err("error disarming timer", .{});
-        root.commitTransaction();
-    }
-}
-
-/// Apply the inflight state and drop stashed buffers. This means that
-/// the next frame drawn will be the post-transaction state of the
-/// layout. Should only be called after all clients have configured for
-/// the new layout. If called early imperfect frames may be drawn.
-fn commitTransaction(root: *Root) void {
-    assert(root.inflight_configures == 0);
-
-    std.log.scoped(.transaction).debug("commiting transaction", .{});
-
-    {
-        var it = root.hidden.inflight.render_list.safeIterator(.forward);
-        while (it.next()) |window| {
-            window.tree.node.reparent(root.hidden.tree);
-            window.popup_tree.node.reparent(root.hidden.tree);
-        }
-    }
-
-    {
-        var it = root.wm.inflight.render_list.iterator(.forward);
-        while (it.next()) |window| {
-            window.commitTransaction();
-
-            window.tree.node.setEnabled(true);
-            window.popup_tree.node.setEnabled(true);
-        }
-    }
-
-    {
-        var it = server.input_manager.seats.first;
-        while (it) |node| : (it = node.next) node.data.cursor.updateState();
-    }
-
-    {
-        // This must be done after updating cursor state in case the window was the target of move/resize.
-        var it = root.hidden.inflight.render_list.safeIterator(.forward);
-        while (it.next()) |window| {
-            window.dropSavedSurfaceTree();
-            if (window.destroying) window.destroy(.assert);
-        }
-    }
-
-    server.idle_inhibit_manager.checkActive();
-
-    if (root.pending_state_dirty) {
-        root.applyPending();
-    }
-}
-
 // We need this listener to deal with outputs that have their position auto-configured
 // by the wlr_output_layout.
 fn handleLayoutChange(listener: *wl.Listener(*wlr.OutputLayout), _: *wlr.OutputLayout) void {
@@ -571,7 +359,7 @@ fn processOutputConfig(
         }
     }
 
-    if (action == .apply) root.applyPending();
+    if (action == .apply) server.wm.applyPending();
 
     if (success) {
         config.sendSucceeded();

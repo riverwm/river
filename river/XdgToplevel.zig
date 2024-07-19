@@ -381,7 +381,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
             switch (toplevel.configure_state) {
                 .acked => {
                     toplevel.configure_state = .committed;
-                    server.root.notifyConfigured();
+                    server.wm.notifyConfigured();
                 },
                 .timed_out_acked => {
                     toplevel.configure_state = .idle;
@@ -400,7 +400,7 @@ fn handleRequestFullscreen(listener: *wl.Listener(void)) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("request_fullscreen", listener);
     if (toplevel.window.pending.fullscreen != toplevel.wlr_toplevel.requested.fullscreen) {
         toplevel.window.pending.fullscreen = toplevel.wlr_toplevel.requested.fullscreen;
-        server.root.applyPending();
+        server.wm.applyPending();
     }
 }
 

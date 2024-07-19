@@ -218,7 +218,7 @@ fn handleUnlock(listener: *wl.Listener(void)) void {
 
     handleDestroy(&manager.destroy);
 
-    server.root.applyPending();
+    server.wm.applyPending();
 }
 
 fn handleDestroy(listener: *wl.Listener(void)) void {

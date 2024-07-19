@@ -108,7 +108,7 @@ fn handleMap(listener: *wl.Listener(void)) void {
         if (consider) layer_surface else null,
     );
 
-    server.root.applyPending();
+    server.wm.applyPending();
 }
 
 fn handleUnmap(listener: *wl.Listener(void)) void {
@@ -118,7 +118,7 @@ fn handleUnmap(listener: *wl.Listener(void)) void {
 
     layer_surface.output.arrangeLayers();
     handleKeyboardInteractiveExclusive(layer_surface.output, null);
-    server.root.applyPending();
+    server.wm.applyPending();
 }
 
 fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
@@ -138,13 +138,13 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     {
         layer_surface.output.arrangeLayers();
         handleKeyboardInteractiveExclusive(layer_surface.output, null);
-        server.root.applyPending();
+        server.wm.applyPending();
     }
 }
 
 /// Focus topmost keyboard-interactivity-exclusive layer surface above normal
 /// content, or if none found, focus the surface given as `consider`.
-/// Requires a call to Root.applyPending()
+/// Requires a call to WindowManager.applyPending()
 fn handleKeyboardInteractiveExclusive(output: *Output, consider: ?*LayerSurface) void {
     if (server.lock_manager.state != .unlocked) return;
 

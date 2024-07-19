@@ -79,6 +79,6 @@ fn handleRequestMode(
 
     if (window.pending.ssd != ssd) {
         window.pending.ssd = ssd;
-        server.root.applyPending();
+        server.wm.applyPending();
     }
 }

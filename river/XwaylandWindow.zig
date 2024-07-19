@@ -229,7 +229,7 @@ fn handleRequestConfigure(
     // Allow xwayland windows to set their own dimensions (but not position) if floating
     xwayland_window.window.pending.box.width = event.width;
     xwayland_window.window.pending.box.height = event.height;
-    server.root.applyPending();
+    server.wm.applyPending();
 }
 
 fn handleSetOverrideRedirect(listener: *wl.Listener(void)) void {
@@ -272,7 +272,7 @@ fn handleSetDecorations(listener: *wl.Listener(void)) void {
 
     if (window.pending.ssd != ssd) {
         window.pending.ssd = ssd;
-        server.root.applyPending();
+        server.wm.applyPending();
     }
 }
 
@@ -280,7 +280,7 @@ fn handleRequestFullscreen(listener: *wl.Listener(void)) void {
     const xwayland_window: *XwaylandWindow = @fieldParentPtr("request_fullscreen", listener);
     if (xwayland_window.window.pending.fullscreen != xwayland_window.xwayland_surface.fullscreen) {
         xwayland_window.window.pending.fullscreen = xwayland_window.xwayland_surface.fullscreen;
-        server.root.applyPending();
+        server.wm.applyPending();
     }
 }
 
