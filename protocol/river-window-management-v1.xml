@@ -364,6 +364,8 @@
         summary="client side decoration preferred, both CSD and SSD supported"/>
       <entry name="prefers_ssd" value="2"
         summary="server side decoration preferred, both CSD and SSD supported"/>
+      <entry name="no_preference" value="3"
+        summary="no preference, both CSD and SSD supported"/>
     </enum>
 
     <event name="decoration_hint">
