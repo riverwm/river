@@ -192,9 +192,20 @@
       This represents a logical window. For example, a window may correspond to
       an xdg_toplevel or Xwayland window.
 
-      A newly created window will not be displayed until the window manager
-      client makes a river_window_v1.propose_dimensions request and the
-      following river_window_manager_v1.commit request.
+      A newly created window will not be displayed until the window manager:
+      1. proposes window dimensions (river_window_v1.propose_dimensions)
+      2. places the window in the render list (river_node_v1.place_above/below)
+      3. commits the pending state (river_window_manager_v1.commit)
+
+      It is a protocol error to commit proposed dimensions without placing the new
+      window in the render list or vice versa.
+
+      The window manager should make this initial commit for new windows as soon
+      as possible after receiving the corresponding update event.
+
+      TODO:
+        - size hints (including unset state)
+        - window cropping
     </description>
 
     <request name="destroy" type="destructor">
@@ -280,6 +291,9 @@
         Request that the window be hidden. Has no effect if the window is already
         hidden. Hides any window borders and decorations as well.
 
+        Newly created windows are considered shown unless explicitly hidden with
+        the hide request.
+
         This request is double-buffered state and will not be applied until the
         next river_window_manager_v1.commit request.
       </description>
@@ -290,6 +304,9 @@
         Request that the window be shown. Has no effect if the window is not
         hidden. Does not guarantee that the window is visible as it may be
         completely obscured by other windows placed above it for example.
+
+        Newly created windows are considered shown unless explicitly hidden with
+        the hide request.
 
         This request is double-buffered state and will not be applied until the
         next river_window_manager_v1.commit request.
