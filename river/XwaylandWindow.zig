@@ -182,10 +182,15 @@ pub fn handleMap(listener: *wl.Listener(void)) void {
     window.inflight.box = window.pending.box;
     window.current.box = window.pending.box;
 
-    // This will be overwritten in Window.map() if the window is matched by a rule.
-    window.pending.ssd = !xwayland_surface.decorations.no_border;
+    if (xwayland_surface.decorations.no_border or
+        xwayland_surface.decorations.no_title)
+    {
+        window.pending.decoration_hint = .prefers_csd;
+    } else {
+        window.pending.decoration_hint = .prefers_ssd;
+    }
 
-    window.pending.fullscreen = xwayland_surface.fullscreen;
+    window.pending.fullscreen_requested = xwayland_surface.fullscreen;
 
     window.map() catch {
         log.err("out of memory", .{});
@@ -268,18 +273,24 @@ fn handleSetDecorations(listener: *wl.Listener(void)) void {
     const xwayland_window: *XwaylandWindow = @fieldParentPtr("set_decorations", listener);
     const window = xwayland_window.window;
 
-    const ssd = !xwayland_window.xwayland_surface.decorations.no_border;
-
-    if (window.pending.ssd != ssd) {
-        window.pending.ssd = ssd;
-        server.wm.applyPending();
+    if (xwayland_window.xwayland_surface.decorations.no_border or
+        xwayland_window.xwayland_surface.decorations.no_title)
+    {
+        window.pending.decoration_hint = .prefers_csd;
+    } else {
+        window.pending.decoration_hint = .prefers_ssd;
     }
+
+    server.wm.applyPending();
 }
 
 fn handleRequestFullscreen(listener: *wl.Listener(void)) void {
     const xwayland_window: *XwaylandWindow = @fieldParentPtr("request_fullscreen", listener);
-    if (xwayland_window.window.pending.fullscreen != xwayland_window.xwayland_surface.fullscreen) {
-        xwayland_window.window.pending.fullscreen = xwayland_window.xwayland_surface.fullscreen;
+    const window = xwayland_window.window;
+    const xwayland_surface = xwayland_window.xwayland_surface;
+
+    if (window.pending.fullscreen_requested != xwayland_surface.fullscreen) {
+        window.pending.fullscreen_requested = xwayland_surface.fullscreen;
         server.wm.applyPending();
     }
 }

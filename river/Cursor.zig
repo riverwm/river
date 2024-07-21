@@ -851,7 +851,7 @@ fn processMotion(cursor: *Cursor, device: *wlr.InputDevice, time: u32, delta_x: 
             data.delta_x = dx - @trunc(dx);
             data.delta_y = dy - @trunc(dy);
 
-            data.window.pending.move(@intFromFloat(dx), @intFromFloat(dy));
+            // XXX move window
 
             server.wm.applyPending();
         },
@@ -863,6 +863,8 @@ fn processMotion(cursor: *Cursor, device: *wlr.InputDevice, time: u32, delta_x: 
 
             data.x += @intFromFloat(dx);
             data.y += @intFromFloat(dy);
+
+            if (true) return; // XXX resize window
 
             // Modify width/height of the pending box, taking constraints into account
             // The x/y coordinates of the window will be adjusted as needed in Window.resizeCommit()

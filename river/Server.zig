@@ -406,17 +406,12 @@ fn handleNewXwaylandSurface(_: *wl.Listener(*wlr.XwaylandSurface), xwayland_surf
 }
 
 fn handleRequestActivate(
-    listener: *wl.Listener(*wlr.XdgActivationV1.event.RequestActivate),
+    _: *wl.Listener(*wlr.XdgActivationV1.event.RequestActivate),
     event: *wlr.XdgActivationV1.event.RequestActivate,
 ) void {
-    const server: *Server = @fieldParentPtr("request_activate", listener);
-
     const node_data = SceneNodeData.fromSurface(event.surface) orelse return;
     switch (node_data.data) {
-        .window => |window| if (window.pending.focus == 0) {
-            window.pending.urgent = true;
-            server.wm.applyPending();
-        },
+        .window => |_| {}, // XXX
         else => |tag| {
             log.info("ignoring xdg-activation-v1 activate request of {s} surface", .{@tagName(tag)});
         },

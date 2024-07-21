@@ -172,7 +172,7 @@ pub fn setFocusRaw(seat: *Seat, new_focus: FocusTarget) void {
     // First clear the current focus
     switch (seat.focused) {
         .window => |window| {
-            window.pending.focus -= 1;
+            //window.pending.focus -= 1; XXX update focus to send activated state
             window.destroyPopups();
         },
         .layer => |layer_surface| {
@@ -183,10 +183,9 @@ pub fn setFocusRaw(seat: *Seat, new_focus: FocusTarget) void {
 
     // Set the new focus
     switch (new_focus) {
-        .window => |target_window| {
+        .window => |_| {
             assert(server.lock_manager.state != .locked);
-            target_window.pending.focus += 1;
-            target_window.pending.urgent = false;
+            //target_window.pending.focus += 1; XXX update focus to send activated state
         },
         .layer => assert(server.lock_manager.state != .locked),
         .lock_surface => assert(server.lock_manager.state != .unlocked),

@@ -23,6 +23,7 @@ const math = std.math;
 const posix = std.posix;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
+const river = @import("wayland").server.river;
 
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
@@ -65,48 +66,20 @@ pub const State = struct {
     urgent: bool = false,
     ssd: bool = false,
     resizing: bool = false,
-
-    /// Modify the x/y of the given state by delta_x/delta_y, clamping to the
-    /// bounds of the output.
-    pub fn move(state: *State, delta_x: i32, delta_y: i32) void {
-        const border_width = if (state.ssd) server.config.border_width else 0;
-
-        const output_width = math.maxInt(i32);
-        const output_height = math.maxInt(i32);
-
-        const max_x = output_width - state.box.width - border_width;
-        state.box.x += delta_x;
-        state.box.x = @max(state.box.x, border_width);
-        state.box.x = @min(state.box.x, max_x);
-        state.box.x = @max(state.box.x, 0);
-
-        const max_y = output_height - state.box.height - border_width;
-        state.box.y += delta_y;
-        state.box.y = @max(state.box.y, border_width);
-        state.box.y = @min(state.box.y, max_y);
-        state.box.y = @max(state.box.y, 0);
-    }
-
-    pub fn clampToOutput(state: *State) void {
-        const output = state.output orelse return;
-
-        var output_width: i32 = undefined;
-        var output_height: i32 = undefined;
-        output.wlr_output.effectiveResolution(&output_width, &output_height);
-
-        const border_width = if (state.ssd) server.config.border_width else 0;
-        state.box.width = @min(state.box.width, output_width - (2 * border_width));
-        state.box.height = @min(state.box.height, output_height - (2 * border_width));
-
-        state.move(0, 0);
-    }
 };
+
+/// The window management protocol object for this window
+/// If the window is unmapped the "closed" event is sent to the current object.
+/// If the window is remapped a new object is created and sent to the window manager.
+object: ?*river.WindowV1,
 
 /// The implementation of this window
 impl: Impl,
 
-/// Link for Root.windows
+/// Link for WindowManager.windows
 link: wl.list.Link,
+/// Link for WindowManager.pending_to_wm.new_windows
+link_new: wl.list.Link,
 
 tree: *wlr.SceneTree,
 surface_tree: *wlr.SceneTree,
@@ -125,20 +98,22 @@ inflight_transaction: bool = false,
 /// transaction completes. See Window.destroy()
 destroying: bool = false,
 
-/// The state of the window that is directly acted upon/modified through user input.
-///
-/// Pending state will be copied to the inflight state and communicated to clients
-/// to be applied as a single atomic transaction across all clients as soon as any
-/// in progress transaction has been completed.
-///
-/// Any time pending state is modified WindowManager.applyPending() must be called
-/// before yielding back to the event loop.
-pending: State = .{},
-pending_render_list_link: wl.list.Link,
+pending: struct {
+    box: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
 
-/// The state most recently sent to the layout generator and clients.
-/// This state is immutable until all clients have replied and the transaction
-/// is completed, at which point this inflight state is copied to current.
+    decoration_hint: river.WindowV1.DecorationHint = .only_supports_csd,
+    /// TODO output hint
+    fullscreen_requested: bool = false,
+
+    resizing: bool = false,
+} = .{},
+
+uncommitted: struct {} = .{},
+uncommitted_render_list_link: wl.list.Link,
+
+committed: struct {} = .{},
+committed_render_list_link: wl.list.Link,
+
 inflight: State = .{},
 inflight_render_list_link: wl.list.Link,
 
@@ -153,6 +128,13 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
     const window = try util.gpa.create(Window);
     errdefer util.gpa.destroy(window);
 
+    const object = blk: {
+        const wm_v1 = server.wm.object orelse break :blk null;
+        break :blk river.WindowV1.create(wm_v1.getClient(), wm_v1.getVersion(), 0) catch
+            return error.OutOfMemory;
+    };
+    errdefer if (object) |o| o.destroy();
+
     const tree = try server.root.hidden_tree.createSceneTree();
     errdefer tree.node.destroy();
 
@@ -160,8 +142,10 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
     errdefer popup_tree.node.destroy();
 
     window.* = .{
+        .object = object,
         .impl = impl,
         .link = undefined,
+        .link_new = undefined,
         .tree = tree,
         .surface_tree = try tree.createSceneTree(),
         .saved_surface_tree = try tree.createSceneTree(),
@@ -173,13 +157,17 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
         },
         .popup_tree = popup_tree,
 
-        .pending_render_list_link = undefined,
+        .uncommitted_render_list_link = undefined,
+        .committed_render_list_link = undefined,
         .inflight_render_list_link = undefined,
     };
 
     server.wm.windows.prepend(window);
-    server.wm.pending.render_list.prepend(window);
-    server.wm.inflight.render_list.prepend(window);
+    server.wm.pending.new_windows.prepend(window);
+
+    window.uncommitted_render_list_link.init();
+    window.committed_render_list_link.init();
+    window.inflight_render_list_link.init();
 
     window.tree.node.setEnabled(false);
     window.popup_tree.node.setEnabled(false);
@@ -208,8 +196,12 @@ pub fn destroy(window: *Window, when: enum { lazy, assert }) void {
         window.popup_tree.node.destroy();
 
         window.link.remove();
-        window.pending_render_list_link.remove();
+        window.link_new.remove();
+        window.uncommitted_render_list_link.remove();
+        window.committed_render_list_link.remove();
         window.inflight_render_list_link.remove();
+
+        // XXX destroy object?
 
         util.gpa.destroy(window);
     } else {

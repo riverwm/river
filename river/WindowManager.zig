@@ -31,18 +31,28 @@ const log = std.log.scoped(.wm);
 global: *wl.Global,
 server_destroy: wl.Listener(*wl.Server) = wl.Listener(*wl.Server).init(handleServerDestroy),
 
-/// The active window manager, if any.
-wm_v1: ?*river.WindowManagerV1 = null,
+/// The protocol object of the active window manager, if any.
+object: ?*river.WindowManagerV1 = null,
 
 windows: wl.list.Head(Window, .link),
 
-/// Pending state sent by the window manager but not yet committed
-/// TODO maybe need to split this into uncommitted and committed but not yet part of transaction
+/// Pending state from windows to be sent to the wm in the next update sequence.
 pending: struct {
-    render_list: wl.list.Head(Window, .pending_render_list_link),
+    new_windows: wl.list.Head(Window, .link_new),
 },
 
-/// Committed state from the window manager that is part of the current transaction.
+/// State sent by the wm but not yet committed with a commit request.
+uncommitted: struct {
+    render_list: wl.list.Head(Window, .uncommitted_render_list_link),
+},
+
+/// State sent by the wm and committed with a commit request.
+committed: struct {
+    render_list: wl.list.Head(Window, .committed_render_list_link),
+},
+
+/// State committed by the wm that has been sent to windows as part of the
+/// current transaction.
 inflight: struct {
     render_list: wl.list.Head(Window, .inflight_render_list_link),
 },
@@ -63,6 +73,12 @@ pub fn init(wm: *WindowManager) !void {
         .global = try wl.Global.create(server.wl_server, river.WindowManagerV1, 1, *WindowManager, wm, bind),
         .windows = undefined,
         .pending = .{
+            .new_windows = undefined,
+        },
+        .uncommitted = .{
+            .render_list = undefined,
+        },
+        .committed = .{
             .render_list = undefined,
         },
         .inflight = .{
@@ -71,6 +87,10 @@ pub fn init(wm: *WindowManager) !void {
         .transaction_timeout = transaction_timeout,
     };
     wm.windows.init();
+    wm.pending.new_windows.init();
+    wm.uncommitted.render_list.init();
+    wm.committed.render_list.init();
+    wm.inflight.render_list.init();
 
     server.wl_server.addDestroyListener(&wm.server_destroy);
 }
@@ -83,41 +103,41 @@ fn handleServerDestroy(listener: *wl.Listener(*wl.Server), _: *wl.Server) void {
 }
 
 fn bind(client: *wl.Client, wm: *WindowManager, version: u32, id: u32) void {
-    const wm_v1 = river.WindowManagerV1.create(client, version, id) catch {
+    const object = river.WindowManagerV1.create(client, version, id) catch {
         client.postNoMemory();
         log.err("out of memory", .{});
         return;
     };
 
-    if (wm.wm_v1 != null) {
-        wm_v1.sendUnavailable();
-        wm_v1.setHandler(?*anyopaque, handleRequestInert, null, null);
+    if (wm.object != null) {
+        object.sendUnavailable();
+        object.setHandler(?*anyopaque, handleRequestInert, null, null);
         return;
     }
 
-    wm.wm_v1 = wm_v1;
-    wm_v1.setHandler(*WindowManager, handleRequest, null, wm);
+    wm.object = object;
+    object.setHandler(*WindowManager, handleRequest, null, wm);
 }
 
 fn handleRequestInert(
-    wm_v1: *river.WindowManagerV1,
+    object: *river.WindowManagerV1,
     request: river.WindowManagerV1.Request,
     _: ?*anyopaque,
 ) void {
-    if (request == .destroy) wm_v1.destroy();
+    if (request == .destroy) object.destroy();
 }
 
 fn handleRequest(
-    wm_v1: *river.WindowManagerV1,
+    object: *river.WindowManagerV1,
     request: river.WindowManagerV1.Request,
     wm: *WindowManager,
 ) void {
-    assert(wm.wm_v1 == wm_v1);
+    assert(wm.object == object);
     switch (request) {
         .stop => {
-            wm.wm_v1 = null;
-            wm_v1.sendFinished();
-            wm_v1.setHandler(?*anyopaque, handleRequestInert, null, null);
+            wm.object = null;
+            object.sendFinished();
+            object.setHandler(?*anyopaque, handleRequestInert, null, null);
         },
         .destroy => {
             // XXX send protocol error

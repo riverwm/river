@@ -90,14 +90,13 @@ fn handleForeignActivate(
 }
 
 fn handleForeignFullscreen(
-    listener: *wl.Listener(*wlr.ForeignToplevelHandleV1.event.Fullscreen),
-    event: *wlr.ForeignToplevelHandleV1.event.Fullscreen,
+    _: *wl.Listener(*wlr.ForeignToplevelHandleV1.event.Fullscreen),
+    _: *wlr.ForeignToplevelHandleV1.event.Fullscreen,
 ) void {
-    const handle: *ForeignToplevelHandle = @fieldParentPtr("foreign_fullscreen", listener);
-    const window: *Window = @fieldParentPtr("foreign_toplevel_handle", handle);
+    //const handle: *ForeignToplevelHandle = @fieldParentPtr("foreign_fullscreen", listener);
+    //const window: *Window = @fieldParentPtr("foreign_toplevel_handle", handle);
 
-    window.pending.fullscreen = event.fullscreen;
-    server.wm.applyPending();
+    // XXX Can I just delete this protocol?
 }
 
 fn handleForeignClose(

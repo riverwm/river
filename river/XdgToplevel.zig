@@ -243,7 +243,7 @@ fn handleMap(listener: *wl.Listener(void)) void {
     window.inflight.box = window.pending.box;
     window.current.box = window.pending.box;
 
-    toplevel.window.pending.fullscreen = toplevel.wlr_toplevel.requested.fullscreen;
+    toplevel.window.pending.fullscreen_requested = toplevel.wlr_toplevel.requested.fullscreen;
 
     window.map() catch {
         log.err("out of memory", .{});
@@ -298,12 +298,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     if (toplevel.wlr_toplevel.base.initial_commit) {
         _ = toplevel.wlr_toplevel.setWmCapabilities(.{ .fullscreen = true });
 
-        if (toplevel.decoration) |decoration| {
-            const ssd = true;
-            _ = decoration.wlr_decoration.setMode(if (ssd) .server_side else .client_side);
-            toplevel.window.pending.ssd = ssd;
-        }
-
+        // XXX I think this is where we actually want to send the new window event.
         return;
     }
 
@@ -398,8 +393,8 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
 /// for now, perhaps it should be denied in some cases in the future.
 fn handleRequestFullscreen(listener: *wl.Listener(void)) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("request_fullscreen", listener);
-    if (toplevel.window.pending.fullscreen != toplevel.wlr_toplevel.requested.fullscreen) {
-        toplevel.window.pending.fullscreen = toplevel.wlr_toplevel.requested.fullscreen;
+    if (toplevel.window.pending.fullscreen_requested != toplevel.wlr_toplevel.requested.fullscreen) {
+        toplevel.window.pending.fullscreen_requested = toplevel.wlr_toplevel.requested.fullscreen;
         server.wm.applyPending();
     }
 }
@@ -409,33 +404,23 @@ fn handleRequestMove(
     event: *wlr.XdgToplevel.event.Move,
 ) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("request_move", listener);
+    _ = toplevel;
     const seat: *Seat = @ptrFromInt(event.seat.seat.data);
-    const window = toplevel.window;
-
-    if (window.pending.fullscreen) return;
 
     // Moving windows with touch or tablet tool is not yet supported.
     if (seat.wlr_seat.validatePointerGrabSerial(null, event.serial)) {
-        switch (seat.cursor.mode) {
-            .passthrough, .down => seat.cursor.startMove(window),
-            .move, .resize => {},
-        }
+        // XXX queue pointer_move_requested, applyPending()
     }
 }
 
 fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), event: *wlr.XdgToplevel.event.Resize) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("request_resize", listener);
+    _ = toplevel;
     const seat: *Seat = @ptrFromInt(event.seat.seat.data);
-    const window = toplevel.window;
-
-    if (window.pending.fullscreen) return;
 
     // Resizing windows with touch or tablet tool is not yet supported.
     if (seat.wlr_seat.validatePointerGrabSerial(null, event.serial)) {
-        switch (seat.cursor.mode) {
-            .passthrough, .down => seat.cursor.startResize(window, event.edges),
-            .move, .resize => {},
-        }
+        // XXX queue pointer_resize_requested, applyPending()
     }
 }
 
