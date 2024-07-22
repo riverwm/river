@@ -97,6 +97,8 @@ xwayland: if (build_options.xwayland) ?*wlr.Xwayland else void = if (build_optio
 new_xwayland_surface: if (build_options.xwayland) wl.Listener(*wlr.XwaylandSurface) else void =
     if (build_options.xwayland) wl.Listener(*wlr.XwaylandSurface).init(handleNewXwaylandSurface),
 
+renderer_lost: wl.Listener(void) = wl.Listener(void).init(handleRendererLost),
+
 new_xdg_toplevel: wl.Listener(*wlr.XdgToplevel) =
     wl.Listener(*wlr.XdgToplevel).init(handleNewXdgToplevel),
 new_toplevel_decoration: wl.Listener(*wlr.XdgToplevelDecorationV1) =
@@ -191,6 +193,7 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
     try server.idle_inhibit_manager.init();
     try server.lock_manager.init();
 
+    server.renderer.events.lost.add(&server.renderer_lost);
     server.xdg_shell.events.new_toplevel.add(&server.new_xdg_toplevel);
     server.xdg_decoration_manager.events.new_toplevel_decoration.add(&server.new_toplevel_decoration);
     server.layer_shell.events.new_surface.add(&server.new_layer_surface);
@@ -205,6 +208,7 @@ pub fn deinit(server: *Server) void {
     server.sigint_source.remove();
     server.sigterm_source.remove();
 
+    server.renderer_lost.link.remove();
     server.new_xdg_toplevel.link.remove();
     server.new_toplevel_decoration.link.remove();
     server.new_layer_surface.link.remove();
@@ -340,6 +344,49 @@ fn blocklist(server: *Server, global: *const wl.Global) bool {
 fn terminate(_: c_int, wl_server: *wl.Server) c_int {
     wl_server.terminate();
     return 0;
+}
+
+fn handleRendererLost(listener: *wl.Listener(void)) void {
+    const server: *Server = @fieldParentPtr("renderer_lost", listener);
+
+    log.info("recovering from GPU reset", .{});
+
+    // There's not much that can be done if creating a new renderer or allocator fails.
+    // With luck there might be another GPU reset after which we try again and succeed.
+
+    server.recoverFromGpuReset() catch |err| switch (err) {
+        error.RendererCreateFailed => log.err("failed to create new renderer after GPU reset", .{}),
+        error.AllocatorCreateFailed => log.err("failed to create new allocator after GPU reset", .{}),
+    };
+}
+
+fn recoverFromGpuReset(server: *Server) !void {
+    const new_renderer = try wlr.Renderer.autocreate(server.backend);
+    errdefer new_renderer.destroy();
+
+    const new_allocator = try wlr.Allocator.autocreate(server.backend, new_renderer);
+    errdefer comptime unreachable; // no failure allowed after this point
+
+    server.renderer_lost.link.remove();
+    new_renderer.events.lost.add(&server.renderer_lost);
+
+    server.compositor.setRenderer(new_renderer);
+
+    {
+        var it = server.root.all_outputs.iterator(.forward);
+        while (it.next()) |output| {
+            // This should never fail here as failure with this combination of
+            // renderer, allocator, and backend should have prevented creating
+            // the output in the first place.
+            _ = output.wlr_output.initRender(new_allocator, new_renderer);
+        }
+    }
+
+    server.renderer.destroy();
+    server.renderer = new_renderer;
+
+    server.allocator.destroy();
+    server.allocator = new_allocator;
 }
 
 fn handleNewXdgToplevel(_: *wl.Listener(*wlr.XdgToplevel), xdg_toplevel: *wlr.XdgToplevel) void {
