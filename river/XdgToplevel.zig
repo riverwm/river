@@ -395,7 +395,7 @@ fn handleRequestFullscreen(listener: *wl.Listener(void)) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("request_fullscreen", listener);
     if (toplevel.window.pending.fullscreen_requested != toplevel.wlr_toplevel.requested.fullscreen) {
         toplevel.window.pending.fullscreen_requested = toplevel.wlr_toplevel.requested.fullscreen;
-        server.wm.applyPending();
+        server.wm.dirtyPending();
     }
 }
 
@@ -409,7 +409,7 @@ fn handleRequestMove(
 
     // Moving windows with touch or tablet tool is not yet supported.
     if (seat.wlr_seat.validatePointerGrabSerial(null, event.serial)) {
-        // XXX queue pointer_move_requested, applyPending()
+        // XXX queue pointer_move_requested, dirtyPending()
     }
 }
 
@@ -420,7 +420,7 @@ fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), ev
 
     // Resizing windows with touch or tablet tool is not yet supported.
     if (seat.wlr_seat.validatePointerGrabSerial(null, event.serial)) {
-        // XXX queue pointer_resize_requested, applyPending()
+        // XXX queue pointer_resize_requested, dirtyPending()
     }
 }
 

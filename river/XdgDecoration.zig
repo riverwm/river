@@ -81,5 +81,5 @@ fn handleRequestMode(
         .server_side => window.pending.decoration_hint = .prefers_ssd,
     }
 
-    server.wm.applyPending();
+    server.wm.dirtyPending();
 }

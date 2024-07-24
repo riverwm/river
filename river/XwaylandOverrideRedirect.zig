@@ -176,7 +176,7 @@ fn handleUnmap(listener: *wl.Listener(void)) void {
         }
     }
 
-    server.wm.applyPending();
+    server.wm.dirtyPending();
 }
 
 fn handleSetGeometry(listener: *wl.Listener(void)) void {

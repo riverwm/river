@@ -129,7 +129,7 @@ pub fn deinit(seat: *Seat) void {
 
 /// Set the current focus. If a visible window is passed it will be focused.
 /// If null is passed, the top window in the stack of the focused output will be focused.
-/// Requires a call to WindowManager.applyPending()
+/// Requires a call to WindowManager.dirtyPending()
 pub fn focus(seat: *Seat, target: ?*Window) void {
     // Views may not receive focus while locked.
     if (server.lock_manager.state != .unlocked) return;

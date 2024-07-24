@@ -359,7 +359,7 @@ fn processOutputConfig(
         }
     }
 
-    if (action == .apply) server.wm.applyPending();
+    if (action == .apply) server.wm.dirtyPending();
 
     if (success) {
         config.sendSucceeded();

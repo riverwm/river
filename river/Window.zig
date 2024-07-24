@@ -484,7 +484,7 @@ pub fn map(window: *Window) !void {
 
     window.foreign_toplevel_handle.map();
 
-    server.wm.applyPending();
+    server.wm.dirtyPending();
 }
 
 /// Called by the impl when the surface will no longer be displayed
@@ -501,7 +501,7 @@ pub fn unmap(window: *Window) void {
 
     window.foreign_toplevel_handle.unmap();
 
-    server.wm.applyPending();
+    server.wm.dirtyPending();
 }
 
 pub fn notifyTitle(window: *const Window) void {

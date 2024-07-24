@@ -86,7 +86,7 @@ fn handleForeignActivate(
     const seat: *Seat = @ptrFromInt(event.seat.data);
 
     seat.focus(window);
-    server.wm.applyPending();
+    server.wm.dirtyPending();
 }
 
 fn handleForeignFullscreen(

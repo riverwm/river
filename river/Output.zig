@@ -237,7 +237,7 @@ pub fn layerSurfaceTree(output: Output, layer: zwlr.LayerShellV1.Layer) *wlr.Sce
 
 /// Arrange all layer surfaces of this output and adjust the usable area.
 /// Will arrange windows as well if the usable area changes.
-/// Requires a call to WindowManager.applyPending()
+/// Requires a call to WindowManager.dirtyPending()
 pub fn arrangeLayers(output: *Output) void {
     var full_box: wlr.Box = .{
         .x = 0,
@@ -329,7 +329,7 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
 
     server.root.handleOutputConfigChange() catch std.log.err("out of memory", .{});
 
-    server.wm.applyPending();
+    server.wm.dirtyPending();
 }
 
 fn handleRequestState(listener: *wl.Listener(*wlr.Output.event.RequestState), event: *wlr.Output.event.RequestState) void {
@@ -340,7 +340,7 @@ fn handleRequestState(listener: *wl.Listener(*wlr.Output.event.RequestState), ev
         return;
     };
 
-    server.wm.applyPending();
+    server.wm.dirtyPending();
 }
 
 // TODO double buffer output state changes for frame perfection and cleaner code.

@@ -36,8 +36,21 @@ object: ?*river.WindowManagerV1 = null,
 
 windows: wl.list.Head(Window, .link),
 
+state: union(enum) {
+    idle,
+    /// An update event was sent to the window manager but has not yet been acked.
+    /// Value is the update serial
+    update_sent: u32,
+    /// An update event was sent to the window manager and has been acked but not yet committed.
+    update_acked,
+    /// The number of configures sent that have not yet been ack'd
+    configures_inflight: u32,
+} = .idle,
+
 /// Pending state from windows to be sent to the wm in the next update sequence.
 pending: struct {
+    /// Pending state has been modified since the last update event sent to the wm.
+    dirty: bool = false,
     new_windows: wl.list.Head(Window, .link_new),
 },
 
@@ -48,6 +61,7 @@ uncommitted: struct {
 
 /// State sent by the wm and committed with a commit request.
 committed: struct {
+    dirty: bool = false,
     render_list: wl.list.Head(Window, .committed_render_list_link),
 },
 
@@ -57,12 +71,11 @@ inflight: struct {
     render_list: wl.list.Head(Window, .inflight_render_list_link),
 },
 
+dirty_idle: ?*wl.EventSource = null,
+
 /// Number of inflight configures sent to windows in the current transaction.
 inflight_configures: u32 = 0,
 transaction_timeout: *wl.EventSource,
-/// Set to true if applyPending() is called while a transaction is inflight.
-/// If true when a transaction completes, causes applyPending() to be called again.
-pending_state_dirty: bool = false,
 
 pub fn init(wm: *WindowManager) !void {
     const event_loop = server.wl_server.getEventLoop();
@@ -149,48 +162,43 @@ fn handleRequest(
     }
 }
 
-/// Trigger asynchronous application of pending state for all outputs and windows.
-/// Changes will not be applied to the scene graph until the layout generator
-/// generates a new layout for all outputs and all affected clients ack a
-/// configure and commit a new buffer.
-pub fn applyPending(wm: *WindowManager) void {
-    {
-        // Changes to the pending state may require a focus update to keep
-        // state consistent. Instead of having focus(null) calls spread all
-        // around the codebase and risk forgetting one, always ensure focus
-        // state is synchronized here.
-        var it = server.input_manager.seats.first;
-        while (it) |node| : (it = node.next) node.data.focus(null);
+pub fn dirtyPending(wm: *WindowManager) void {
+    wm.pending.dirty = true;
+
+    if (wm.dirty_idle == null) {
+        const event_loop = server.wl_server.getEventLoop();
+        wm.dirty_idle = event_loop.addIdle(*WindowManager, handleDirty, wm) catch {
+            log.err("out of memory", .{});
+            return;
+        };
     }
+}
 
-    // If there is already a transaction inflight, wait until it completes.
-    if (wm.inflight_configures > 0) {
-        wm.pending_state_dirty = true;
-        return;
-    }
-    wm.pending_state_dirty = false;
+fn handleDirty(wm: *WindowManager) void {
+    switch (wm.state) {
+        .idle => {
+            assert(!wm.committed.dirty);
 
-    {
-        var it = server.input_manager.seats.first;
-        while (it) |node| : (it = node.next) {
-            const cursor = &node.data.cursor;
-
-            switch (cursor.mode) {
-                .passthrough, .down => {},
-                inline .move, .resize => |data| {
-                    if (data.window.inflight.fullscreen) {
-                        cursor.mode = .passthrough;
-                        data.window.pending.resizing = false;
-                        data.window.inflight.resizing = false;
-                    }
-                },
+            if (wm.pending.dirty) {
+                wm.sendUpdate();
             }
-
-            cursor.inflight_mode = cursor.mode;
-        }
+        },
+        .update_sent, .update_acked, .configures_inflight => {},
     }
+}
 
-    wm.sendConfigures();
+fn sendUpdate(wm: *WindowManager) void {
+    assert(wm.state == .idle);
+
+    const wm_v1 = wm.object orelse return;
+
+    // XXX send all dirty pending state
+
+    wm.pending.dirty = false;
+
+    const serial = server.wl_server.nextSerial();
+    wm_v1.sendUpdate(serial);
+    wm.state = .{ .update_sent = serial };
 }
 
 fn sendConfigures(wm: *WindowManager) void {
@@ -282,7 +290,7 @@ fn commitTransaction(wm: *WindowManager) void {
 
     server.idle_inhibit_manager.checkActive();
 
-    if (wm.pending_state_dirty) {
-        wm.applyPending();
+    if (wm.pending.dirty) {
+        wm.dirtyPending();
     }
 }
