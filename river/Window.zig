@@ -69,17 +69,17 @@ pub const State = struct {
 };
 
 /// The window management protocol object for this window
-/// If the window is unmapped the "closed" event is sent to the current object.
-/// If the window is remapped a new object is created and sent to the window manager.
-object: ?*river.WindowV1,
+/// Created after the window is ready to be configured.
+/// Lifetime is managed through pending.state
+object: ?*river.WindowV1 = null,
 
 /// The implementation of this window
 impl: Impl,
 
 /// Link for WindowManager.windows
 link: wl.list.Link,
-/// Link for WindowManager.pending_to_wm.new_windows
-link_new: wl.list.Link,
+/// Link for WindowManager.pending.dirty_windows
+link_dirty: wl.list.Link,
 
 tree: *wlr.SceneTree,
 surface_tree: *wlr.SceneTree,
@@ -98,14 +98,35 @@ inflight_transaction: bool = false,
 /// transaction completes. See Window.destroy()
 destroying: bool = false,
 
+/// State to be sent to the window manager client in the next update sequence.
 pending: struct {
+    state: enum {
+        /// Indicates that there is currently no associated river_window_v1
+        /// object.
+        init,
+        /// Indicates that the window is ready to be configured.
+        /// Create a river_window_v1 object if needed an send events.
+        ready,
+        /// Indicates that the closed event will be sent in the next update sequence.
+        closing,
+    } = .init,
     box: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
-
     decoration_hint: river.WindowV1.DecorationHint = .only_supports_csd,
-    /// TODO output hint
-    fullscreen_requested: bool = false,
+    /// Set back to no_request at the end of each update sequence
+    fullscreen_requested: enum {
+        no_request,
+        /// TODO output hint
+        fullscreen,
+        exit,
+    } = .no_request,
+} = .{},
 
-    resizing: bool = false,
+/// State sent to the window manager client in the latest update sequence.
+/// This state is only kept around in order to avoid sending redundant events
+/// to the window manager client.
+sent: struct {
+    box: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+    decoration_hint: river.WindowV1.DecorationHint = .only_supports_csd,
 } = .{},
 
 uncommitted: struct {} = .{},
@@ -128,13 +149,6 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
     const window = try util.gpa.create(Window);
     errdefer util.gpa.destroy(window);
 
-    const object = blk: {
-        const wm_v1 = server.wm.object orelse break :blk null;
-        break :blk river.WindowV1.create(wm_v1.getClient(), wm_v1.getVersion(), 0) catch
-            return error.OutOfMemory;
-    };
-    errdefer if (object) |o| o.destroy();
-
     const tree = try server.root.hidden_tree.createSceneTree();
     errdefer tree.node.destroy();
 
@@ -142,10 +156,9 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
     errdefer popup_tree.node.destroy();
 
     window.* = .{
-        .object = object,
         .impl = impl,
         .link = undefined,
-        .link_new = undefined,
+        .link_dirty = undefined,
         .tree = tree,
         .surface_tree = try tree.createSceneTree(),
         .saved_surface_tree = try tree.createSceneTree(),
@@ -163,7 +176,7 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
     };
 
     server.wm.windows.prepend(window);
-    server.wm.pending.new_windows.prepend(window);
+    window.link_dirty.init();
 
     window.uncommitted_render_list_link.init();
     window.committed_render_list_link.init();
@@ -185,6 +198,7 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
 pub fn destroy(window: *Window, when: enum { lazy, assert }) void {
     assert(window.impl == .none);
     assert(!window.mapped);
+    assert(window.object == null);
 
     window.destroying = true;
 
@@ -196,7 +210,7 @@ pub fn destroy(window: *Window, when: enum { lazy, assert }) void {
         window.popup_tree.node.destroy();
 
         window.link.remove();
-        window.link_new.remove();
+        window.link_dirty.remove();
         window.uncommitted_render_list_link.remove();
         window.committed_render_list_link.remove();
         window.inflight_render_list_link.remove();
@@ -210,6 +224,121 @@ pub fn destroy(window: *Window, when: enum { lazy, assert }) void {
             .assert => unreachable,
         }
     }
+}
+
+fn dirtyPending(window: *Window) void {
+    switch (window.pending.state) {
+        .init => {},
+        .ready, .closing => {
+            window.link_dirty.remove();
+            server.wm.pending.dirty_windows.prepend(window);
+            server.wm.dirtyPending();
+        },
+    }
+}
+
+pub fn ready(window: *Window) void {
+    if (window.pending.state != .ready) {
+        window.pending.state = .ready;
+        window.dirtyPending();
+    }
+}
+
+pub fn closing(window: *Window) void {
+    if (window.pending.state != .closing) {
+        window.pending.state = .closing;
+        window.dirtyPending();
+    }
+}
+
+pub fn setDecorationHint(window: *Window, hint: river.WindowV1.DecorationHint) void {
+    window.pending.decoration_hint = hint;
+    if (hint != window.sent.decoration_hint) {
+        window.dirtyPending();
+    }
+}
+
+pub fn setFullscreenRequested(window: *Window, fullscreen_requested: bool) void {
+    if (fullscreen_requested) {
+        window.pending.fullscreen_requested = .fullscreen;
+    } else {
+        window.pending.fullscreen_requested = .exit;
+    }
+    window.dirtyPending();
+}
+
+/// Send dirty pending state as part of an in progress update sequence.
+pub fn sendDirty(window: *Window) !void {
+    assert(window.pending.state != .init);
+
+    switch (window.pending.state) {
+        .init => unreachable,
+        .closing => {
+            window.pending.state = .init;
+            if (window.object) |window_v1| {
+                window.object = null;
+                window_v1.sendClosed();
+                window_v1.setHandler(?*anyopaque, handleRequestInert, null, null);
+            }
+        },
+        .ready => {
+            const wm_v1 = server.wm.object.?;
+            const new = window.object == null;
+            const window_v1 = window.object orelse blk: {
+                const window_v1 = try river.WindowV1.create(wm_v1.getClient(), wm_v1.getVersion(), 0);
+                window.object = window_v1;
+
+                window_v1.setHandler(*Window, handleRequest, null, window);
+
+                wm_v1.sendWindow(window_v1);
+                break :blk window_v1;
+            };
+            errdefer comptime unreachable;
+
+            const pending = &window.pending;
+            const sent = &window.sent;
+
+            // XXX send all dirty pending state
+            if ((pending.box.width != sent.box.width or
+                pending.box.height != sent.box.height) and !pending.box.empty())
+            {
+                window_v1.sendDimensions(window.pending.box.width, window.pending.box.height);
+                sent.box.width = pending.box.width;
+                sent.box.height = pending.box.height;
+            }
+            if (new or pending.decoration_hint != sent.decoration_hint) {
+                window_v1.sendDecorationHint(window.pending.decoration_hint);
+                sent.decoration_hint = pending.decoration_hint;
+            }
+            switch (pending.fullscreen_requested) {
+                .no_request => {},
+                .fullscreen => window_v1.sendFullscreenRequested(null),
+                .exit => window_v1.sendExitFullscreenRequested(),
+            }
+            pending.fullscreen_requested = .no_request;
+        },
+    }
+
+    window.link_dirty.remove();
+    window.link_dirty.init();
+}
+
+fn handleRequestInert(
+    window_v1: *river.WindowV1,
+    request: river.WindowV1.Request,
+    _: ?*anyopaque,
+) void {
+    if (request == .destroy) window_v1.destroy();
+}
+
+fn handleRequest(
+    window_v1: *river.WindowV1,
+    _: river.WindowV1.Request,
+    window: *Window,
+) void {
+    assert(window.object == window_v1);
+    // XXX handle requests
+    //switch (request) {}
 }
 
 /// The change in x/y position of the window during resize cannot be determined
@@ -484,7 +613,7 @@ pub fn map(window: *Window) !void {
 
     window.foreign_toplevel_handle.map();
 
-    server.wm.dirtyPending();
+    window.ready();
 }
 
 /// Called by the impl when the surface will no longer be displayed
@@ -493,15 +622,12 @@ pub fn unmap(window: *Window) void {
 
     if (!window.saved_surface_tree.node.enabled) window.saveSurfaceTree();
 
-    //window.pending_render_list_link.remove();
-    //server.root.hidden.pending.render_list.prepend(window);
-
     assert(window.mapped and !window.destroying);
     window.mapped = false;
 
     window.foreign_toplevel_handle.unmap();
 
-    server.wm.dirtyPending();
+    window.closing();
 }
 
 pub fn notifyTitle(window: *const Window) void {

@@ -75,11 +75,9 @@ fn handleRequestMode(
     const toplevel: *XdgToplevel = @ptrFromInt(decoration.wlr_decoration.toplevel.base.data);
     const window = toplevel.window;
 
-    switch (decoration.wlr_decoration.requested_mode) {
-        .none => window.pending.decoration_hint = .no_preference,
-        .client_side => window.pending.decoration_hint = .prefers_csd,
-        .server_side => window.pending.decoration_hint = .prefers_ssd,
-    }
-
-    server.wm.dirtyPending();
+    window.setDecorationHint(switch (decoration.wlr_decoration.requested_mode) {
+        .none => .no_preference,
+        .client_side => .prefers_csd,
+        .server_side => .prefers_ssd,
+    });
 }

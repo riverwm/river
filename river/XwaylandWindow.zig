@@ -46,18 +46,16 @@ request_configure: wl.Listener(*wlr.XwaylandSurface.event.Configure) =
 set_override_redirect: wl.Listener(void) = wl.Listener(void).init(handleSetOverrideRedirect),
 associate: wl.Listener(void) = wl.Listener(void).init(handleAssociate),
 dissociate: wl.Listener(void) = wl.Listener(void).init(handleDissociate),
-
-// Active while the xwayland_surface is associated with a wlr_surface
-map: wl.Listener(void) = wl.Listener(void).init(handleMap),
-unmap: wl.Listener(void) = wl.Listener(void).init(handleUnmap),
-
-// Active while mapped
 set_title: wl.Listener(void) = wl.Listener(void).init(handleSetTitle),
 set_class: wl.Listener(void) = wl.Listener(void).init(handleSetClass),
 set_decorations: wl.Listener(void) = wl.Listener(void).init(handleSetDecorations),
 request_fullscreen: wl.Listener(void) = wl.Listener(void).init(handleRequestFullscreen),
 request_minimize: wl.Listener(*wlr.XwaylandSurface.event.Minimize) =
     wl.Listener(*wlr.XwaylandSurface.event.Minimize).init(handleRequestMinimize),
+
+// Active while the xwayland_surface is associated with a wlr_surface
+map: wl.Listener(void) = wl.Listener(void).init(handleMap),
+unmap: wl.Listener(void) = wl.Listener(void).init(handleUnmap),
 
 pub fn create(xwayland_surface: *wlr.XwaylandSurface) error{OutOfMemory}!void {
     const window = try Window.create(.{ .xwayland_window = .{
@@ -75,6 +73,11 @@ pub fn create(xwayland_surface: *wlr.XwaylandSurface) error{OutOfMemory}!void {
     xwayland_surface.events.dissociate.add(&xwayland_window.dissociate);
     xwayland_surface.events.request_configure.add(&xwayland_window.request_configure);
     xwayland_surface.events.set_override_redirect.add(&xwayland_window.set_override_redirect);
+    xwayland_surface.events.set_title.add(&xwayland_window.set_title);
+    xwayland_surface.events.set_class.add(&xwayland_window.set_class);
+    xwayland_surface.events.set_decorations.add(&xwayland_window.set_decorations);
+    xwayland_surface.events.request_fullscreen.add(&xwayland_window.request_fullscreen);
+    xwayland_surface.events.request_minimize.add(&xwayland_window.request_minimize);
 
     if (xwayland_surface.surface) |surface| {
         handleAssociate(&xwayland_window.associate);
@@ -133,6 +136,11 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
     xwayland_window.dissociate.link.remove();
     xwayland_window.request_configure.link.remove();
     xwayland_window.set_override_redirect.link.remove();
+    xwayland_window.set_title.link.remove();
+    xwayland_window.set_class.link.remove();
+    xwayland_window.set_decorations.link.remove();
+    xwayland_window.request_fullscreen.link.remove();
+    xwayland_window.request_minimize.link.remove();
 
     const window = xwayland_window.window;
     window.impl = .none;
@@ -160,19 +168,13 @@ pub fn handleMap(listener: *wl.Listener(void)) void {
     const surface = xwayland_surface.surface.?;
     surface.data = @intFromPtr(&window.tree.node);
 
-    // Add listeners that are only active while mapped
-    xwayland_surface.events.set_title.add(&xwayland_window.set_title);
-    xwayland_surface.events.set_class.add(&xwayland_window.set_class);
-    xwayland_surface.events.set_decorations.add(&xwayland_window.set_decorations);
-    xwayland_surface.events.request_fullscreen.add(&xwayland_window.request_fullscreen);
-    xwayland_surface.events.request_minimize.add(&xwayland_window.request_minimize);
-
     xwayland_window.surface_tree = window.surface_tree.createSceneSubsurfaceTree(surface) catch {
         log.err("out of memory", .{});
         surface.resource.getClient().postNoMemory();
         return;
     };
 
+    // XXX this seems like it should be deleted/moved to handleCommit()
     window.pending.box = .{
         .x = 0,
         .y = 0,
@@ -181,16 +183,6 @@ pub fn handleMap(listener: *wl.Listener(void)) void {
     };
     window.inflight.box = window.pending.box;
     window.current.box = window.pending.box;
-
-    if (xwayland_surface.decorations.no_border or
-        xwayland_surface.decorations.no_title)
-    {
-        window.pending.decoration_hint = .prefers_csd;
-    } else {
-        window.pending.decoration_hint = .prefers_ssd;
-    }
-
-    window.pending.fullscreen_requested = xwayland_surface.fullscreen;
 
     window.map() catch {
         log.err("out of memory", .{});
@@ -202,12 +194,6 @@ fn handleUnmap(listener: *wl.Listener(void)) void {
     const xwayland_window: *XwaylandWindow = @fieldParentPtr("unmap", listener);
 
     xwayland_window.xwayland_surface.surface.?.data = 0;
-
-    // Remove listeners that are only active while mapped
-    xwayland_window.set_title.link.remove();
-    xwayland_window.set_class.link.remove();
-    xwayland_window.request_fullscreen.link.remove();
-    xwayland_window.request_minimize.link.remove();
 
     xwayland_window.window.unmap();
 
@@ -271,28 +257,19 @@ fn handleSetClass(listener: *wl.Listener(void)) void {
 
 fn handleSetDecorations(listener: *wl.Listener(void)) void {
     const xwayland_window: *XwaylandWindow = @fieldParentPtr("set_decorations", listener);
-    const window = xwayland_window.window;
 
     if (xwayland_window.xwayland_surface.decorations.no_border or
         xwayland_window.xwayland_surface.decorations.no_title)
     {
-        window.pending.decoration_hint = .prefers_csd;
+        xwayland_window.window.setDecorationHint(.prefers_csd);
     } else {
-        window.pending.decoration_hint = .prefers_ssd;
+        xwayland_window.window.setDecorationHint(.prefers_ssd);
     }
-
-    server.wm.dirtyPending();
 }
 
 fn handleRequestFullscreen(listener: *wl.Listener(void)) void {
     const xwayland_window: *XwaylandWindow = @fieldParentPtr("request_fullscreen", listener);
-    const window = xwayland_window.window;
-    const xwayland_surface = xwayland_window.xwayland_surface;
-
-    if (window.pending.fullscreen_requested != xwayland_surface.fullscreen) {
-        window.pending.fullscreen_requested = xwayland_surface.fullscreen;
-        server.wm.dirtyPending();
-    }
+    xwayland_window.window.setFullscreenRequested(xwayland_window.xwayland_surface.fullscreen);
 }
 
 /// Some X11 clients will minimize themselves regardless of how we respond.

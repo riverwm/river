@@ -64,10 +64,6 @@ map: wl.Listener(void) = wl.Listener(void).init(handleMap),
 unmap: wl.Listener(void) = wl.Listener(void).init(handleUnmap),
 commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
 new_popup: wl.Listener(*wlr.XdgPopup) = wl.Listener(*wlr.XdgPopup).init(handleNewPopup),
-
-// Listeners that are only active while the window is mapped
-ack_configure: wl.Listener(*wlr.XdgSurface.Configure) =
-    wl.Listener(*wlr.XdgSurface.Configure).init(handleAckConfigure),
 request_fullscreen: wl.Listener(void) = wl.Listener(void).init(handleRequestFullscreen),
 request_move: wl.Listener(*wlr.XdgToplevel.event.Move) =
     wl.Listener(*wlr.XdgToplevel.event.Move).init(handleRequestMove),
@@ -75,6 +71,10 @@ request_resize: wl.Listener(*wlr.XdgToplevel.event.Resize) =
     wl.Listener(*wlr.XdgToplevel.event.Resize).init(handleRequestResize),
 set_title: wl.Listener(void) = wl.Listener(void).init(handleSetTitle),
 set_app_id: wl.Listener(void) = wl.Listener(void).init(handleSetAppId),
+
+// Listeners that are only active while the window is mapped
+ack_configure: wl.Listener(*wlr.XdgSurface.Configure) =
+    wl.Listener(*wlr.XdgSurface.Configure).init(handleAckConfigure),
 
 pub fn create(wlr_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
     const window = try Window.create(.{ .toplevel = .{
@@ -108,6 +108,11 @@ pub fn create(wlr_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
     wlr_toplevel.base.surface.events.map.add(&toplevel.map);
     wlr_toplevel.base.surface.events.commit.add(&toplevel.commit);
     wlr_toplevel.base.events.new_popup.add(&toplevel.new_popup);
+    wlr_toplevel.events.request_fullscreen.add(&toplevel.request_fullscreen);
+    wlr_toplevel.events.request_move.add(&toplevel.request_move);
+    wlr_toplevel.events.request_resize.add(&toplevel.request_resize);
+    wlr_toplevel.events.set_title.add(&toplevel.set_title);
+    wlr_toplevel.events.set_app_id.add(&toplevel.set_app_id);
 }
 
 /// Send a configure event, applying the inflight state of the window.
@@ -205,12 +210,17 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
     }
     assert(toplevel.decoration == null);
 
-    // Remove listeners that are active for the entire lifetime of the window
+    // Remove listeners that are active for the entire lifetime of the toplevel
     toplevel.destroy.link.remove();
     toplevel.map.link.remove();
     toplevel.unmap.link.remove();
     toplevel.commit.link.remove();
     toplevel.new_popup.link.remove();
+    toplevel.request_fullscreen.link.remove();
+    toplevel.request_move.link.remove();
+    toplevel.request_resize.link.remove();
+    toplevel.set_title.link.remove();
+    toplevel.set_app_id.link.remove();
 
     // The wlr_surface may outlive the wlr_xdg_toplevel so we must clean up the user data.
     toplevel.wlr_toplevel.base.surface.data = 0;
@@ -226,14 +236,10 @@ fn handleMap(listener: *wl.Listener(void)) void {
 
     // Add listeners that are only active while mapped
     toplevel.wlr_toplevel.base.events.ack_configure.add(&toplevel.ack_configure);
-    toplevel.wlr_toplevel.events.request_fullscreen.add(&toplevel.request_fullscreen);
-    toplevel.wlr_toplevel.events.request_move.add(&toplevel.request_move);
-    toplevel.wlr_toplevel.events.request_resize.add(&toplevel.request_resize);
-    toplevel.wlr_toplevel.events.set_title.add(&toplevel.set_title);
-    toplevel.wlr_toplevel.events.set_app_id.add(&toplevel.set_app_id);
 
     toplevel.wlr_toplevel.base.getGeometry(&toplevel.geometry);
 
+    // XXX this seems like it should be deleted/moved to handleCommit()
     window.pending.box = .{
         .x = 0,
         .y = 0,
@@ -242,8 +248,6 @@ fn handleMap(listener: *wl.Listener(void)) void {
     };
     window.inflight.box = window.pending.box;
     window.current.box = window.pending.box;
-
-    toplevel.window.pending.fullscreen_requested = toplevel.wlr_toplevel.requested.fullscreen;
 
     window.map() catch {
         log.err("out of memory", .{});
@@ -257,11 +261,6 @@ fn handleUnmap(listener: *wl.Listener(void)) void {
 
     // Remove listeners that are only active while mapped
     toplevel.ack_configure.link.remove();
-    toplevel.request_fullscreen.link.remove();
-    toplevel.request_move.link.remove();
-    toplevel.request_resize.link.remove();
-    toplevel.set_title.link.remove();
-    toplevel.set_app_id.link.remove();
 
     toplevel.window.unmap();
 }
@@ -296,9 +295,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     const window = toplevel.window;
 
     if (toplevel.wlr_toplevel.base.initial_commit) {
-        _ = toplevel.wlr_toplevel.setWmCapabilities(.{ .fullscreen = true });
-
-        // XXX I think this is where we actually want to send the new window event.
+        window.ready();
         return;
     }
 
@@ -389,14 +386,9 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     }
 }
 
-/// Called when the client asks to be fullscreened. We always honor the request
-/// for now, perhaps it should be denied in some cases in the future.
 fn handleRequestFullscreen(listener: *wl.Listener(void)) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("request_fullscreen", listener);
-    if (toplevel.window.pending.fullscreen_requested != toplevel.wlr_toplevel.requested.fullscreen) {
-        toplevel.window.pending.fullscreen_requested = toplevel.wlr_toplevel.requested.fullscreen;
-        server.wm.dirtyPending();
-    }
+    toplevel.window.setFullscreenRequested(toplevel.wlr_toplevel.requested.fullscreen);
 }
 
 fn handleRequestMove(

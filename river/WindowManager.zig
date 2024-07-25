@@ -51,7 +51,7 @@ state: union(enum) {
 pending: struct {
     /// Pending state has been modified since the last update event sent to the wm.
     dirty: bool = false,
-    new_windows: wl.list.Head(Window, .link_new),
+    dirty_windows: wl.list.Head(Window, .link_dirty),
 },
 
 /// State sent by the wm but not yet committed with a commit request.
@@ -86,7 +86,7 @@ pub fn init(wm: *WindowManager) !void {
         .global = try wl.Global.create(server.wl_server, river.WindowManagerV1, 1, *WindowManager, wm, bind),
         .windows = undefined,
         .pending = .{
-            .new_windows = undefined,
+            .dirty_windows = undefined,
         },
         .uncommitted = .{
             .render_list = undefined,
@@ -100,7 +100,7 @@ pub fn init(wm: *WindowManager) !void {
         .transaction_timeout = transaction_timeout,
     };
     wm.windows.init();
-    wm.pending.new_windows.init();
+    wm.pending.dirty_windows.init();
     wm.uncommitted.render_list.init();
     wm.committed.render_list.init();
     wm.inflight.render_list.init();
@@ -130,6 +130,7 @@ fn bind(client: *wl.Client, wm: *WindowManager, version: u32, id: u32) void {
 
     wm.object = object;
     object.setHandler(*WindowManager, handleRequest, null, wm);
+    // XXX send existing windows?
 }
 
 fn handleRequestInert(
@@ -193,6 +194,16 @@ fn sendUpdate(wm: *WindowManager) void {
     const wm_v1 = wm.object orelse return;
 
     // XXX send all dirty pending state
+
+    {
+        var it = wm.pending.dirty_windows.safeIterator(.forward);
+        while (it.next()) |window| {
+            window.sendDirty() catch {
+                log.err("out of memory", .{});
+                continue; // Try again next update
+            };
+        }
+    }
 
     wm.pending.dirty = false;
 

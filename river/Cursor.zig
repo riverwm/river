@@ -331,8 +331,7 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
                     // If we were in down mode, we need pass along the release event
                     _ = cursor.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
                 },
-                .move => {},
-                .resize => |data| data.window.pending.resizing = false,
+                .move, .resize => {},
             }
 
             cursor.mode = .passthrough;
