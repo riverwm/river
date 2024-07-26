@@ -367,6 +367,8 @@ fn sendLayerConfigures(
             if (@as(?*SceneNodeData, @ptrFromInt(node.data))) |node_data| {
                 const layer_surface = node_data.data.layer_surface;
 
+                if (!layer_surface.wlr_layer_surface.initialized) continue;
+
                 const exclusive = layer_surface.wlr_layer_surface.current.exclusive_zone > 0;
                 if (exclusive != (mode == .exclusive)) {
                     continue;
