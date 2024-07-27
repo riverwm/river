@@ -465,8 +465,8 @@ matches everything while _\*\*_ and the empty string are invalid.
 
 The _input_ command can be used to create a configuration rule for an input
 device identified by its _name_.
-The _name_ of an input device consists of its type, its numerical vendor id,
-its numerical product id and finally its self-advertised name, separated by -.
+The _name_ of an input device consists of its type, its decimal vendor id,
+its decimal product id and finally its self-advertised name, separated by -.
 Simple globbing patterns are supported, see the rules section for further
 information on globs.
 
