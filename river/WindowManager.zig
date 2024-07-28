@@ -43,8 +43,8 @@ state: union(enum) {
     update_sent: u32,
     /// An update event was sent to the window manager and has been acked but not yet committed.
     update_acked,
-    /// The number of configures sent that have not yet been ack'd
-    configures_inflight: u32,
+    /// The number of configures sent that have not yet been acked
+    inflight_configures: u32,
 } = .idle,
 
 /// Pending state from windows to be sent to the wm in the next update sequence.
@@ -73,14 +73,12 @@ inflight: struct {
 
 dirty_idle: ?*wl.EventSource = null,
 
-/// Number of inflight configures sent to windows in the current transaction.
-inflight_configures: u32 = 0,
-transaction_timeout: *wl.EventSource,
+timeout: *wl.EventSource,
 
 pub fn init(wm: *WindowManager) !void {
     const event_loop = server.wl_server.getEventLoop();
-    const transaction_timeout = try event_loop.addTimer(*WindowManager, handleTransactionTimeout, wm);
-    errdefer transaction_timeout.remove();
+    const timeout = try event_loop.addTimer(*WindowManager, handleTimeout, wm);
+    errdefer timeout.remove();
 
     wm.* = .{
         .global = try wl.Global.create(server.wl_server, river.WindowManagerV1, 1, *WindowManager, wm, bind),
@@ -97,7 +95,7 @@ pub fn init(wm: *WindowManager) !void {
         .inflight = .{
             .render_list = undefined,
         },
-        .transaction_timeout = transaction_timeout,
+        .timeout = timeout,
     };
     wm.windows.init();
     wm.pending.dirty_windows.init();
@@ -112,7 +110,7 @@ fn handleServerDestroy(listener: *wl.Listener(*wl.Server), _: *wl.Server) void {
     const wm: *WindowManager = @fieldParentPtr("server_destroy", listener);
 
     wm.global.destroy();
-    wm.transaction_timeout.remove();
+    wm.timeout.remove();
 }
 
 fn bind(client: *wl.Client, wm: *WindowManager, version: u32, id: u32) void {
@@ -156,8 +154,23 @@ fn handleRequest(
         .destroy => {
             // XXX send protocol error
         },
-        .ack_update => |_| {},
-        .commit => {},
+        .ack_update => |args| {
+            switch (wm.state) {
+                .update_sent => |serial| {
+                    if (args.serial == serial) {
+                        wm.state = .update_acked;
+                    }
+                },
+                .idle, .update_acked, .inflight_configures => {},
+            }
+        },
+        .commit => {
+            wm.committed.dirty = true;
+            switch (wm.state) {
+                .idle, .update_acked => wm.sendConfigures(),
+                .update_sent, .inflight_configures => {},
+            }
+        },
         .get_seat => |_| {},
         .get_shell_surface => |_| {},
     }
@@ -184,12 +197,13 @@ fn handleDirty(wm: *WindowManager) void {
                 wm.sendUpdate();
             }
         },
-        .update_sent, .update_acked, .configures_inflight => {},
+        .update_sent, .update_acked, .inflight_configures => {},
     }
 }
 
 fn sendUpdate(wm: *WindowManager) void {
     assert(wm.state == .idle);
+    assert(wm.pending.dirty);
 
     const wm_v1 = wm.object orelse return;
 
@@ -210,10 +224,21 @@ fn sendUpdate(wm: *WindowManager) void {
     const serial = server.wl_server.nextSerial();
     wm_v1.sendUpdate(serial);
     wm.state = .{ .update_sent = serial };
+
+    wm.startTimeoutTimer();
 }
 
 fn sendConfigures(wm: *WindowManager) void {
-    assert(wm.inflight_configures == 0);
+    switch (wm.state) {
+        .idle, .update_acked => {},
+        .update_sent, .inflight_configures => unreachable,
+    }
+    assert(wm.committed.dirty);
+
+    // XXX apply committed to inflight
+    wm.committed.dirty = false;
+
+    wm.state = .{ .inflight_configures = 0 };
 
     {
         var it = wm.inflight.render_list.iterator(.forward);
@@ -226,7 +251,7 @@ fn sendConfigures(wm: *WindowManager) void {
             if (!window.mapped) continue;
 
             if (window.configure()) {
-                wm.inflight_configures += 1;
+                wm.state.inflight_configures += 1;
 
                 window.saveSurfaceTree();
                 window.sendFrameDone();
@@ -234,34 +259,42 @@ fn sendConfigures(wm: *WindowManager) void {
         }
     }
 
-    if (wm.inflight_configures > 0) {
-        std.log.scoped(.transaction).debug("started transaction with {} pending configure(s)", .{
-            wm.inflight_configures,
-        });
+    log.debug("started transaction with {} configure(s)", .{wm.state.inflight_configures});
 
-        wm.transaction_timeout.timerUpdate(100) catch {
-            std.log.scoped(.transaction).err("failed to update timer", .{});
-            wm.commitTransaction();
-        };
+    if (wm.state.inflight_configures > 0) {
+        wm.startTimeoutTimer();
     } else {
         wm.commitTransaction();
     }
 }
 
-fn handleTransactionTimeout(wm: *WindowManager) c_int {
-    std.log.scoped(.transaction).err("timeout occurred, some imperfect frames may be shown", .{});
+fn startTimeoutTimer(wm: *WindowManager) void {
+    wm.timeout.timerUpdate(100) catch {
+        log.err("failed to start timer", .{});
+        _ = wm.handleTimeout();
+    };
+}
 
-    wm.inflight_configures = 0;
-    wm.commitTransaction();
+fn handleTimeout(wm: *WindowManager) c_int {
+    log.err("timeout occurred, some imperfect frames may be shown", .{});
+
+    switch (wm.state) {
+        .idle => unreachable,
+        .update_sent, .update_acked => wm.state = .idle,
+        .inflight_configures => {
+            wm.state.inflight_configures = 0;
+            wm.commitTransaction();
+        },
+    }
 
     return 0;
 }
 
 pub fn notifyConfigured(wm: *WindowManager) void {
-    wm.inflight_configures -= 1;
-    if (wm.inflight_configures == 0) {
+    wm.state.inflight_configures -= 1;
+    if (wm.state.inflight_configures == 0) {
         // Disarm the timer, as we didn't timeout
-        wm.transaction_timeout.timerUpdate(0) catch std.log.scoped(.transaction).err("error disarming timer", .{});
+        wm.timeout.timerUpdate(0) catch log.err("error disarming timer", .{});
         wm.commitTransaction();
     }
 }
@@ -271,9 +304,10 @@ pub fn notifyConfigured(wm: *WindowManager) void {
 /// layout. Should only be called after all clients have configured for
 /// the new layout. If called early imperfect frames may be drawn.
 fn commitTransaction(wm: *WindowManager) void {
-    assert(wm.inflight_configures == 0);
+    assert(wm.state.inflight_configures == 0);
+    wm.state = .idle;
 
-    std.log.scoped(.transaction).debug("commiting transaction", .{});
+    log.debug("commiting transaction", .{});
 
     {
         var it = wm.inflight.render_list.iterator(.forward);
@@ -301,7 +335,9 @@ fn commitTransaction(wm: *WindowManager) void {
 
     server.idle_inhibit_manager.checkActive();
 
-    if (wm.pending.dirty) {
+    if (wm.committed.dirty) {
+        wm.sendConfigures();
+    } else if (wm.pending.dirty) {
         wm.dirtyPending();
     }
 }
