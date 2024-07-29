@@ -32,6 +32,7 @@ const ForeignToplevelHandle = @import("ForeignToplevelHandle.zig");
 const Output = @import("Output.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
 const Seat = @import("Seat.zig");
+const WmNode = @import("WmNode.zig");
 const XdgToplevel = @import("XdgToplevel.zig");
 const XwaylandWindow = @import("XwaylandWindow.zig");
 
@@ -68,10 +69,44 @@ pub const State = struct {
     resizing: bool = false,
 };
 
+pub const WmState = struct {
+    x: i32 = 0,
+    y: i32 = 0,
+    proposed: ?struct {
+        width: u31,
+        height: u31,
+    } = null,
+    hidden: bool = false,
+    decoration_choice: enum {
+        none,
+        csd,
+        ssd,
+    } = .none,
+    border: struct {
+        edges: river.WindowV1.Edges = .{},
+        width: u31 = 0,
+        r: u32 = 0,
+        b: u32 = 0,
+        g: u32 = 0,
+        a: u32 = 0,
+    } = .{},
+    tiled: river.WindowV1.Edges = .{},
+    capabilities: river.WindowV1.Capabilities = .{
+        .window_menu = true,
+        .maximize = true,
+        .fullscreen = true,
+        .minimize = true,
+    },
+    maximized: bool = false,
+    fullscreen: bool = false, // XXX output
+    closing: bool = false,
+};
+
 /// The window management protocol object for this window
 /// Created after the window is ready to be configured.
 /// Lifetime is managed through pending.state
 object: ?*river.WindowV1 = null,
+node: WmNode,
 
 /// The implementation of this window
 impl: Impl,
@@ -91,6 +126,9 @@ popup_tree: *wlr.SceneTree,
 /// Bounds on the width/height of the window, set by the toplevel/xwayland_window implementation.
 constraints: Constraints = .{},
 
+/// Set to true once the window manager client has made its first commit
+/// proposing dimensions for a new river_window_v1 object.
+initialized: bool = false,
 mapped: bool = false,
 /// This is true if the Window is involved in the currently inflight transaction.
 inflight_transaction: bool = false,
@@ -129,14 +167,13 @@ sent: struct {
     decoration_hint: river.WindowV1.DecorationHint = .only_supports_csd,
 } = .{},
 
-uncommitted: struct {} = .{},
-uncommitted_render_list_link: wl.list.Link,
+/// State requested by the window manager client but not yet committed.
+uncommitted: WmState = .{},
+/// State requested by the window manager client and committed.
+committed: WmState = .{},
 
-committed: struct {} = .{},
-committed_render_list_link: wl.list.Link,
-
+/// State sent to the window as part of a transaction.
 inflight: State = .{},
-inflight_render_list_link: wl.list.Link,
 
 /// The current state represented by the scene graph.
 current: State = .{},
@@ -156,6 +193,7 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
     errdefer popup_tree.node.destroy();
 
     window.* = .{
+        .node = undefined,
         .impl = impl,
         .link = undefined,
         .link_dirty = undefined,
@@ -169,18 +207,12 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
             try tree.createSceneRect(0, 0, &server.config.border_color),
         },
         .popup_tree = popup_tree,
-
-        .uncommitted_render_list_link = undefined,
-        .committed_render_list_link = undefined,
-        .inflight_render_list_link = undefined,
     };
+
+    window.node.init(.window);
 
     server.wm.windows.prepend(window);
     window.link_dirty.init();
-
-    window.uncommitted_render_list_link.init();
-    window.committed_render_list_link.init();
-    window.inflight_render_list_link.init();
 
     window.tree.node.setEnabled(false);
     window.popup_tree.node.setEnabled(false);
@@ -211,11 +243,8 @@ pub fn destroy(window: *Window, when: enum { lazy, assert }) void {
 
         window.link.remove();
         window.link_dirty.remove();
-        window.uncommitted_render_list_link.remove();
-        window.committed_render_list_link.remove();
-        window.inflight_render_list_link.remove();
 
-        // XXX destroy object?
+        window.node.deinit();
 
         util.gpa.destroy(window);
     } else {
@@ -275,10 +304,24 @@ pub fn sendDirty(window: *Window) !void {
         .init => unreachable,
         .closing => {
             window.pending.state = .init;
+            window.initialized = false;
+            window.uncommitted = .{};
+            window.committed = .{};
+
+            window.node.link_uncommitted.remove();
+            window.node.link_uncommitted.init();
+            window.node.link_committed.remove();
+            window.node.link_committed.init();
+            window.node.link_inflight.remove();
+            window.node.link_inflight.init();
+
             if (window.object) |window_v1| {
                 window.object = null;
                 window_v1.sendClosed();
                 window_v1.setHandler(?*anyopaque, handleRequestInert, null, null);
+                window.node.makeInert();
+            } else {
+                assert(window.node.object == null);
             }
         },
         .ready => {
@@ -287,10 +330,11 @@ pub fn sendDirty(window: *Window) !void {
             const window_v1 = window.object orelse blk: {
                 const window_v1 = try river.WindowV1.create(wm_v1.getClient(), wm_v1.getVersion(), 0);
                 window.object = window_v1;
-
                 window_v1.setHandler(*Window, handleRequest, null, window);
-
                 wm_v1.sendWindow(window_v1);
+
+                server.wm.uncommitted.render_list.append(&window.node);
+
                 break :blk window_v1;
             };
             errdefer comptime unreachable;
@@ -333,12 +377,75 @@ fn handleRequestInert(
 
 fn handleRequest(
     window_v1: *river.WindowV1,
-    _: river.WindowV1.Request,
+    request: river.WindowV1.Request,
     window: *Window,
 ) void {
     assert(window.object == window_v1);
-    // XXX handle requests
-    //switch (request) {}
+    const uncommitted = &window.uncommitted;
+    switch (request) {
+        .destroy => {}, // XXX send protocol error
+        .close => uncommitted.closing = true,
+        .get_node => |args| {
+            if (window.node.object != null) {
+                // XXX send protocol error
+            }
+            window.node.createObject(window_v1.getClient(), window_v1.getVersion(), args.id);
+        },
+        .propose_dimensions => |args| {
+            if (args.width < 0 or args.height < 0) {
+                // XXX send protocol error
+            }
+            uncommitted.proposed = .{
+                .width = @intCast(args.width),
+                .height = @intCast(args.height),
+            };
+        },
+        .hide => uncommitted.hidden = true,
+        .show => uncommitted.hidden = false,
+        .use_csd => uncommitted.decoration_choice = .csd,
+        .use_ssd => uncommitted.decoration_choice = .ssd,
+        .set_borders => |args| {
+            if (args.width < 0) {
+                // XXX send protocol error
+            }
+            uncommitted.border = .{
+                .edges = args.edges,
+                .width = @intCast(args.width),
+                .r = args.r,
+                .g = args.g,
+                .b = args.b,
+                .a = args.a,
+            };
+        },
+        .set_tiled => |args| uncommitted.tiled = args.edges,
+        .get_decoration_surface => {}, // XXX support decoration surfaces
+        .set_capabilities => |args| uncommitted.capabilities = args.caps,
+        .inform_maximized => uncommitted.maximized = true,
+        .inform_unmaximized => uncommitted.maximized = false,
+        .fullscreen => uncommitted.fullscreen = true,
+        .exit_fullscreen => uncommitted.fullscreen = false,
+    }
+}
+
+pub fn commitWmState(window: *Window) void {
+    if (!window.initialized and window.uncommitted.proposed != null) {
+        window.initialized = true;
+    }
+
+    window.committed = .{
+        .x = window.uncommitted.x,
+        .y = window.uncommitted.y,
+        .proposed = window.uncommitted.proposed orelse window.committed.proposed,
+        .hidden = window.uncommitted.hidden,
+        .decoration_choice = window.uncommitted.decoration_choice,
+        .border = window.uncommitted.border,
+        .tiled = window.uncommitted.tiled,
+        .capabilities = window.uncommitted.capabilities,
+        .maximized = window.uncommitted.maximized,
+        .fullscreen = window.uncommitted.fullscreen,
+        .closing = window.uncommitted.closing,
+    };
+    window.uncommitted.proposed = null;
 }
 
 /// The change in x/y position of the window during resize cannot be determined

@@ -25,6 +25,7 @@ const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Window = @import("Window.zig");
+const WmNode = @import("WmNode.zig");
 
 const log = std.log.scoped(.wm);
 
@@ -56,19 +57,19 @@ pending: struct {
 
 /// State sent by the wm but not yet committed with a commit request.
 uncommitted: struct {
-    render_list: wl.list.Head(Window, .uncommitted_render_list_link),
+    render_list: wl.list.Head(WmNode, .link_uncommitted),
 },
 
 /// State sent by the wm and committed with a commit request.
 committed: struct {
     dirty: bool = false,
-    render_list: wl.list.Head(Window, .committed_render_list_link),
+    render_list: wl.list.Head(WmNode, .link_committed),
 },
 
 /// State committed by the wm that has been sent to windows as part of the
 /// current transaction.
 inflight: struct {
-    render_list: wl.list.Head(Window, .inflight_render_list_link),
+    render_list: wl.list.Head(WmNode, .link_inflight),
 },
 
 dirty_idle: ?*wl.EventSource = null,
@@ -165,6 +166,16 @@ fn handleRequest(
             }
         },
         .commit => {
+            {
+                var it = wm.uncommitted.render_list.iterator(.forward);
+                while (it.next()) |node| {
+                    wm.committed.render_list.append(node);
+                    switch (node.get()) {
+                        .window => |window| window.commitWmState(),
+                    }
+                }
+            }
+
             wm.committed.dirty = true;
             switch (wm.state) {
                 .idle, .update_acked => wm.sendConfigures(),
@@ -181,21 +192,19 @@ pub fn dirtyPending(wm: *WindowManager) void {
 
     if (wm.dirty_idle == null) {
         const event_loop = server.wl_server.getEventLoop();
-        wm.dirty_idle = event_loop.addIdle(*WindowManager, handleDirty, wm) catch {
+        wm.dirty_idle = event_loop.addIdle(*WindowManager, handleDirtyPending, wm) catch {
             log.err("out of memory", .{});
             return;
         };
     }
 }
 
-fn handleDirty(wm: *WindowManager) void {
+fn handleDirtyPending(wm: *WindowManager) void {
+    assert(wm.pending.dirty);
     switch (wm.state) {
         .idle => {
             assert(!wm.committed.dirty);
-
-            if (wm.pending.dirty) {
-                wm.sendUpdate();
-            }
+            wm.sendUpdate();
         },
         .update_sent, .update_acked, .inflight_configures => {},
     }
@@ -242,19 +251,23 @@ fn sendConfigures(wm: *WindowManager) void {
 
     {
         var it = wm.inflight.render_list.iterator(.forward);
-        while (it.next()) |window| {
-            assert(!window.inflight_transaction);
-            window.inflight_transaction = true;
+        while (it.next()) |node| {
+            switch (node.get()) {
+                .window => |window| {
+                    assert(!window.inflight_transaction);
+                    window.inflight_transaction = true;
 
-            // This can happen if a window is unmapped while a layout demand including it is inflight
-            // If a window has been unmapped, don't send it a configure.
-            if (!window.mapped) continue;
+                    // This can happen if a window is unmapped while a layout demand including it
+                    // is inflight If a window has been unmapped, don't send it a configure.
+                    if (!window.mapped) continue;
 
-            if (window.configure()) {
-                wm.state.inflight_configures += 1;
+                    if (window.configure()) {
+                        wm.state.inflight_configures += 1;
 
-                window.saveSurfaceTree();
-                window.sendFrameDone();
+                        window.saveSurfaceTree();
+                        window.sendFrameDone();
+                    }
+                },
             }
         }
     }
@@ -311,11 +324,15 @@ fn commitTransaction(wm: *WindowManager) void {
 
     {
         var it = wm.inflight.render_list.iterator(.forward);
-        while (it.next()) |window| {
-            window.commitTransaction();
+        while (it.next()) |node| {
+            switch (node.get()) {
+                .window => |window| {
+                    window.commitTransaction();
 
-            window.tree.node.setEnabled(true);
-            window.popup_tree.node.setEnabled(true);
+                    window.tree.node.setEnabled(true);
+                    window.popup_tree.node.setEnabled(true);
+                },
+            }
         }
     }
 
@@ -327,9 +344,13 @@ fn commitTransaction(wm: *WindowManager) void {
     {
         // This must be done after updating cursor state in case the window was the target of move/resize.
         var it = wm.inflight.render_list.safeIterator(.forward);
-        while (it.next()) |window| {
-            window.dropSavedSurfaceTree();
-            if (window.destroying) window.destroy(.assert);
+        while (it.next()) |node| {
+            switch (node.get()) {
+                .window => |window| {
+                    window.dropSavedSurfaceTree();
+                    if (window.destroying) window.destroy(.assert);
+                },
+            }
         }
     }
 
@@ -338,6 +359,6 @@ fn commitTransaction(wm: *WindowManager) void {
     if (wm.committed.dirty) {
         wm.sendConfigures();
     } else if (wm.pending.dirty) {
-        wm.dirtyPending();
+        wm.sendUpdate();
     }
 }
