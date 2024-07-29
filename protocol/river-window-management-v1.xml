@@ -192,16 +192,13 @@
       This represents a logical window. For example, a window may correspond to
       an xdg_toplevel or Xwayland window.
 
-      A newly created window will not be displayed until the window manager:
-      1. proposes window dimensions (river_window_v1.propose_dimensions)
-      2. places the window in the render list (river_node_v1.place_above/below)
-      3. commits the pending state (river_window_manager_v1.commit)
+      A newly created window will not be displayed until the window manager
+      proposes window dimensions (river_window_v1.propose_dimensions) and makes
+      a river_window_manager_v1.commit request.
 
-      It is a protocol error to commit proposed dimensions without placing the new
-      window in the render list or vice versa.
-
-      The window manager should make this initial commit for new windows as soon
-      as possible after receiving the corresponding update event.
+      The window manager should make this initial commit proposing dimensions
+      for new windows as soon as possible after receiving the corresponding
+      update event.
 
       TODO:
         - size hints (including unset state)
@@ -248,6 +245,9 @@
     <request name="get_node">
       <description summary="get the window's render list node">
         Get the node in the render list corresponding to the window.
+
+        It is a protocol error to make this request more than once for a single
+        window.
       </description>
       <arg name="id" type="new_id" interface="river_node_v1"/>
     </request>
@@ -736,6 +736,9 @@
     <request name="get_node">
       <description summary="get the shell surface's render list node">
         Get the node in the render list corresponding to the shell surface.
+
+        It is a protocol error to make this request more than once for a single
+        shell surface.
       </description>
       <arg name="id" type="new_id" interface="river_node_v1"/>
     </request>
@@ -759,6 +762,10 @@
       the compositor. Nodes may correspond to windows or shell surfaces. The
       relative ordering of nodes may be changed with the place_above and
       place_below requests, changing the rendering order.
+
+      The initial position of a node in the render list is undefined, the window
+      manager client must use the place_above or place_below request to
+      guarantee a specific rendering order.
     </description>
 
     <request name="destroy" type="destructor">
