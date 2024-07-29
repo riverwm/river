@@ -530,7 +530,7 @@
         This request is double-buffered state and will not be applied until the
         next river_window_manager_v1.commit request.
       </description>
-      <arg name="output" type="object" interface="river_output_v1"/>
+      <arg name="caps" type="uint" enum="capabilities"/>
     </request>
 
     <event name="show_window_menu_requested">
