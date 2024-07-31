@@ -88,30 +88,44 @@ pub fn create(xsurface: *wlr.XwaylandSurface) error{OutOfMemory}!void {
 }
 
 /// Always returns false as we do not care about frame perfection for Xwayland windows.
-pub fn configure(xwindow: XwaylandWindow) bool {
+pub fn configure(xwindow: *XwaylandWindow) bool {
     const inflight = &xwindow.window.inflight;
     const current = &xwindow.window.current;
 
-    if (xwindow.xsurface.x == inflight.box.x and
-        xwindow.xsurface.y == inflight.box.y and
-        xwindow.xsurface.width == inflight.box.width and
-        xwindow.xsurface.height == inflight.box.height and
-        (inflight.focus != 0) == (current.focus != 0))
-        // TODO fullscreen
-    {
-        return false;
+    // Sending a 0 width/height to X11 clients is invalid, so fake it
+    if (inflight.box.width == 0) {
+        inflight.box.width = xwindow.window.pending.box.width;
+    }
+    if (inflight.box.height == 0) {
+        inflight.box.height = xwindow.window.pending.box.height;
     }
 
-    xwindow.xsurface.configure(
-        math.lossyCast(i16, inflight.box.x),
-        math.lossyCast(i16, inflight.box.y),
-        math.lossyCast(u16, inflight.box.width),
-        math.lossyCast(u16, inflight.box.height),
-    );
+    if (inflight.hidden != current.hidden) {
+        xwindow.xsurface.setWithdrawn(inflight.hidden);
+    }
 
-    xwindow.setActivated(inflight.focus != 0);
+    if (inflight.box.x != current.box.x or
+        inflight.box.y != current.box.y or
+        inflight.box.width != current.box.width or
+        inflight.box.height != current.box.height)
+    {
+        xwindow.xsurface.configure(
+            math.lossyCast(i16, inflight.box.x),
+            math.lossyCast(i16, inflight.box.y),
+            math.lossyCast(u16, inflight.box.width),
+            math.lossyCast(u16, inflight.box.height),
+        );
+    }
 
-    if (false) xwindow.xsurface.setFullscreen();
+    if ((inflight.focus != 0) != (current.focus != 0)) {
+        xwindow.setActivated(inflight.focus != 0);
+    }
+    if (inflight.maximized != current.maximized) {
+        xwindow.xsurface.setFullscreen(inflight.maximized);
+    }
+    if (inflight.fullscreen != current.fullscreen) {
+        xwindow.xsurface.setFullscreen(inflight.fullscreen);
+    }
 
     return false;
 }
@@ -215,7 +229,6 @@ fn handleRequestConfigure(
         return;
     }
 
-    // Allow xwayland windows to set their own dimensions (but not position) if floating
     xwindow.window.pending.box.width = event.width;
     xwindow.window.pending.box.height = event.height;
     server.wm.dirtyPending();

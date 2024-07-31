@@ -169,6 +169,7 @@ fn handleRequest(
             {
                 var it = wm.uncommitted.render_list.iterator(.forward);
                 while (it.next()) |node| {
+                    node.link_committed.remove();
                     wm.committed.render_list.append(node);
                     switch (node.get()) {
                         .window => |window| window.commitWmState(),
@@ -243,29 +244,18 @@ fn sendConfigures(wm: *WindowManager) void {
         .update_sent, .inflight_configures => unreachable,
     }
     assert(wm.committed.dirty);
-
-    // XXX apply committed to inflight
     wm.committed.dirty = false;
 
     wm.state = .{ .inflight_configures = 0 };
-
     {
-        var it = wm.inflight.render_list.iterator(.forward);
+        var it = wm.committed.render_list.iterator(.forward);
         while (it.next()) |node| {
+            node.link_inflight.remove();
+            wm.inflight.render_list.append(node);
             switch (node.get()) {
                 .window => |window| {
-                    assert(!window.inflight_transaction);
-                    window.inflight_transaction = true;
-
-                    // This can happen if a window is unmapped while a layout demand including it
-                    // is inflight If a window has been unmapped, don't send it a configure.
-                    if (!window.mapped) continue;
-
                     if (window.configure()) {
                         wm.state.inflight_configures += 1;
-
-                        window.saveSurfaceTree();
-                        window.sendFrameDone();
                     }
                 },
             }

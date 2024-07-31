@@ -387,6 +387,9 @@
         Tell the client to use client side decoration and draw its own title
         bar, borders, etc.
 
+        This is the default if neither this request nor the use_ssd request is
+        ever made.
+
         This request is double-buffered state and will not be applied until the
         next river_window_manager_v1.commit request.
       </description>

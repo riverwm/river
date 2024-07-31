@@ -130,16 +130,7 @@ pub fn configure(toplevel: *XdgToplevel) bool {
     const inflight = &toplevel.window.inflight;
     const current = &toplevel.window.current;
 
-    // We avoid a special case for newly mapped windows which we have not yet
-    // configured by setting the current width/height to the initial width/height
-    // of the window in handleMap().
-    if (inflight.box.width == current.box.width and
-        inflight.box.height == current.box.height and
-        (inflight.focus != 0) == (current.focus != 0) and
-        inflight.fullscreen == current.fullscreen and
-        inflight.ssd == current.ssd and
-        inflight.resizing == current.resizing)
-    {
+    if (!toplevel.needsConfigure()) {
         // If no new configure is required, continue to track a timed out configure
         // from the previous transaction if any.
         switch (toplevel.configure_state) {
@@ -159,15 +150,21 @@ pub fn configure(toplevel: *XdgToplevel) bool {
     const wlr_toplevel = toplevel.wlr_toplevel;
 
     _ = wlr_toplevel.setActivated(inflight.focus != 0);
+    _ = wlr_toplevel.setTiled(.{
+        .top = inflight.tiled.top,
+        .bottom = inflight.tiled.bottom,
+        .left = inflight.tiled.left,
+        .right = inflight.tiled.right,
+    });
+    _ = wlr_toplevel.setWmCapabilities(.{
+        .window_menu = inflight.capabilities.window_menu,
+        .maximize = inflight.capabilities.maximize,
+        .fullscreen = inflight.capabilities.fullscreen,
+        .minimize = inflight.capabilities.minimize,
+    });
+    _ = wlr_toplevel.setMaximized(inflight.maximized);
     _ = wlr_toplevel.setFullscreen(inflight.fullscreen);
     _ = wlr_toplevel.setResizing(inflight.resizing);
-
-    // TODO
-    if (true) {
-        _ = wlr_toplevel.setTiled(.{ .top = false, .bottom = false, .left = false, .right = false });
-    } else {
-        _ = wlr_toplevel.setTiled(.{ .top = true, .bottom = true, .left = true, .right = true });
-    }
 
     if (toplevel.decoration) |decoration| {
         _ = decoration.wlr_decoration.setMode(if (inflight.ssd) .server_side else .client_side);
@@ -175,14 +172,14 @@ pub fn configure(toplevel: *XdgToplevel) bool {
 
     // We need to call this wlroots function even if the inflight dimensions
     // match the current dimensions in order to prevent wlroots internal state
-    // from getting out of sync in the case where a client has resized ittoplevel.
+    // from getting out of sync in the case where a client has resized the toplevel.
     const configure_serial = wlr_toplevel.setSize(inflight.box.width, inflight.box.height);
 
     // Only track configures with the transaction system if they affect the dimensions of the window.
     // If the configure state is not idle this means we are currently tracking a timed out
     // configure from a previous transaction and should instead track the newly sent configure.
-    if (inflight.box.width == current.box.width and
-        inflight.box.height == current.box.height and
+    if (inflight.box.width != 0 and inflight.box.width == current.box.width and
+        inflight.box.height != 0 and inflight.box.height == current.box.height and
         toplevel.configure_state == .idle)
     {
         return false;
@@ -193,6 +190,32 @@ pub fn configure(toplevel: *XdgToplevel) bool {
     };
 
     return true;
+}
+
+fn needsConfigure(toplevel: *XdgToplevel) bool {
+    const inflight = &toplevel.window.inflight;
+    const current = &toplevel.window.current;
+
+    // Never send configures to hidden windows.
+    // If transitioning from hidden to not-hidden, send a configure.
+    if (inflight.hidden) return false;
+    if (current.hidden) return true;
+
+    if (inflight.box.width == 0 or inflight.box.width != current.box.width or
+        inflight.box.height == 0 or inflight.box.height != current.box.height)
+    {
+        return true;
+    }
+
+    if ((inflight.focus != 0) != (current.focus != 0)) return true;
+    if (inflight.ssd != current.ssd) return true;
+    if (!std.meta.eql(inflight.tiled, current.tiled)) return true;
+    if (!std.meta.eql(inflight.capabilities, current.capabilities)) return true;
+    if (inflight.maximized != current.maximized) return true;
+    if (inflight.fullscreen != current.fullscreen) return true;
+    if (inflight.resizing != current.resizing) return true;
+
+    return false;
 }
 
 pub fn destroyPopups(toplevel: XdgToplevel) void {

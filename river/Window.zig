@@ -56,16 +56,27 @@ const Impl = union(enum) {
     none,
 };
 
+pub const Border = struct {
+    edges: river.WindowV1.Edges = .{},
+    width: u31 = 0,
+    r: u32 = 0,
+    b: u32 = 0,
+    g: u32 = 0,
+    a: u32 = 0,
+};
+
 pub const State = struct {
     /// The output-relative coordinates of the window and dimensions requested by river.
     box: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
-
+    hidden: bool = false,
     /// Number of seats currently focusing the window
     focus: u32 = 0,
-
-    fullscreen: bool = false,
-    urgent: bool = false,
     ssd: bool = false,
+    border: Border = .{},
+    tiled: river.WindowV1.Edges = .{},
+    capabilities: river.WindowV1.Capabilities = .{},
+    maximized: bool = false,
+    fullscreen: bool = false,
     resizing: bool = false,
 };
 
@@ -77,19 +88,8 @@ pub const WmState = struct {
         height: u31,
     } = null,
     hidden: bool = false,
-    decoration_choice: enum {
-        none,
-        csd,
-        ssd,
-    } = .none,
-    border: struct {
-        edges: river.WindowV1.Edges = .{},
-        width: u31 = 0,
-        r: u32 = 0,
-        b: u32 = 0,
-        g: u32 = 0,
-        a: u32 = 0,
-    } = .{},
+    ssd: bool = false,
+    border: Border = .{},
     tiled: river.WindowV1.Edges = .{},
     capabilities: river.WindowV1.Capabilities = .{
         .window_menu = true,
@@ -130,8 +130,6 @@ constraints: Constraints = .{},
 /// proposing dimensions for a new river_window_v1 object.
 initialized: bool = false,
 mapped: bool = false,
-/// This is true if the Window is involved in the currently inflight transaction.
-inflight_transaction: bool = false,
 /// This indicates that the window should be destroyed when the current
 /// transaction completes. See Window.destroy()
 destroying: bool = false,
@@ -402,8 +400,8 @@ fn handleRequest(
         },
         .hide => uncommitted.hidden = true,
         .show => uncommitted.hidden = false,
-        .use_csd => uncommitted.decoration_choice = .csd,
-        .use_ssd => uncommitted.decoration_choice = .ssd,
+        .use_ssd => uncommitted.ssd = true,
+        .use_csd => uncommitted.ssd = false,
         .set_borders => |args| {
             if (args.width < 0) {
                 // XXX send protocol error
@@ -437,7 +435,7 @@ pub fn commitWmState(window: *Window) void {
         .y = window.uncommitted.y,
         .proposed = window.uncommitted.proposed orelse window.committed.proposed,
         .hidden = window.uncommitted.hidden,
-        .decoration_choice = window.uncommitted.decoration_choice,
+        .ssd = window.uncommitted.ssd,
         .border = window.uncommitted.border,
         .tiled = window.uncommitted.tiled,
         .capabilities = window.uncommitted.capabilities,
@@ -481,9 +479,6 @@ pub fn resizeUpdatePosition(window: *Window, width: i32, height: i32) void {
 }
 
 pub fn commitTransaction(window: *Window) void {
-    assert(window.inflight_transaction);
-    window.inflight_transaction = false;
-
     window.foreign_toplevel_handle.update();
 
     window.dropSavedSurfaceTree();
@@ -604,14 +599,44 @@ pub fn updateSceneState(window: *Window) void {
     }
 }
 
+/// Applies committed state from the window manager client to the inflight state.
 /// Returns true if the configure should be waited for by the transaction system.
 pub fn configure(window: *Window) bool {
+    if (!window.initialized) return false;
+
     assert(window.mapped and !window.destroying);
-    switch (window.impl) {
-        .toplevel => |*toplevel| return toplevel.configure(),
-        .xwayland => |*xwindow| return xwindow.configure(),
+
+    const committed = &window.committed;
+    window.inflight = .{
+        .box = .{
+            .x = committed.x,
+            .y = committed.y,
+            .width = if (committed.proposed) |p| p.width else window.pending.box.width,
+            .height = if (committed.proposed) |p| p.height else window.pending.box.height,
+        },
+        .hidden = committed.hidden,
+        .focus = 0, // XXX
+        .ssd = committed.ssd,
+        .border = committed.border,
+        .tiled = committed.tiled,
+        .capabilities = committed.capabilities,
+        .maximized = committed.maximized,
+        .fullscreen = committed.fullscreen,
+        .resizing = false, // XXX
+    };
+
+    const track_configure = switch (window.impl) {
+        .toplevel => |*toplevel| toplevel.configure(),
+        .xwayland => |*xwindow| xwindow.configure(),
         .none => unreachable,
+    };
+
+    if (track_configure) {
+        window.saveSurfaceTree();
+        window.sendFrameDone();
     }
+
+    return track_configure;
 }
 
 /// Returns null if the window is currently being destroyed and no longer has
