@@ -47,7 +47,7 @@ pub const Constraints = struct {
 
 const Impl = union(enum) {
     toplevel: XdgToplevel,
-    xwayland_window: if (build_options.xwayland) XwaylandWindow else noreturn,
+    xwayland: if (build_options.xwayland) XwaylandWindow else noreturn,
     /// This state is assigned during destruction after the xdg toplevel
     /// has been destroyed but while the transaction system is still rendering
     /// saved surfaces of the window.
@@ -123,7 +123,7 @@ saved_surface_tree: *wlr.SceneTree,
 borders: [4]*wlr.SceneRect,
 popup_tree: *wlr.SceneTree,
 
-/// Bounds on the width/height of the window, set by the toplevel/xwayland_window implementation.
+/// Bounds on the width/height of the window, set by the toplevel/xwindow implementation.
 constraints: Constraints = .{},
 
 /// Set to true once the window manager client has made its first commit
@@ -531,18 +531,18 @@ pub fn commitTransaction(window: *Window) void {
                 .timed_out, .timed_out_acked => unreachable,
             }
         },
-        .xwayland_window => |xwayland_window| {
+        .xwayland => |xwindow| {
             if (window.inflight.resizing) {
                 window.resizeUpdatePosition(
-                    xwayland_window.xwayland_surface.width,
-                    xwayland_window.xwayland_surface.height,
+                    xwindow.xsurface.width,
+                    xwindow.xsurface.height,
                 );
             }
 
-            window.inflight.box.width = xwayland_window.xwayland_surface.width;
-            window.inflight.box.height = xwayland_window.xwayland_surface.height;
-            window.pending.box.width = xwayland_window.xwayland_surface.width;
-            window.pending.box.height = xwayland_window.xwayland_surface.height;
+            window.inflight.box.width = xwindow.xsurface.width;
+            window.inflight.box.height = xwindow.xsurface.height;
+            window.pending.box.width = xwindow.xsurface.width;
+            window.pending.box.height = xwindow.xsurface.height;
 
             window.current = window.inflight;
         },
@@ -609,7 +609,7 @@ pub fn configure(window: *Window) bool {
     assert(window.mapped and !window.destroying);
     switch (window.impl) {
         .toplevel => |*toplevel| return toplevel.configure(),
-        .xwayland_window => |*xwayland_window| return xwayland_window.configure(),
+        .xwayland => |*xwindow| return xwindow.configure(),
         .none => unreachable,
     }
 }
@@ -620,7 +620,7 @@ pub fn configure(window: *Window) bool {
 pub fn rootSurface(window: Window) ?*wlr.Surface {
     return switch (window.impl) {
         .toplevel => |toplevel| toplevel.wlr_toplevel.base.surface,
-        .xwayland_window => |xwayland_window| xwayland_window.xwayland_surface.surface,
+        .xwayland => |xwindow| xwindow.xsurface.surface,
         .none => null,
     };
 }
@@ -672,7 +672,7 @@ fn saveSurfaceTreeIter(
 pub fn close(window: Window) void {
     switch (window.impl) {
         .toplevel => |toplevel| toplevel.wlr_toplevel.sendClose(),
-        .xwayland_window => |xwayland_window| xwayland_window.xwayland_surface.close(),
+        .xwayland => |xwindow| xwindow.xsurface.close(),
         .none => {},
     }
 }
@@ -680,7 +680,7 @@ pub fn close(window: Window) void {
 pub fn destroyPopups(window: Window) void {
     switch (window.impl) {
         .toplevel => |toplevel| toplevel.destroyPopups(),
-        .xwayland_window, .none => {},
+        .xwayland, .none => {},
     }
 }
 
@@ -689,7 +689,7 @@ pub fn getTitle(window: Window) ?[*:0]const u8 {
     assert(!window.destroying);
     return switch (window.impl) {
         .toplevel => |toplevel| toplevel.wlr_toplevel.title,
-        .xwayland_window => |xwayland_window| xwayland_window.xwayland_surface.title,
+        .xwayland => |xwindow| xwindow.xsurface.title,
         .none => unreachable,
     };
 }
@@ -700,7 +700,7 @@ pub fn getAppId(window: Window) ?[*:0]const u8 {
     return switch (window.impl) {
         .toplevel => |toplevel| toplevel.wlr_toplevel.app_id,
         // X11 clients don't have an app_id but the class serves a similar role.
-        .xwayland_window => |xwayland_window| xwayland_window.xwayland_surface.class,
+        .xwayland => |xwindow| xwindow.xsurface.class,
         .none => unreachable,
     };
 }

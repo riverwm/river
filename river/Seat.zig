@@ -55,7 +55,7 @@ pub const FocusTarget = union(enum) {
     pub fn surface(target: FocusTarget) ?*wlr.Surface {
         return switch (target) {
             .window => |window| window.rootSurface(),
-            .override_redirect => |override_redirect| override_redirect.xwayland_surface.surface,
+            .override_redirect => |override_redirect| override_redirect.xsurface.surface,
             .layer => |layer| layer.wlr_layer_surface.surface,
             .lock_surface => |lock_surface| lock_surface.wlr_lock_surface.surface,
             .none => null,

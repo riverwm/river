@@ -90,7 +90,7 @@ lock_manager: LockManager,
 wm: WindowManager,
 
 xwayland: if (build_options.xwayland) ?*wlr.Xwayland else void = if (build_options.xwayland) null,
-new_xwayland_surface: if (build_options.xwayland) wl.Listener(*wlr.XwaylandSurface) else void =
+new_xsurface: if (build_options.xwayland) wl.Listener(*wlr.XwaylandSurface) else void =
     if (build_options.xwayland) wl.Listener(*wlr.XwaylandSurface).init(handleNewXwaylandSurface),
 
 new_xdg_toplevel: wl.Listener(*wlr.XdgToplevel) =
@@ -174,7 +174,7 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
 
     if (build_options.xwayland and runtime_xwayland) {
         server.xwayland = try wlr.Xwayland.create(wl_server, compositor, false);
-        server.xwayland.?.events.new_surface.add(&server.new_xwayland_surface);
+        server.xwayland.?.events.new_surface.add(&server.new_xsurface);
     }
 
     try server.root.init();
@@ -205,7 +205,7 @@ pub fn deinit(server: *Server) void {
 
     if (build_options.xwayland) {
         if (server.xwayland) |xwayland| {
-            server.new_xwayland_surface.link.remove();
+            server.new_xsurface.link.remove();
             xwayland.destroy();
         }
     }
