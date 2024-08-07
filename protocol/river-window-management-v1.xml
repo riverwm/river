@@ -196,10 +196,6 @@
       proposes window dimensions (river_window_v1.propose_dimensions) and makes
       a river_window_manager_v1.commit request.
 
-      The window manager should make this initial commit proposing dimensions
-      for new windows as soon as possible after receiving the corresponding
-      update event.
-
       TODO:
         - size hints (including unset state)
         - window cropping
