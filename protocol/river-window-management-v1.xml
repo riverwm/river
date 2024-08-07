@@ -206,9 +206,9 @@
         This request indicates that the client will no longer use the window
         object and that it may be safely destroyed.
 
-        This request should be made by the client after the
-        river_window_v1.closed event is received to complete destruction of the
-        window.
+        This request should be made after the river_window_v1.closed event or
+        river_window_manager_v1.finished is received to complete destruction of
+        the window.
       </description>
     </request>
 
@@ -229,9 +229,12 @@
 
     <request name="close">
       <description summary="request that the window be closed">
-        Request that the window be closed. The server will send a
-        river_window_v1.closed event when the window has been closed and it is
-        safe to destroy this object.
+        Request that the window be closed. The window may ignore this request or
+        only close after some delay, perhaps opening a dialog asking the user to
+        save their work or similar.
+
+        The server will send a river_window_v1.closed event if/when the window
+        has been closed.
 
         This request is double-buffered state and will not be applied until the
         next river_window_manager_v1.commit request.
