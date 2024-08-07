@@ -112,12 +112,16 @@ fn handleRequest(
             const other_data = args.other.getUserData() orelse return;
             const other: *WmNode = @ptrCast(@alignCast(other_data));
 
+            if (other == node) return;
+
             node.link_uncommitted.remove();
             other.link_uncommitted.insert(&node.link_uncommitted);
         },
         .place_below => |args| {
             const other_data = args.other.getUserData() orelse return;
             const other: *WmNode = @ptrCast(@alignCast(other_data));
+
+            if (other == node) return;
 
             node.link_uncommitted.remove();
             other.link_uncommitted.prev.?.insert(&node.link_uncommitted);

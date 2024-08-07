@@ -614,7 +614,7 @@
         be made fullscreen and allows them to provide an output preference.
 
         The window manager is free to honor this request using
-        river_window_v1.set_fullscreen or ignore it.
+        river_window_v1.fullscreen or ignore it.
 
         This event is double-buffered state and will be followed by a
         river_window_manager_v1.update event.
@@ -629,7 +629,7 @@
         fullscreen.
 
         The window manager is free to honor this request using
-        river_window_v1.unset_fullscreen or ignore it.
+        river_window_v1.exit_fullscreen or ignore it.
 
         This event is double-buffered state and will be followed by a
         river_window_manager_v1.update event.
@@ -814,7 +814,10 @@
 
     <request name="place_above">
       <description summary="place node above another node">
-        This request places the node above another node in the scene graph.
+        This request places the node directly above another node in the
+        compositor's render list.
+
+        Attempting to place a node above itself has no effect.
 
         This request is double-buffered state and will not be applied until the
         next river_window_manager_v1.commit request.
@@ -824,7 +827,10 @@
 
     <request name="place_below">
       <description summary="place node below another node">
-        This request places the node below another node in the scene graph.
+        This request places the node directly below another node in the
+        compositor's render list.
+
+        Attempting to place a node below itself has no effect.
 
         This request is double-buffered state and will not be applied until the
         next river_window_manager_v1.commit request.
