@@ -46,6 +46,9 @@
         running. The circumstances causing this event to be sent are compositor
         policy.
 
+        If sent, this event is guaranteed to be the first and only event sent by
+        the server.
+
         The server will send no further events on this object. The client should
         destroy this object and all objects created through this interface.
       </description>
