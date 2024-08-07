@@ -421,6 +421,11 @@
         on the specified edges of the window. Borders are drawn above the window
         content.
 
+        Corners are drawn only between borders on adjacent edges. If e.g. the
+        left edge has a border and the top edge does not, the border drawn on
+        the left edge will not extend vertically beyond the top edge of the
+        window.
+
         The color is defined by four 32-bit RGBA values. Unless specified in
         another protocol extension, the RGBA values use pre-multiplied alpha.
 
