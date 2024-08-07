@@ -673,24 +673,12 @@ fn commitTransaction(root: *Root) void {
         while (focus_stack_it.next()) |view| {
             assert(view.inflight.output == output);
 
-            if (view.current.output != view.inflight.output or
-                (output.current.fullscreen == view and output.inflight.fullscreen != view))
-            {
-                if (view.inflight.float) {
-                    view.tree.node.reparent(output.layers.float);
-                } else {
-                    view.tree.node.reparent(output.layers.layout);
-                }
-                view.popup_tree.node.reparent(output.layers.popups);
+            if (view.inflight.float) {
+                view.tree.node.reparent(output.layers.float);
+            } else {
+                view.tree.node.reparent(output.layers.layout);
             }
-
-            if (view.current.float != view.inflight.float) {
-                if (view.inflight.float) {
-                    view.tree.node.reparent(output.layers.float);
-                } else {
-                    view.tree.node.reparent(output.layers.layout);
-                }
-            }
+            view.popup_tree.node.reparent(output.layers.popups);
 
             view.commitTransaction();
 
@@ -703,15 +691,13 @@ fn commitTransaction(root: *Root) void {
             }
         }
 
-        if (output.inflight.fullscreen != output.current.fullscreen) {
-            if (output.inflight.fullscreen) |view| {
-                assert(view.inflight.output == output);
-                assert(view.current.output == output);
-                view.tree.node.reparent(output.layers.fullscreen);
-            }
-            output.current.fullscreen = output.inflight.fullscreen;
-            output.layers.fullscreen.node.setEnabled(output.current.fullscreen != null);
+        if (output.inflight.fullscreen) |view| {
+            assert(view.inflight.output == output);
+            assert(view.current.output == output);
+            view.tree.node.reparent(output.layers.fullscreen);
         }
+        output.current.fullscreen = output.inflight.fullscreen;
+        output.layers.fullscreen.node.setEnabled(output.current.fullscreen != null);
 
         output.status.handleTransactionCommit(output);
     }
