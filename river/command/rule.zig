@@ -38,6 +38,8 @@ const Action = enum {
     dimensions,
     fullscreen,
     @"no-fullscreen",
+    tearing,
+    @"no-tearing",
 };
 
 pub fn ruleAdd(_: *Seat, args: []const [:0]const u8, _: *?[]const u8) Error!void {
@@ -53,7 +55,7 @@ pub fn ruleAdd(_: *Seat, args: []const [:0]const u8, _: *?[]const u8) Error!void
     const action = std.meta.stringToEnum(Action, result.args[0]) orelse return Error.UnknownOption;
 
     const positional_arguments_count: u8 = switch (action) {
-        .float, .@"no-float", .ssd, .csd, .fullscreen, .@"no-fullscreen" => 1,
+        .float, .@"no-float", .ssd, .csd, .fullscreen, .@"no-fullscreen", .tearing, .@"no-tearing" => 1,
         .tags, .output => 2,
         .position, .dimensions => 3,
     };
@@ -82,6 +84,14 @@ pub fn ruleAdd(_: *Seat, args: []const [:0]const u8, _: *?[]const u8) Error!void
             });
             apply_ssd_rules();
             server.root.applyPending();
+        },
+        .tearing, .@"no-tearing" => {
+            try server.config.rules.tearing.add(.{
+                .app_id_glob = app_id_glob,
+                .title_glob = title_glob,
+                .value = (action == .tearing),
+            });
+            apply_tearing_rules();
         },
         .tags => {
             const tags = try fmt.parseInt(u32, result.args[1], 10);
@@ -177,6 +187,10 @@ pub fn ruleDel(_: *Seat, args: []const [:0]const u8, _: *?[]const u8) Error!void
         .fullscreen, .@"no-fullscreen" => {
             _ = server.config.rules.fullscreen.del(rule);
         },
+        .tearing, .@"no-tearing" => {
+            _ = server.config.rules.tearing.del(rule);
+            apply_tearing_rules();
+        },
     }
 }
 
@@ -187,6 +201,17 @@ fn apply_ssd_rules() void {
 
         if (server.config.rules.ssd.match(view)) |ssd| {
             view.pending.ssd = ssd;
+        }
+    }
+}
+
+fn apply_tearing_rules() void {
+    var it = server.root.views.iterator(.forward);
+    while (it.next()) |view| {
+        if (view.destroying) continue;
+
+        if (server.config.rules.tearing.match(view)) |tearing| {
+            view.tearing_mode = if (tearing) .override_true else .override_false;
         }
     }
 }
@@ -203,6 +228,7 @@ pub fn listRules(_: *Seat, args: []const [:0]const u8, out: *?[]const u8) Error!
         position,
         dimensions,
         fullscreen,
+        tearing,
     }, args[1]) orelse return Error.UnknownOption;
     const max_glob_len = switch (rule_list) {
         inline else => |list| @field(server.config.rules, @tagName(list)).getMaxGlobLen(),
@@ -218,12 +244,13 @@ pub fn listRules(_: *Seat, args: []const [:0]const u8, out: *?[]const u8) Error!
     try writer.writeAll("action\n");
 
     switch (rule_list) {
-        inline .float, .ssd, .output, .fullscreen => |list| {
+        inline .float, .ssd, .output, .fullscreen, .tearing => |list| {
             const rules = switch (list) {
                 .float => server.config.rules.float.rules.items,
                 .ssd => server.config.rules.ssd.rules.items,
                 .output => server.config.rules.output.rules.items,
                 .fullscreen => server.config.rules.fullscreen.rules.items,
+                .tearing => server.config.rules.tearing.rules.items,
                 else => unreachable,
             };
             for (rules) |rule| {
@@ -234,6 +261,7 @@ pub fn listRules(_: *Seat, args: []const [:0]const u8, out: *?[]const u8) Error!
                     .ssd => if (rule.value) "ssd" else "csd",
                     .output => rule.value,
                     .fullscreen => if (rule.value) "fullscreen" else "no-fullscreen",
+                    .tearing => if (rule.value) "tearing" else "no-tearing",
                     else => unreachable,
                 }});
             }

@@ -84,6 +84,8 @@ screencopy_manager: *wlr.ScreencopyManagerV1,
 
 foreign_toplevel_manager: *wlr.ForeignToplevelManagerV1,
 
+tearing_control_manager: *wlr.TearingControlManagerV1,
+
 input_manager: InputManager,
 root: Root,
 config: Config,
@@ -158,6 +160,8 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
         .screencopy_manager = try wlr.ScreencopyManagerV1.create(wl_server),
 
         .foreign_toplevel_manager = try wlr.ForeignToplevelManagerV1.create(wl_server),
+
+        .tearing_control_manager = try wlr.TearingControlManagerV1.create(wl_server, 1),
 
         .config = try Config.init(),
 

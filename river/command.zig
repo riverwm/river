@@ -41,6 +41,7 @@ const command_impls = std.StaticStringMap(
 ).initComptime(
     .{
         // zig fmt: off
+        .{ "allow-tearing",             @import("command/config.zig").allowTearing },
         .{ "attach-mode",               @import("command/attach_mode.zig").defaultAttachMode },
         .{ "background-color",          @import("command/config.zig").backgroundColor },
         .{ "border-color-focused",      @import("command/config.zig").borderColorFocused },
