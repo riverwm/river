@@ -46,8 +46,7 @@ pub fn create(wlr_lock_surface: *wlr.SessionLockSurfaceV1, lock: *wlr.SessionLoc
     };
     wlr_lock_surface.data = @intFromPtr(lock_surface);
 
-    const output = lock_surface.getOutput();
-    const tree = try output.locked_content.createSceneSubsurfaceTree(wlr_lock_surface.surface);
+    const tree = try server.root.locked_tree.createSceneSubsurfaceTree(wlr_lock_surface.surface);
     errdefer tree.node.destroy();
 
     try SceneNodeData.attach(&tree.node, .{ .lock_surface = lock_surface });
@@ -104,10 +103,6 @@ pub fn configure(lock_surface: *LockSurface) void {
 
 fn handleMap(listener: *wl.Listener(void)) void {
     const lock_surface: *LockSurface = @fieldParentPtr("map", listener);
-    const output = lock_surface.getOutput();
-
-    output.normal_content.node.setEnabled(false);
-    output.locked_content.node.setEnabled(true);
 
     // Unfortunately the surface commit handlers for the scene subsurface tree corresponding to
     // this lock surface won't be called until after this function returns, which means that we cannot

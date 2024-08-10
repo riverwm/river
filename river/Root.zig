@@ -37,22 +37,37 @@ const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
 scene: *wlr.Scene,
 /// All windows, status bars, drowdown menus, etc. that can recieve pointer events and similar.
-interactive_content: *wlr.SceneTree,
-/// Drag icons, which cannot recieve e.g. pointer events and are therefore kept in a separate tree.
+interactive_tree: *wlr.SceneTree,
+/// Drag icons, which cannot recieve e.g. pointer events and are therefore kept
+/// in a separate tree from the interactive tree.
 drag_icons: *wlr.SceneTree,
+/// Always disabled, used for staging changes
+/// TODO can this be refactored away?
+hidden_tree: *wlr.SceneTree,
+/// Direct child of interactive_tree, disabled when the session is locked
+normal_tree: *wlr.SceneTree,
+/// Direct child of interactive_tree, enabled when the session is locked
+locked_tree: *wlr.SceneTree,
 
-/// All direct children of the interactive_content scene node
+/// All direct children of the normal_tree scene node
 layers: struct {
-    /// Parent tree for output trees which have their position updated when
-    /// outputs are moved in the layout.
-    outputs: *wlr.SceneTree,
+    /// Background layer shell layer
+    background: *wlr.SceneTree,
+    /// Bottom layer shell layer
+    bottom: *wlr.SceneTree,
+    /// Windows and shell surfaces of the window manager
+    wm: *wlr.SceneTree,
+    /// Top layer shell layer
+    top: *wlr.SceneTree,
+    /// Overlay layer shell layer
+    overlay: *wlr.SceneTree,
+    /// Popups from xdg-shell and input-method-v2 clients
+    popups: *wlr.SceneTree,
     /// Xwayland override redirect windows are a legacy wart that decide where
     /// to place themselves in layout coordinates. Unfortunately this is how
     /// X11 decided to make dropdown menus and the like possible.
     override_redirect: if (build_options.xwayland) *wlr.SceneTree else void,
 },
-
-hidden_tree: *wlr.SceneTree,
 
 new_output: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleNewOutput),
 
@@ -90,27 +105,33 @@ pub fn init(root: *Root) !void {
     const scene = try wlr.Scene.create();
     errdefer scene.tree.node.destroy();
 
-    const interactive_content = try scene.tree.createSceneTree();
+    const interactive_tree = try scene.tree.createSceneTree();
     const drag_icons = try scene.tree.createSceneTree();
     const hidden_tree = try scene.tree.createSceneTree();
     hidden_tree.node.setEnabled(false);
 
-    const outputs = try interactive_content.createSceneTree();
-    const override_redirect = if (build_options.xwayland) try interactive_content.createSceneTree();
+    const normal_tree = try interactive_tree.createSceneTree();
+    const locked_tree = try interactive_tree.createSceneTree();
 
     root.* = .{
         .scene = scene,
-        .interactive_content = interactive_content,
+        .interactive_tree = interactive_tree,
         .drag_icons = drag_icons,
+        .hidden_tree = hidden_tree,
+        .normal_tree = normal_tree,
+        .locked_tree = locked_tree,
         .layers = .{
-            .outputs = outputs,
-            .override_redirect = override_redirect,
+            .background = try normal_tree.createSceneTree(),
+            .bottom = try normal_tree.createSceneTree(),
+            .wm = try normal_tree.createSceneTree(),
+            .top = try normal_tree.createSceneTree(),
+            .overlay = try normal_tree.createSceneTree(),
+            .popups = try normal_tree.createSceneTree(),
+            .override_redirect = if (build_options.xwayland) try normal_tree.createSceneTree(),
         },
         .output_layout = output_layout,
         .all_outputs = undefined,
         .active_outputs = undefined,
-
-        .hidden_tree = hidden_tree,
 
         .presentation = try wlr.Presentation.create(server.wl_server, server.backend),
         .xdg_output_manager = try wlr.XdgOutputManagerV1.create(server.wl_server, output_layout),
@@ -142,12 +163,12 @@ pub const AtResult = struct {
     data: SceneNodeData.Data,
 };
 
-/// Return information about what is currently rendered in the interactive_content
+/// Return information about what is currently rendered in the interactive_tree
 /// tree at the given layout coordinates, taking surface input regions into account.
 pub fn at(root: Root, lx: f64, ly: f64) ?AtResult {
     var sx: f64 = undefined;
     var sy: f64 = undefined;
-    const node = root.interactive_content.node.at(lx, ly, &sx, &sy) orelse return null;
+    const node = root.interactive_tree.node.at(lx, ly, &sx, &sy) orelse return null;
 
     const surface: ?*wlr.Surface = blk: {
         if (node.type == .buffer) {
@@ -170,6 +191,16 @@ pub fn at(root: Root, lx: f64, ly: f64) ?AtResult {
     } else {
         return null;
     }
+}
+
+pub fn layerSurfaceTree(root: Root, layer: zwlr.LayerShellV1.Layer) *wlr.SceneTree {
+    const trees = [_]*wlr.SceneTree{
+        root.layers.background,
+        root.layers.bottom,
+        root.layers.top,
+        root.layers.overlay,
+    };
+    return trees[@intCast(@intFromEnum(layer))];
 }
 
 fn handleNewOutput(_: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
@@ -203,22 +234,11 @@ pub fn deactivateOutput(root: *Root, output: *Output) void {
     }
 
     root.output_layout.remove(output.wlr_output);
-    output.tree.node.setEnabled(false);
 
     output.active_link.remove();
     output.active_link.init();
 
-    // Close all layer surfaces on the removed output
-    for ([_]zwlr.LayerShellV1.Layer{ .overlay, .top, .bottom, .background }) |layer| {
-        const tree = output.layerSurfaceTree(layer);
-        var it = tree.children.safeIterator(.forward);
-        while (it.next()) |scene_node| {
-            assert(scene_node.type == .tree);
-            if (@as(?*SceneNodeData, @ptrFromInt(scene_node.data))) |node_data| {
-                node_data.data.layer_surface.wlr_layer_surface.destroy();
-            }
-        }
-    }
+    // XXX Close all layer surfaces on the removed output
 
     // We must call reconfigureDevices here to unmap devices that might be mapped to this output
     // in order to prevent a segfault in wlroots.
@@ -271,9 +291,10 @@ pub fn handleOutputConfigChange(root: *Root) !void {
         var box: wlr.Box = undefined;
         root.output_layout.getBox(output.wlr_output, &box);
 
-        output.tree.node.setEnabled(!box.empty());
-        output.tree.node.setPosition(box.x, box.y);
-        output.scene_output.setPosition(box.x, box.y);
+        // XXX
+        //output.tree.node.setEnabled(!box.empty());
+        //output.tree.node.setPosition(box.x, box.y);
+        //output.scene_output.setPosition(box.x, box.y);
 
         const head = try wlr.OutputConfigurationV1.Head.create(config, output.wlr_output);
         head.state.x = box.x;

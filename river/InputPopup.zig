@@ -118,7 +118,7 @@ pub fn update(input_popup: *InputPopup) void {
     const popup_tree = switch (focused.data) {
         .window => |window| window.popup_tree,
         .layer_surface => |layer_surface| layer_surface.popup_tree,
-        .lock_surface => |lock_surface| lock_surface.getOutput().layers.popups,
+        .lock_surface => |_| server.root.layers.popups, // XXX Do we need per-lock-surface popup trees?
         // Xwayland doesn't use the text-input protocol
         .override_redirect => unreachable,
     };

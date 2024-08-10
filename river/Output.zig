@@ -52,31 +52,6 @@ active_link: wl.list.Link,
 /// TODO: this should be part of the output's State
 usable_box: wlr.Box,
 
-/// Scene node representing the entire output.
-/// Position must be updated when the output is moved in the layout.
-tree: *wlr.SceneTree,
-normal_content: *wlr.SceneTree,
-locked_content: *wlr.SceneTree,
-
-/// Child nodes of normal_content
-layers: struct {
-    background_color_rect: *wlr.SceneRect,
-    /// Background layer shell layer
-    background: *wlr.SceneTree,
-    /// Bottom layer shell layer
-    bottom: *wlr.SceneTree,
-    /// Windows and shell surfaces of the window manager
-    wm: *wlr.SceneTree,
-    /// Top layer shell layer
-    top: *wlr.SceneTree,
-    /// Fullscreen windows
-    fullscreen: *wlr.SceneTree,
-    /// Overlay layer shell layer
-    overlay: *wlr.SceneTree,
-    /// Popups from xdg-shell and input-method-v2 clients
-    popups: *wlr.SceneTree,
-},
-
 /// Tracks the currently presented frame on the output as it pertains to ext-session-lock.
 /// The output is initially considered blanked:
 /// If using the DRM backend it will be blanked with the initial modeset.
@@ -101,20 +76,6 @@ lock_render_state: enum {
 /// Set to true if a gamma control client makes a set gamma request.
 /// This request is handled while rendering the next frame in handleFrame().
 gamma_dirty: bool = false,
-
-/// The state most recently sent to the layout generator and clients.
-/// This state is immutable until all clients have replied and the transaction
-/// is completed, at which point this inflight state is copied to current.
-inflight: struct {
-    /// The window to be made fullscreen, if any.
-    fullscreen: ?*Window = null,
-} = .{},
-
-/// The current state represented by the scene graph.
-current: struct {
-    /// The currently fullscreen window, if any.
-    fullscreen: ?*Window = null,
-} = .{},
 
 destroy: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleDestroy),
 request_state: wl.Listener(*wlr.Output.event.RequestState) = wl.Listener(*wlr.Output.event.RequestState).init(handleRequestState),
@@ -175,31 +136,11 @@ pub fn create(wlr_output: *wlr.Output) !void {
 
     const scene_output = try server.root.scene.createSceneOutput(wlr_output);
 
-    const tree = try server.root.layers.outputs.createSceneTree();
-    const normal_content = try tree.createSceneTree();
-
     output.* = .{
         .wlr_output = wlr_output,
         .scene_output = scene_output,
         .all_link = undefined,
         .active_link = undefined,
-        .tree = tree,
-        .normal_content = normal_content,
-        .locked_content = try tree.createSceneTree(),
-        .layers = .{
-            .background_color_rect = try normal_content.createSceneRect(
-                width,
-                height,
-                &server.config.background_color,
-            ),
-            .background = try normal_content.createSceneTree(),
-            .bottom = try normal_content.createSceneTree(),
-            .wm = try normal_content.createSceneTree(),
-            .top = try normal_content.createSceneTree(),
-            .fullscreen = try normal_content.createSceneTree(),
-            .overlay = try normal_content.createSceneTree(),
-            .popups = try normal_content.createSceneTree(),
-        },
         .usable_box = .{
             .x = 0,
             .y = 0,
@@ -208,9 +149,6 @@ pub fn create(wlr_output: *wlr.Output) !void {
         },
     };
     wlr_output.data = @intFromPtr(output);
-
-    _ = try output.layers.fullscreen.createSceneRect(width, height, &[_]f32{ 0, 0, 0, 1.0 });
-    output.layers.fullscreen.node.setEnabled(false);
 
     wlr_output.events.destroy.add(&output.destroy);
     wlr_output.events.request_state.add(&output.request_state);
@@ -223,16 +161,6 @@ pub fn create(wlr_output: *wlr.Output) !void {
     server.root.all_outputs.append(output);
 
     output.handleEnableDisable();
-}
-
-pub fn layerSurfaceTree(output: Output, layer: zwlr.LayerShellV1.Layer) *wlr.SceneTree {
-    const trees = [_]*wlr.SceneTree{
-        output.layers.background,
-        output.layers.bottom,
-        output.layers.top,
-        output.layers.overlay,
-    };
-    return trees[@intCast(@intFromEnum(layer))];
 }
 
 /// Arrange all layer surfaces of this output and adjust the usable area.
@@ -264,6 +192,7 @@ fn sendLayerConfigures(
     usable_box: *wlr.Box,
     mode: enum { exclusive, non_exclusive },
 ) void {
+    if (true) @panic("XXX");
     for ([_]zwlr.LayerShellV1.Layer{ .background, .bottom, .top, .overlay }) |layer| {
         const tree = output.layerSurfaceTree(layer);
         var it = tree.children.safeIterator(.forward);
@@ -321,8 +250,6 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
     output.frame.link.remove();
     output.present.link.remove();
 
-    output.tree.node.destroy();
-
     output.wlr_output.data = 0;
 
     util.gpa.destroy(output);
@@ -362,9 +289,8 @@ pub fn applyState(output: *Output, state: *wlr.Output.State) error{CommitFailed}
     }
 
     if (state.committed.mode) {
-        output.updateBackgroundRect();
         output.arrangeLayers();
-        server.lock_manager.updateLockSurfaceSize(output);
+        if (server.lock_manager.lockSurfaceFromOutput(output)) |s| s.configure();
     }
 }
 
@@ -382,38 +308,12 @@ fn handleEnableDisable(output: *Output) void {
 }
 
 pub fn updateLockRenderStateOnEnableDisable(output: *Output) void {
-    // We can't assert the current state of normal_content/locked_content
-    // here as this output may be newly created.
     if (output.wlr_output.enabled) {
-        switch (server.lock_manager.state) {
-            .unlocked => {
-                assert(output.lock_render_state == .blanked);
-                output.normal_content.node.setEnabled(true);
-                output.locked_content.node.setEnabled(false);
-            },
-            .waiting_for_lock_surfaces, .waiting_for_blank, .locked => {
-                assert(output.lock_render_state == .blanked);
-                output.normal_content.node.setEnabled(false);
-                output.locked_content.node.setEnabled(true);
-            },
-        }
+        assert(output.lock_render_state == .blanked);
     } else {
         // Disabling and re-enabling an output always blanks it.
         output.lock_render_state = .blanked;
-        output.normal_content.node.setEnabled(false);
-        output.locked_content.node.setEnabled(true);
     }
-}
-
-pub fn updateBackgroundRect(output: *Output) void {
-    var width: c_int = undefined;
-    var height: c_int = undefined;
-    output.wlr_output.effectiveResolution(&width, &height);
-    output.layers.background_color_rect.setSize(width, height);
-
-    var it = output.layers.fullscreen.children.iterator(.forward);
-    const fullscreen_background: *wlr.SceneRect = @fieldParentPtr("node", it.next().?);
-    fullscreen_background.setSize(width, height);
 }
 
 fn handleFrame(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
@@ -457,12 +357,20 @@ fn renderAndCommit(output: *Output, scene_output: *wlr.SceneOutput) !void {
         if (!scene_output.commit(null)) return error.CommitFailed;
     }
 
+    const lock_surface_mapped = blk: {
+        if (server.lock_manager.lockSurfaceFromOutput(output)) |lock_surface| {
+            break :blk lock_surface.wlr_lock_surface.surface.mapped;
+        } else {
+            break :blk false;
+        }
+    };
+
     if (server.lock_manager.state == .locked or
-        (server.lock_manager.state == .waiting_for_lock_surfaces and output.locked_content.node.enabled) or
+        (server.lock_manager.state == .waiting_for_lock_surfaces and lock_surface_mapped) or
         server.lock_manager.state == .waiting_for_blank)
     {
-        assert(!output.normal_content.node.enabled);
-        assert(output.locked_content.node.enabled);
+        assert(!server.root.normal_tree.node.enabled);
+        assert(server.root.locked_tree.node.enabled);
 
         switch (server.lock_manager.state) {
             .unlocked => unreachable,

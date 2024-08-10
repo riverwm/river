@@ -47,13 +47,13 @@ pub fn create(wlr_layer_surface: *wlr.LayerSurfaceV1) error{OutOfMemory}!void {
     const layer_surface = try util.gpa.create(LayerSurface);
     errdefer util.gpa.destroy(layer_surface);
 
-    const layer_tree = output.layerSurfaceTree(wlr_layer_surface.current.layer);
+    const layer_tree = server.root.layerSurfaceTree(wlr_layer_surface.current.layer);
 
     layer_surface.* = .{
         .output = output,
         .wlr_layer_surface = wlr_layer_surface,
         .scene_layer_surface = try layer_tree.createSceneLayerSurfaceV1(wlr_layer_surface),
-        .popup_tree = try output.layers.popups.createSceneTree(),
+        .popup_tree = try server.root.layers.popups.createSceneTree(),
     };
 
     try SceneNodeData.attach(&layer_surface.scene_layer_surface.tree.node, .{ .layer_surface = layer_surface });
@@ -103,10 +103,7 @@ fn handleMap(listener: *wl.Listener(void)) void {
 
     const consider = wlr_surface.current.keyboard_interactive == .on_demand and
         (wlr_surface.current.layer == .top or wlr_surface.current.layer == .overlay);
-    handleKeyboardInteractiveExclusive(
-        layer_surface.output,
-        if (consider) layer_surface else null,
-    );
+    handleKeyboardInteractiveExclusive(if (consider) layer_surface else null);
 
     server.wm.dirtyPending();
 }
@@ -117,7 +114,7 @@ fn handleUnmap(listener: *wl.Listener(void)) void {
     log.debug("layer surface '{s}' unmapped", .{layer_surface.wlr_layer_surface.namespace});
 
     layer_surface.output.arrangeLayers();
-    handleKeyboardInteractiveExclusive(layer_surface.output, null);
+    handleKeyboardInteractiveExclusive(null);
     server.wm.dirtyPending();
 }
 
@@ -129,7 +126,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
 
     // If the layer was changed, move the LayerSurface to the proper tree.
     if (wlr_layer_surface.current.committed.layer) {
-        const tree = layer_surface.output.layerSurfaceTree(wlr_layer_surface.current.layer);
+        const tree = server.root.layerSurfaceTree(wlr_layer_surface.current.layer);
         layer_surface.scene_layer_surface.tree.node.reparent(tree);
     }
 
@@ -137,7 +134,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
         @as(u32, @bitCast(wlr_layer_surface.current.committed)) != 0)
     {
         layer_surface.output.arrangeLayers();
-        handleKeyboardInteractiveExclusive(layer_surface.output, null);
+        handleKeyboardInteractiveExclusive(null);
         server.wm.dirtyPending();
     }
 }
@@ -145,13 +142,13 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
 /// Focus topmost keyboard-interactivity-exclusive layer surface above normal
 /// content, or if none found, focus the surface given as `consider`.
 /// Requires a call to WindowManager.dirtyPending()
-fn handleKeyboardInteractiveExclusive(output: *Output, consider: ?*LayerSurface) void {
+fn handleKeyboardInteractiveExclusive(consider: ?*LayerSurface) void {
     if (server.lock_manager.state != .unlocked) return;
 
     // Find the topmost layer surface (if any) in the top or overlay layers which
     // requests exclusive keyboard interactivity.
     const to_focus = outer: for ([_]zwlr.LayerShellV1.Layer{ .overlay, .top }) |layer| {
-        const tree = output.layerSurfaceTree(layer);
+        const tree = server.root.layerSurfaceTree(layer);
         // Iterate in reverse to match rendering order.
         var it = tree.children.iterator(.reverse);
         while (it.next()) |node| {
@@ -179,8 +176,7 @@ fn handleKeyboardInteractiveExclusive(output: *Output, consider: ?*LayerSurface)
         if (true) @panic("TODO");
         if (false) {
             if (to_focus) |s| {
-                // If we found a surface on the output that requires focus, grab the focus of all
-                // seats that are focusing that output.
+                // If we found a surface that requires focus, grab the focus of all seats.
                 seat.setFocusRaw(.{ .layer = s });
                 continue;
             }

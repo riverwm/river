@@ -135,13 +135,7 @@ fn handleLockSurfacesTimeout(manager: *LockManager) c_int {
     assert(manager.state == .waiting_for_lock_surfaces);
     manager.state = .waiting_for_blank;
 
-    {
-        var it = server.root.active_outputs.iterator(.forward);
-        while (it.next()) |output| {
-            output.normal_content.node.setEnabled(false);
-            output.locked_content.node.setEnabled(true);
-        }
-    }
+    if (true) @panic("XXX blank all outputs");
 
     // This call is necessary in the case that all outputs in the layout are disabled.
     manager.maybeLock();
@@ -193,20 +187,11 @@ fn handleUnlock(listener: *wl.Listener(void)) void {
 
     log.info("session unlocked", .{});
 
-    {
-        var it = server.root.active_outputs.iterator(.forward);
-        while (it.next()) |output| {
-            assert(!output.normal_content.node.enabled);
-            output.normal_content.node.setEnabled(true);
+    assert(!server.root.normal_tree.node.enabled);
+    server.root.normal_tree.node.setEnabled(true);
 
-            assert(output.locked_content.node.enabled);
-            output.locked_content.node.setEnabled(false);
-        }
-    }
-
-    if (build_options.xwayland) {
-        server.root.layers.override_redirect.node.setEnabled(true);
-    }
+    assert(server.root.locked_tree.node.enabled);
+    server.root.locked_tree.node.setEnabled(true);
 
     {
         var it = server.input_manager.seats.first;
@@ -254,14 +239,16 @@ fn handleSurface(
     };
 }
 
-pub fn updateLockSurfaceSize(manager: *LockManager, output: *Output) void {
-    const lock = manager.lock orelse return;
+pub fn lockSurfaceFromOutput(manager: *LockManager, output: *Output) ?*LockSurface {
+    const lock = manager.lock orelse return null;
 
     var it = lock.surfaces.iterator(.forward);
     while (it.next()) |wlr_lock_surface| {
         const lock_surface: *LockSurface = @ptrFromInt(wlr_lock_surface.data);
         if (output == lock_surface.getOutput()) {
-            lock_surface.configure();
+            return lock_surface;
         }
     }
+
+    return null;
 }
