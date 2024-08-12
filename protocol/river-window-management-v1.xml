@@ -1300,7 +1300,8 @@
 
         Releasing the modifiers for the binding without releasing the "main"
         physical key that produces the bound keysym does not trigger the release
-        event. This event is not sent until the "main" key is released.
+        event. This event is sent when the "main" key is released, even if the
+        modifiers have changed since the pressed event.
 
         This event is double-buffered state and will be followed by a
         river_window_manager_v1.update event.
@@ -1385,8 +1386,9 @@
         been released.
 
         Releasing the modifiers for the binding without releasing the pointer
-        button does not trigger the release event. This event is not sent until
-        the pointer button is released.
+        button does not trigger the release event. This event is sent when the
+        pointer button is released, even if the modifiers have changed since
+        the pressed event.
 
         This event is double-buffered state and will be followed by a
         river_window_manager_v1.update event.
