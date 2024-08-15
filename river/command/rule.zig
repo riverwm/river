@@ -211,7 +211,7 @@ fn apply_tearing_rules() void {
         if (view.destroying) continue;
 
         if (server.config.rules.tearing.match(view)) |tearing| {
-            view.tearing_mode = if (tearing) .override_true else .override_false;
+            view.tearing_mode = if (tearing) .tearing else .no_tearing;
         }
     }
 }

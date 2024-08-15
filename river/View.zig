@@ -61,8 +61,8 @@ const AttachRelativeMode = enum {
 };
 
 const TearingMode = enum {
-    override_false,
-    override_true,
+    no_tearing,
+    tearing,
     window_hint,
 };
 
@@ -184,7 +184,6 @@ foreign_toplevel_handle: ForeignToplevelHandle = .{},
 /// Connector name of the output this view occupied before an evacuation.
 output_before_evac: ?[]const u8 = null,
 
-// Current tearing mode of the view. Defaults to using the window tearing hint.
 tearing_mode: TearingMode = .window_hint,
 
 pub fn create(impl: Impl) error{OutOfMemory}!*View {
@@ -582,14 +581,19 @@ pub fn getAppId(view: View) ?[*:0]const u8 {
     };
 }
 
-/// Return true if the view can currently tear.
+/// Return true if tearing should be allowed for the view.
 pub fn allowTearing(view: *View) bool {
     switch (view.tearing_mode) {
-        TearingMode.override_false => return false,
-        TearingMode.override_true => return true,
-        TearingMode.window_hint => if (view.rootSurface()) |root_surface| {
-            return server.tearing_control_manager.hintFromSurface(root_surface) == .@"async";
-        } else return false,
+        .no_tearing => return false,
+        .tearing => return true,
+        .window_hint => {
+            if (server.config.allow_tearing) {
+                if (view.rootSurface()) |root_surface| {
+                    return server.tearing_control_manager.hintFromSurface(root_surface) == .@"async";
+                }
+            }
+            return false;
+        },
     }
 }
 
@@ -662,7 +666,7 @@ pub fn map(view: *View) !void {
     }
 
     if (server.config.rules.tearing.match(view)) |tearing| {
-        view.tearing_mode = if (tearing) .override_true else .override_false;
+        view.tearing_mode = if (tearing) .tearing else .no_tearing;
     }
 
     if (server.config.rules.dimensions.match(view)) |dimensions| {

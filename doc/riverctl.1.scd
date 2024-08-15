@@ -307,11 +307,10 @@ matches everything while _\*\*_ and the empty string are invalid.
 	- *fullscreen*: Make the view fullscreen. Applies only to new views.
 	- *no-fullscreen*: Don't make the view fullscreen. Applies only to
 	  new views.
-	- *tearing*: Enable tearing for view when fullscreen regardless of the
-	  supplied tearing hint. Note that tearing additionally requires setting the
-	  *allow-tearing* server option. Applies to new and existing views.
-	- *no-tearing*: Disable tearing for view regardless of the supplied
-	  tearing hint. Applies to new and existing views.
+	- *tearing*: Allow the view to tear when fullscreen regardless of the
+	  view's preference. Applies to new and existing views.
+	- *no-tearing*: Disable tearing for the view regardless of the view's
+	  preference. Applies to new and existing views.
 
 	Both *float* and *no-float* rules are added to the same list,
 	which means that adding a *no-float* rule with the same arguments
@@ -371,7 +370,8 @@ matches everything while _\*\*_ and the empty string are invalid.
 	default-attach-mode if any.
 
 *allow-tearing* *enabled*|*disabled*
-	Allow windows to tear if requested by either the program or the user.
+	Allow fullscreen views to tear if requested by the view. See also the
+	*tearing* rule to force enable tearing for specific views.
 
 *background-color* _0xRRGGBB_|_0xRRGGBBAA_
 	Set the background color.

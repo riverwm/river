@@ -31,8 +31,11 @@ pub fn allowTearing(
 ) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
-    server.config.allow_tearing = std.meta.stringToEnum(Config.AllowTearing, args[1]) orelse
+
+    const arg = std.meta.stringToEnum(enum { enabled, disabled }, args[1]) orelse
         return Error.UnknownOption;
+
+    server.config.allow_tearing = arg == .enabled;
 }
 
 pub fn borderWidth(

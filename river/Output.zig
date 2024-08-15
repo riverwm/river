@@ -557,18 +557,21 @@ fn renderAndCommit(output: *Output, scene_output: *wlr.SceneOutput) !void {
         }
     }
 
-    if (output.allowTearing() and server.config.allow_tearing == .enabled) {
-        state.tearing_page_flip = true;
-
-        if (!output.wlr_output.testState(&state)) {
-            log.debug("tearing page flip test failed for {s}, retrying without tearing", .{output.wlr_output.name});
-            state.tearing_page_flip = false;
+    if (output.current.fullscreen) |fullscreen| {
+        if (fullscreen.allowTearing()) {
+            state.tearing_page_flip = true;
+            if (!output.wlr_output.testState(&state)) {
+                log.debug("tearing page flip test failed for {s}, retrying without tearing", .{
+                    output.wlr_output.name,
+                });
+                state.tearing_page_flip = false;
+            }
         }
     }
 
     if (!output.wlr_output.commitState(&state)) return error.CommitFailed;
 
-    if (output.gamma_dirty) output.gamma_dirty = false;
+    output.gamma_dirty = false;
 
     if (server.lock_manager.state == .locked or
         (server.lock_manager.state == .waiting_for_lock_surfaces and output.locked_content.node.enabled) or
@@ -640,14 +643,6 @@ fn setTitle(output: Output) void {
     } else if (wlr.config.has_x11_backend and output.wlr_output.isX11()) {
         output.wlr_output.x11SetTitle(title);
     }
-}
-
-fn allowTearing(output: *Output) bool {
-    if (output.current.fullscreen) |fullscreen_view| {
-        return fullscreen_view.allowTearing();
-    }
-
-    return false;
 }
 
 pub fn handleLayoutNamespaceChange(output: *Output) void {
