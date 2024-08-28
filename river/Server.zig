@@ -320,7 +320,8 @@ fn allowlist(server: *Server, global: *const wl.Global) bool {
         global == server.input_manager.text_input_manager.global or
         global == server.input_manager.tablet_manager.global or
         global == server.input_manager.pointer_gestures.global or
-        global == server.idle_inhibit_manager.wlr_manager.global;
+        global == server.idle_inhibit_manager.wlr_manager.global or
+        global == server.tearing_control_manager.global;
 }
 
 /// Returns true if the global is blocked for security contexts
