@@ -28,7 +28,6 @@ const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const DragIcon = @import("DragIcon.zig");
-const LayerSurface = @import("LayerSurface.zig");
 const LockSurface = @import("LockSurface.zig");
 const Output = @import("Output.zig");
 const SceneNodeData = @import("SceneNodeData.zig");

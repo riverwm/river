@@ -30,7 +30,6 @@ const zwlr = wayland.server.zwlr;
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
-const LayerSurface = @import("LayerSurface.zig");
 const LockSurface = @import("LockSurface.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
 const Window = @import("Window.zig");
@@ -46,11 +45,6 @@ all_link: wl.list.Link,
 
 /// For Root.active_outputs
 active_link: wl.list.Link,
-
-/// The area left for windows and other layer surfaces after applying the
-/// exclusive zones of exclusive layer surfaces.
-/// TODO: this should be part of the output's State
-usable_box: wlr.Box,
 
 /// Tracks the currently presented frame on the output as it pertains to ext-session-lock.
 /// The output is initially considered blanked:
@@ -141,12 +135,6 @@ pub fn create(wlr_output: *wlr.Output) !void {
         .scene_output = scene_output,
         .all_link = undefined,
         .active_link = undefined,
-        .usable_box = .{
-            .x = 0,
-            .y = 0,
-            .width = width,
-            .height = height,
-        },
     };
     wlr_output.data = @intFromPtr(output);
 
@@ -161,78 +149,6 @@ pub fn create(wlr_output: *wlr.Output) !void {
     server.root.all_outputs.append(output);
 
     output.handleEnableDisable();
-}
-
-/// Arrange all layer surfaces of this output and adjust the usable area.
-/// Will arrange windows as well if the usable area changes.
-/// Requires a call to WindowManager.dirtyPending()
-pub fn arrangeLayers(output: *Output) void {
-    var full_box: wlr.Box = .{
-        .x = 0,
-        .y = 0,
-        .width = undefined,
-        .height = undefined,
-    };
-    output.wlr_output.effectiveResolution(&full_box.width, &full_box.height);
-
-    // This box is modified as exclusive zones are applied
-    var usable_box = full_box;
-
-    // Ensure all exclusive zones are applied before arranging surfaces
-    // without exclusive zones.
-    output.sendLayerConfigures(full_box, &usable_box, .exclusive);
-    output.sendLayerConfigures(full_box, &usable_box, .non_exclusive);
-
-    output.usable_box = usable_box;
-}
-
-fn sendLayerConfigures(
-    output: *Output,
-    full_box: wlr.Box,
-    usable_box: *wlr.Box,
-    mode: enum { exclusive, non_exclusive },
-) void {
-    if (true) @panic("XXX");
-    for ([_]zwlr.LayerShellV1.Layer{ .background, .bottom, .top, .overlay }) |layer| {
-        const tree = output.layerSurfaceTree(layer);
-        var it = tree.children.safeIterator(.forward);
-        while (it.next()) |node| {
-            assert(node.type == .tree);
-            if (@as(?*SceneNodeData, @ptrFromInt(node.data))) |node_data| {
-                const layer_surface = node_data.data.layer_surface;
-
-                const exclusive = layer_surface.wlr_layer_surface.current.exclusive_zone > 0;
-                if (exclusive != (mode == .exclusive)) {
-                    continue;
-                }
-
-                {
-                    var new_usable_box = usable_box.*;
-
-                    layer_surface.scene_layer_surface.configure(&full_box, &new_usable_box);
-
-                    // Clients can request bogus exclusive zones larger than the output
-                    // dimensions and river must handle this gracefully. It seems reasonable
-                    // to close layer shell clients that would cause the usable area of the
-                    // output to become less than half the width/height of its full dimensions.
-                    if (new_usable_box.width < @divTrunc(full_box.width, 2) or
-                        new_usable_box.height < @divTrunc(full_box.height, 2))
-                    {
-                        layer_surface.wlr_layer_surface.destroy();
-                        continue;
-                    }
-
-                    usable_box.* = new_usable_box;
-                }
-
-                layer_surface.popup_tree.node.setPosition(
-                    layer_surface.scene_layer_surface.tree.node.x,
-                    layer_surface.scene_layer_surface.tree.node.y,
-                );
-                layer_surface.scene_layer_surface.tree.node.subsurfaceTreeSetClip(&full_box);
-            }
-        }
-    }
 }
 
 fn handleDestroy(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
@@ -289,7 +205,6 @@ pub fn applyState(output: *Output, state: *wlr.Output.State) error{CommitFailed}
     }
 
     if (state.committed.mode) {
-        output.arrangeLayers();
         if (server.lock_manager.lockSurfaceFromOutput(output)) |s| s.configure();
     }
 }

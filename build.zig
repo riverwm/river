@@ -102,7 +102,6 @@ pub fn build(b: *Build) !void {
     scanner.addCustomProtocol("protocol/river-window-management-v1.xml");
     scanner.addCustomProtocol("protocol/river-control-unstable-v1.xml");
     scanner.addCustomProtocol("protocol/river-layout-v3.xml");
-    scanner.addCustomProtocol("protocol/wlr-layer-shell-unstable-v1.xml");
     scanner.addCustomProtocol("protocol/wlr-output-power-management-unstable-v1.xml");
 
     // Some of these versions may be out of date with what wlroots implements.
@@ -130,7 +129,6 @@ pub fn build(b: *Build) !void {
     scanner.generate("zriver_control_v1", 1);
     scanner.generate("river_layout_manager_v3", 2);
 
-    scanner.generate("zwlr_layer_shell_v1", 4);
     scanner.generate("zwlr_output_power_manager_v1", 1);
 
     const wayland = b.createModule(.{ .root_source_file = scanner.result });

@@ -33,7 +33,6 @@ const util = @import("util.zig");
 const Config = @import("Config.zig");
 const DragIcon = @import("DragIcon.zig");
 const InputDevice = @import("InputDevice.zig");
-const LayerSurface = @import("LayerSurface.zig");
 const LockSurface = @import("LockSurface.zig");
 const Output = @import("Output.zig");
 const PointerConstraint = @import("PointerConstraint.zig");
@@ -382,13 +381,6 @@ fn updateKeyboardFocus(cursor: Cursor, result: Root.AtResult) void {
     switch (result.data) {
         .window => |window| {
             cursor.seat.focus(window);
-        },
-        .layer_surface => |layer_surface| {
-            // If a keyboard inteactive layer surface has been clicked on,
-            // give it keyboard focus.
-            if (layer_surface.wlr_layer_surface.current.keyboard_interactive != .none) {
-                cursor.seat.setFocusRaw(.{ .layer = layer_surface });
-            }
         },
         .lock_surface => |lock_surface| {
             assert(server.lock_manager.state != .unlocked);

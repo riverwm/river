@@ -57,12 +57,6 @@ pub fn checkActive(inhibit_manager: *IdleInhibitManager) void {
                 inhibited = true;
                 break;
             },
-            .layer_surface => |layer_surface| {
-                if (layer_surface.wlr_layer_surface.surface.mapped) {
-                    inhibited = true;
-                    break;
-                }
-            },
             .lock_surface, .override_redirect => {
                 inhibited = true;
                 break;

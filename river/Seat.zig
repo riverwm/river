@@ -33,7 +33,6 @@ const InputManager = @import("InputManager.zig");
 const InputRelay = @import("InputRelay.zig");
 const Keyboard = @import("Keyboard.zig");
 const KeyboardGroup = @import("KeyboardGroup.zig");
-const LayerSurface = @import("LayerSurface.zig");
 const LockSurface = @import("LockSurface.zig");
 const Mapping = @import("Mapping.zig");
 const Output = @import("Output.zig");
@@ -48,7 +47,6 @@ const log = std.log.scoped(.seat);
 pub const FocusTarget = union(enum) {
     window: *Window,
     override_redirect: if (build_options.xwayland) *XwaylandOverrideRedirect else noreturn,
-    layer: *LayerSurface,
     lock_surface: *LockSurface,
     none: void,
 
@@ -56,7 +54,6 @@ pub const FocusTarget = union(enum) {
         return switch (target) {
             .window => |window| window.rootSurface(),
             .override_redirect => |override_redirect| override_redirect.xsurface.surface,
-            .layer => |layer| layer.wlr_layer_surface.surface,
             .lock_surface => |lock_surface| lock_surface.wlr_lock_surface.surface,
             .none => null,
         };
@@ -134,24 +131,6 @@ pub fn focus(seat: *Seat, target: ?*Window) void {
     // Views may not receive focus while locked.
     if (server.lock_manager.state != .unlocked) return;
 
-    // A layer surface with exclusive focus will prevent any window from gaining
-    // focus if it is on the top or overlay layer. Otherwise, only steal focus
-    // from a focused layer surface if there is an explicit target window.
-    if (seat.focused == .layer) {
-        const wlr_layer_surface = seat.focused.layer.wlr_layer_surface;
-        assert(wlr_layer_surface.surface.mapped);
-        switch (wlr_layer_surface.current.keyboard_interactive) {
-            .none => {},
-            .exclusive => switch (wlr_layer_surface.current.layer) {
-                .top, .overlay => return,
-                .bottom, .background => if (target == null) return,
-                _ => {},
-            },
-            .on_demand => if (target == null) return,
-            _ => {},
-        }
-    }
-
     // Focus the target window or clear the focus if target is null
     if (target) |window| {
         seat.setFocusRaw(.{ .window = window });
@@ -175,9 +154,6 @@ pub fn setFocusRaw(seat: *Seat, new_focus: FocusTarget) void {
             //window.pending.focus -= 1; XXX update focus to send activated state
             window.destroyPopups();
         },
-        .layer => |layer_surface| {
-            layer_surface.destroyPopups();
-        },
         .override_redirect, .lock_surface, .none => {},
     }
 
@@ -187,7 +163,6 @@ pub fn setFocusRaw(seat: *Seat, new_focus: FocusTarget) void {
             assert(server.lock_manager.state != .locked);
             //target_window.pending.focus += 1; XXX update focus to send activated state
         },
-        .layer => assert(server.lock_manager.state != .locked),
         .lock_surface => assert(server.lock_manager.state != .unlocked),
         .override_redirect, .none => {},
     }

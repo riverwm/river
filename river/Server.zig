@@ -29,7 +29,6 @@ const util = @import("util.zig");
 const Config = @import("Config.zig");
 const IdleInhibitManager = @import("IdleInhibitManager.zig");
 const InputManager = @import("InputManager.zig");
-const LayerSurface = @import("LayerSurface.zig");
 const LockManager = @import("LockManager.zig");
 const Output = @import("Output.zig");
 const Root = @import("Root.zig");
@@ -70,7 +69,6 @@ cursor_shape_manager: *wlr.CursorShapeManagerV1,
 
 xdg_shell: *wlr.XdgShell,
 xdg_decoration_manager: *wlr.XdgDecorationManagerV1,
-layer_shell: *wlr.LayerShellV1,
 xdg_activation: *wlr.XdgActivationV1,
 
 data_device_manager: *wlr.DataDeviceManager,
@@ -97,8 +95,6 @@ new_xdg_toplevel: wl.Listener(*wlr.XdgToplevel) =
     wl.Listener(*wlr.XdgToplevel).init(handleNewXdgToplevel),
 new_toplevel_decoration: wl.Listener(*wlr.XdgToplevelDecorationV1) =
     wl.Listener(*wlr.XdgToplevelDecorationV1).init(handleNewToplevelDecoration),
-new_layer_surface: wl.Listener(*wlr.LayerSurfaceV1) =
-    wl.Listener(*wlr.LayerSurfaceV1).init(handleNewLayerSurface),
 request_activate: wl.Listener(*wlr.XdgActivationV1.event.RequestActivate) =
     wl.Listener(*wlr.XdgActivationV1.event.RequestActivate).init(handleRequestActivate),
 request_set_cursor_shape: wl.Listener(*wlr.CursorShapeManagerV1.event.RequestSetShape) =
@@ -141,7 +137,6 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
 
         .xdg_shell = try wlr.XdgShell.create(wl_server, 5),
         .xdg_decoration_manager = try wlr.XdgDecorationManagerV1.create(wl_server),
-        .layer_shell = try wlr.LayerShellV1.create(wl_server, 4),
         .xdg_activation = try wlr.XdgActivationV1.create(wl_server),
 
         .data_device_manager = try wlr.DataDeviceManager.create(wl_server),
@@ -185,7 +180,6 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
 
     server.xdg_shell.events.new_toplevel.add(&server.new_xdg_toplevel);
     server.xdg_decoration_manager.events.new_toplevel_decoration.add(&server.new_toplevel_decoration);
-    server.layer_shell.events.new_surface.add(&server.new_layer_surface);
     server.xdg_activation.events.request_activate.add(&server.request_activate);
     server.cursor_shape_manager.events.request_set_shape.add(&server.request_set_cursor_shape);
 
@@ -199,7 +193,6 @@ pub fn deinit(server: *Server) void {
 
     server.new_xdg_toplevel.link.remove();
     server.new_toplevel_decoration.link.remove();
-    server.new_layer_surface.link.remove();
     server.request_activate.link.remove();
     server.request_set_cursor_shape.link.remove();
 
@@ -310,7 +303,6 @@ fn allowlist(server: *Server, global: *const wl.Global) bool {
 /// Returns true if the global is blocked for security contexts
 fn blocklist(server: *Server, global: *const wl.Global) bool {
     return global == server.security_context_manager.global or
-        global == server.layer_shell.global or
         global == server.foreign_toplevel_manager.global or
         global == server.screencopy_manager.global or
         global == server.export_dmabuf_manager.global or
@@ -346,44 +338,6 @@ fn handleNewToplevelDecoration(
     wlr_decoration: *wlr.XdgToplevelDecorationV1,
 ) void {
     XdgDecoration.init(wlr_decoration);
-}
-
-fn handleNewLayerSurface(_: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wlr.LayerSurfaceV1) void {
-    log.debug(
-        "new layer surface: namespace {s}, layer {s}, anchor {b:0>4}, size {},{}, margin {},{},{},{}, exclusive_zone {}",
-        .{
-            wlr_layer_surface.namespace,
-            @tagName(wlr_layer_surface.current.layer),
-            @as(u32, @bitCast(wlr_layer_surface.current.anchor)),
-            wlr_layer_surface.current.desired_width,
-            wlr_layer_surface.current.desired_height,
-            wlr_layer_surface.current.margin.top,
-            wlr_layer_surface.current.margin.right,
-            wlr_layer_surface.current.margin.bottom,
-            wlr_layer_surface.current.margin.left,
-            wlr_layer_surface.current.exclusive_zone,
-        },
-    );
-
-    // If the new layer surface does not have an output assigned to it, use the
-    // first output or close the surface if none are available.
-    if (wlr_layer_surface.output == null) {
-        if (true) @panic("TODO");
-
-        const output = null orelse {
-            log.err("no output available for layer surface '{s}'", .{wlr_layer_surface.namespace});
-            wlr_layer_surface.destroy();
-            return;
-        };
-
-        log.debug("new layer surface had null output, assigning it to output '{s}'", .{output.wlr_output.name});
-        wlr_layer_surface.output = output.wlr_output;
-    }
-
-    LayerSurface.create(wlr_layer_surface) catch {
-        wlr_layer_surface.resource.postNoMemory();
-        return;
-    };
 }
 
 fn handleNewXwaylandSurface(_: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {

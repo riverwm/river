@@ -29,7 +29,7 @@ const SceneNodeData = @import("SceneNodeData.zig");
 const log = std.log.scoped(.xdg_popup);
 
 wlr_xdg_popup: *wlr.XdgPopup,
-/// The root of the surface tree, i.e. the Window or LayerSurface popup_tree.
+/// The root of the surface tree, i.e. the Window's popup_tree
 root: *wlr.SceneTree,
 
 tree: *wlr.SceneTree,
@@ -97,7 +97,6 @@ fn handleReposition(listener: *wl.Listener(void)) void {
 
     const output = switch (SceneNodeData.fromNode(&xdg_popup.root.node).?.data) {
         .window => |_| @panic("TODO"),
-        .layer_surface => |layer_surface| layer_surface.output,
         else => unreachable,
     };
 
