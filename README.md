@@ -7,7 +7,7 @@
 River is a dynamic tiling Wayland compositor with flexible runtime
 configuration.
 
-Check [packaging status](https://repology.org/project/river/versions) —
+Check [packaging status](https://repology.org/project/river-compositor/versions) —
 Join us at [#river](https://web.libera.chat/?channels=#river) on irc.libera.chat —
 Read our man pages, [wiki](https://codeberg.org/river/wiki), and
 [Code of Conduct](CODE_OF_CONDUCT.md)
