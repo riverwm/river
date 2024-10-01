@@ -126,6 +126,7 @@ _riverctl()
                                 'tap-button-map:Configure the button mapping for tapping'
                                 'scroll-method:Set the scroll method'
                                 'scroll-button:Set the scroll button'
+                                'scroll-button-lock:Enable or disable the scroll button lock functionality'
                                 'map-to-output:Map to a given output'
                             )
 
@@ -144,6 +145,7 @@ _riverctl()
                                 natural-scroll) _alternative 'input-cmds:args:(enabled disabled)' ;;
                                 left-handed) _alternative 'input-cmds:args:(enabled disabled)' ;;
                                 tap) _alternative 'input-cmds:args:(enabled disabled)' ;;
+                                scroll-button-lock) _alternative 'input-cmds:args:(enabled disabled)' ;;
                                 tap-button-map) _alternative 'input-cmds:args:(left-right-middle left-middle-right)' ;;
                                 scroll-method) _alternative 'input-cmds:args:(none two-finger edge button)' ;;
                                 *) return 0 ;;

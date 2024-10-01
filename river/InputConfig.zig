@@ -215,6 +215,18 @@ pub const ScrollButton = struct {
     }
 };
 
+pub const ScrollButtonLock = enum {
+    enabled,
+    disabled,
+
+    fn apply(scroll_button_lock: ScrollButtonLock, device: *c.libinput_device) void {
+        _ = c.libinput_device_config_scroll_set_button_lock(device, switch (scroll_button_lock) {
+            .enabled => c.LIBINPUT_CONFIG_SCROLL_BUTTON_LOCK_ENABLED,
+            .disabled => c.LIBINPUT_CONFIG_SCROLL_BUTTON_LOCK_DISABLED,
+        });
+    }
+};
+
 pub const MapToOutput = struct {
     output_name: ?[]const u8,
 
@@ -279,6 +291,7 @@ tap: ?TapState = null,
 @"pointer-accel": ?PointerAccel = null,
 @"scroll-method": ?ScrollMethod = null,
 @"scroll-button": ?ScrollButton = null,
+@"scroll-button-lock": ?ScrollButtonLock = null,
 @"map-to-output": ?MapToOutput = null,
 
 pub fn deinit(config: *InputConfig) void {

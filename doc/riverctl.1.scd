@@ -545,6 +545,11 @@ However note that not every input device supports every property.
 	Set the scroll button of an input device. _button_ is the name of a Linux
 	input event code.
 
+*input* _name_ *scroll-button-lock* *enabled*|*disabled*
+	Enable or disable the scroll button lock functionality of the input device. If
+	active, the button does not need to be held down. One press makes the button
+	considered to be held down, and a second press releases the button.
+
 *input* _name_ *map-to-output* _output_|*disabled*
 	Maps the input to a given output. This is valid even if the output isn't
 	currently active and will lead to the device being mapped once it is

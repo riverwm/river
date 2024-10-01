@@ -99,6 +99,7 @@ function __riverctl_completion ()
 				tap-button-map \
 				scroll-method \
 				scroll-button \
+				scroll-button-lock \
 				map-to-output"
 			COMPREPLY=($(compgen -W "${OPTS}" -- "${COMP_WORDS[3]}"))
 		elif [ "${COMP_WORDS[1]}" == "hide-cursor" ]
@@ -117,7 +118,7 @@ function __riverctl_completion ()
 				"events") OPTS="enabled disabled disabled-on-external-mouse" ;;
 				"accel-profile") OPTS="none flat adaptive" ;;
 				"click-method") OPTS="none button-areas clickfinger" ;;
-				"drag"|"drag-lock"|"disable-while-typing"|"middle-emulation"|"left-handed"|"tap") OPTS="enabled disabled" ;;
+				"drag"|"drag-lock"|"disable-while-typing"|"middle-emulation"|"left-handed"|"tap"|"scroll-button-lock") OPTS="enabled disabled" ;;
 				"tap-button-map") OPTS="left-right-middle left-middle-right" ;;
 				"scroll-method") OPTS="none two-finger edge button" ;;
 				*) return ;;
