@@ -547,7 +547,9 @@ fn renderAndCommit(output: *Output, scene_output: *wlr.SceneOutput) !void {
         const control = server.root.gamma_control_manager.getControl(output.wlr_output);
         if (!wlr.GammaControlV1.apply(control, &state)) return error.OutOfMemory;
 
-        if (!output.wlr_output.testState(&state)) {
+        // TODO(wlroots): remove this isHeadless() workaround after upstream fix is available
+        // in a release: https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/4868
+        if (!output.wlr_output.testState(&state) or output.wlr_output.isHeadless()) {
             wlr.GammaControlV1.sendFailedAndDestroy(control);
             state.clearGammaLut();
             // If the backend does not support gamma LUTs it will reject any
