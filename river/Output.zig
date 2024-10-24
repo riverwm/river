@@ -393,11 +393,15 @@ fn sendLayerConfigures(
                     usable_box.* = new_usable_box;
                 }
 
-                layer_surface.popup_tree.node.setPosition(
-                    layer_surface.scene_layer_surface.tree.node.x,
-                    layer_surface.scene_layer_surface.tree.node.y,
-                );
-                layer_surface.scene_layer_surface.tree.node.subsurfaceTreeSetClip(&full_box);
+                const x = layer_surface.scene_layer_surface.tree.node.x;
+                const y = layer_surface.scene_layer_surface.tree.node.y;
+                layer_surface.popup_tree.node.setPosition(x, y);
+                layer_surface.scene_layer_surface.tree.node.subsurfaceTreeSetClip(&.{
+                    .x = -x,
+                    .y = -y,
+                    .width = full_box.width,
+                    .height = full_box.height,
+                });
             }
         }
     }
