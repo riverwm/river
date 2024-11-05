@@ -86,6 +86,8 @@ foreign_toplevel_manager: *wlr.ForeignToplevelManagerV1,
 
 tearing_control_manager: *wlr.TearingControlManagerV1,
 
+alpha_modifier: *wlr.AlphaModifierV1,
+
 input_manager: InputManager,
 root: Root,
 config: Config,
@@ -162,6 +164,8 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
         .foreign_toplevel_manager = try wlr.ForeignToplevelManagerV1.create(wl_server),
 
         .tearing_control_manager = try wlr.TearingControlManagerV1.create(wl_server, 1),
+
+        .alpha_modifier = try wlr.AlphaModifierV1.create(wl_server),
 
         .config = try Config.init(),
 
@@ -321,7 +325,8 @@ fn allowlist(server: *Server, global: *const wl.Global) bool {
         global == server.input_manager.tablet_manager.global or
         global == server.input_manager.pointer_gestures.global or
         global == server.idle_inhibit_manager.wlr_manager.global or
-        global == server.tearing_control_manager.global;
+        global == server.tearing_control_manager.global or
+        global == server.alpha_modifier.global;
 }
 
 /// Returns true if the global is blocked for security contexts
