@@ -422,7 +422,8 @@ matches everything while _\*\*_ and the empty string are invalid.
 
 *set-repeat* _rate_ _delay_
 	Set the keyboard repeat rate to _rate_ key repeats per second and
-	repeat delay to _delay_ milliseconds.
+	repeat delay to _delay_ milliseconds. The default is a rate of 25
+	repeats per second and a delay of 600ms.
 
 *xcursor-theme* _theme_name_ [_size_]
 	Set the xcursor theme to _theme_name_ and optionally set the _size_.
