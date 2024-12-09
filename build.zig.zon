@@ -1,6 +1,6 @@
 .{
     .name = "river",
-    .version = "0.3.6-dev",
+    .version = "0.3.6",
     .paths = .{""},
     .dependencies = .{
         .@"zig-pixman" = .{
