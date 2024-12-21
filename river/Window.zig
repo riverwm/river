@@ -234,7 +234,7 @@ pub fn destroy(window: *Window, when: enum { lazy, assert }) void {
 
     // If there are still saved buffers, then this window needs to be kept
     // around until the current transaction completes. This function will be
-    // called again in Root.commitTransaction()
+    // called again in WindowManager.commitTransaction()
     if (!window.saved_surface_tree.node.enabled) {
         window.tree.node.destroy();
         window.popup_tree.node.destroy();
@@ -265,17 +265,15 @@ fn dirtyPending(window: *Window) void {
 }
 
 pub fn ready(window: *Window) void {
-    if (window.pending.state != .ready) {
-        window.pending.state = .ready;
-        window.dirtyPending();
-    }
+    assert(window.pending.state != .ready);
+    window.pending.state = .ready;
+    window.dirtyPending();
 }
 
 pub fn closing(window: *Window) void {
-    if (window.pending.state != .closing) {
-        window.pending.state = .closing;
-        window.dirtyPending();
-    }
+    assert(window.pending.state != .closing);
+    window.pending.state = .closing;
+    window.dirtyPending();
 }
 
 pub fn setDecorationHint(window: *Window, hint: river.WindowV1.DecorationHint) void {
@@ -480,8 +478,6 @@ pub fn resizeUpdatePosition(window: *Window, width: i32, height: i32) void {
 
 pub fn commitTransaction(window: *Window) void {
     window.foreign_toplevel_handle.update();
-
-    window.dropSavedSurfaceTree();
 
     switch (window.impl) {
         .toplevel => |*toplevel| {

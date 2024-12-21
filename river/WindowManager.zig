@@ -197,7 +197,10 @@ fn handleRequest(
 
             wm.committed.dirty = true;
             switch (wm.state) {
-                .idle, .update_acked => wm.sendConfigures(),
+                .idle, .update_acked => {
+                    wm.cancelTimeoutTimer();
+                    wm.sendConfigures();
+                },
                 .update_sent, .inflight_configures => {},
             }
         },
@@ -348,6 +351,10 @@ fn startTimeoutTimer(wm: *WindowManager) void {
     };
 }
 
+fn cancelTimeoutTimer(wm: *WindowManager) void {
+    wm.timeout.timerUpdate(0) catch log.err("error disarming timer", .{});
+}
+
 fn handleTimeout(wm: *WindowManager) c_int {
     log.err("timeout occurred, some imperfect frames may be shown", .{});
 
@@ -366,8 +373,7 @@ fn handleTimeout(wm: *WindowManager) c_int {
 pub fn notifyConfigured(wm: *WindowManager) void {
     wm.state.inflight_configures -= 1;
     if (wm.state.inflight_configures == 0) {
-        // Disarm the timer, as we didn't timeout
-        wm.timeout.timerUpdate(0) catch log.err("error disarming timer", .{});
+        wm.cancelTimeoutTimer();
         wm.commitTransaction();
     }
 }
@@ -381,6 +387,14 @@ fn commitTransaction(wm: *WindowManager) void {
     wm.state = .idle;
 
     log.debug("commiting transaction", .{});
+
+    {
+        var it = wm.windows.safeIterator(.forward);
+        while (it.next()) |window| {
+            window.dropSavedSurfaceTree();
+            if (window.destroying) window.destroy(.assert);
+        }
+    }
 
     {
         var it = wm.inflight.render_list.iterator(.forward);
@@ -402,19 +416,6 @@ fn commitTransaction(wm: *WindowManager) void {
     {
         var it = server.input_manager.seats.first;
         while (it) |node| : (it = node.next) node.data.cursor.updateState();
-    }
-
-    {
-        // This must be done after updating cursor state in case the window was the target of move/resize.
-        var it = wm.inflight.render_list.safeIterator(.forward);
-        while (it.next()) |node| {
-            switch (node.get()) {
-                .window => |window| {
-                    window.dropSavedSurfaceTree();
-                    if (window.destroying) window.destroy(.assert);
-                },
-            }
-        }
     }
 
     server.idle_inhibit_manager.checkActive();
