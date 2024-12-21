@@ -137,7 +137,7 @@ pub fn update(input_popup: *InputPopup) void {
     _ = focused.node.coords(&focused_x, &focused_y);
 
     var output_box: wlr.Box = undefined;
-    server.root.output_layout.getBox(output.wlr_output, &output_box);
+    server.om.output_layout.getBox(output.wlr_output, &output_box);
 
     // Relative to the surface with the active text input
     var cursor_box = text_input.wlr_text_input.current.cursor_rectangle;

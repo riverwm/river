@@ -221,7 +221,7 @@ pub const MapToOutput = struct {
     fn apply(map_to_output: MapToOutput, device: *InputDevice) void {
         const wlr_output = blk: {
             if (map_to_output.output_name) |name| {
-                var it = server.root.output_layout.outputs.iterator(.forward);
+                var it = server.om.output_layout.outputs.iterator(.forward);
                 while (it.next()) |layout_output| {
                     if (mem.eql(u8, mem.span(layout_output.output.name), name)) {
                         break :blk layout_output.output;

@@ -31,7 +31,7 @@ const IdleInhibitManager = @import("IdleInhibitManager.zig");
 const InputManager = @import("InputManager.zig");
 const LockManager = @import("LockManager.zig");
 const Output = @import("Output.zig");
-const Root = @import("Root.zig");
+const OutputManager = @import("OutputManager.zig");
 const Scene = @import("Scene.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
 const Seat = @import("Seat.zig");
@@ -83,7 +83,7 @@ foreign_toplevel_manager: *wlr.ForeignToplevelManagerV1,
 
 scene: Scene,
 input_manager: InputManager,
-root: Root,
+om: OutputManager,
 config: Config,
 idle_inhibit_manager: IdleInhibitManager,
 lock_manager: LockManager,
@@ -153,7 +153,7 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
         .config = try Config.init(),
 
         .scene = undefined,
-        .root = undefined,
+        .om = undefined,
         .input_manager = undefined,
         .idle_inhibit_manager = undefined,
         .lock_manager = undefined,
@@ -176,7 +176,7 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
     }
 
     try server.scene.init();
-    try server.root.init();
+    try server.om.init();
     try server.input_manager.init();
     try server.idle_inhibit_manager.init();
     try server.lock_manager.init();
@@ -219,7 +219,7 @@ pub fn deinit(server: *Server) void {
     server.renderer.destroy();
     server.allocator.destroy();
 
-    server.root.deinit();
+    server.om.deinit();
     server.input_manager.deinit();
     server.idle_inhibit_manager.deinit();
     server.lock_manager.deinit();
@@ -294,8 +294,8 @@ fn allowlist(server: *Server, global: *const wl.Global) bool {
         global == server.xdg_activation.global or
         global == server.data_device_manager.global or
         global == server.primary_selection_manager.global or
-        global == server.root.presentation.global or
-        global == server.root.xdg_output_manager.global or
+        global == server.om.presentation.global or
+        global == server.om.xdg_output_manager.global or
         global == server.input_manager.relative_pointer_manager.global or
         global == server.input_manager.pointer_constraints.global or
         global == server.input_manager.text_input_manager.global or
@@ -311,9 +311,9 @@ fn blocklist(server: *Server, global: *const wl.Global) bool {
         global == server.screencopy_manager.global or
         global == server.export_dmabuf_manager.global or
         global == server.data_control_manager.global or
-        global == server.root.output_manager.global or
-        global == server.root.power_manager.global or
-        global == server.root.gamma_control_manager.global or
+        global == server.om.wlr_output_manager.global or
+        global == server.om.power_manager.global or
+        global == server.om.gamma_control_manager.global or
         global == server.input_manager.idle_notifier.global or
         global == server.input_manager.virtual_pointer_manager.global or
         global == server.input_manager.virtual_keyboard_manager.global or

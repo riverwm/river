@@ -101,7 +101,7 @@ fn handleReposition(listener: *wl.Listener(void)) void {
     };
 
     var box: wlr.Box = undefined;
-    server.root.output_layout.getBox(output.wlr_output, &box);
+    server.om.output_layout.getBox(output.wlr_output, &box);
 
     var root_lx: c_int = undefined;
     var root_ly: c_int = undefined;

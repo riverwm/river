@@ -389,7 +389,7 @@ fn commitTransaction(wm: *WindowManager) void {
         }
     }
 
-    server.root.commitOutputState();
+    server.om.commitOutputState();
 
     {
         var it = server.input_manager.seats.first;

@@ -201,7 +201,7 @@ pub fn create(wlr_output: *wlr.Output) !void {
     };
     wlr_output.data = @intFromPtr(output);
 
-    server.root.outputs.append(output);
+    server.om.outputs.append(output);
     server.wm.pending.outputs.append(output);
     output.link_sent.init();
 
@@ -355,7 +355,7 @@ fn renderAndCommit(output: *Output) !void {
     output.current.apply(&state);
 
     if (output.gamma_dirty) {
-        const control = server.root.gamma_control_manager.getControl(wlr_output);
+        const control = server.om.gamma_control_manager.getControl(wlr_output);
         if (!wlr.GammaControlV1.apply(control, &state)) return error.OutOfMemory;
 
         if (!wlr_output.testState(&state)) {

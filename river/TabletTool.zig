@@ -73,7 +73,7 @@ fn create(wlr_seat: *wlr.Seat, wlr_tool: *wlr.TabletTool) error{OutOfMemory}!*Ta
     const wlr_cursor = try wlr.Cursor.create();
     errdefer wlr_cursor.destroy();
 
-    wlr_cursor.attachOutputLayout(server.root.output_layout);
+    wlr_cursor.attachOutputLayout(server.om.output_layout);
 
     const tablet_manager = server.input_manager.tablet_manager;
     tool.* = .{

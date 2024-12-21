@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-const Root = @This();
+const OutputManager = @This();
 
 const build_options = @import("build_options");
 const std = @import("std");
@@ -34,6 +34,8 @@ const SceneNodeData = @import("SceneNodeData.zig");
 const Window = @import("Window.zig");
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
+const log = std.log.scoped(.output_manager);
+
 new_output: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleNewOutput),
 
 output_layout: *wlr.OutputLayout,
@@ -41,7 +43,7 @@ output_layout: *wlr.OutputLayout,
 presentation: *wlr.Presentation,
 xdg_output_manager: *wlr.XdgOutputManagerV1,
 
-output_manager: *wlr.OutputManagerV1,
+wlr_output_manager: *wlr.OutputManagerV1,
 manager_apply: wl.Listener(*wlr.OutputConfigurationV1) =
     wl.Listener(*wlr.OutputConfigurationV1).init(handleManagerApply),
 manager_test: wl.Listener(*wlr.OutputConfigurationV1) =
@@ -58,37 +60,35 @@ gamma_control_set_gamma: wl.Listener(*wlr.GammaControlManagerV1.event.SetGamma) 
 /// All Outputs that have a corresponding wlr_output.
 outputs: wl.list.Head(Output, .link),
 
-pub fn init(root: *Root) !void {
+pub fn init(om: *OutputManager) !void {
     const output_layout = try wlr.OutputLayout.create(server.wl_server);
     errdefer output_layout.destroy();
 
-    root.* = .{
+    om.* = .{
         .output_layout = output_layout,
         .outputs = undefined,
 
         .presentation = try wlr.Presentation.create(server.wl_server, server.backend),
         .xdg_output_manager = try wlr.XdgOutputManagerV1.create(server.wl_server, output_layout),
-        .output_manager = try wlr.OutputManagerV1.create(server.wl_server),
+        .wlr_output_manager = try wlr.OutputManagerV1.create(server.wl_server),
         .power_manager = try wlr.OutputPowerManagerV1.create(server.wl_server),
         .gamma_control_manager = try wlr.GammaControlManagerV1.create(server.wl_server),
     };
 
-    root.outputs.init();
+    om.outputs.init();
 
-    server.backend.events.new_output.add(&root.new_output);
-    root.output_manager.events.apply.add(&root.manager_apply);
-    root.output_manager.events.@"test".add(&root.manager_test);
-    root.power_manager.events.set_mode.add(&root.power_manager_set_mode);
-    root.gamma_control_manager.events.set_gamma.add(&root.gamma_control_set_gamma);
+    server.backend.events.new_output.add(&om.new_output);
+    om.wlr_output_manager.events.apply.add(&om.manager_apply);
+    om.wlr_output_manager.events.@"test".add(&om.manager_test);
+    om.power_manager.events.set_mode.add(&om.power_manager_set_mode);
+    om.gamma_control_manager.events.set_gamma.add(&om.gamma_control_set_gamma);
 }
 
-pub fn deinit(root: *Root) void {
-    root.output_layout.destroy();
+pub fn deinit(om: *OutputManager) void {
+    om.output_layout.destroy();
 }
 
 fn handleNewOutput(_: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
-    const log = std.log.scoped(.output_manager);
-
     log.debug("new output {s}", .{wlr_output.name});
 
     Output.create(wlr_output) catch |err| {
@@ -110,7 +110,7 @@ fn handleManagerTest(_: *wl.Listener(*wlr.OutputConfigurationV1), config: *wlr.O
     }
 
     const states = config.buildState() catch {
-        std.log.err("out of memory", .{});
+        log.err("out of memory", .{});
         config.sendFailed();
         return;
     };
@@ -128,7 +128,7 @@ fn handleManagerTest(_: *wl.Listener(*wlr.OutputConfigurationV1), config: *wlr.O
 }
 
 fn handleManagerApply(_: *wl.Listener(*wlr.OutputConfigurationV1), config: *wlr.OutputConfigurationV1) void {
-    std.log.scoped(.output_manager).info("applying output configuration", .{});
+    log.info("applying output configuration", .{});
 
     if (!validateConfigCoordinates(config)) {
         config.sendFailed();
@@ -184,7 +184,7 @@ fn validateConfigCoordinates(config: *wlr.OutputConfigurationV1) bool {
         if (build_options.xwayland and server.xwayland != null and
             (head.state.x < 0 or head.state.y < 0))
         {
-            std.log.scoped(.output_manager).err(
+            log.err(
                 \\Attempted to set negative coordinates for output {s}.
                 \\Negative output coordinates are disallowed if Xwayland is enabled due to a limitation of Xwayland.
             , .{head.state.output.name});
@@ -201,7 +201,7 @@ fn handlePowerManagerSetMode(
     // The output may have been destroyed, in which case there is nothing to do
     const output = @as(?*Output, @ptrFromInt(event.output.data)) orelse return;
 
-    std.log.debug("client requested dpms {s} for output {s}", .{
+    log.debug("client requested dpms {s} for output {s}", .{
         @tagName(event.mode),
         event.output.name,
     });
@@ -226,13 +226,13 @@ fn handleSetGamma(
     // The output may have been destroyed, in which case there is nothing to do
     const output = @as(?*Output, @ptrFromInt(event.output.data)) orelse return;
 
-    std.log.debug("client requested to set gamma", .{});
+    log.debug("client requested to set gamma", .{});
 
     output.gamma_dirty = true;
     event.output.scheduleFrame();
 }
 
-pub fn commitOutputState(root: *Root) void {
+pub fn commitOutputState(om: *OutputManager) void {
     const wm = &server.wm;
 
     {
@@ -242,13 +242,13 @@ pub fn commitOutputState(root: *Root) void {
             switch (output.sent.state) {
                 .enabled, .disabled_soft => {
                     output.scene_output.?.setPosition(output.sent.x, output.sent.y);
-                    _ = root.output_layout.add(wlr_output, output.sent.x, output.sent.y) catch {
-                        std.log.err("out of memory", .{});
+                    _ = om.output_layout.add(wlr_output, output.sent.x, output.sent.y) catch {
+                        log.err("out of memory", .{});
                         continue; // Try again next time
                     };
                 },
                 .disabled_hard, .destroying => {
-                    root.output_layout.remove(wlr_output);
+                    om.output_layout.remove(wlr_output);
                 },
             }
         }
@@ -295,7 +295,7 @@ pub fn commitOutputState(root: *Root) void {
             while (it.next()) |output| {
                 const wlr_output = output.wlr_output orelse continue;
                 const state = states.addOne() catch {
-                    std.log.err("out of memory", .{});
+                    log.err("out of memory", .{});
                     return;
                 };
 
@@ -311,7 +311,7 @@ pub fn commitOutputState(root: *Root) void {
         defer swapchain_manager.finish();
 
         if (!swapchain_manager.prepare(states.items)) {
-            std.log.err("failed to prepare new output configuration", .{});
+            log.err("failed to prepare new output configuration", .{});
             // TODO search for a working fallback
 
             if (wm.sent.output_config) |config| {
@@ -337,12 +337,12 @@ pub fn commitOutputState(root: *Root) void {
             if (!output.scene_output.?.buildState(&state.base, &.{
                 .swapchain = swapchain_manager.getSwapchain(state.output),
             })) {
-                std.log.err("failed to render scene for {s}", .{state.output.name});
+                log.err("failed to render scene for {s}", .{state.output.name});
             }
         }
 
         if (!server.backend.commit(states.items)) {
-            std.log.err("failed to commit new output configuration", .{});
+            log.err("failed to commit new output configuration", .{});
 
             if (wm.sent.output_config) |config| {
                 config.sendFailed();
@@ -383,18 +383,18 @@ pub fn commitOutputState(root: *Root) void {
     }
 
     // XXX sending this every transaction is too noisy
-    root.sendManagerConfig() catch {
-        std.log.err("out of memory", .{});
+    om.sendConfig() catch {
+        log.err("out of memory", .{});
     };
 }
 
 /// Send the current output state to all wlr-output-manager clients.
-fn sendManagerConfig(root: *Root) !void {
+fn sendConfig(om: *OutputManager) !void {
     const config = try wlr.OutputConfigurationV1.create();
     // this destroys all associated config heads as well
     errdefer config.destroy();
 
-    var it = root.outputs.iterator(.forward);
+    var it = om.outputs.iterator(.forward);
     while (it.next()) |output| {
         const head = try wlr.OutputConfigurationV1.Head.create(config, output.wlr_output.?);
 
@@ -411,5 +411,5 @@ fn sendManagerConfig(root: *Root) !void {
         head.state.y = output.current.y;
     }
 
-    root.output_manager.setConfiguration(config);
+    om.wlr_output_manager.setConfiguration(config);
 }

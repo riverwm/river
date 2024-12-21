@@ -147,7 +147,7 @@ pub fn maybeLock(manager: *LockManager) void {
     var all_outputs_blanked = true;
     var all_outputs_rendered_lock_surface = true;
     {
-        var it = server.root.outputs.iterator(.forward);
+        var it = server.om.outputs.iterator(.forward);
         while (it.next()) |output| {
             if (!output.wlr_output.?.enabled) continue;
 

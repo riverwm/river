@@ -184,7 +184,7 @@ tablet_tool_button: wl.Listener(*wlr.Tablet.event.Button) =
 pub fn init(cursor: *Cursor, seat: *Seat) !void {
     const wlr_cursor = try wlr.Cursor.create();
     errdefer wlr_cursor.destroy();
-    wlr_cursor.attachOutputLayout(server.root.output_layout);
+    wlr_cursor.attachOutputLayout(server.om.output_layout);
 
     // This is here so that cursor.xcursor_manager doesn't need to be an
     // optional pointer. This isn't optimal as it does a needless allocation,
