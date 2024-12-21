@@ -323,7 +323,7 @@ pub fn sendDirty(window: *Window) !void {
             }
         },
         .ready => {
-            const wm_v1 = server.wm.object.?;
+            const wm_v1 = server.wm.object orelse return;
             const new = window.object == null;
             const window_v1 = window.object orelse blk: {
                 const window_v1 = try river.WindowV1.create(wm_v1.getClient(), wm_v1.getVersion(), 0);
@@ -604,7 +604,7 @@ pub fn updateSceneState(window: *Window) void {
 pub fn configure(window: *Window) bool {
     if (!window.initialized) return false;
 
-    assert(window.mapped and !window.destroying);
+    assert(!window.destroying);
 
     const committed = &window.committed;
     window.inflight = .{
@@ -631,7 +631,7 @@ pub fn configure(window: *Window) bool {
         .none => unreachable,
     };
 
-    if (track_configure) {
+    if (track_configure and window.mapped) {
         window.saveSurfaceTree();
         window.sendFrameDone();
     }
@@ -744,8 +744,6 @@ pub fn map(window: *Window) !void {
     window.mapped = true;
 
     window.foreign_toplevel_handle.map();
-
-    window.ready();
 }
 
 /// Called by the impl when the surface will no longer be displayed

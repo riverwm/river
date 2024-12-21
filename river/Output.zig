@@ -67,7 +67,7 @@ pub const State = struct {
     } = .none,
     scale: f32 = 1,
     transform: wl.Output.Transform = .normal,
-    adaptive_sync: bool = false,
+    adaptive_sync: bool = true,
     auto_layout: bool = true,
 
     /// Width in the logical coordinate space
@@ -242,32 +242,34 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) v
 pub fn sendDirty(output: *Output) !void {
     switch (output.pending.state) {
         .enabled, .disabled_soft => {
-            const wm_v1 = server.wm.object.?;
-            const new = output.object == null;
-            const output_v1 = output.object orelse blk: {
-                const output_v1 = try river.OutputV1.create(wm_v1.getClient(), wm_v1.getVersion(), 0);
-                output.object = output_v1;
+            if (server.wm.object) |wm_v1| {
+                const new = output.object == null;
+                const output_v1 = output.object orelse blk: {
+                    const output_v1 = try river.OutputV1.create(wm_v1.getClient(), wm_v1.getVersion(), 0);
+                    output.object = output_v1;
 
-                output_v1.setHandler(*Output, handleRequest, null, output);
-                wm_v1.sendOutput(output_v1);
-                output.link_sent.remove();
-                server.wm.sent.outputs.append(output);
+                    output_v1.setHandler(*Output, handleRequest, null, output);
+                    wm_v1.sendOutput(output_v1);
 
-                break :blk output_v1;
-            };
-            errdefer comptime unreachable;
+                    break :blk output_v1;
+                };
+                errdefer comptime unreachable;
 
-            const pending = &output.pending;
-            const sent = &output.sent;
+                const pending = &output.pending;
+                const sent = &output.sent;
 
-            if (new or pending.width() != sent.width() or pending.height() != sent.height()) {
-                output_v1.sendDimensions(pending.width(), pending.height());
-            }
-            if (new or pending.x != sent.x or pending.y != sent.y) {
-                output_v1.sendPosition(pending.x, pending.y);
+                if (new or pending.width() != sent.width() or pending.height() != sent.height()) {
+                    output_v1.sendDimensions(pending.width(), pending.height());
+                }
+                if (new or pending.x != sent.x or pending.y != sent.y) {
+                    output_v1.sendPosition(pending.x, pending.y);
+                }
             }
 
             output.sent = output.pending;
+
+            output.link_sent.remove();
+            server.wm.sent.outputs.append(output);
         },
         .disabled_hard, .destroying => {
             if (output.object) |output_v1| {
@@ -318,6 +320,8 @@ fn handleRequestState(listener: *wl.Listener(*wlr.Output.event.RequestState), ev
         log.err("backend requested unsupported state {}", .{committed});
         return;
     }
+
+    log.debug("backend requested new mode", .{});
 
     if (event.state.mode) |mode| {
         output.pending.mode = .{ .standard = mode };

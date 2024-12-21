@@ -60,6 +60,8 @@ configure_state: union(enum) {
 
 // Listeners that are always active over the window's lifetime
 destroy: wl.Listener(void) = wl.Listener(void).init(handleDestroy),
+ack_configure: wl.Listener(*wlr.XdgSurface.Configure) =
+    wl.Listener(*wlr.XdgSurface.Configure).init(handleAckConfigure),
 map: wl.Listener(void) = wl.Listener(void).init(handleMap),
 unmap: wl.Listener(void) = wl.Listener(void).init(handleUnmap),
 commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
@@ -71,10 +73,6 @@ request_resize: wl.Listener(*wlr.XdgToplevel.event.Resize) =
     wl.Listener(*wlr.XdgToplevel.event.Resize).init(handleRequestResize),
 set_title: wl.Listener(void) = wl.Listener(void).init(handleSetTitle),
 set_app_id: wl.Listener(void) = wl.Listener(void).init(handleSetAppId),
-
-// Listeners that are only active while the window is mapped
-ack_configure: wl.Listener(*wlr.XdgSurface.Configure) =
-    wl.Listener(*wlr.XdgSurface.Configure).init(handleAckConfigure),
 
 pub fn create(wlr_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
     const window = try Window.create(.{ .toplevel = .{
@@ -103,8 +101,8 @@ pub fn create(wlr_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
     wlr_toplevel.base.data = @intFromPtr(toplevel);
     wlr_toplevel.base.surface.data = @intFromPtr(&window.tree.node);
 
-    // Add listeners that are active over the toplevel's entire lifetime
     wlr_toplevel.events.destroy.add(&toplevel.destroy);
+    wlr_toplevel.base.events.ack_configure.add(&toplevel.ack_configure);
     wlr_toplevel.base.surface.events.map.add(&toplevel.map);
     wlr_toplevel.base.surface.events.commit.add(&toplevel.commit);
     wlr_toplevel.base.events.new_popup.add(&toplevel.new_popup);
@@ -233,8 +231,8 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
     }
     assert(toplevel.decoration == null);
 
-    // Remove listeners that are active for the entire lifetime of the toplevel
     toplevel.destroy.link.remove();
+    toplevel.ack_configure.link.remove();
     toplevel.map.link.remove();
     toplevel.unmap.link.remove();
     toplevel.commit.link.remove();
@@ -257,9 +255,6 @@ fn handleMap(listener: *wl.Listener(void)) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("map", listener);
     const window = toplevel.window;
 
-    // Add listeners that are only active while mapped
-    toplevel.wlr_toplevel.base.events.ack_configure.add(&toplevel.ack_configure);
-
     toplevel.wlr_toplevel.base.getGeometry(&toplevel.geometry);
 
     // XXX this seems like it should be deleted/moved to handleCommit()
@@ -281,9 +276,6 @@ fn handleMap(listener: *wl.Listener(void)) void {
 /// Called when the surface is unmapped and will no longer be displayed.
 fn handleUnmap(listener: *wl.Listener(void)) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("unmap", listener);
-
-    // Remove listeners that are only active while mapped
-    toplevel.ack_configure.link.remove();
 
     toplevel.window.unmap();
 }

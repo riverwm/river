@@ -220,6 +220,7 @@ pub fn dirtyPending(wm: *WindowManager) void {
 
 fn handleDirtyPending(wm: *WindowManager) void {
     assert(wm.pending.dirty);
+    wm.dirty_idle = null;
     switch (wm.state) {
         .idle => {
             assert(!wm.committed.dirty);
@@ -233,7 +234,7 @@ fn sendUpdate(wm: *WindowManager) void {
     assert(wm.state == .idle);
     assert(wm.pending.dirty);
 
-    const wm_v1 = wm.object orelse return;
+    log.debug("sending update to window manager", .{});
 
     // XXX send all dirty pending state
 
@@ -245,7 +246,6 @@ fn sendUpdate(wm: *WindowManager) void {
                 log.err("out of memory", .{});
                 continue; // Try again next update
             };
-            output.link_pending.remove();
         }
     }
 
@@ -265,11 +265,17 @@ fn sendUpdate(wm: *WindowManager) void {
 
     wm.pending.dirty = false;
 
-    const serial = server.wl_server.nextSerial();
-    wm_v1.sendUpdate(serial);
-    wm.state = .{ .update_sent = serial };
+    if (wm.object) |wm_v1| {
+        const serial = server.wl_server.nextSerial();
+        wm_v1.sendUpdate(serial);
+        wm.state = .{ .update_sent = serial };
 
-    wm.startTimeoutTimer();
+        wm.startTimeoutTimer();
+    } else {
+        // Pretend that the non-existent wm client made an empty commit.
+        wm.committed.dirty = true;
+        wm.sendConfigures();
+    }
 }
 
 fn autoLayoutOutputs(wm: *WindowManager) void {
@@ -306,6 +312,7 @@ fn sendConfigures(wm: *WindowManager) void {
         .idle, .update_acked => {},
         .update_sent, .inflight_configures => unreachable,
     }
+
     assert(wm.committed.dirty);
     wm.committed.dirty = false;
 
@@ -382,6 +389,7 @@ fn commitTransaction(wm: *WindowManager) void {
                 .window => |window| {
                     window.commitTransaction();
 
+                    window.tree.node.reparent(server.scene.layers.wm);
                     window.tree.node.setEnabled(true);
                     window.popup_tree.node.setEnabled(true);
                 },
@@ -410,6 +418,8 @@ fn commitTransaction(wm: *WindowManager) void {
     }
 
     server.idle_inhibit_manager.checkActive();
+
+    log.debug("finished committing transaction", .{});
 
     if (wm.committed.dirty) {
         wm.sendConfigures();
