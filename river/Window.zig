@@ -184,10 +184,10 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
     const window = try util.gpa.create(Window);
     errdefer util.gpa.destroy(window);
 
-    const tree = try server.root.hidden_tree.createSceneTree();
+    const tree = try server.scene.hidden_tree.createSceneTree();
     errdefer tree.node.destroy();
 
-    const popup_tree = try server.root.hidden_tree.createSceneTree();
+    const popup_tree = try server.scene.hidden_tree.createSceneTree();
     errdefer popup_tree.node.destroy();
 
     window.* = .{

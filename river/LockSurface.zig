@@ -46,7 +46,7 @@ pub fn create(wlr_lock_surface: *wlr.SessionLockSurfaceV1, lock: *wlr.SessionLoc
     };
     wlr_lock_surface.data = @intFromPtr(lock_surface);
 
-    const tree = try server.root.locked_tree.createSceneSubsurfaceTree(wlr_lock_surface.surface);
+    const tree = try server.scene.locked_tree.createSceneSubsurfaceTree(wlr_lock_surface.surface);
     errdefer tree.node.destroy();
 
     try SceneNodeData.attach(&tree.node, .{ .lock_surface = lock_surface });

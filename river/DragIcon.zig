@@ -32,7 +32,7 @@ scene_drag_icon: *wlr.SceneTree,
 destroy: wl.Listener(*wlr.Drag.Icon) = wl.Listener(*wlr.Drag.Icon).init(handleDestroy),
 
 pub fn create(wlr_drag_icon: *wlr.Drag.Icon, cursor: *Cursor) error{OutOfMemory}!void {
-    const scene_drag_icon = try server.root.drag_icons.createSceneDragIcon(wlr_drag_icon);
+    const scene_drag_icon = try server.scene.drag_icons.createSceneDragIcon(wlr_drag_icon);
     errdefer scene_drag_icon.node.destroy();
 
     const drag_icon = try util.gpa.create(DragIcon);

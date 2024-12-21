@@ -188,7 +188,7 @@ pub fn create(wlr_output: *wlr.Output) !void {
 
     if (!wlr_output.initRender(server.allocator, server.renderer)) return error.InitRenderFailed;
 
-    const scene_output = try server.root.scene.createSceneOutput(wlr_output);
+    const scene_output = try server.scene.wlr_scene.createSceneOutput(wlr_output);
 
     errdefer comptime unreachable;
 
@@ -386,8 +386,8 @@ fn renderAndCommit(output: *Output) !void {
         (server.lock_manager.state == .waiting_for_lock_surfaces and lock_surface_mapped) or
         server.lock_manager.state == .waiting_for_blank)
     {
-        assert(!server.root.normal_tree.node.enabled);
-        assert(server.root.locked_tree.node.enabled);
+        assert(!server.scene.normal_tree.node.enabled);
+        assert(server.scene.locked_tree.node.enabled);
 
         switch (server.lock_manager.state) {
             .unlocked => unreachable,

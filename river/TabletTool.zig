@@ -209,7 +209,7 @@ pub fn tip(tool: *TabletTool, tablet: *Tablet, event: *wlr.Tablet.event.Tip) voi
 
             tool.wp_tool.notifyDown();
 
-            if (server.root.at(tool.wlr_cursor.x, tool.wlr_cursor.y)) |result| {
+            if (server.scene.at(tool.wlr_cursor.x, tool.wlr_cursor.y)) |result| {
                 if (result.surface != null) {
                     tool.mode = .{
                         .down = .{
@@ -252,7 +252,7 @@ fn maybeExitDown(tool: *TabletTool, tablet: *Tablet) void {
 /// If there is no surface under the cursor or the surface under the cursor
 /// does not support the tablet v2 protocol, send a proximity_out event.
 fn passthrough(tool: *TabletTool, tablet: *Tablet) void {
-    if (server.root.at(tool.wlr_cursor.x, tool.wlr_cursor.y)) |result| {
+    if (server.scene.at(tool.wlr_cursor.x, tool.wlr_cursor.y)) |result| {
         if (result.data == .lock_surface) {
             assert(server.lock_manager.state != .unlocked);
         } else {

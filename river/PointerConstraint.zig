@@ -78,7 +78,7 @@ pub fn maybeActivate(constraint: *PointerConstraint) void {
 
     if (seat.cursor.mode == .move or seat.cursor.mode == .resize) return;
 
-    const result = server.root.at(seat.cursor.wlr_cursor.x, seat.cursor.wlr_cursor.y) orelse return;
+    const result = server.scene.at(seat.cursor.wlr_cursor.x, seat.cursor.wlr_cursor.y) orelse return;
     if (result.surface != constraint.wlr_constraint.surface) return;
 
     const sx: i32 = @intFromFloat(result.sx);

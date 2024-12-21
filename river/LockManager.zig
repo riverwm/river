@@ -99,7 +99,7 @@ fn handleLock(listener: *wl.Listener(*wlr.SessionLockV1), lock: *wlr.SessionLock
         manager.state = .waiting_for_lock_surfaces;
 
         if (build_options.xwayland) {
-            server.root.layers.override_redirect.node.setEnabled(false);
+            server.scene.layers.override_redirect.node.setEnabled(false);
         }
 
         manager.lock_surfaces_timer.timerUpdate(200) catch {
@@ -189,11 +189,11 @@ fn handleUnlock(listener: *wl.Listener(void)) void {
 
     log.info("session unlocked", .{});
 
-    assert(!server.root.normal_tree.node.enabled);
-    server.root.normal_tree.node.setEnabled(true);
+    assert(!server.scene.normal_tree.node.enabled);
+    server.scene.normal_tree.node.setEnabled(true);
 
-    assert(server.root.locked_tree.node.enabled);
-    server.root.locked_tree.node.setEnabled(true);
+    assert(server.scene.locked_tree.node.enabled);
+    server.scene.locked_tree.node.setEnabled(true);
 
     {
         var it = server.input_manager.seats.first;

@@ -115,7 +115,7 @@ pub fn handleMap(listener: *wl.Listener(void)) void {
 fn mapImpl(override_redirect: *XwaylandOverrideRedirect) error{OutOfMemory}!void {
     const surface = override_redirect.xsurface.surface.?;
     override_redirect.surface_tree =
-        try server.root.layers.override_redirect.createSceneSubsurfaceTree(surface);
+        try server.scene.layers.override_redirect.createSceneSubsurfaceTree(surface);
     try SceneNodeData.attach(&override_redirect.surface_tree.?.node, .{
         .override_redirect = override_redirect,
     });

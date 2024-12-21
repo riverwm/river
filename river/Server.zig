@@ -32,8 +32,9 @@ const InputManager = @import("InputManager.zig");
 const LockManager = @import("LockManager.zig");
 const Output = @import("Output.zig");
 const Root = @import("Root.zig");
-const Seat = @import("Seat.zig");
+const Scene = @import("Scene.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
+const Seat = @import("Seat.zig");
 const TabletTool = @import("TabletTool.zig");
 const WindowManager = @import("WindowManager.zig");
 const XdgDecoration = @import("XdgDecoration.zig");
@@ -80,6 +81,7 @@ screencopy_manager: *wlr.ScreencopyManagerV1,
 
 foreign_toplevel_manager: *wlr.ForeignToplevelManagerV1,
 
+scene: Scene,
 input_manager: InputManager,
 root: Root,
 config: Config,
@@ -150,6 +152,7 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
 
         .config = try Config.init(),
 
+        .scene = undefined,
         .root = undefined,
         .input_manager = undefined,
         .idle_inhibit_manager = undefined,
@@ -172,6 +175,7 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
         server.xwayland.?.events.new_surface.add(&server.new_xsurface);
     }
 
+    try server.scene.init();
     try server.root.init();
     try server.input_manager.init();
     try server.idle_inhibit_manager.init();
@@ -210,7 +214,7 @@ pub fn deinit(server: *Server) void {
     // The scene graph needs to be destroyed after the backend but before the renderer
     // Output destruction requires the scene graph to still be around while the scene
     // graph may require the renderer to still be around to destroy textures it seems.
-    server.root.scene.tree.node.destroy();
+    server.scene.wlr_scene.tree.node.destroy();
 
     server.renderer.destroy();
     server.allocator.destroy();

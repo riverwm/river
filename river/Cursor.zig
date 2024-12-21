@@ -36,7 +36,7 @@ const InputDevice = @import("InputDevice.zig");
 const LockSurface = @import("LockSurface.zig");
 const Output = @import("Output.zig");
 const PointerConstraint = @import("PointerConstraint.zig");
-const Root = @import("Root.zig");
+const Scene = @import("Scene.zig");
 const Seat = @import("Seat.zig");
 const Tablet = @import("Tablet.zig");
 const TabletTool = @import("TabletTool.zig");
@@ -351,7 +351,7 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
         return;
     }
 
-    if (server.root.at(cursor.wlr_cursor.x, cursor.wlr_cursor.y)) |result| {
+    if (server.scene.at(cursor.wlr_cursor.x, cursor.wlr_cursor.y)) |result| {
         if (result.data == .window and cursor.handlePointerMapping(event, result.data.window)) {
             // If a mapping is triggered don't send events to clients.
             return;
@@ -377,7 +377,7 @@ fn handleButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.P
 }
 
 /// Requires a call to WindowManager.dirtyPending()
-fn updateKeyboardFocus(cursor: Cursor, result: Root.AtResult) void {
+fn updateKeyboardFocus(cursor: Cursor, result: Scene.AtResult) void {
     switch (result.data) {
         .window => |window| {
             cursor.seat.focus(window);
@@ -486,7 +486,7 @@ fn handleTouchDown(
         return;
     };
 
-    if (server.root.at(lx, ly)) |result| {
+    if (server.scene.at(lx, ly)) |result| {
         cursor.updateKeyboardFocus(result);
 
         if (result.surface) |surface| {
@@ -516,7 +516,7 @@ fn handleTouchMotion(
 
         cursor.updateDragIcons();
 
-        if (server.root.at(point.lx, point.ly)) |result| {
+        if (server.scene.at(point.lx, point.ly)) |result| {
             cursor.seat.wlr_seat.touchNotifyMotion(event.time_msec, event.touch_id, result.sx, result.sy);
         }
     }
@@ -976,7 +976,7 @@ pub fn updateState(cursor: *Cursor) void {
 fn passthrough(cursor: *Cursor, time: u32) void {
     assert(cursor.mode == .passthrough);
 
-    if (server.root.at(cursor.wlr_cursor.x, cursor.wlr_cursor.y)) |result| {
+    if (server.scene.at(cursor.wlr_cursor.x, cursor.wlr_cursor.y)) |result| {
         if (result.data == .lock_surface) {
             assert(server.lock_manager.state != .unlocked);
         } else {
@@ -994,7 +994,7 @@ fn passthrough(cursor: *Cursor, time: u32) void {
 }
 
 fn updateDragIcons(cursor: *Cursor) void {
-    var it = server.root.drag_icons.children.iterator(.forward);
+    var it = server.scene.drag_icons.children.iterator(.forward);
     while (it.next()) |node| {
         const icon = @as(*DragIcon, @ptrFromInt(node.data));
 
