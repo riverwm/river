@@ -192,6 +192,31 @@ pub fn build(b: *Build) !void {
     }
 
     {
+        const rivercompat = b.addExecutable(.{
+            .name = "rivercompat",
+            .root_source_file = b.path("rivercompat/main.zig"),
+            .target = target,
+            .optimize = optimize,
+            .strip = strip,
+            .use_llvm = llvm,
+            .use_lld = llvm,
+        });
+        rivercompat.root_module.addOptions("build_options", options);
+
+        rivercompat.root_module.addImport("flags", flags);
+        rivercompat.root_module.addImport("wayland", wayland);
+        rivercompat.linkLibC();
+        rivercompat.linkSystemLibrary("wayland-client");
+
+        scanner.addCSource(rivercompat);
+
+        rivercompat.pie = pie;
+        rivercompat.root_module.omit_frame_pointer = omit_frame_pointer;
+
+        b.installArtifact(rivercompat);
+    }
+
+    {
         const riverctl = b.addExecutable(.{
             .name = "riverctl",
             .root_source_file = b.path("riverctl/main.zig"),
