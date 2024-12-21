@@ -165,6 +165,10 @@
       <description summary="new logical output">
         A new logical output has been created, perhaps due to a new physical
         monitor being plugged in or perhaps due to a change in configuration.
+
+        This event is double-buffered state and will be followed by
+        river_output_v1.position and dimensions events as well as a
+        river_window_manager_v1.update event.
       </description>
       <arg name="id" type="new_id" interface="river_output_v1"/>
     </event>

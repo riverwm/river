@@ -141,7 +141,7 @@ pending: struct {
         /// object.
         init,
         /// Indicates that the window is ready to be configured.
-        /// Create a river_window_v1 object if needed an send events.
+        /// Create a river_window_v1 object if needed and send events.
         ready,
         /// Indicates that the closed event will be sent in the next update sequence.
         closing,

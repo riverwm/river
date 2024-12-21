@@ -147,8 +147,10 @@ pub fn maybeLock(manager: *LockManager) void {
     var all_outputs_blanked = true;
     var all_outputs_rendered_lock_surface = true;
     {
-        var it = server.root.active_outputs.iterator(.forward);
+        var it = server.root.outputs.iterator(.forward);
         while (it.next()) |output| {
+            if (!output.wlr_output.?.enabled) continue;
+
             switch (output.lock_render_state) {
                 .pending_unlock, .unlocked, .pending_blank, .pending_lock_surface => {
                     all_outputs_blanked = false;

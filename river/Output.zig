@@ -1,6 +1,6 @@
 // This file is part of river, a dynamic tiling wayland compositor.
 //
-// Copyright 2020 The River Developers
+// Copyright 2020-2024 The River Developers
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -26,6 +26,7 @@ const wlr = @import("wlroots");
 const wayland = @import("wayland");
 const wl = wayland.server.wl;
 const zwlr = wayland.server.zwlr;
+const river = wayland.server.river;
 
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
@@ -37,19 +38,102 @@ const Config = @import("Config.zig");
 
 const log = std.log.scoped(.output);
 
-wlr_output: *wlr.Output,
-scene_output: *wlr.SceneOutput,
+pub const State = struct {
+    state: enum {
+        /// Powered on and exposed to the window manager
+        enabled,
+        /// Powered off and exposed to the window manager
+        disabled_soft,
+        /// Powered off and hidden from the window manager
+        disabled_hard,
+        /// Corresponding hardware no longer present
+        destroying,
+    } = .disabled_hard,
+    /// Logical coordinate space
+    x: i32 = 0,
+    /// Logical coordinate space
+    y: i32 = 0,
+    /// The width/height of modes is in physical pixels, not in the
+    /// compositors logical coordinate space.
+    mode: union(enum) {
+        standard: *wlr.Output.Mode,
+        custom: struct {
+            width: i32 = 0,
+            height: i32 = 0,
+            refresh: i32 = 0,
+        },
+        /// Used before the initial modeset and after the wlr_output is destroyed.
+        none,
+    } = .none,
+    scale: f32 = 1,
+    transform: wl.Output.Transform = .normal,
+    adaptive_sync: bool = false,
+    auto_layout: bool = true,
 
-/// For Root.all_outputs
-all_link: wl.list.Link,
+    /// Width in the logical coordinate space
+    pub fn width(state: *const State) i32 {
+        const physical: f32 = blk: {
+            if (@mod(@intFromEnum(state.transform), 2) == 0) {
+                break :blk @floatFromInt(switch (state.mode) {
+                    .standard => |mode| mode.width,
+                    .custom => |mode| mode.width,
+                    .none => 0,
+                });
+            } else {
+                break :blk @floatFromInt(switch (state.mode) {
+                    .standard => |mode| mode.height,
+                    .custom => |mode| mode.height,
+                    .none => 0,
+                });
+            }
+        };
+        return @intFromFloat(physical / state.scale);
+    }
 
-/// For Root.active_outputs
-active_link: wl.list.Link,
+    /// Height in the logical coordinate space
+    pub fn height(state: *const State) i32 {
+        const physical: f32 = blk: {
+            if (@mod(@intFromEnum(state.transform), 2) == 0) {
+                break :blk @floatFromInt(switch (state.mode) {
+                    .standard => |mode| mode.height,
+                    .custom => |mode| mode.height,
+                    .none => 0,
+                });
+            } else {
+                break :blk @floatFromInt(switch (state.mode) {
+                    .standard => |mode| mode.width,
+                    .custom => |mode| mode.width,
+                    .none => 0,
+                });
+            }
+        };
+        return @intFromFloat(physical / state.scale);
+    }
+
+    pub fn apply(state: *const State, wlr_state: *wlr.Output.State) void {
+        wlr_state.setEnabled(state.state == .enabled);
+        switch (state.mode) {
+            .standard => |mode| wlr_state.setMode(mode),
+            .custom => |mode| wlr_state.setCustomMode(mode.width, mode.height, mode.refresh),
+            .none => {},
+        }
+        wlr_state.setScale(state.scale);
+        wlr_state.setTransform(state.transform);
+        wlr_state.setAdaptiveSyncEnabled(state.adaptive_sync);
+    }
+};
+
+/// Set to null when the wlr_output is destroyed.
+wlr_output: ?*wlr.Output,
+scene_output: ?*wlr.SceneOutput,
+
+object: ?*river.OutputV1 = null,
 
 /// Tracks the currently presented frame on the output as it pertains to ext-session-lock.
 /// The output is initially considered blanked:
 /// If using the DRM backend it will be blanked with the initial modeset.
 /// If using the Wayland or X11 backend nothing will be visible until the first frame is rendered.
+/// XXX set this to blanked on enabled->disabled transition
 lock_render_state: enum {
     /// Submitted an unlocked buffer but the buffer has not yet been presented.
     pending_unlock,
@@ -71,6 +155,18 @@ lock_render_state: enum {
 /// This request is handled while rendering the next frame in handleFrame().
 gamma_dirty: bool = false,
 
+/// Root.outputs
+link: wl.list.Link,
+
+/// Pending state to be sent to the wm in the next update sequence.
+pending: State = .{},
+link_pending: wl.list.Link,
+/// State sent to the wm in the latest update sequence.
+sent: State = .{},
+link_sent: wl.list.Link,
+/// State applied to the wlr_output and rendered.
+current: State = .{},
+
 destroy: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleDestroy),
 request_state: wl.Listener(*wlr.Output.event.RequestState) = wl.Listener(*wlr.Output.event.RequestState).init(handleRequestState),
 frame: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleFrame),
@@ -80,181 +176,189 @@ pub fn create(wlr_output: *wlr.Output) !void {
     const output = try util.gpa.create(Output);
     errdefer util.gpa.destroy(output);
 
-    if (!wlr_output.initRender(server.allocator, server.renderer)) return error.InitRenderFailed;
-
-    // If no standard mode for the output works we can't enable the output automatically.
-    // It will stay disabled unless the user configures a custom mode which works.
-    //
-    // For the Wayland backend, the list of modes will be empty and it is possible to
-    // enable the output without setting a mode.
     {
-        var state = wlr.Output.State.init();
-        defer state.finish();
-
-        state.setEnabled(true);
-
-        if (wlr_output.preferredMode()) |preferred_mode| {
-            state.setMode(preferred_mode);
-        }
-
-        if (!wlr_output.commitState(&state)) {
-            log.err("initial output commit with preferred mode failed, trying all modes", .{});
-
-            // It is important to try other modes if the preferred mode fails
-            // which is reported to be helpful in practice with e.g. multiple
-            // high resolution monitors connected through a usb dock.
-            var it = wlr_output.modes.iterator(.forward);
-            while (it.next()) |mode| {
-                state.setMode(mode);
-                if (wlr_output.commitState(&state)) {
-                    log.info("initial output commit succeeded with mode {}x{}@{}mHz", .{
-                        mode.width,
-                        mode.height,
-                        mode.refresh,
-                    });
-                    break;
-                } else {
-                    log.err("initial output commit failed with mode {}x{}@{}mHz", .{
-                        mode.width,
-                        mode.height,
-                        mode.refresh,
-                    });
-                }
-            }
+        const title = try fmt.allocPrintZ(util.gpa, "river - {s}", .{wlr_output.name});
+        defer util.gpa.free(title);
+        if (wlr_output.isWl()) {
+            wlr_output.wlSetTitle(title);
+        } else if (wlr.config.has_x11_backend and wlr_output.isX11()) {
+            wlr_output.x11SetTitle(title);
         }
     }
 
-    var width: c_int = undefined;
-    var height: c_int = undefined;
-    wlr_output.effectiveResolution(&width, &height);
+    if (!wlr_output.initRender(server.allocator, server.renderer)) return error.InitRenderFailed;
 
     const scene_output = try server.root.scene.createSceneOutput(wlr_output);
+
+    errdefer comptime unreachable;
 
     output.* = .{
         .wlr_output = wlr_output,
         .scene_output = scene_output,
-        .all_link = undefined,
-        .active_link = undefined,
+        .link = undefined,
+        .link_pending = undefined,
+        .link_sent = undefined,
     };
     wlr_output.data = @intFromPtr(output);
+
+    server.root.outputs.append(output);
+    server.wm.pending.outputs.append(output);
+    output.link_sent.init();
 
     wlr_output.events.destroy.add(&output.destroy);
     wlr_output.events.request_state.add(&output.request_state);
     wlr_output.events.frame.add(&output.frame);
     wlr_output.events.present.add(&output.present);
 
-    output.setTitle();
+    output.pending.state = .enabled;
+    if (wlr_output.preferredMode()) |preferred_mode| {
+        output.pending.mode = .{ .standard = preferred_mode };
+    }
 
-    output.active_link.init();
-    server.root.all_outputs.append(output);
-
-    output.handleEnableDisable();
+    server.wm.dirtyPending();
 }
 
-fn handleDestroy(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
+fn handleDestroy(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
     const output: *Output = @fieldParentPtr("destroy", listener);
 
-    log.debug("output '{s}' destroyed", .{output.wlr_output.name});
+    log.debug("output '{s}' destroyed", .{wlr_output.name});
 
-    // Remove the destroyed output from root if it wasn't already removed
-    server.root.deactivateOutput(output);
-
-    output.all_link.remove();
+    output.link.remove();
 
     output.destroy.link.remove();
     output.request_state.link.remove();
     output.frame.link.remove();
     output.present.link.remove();
 
-    output.wlr_output.data = 0;
+    wlr_output.data = 0;
 
-    util.gpa.destroy(output);
-
-    server.root.handleOutputConfigChange() catch std.log.err("out of memory", .{});
+    output.wlr_output = null;
+    output.scene_output = null;
+    output.pending.state = .destroying;
 
     server.wm.dirtyPending();
+}
+
+pub fn sendDirty(output: *Output) !void {
+    switch (output.pending.state) {
+        .enabled, .disabled_soft => {
+            const wm_v1 = server.wm.object.?;
+            const new = output.object == null;
+            const output_v1 = output.object orelse blk: {
+                const output_v1 = try river.OutputV1.create(wm_v1.getClient(), wm_v1.getVersion(), 0);
+                output.object = output_v1;
+
+                output_v1.setHandler(*Output, handleRequest, null, output);
+                wm_v1.sendOutput(output_v1);
+                output.link_sent.remove();
+                server.wm.sent.outputs.append(output);
+
+                break :blk output_v1;
+            };
+            errdefer comptime unreachable;
+
+            const pending = &output.pending;
+            const sent = &output.sent;
+
+            if (new or pending.width() != sent.width() or pending.height() != sent.height()) {
+                output_v1.sendDimensions(pending.width(), pending.height());
+            }
+            if (new or pending.x != sent.x or pending.y != sent.y) {
+                output_v1.sendPosition(pending.x, pending.y);
+            }
+
+            output.sent = output.pending;
+        },
+        .disabled_hard, .destroying => {
+            if (output.object) |output_v1| {
+                output_v1.sendRemoved();
+                output_v1.setHandler(?*anyopaque, handleRequestInert, null, null);
+                output.object = null;
+            }
+
+            output.link_pending.remove();
+            output.link_sent.remove();
+            output.link_pending.init();
+            output.link_sent.init();
+
+            if (output.pending.state == .destroying) {
+                util.gpa.destroy(output);
+            }
+        },
+    }
+}
+
+fn handleRequestInert(
+    output_v1: *river.OutputV1,
+    request: river.OutputV1.Request,
+    _: ?*anyopaque,
+) void {
+    if (request == .destroy) output_v1.destroy();
+}
+
+fn handleRequest(
+    _: *river.OutputV1,
+    request: river.OutputV1.Request,
+    _: ?*Output,
+) void {
+    switch (request) {
+        .destroy => {}, // XXX send protocol error
+    }
 }
 
 fn handleRequestState(listener: *wl.Listener(*wlr.Output.event.RequestState), event: *wlr.Output.event.RequestState) void {
     const output: *Output = @fieldParentPtr("request_state", listener);
 
-    output.applyState(event.state) catch {
-        log.err("failed to commit requested state", .{});
+    // The only state currently requested by a wlroots backend is a
+    // custom mode as the Wayland/X11 backend window is resized.
+    const committed: u32 = @bitCast(event.state.committed);
+    const supported: u32 = @bitCast(wlr.Output.State.Fields{ .mode = true });
+
+    if (committed != supported) {
+        log.err("backend requested unsupported state {}", .{committed});
         return;
-    };
+    }
+
+    if (event.state.mode) |mode| {
+        output.pending.mode = .{ .standard = mode };
+    } else {
+        output.pending.mode = .{ .custom = .{
+            .width = event.state.custom_mode.width,
+            .height = event.state.custom_mode.height,
+            .refresh = event.state.custom_mode.refresh,
+        } };
+    }
 
     server.wm.dirtyPending();
 }
 
-// TODO double buffer output state changes for frame perfection and cleaner code.
-// Schedule a frame and commit in the frame handler.
-// Get rid of this function.
-pub fn applyState(output: *Output, state: *wlr.Output.State) error{CommitFailed}!void {
-
-    // We need to be precise about this state change to make assertions
-    // in updateLockRenderStateOnEnableDisable() possible.
-    const enable_state_change = state.committed.enabled and
-        (state.enabled != output.wlr_output.enabled);
-
-    if (!output.wlr_output.commitState(state)) {
-        return error.CommitFailed;
-    }
-
-    if (enable_state_change) {
-        output.handleEnableDisable();
-    }
-
-    if (state.committed.mode) {
-        if (server.lock_manager.lockSurfaceFromOutput(output)) |s| s.configure();
-    }
-}
-
-fn handleEnableDisable(output: *Output) void {
-    output.updateLockRenderStateOnEnableDisable();
-    output.gamma_dirty = true;
-
-    if (output.wlr_output.enabled) {
-        // Add the output to root.active_outputs and the output layout if it has not
-        // already been added.
-        server.root.activateOutput(output);
-    } else {
-        server.root.deactivateOutput(output);
-    }
-}
-
-pub fn updateLockRenderStateOnEnableDisable(output: *Output) void {
-    if (output.wlr_output.enabled) {
-        assert(output.lock_render_state == .blanked);
-    } else {
-        // Disabling and re-enabling an output always blanks it.
-        output.lock_render_state = .blanked;
-    }
-}
-
-fn handleFrame(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
+fn handleFrame(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
     const output: *Output = @fieldParentPtr("frame", listener);
-    const scene_output = server.root.scene.getSceneOutput(output.wlr_output).?;
 
     // TODO this should probably be retried on failure
-    output.renderAndCommit(scene_output) catch |err| switch (err) {
+    output.renderAndCommit() catch |err| switch (err) {
         error.OutOfMemory => log.err("out of memory", .{}),
-        error.CommitFailed => log.err("output commit failed for {s}", .{output.wlr_output.name}),
+        error.CommitFailed => log.err("output commit failed for {s}", .{wlr_output.name}),
     };
 
     var now: posix.timespec = undefined;
     posix.clock_gettime(posix.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
-    scene_output.sendFrameDone(&now);
+    output.scene_output.?.sendFrameDone(&now);
 }
 
-fn renderAndCommit(output: *Output, scene_output: *wlr.SceneOutput) !void {
-    if (output.gamma_dirty) {
-        var state = wlr.Output.State.init();
-        defer state.finish();
+fn renderAndCommit(output: *Output) !void {
+    const wlr_output = output.wlr_output.?;
 
-        const control = server.root.gamma_control_manager.getControl(output.wlr_output);
+    var state = wlr.Output.State.init();
+    defer state.finish();
+
+    output.current.apply(&state);
+
+    if (output.gamma_dirty) {
+        const control = server.root.gamma_control_manager.getControl(wlr_output);
         if (!wlr.GammaControlV1.apply(control, &state)) return error.OutOfMemory;
 
-        if (!output.wlr_output.testState(&state)) {
+        if (!wlr_output.testState(&state)) {
             wlr.GammaControlV1.sendFailedAndDestroy(control);
             state.clearGammaLut();
             // If the backend does not support gamma LUTs it will reject any
@@ -262,15 +366,13 @@ fn renderAndCommit(output: *Output, scene_output: *wlr.SceneOutput) !void {
             // has a null LUT. The wayland backend for example has this behavior.
             state.committed.gamma_lut = false;
         }
-
-        if (!scene_output.buildState(&state, null)) return error.CommitFailed;
-
-        if (!output.wlr_output.commitState(&state)) return error.CommitFailed;
-
-        output.gamma_dirty = false;
-    } else {
-        if (!scene_output.commit(null)) return error.CommitFailed;
     }
+
+    if (!output.scene_output.?.buildState(&state, null)) return error.CommitFailed;
+
+    if (!wlr_output.commitState(&state)) return error.CommitFailed;
+
+    output.gamma_dirty = false;
 
     const lock_surface_mapped = blk: {
         if (server.lock_manager.lockSurfaceFromOutput(output)) |lock_surface| {
@@ -339,15 +441,5 @@ fn handlePresent(
             }
         },
         .blanked, .lock_surface => {},
-    }
-}
-
-fn setTitle(output: Output) void {
-    const title = fmt.allocPrintZ(util.gpa, "river - {s}", .{output.wlr_output.name}) catch return;
-    defer util.gpa.free(title);
-    if (output.wlr_output.isWl()) {
-        output.wlr_output.wlSetTitle(title);
-    } else if (wlr.config.has_x11_backend and output.wlr_output.isX11()) {
-        output.wlr_output.x11SetTitle(title);
     }
 }

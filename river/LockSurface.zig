@@ -97,7 +97,7 @@ pub fn getOutput(lock_surface: *LockSurface) *Output {
 pub fn configure(lock_surface: *LockSurface) void {
     var output_width: i32 = undefined;
     var output_height: i32 = undefined;
-    lock_surface.getOutput().wlr_output.effectiveResolution(&output_width, &output_height);
+    lock_surface.wlr_lock_surface.output.effectiveResolution(&output_width, &output_height);
     _ = lock_surface.wlr_lock_surface.configure(@intCast(output_width), @intCast(output_height));
 }
 

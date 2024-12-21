@@ -12,8 +12,8 @@
             .hash = "12206015b1750462788de094b8154eab733a36523639124ace437d4631ca01b5ba18",
         },
         .@"zig-wlroots" = .{
-            .url = "https://codeberg.org/ifreund/zig-wlroots/archive/ae6151f22ceb4ccd7efb1291dea573785918a7ec.tar.gz",
-            .hash = "12204d99aebfbf88f1ff3ab197362937b3d4bef4f45fde9c4ee0d569e095a2a25889",
+            .url = "https://codeberg.org/ifreund/zig-wlroots/archive/a2372a124d9b8568775849a2ea60da36c4f5b0dd.tar.gz",
+            .hash = "122019ca283db70a0f4932e54b5195e2392b9220c7f97808d0e74c14be30aea4a458",
         },
         .@"zig-xkbcommon" = .{
             .url = "https://codeberg.org/ifreund/zig-xkbcommon/archive/v0.2.0.tar.gz",

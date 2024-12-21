@@ -19,11 +19,13 @@ const WindowManager = @This();
 const std = @import("std");
 const assert = std.debug.assert;
 const wl = @import("wayland").server.wl;
+const wlr = @import("wlroots");
 const river = @import("wayland").server.river;
 
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
+const Output = @import("Output.zig");
 const Window = @import("Window.zig");
 const WmNode = @import("WmNode.zig");
 
@@ -48,11 +50,21 @@ state: union(enum) {
     inflight_configures: u32,
 } = .idle,
 
-/// Pending state from windows to be sent to the wm in the next update sequence.
+/// Pending state to be sent to the wm in the next update sequence.
 pending: struct {
     /// Pending state has been modified since the last update event sent to the wm.
     dirty: bool = false,
+
     dirty_windows: wl.list.Head(Window, .link_dirty),
+
+    outputs: wl.list.Head(Output, .link_pending),
+    output_config: ?*wlr.OutputConfigurationV1 = null,
+},
+
+/// State sent to the wm in the latest update sequence.
+sent: struct {
+    outputs: wl.list.Head(Output, .link_sent),
+    output_config: ?*wlr.OutputConfigurationV1 = null,
 },
 
 /// State sent by the wm but not yet committed with a commit request.
@@ -86,6 +98,10 @@ pub fn init(wm: *WindowManager) !void {
         .windows = undefined,
         .pending = .{
             .dirty_windows = undefined,
+            .outputs = undefined,
+        },
+        .sent = .{
+            .outputs = undefined,
         },
         .uncommitted = .{
             .render_list = undefined,
@@ -100,6 +116,8 @@ pub fn init(wm: *WindowManager) !void {
     };
     wm.windows.init();
     wm.pending.dirty_windows.init();
+    wm.pending.outputs.init();
+    wm.sent.outputs.init();
     wm.uncommitted.render_list.init();
     wm.committed.render_list.init();
     wm.inflight.render_list.init();
@@ -219,6 +237,22 @@ fn sendUpdate(wm: *WindowManager) void {
 
     // XXX send all dirty pending state
 
+    wm.autoLayoutOutputs();
+    {
+        var it = wm.pending.outputs.safeIterator(.forward);
+        while (it.next()) |output| {
+            output.sendDirty() catch {
+                log.err("out of memory", .{});
+                continue; // Try again next update
+            };
+            output.link_pending.remove();
+        }
+    }
+
+    assert(wm.sent.output_config == null);
+    wm.sent.output_config = wm.pending.output_config;
+    wm.pending.output_config = null;
+
     {
         var it = wm.pending.dirty_windows.safeIterator(.forward);
         while (it.next()) |window| {
@@ -236,6 +270,35 @@ fn sendUpdate(wm: *WindowManager) void {
     wm.state = .{ .update_sent = serial };
 
     wm.startTimeoutTimer();
+}
+
+fn autoLayoutOutputs(wm: *WindowManager) void {
+    // Find the right most edge of any non-autolayout output.
+    var rightmost_edge: i32 = 0;
+    var row_y: i32 = 0;
+    {
+        var it = wm.pending.outputs.iterator(.forward);
+        while (it.next()) |output| {
+            if (output.pending.auto_layout) continue;
+
+            const x = output.pending.x + output.pending.width();
+            if (x > rightmost_edge) {
+                rightmost_edge = x;
+                row_y = output.pending.y;
+            }
+        }
+    }
+    // Place autolayout outputs in a row starting at the rightmost edge.
+    {
+        var it = wm.pending.outputs.iterator(.forward);
+        while (it.next()) |output| {
+            if (!output.pending.auto_layout) continue;
+
+            output.pending.x = rightmost_edge;
+            output.pending.y = row_y;
+            rightmost_edge += output.pending.width();
+        }
+    }
 }
 
 fn sendConfigures(wm: *WindowManager) void {
@@ -325,6 +388,8 @@ fn commitTransaction(wm: *WindowManager) void {
             }
         }
     }
+
+    server.root.commitOutputState();
 
     {
         var it = server.input_manager.seats.first;
