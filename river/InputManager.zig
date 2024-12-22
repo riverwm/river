@@ -60,8 +60,6 @@ configs: std.ArrayList(InputConfig),
 devices: wl.list.Head(InputDevice, .link),
 seats: std.TailQueue(Seat) = .{},
 
-exclusive_client: ?*wl.Client = null,
-
 new_virtual_pointer: wl.Listener(*wlr.VirtualPointerManagerV1.event.NewPointer) =
     wl.Listener(*wlr.VirtualPointerManagerV1.event.NewPointer).init(handleNewVirtualPointer),
 new_virtual_keyboard: wl.Listener(*wlr.VirtualKeyboardV1) =
@@ -134,14 +132,6 @@ pub fn deinit(input_manager: *InputManager) void {
 
 pub fn defaultSeat(input_manager: InputManager) *Seat {
     return &input_manager.seats.first.?.data;
-}
-
-/// Returns true if input is currently allowed on the passed surface.
-pub fn inputAllowed(input_manager: InputManager, wlr_surface: *wlr.Surface) bool {
-    return if (input_manager.exclusive_client) |exclusive_client|
-        exclusive_client == wlr_surface.resource.getClient()
-    else
-        true;
 }
 
 /// Reconfigures all devices' libinput configuration as well as their output mapping.
