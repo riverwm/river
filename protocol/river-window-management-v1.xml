@@ -155,14 +155,14 @@
     </event>
 
     <event name="window">
-      <description summary="new logical window">
+      <description summary="new window">
         A new window has been created by some client.
       </description>
       <arg name="id" type="new_id" interface="river_window_v1"/>
     </event>
 
     <event name="output">
-      <description summary="new logical output">
+      <description summary="new output">
         A new logical output has been created, perhaps due to a new physical
         monitor being plugged in or perhaps due to a change in configuration.
 
@@ -173,13 +173,15 @@
       <arg name="id" type="new_id" interface="river_output_v1"/>
     </event>
 
-    <request name="get_seat">
-      <description summary="get a seat extension object">
-        Get the river_seat_v1 extension object for the given wl_seat.
+    <event name="seat">
+      <description summary="new seat">
+        A new seat has been created.
+
+        This event is double-buffered state and will be followed by a
+        river_window_manager_v1.update event.
       </description>
       <arg name="id" type="new_id" interface="river_seat_v1"/>
-      <arg name="seat" type="object" interface="wl_seat"/>
-    </request>
+    </event>
 
     <request name="get_shell_surface">
       <description summary="assign the river_shell_surface_v1 surface role">
@@ -864,19 +866,18 @@
         This request indicates that the client will no longer use the output
         object and that it may be safely destroyed.
 
-        This request should be made by the client after the
-        river_output_v1.removed event is received to complete destruction of the
-        output.
+        This request should be made after the river_output_v1.removed event is
+        received to complete destruction of the output.
       </description>
     </request>
 
     <event name="removed">
       <description summary="the output is removed">
-        This event indicates that logical output is no longer conceptually part
-        of window management space.
+        This event indicates that the logical output is no longer conceptually
+        part of window management space.
 
         The server will send no further events on this object and ignore any
-        request other than river_output_v1.destroy made after this event is
+        request (other than river_output_v1.destroy) made after this event is
         sent. The client should destroy this object with the
         river_output_v1.destroy request to free up resources.
 
@@ -924,9 +925,11 @@
   </interface>
 
   <interface name="river_seat_v1" version="1">
-    <description summary="a extension of wl_seat for window management">
-      This object extends the wl_seat object with the features necessary for
-      window management.
+    <description summary="a window management seat">
+      This object represents a single user's collection of input devices. It
+      allows the window manager to route keyboard input to windows, get
+      high-level information about pointer input, define keyboard and pointer
+      bindings, etc.
 
       TODO:
         - touch input
@@ -937,8 +940,26 @@
       <description summary="destroy the seat object">
         This request indicates that the client will no longer use the seat
         object and that it may be safely destroyed.
+
+        This request should be made after the river_seat_v1.removed event is
+        received to complete destruction of the seat.
       </description>
     </request>
+
+    <event name="removed">
+      <description summary="the seat is removed">
+        This event indicates that seat is no longer in use and should be
+        destroyed.
+
+        The server will send no further events on this object and ignore any
+        request (other than river_seat_v1.destroy) made after this event is sent.
+        The client should destroy this object with the river_seat_v1.destroy
+        request to free up resources.
+
+        This event is double-buffered state and will be followed by a
+        river_window_manager_v1.update event.
+      </description>
+    </event>
 
     <request name="focus_window">
       <description summary="give keyboard focus to a window">
