@@ -253,21 +253,8 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
 
 fn handleMap(listener: *wl.Listener(void)) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("map", listener);
-    const window = toplevel.window;
 
-    toplevel.wlr_toplevel.base.getGeometry(&toplevel.geometry);
-
-    // XXX this seems like it should be deleted/moved to handleCommit()
-    window.pending.box = .{
-        .x = 0,
-        .y = 0,
-        .width = toplevel.geometry.width,
-        .height = toplevel.geometry.height,
-    };
-    window.inflight.box = window.pending.box;
-    window.current.box = window.pending.box;
-
-    window.map() catch {
+    toplevel.window.map() catch {
         log.err("out of memory", .{});
         toplevel.wlr_toplevel.resource.getClient().postNoMemory();
     };
