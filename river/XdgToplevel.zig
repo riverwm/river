@@ -147,7 +147,7 @@ pub fn configure(toplevel: *XdgToplevel) bool {
 
     const wlr_toplevel = toplevel.wlr_toplevel;
 
-    _ = wlr_toplevel.setActivated(inflight.focus != 0);
+    _ = wlr_toplevel.setActivated(inflight.activated);
     _ = wlr_toplevel.setTiled(.{
         .top = inflight.tiled.top,
         .bottom = inflight.tiled.bottom,
@@ -205,7 +205,7 @@ fn needsConfigure(toplevel: *XdgToplevel) bool {
         return true;
     }
 
-    if ((inflight.focus != 0) != (current.focus != 0)) return true;
+    if (inflight.activated != current.activated) return true;
     if (inflight.ssd != current.ssd) return true;
     if (!std.meta.eql(inflight.tiled, current.tiled)) return true;
     if (!std.meta.eql(inflight.capabilities, current.capabilities)) return true;

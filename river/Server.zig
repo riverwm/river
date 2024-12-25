@@ -175,12 +175,12 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
         server.xwayland.?.events.new_surface.add(&server.new_xsurface);
     }
 
+    try server.wm.init();
     try server.scene.init();
     try server.om.init();
     try server.input_manager.init();
     try server.idle_inhibit_manager.init();
     try server.lock_manager.init();
-    try server.wm.init();
 
     server.xdg_shell.events.new_toplevel.add(&server.new_xdg_toplevel);
     server.xdg_decoration_manager.events.new_toplevel_decoration.add(&server.new_toplevel_decoration);

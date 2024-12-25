@@ -165,9 +165,8 @@ fn handleUnmap(listener: *wl.Listener(void)) void {
 
     // If the unmapped surface is currently focused, pass keyboard focus
     // to the most appropriate surface.
-    var seat_it = server.input_manager.seats.first;
-    while (seat_it) |seat_node| : (seat_it = seat_node.next) {
-        const seat = &seat_node.data;
+    var seat_it = server.input_manager.seats.iterator(.forward);
+    while (seat_it.next()) |seat| {
         if (seat.focused == .window and seat.focused.window.impl == .xwayland and
             seat.focused.window.impl.xwayland.xsurface.pid == override_redirect.xsurface.pid and
             seat.wlr_seat.keyboard_state.focused_surface == override_redirect.xsurface.surface)

@@ -58,7 +58,7 @@ tablet_manager: *wlr.TabletManagerV2,
 configs: std.ArrayList(InputConfig),
 
 devices: wl.list.Head(InputDevice, .link),
-seats: std.TailQueue(Seat) = .{},
+seats: wl.list.Head(Seat, .link),
 
 new_virtual_pointer: wl.Listener(*wlr.VirtualPointerManagerV1.event.NewPointer) =
     wl.Listener(*wlr.VirtualPointerManagerV1.event.NewPointer).init(handleNewVirtualPointer),
@@ -72,9 +72,6 @@ new_text_input: wl.Listener(*wlr.TextInputV3) =
     wl.Listener(*wlr.TextInputV3).init(handleNewTextInput),
 
 pub fn init(input_manager: *InputManager) !void {
-    const seat_node = try util.gpa.create(std.TailQueue(Seat).Node);
-    errdefer util.gpa.destroy(seat_node);
-
     input_manager.* = .{
         // These are automatically freed when the display is destroyed
         .idle_notifier = try wlr.IdleNotifierV1.create(server.wl_server),
@@ -89,11 +86,12 @@ pub fn init(input_manager: *InputManager) !void {
         .configs = std.ArrayList(InputConfig).init(util.gpa),
 
         .devices = undefined,
+        .seats = undefined,
     };
     input_manager.devices.init();
+    input_manager.seats.init();
 
-    input_manager.seats.prepend(seat_node);
-    try seat_node.data.init(default_seat_name);
+    try Seat.create(default_seat_name);
 
     if (build_options.xwayland) {
         if (server.xwayland) |xwayland| {
@@ -119,9 +117,8 @@ pub fn deinit(input_manager: *InputManager) void {
     input_manager.new_input_method.link.remove();
     input_manager.new_text_input.link.remove();
 
-    while (input_manager.seats.pop()) |seat_node| {
-        seat_node.data.deinit();
-        util.gpa.destroy(seat_node);
+    while (input_manager.seats.first()) |seat| {
+        seat.destroy();
     }
 
     for (input_manager.configs.items) |*config| {
@@ -130,8 +127,17 @@ pub fn deinit(input_manager: *InputManager) void {
     input_manager.configs.deinit();
 }
 
-pub fn defaultSeat(input_manager: InputManager) *Seat {
-    return &input_manager.seats.first.?.data;
+pub fn defaultSeat(input_manager: *InputManager) *Seat {
+    return input_manager.seats.first().?;
+}
+
+pub fn processEvents(input_manager: *InputManager) void {
+    assert(server.wm.state == .idle);
+
+    var it = input_manager.seats.iterator(.forward);
+    while (it.next()) |seat| {
+        seat.processEvents();
+    }
 }
 
 /// Reconfigures all devices' libinput configuration as well as their output mapping.

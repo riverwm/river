@@ -239,13 +239,16 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) v
     server.wm.dirtyPending();
 }
 
-pub fn sendDirty(output: *Output) !void {
+pub fn sendDirty(output: *Output) void {
     switch (output.pending.state) {
         .enabled, .disabled_soft => {
             if (server.wm.object) |wm_v1| {
                 const new = output.object == null;
                 const output_v1 = output.object orelse blk: {
-                    const output_v1 = try river.OutputV1.create(wm_v1.getClient(), wm_v1.getVersion(), 0);
+                    const output_v1 = river.OutputV1.create(wm_v1.getClient(), wm_v1.getVersion(), 0) catch {
+                        log.err("out of memory", .{});
+                        return; // try again next update
+                    };
                     output.object = output_v1;
 
                     output_v1.setHandler(*Output, handleRequest, null, output);

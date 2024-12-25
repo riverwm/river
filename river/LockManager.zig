@@ -110,10 +110,9 @@ fn handleLock(listener: *wl.Listener(*wlr.SessionLockV1), lock: *wlr.SessionLock
         };
 
         {
-            var it = server.input_manager.seats.first;
-            while (it) |node| : (it = node.next) {
-                const seat = &node.data;
-                seat.setFocusRaw(.none);
+            var it = server.input_manager.seats.iterator(.forward);
+            while (it.next()) |seat| {
+                seat.focus(.none);
             }
         }
     } else {
@@ -196,10 +195,9 @@ fn handleUnlock(listener: *wl.Listener(void)) void {
     server.scene.locked_tree.node.setEnabled(true);
 
     {
-        var it = server.input_manager.seats.first;
-        while (it) |node| : (it = node.next) {
-            const seat = &node.data;
-            seat.setFocusRaw(.none);
+        var it = server.input_manager.seats.iterator(.forward);
+        while (it.next()) |seat| {
+            seat.focus(.none);
         }
     }
 

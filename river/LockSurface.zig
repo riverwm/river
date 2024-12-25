@@ -62,16 +62,15 @@ pub fn create(wlr_lock_surface: *wlr.SessionLockSurfaceV1, lock: *wlr.SessionLoc
 pub fn destroy(lock_surface: *LockSurface) void {
     {
         var surface_it = lock_surface.lock.surfaces.iterator(.forward);
-        const new_focus: Seat.FocusTarget = while (surface_it.next()) |surface| {
+        const new_focus: Seat.Focus = while (surface_it.next()) |surface| {
             if (surface != lock_surface.wlr_lock_surface)
                 break .{ .lock_surface = @ptrFromInt(surface.data) };
         } else .none;
 
-        var seat_it = server.input_manager.seats.first;
-        while (seat_it) |node| : (seat_it = node.next) {
-            const seat = &node.data;
+        var seat_it = server.input_manager.seats.iterator(.forward);
+        while (seat_it.next()) |seat| {
             if (seat.focused == .lock_surface and seat.focused.lock_surface == lock_surface) {
-                seat.setFocusRaw(new_focus);
+                seat.focus(new_focus);
             }
             seat.cursor.updateState();
         }
@@ -117,11 +116,10 @@ fn handleMap(listener: *wl.Listener(void)) void {
 }
 
 fn updateFocus(lock_surface: *LockSurface) void {
-    var it = server.input_manager.seats.first;
-    while (it) |node| : (it = node.next) {
-        const seat = &node.data;
+    var it = server.input_manager.seats.iterator(.forward);
+    while (it.next()) |seat| {
         if (seat.focused != .lock_surface) {
-            seat.setFocusRaw(.{ .lock_surface = lock_surface });
+            seat.focus(.{ .lock_surface = lock_surface });
         }
         seat.cursor.updateState();
     }

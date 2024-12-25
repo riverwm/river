@@ -1,6 +1,6 @@
 // This file is part of river, a dynamic tiling wayland compositor.
 //
-// Copyright 2020 The River Developers
+// Copyright 2020-2024 The River Developers
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -69,8 +69,8 @@ pub const State = struct {
     /// The output-relative coordinates of the window and dimensions requested by river.
     box: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
     hidden: bool = false,
-    /// Number of seats currently focusing the window
-    focus: u32 = 0,
+    /// True if the window has keyboard focus from at least one seat.
+    activated: bool = false,
     ssd: bool = false,
     border: Border = .{},
     tiled: river.WindowV1.Edges = .{},
@@ -228,7 +228,7 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
 pub fn destroy(window: *Window, when: enum { lazy, assert }) void {
     assert(window.impl == .none);
     assert(!window.mapped);
-    assert(window.object == null);
+    assert(window.pending.state == .closing);
 
     window.destroying = true;
 
@@ -293,7 +293,7 @@ pub fn setFullscreenRequested(window: *Window, fullscreen_requested: bool) void 
 }
 
 /// Send dirty pending state as part of an in progress update sequence.
-pub fn sendDirty(window: *Window) !void {
+pub fn sendDirty(window: *Window) void {
     assert(window.pending.state != .init);
 
     switch (window.pending.state) {
@@ -324,7 +324,10 @@ pub fn sendDirty(window: *Window) !void {
             const wm_v1 = server.wm.object orelse return;
             const new = window.object == null;
             const window_v1 = window.object orelse blk: {
-                const window_v1 = try river.WindowV1.create(wm_v1.getClient(), wm_v1.getVersion(), 0);
+                const window_v1 = river.WindowV1.create(wm_v1.getClient(), wm_v1.getVersion(), 0) catch {
+                    log.err("out of memory", .{});
+                    return; // try again next update
+                };
                 window.object = window_v1;
                 window_v1.setHandler(*Window, handleRequest, null, window);
                 wm_v1.sendWindow(window_v1);
@@ -452,11 +455,12 @@ pub fn resizeUpdatePosition(window: *Window, width: i32, height: i32) void {
     assert(window.inflight.resizing);
 
     const data = blk: {
-        var it = server.input_manager.seats.first;
-        while (it) |node| : (it = node.next) {
-            const cursor = &node.data.cursor;
-            if (cursor.inflight_mode == .resize and cursor.inflight_mode.resize.window == window) {
-                break :blk cursor.inflight_mode.resize;
+        var it = server.input_manager.seats.iterator(.forward);
+        while (it.next()) |seat| {
+            if (seat.cursor.inflight_mode == .resize and
+                seat.cursor.inflight_mode.resize.window == window)
+            {
+                break :blk seat.cursor.inflight_mode.resize;
             }
         } else {
             // The window resizing state should never be set when the window is
@@ -602,6 +606,16 @@ pub fn configure(window: *Window) bool {
 
     assert(!window.destroying);
 
+    const activated = blk: {
+        var it = server.wm.sent.seats.iterator(.forward);
+        while (it.next()) |seat| {
+            if (seat.committed.focus == .window and seat.committed.focus.window == window) {
+                break :blk true;
+            }
+        }
+        break :blk false;
+    };
+
     const committed = &window.committed;
     window.inflight = .{
         .box = .{
@@ -611,7 +625,7 @@ pub fn configure(window: *Window) bool {
             .height = if (committed.proposed) |p| p.height else window.pending.box.height,
         },
         .hidden = committed.hidden,
-        .focus = 0, // XXX
+        .activated = activated,
         .ssd = committed.ssd,
         .border = committed.border,
         .tiled = committed.tiled,

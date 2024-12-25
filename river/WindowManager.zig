@@ -26,6 +26,7 @@ const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Output = @import("Output.zig");
+const Seat = @import("Seat.zig");
 const Window = @import("Window.zig");
 const WmNode = @import("WmNode.zig");
 
@@ -59,12 +60,16 @@ pending: struct {
 
     outputs: wl.list.Head(Output, .link_pending),
     output_config: ?*wlr.OutputConfigurationV1 = null,
+
+    seats: wl.list.Head(Seat, .link_pending),
 },
 
 /// State sent to the wm in the latest update sequence.
 sent: struct {
     outputs: wl.list.Head(Output, .link_sent),
     output_config: ?*wlr.OutputConfigurationV1 = null,
+
+    seats: wl.list.Head(Seat, .link_sent),
 },
 
 /// State sent by the wm but not yet committed with a commit request.
@@ -74,6 +79,7 @@ uncommitted: struct {
 
 /// State sent by the wm and committed with a commit request.
 committed: struct {
+    // The wm has committed state since state was last sent to windows.
     dirty: bool = false,
     render_list: wl.list.Head(WmNode, .link_committed),
 },
@@ -99,9 +105,11 @@ pub fn init(wm: *WindowManager) !void {
         .pending = .{
             .dirty_windows = undefined,
             .outputs = undefined,
+            .seats = undefined,
         },
         .sent = .{
             .outputs = undefined,
+            .seats = undefined,
         },
         .uncommitted = .{
             .render_list = undefined,
@@ -117,7 +125,9 @@ pub fn init(wm: *WindowManager) !void {
     wm.windows.init();
     wm.pending.dirty_windows.init();
     wm.pending.outputs.init();
+    wm.pending.seats.init();
     wm.sent.outputs.init();
+    wm.sent.seats.init();
     wm.uncommitted.render_list.init();
     wm.committed.render_list.init();
     wm.inflight.render_list.init();
@@ -147,7 +157,7 @@ fn bind(client: *wl.Client, wm: *WindowManager, version: u32, id: u32) void {
 
     wm.object = object;
     object.setHandler(*WindowManager, handleRequest, null, wm);
-    // XXX send existing windows?
+    // XXX send existing windows outputs and seats, including output dimensions
 }
 
 fn handleRequestInert(
@@ -195,6 +205,11 @@ fn handleRequest(
                 }
             }
 
+            {
+                var it = wm.sent.seats.iterator(.forward);
+                while (it.next()) |seat| seat.commitWmState();
+            }
+
             wm.committed.dirty = true;
             switch (wm.state) {
                 .idle, .update_acked => {
@@ -204,7 +219,6 @@ fn handleRequest(
                 .update_sent, .inflight_configures => {},
             }
         },
-        .get_seat => |_| {},
         .get_shell_surface => |_| {},
     }
 }
@@ -239,17 +253,10 @@ fn sendUpdate(wm: *WindowManager) void {
 
     log.debug("sending update to window manager", .{});
 
-    // XXX send all dirty pending state
-
     wm.autoLayoutOutputs();
     {
         var it = wm.pending.outputs.safeIterator(.forward);
-        while (it.next()) |output| {
-            output.sendDirty() catch {
-                log.err("out of memory", .{});
-                continue; // Try again next update
-            };
-        }
+        while (it.next()) |output| output.sendDirty();
     }
 
     assert(wm.sent.output_config == null);
@@ -258,12 +265,12 @@ fn sendUpdate(wm: *WindowManager) void {
 
     {
         var it = wm.pending.dirty_windows.safeIterator(.forward);
-        while (it.next()) |window| {
-            window.sendDirty() catch {
-                log.err("out of memory", .{});
-                continue; // Try again next update
-            };
-        }
+        while (it.next()) |window| window.sendDirty();
+    }
+
+    {
+        var it = wm.pending.seats.safeIterator(.forward);
+        while (it.next()) |seat| seat.sendDirty();
     }
 
     wm.pending.dirty = false;
@@ -318,6 +325,11 @@ fn sendConfigures(wm: *WindowManager) void {
 
     assert(wm.committed.dirty);
     wm.committed.dirty = false;
+
+    {
+        var it = wm.sent.seats.iterator(.forward);
+        while (it.next()) |seat| seat.applyCommitted();
+    }
 
     wm.state = .{ .inflight_configures = 0 };
     {
@@ -414,8 +426,8 @@ fn commitTransaction(wm: *WindowManager) void {
     server.om.commitOutputState();
 
     {
-        var it = server.input_manager.seats.first;
-        while (it) |node| : (it = node.next) node.data.cursor.updateState();
+        var it = server.input_manager.seats.iterator(.forward);
+        while (it.next()) |seat| seat.cursor.updateState();
     }
 
     server.idle_inhibit_manager.checkActive();
@@ -426,5 +438,7 @@ fn commitTransaction(wm: *WindowManager) void {
         wm.sendConfigures();
     } else if (wm.pending.dirty) {
         wm.sendUpdate();
+    } else {
+        server.input_manager.processEvents();
     }
 }

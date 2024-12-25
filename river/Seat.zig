@@ -1,6 +1,6 @@
 // This file is part of river, a dynamic tiling wayland compositor.
 //
-// Copyright 2020 - 2024 The River Developers
+// Copyright 2020-2024 The River Developers
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -20,7 +20,9 @@ const build_options = @import("build_options");
 const std = @import("std");
 const assert = std.debug.assert;
 const wlr = @import("wlroots");
-const wl = @import("wayland").server.wl;
+const wayland = @import("wayland");
+const wl = wayland.server.wl;
+const river = wayland.server.river;
 const xkb = @import("xkbcommon");
 
 const server = &@import("main.zig").server;
@@ -44,13 +46,52 @@ const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
 const log = std.log.scoped(.seat);
 
-pub const FocusTarget = union(enum) {
+pub const Event = union(enum) {
+    keyboard_key: struct {
+        keyboard: *Keyboard,
+        key: wlr.Keyboard.event.Key,
+    },
+    keyboard_modifiers: struct {
+        keyboard: *Keyboard,
+        modifiers: wlr.Keyboard.Modifiers,
+    },
+
+    pointer_motion_relative: wlr.Pointer.event.Motion,
+    pointer_motion_absolute: wlr.Pointer.event.MotionAbsolute,
+    pointer_button: wlr.Pointer.event.Button,
+    pointer_axis: wlr.Pointer.event.Axis,
+    pointer_frame: void,
+
+    pointer_swipe_begin: wlr.Pointer.event.SwipeBegin,
+    pointer_swipe_update: wlr.Pointer.event.SwipeUpdate,
+    pointer_swipe_end: wlr.Pointer.event.SwipeEnd,
+
+    pointer_pinch_begin: wlr.Pointer.event.PinchBegin,
+    pointer_pinch_update: wlr.Pointer.event.PinchUpdate,
+    pointer_pinch_end: wlr.Pointer.event.PinchEnd,
+};
+
+pub const WmState = struct {
+    focus: WmFocus = .none,
+    // TODO pointer move/resize state
+    // TODO confine region
+    // TODO pointer warp
+    // TODO xkb/pointer bindings
+};
+
+pub const WmFocus = union(enum) {
+    none,
+    window: *Window,
+    // TODO shell_surface: *ShellSurface,
+};
+
+pub const Focus = union(enum) {
     window: *Window,
     override_redirect: if (build_options.xwayland) *XwaylandOverrideRedirect else noreturn,
     lock_surface: *LockSurface,
     none: void,
 
-    pub fn surface(target: FocusTarget) ?*wlr.Surface {
+    pub fn surface(target: Focus) ?*wlr.Surface {
         return switch (target) {
             .window => |window| window.rootSurface(),
             .override_redirect => |override_redirect| override_redirect.xsurface.surface,
@@ -60,16 +101,49 @@ pub const FocusTarget = union(enum) {
     }
 };
 
+/// XXX experiment with different sizes here, consider making dynamic
+/// XXX Clean out events for destroyed input devices
+const EventQueue = std.fifo.LinearFifo(Event, .{ .Static = 1024 });
+
 wlr_seat: *wlr.Seat,
 
-/// Multiple mice are handled by the same Cursor
+link: wl.list.Link,
+
+destroying: bool = false,
+
+object: ?*river.SeatV1 = null,
+
+event_queue: EventQueue = EventQueue.init(),
+
+/// State to be sent to the window manager client in the next update sequence.
+pending: struct {
+    /// The window entered/hovered by the pointer, if any
+    window: ?*Window = null,
+    /// The window clicked on, touched, etc.
+    window_interaction: ?*Window = null,
+} = .{},
+link_pending: wl.list.Link,
+
+/// State sent to the window manager client in the latest update sequence.
+sent: struct {
+    /// The window entered/hovered by the pointer, if any
+    window: ?*Window = null,
+} = .{},
+link_sent: wl.list.Link,
+
+/// State requested by the window manager client but not yet committed.
+uncommitted: WmState = .{},
+/// State requested by the window manager client and committed.
+committed: WmState = .{},
+
+/// Multiple physical mice are handled by the same Cursor
 cursor: Cursor,
-/// Input Method handling
+
 relay: InputRelay,
 
 keyboard_groups: std.TailQueue(KeyboardGroup) = .{},
 
-focused: FocusTarget = .none,
+focused: Focus = .none,
 
 /// The currently in progress drag operation type.
 drag: enum {
@@ -87,14 +161,25 @@ drag_destroy: wl.Listener(*wlr.Drag) = wl.Listener(*wlr.Drag).init(handleDragDes
 request_set_primary_selection: wl.Listener(*wlr.Seat.event.RequestSetPrimarySelection) =
     wl.Listener(*wlr.Seat.event.RequestSetPrimarySelection).init(handleRequestSetPrimarySelection),
 
-pub fn init(seat: *Seat, name: [*:0]const u8) !void {
+pub fn create(name: [*:0]const u8) !void {
+    const seat = try util.gpa.create(Seat);
+    errdefer util.gpa.destroy(seat);
+
     seat.* = .{
         // This will be automatically destroyed when the display is destroyed
         .wlr_seat = try wlr.Seat.create(server.wl_server, name),
+        .link = undefined,
+        .link_pending = undefined,
+        .link_sent = undefined,
         .cursor = undefined,
         .relay = undefined,
     };
     seat.wlr_seat.data = @intFromPtr(seat);
+
+    server.input_manager.seats.append(seat);
+    server.wm.pending.seats.append(seat);
+    seat.link_sent.init();
+    server.wm.dirtyPending();
 
     try seat.cursor.init(seat);
     seat.relay.init();
@@ -105,11 +190,15 @@ pub fn init(seat: *Seat, name: [*:0]const u8) !void {
     seat.wlr_seat.events.request_set_primary_selection.add(&seat.request_set_primary_selection);
 }
 
-pub fn deinit(seat: *Seat) void {
+pub fn destroy(seat: *Seat) void {
     {
         var it = server.input_manager.devices.iterator(.forward);
         while (it.next()) |device| assert(device.seat != seat);
     }
+
+    seat.link.remove();
+    seat.link_pending.remove();
+    seat.link_sent.remove();
 
     seat.cursor.deinit();
 
@@ -124,25 +213,179 @@ pub fn deinit(seat: *Seat) void {
     seat.request_set_primary_selection.link.remove();
 }
 
-/// Set the current focus. If a visible window is passed it will be focused.
-/// If null is passed, the top window in the stack of the focused output will be focused.
-/// Requires a call to WindowManager.dirtyPending()
-pub fn focus(seat: *Seat, target: ?*Window) void {
-    // Views may not receive focus while locked.
-    if (server.lock_manager.state != .unlocked) return;
+pub fn queueEvent(seat: *Seat, event: Event) void {
+    seat.handleActivity();
 
-    // Focus the target window or clear the focus if target is null
-    if (target) |window| {
-        seat.setFocusRaw(.{ .window = window });
-    } else {
-        seat.setFocusRaw(.{ .none = {} });
+    seat.event_queue.writeItem(event) catch {
+        log.err("dropping {s} event, no space in event queue", .{@tagName(event)});
+        return;
+    };
+
+    if (server.wm.state == .idle) {
+        seat.processEvents();
     }
 }
 
-/// Switch focus to the target, handling unfocus and input inhibition
-/// properly. This should only be called directly if dealing with layers or
-/// override redirect xwayland windows.
-pub fn setFocusRaw(seat: *Seat, new_focus: FocusTarget) void {
+pub fn processEvents(seat: *Seat) void {
+    assert(server.wm.state == .idle);
+
+    var expect_frame: bool = false;
+    while (seat.event_queue.readItem()) |event| {
+        const pg = server.input_manager.pointer_gestures;
+        switch (event) {
+            .keyboard_key => |ev| ev.keyboard.processKey(&ev.key),
+            .keyboard_modifiers => |ev| ev.keyboard.processModifiers(&ev.modifiers),
+
+            .pointer_motion_relative => |ev| seat.cursor.processMotionRelative(&ev),
+            .pointer_motion_absolute => |ev| seat.cursor.processMotionAbsolute(&ev),
+            .pointer_button => |ev| seat.cursor.processButton(&ev),
+            .pointer_axis => |ev| seat.cursor.processAxis(&ev),
+            .pointer_frame => seat.wlr_seat.pointerNotifyFrame(),
+
+            .pointer_swipe_begin => |ev| pg.sendSwipeBegin(seat.wlr_seat, ev.time_msec, ev.fingers),
+            .pointer_swipe_update => |ev| pg.sendSwipeUpdate(seat.wlr_seat, ev.time_msec, ev.dx, ev.dy),
+            .pointer_swipe_end => |ev| pg.sendSwipeEnd(seat.wlr_seat, ev.time_msec, ev.cancelled),
+
+            .pointer_pinch_begin => |ev| pg.sendPinchBegin(seat.wlr_seat, ev.time_msec, ev.fingers),
+            .pointer_pinch_update => |ev| pg.sendPinchUpdate(seat.wlr_seat, ev.time_msec, ev.dx, ev.dy, ev.scale, ev.rotation),
+            .pointer_pinch_end => |ev| pg.sendPinchEnd(seat.wlr_seat, ev.time_msec, ev.cancelled),
+        }
+
+        // Don't split up pointer events grouped by a frame event
+        switch (event) {
+            .pointer_motion_relative,
+            .pointer_motion_absolute,
+            .pointer_button,
+            .pointer_axis,
+            => {
+                expect_frame = true;
+                continue;
+            },
+            .pointer_frame => expect_frame = false,
+            else => assert(!expect_frame),
+        }
+
+        if (server.wm.pending.dirty) {
+            // Wait for feedback from the window manager before further processing.
+            // The window manager might decide to change focus or redefine keyboard/pointer bindings.
+            break;
+        }
+    }
+}
+
+pub fn sendDirty(seat: *Seat) void {
+    if (seat.destroying) {
+        if (seat.object) |seat_v1| {
+            seat_v1.sendRemoved();
+            seat_v1.setHandler(?*anyopaque, handleRequestInert, null, null);
+            seat.object = null;
+        }
+
+        seat.link_pending.remove();
+        seat.link_sent.remove();
+        seat.link_pending.init();
+        seat.link_sent.init();
+
+        seat.destroy();
+        return;
+    }
+
+    if (server.wm.object) |wm_v1| {
+        const new = seat.object == null;
+        const seat_v1 = seat.object orelse blk: {
+            const seat_v1 = river.SeatV1.create(wm_v1.getClient(), wm_v1.getVersion(), 0) catch {
+                log.err("out of memory", .{});
+                return; // try again next update
+            };
+            seat.object = seat_v1;
+
+            seat_v1.setHandler(*Seat, handleRequest, null, seat);
+            wm_v1.sendSeat(seat_v1);
+
+            seat.link_sent.remove();
+            server.wm.sent.seats.append(seat);
+
+            break :blk seat_v1;
+        };
+        errdefer comptime unreachable;
+
+        if (new) {
+            if (seat.pending.window) |window| {
+                if (window.object) |window_v1| {
+                    seat_v1.sendPointerEnter(window_v1);
+                    seat.sent.window = seat.pending.window;
+                }
+            }
+        } else if (seat.pending.window != seat.sent.window) {
+            if (seat.sent.window) |window| {
+                if (window.object) |window_v1| {
+                    seat_v1.sendPointerLeave(window_v1);
+                    seat.sent.window = null;
+                }
+            }
+            if (seat.pending.window) |window| {
+                if (window.object) |window_v1| {
+                    seat_v1.sendPointerEnter(window_v1);
+                    seat.sent.window = window;
+                }
+            }
+        }
+
+        if (seat.pending.window_interaction) |window| {
+            if (window.object) |window_v1| {
+                seat_v1.sendWindowInteraction(window_v1);
+                seat.pending.window_interaction = null;
+            }
+        }
+    }
+}
+
+fn handleRequestInert(
+    seat_v1: *river.SeatV1,
+    request: river.SeatV1.Request,
+    _: ?*anyopaque,
+) void {
+    if (request == .destroy) seat_v1.destroy();
+}
+
+fn handleRequest(
+    seat_v1: *river.SeatV1,
+    request: river.SeatV1.Request,
+    seat: *Seat,
+) void {
+    assert(seat.object == seat_v1);
+    switch (request) {
+        .destroy => {}, // XXX send protocol error
+        .focus_window => |args| {
+            const data = args.window.getUserData() orelse return;
+            const window: *Window = @ptrCast(@alignCast(data));
+            seat.uncommitted.focus = .{ .window = window };
+        },
+        .focus_shell_surface => {},
+        .clear_focus => seat.uncommitted.focus = .none,
+        .pointer_move_window => {},
+        .pointer_resize_window => {},
+        .pointer_confine_to_region => {},
+        .pointer_warp => {},
+        .define_xkb_binding => {},
+        .define_pointer_binding => {},
+    }
+}
+
+pub fn commitWmState(seat: *Seat) void {
+    seat.committed = seat.uncommitted;
+}
+
+pub fn applyCommitted(seat: *Seat) void {
+    if (server.lock_manager.state == .unlocked) {
+        switch (seat.committed.focus) {
+            .none => seat.focus(.none),
+            .window => |window| seat.focus(.{ .window = window }),
+        }
+    }
+}
+
+pub fn focus(seat: *Seat, new_focus: Focus) void {
     // If the target is already focused, do nothing
     if (std.meta.eql(new_focus, seat.focused)) return;
 
@@ -150,19 +393,13 @@ pub fn setFocusRaw(seat: *Seat, new_focus: FocusTarget) void {
 
     // First clear the current focus
     switch (seat.focused) {
-        .window => |window| {
-            //window.pending.focus -= 1; XXX update focus to send activated state
-            window.destroyPopups();
-        },
+        .window => |window| window.destroyPopups(),
         .override_redirect, .lock_surface, .none => {},
     }
 
     // Set the new focus
     switch (new_focus) {
-        .window => |_| {
-            assert(server.lock_manager.state != .locked);
-            //target_window.pending.focus += 1; XXX update focus to send activated state
-        },
+        .window => assert(server.lock_manager.state != .locked),
         .lock_surface => assert(server.lock_manager.state != .unlocked),
         .override_redirect, .none => {},
     }
@@ -217,6 +454,7 @@ fn keyboardNotifyEnter(seat: *Seat, wlr_surface: *wlr.Surface) void {
         seat.wlr_seat.keyboardNotifyEnter(
             wlr_surface,
             keycodes.constSlice(),
+            // XXX this is not ok, use our own stored modifiers
             &wlr_keyboard.modifiers,
         );
     } else {

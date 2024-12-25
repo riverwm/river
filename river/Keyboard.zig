@@ -31,6 +31,11 @@ const InputDevice = @import("InputDevice.zig");
 
 const log = std.log.scoped(.keyboard);
 
+pub const Event = union(enum) {
+    key: wlr.Keyboard.event.Key,
+    modifiers: wlr.Keyboard.Modifiers,
+};
+
 const KeyConsumer = enum {
     mapping,
     im_grab,
@@ -85,8 +90,8 @@ device: InputDevice,
 /// Pressed keys along with where their press event has been sent
 pressed: Pressed = .{},
 
-key: wl.Listener(*wlr.Keyboard.event.Key) = wl.Listener(*wlr.Keyboard.event.Key).init(handleKey),
-modifiers: wl.Listener(*wlr.Keyboard) = wl.Listener(*wlr.Keyboard).init(handleModifiers),
+key: wl.Listener(*wlr.Keyboard.event.Key) = wl.Listener(*wlr.Keyboard.event.Key).init(queueKey),
+modifiers: wl.Listener(*wlr.Keyboard) = wl.Listener(*wlr.Keyboard).init(queueModifiers),
 
 pub fn init(keyboard: *Keyboard, seat: *Seat, wlr_device: *wlr.InputDevice) !void {
     keyboard.* = .{
@@ -144,9 +149,7 @@ pub fn deinit(keyboard: *Keyboard) void {
     keyboard.* = undefined;
 }
 
-fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboard.event.Key) void {
-    // This event is raised when a key is pressed or released.
-    const keyboard: *Keyboard = @fieldParentPtr("key", listener);
+pub fn processKey(keyboard: *Keyboard, event: *const wlr.Keyboard.event.Key) void {
     const wlr_keyboard = keyboard.device.wlr_device.toKeyboard();
 
     // If the keyboard is in a group, this event will be handled by the group's Keyboard instance.
@@ -157,6 +160,7 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
     // Translate libinput keycode -> xkbcommon
     const keycode = event.keycode + 8;
 
+    // XXX this is not ok, we need to store current modifiers per-Keyboard ourselves
     const modifiers = wlr_keyboard.getModifiers();
     const released = event.state == .released;
 
@@ -229,12 +233,7 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
     if (released) _ = keyboard.device.seat.handleMapping(keycode, modifiers, released, xkb_state);
 }
 
-fn isModifier(keysym: xkb.Keysym) bool {
-    return @intFromEnum(keysym) >= xkb.Keysym.Shift_L and @intFromEnum(keysym) <= xkb.Keysym.Hyper_R;
-}
-
-fn handleModifiers(listener: *wl.Listener(*wlr.Keyboard), _: *wlr.Keyboard) void {
-    const keyboard: *Keyboard = @fieldParentPtr("modifiers", listener);
+pub fn processModifiers(keyboard: *Keyboard, modifiers: *const wlr.Keyboard.Modifiers) void {
     const wlr_keyboard = keyboard.device.wlr_device.toKeyboard();
 
     // If the keyboard is in a group, this event will be handled by the group's Keyboard instance.
@@ -242,10 +241,10 @@ fn handleModifiers(listener: *wl.Listener(*wlr.Keyboard), _: *wlr.Keyboard) void
 
     if (keyboard.getInputMethodGrab()) |keyboard_grab| {
         keyboard_grab.setKeyboard(keyboard_grab.keyboard);
-        keyboard_grab.sendModifiers(&wlr_keyboard.modifiers);
+        keyboard_grab.sendModifiers(modifiers);
     } else {
         keyboard.device.seat.wlr_seat.setKeyboard(keyboard.device.wlr_device.toKeyboard());
-        keyboard.device.seat.wlr_seat.keyboardNotifyModifiers(&wlr_keyboard.modifiers);
+        keyboard.device.seat.wlr_seat.keyboardNotifyModifiers(modifiers);
     }
 }
 
@@ -282,4 +281,14 @@ fn getInputMethodGrab(keyboard: Keyboard) ?*wlr.InputMethodV2.KeyboardGrab {
         }
     }
     return null;
+}
+
+fn queueKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboard.event.Key) void {
+    const keyboard: *Keyboard = @fieldParentPtr("key", listener);
+    keyboard.device.seat.queueEvent(.{ .keyboard_key = .{ .keyboard = keyboard, .key = event.* } });
+}
+
+fn queueModifiers(listener: *wl.Listener(*wlr.Keyboard), wlr_keyboard: *wlr.Keyboard) void {
+    const keyboard: *Keyboard = @fieldParentPtr("modifiers", listener);
+    keyboard.device.seat.queueEvent(.{ .keyboard_modifiers = .{ .keyboard = keyboard, .modifiers = wlr_keyboard.modifiers } });
 }

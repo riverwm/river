@@ -71,22 +71,18 @@ pub fn update(handle: *ForeignToplevelHandle) void {
 
     const wlr_handle = handle.wlr_handle orelse return;
 
-    wlr_handle.setActivated(window.inflight.focus != 0);
+    wlr_handle.setActivated(window.inflight.activated);
     wlr_handle.setFullscreen(window.inflight.fullscreen);
 }
 
-/// Only honors the request if the window is already visible on the seat's
-/// currently focused output.
 fn handleForeignActivate(
-    listener: *wl.Listener(*wlr.ForeignToplevelHandleV1.event.Activated),
-    event: *wlr.ForeignToplevelHandleV1.event.Activated,
+    _: *wl.Listener(*wlr.ForeignToplevelHandleV1.event.Activated),
+    _: *wlr.ForeignToplevelHandleV1.event.Activated,
 ) void {
-    const handle: *ForeignToplevelHandle = @fieldParentPtr("foreign_activate", listener);
-    const window: *Window = @fieldParentPtr("foreign_toplevel_handle", handle);
-    const seat: *Seat = @ptrFromInt(event.seat.data);
+    //const handle: *ForeignToplevelHandle = @fieldParentPtr("foreign_activate", listener);
+    //const window: *Window = @fieldParentPtr("foreign_toplevel_handle", handle);
 
-    seat.focus(window);
-    server.wm.dirtyPending();
+    // XXX Can I just delete this protocol?
 }
 
 fn handleForeignFullscreen(

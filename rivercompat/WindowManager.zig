@@ -47,5 +47,8 @@ fn handleEvent(wm_v1: *river.WindowManagerV1, event: river.WindowManagerV1.Event
         .output => |args| {
             _ = args;
         },
+        .seat => |args| {
+            _ = args;
+        },
     }
 }
