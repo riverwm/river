@@ -895,6 +895,9 @@
         logical coordinate space. The x and y coordinates may be positive or
         negative.
 
+        This event is sent once when the river_output_v1 is created and again
+        whenever the position changes.
+
         This event is double-buffered state and will be followed by a
         river_window_manager_v1.update event.
 
@@ -911,6 +914,9 @@
         This event indicates the dimensions of the output in the compositor's
         logical coordinate space. The width and height will always be strictly
         greater than zero.
+
+        This event is sent once when the river_output_v1 is created and again
+        whenever the dimensions change.
 
         This event is double-buffered state and will be followed by a
         river_window_manager_v1.update event.
