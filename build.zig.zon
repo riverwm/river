@@ -8,8 +8,8 @@
             .hash = "12209db20ce873af176138b76632931def33a10539387cba745db72933c43d274d56",
         },
         .@"zig-wayland" = .{
-            .url = "https://codeberg.org/ifreund/zig-wayland/archive/89afa3baecf7ebfd76e3730c3381b33098f3af42.tar.gz",
-            .hash = "12206015b1750462788de094b8154eab733a36523639124ace437d4631ca01b5ba18",
+            .url = "https://codeberg.org/ifreund/zig-wayland/archive/2500fc313608be05370ebb67426a05604f2fd937.tar.gz",
+            .hash = "12200e8929e6f520bab7c6229a5d550f818bd6109077d2b99dee4aa79aa6f4835344",
         },
         .@"zig-wlroots" = .{
             .url = "https://codeberg.org/ifreund/zig-wlroots/archive/70a4de5cd6886003e54f55239d2753b025271bc9.tar.gz",

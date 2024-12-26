@@ -16,22 +16,31 @@
 
 const WindowManager = @This();
 
+const std = @import("std");
+const assert = std.debug.assert;
 const main = @import("main.zig");
 const wayland = @import("wayland");
 const wl = wayland.client.wl;
 const river = wayland.client.river;
 
+const Seat = @import("Seat.zig");
+const Window = @import("Window.zig");
+
 wm_v1: *river.WindowManagerV1,
+windows: wl.list.Head(Window, .link),
 
 pub fn init(wm: *WindowManager, wm_v1: *river.WindowManagerV1) void {
     wm.* = .{
         .wm_v1 = wm_v1,
+        .windows = undefined,
     };
+    wm.windows.init();
 
     wm_v1.setListener(*WindowManager, handleEvent, wm);
 }
 
-fn handleEvent(wm_v1: *river.WindowManagerV1, event: river.WindowManagerV1.Event, _: *WindowManager) void {
+fn handleEvent(wm_v1: *river.WindowManagerV1, event: river.WindowManagerV1.Event, wm: *WindowManager) void {
+    assert(wm.wm_v1 == wm_v1);
     switch (event) {
         .unavailable => main.fatal("another window manager is already running", .{}),
         .finished => unreachable, // We never send river_window_manager_v1.stop
@@ -42,13 +51,28 @@ fn handleEvent(wm_v1: *river.WindowManagerV1, event: river.WindowManagerV1.Event
         .session_locked => {},
         .session_unlocked => {},
         .window => |args| {
-            args.id.proposeDimensions(400, 400);
+            Window.create(args.id, wm);
+            wm.arrange();
         },
         .output => |args| {
             _ = args;
         },
         .seat => |args| {
-            _ = args;
+            Seat.create(args.id);
         },
+    }
+}
+
+pub fn arrange(wm: *WindowManager) void {
+    {
+        var x: i32 = 0;
+        var y: i32 = 0;
+        var it = wm.windows.iterator(.forward);
+        while (it.next()) |window| {
+            window.node_v1.setPosition(x, y);
+            window.window_v1.proposeDimensions(400, 400);
+            x += 40;
+            y += 40;
+        }
     }
 }

@@ -112,11 +112,11 @@ fn handleRequest(
         },
         .place_top => {
             node.link_uncommitted.remove();
-            server.wm.uncommitted.render_list.prepend(node);
+            server.wm.uncommitted.render_list.append(node);
         },
         .place_bottom => {
             node.link_uncommitted.remove();
-            server.wm.uncommitted.render_list.append(node);
+            server.wm.uncommitted.render_list.prepend(node);
         },
         .place_above => |args| {
             const other_data = args.other.getUserData() orelse return;

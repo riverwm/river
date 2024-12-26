@@ -382,9 +382,9 @@ pub fn main() !void {
 fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, context: *Context) void {
     switch (event) {
         .global => |global| {
-            if (mem.orderZ(u8, global.interface, river.LayoutManagerV3.getInterface().name) == .eq) {
+            if (mem.orderZ(u8, global.interface, river.LayoutManagerV3.interface.name) == .eq) {
                 context.layout_manager = registry.bind(global.name, river.LayoutManagerV3, 1) catch return;
-            } else if (mem.orderZ(u8, global.interface, wl.Output.getInterface().name) == .eq) {
+            } else if (mem.orderZ(u8, global.interface, wl.Output.interface.name) == .eq) {
                 context.addOutput(registry, global.name) catch |err| fatal("failed to bind output: {}", .{err});
             }
         },

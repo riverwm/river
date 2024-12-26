@@ -74,6 +74,7 @@ sent: struct {
 
 /// State sent by the wm but not yet committed with a commit request.
 uncommitted: struct {
+    /// The list is in rendering order, the last node in the list is rendered on top.
     render_list: wl.list.Head(WmNode, .link_uncommitted),
 },
 
@@ -81,12 +82,14 @@ uncommitted: struct {
 committed: struct {
     // The wm has committed state since state was last sent to windows.
     dirty: bool = false,
+    /// The list is in rendering order, the last node in the list is rendered on top.
     render_list: wl.list.Head(WmNode, .link_committed),
 },
 
 /// State committed by the wm that has been sent to windows as part of the
 /// current transaction.
 inflight: struct {
+    /// The list is in rendering order, the last node in the list is rendered on top.
     render_list: wl.list.Head(WmNode, .link_inflight),
 },
 
@@ -415,6 +418,7 @@ fn commitTransaction(wm: *WindowManager) void {
                     window.commitTransaction();
 
                     window.tree.node.reparent(server.scene.layers.wm);
+                    window.tree.node.raiseToTop();
                     window.tree.node.setEnabled(true);
                     window.popup_tree.node.setEnabled(true);
                 },

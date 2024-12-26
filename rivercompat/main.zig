@@ -44,7 +44,7 @@ const Globals = struct {
     fn handleEvent(registry: *wl.Registry, event: wl.Registry.Event, globals: *Globals) void {
         switch (event) {
             .global => |global| {
-                if (mem.orderZ(u8, global.interface, river.WindowManagerV1.getInterface().name) == .eq) {
+                if (mem.orderZ(u8, global.interface, river.WindowManagerV1.interface.name) == .eq) {
                     globals.wm_v1 = registry.bind(global.name, river.WindowManagerV1, 1) catch return;
                 }
             },
