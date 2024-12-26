@@ -50,6 +50,7 @@ pub fn main() anyerror!void {
         .{ .name = "version", .kind = .boolean },
         .{ .name = "c", .kind = .arg },
         .{ .name = "log-level", .kind = .arg },
+        .{ .name = "log-scopes", .kind = .arg },
         .{ .name = "no-xwayland", .kind = .boolean },
     }).parse(std.os.argv[1..]) catch {
         try io.getStdErr().writeAll(usage);
@@ -82,6 +83,32 @@ pub fn main() anyerror!void {
             log.err("invalid log level '{s}'", .{level});
             try io.getStdErr().writeAll(usage);
             posix.exit(1);
+        }
+    }
+    if (result.flags.@"log-scopes") |scopes| {
+        // Examples:
+        // -log-scopes input,wm     (only default, input, and wm scopes)
+        // -log-scopes all,~wlroots (all scopes except wlroots)
+        log_scopes = std.EnumSet(LogScope).initEmpty();
+        var it = mem.splitScalar(u8, scopes, ',');
+        while (it.next()) |raw| {
+            if (mem.eql(u8, raw, "all")) {
+                log_scopes = std.EnumSet(LogScope).initFull();
+            } else if (raw.len > 0 and raw[0] == '~') {
+                // I'd rather use an exclamation mark than a tilde but the
+                // former requires quoting in most shells.
+                const scope = std.meta.stringToEnum(LogScope, raw[1..]) orelse {
+                    log.err("invalid log scope '{s}'", .{raw});
+                    posix.exit(1);
+                };
+                log_scopes.remove(scope);
+            } else {
+                const scope = std.meta.stringToEnum(LogScope, raw) orelse {
+                    log.err("invalid log scope '{s}'", .{raw});
+                    posix.exit(1);
+                };
+                log_scopes.insert(scope);
+            }
         }
     }
     const enable_xwayland = !result.flags.@"no-xwayland";
@@ -159,6 +186,21 @@ fn defaultInitPath() !?[:0]const u8 {
     return path;
 }
 
+// Scopes should be added to this list sparingly.
+// Only add new scopes if filtering based on them would be meaningful.
+const LogScope = enum {
+    default,
+    wlroots,
+    output,
+    input,
+    lock,
+    wm,
+    xdg,
+    xwayland,
+};
+
+var log_scopes: std.EnumSet(LogScope) = std.EnumSet(LogScope).initFull();
+
 /// Set the default log level based on the build mode.
 var runtime_log_level: log.Level = switch (builtin.mode) {
     .Debug => .debug,
@@ -179,20 +221,7 @@ pub fn logFn(
 ) void {
     if (@intFromEnum(level) > @intFromEnum(runtime_log_level)) return;
 
-    // Scopes should be added to this list sparingly.
-    // Only add new scopes if filtering based on them would be meaningful.
-    switch (scope) {
-        .default,
-        .wlroots,
-        .output,
-        .input,
-        .lock,
-        .wm,
-        .xdg,
-        .xwayland,
-        => {},
-        else => @compileError("invalid log scope"),
-    }
+    if (scope != .default and !log_scopes.contains(scope)) return;
 
     const scope_prefix = if (scope == .default) ": " else "(" ++ @tagName(scope) ++ "): ";
 
