@@ -21,6 +21,7 @@ const assert = std.debug.assert;
 const wl = @import("wayland").server.wl;
 const river = @import("wayland").server.river;
 
+const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Window = @import("Window.zig");
@@ -108,6 +109,14 @@ fn handleRequest(
                 window.uncommitted.x = args.x;
                 window.uncommitted.y = args.y;
             },
+        },
+        .place_top => {
+            node.link_uncommitted.remove();
+            server.wm.uncommitted.render_list.prepend(node);
+        },
+        .place_bottom => {
+            node.link_uncommitted.remove();
+            server.wm.uncommitted.render_list.append(node);
         },
         .place_above => |args| {
             const other_data = args.other.getUserData() orelse return;

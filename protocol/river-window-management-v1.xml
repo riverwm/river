@@ -825,6 +825,26 @@
       <arg name="y" type="int"/>
     </event>
 
+    <request name="place_top">
+      <description summary="place node above all other nodes">
+        This request places the node above all other nodes in the compositor's
+        render list.
+
+        This request is double-buffered state and will not be applied until the
+        next river_window_manager_v1.commit request.
+      </description>
+    </request>
+
+    <request name="place_bottom">
+      <description summary="place node below all other nodes">
+        This request places the node below all other nodes in the compositor's
+        render list.
+
+        This request is double-buffered state and will not be applied until the
+        next river_window_manager_v1.commit request.
+      </description>
+    </request>
+
     <request name="place_above">
       <description summary="place node above another node">
         This request places the node directly above another node in the
