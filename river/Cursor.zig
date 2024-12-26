@@ -363,7 +363,6 @@ pub fn processMotionRelative(cursor: *Cursor, event: *const wlr.Pointer.event.Mo
 
             // XXX move window
 
-            server.wm.dirtyPending();
         },
         .resize => |*data| {
             dx += data.delta_x;
@@ -417,8 +416,6 @@ pub fn processMotionRelative(cursor: *Cursor, event: *const wlr.Pointer.event.Mo
                 box.height = @min(box.height, output_height - border_width - box.y);
                 data.y = box.height - data.initial_height;
             }
-
-            server.wm.dirtyPending();
         },
     }
 }
@@ -458,8 +455,6 @@ pub fn processButton(cursor: *Cursor, event: *const wlr.Pointer.event.Button) vo
 
             cursor.mode = .passthrough;
             cursor.passthrough(event.time_msec);
-
-            server.wm.dirtyPending();
         } else {
             _ = cursor.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
         }
@@ -773,7 +768,7 @@ fn computeEdges(cursor: *const Cursor, window: *const Window) wlr.Edges {
     }
 }
 
-fn enterMode(cursor: *Cursor, mode: Mode, window: *Window, xcursor_name: [*:0]const u8) void {
+fn enterMode(cursor: *Cursor, mode: Mode, _: *Window, xcursor_name: [*:0]const u8) void {
     assert(cursor.mode == .passthrough or cursor.mode == .down);
     assert(mode == .move or mode == .resize);
 
@@ -781,12 +776,8 @@ fn enterMode(cursor: *Cursor, mode: Mode, window: *Window, xcursor_name: [*:0]co
 
     cursor.mode = mode;
 
-    cursor.seat.focus(window);
-
     cursor.seat.wlr_seat.pointerNotifyClearFocus();
     cursor.setXcursor(xcursor_name);
-
-    server.wm.dirtyPending();
 }
 
 /// Handle potential change in location of windows on the output, as well as

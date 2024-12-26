@@ -228,7 +228,10 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
 pub fn destroy(window: *Window, when: enum { lazy, assert }) void {
     assert(window.impl == .none);
     assert(!window.mapped);
-    assert(window.pending.state == .closing);
+    switch (window.pending.state) {
+        .init, .closing => {},
+        .ready => unreachable,
+    }
 
     window.destroying = true;
 

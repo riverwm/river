@@ -157,7 +157,6 @@ fn bind(client: *wl.Client, wm: *WindowManager, version: u32, id: u32) void {
 
     wm.object = object;
     object.setHandler(*WindowManager, handleRequest, null, wm);
-    // XXX send existing windows outputs and seats, including output dimensions
 }
 
 fn handleRequestInert(

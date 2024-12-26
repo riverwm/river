@@ -80,6 +80,7 @@ pub fn createObject(node: *WmNode, client: *wl.Client, version: u32, id: u32) vo
 pub fn makeInert(node: *WmNode) void {
     if (node.object) |node_v1| {
         node_v1.setHandler(?*anyopaque, handleRequestInert, null, null);
+        node.object = null;
     }
 }
 
