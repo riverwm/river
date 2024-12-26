@@ -26,7 +26,7 @@ const util = @import("util.zig");
 
 const Seat = @import("Seat.zig");
 
-const log = std.log.scoped(.pointer_constraint);
+const log = std.log.scoped(.input);
 
 wlr_constraint: *wlr.PointerConstraintV1,
 

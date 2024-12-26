@@ -26,7 +26,7 @@ const util = @import("util.zig");
 const Seat = @import("Seat.zig");
 const InputDevice = @import("InputDevice.zig");
 
-const log = std.log.scoped(.switch_device);
+const log = std.log.scoped(.input);
 
 pub const Type = enum {
     lid,

@@ -58,6 +58,11 @@ map: wl.Listener(void) = wl.Listener(void).init(handleMap),
 unmap: wl.Listener(void) = wl.Listener(void).init(handleUnmap),
 
 pub fn create(xsurface: *wlr.XwaylandSurface) error{OutOfMemory}!void {
+    log.debug("new xwayland window: title='{?s}', class='{?s}'", .{
+        xsurface.title,
+        xsurface.class,
+    });
+
     const window = try Window.create(.{ .xwayland = .{
         .window = undefined,
         .xsurface = xsurface,

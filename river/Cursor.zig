@@ -43,7 +43,7 @@ const TabletTool = @import("TabletTool.zig");
 const Window = @import("Window.zig");
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
-const log = std.log.scoped(.cursor);
+const log = std.log.scoped(.input);
 
 const Mode = union(enum) {
     passthrough: void,

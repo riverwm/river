@@ -50,6 +50,11 @@ unmap: wl.Listener(void) = wl.Listener(void).init(handleUnmap),
 set_geometry: wl.Listener(void) = wl.Listener(void).init(handleSetGeometry),
 
 pub fn create(xsurface: *wlr.XwaylandSurface) error{OutOfMemory}!void {
+    log.debug("new xwayland override redirect: title='{?s}', class='{?s}'", .{
+        xsurface.title,
+        xsurface.class,
+    });
+
     const override_redirect = try util.gpa.create(XwaylandOverrideRedirect);
     errdefer util.gpa.destroy(override_redirect);
 

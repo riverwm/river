@@ -23,7 +23,7 @@ const math = std.math;
 const meta = std.meta;
 const wlr = @import("wlroots");
 
-const log = std.log.scoped(.input_config);
+const log = std.log.scoped(.input);
 
 const c = @import("c.zig");
 

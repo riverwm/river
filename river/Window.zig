@@ -36,7 +36,7 @@ const WmNode = @import("WmNode.zig");
 const XdgToplevel = @import("XdgToplevel.zig");
 const XwaylandWindow = @import("XwaylandWindow.zig");
 
-const log = std.log.scoped(.window);
+const log = std.log.scoped(.wm);
 
 pub const Constraints = struct {
     min_width: u31 = 1,

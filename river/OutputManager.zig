@@ -34,7 +34,7 @@ const SceneNodeData = @import("SceneNodeData.zig");
 const Window = @import("Window.zig");
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
-const log = std.log.scoped(.output_manager);
+const log = std.log.scoped(.output);
 
 new_output: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleNewOutput),
 

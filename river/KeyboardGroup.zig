@@ -25,7 +25,7 @@ const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 const xkb = @import("xkbcommon");
 
-const log = std.log.scoped(.keyboard_group);
+const log = std.log.scoped(.input);
 
 const server = &@import("main.zig").server;
 const util = @import("util.zig");

@@ -39,7 +39,7 @@ const TextInput = @import("TextInput.zig");
 
 const default_seat_name = "default";
 
-const log = std.log.scoped(.input_manager);
+const log = std.log.scoped(.input);
 
 new_input: wl.Listener(*wlr.InputDevice) = wl.Listener(*wlr.InputDevice).init(handleNewInput),
 

@@ -27,7 +27,7 @@ const util = @import("util.zig");
 const InputRelay = @import("InputRelay.zig");
 const Seat = @import("Seat.zig");
 
-const log = std.log.scoped(.text_input);
+const log = std.log.scoped(.input);
 
 link: wl.list.Link,
 

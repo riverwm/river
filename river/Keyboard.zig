@@ -29,7 +29,7 @@ const util = @import("util.zig");
 const Seat = @import("Seat.zig");
 const InputDevice = @import("InputDevice.zig");
 
-const log = std.log.scoped(.keyboard);
+const log = std.log.scoped(.input);
 
 pub const Event = union(enum) {
     key: wlr.Keyboard.event.Key,
@@ -256,9 +256,8 @@ fn handleBuiltinMapping(keysym: xkb.Keysym) bool {
             log.debug("switch VT keysym received", .{});
             if (server.session) |session| {
                 const vt = @intFromEnum(keysym) - xkb.Keysym.XF86Switch_VT_1 + 1;
-                const log_server = std.log.scoped(.server);
-                log_server.info("switching to VT {}", .{vt});
-                session.changeVt(vt) catch log_server.err("changing VT failed", .{});
+                std.log.info("switching to VT {}", .{vt});
+                session.changeVt(vt) catch std.log.err("changing VT failed", .{});
             }
             return true;
         },

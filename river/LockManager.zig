@@ -30,7 +30,7 @@ const util = @import("util.zig");
 const LockSurface = @import("LockSurface.zig");
 const Output = @import("Output.zig");
 
-const log = std.log.scoped(.session_lock);
+const log = std.log.scoped(.lock);
 
 wlr_manager: *wlr.SessionLockManagerV1,
 

@@ -33,7 +33,7 @@ const Keyboard = @import("Keyboard.zig");
 const Switch = @import("Switch.zig");
 const Tablet = @import("Tablet.zig");
 
-const log = std.log.scoped(.input_manager);
+const log = std.log.scoped(.input);
 
 seat: *Seat,
 wlr_device: *wlr.InputDevice,

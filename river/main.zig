@@ -179,6 +179,21 @@ pub fn logFn(
 ) void {
     if (@intFromEnum(level) > @intFromEnum(runtime_log_level)) return;
 
+    // Scopes should be added to this list sparingly.
+    // Only add new scopes if filtering based on them would be meaningful.
+    switch (scope) {
+        .default,
+        .wlroots,
+        .output,
+        .input,
+        .lock,
+        .wm,
+        .xdg,
+        .xwayland,
+        => {},
+        else => @compileError("invalid log scope"),
+    }
+
     const scope_prefix = if (scope == .default) ": " else "(" ++ @tagName(scope) ++ "): ";
 
     const stderr = io.getStdErr().writer();

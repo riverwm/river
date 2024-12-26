@@ -31,7 +31,7 @@ const XdgPopup = @import("XdgPopup.zig");
 const Window = @import("Window.zig");
 const XdgDecoration = @import("XdgDecoration.zig");
 
-const log = std.log.scoped(.xdg_shell);
+const log = std.log.scoped(.xdg);
 
 /// TODO(zig): get rid of this and use @fieldParentPtr(), https://github.com/ziglang/zig/issues/6611
 window: *Window,
@@ -75,6 +75,8 @@ set_title: wl.Listener(void) = wl.Listener(void).init(handleSetTitle),
 set_app_id: wl.Listener(void) = wl.Listener(void).init(handleSetAppId),
 
 pub fn create(wlr_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
+    log.debug("new xdg_toplevel", .{});
+
     const window = try Window.create(.{ .toplevel = .{
         .window = undefined,
         .wlr_toplevel = wlr_toplevel,

@@ -42,7 +42,7 @@ const XdgToplevel = @import("XdgToplevel.zig");
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 const XwaylandWindow = @import("XwaylandWindow.zig");
 
-const log = std.log.scoped(.server);
+const log = std.log;
 
 wl_server: *wl.Server,
 
@@ -328,8 +328,6 @@ fn terminate(_: c_int, wl_server: *wl.Server) c_int {
 }
 
 fn handleNewXdgToplevel(_: *wl.Listener(*wlr.XdgToplevel), xdg_toplevel: *wlr.XdgToplevel) void {
-    log.debug("new xdg_toplevel", .{});
-
     XdgToplevel.create(xdg_toplevel) catch {
         log.err("out of memory", .{});
         xdg_toplevel.resource.postNoMemory();
@@ -344,19 +342,14 @@ fn handleNewToplevelDecoration(
     XdgDecoration.init(wlr_decoration);
 }
 
-fn handleNewXwaylandSurface(_: *wl.Listener(*wlr.XwaylandSurface), xwayland_surface: *wlr.XwaylandSurface) void {
-    log.debug(
-        "new xwayland surface: title='{?s}', class='{?s}', override redirect={}",
-        .{ xwayland_surface.title, xwayland_surface.class, xwayland_surface.override_redirect },
-    );
-
-    if (xwayland_surface.override_redirect) {
-        _ = XwaylandOverrideRedirect.create(xwayland_surface) catch {
+fn handleNewXwaylandSurface(_: *wl.Listener(*wlr.XwaylandSurface), xsurface: *wlr.XwaylandSurface) void {
+    if (xsurface.override_redirect) {
+        _ = XwaylandOverrideRedirect.create(xsurface) catch {
             log.err("out of memory", .{});
             return;
         };
     } else {
-        _ = XwaylandWindow.create(xwayland_surface) catch {
+        _ = XwaylandWindow.create(xsurface) catch {
             log.err("out of memory", .{});
             return;
         };

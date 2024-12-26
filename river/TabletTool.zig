@@ -28,7 +28,7 @@ const util = @import("util.zig");
 
 const Tablet = @import("Tablet.zig");
 
-const log = std.log.scoped(.tablet_tool);
+const log = std.log.scoped(.input);
 
 const Mode = union(enum) {
     passthrough,

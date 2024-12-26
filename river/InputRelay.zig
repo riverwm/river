@@ -29,7 +29,7 @@ const TextInput = @import("TextInput.zig");
 const InputPopup = @import("InputPopup.zig");
 const Seat = @import("Seat.zig");
 
-const log = std.log.scoped(.input_relay);
+const log = std.log.scoped(.input);
 
 /// List of all text input objects for the seat.
 /// Multiple text input objects may be created per seat, even multiple from the same client.

@@ -44,7 +44,7 @@ const Tablet = @import("Tablet.zig");
 const Window = @import("Window.zig");
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
-const log = std.log.scoped(.seat);
+const log = std.log.scoped(.input);
 
 pub const Event = union(enum) {
     keyboard_key: struct {
