@@ -299,7 +299,7 @@ pub fn sendDirty(seat: *Seat) void {
             };
             seat.object = seat_v1;
 
-            seat_v1.setHandler(*Seat, handleRequest, null, seat);
+            seat_v1.setHandler(*Seat, handleRequest, handleDestroy, seat);
             wm_v1.sendSeat(seat_v1);
 
             seat.link_sent.remove();
@@ -348,6 +348,10 @@ fn handleRequestInert(
     if (request == .destroy) seat_v1.destroy();
 }
 
+fn handleDestroy(_: *river.SeatV1, seat: *Seat) void {
+    seat.object = null;
+}
+
 fn handleRequest(
     seat_v1: *river.SeatV1,
     request: river.SeatV1.Request,
@@ -355,7 +359,10 @@ fn handleRequest(
 ) void {
     assert(seat.object == seat_v1);
     switch (request) {
-        .destroy => {}, // XXX send protocol error
+        .destroy => {
+            // XXX send protocol error
+            seat_v1.destroy();
+        },
         .focus_window => |args| {
             const data = args.window.getUserData() orelse return;
             const window: *Window = @ptrCast(@alignCast(data));

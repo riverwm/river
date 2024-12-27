@@ -159,7 +159,7 @@ fn bind(client: *wl.Client, wm: *WindowManager, version: u32, id: u32) void {
     }
 
     wm.object = object;
-    object.setHandler(*WindowManager, handleRequest, null, wm);
+    object.setHandler(*WindowManager, handleRequest, handleDestroy, wm);
 }
 
 fn handleRequestInert(
@@ -170,20 +170,25 @@ fn handleRequestInert(
     if (request == .destroy) object.destroy();
 }
 
+fn handleDestroy(_: *river.WindowManagerV1, wm: *WindowManager) void {
+    wm.object = null;
+}
+
 fn handleRequest(
-    object: *river.WindowManagerV1,
+    wm_v1: *river.WindowManagerV1,
     request: river.WindowManagerV1.Request,
     wm: *WindowManager,
 ) void {
-    assert(wm.object == object);
+    assert(wm.object == wm_v1);
     switch (request) {
         .stop => {
             wm.object = null;
-            object.sendFinished();
-            object.setHandler(?*anyopaque, handleRequestInert, null, null);
+            wm_v1.sendFinished();
+            wm_v1.setHandler(?*anyopaque, handleRequestInert, null, null);
         },
         .destroy => {
             // XXX send protocol error
+            wm_v1.destroy();
         },
         .ack_update => |args| {
             switch (wm.state) {

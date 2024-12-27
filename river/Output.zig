@@ -251,7 +251,7 @@ pub fn sendDirty(output: *Output) void {
                     };
                     output.object = output_v1;
 
-                    output_v1.setHandler(*Output, handleRequest, null, output);
+                    output_v1.setHandler(*Output, handleRequest, handleObjectDestroy, output);
                     wm_v1.sendOutput(output_v1);
 
                     break :blk output_v1;
@@ -301,13 +301,21 @@ fn handleRequestInert(
     if (request == .destroy) output_v1.destroy();
 }
 
+fn handleObjectDestroy(_: *river.OutputV1, output: *Output) void {
+    output.object = null;
+}
+
 fn handleRequest(
-    _: *river.OutputV1,
+    output_v1: *river.OutputV1,
     request: river.OutputV1.Request,
-    _: ?*Output,
+    output: *Output,
 ) void {
+    assert(output.object == output_v1);
     switch (request) {
-        .destroy => {}, // XXX send protocol error
+        .destroy => {
+            // XXX send protocol error
+            output_v1.destroy();
+        },
     }
 }
 

@@ -332,7 +332,7 @@ pub fn sendDirty(window: *Window) void {
                     return; // try again next update
                 };
                 window.object = window_v1;
-                window_v1.setHandler(*Window, handleRequest, null, window);
+                window_v1.setHandler(*Window, handleRequest, handleDestroy, window);
                 wm_v1.sendWindow(window_v1);
 
                 server.wm.uncommitted.render_list.append(&window.node);
@@ -377,6 +377,11 @@ fn handleRequestInert(
     if (request == .destroy) window_v1.destroy();
 }
 
+fn handleDestroy(_: *river.WindowV1, window: *Window) void {
+    window.object = null;
+    window.node.makeInert();
+}
+
 fn handleRequest(
     window_v1: *river.WindowV1,
     request: river.WindowV1.Request,
@@ -385,7 +390,10 @@ fn handleRequest(
     assert(window.object == window_v1);
     const uncommitted = &window.uncommitted;
     switch (request) {
-        .destroy => {}, // XXX send protocol error
+        .destroy => {
+            // XXX send protocol error
+            window_v1.destroy();
+        },
         .close => uncommitted.closing = true,
         .get_node => |args| {
             if (window.node.object != null) {
