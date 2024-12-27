@@ -160,6 +160,7 @@ fn bind(client: *wl.Client, wm: *WindowManager, version: u32, id: u32) void {
 
     wm.object = object;
     object.setHandler(*WindowManager, handleRequest, handleDestroy, wm);
+    wm.dirtyPending();
 }
 
 fn handleRequestInert(
