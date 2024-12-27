@@ -377,14 +377,10 @@ fn cancelTimeoutTimer(wm: *WindowManager) void {
 fn handleTimeout(wm: *WindowManager) c_int {
     log.err("timeout occurred, some imperfect frames may be shown", .{});
 
-    switch (wm.state) {
-        .idle => unreachable,
-        .update_sent, .update_acked => wm.state = .idle,
-        .inflight_configures => {
-            wm.state.inflight_configures = 0;
-            wm.commitTransaction();
-        },
-    }
+    assert(wm.state != .idle);
+
+    wm.state = .{ .inflight_configures = 0 };
+    wm.commitTransaction();
 
     return 0;
 }
