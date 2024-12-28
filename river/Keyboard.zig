@@ -26,8 +26,9 @@ const globber = @import("globber");
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
-const Seat = @import("Seat.zig");
 const InputDevice = @import("InputDevice.zig");
+const Seat = @import("Seat.zig");
+const XkbBinding = @import("XkbBinding.zig");
 
 const log = std.log.scoped(.input);
 
@@ -36,10 +37,12 @@ pub const Event = union(enum) {
     modifiers: wlr.Keyboard.Modifiers,
 };
 
-const KeyConsumer = enum {
-    mapping,
+const KeyConsumer = union(enum) {
+    /// A null value indicates that the xkb_binding_v1 was destroyed or that
+    /// a press event was already sent due to a press on a different keyboard.
+    binding: ?*XkbBinding,
     im_grab,
-    /// Seat's focused client (xdg or layer shell)
+    /// Seat's focused client
     focus,
 };
 
@@ -152,23 +155,16 @@ pub fn deinit(keyboard: *Keyboard) void {
 pub fn processKey(keyboard: *Keyboard, event: *const wlr.Keyboard.event.Key) void {
     const wlr_keyboard = keyboard.device.wlr_device.toKeyboard();
 
-    // If the keyboard is in a group, this event will be handled by the group's Keyboard instance.
-    if (wlr_keyboard.group != null) return;
-
-    keyboard.device.seat.handleActivity();
-
     // Translate libinput keycode -> xkbcommon
-    const keycode = event.keycode + 8;
+    const xkb_keycode = event.keycode + 8;
 
     // XXX this is not ok, we need to store current modifiers per-Keyboard ourselves
     const modifiers = wlr_keyboard.getModifiers();
     const released = event.state == .released;
 
-    // We must ref() the state here as a mapping could change the keyboard layout.
-    const xkb_state = (wlr_keyboard.xkb_state orelse return).ref();
-    defer xkb_state.unref();
+    const xkb_state = wlr_keyboard.xkb_state orelse return;
 
-    const keysyms = xkb_state.keyGetSyms(keycode);
+    const keysyms = xkb_state.keyGetSyms(xkb_keycode);
 
     for (keysyms) |sym| {
         if (!released and handleBuiltinMapping(sym)) return;
@@ -179,7 +175,7 @@ pub fn processKey(keyboard: *Keyboard, event: *const wlr.Keyboard.event.Key) voi
     // other than to ignore any newer presses. No need to worry about pairing
     // the correct release, as the client is unlikely to send all of them
     // (and we already ignore releasing keys we don't know were pressed).
-    if (!released and keyboard.pressed.contains(event.keycode)) {
+    if (!released and keyboard.pressed.contains(xkb_keycode)) {
         log.err("key pressed again without release, virtual-keyboard client bug?", .{});
         return;
     }
@@ -193,7 +189,7 @@ pub fn processKey(keyboard: *Keyboard, event: *const wlr.Keyboard.event.Key) voi
         if (released) {
             // The released key might not be in the pressed set when switching from a different tty
             // or if the press was ignored due to >32 keys being pressed simultaneously.
-            break :blk keyboard.pressed.remove(event.keycode) orelse return;
+            break :blk keyboard.pressed.remove(xkb_keycode) orelse return;
         }
 
         // Ignore key presses beyond 32 simultaneously pressed keys (see comments in Pressed).
@@ -201,8 +197,11 @@ pub fn processKey(keyboard: *Keyboard, event: *const wlr.Keyboard.event.Key) voi
         // both the press and release mapping for certain key or neither mapping.
         keyboard.pressed.keys.ensureUnusedCapacity(1) catch return;
 
-        if (keyboard.device.seat.handleMapping(keycode, modifiers, released, xkb_state)) {
-            break :blk .mapping;
+        if (keyboard.device.seat.matchXkbBinding(xkb_keycode, modifiers, xkb_state)) |binding| {
+            log.debug("matched xkb binding", .{});
+            break :blk .{
+                .binding = if (binding.sent_pressed) null else binding,
+            };
         } else if (keyboard.getInputMethodGrab() != null) {
             break :blk .im_grab;
         }
@@ -211,13 +210,17 @@ pub fn processKey(keyboard: *Keyboard, event: *const wlr.Keyboard.event.Key) voi
     };
 
     if (!released) {
-        keyboard.pressed.addAssumeCapacity(.{ .code = event.keycode, .consumer = consumer });
+        keyboard.pressed.addAssumeCapacity(.{ .code = xkb_keycode, .consumer = consumer });
     }
 
     switch (consumer) {
-        // Press mappings are handled above when determining the consumer of the press
-        // Release mappings are handled separately as they are executed independent of the consumer.
-        .mapping => {},
+        .binding => |b| if (b) |binding| {
+            if (released) {
+                binding.released();
+            } else {
+                binding.pressed();
+            }
+        },
         .im_grab => if (keyboard.getInputMethodGrab()) |keyboard_grab| {
             keyboard_grab.setKeyboard(keyboard_grab.keyboard);
             keyboard_grab.sendKey(event.time_msec, event.keycode, event.state);
@@ -228,17 +231,9 @@ pub fn processKey(keyboard: *Keyboard, event: *const wlr.Keyboard.event.Key) voi
             wlr_seat.keyboardNotifyKey(event.time_msec, event.keycode, event.state);
         },
     }
-
-    // Release mappings don't interact with anything
-    if (released) _ = keyboard.device.seat.handleMapping(keycode, modifiers, released, xkb_state);
 }
 
 pub fn processModifiers(keyboard: *Keyboard, modifiers: *const wlr.Keyboard.Modifiers) void {
-    const wlr_keyboard = keyboard.device.wlr_device.toKeyboard();
-
-    // If the keyboard is in a group, this event will be handled by the group's Keyboard instance.
-    if (wlr_keyboard.group != null) return;
-
     if (keyboard.getInputMethodGrab()) |keyboard_grab| {
         keyboard_grab.setKeyboard(keyboard_grab.keyboard);
         keyboard_grab.sendModifiers(modifiers);
@@ -284,10 +279,19 @@ fn getInputMethodGrab(keyboard: Keyboard) ?*wlr.InputMethodV2.KeyboardGrab {
 
 fn queueKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboard.event.Key) void {
     const keyboard: *Keyboard = @fieldParentPtr("key", listener);
+    const wlr_keyboard = keyboard.device.wlr_device.toKeyboard();
+
+    // If the keyboard is in a group, this event will be handled by the group's Keyboard instance.
+    if (wlr_keyboard.group != null) return;
+
     keyboard.device.seat.queueEvent(.{ .keyboard_key = .{ .keyboard = keyboard, .key = event.* } });
 }
 
 fn queueModifiers(listener: *wl.Listener(*wlr.Keyboard), wlr_keyboard: *wlr.Keyboard) void {
     const keyboard: *Keyboard = @fieldParentPtr("modifiers", listener);
+
+    // If the keyboard is in a group, this event will be handled by the group's Keyboard instance.
+    if (wlr_keyboard.group != null) return;
+
     keyboard.device.seat.queueEvent(.{ .keyboard_modifiers = .{ .keyboard = keyboard, .modifiers = wlr_keyboard.modifiers } });
 }

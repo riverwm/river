@@ -36,12 +36,12 @@ const InputRelay = @import("InputRelay.zig");
 const Keyboard = @import("Keyboard.zig");
 const KeyboardGroup = @import("KeyboardGroup.zig");
 const LockSurface = @import("LockSurface.zig");
-const Mapping = @import("Mapping.zig");
 const Output = @import("Output.zig");
 const PointerConstraint = @import("PointerConstraint.zig");
 const Switch = @import("Switch.zig");
 const Tablet = @import("Tablet.zig");
 const Window = @import("Window.zig");
+const XkbBinding = @import("XkbBinding.zig");
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
 const log = std.log.scoped(.input);
@@ -136,6 +136,8 @@ uncommitted: WmState = .{},
 /// State requested by the window manager client and committed.
 committed: WmState = .{},
 
+xkb_bindings: wl.list.Head(XkbBinding, .link),
+
 /// Multiple physical mice are handled by the same Cursor
 cursor: Cursor,
 
@@ -171,6 +173,7 @@ pub fn create(name: [*:0]const u8) !void {
         .link = undefined,
         .link_pending = undefined,
         .link_sent = undefined,
+        .xkb_bindings = undefined,
         .cursor = undefined,
         .relay = undefined,
     };
@@ -180,6 +183,8 @@ pub fn create(name: [*:0]const u8) !void {
     server.wm.pending.seats.append(seat);
     seat.link_sent.init();
     server.wm.dirtyPending();
+
+    seat.xkb_bindings.init();
 
     try seat.cursor.init(seat);
     seat.relay.init();
@@ -337,6 +342,26 @@ pub fn sendDirty(seat: *Seat) void {
                 seat.pending.window_interaction = null;
             }
         }
+
+        {
+            var it = seat.xkb_bindings.iterator(.forward);
+            while (it.next()) |binding| {
+                switch (binding.pending.state_change) {
+                    .none => {},
+                    .pressed => {
+                        assert(!binding.sent_pressed);
+                        binding.sent_pressed = true;
+                        binding.object.sendPressed();
+                    },
+                    .released => {
+                        assert(binding.sent_pressed);
+                        binding.sent_pressed = false;
+                        binding.object.sendReleased();
+                    },
+                }
+                binding.pending.state_change = .none;
+            }
+        }
     }
 }
 
@@ -374,12 +399,32 @@ fn handleRequest(
         .pointer_resize_window => {},
         .pointer_confine_to_region => {},
         .pointer_warp => {},
-        .define_xkb_binding => {},
-        .define_pointer_binding => {},
+        .get_xkb_binding => |args| {
+            XkbBinding.create(
+                seat,
+                seat_v1.getClient(),
+                seat_v1.getVersion(),
+                args.id,
+                @enumFromInt(args.keysym),
+                args.modifiers,
+            ) catch {
+                seat_v1.getClient().postNoMemory();
+                log.err("out of memory", .{});
+                return;
+            };
+        },
+        .get_pointer_binding => {},
     }
 }
 
 pub fn commitWmState(seat: *Seat) void {
+    {
+        var it = seat.xkb_bindings.iterator(.forward);
+        while (it.next()) |binding| {
+            binding.committed = binding.uncommitted;
+        }
+    }
+
     seat.committed = seat.uncommitted;
 }
 
@@ -475,34 +520,34 @@ pub fn handleActivity(seat: Seat) void {
 
 /// Handle any user-defined mapping for passed keycode, modifiers and keyboard state
 /// Returns true if a mapping was run
-pub fn handleMapping(
-    _: *Seat,
+pub fn matchXkbBinding(
+    seat: *Seat,
     keycode: xkb.Keycode,
     modifiers: wlr.Keyboard.ModifierMask,
-    released: bool,
     xkb_state: *xkb.State,
-) bool {
-    const mappings = &server.config.mappings;
-
-    // It is possible for more than one mapping to be matched due to the
-    // existence of layout-independent mappings. It is also possible due to
+) ?*XkbBinding {
+    // It is possible for more than one binding to be matched due to the
+    // existence of layout-independent bindings. It is also possible due to
     // translation by xkbcommon consuming modifiers. On the swedish layout
     // for example, translating Super+Shift+Space may consume the Shift
-    // modifier and confict with a mapping for Super+Space. For this reason,
+    // modifier and confict with a binding for Super+Space. For this reason,
     // matching wihout xkbcommon translation is done first and after a match
     // has been found all further matches are ignored.
-    var found: ?*Mapping = null;
+    var found: ?*XkbBinding = null;
 
     // First check for matches without translating keysyms with xkbcommon.
     // That is, if the physical keys Mod+Shift+1 are pressed on a US layout don't
     // translate the keysym 1 to an exclamation mark. This behavior is generally
     // what is desired.
-    for (mappings.items) |*mapping| {
-        if (mapping.match(keycode, modifiers, released, xkb_state, .no_translate)) {
-            if (found == null) {
-                found = mapping;
-            } else {
-                log.debug("already found a matching mapping, ignoring additional match", .{});
+    {
+        var it = seat.xkb_bindings.iterator(.forward);
+        while (it.next()) |binding| {
+            if (binding.match(keycode, modifiers, xkb_state, .no_translate)) {
+                if (found == null) {
+                    found = binding;
+                } else {
+                    log.debug("already found a matching binding, ignoring additional match", .{});
+                }
             }
         }
     }
@@ -511,23 +556,20 @@ pub fn handleMapping(
     // with xkbcommon for intuitive behavior. For example, layouts may require
     // translation with the numlock modifier to obtain keypad number keysyms
     // (e.g. KP_1).
-    for (mappings.items) |*mapping| {
-        if (mapping.match(keycode, modifiers, released, xkb_state, .translate)) {
-            if (found == null) {
-                found = mapping;
-            } else {
-                log.debug("already found a matching mapping, ignoring additional match", .{});
+    {
+        var it = seat.xkb_bindings.iterator(.forward);
+        while (it.next()) |binding| {
+            if (binding.match(keycode, modifiers, xkb_state, .translate)) {
+                if (found == null) {
+                    found = binding;
+                } else {
+                    log.debug("already found a matching binding, ignoring additional match", .{});
+                }
             }
         }
     }
 
-    // The mapped command must be run outside of the loop above as it may modify
-    // the list of mappings we are iterating through, possibly causing it to be re-allocated.
-    if (found) |_| {
-        return true;
-    }
-
-    return false;
+    return found;
 }
 
 /// Handle any user-defined mapping for switches

@@ -1177,7 +1177,7 @@
       <entry name="mod5" value="128"/>
     </enum>
 
-    <request name="define_xkb_binding">
+    <request name="get_xkb_binding">
       <description summary="define a new xkbcommon key binding">
         Define a key binding in terms of an xkbcommon keysym and other
         configurable properties.
@@ -1191,7 +1191,7 @@
       <arg name="modifiers" type="uint" enum="modifiers"/>
     </request>
 
-    <request name="define_pointer_binding">
+    <request name="get_pointer_binding">
       <description summary="define a new pointer binding">
         Define a pointer binding in terms of a pointer button, modifiers, and
         other configurable properties.

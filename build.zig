@@ -202,6 +202,7 @@ pub fn build(b: *Build) !void {
 
         rivercompat.root_module.addImport("flags", flags);
         rivercompat.root_module.addImport("wayland", wayland);
+        rivercompat.root_module.addImport("xkbcommon", xkbcommon);
         rivercompat.linkLibC();
         rivercompat.linkSystemLibrary("wayland-client");
 

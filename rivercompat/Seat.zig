@@ -19,21 +19,53 @@ const Seat = @This();
 const std = @import("std");
 const assert = std.debug.assert;
 const wayland = @import("wayland");
+const xkb = @import("xkbcommon");
 const wl = wayland.client.wl;
 const river = wayland.client.river;
 
 const Window = @import("Window.zig");
+const WindowManager = @import("WindowManager.zig");
+const XkbBinding = @import("XkbBinding.zig");
 
 const gpa = std.heap.c_allocator;
 
+wm: *WindowManager,
 seat_v1: *river.SeatV1,
+focused: ?*Window = null,
 
-pub fn create(seat_v1: *river.SeatV1) void {
+pub fn create(wm: *WindowManager, seat_v1: *river.SeatV1) void {
     const seat = gpa.create(Seat) catch @panic("OOM");
     seat.* = .{
+        .wm = wm,
         .seat_v1 = seat_v1,
     };
     seat_v1.setListener(*Seat, handleEvent, seat);
+
+    XkbBinding.create(seat, xkb.Keysym.n, .{ .mod1 = true });
+}
+
+pub fn focus(seat: *Seat, target: ?*Window) void {
+    if (target) |window| {
+        seat.seat_v1.focusWindow(window.window_v1);
+        seat.focused = window;
+
+        window.link.remove();
+        seat.wm.windows.prepend(window);
+
+        window.node_v1.placeTop();
+    } else {
+        seat.seat_v1.clearFocus();
+    }
+}
+
+pub fn focusNext(seat: *Seat) void {
+    if (seat.focused != null) {
+        if (seat.wm.windows.length() >= 2) {
+            seat.focus(seat.wm.windows.last().?);
+        }
+    } else if (seat.wm.windows.first()) |top| {
+        seat.focus(top);
+    }
 }
 
 fn handleEvent(seat_v1: *river.SeatV1, event: river.SeatV1.Event, seat: *Seat) void {
@@ -49,8 +81,7 @@ fn handleEvent(seat_v1: *river.SeatV1, event: river.SeatV1.Event, seat: *Seat) v
         .window_interaction => |args| {
             const window_v1 = args.window orelse return;
             const window: *Window = @ptrCast(@alignCast(window_v1.getUserData()));
-            seat_v1.focusWindow(window_v1);
-            window.node_v1.placeTop();
+            seat.focus(window);
         },
     }
 }

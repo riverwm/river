@@ -28,7 +28,6 @@ const util = @import("util.zig");
 
 const Server = @import("Server.zig");
 const Output = @import("Output.zig");
-const Mapping = @import("Mapping.zig");
 const Switch = @import("Switch.zig");
 const Window = @import("Window.zig");
 
@@ -51,7 +50,6 @@ border_width: u31 = 2,
 /// Color of border in RGBA with premultiplied alpha
 border_color: [4]f32 = [_]f32{ 0.34509804, 0.43137255, 0.45882353, 1.0 }, // Solarized base01
 
-mappings: std.ArrayListUnmanaged(Mapping) = .{},
 pointer_mappings: std.ArrayListUnmanaged(struct {
     event_code: u32,
     modifiers: wlr.Keyboard.ModifierMask,

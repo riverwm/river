@@ -58,7 +58,7 @@ fn handleEvent(wm_v1: *river.WindowManagerV1, event: river.WindowManagerV1.Event
             _ = args;
         },
         .seat => |args| {
-            Seat.create(args.id);
+            Seat.create(wm, args.id);
         },
     }
 }
