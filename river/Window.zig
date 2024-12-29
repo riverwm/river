@@ -660,6 +660,14 @@ pub fn configure(window: *Window) bool {
         .resizing = false, // XXX
     };
 
+    // Ensure a dimensions event is sent if the window manager has proposed dimensions
+    // even if the actual dimensions commited by the window do not change.
+    if (committed.proposed != null) {
+        window.sent.box.width = 0;
+        window.sent.box.height = 0;
+        committed.proposed = null;
+    }
+
     const track_configure = switch (window.impl) {
         .toplevel => |*toplevel| toplevel.configure(),
         .xwayland => |*xwindow| xwindow.configure(),
