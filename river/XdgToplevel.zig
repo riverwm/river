@@ -298,6 +298,13 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("commit", listener);
     const window = toplevel.window;
 
+    window.setDimensionsHint(.{
+        .min_width = @intCast(toplevel.wlr_toplevel.current.min_width),
+        .min_height = @intCast(toplevel.wlr_toplevel.current.min_height),
+        .max_width = @intCast(toplevel.wlr_toplevel.current.max_width),
+        .max_height = @intCast(toplevel.wlr_toplevel.current.max_height),
+    });
+
     if (toplevel.wlr_toplevel.base.initial_commit) {
         window.ready();
         return;
@@ -305,16 +312,6 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
 
     if (!window.mapped) {
         return;
-    }
-
-    {
-        const state = &toplevel.wlr_toplevel.current;
-        window.constraints = .{
-            .min_width = @max(state.min_width, 1),
-            .max_width = if (state.max_width > 0) @intCast(state.max_width) else math.maxInt(u31),
-            .min_height = @max(state.min_height, 1),
-            .max_height = if (state.max_height > 0) @intCast(state.max_height) else math.maxInt(u31),
-        };
     }
 
     switch (toplevel.configure_state) {

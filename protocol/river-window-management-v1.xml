@@ -206,7 +206,6 @@
       a river_window_manager_v1.commit request.
 
       TODO:
-        - size hints (including unset state)
         - window cropping
     </description>
 
@@ -259,6 +258,28 @@
       </description>
       <arg name="id" type="new_id" interface="river_node_v1"/>
     </request>
+
+    <event name="dimensions_hint">
+      <description summary="the window's preferred min/max dimensions">
+        This event informs the window manager of the window's preferred min/max
+        dimensions. These preferences are a hint, and the window manager is free
+        to propose dimensions outside of these bounds.
+
+        All min/max width/height values must be strictly greater than or equal
+        to 0. A value of 0 indicates that the window has no preference for that
+        value.
+
+        The min_width/min_height must be strictly less than or equal to the
+        max_width/max_height.
+
+        This event is double-buffered state and will be followed by a
+        river_window_manager_v1.update event.
+      </description>
+      <arg name="min_width" type="int"/>
+      <arg name="min_height" type="int"/>
+      <arg name="max_width" type="int"/>
+      <arg name="max_height" type="int"/>
+    </event>
 
     <event name="dimensions">
       <description summary="window dimensions">

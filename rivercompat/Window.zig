@@ -63,6 +63,7 @@ fn handleEvent(window_v1: *river.WindowV1, event: river.WindowV1.Event, window: 
 
             gpa.destroy(window);
         },
+        .dimensions_hint => {},
         .dimensions => {},
         .app_id => {},
         .title => {},

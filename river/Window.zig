@@ -20,6 +20,7 @@ const build_options = @import("build_options");
 const std = @import("std");
 const assert = std.debug.assert;
 const math = std.math;
+const meta = std.meta;
 const posix = std.posix;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
@@ -38,11 +39,11 @@ const XwaylandWindow = @import("XwaylandWindow.zig");
 
 const log = std.log.scoped(.wm);
 
-pub const Constraints = struct {
-    min_width: u31 = 1,
-    max_width: u31 = math.maxInt(u31),
-    min_height: u31 = 1,
-    max_height: u31 = math.maxInt(u31),
+pub const DimensionsHint = struct {
+    min_width: u31 = 0,
+    max_width: u31 = 0,
+    min_height: u31 = 0,
+    max_height: u31 = 0,
 };
 
 const Impl = union(enum) {
@@ -123,9 +124,6 @@ saved_surface_tree: *wlr.SceneTree,
 borders: [4]*wlr.SceneRect,
 popup_tree: *wlr.SceneTree,
 
-/// Bounds on the width/height of the window, set by the toplevel/xwindow implementation.
-constraints: Constraints = .{},
-
 /// Set to true once the window manager client has made its first commit
 /// proposing dimensions for a new river_window_v1 object.
 initialized: bool = false,
@@ -146,6 +144,7 @@ pending: struct {
         /// Indicates that the closed event will be sent in the next update sequence.
         closing,
     } = .init,
+    dimensions_hint: DimensionsHint = .{},
     box: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
     decoration_hint: river.WindowV1.DecorationHint = .only_supports_csd,
     /// Set back to no_request at the end of each update sequence
@@ -161,6 +160,7 @@ pending: struct {
 /// This state is only kept around in order to avoid sending redundant events
 /// to the window manager client.
 sent: struct {
+    dimensions_hint: DimensionsHint = .{},
     box: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
     decoration_hint: river.WindowV1.DecorationHint = .only_supports_csd,
 } = .{},
@@ -279,6 +279,13 @@ pub fn closing(window: *Window) void {
     window.dirtyPending();
 }
 
+pub fn setDimensionsHint(window: *Window, hint: DimensionsHint) void {
+    window.pending.dimensions_hint = hint;
+    if (!meta.eql(window.sent.dimensions_hint, hint)) {
+        window.dirtyPending();
+    }
+}
+
 pub fn setDimensions(window: *Window, width: i32, height: i32) void {
     window.pending.box.width = width;
     window.pending.box.height = height;
@@ -357,7 +364,15 @@ pub fn sendDirty(window: *Window) void {
             const sent = &window.sent;
 
             // XXX send all dirty pending state
-            log.debug("XXXXXXXXXXXXXX pending {any} sent {any}", .{ pending.box, sent.box });
+            if (new or !meta.eql(pending.dimensions_hint, sent.dimensions_hint)) {
+                window_v1.sendDimensionsHint(
+                    pending.dimensions_hint.min_width,
+                    pending.dimensions_hint.min_height,
+                    pending.dimensions_hint.max_width,
+                    pending.dimensions_hint.max_height,
+                );
+                sent.dimensions_hint = pending.dimensions_hint;
+            }
             if ((new or pending.box.width != sent.box.width or
                 pending.box.height != sent.box.height) and !pending.box.empty())
             {
