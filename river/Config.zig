@@ -19,7 +19,6 @@ const Config = @This();
 const std = @import("std");
 const fmt = std.fmt;
 const mem = std.mem;
-const globber = @import("globber");
 const wlr = @import("wlroots");
 const xkb = @import("xkbcommon");
 
@@ -27,19 +26,7 @@ const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Server = @import("Server.zig");
-const Output = @import("Output.zig");
 const Switch = @import("Switch.zig");
-const Window = @import("Window.zig");
-
-pub const Position = struct {
-    x: u31,
-    y: u31,
-};
-
-pub const Dimensions = struct {
-    width: u31,
-    height: u31,
-};
 
 /// Color of background in RGBA with premultiplied alpha (alpha should only affect nested sessions)
 background_color: [4]f32 = [_]f32{ 0.0, 0.16862745, 0.21176471, 1.0 }, // Solarized base03
@@ -50,10 +37,6 @@ border_width: u31 = 2,
 /// Color of border in RGBA with premultiplied alpha
 border_color: [4]f32 = [_]f32{ 0.34509804, 0.43137255, 0.45882353, 1.0 }, // Solarized base01
 
-pointer_mappings: std.ArrayListUnmanaged(struct {
-    event_code: u32,
-    modifiers: wlr.Keyboard.ModifierMask,
-}) = .{},
 switch_mappings: std.ArrayListUnmanaged(struct {
     switch_type: Switch.Type,
     switch_state: Switch.State,

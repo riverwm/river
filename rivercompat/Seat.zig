@@ -23,9 +23,12 @@ const xkb = @import("xkbcommon");
 const wl = wayland.client.wl;
 const river = wayland.client.river;
 
+const c = @import("c.zig");
+
 const Window = @import("Window.zig");
 const WindowManager = @import("WindowManager.zig");
 const XkbBinding = @import("XkbBinding.zig");
+const PointerBinding = @import("PointerBinding.zig");
 
 const gpa = std.heap.c_allocator;
 
@@ -41,7 +44,8 @@ pub fn create(wm: *WindowManager, seat_v1: *river.SeatV1) void {
     };
     seat_v1.setListener(*Seat, handleEvent, seat);
 
-    XkbBinding.create(seat, xkb.Keysym.n, .{ .mod1 = true });
+    XkbBinding.create(seat, xkb.Keysym.n, .{ .mod4 = true });
+    PointerBinding.create(seat, c.BTN_RIGHT, .{ .mod4 = true });
 }
 
 pub fn focus(seat: *Seat, target: ?*Window) void {

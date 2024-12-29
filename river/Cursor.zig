@@ -35,6 +35,7 @@ const DragIcon = @import("DragIcon.zig");
 const InputDevice = @import("InputDevice.zig");
 const LockSurface = @import("LockSurface.zig");
 const Output = @import("Output.zig");
+const PointerBinding = @import("PointerBinding.zig");
 const PointerConstraint = @import("PointerConstraint.zig");
 const Scene = @import("Scene.zig");
 const Seat = @import("Seat.zig");
@@ -46,7 +47,10 @@ const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 const log = std.log.scoped(.input);
 
 const Mode = union(enum) {
-    passthrough: void,
+    passthrough,
+    /// This mode is entered when a binding is triggered and exited when there
+    /// are no longer any buttons pressed.
+    ignore,
     down: struct {
         // TODO: To handle the surface with pointer focus being moved during
         // down mode we need to store the starting location of the surface as
@@ -127,8 +131,8 @@ xcursor_manager: *wlr.XcursorManager,
 /// surface to be used as the cursor shape instead.
 xcursor_name: ?[*:0]const u8 = null,
 
-/// Number of distinct buttons currently pressed
-pressed_count: u32 = 0,
+/// The set of currently pressed pointer buttons and the corresponding pointer mapping if any.
+pressed: std.AutoHashMapUnmanaged(u32, ?*PointerBinding) = .{},
 
 /// The pointer constraint for the surface that currently has keyboard focus, if any.
 /// This constraint is not necessarily active, activation only occurs once the cursor
@@ -233,6 +237,8 @@ pub fn init(cursor: *Cursor, seat: *Seat) !void {
 pub fn deinit(cursor: *Cursor) void {
     cursor.xcursor_manager.destroy();
     cursor.wlr_cursor.destroy();
+    cursor.pressed.deinit(util.gpa);
+    cursor.touch_points.deinit(util.gpa);
 }
 
 /// Set the cursor theme for the given seat, as well as the xwayland theme if
@@ -332,13 +338,14 @@ pub fn processMotionRelative(cursor: *Cursor, event: *const wlr.Pointer.event.Mo
     }
 
     switch (cursor.mode) {
-        .passthrough, .down => {
+        .passthrough, .ignore, .down => {
             cursor.wlr_cursor.move(event.device, dx, dy);
 
             switch (cursor.mode) {
                 .passthrough => {
                     cursor.passthrough(event.time_msec);
                 },
+                .ignore => {},
                 .down => |data| {
                     cursor.seat.wlr_seat.pointerNotifyMotion(
                         event.time_msec,
@@ -438,56 +445,83 @@ pub fn processMotionAbsolute(cursor: *Cursor, event: *const wlr.Pointer.event.Mo
 }
 
 pub fn processButton(cursor: *Cursor, event: *const wlr.Pointer.event.Button) void {
-    if (event.state == .released) {
-        assert(cursor.pressed_count > 0);
-        cursor.pressed_count -= 1;
-        if (cursor.pressed_count == 0 and cursor.mode != .passthrough) {
-            log.debug("leaving {s} mode", .{@tagName(cursor.mode)});
+    if (event.state == .pressed) {
+        const result = cursor.pressed.getOrPut(util.gpa, event.button) catch {
+            log.err("out of memory", .{});
+            return;
+        };
+        if (result.found_existing) {
+            log.err("ignoring duplicate pointer button {d} press", .{event.button});
+            return;
+        }
+
+        if (cursor.seat.matchPointerBinding(event.button)) |binding| {
+            result.value_ptr.* = binding;
+            binding.pressed();
+            log.debug("entering cursor mode ignore", .{});
+            cursor.mode = .ignore;
+            cursor.clearFocus();
+            return;
+        }
+
+        result.value_ptr.* = null;
+
+        switch (cursor.mode) {
+            .passthrough => {
+                if (server.scene.at(cursor.wlr_cursor.x, cursor.wlr_cursor.y)) |at| {
+                    cursor.interact(at);
+
+                    if (at.surface != null) {
+                        _ = cursor.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
+                        log.debug("entering cursor mode down", .{});
+                        cursor.mode = .{
+                            .down = .{
+                                .lx = cursor.wlr_cursor.x,
+                                .ly = cursor.wlr_cursor.y,
+                                .sx = at.sx,
+                                .sy = at.sy,
+                            },
+                        };
+                        return;
+                    }
+                }
+
+                log.debug("entering cursor mode ignore", .{});
+                cursor.mode = .ignore;
+                cursor.clearFocus();
+                return;
+            },
+            // Pointer focus does not change while in down mode.
+            .down => {
+                _ = cursor.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
+            },
+            // No client has pointer focus while in ignore/move/resize mode.
+            .ignore, .move, .resize => {},
+        }
+    } else {
+        assert(event.state == .released);
+        const result = cursor.pressed.fetchRemove(event.button);
+        if (result) |kv| {
+            if (kv.value) |binding| {
+                binding.released();
+            }
 
             switch (cursor.mode) {
                 .passthrough => unreachable,
                 .down => {
-                    // If we were in down mode, we need pass along the release event
                     _ = cursor.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
                 },
-                .move, .resize => {},
+                // No client has pointer focus while in ignore/move/resize mode.
+                .ignore, .move, .resize => {},
             }
-
-            cursor.mode = .passthrough;
-            cursor.passthrough(event.time_msec);
+            if (cursor.pressed.count() == 0) {
+                log.debug("exiting cursor mode {s}", .{@tagName(cursor.mode)});
+                cursor.mode = .passthrough;
+                cursor.passthrough(event.time_msec);
+            }
         } else {
-            _ = cursor.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
-        }
-        return;
-    }
-
-    assert(event.state == .pressed);
-    cursor.pressed_count += 1;
-
-    if (cursor.pressed_count > 1) {
-        _ = cursor.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
-        return;
-    }
-
-    if (server.scene.at(cursor.wlr_cursor.x, cursor.wlr_cursor.y)) |result| {
-        if (result.data == .window and cursor.handlePointerMapping(event, result.data.window)) {
-            // If a mapping is triggered don't send events to clients.
+            log.err("ignoring duplicate pointer button {d} release", .{event.button});
             return;
-        }
-
-        cursor.interact(result);
-
-        _ = cursor.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
-
-        if (result.surface != null) {
-            cursor.mode = .{
-                .down = .{
-                    .lx = cursor.wlr_cursor.x,
-                    .ly = cursor.wlr_cursor.y,
-                    .sx = result.sx,
-                    .sy = result.sy,
-                },
-            };
         }
     }
 }
@@ -673,21 +707,6 @@ fn handleTabletToolButton(
     tool.button(tablet, event);
 }
 
-/// Handle the mapping for the passed button if any. Returns true if there
-/// was a mapping and the button was handled.
-fn handlePointerMapping(cursor: *Cursor, event: *const wlr.Pointer.event.Button, _: *Window) bool {
-    const wlr_keyboard = cursor.seat.wlr_seat.getKeyboard() orelse return false;
-    // XXX this is not ok, we need to store current modifiers per-Keyboard ourselves
-    const modifiers = wlr_keyboard.getModifiers();
-
-    return for (server.config.pointer_mappings.items) |mapping| {
-        if (event.button == mapping.event_code and std.meta.eql(modifiers, mapping.modifiers)) {
-            // trigger action
-            break true;
-        }
-    } else false;
-}
-
 pub fn startMove(cursor: *Cursor, window: *Window) void {
     if (cursor.constraint) |constraint| {
         if (constraint.state == .active) constraint.deactivate();
@@ -797,7 +816,7 @@ pub fn updateState(cursor: *Cursor) void {
             cursor.passthrough(msec);
         },
         // TODO: Leave down mode if the target surface is no longer visible.
-        .down => {},
+        .ignore, .down => {},
         .move, .resize => {
             // Moving and resizing of windows is handled through the transaction system. Therefore,
             // we must inspect the inflight_mode instead if a move or a resize is in progress.
@@ -814,7 +833,7 @@ pub fn updateState(cursor: *Cursor) void {
             // Therefore, the user already expects the cursor to be free from the window and
             // we should not warp it back to the fixed offset of the move/resize.
             switch (cursor.inflight_mode) {
-                .passthrough, .down => {},
+                .passthrough, .ignore, .down => {},
                 inline .move, .resize => |data, mode| {
 
                     // These conditions are checked in WindowManager.dirtyPending()

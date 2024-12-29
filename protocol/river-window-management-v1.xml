@@ -1199,7 +1199,7 @@
         The button argument is a Linux input event code defined in the
         linux/input-event-codes.h header file (e.g. BTN_RIGHT).
 
-        The new key binding is not enabled until initial configuration is
+        The new pointer binding is not enabled until initial configuration is
         completed, the enable request is made, and the change is committed with
         a river_window_manager_v1.commit request.
       </description>

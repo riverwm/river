@@ -37,6 +37,7 @@ const Keyboard = @import("Keyboard.zig");
 const KeyboardGroup = @import("KeyboardGroup.zig");
 const LockSurface = @import("LockSurface.zig");
 const Output = @import("Output.zig");
+const PointerBinding = @import("PointerBinding.zig");
 const PointerConstraint = @import("PointerConstraint.zig");
 const Switch = @import("Switch.zig");
 const Tablet = @import("Tablet.zig");
@@ -137,6 +138,7 @@ uncommitted: WmState = .{},
 committed: WmState = .{},
 
 xkb_bindings: wl.list.Head(XkbBinding, .link),
+pointer_bindings: wl.list.Head(PointerBinding, .link),
 
 /// Multiple physical mice are handled by the same Cursor
 cursor: Cursor,
@@ -174,6 +176,7 @@ pub fn create(name: [*:0]const u8) !void {
         .link_pending = undefined,
         .link_sent = undefined,
         .xkb_bindings = undefined,
+        .pointer_bindings = undefined,
         .cursor = undefined,
         .relay = undefined,
     };
@@ -185,6 +188,7 @@ pub fn create(name: [*:0]const u8) !void {
     server.wm.dirtyPending();
 
     seat.xkb_bindings.init();
+    seat.pointer_bindings.init();
 
     try seat.cursor.init(seat);
     seat.relay.init();
@@ -362,6 +366,25 @@ pub fn sendDirty(seat: *Seat) void {
                 binding.pending.state_change = .none;
             }
         }
+        {
+            var it = seat.pointer_bindings.iterator(.forward);
+            while (it.next()) |binding| {
+                switch (binding.pending.state_change) {
+                    .none => {},
+                    .pressed => {
+                        assert(!binding.sent_pressed);
+                        binding.sent_pressed = true;
+                        binding.object.sendPressed();
+                    },
+                    .released => {
+                        assert(binding.sent_pressed);
+                        binding.sent_pressed = false;
+                        binding.object.sendReleased();
+                    },
+                }
+                binding.pending.state_change = .none;
+            }
+        }
     }
 }
 
@@ -413,13 +436,32 @@ fn handleRequest(
                 return;
             };
         },
-        .get_pointer_binding => {},
+        .get_pointer_binding => |args| {
+            PointerBinding.create(
+                seat,
+                seat_v1.getClient(),
+                seat_v1.getVersion(),
+                args.id,
+                args.button,
+                args.modifiers,
+            ) catch {
+                seat_v1.getClient().postNoMemory();
+                log.err("out of memory", .{});
+                return;
+            };
+        },
     }
 }
 
 pub fn commitWmState(seat: *Seat) void {
     {
         var it = seat.xkb_bindings.iterator(.forward);
+        while (it.next()) |binding| {
+            binding.committed = binding.uncommitted;
+        }
+    }
+    {
+        var it = seat.pointer_bindings.iterator(.forward);
         while (it.next()) |binding| {
             binding.committed = binding.uncommitted;
         }
@@ -546,7 +588,7 @@ pub fn matchXkbBinding(
                 if (found == null) {
                     found = binding;
                 } else {
-                    log.debug("already found a matching binding, ignoring additional match", .{});
+                    log.debug("already found a matching xkb_binding, ignoring additional match", .{});
                 }
             }
         }
@@ -563,7 +605,32 @@ pub fn matchXkbBinding(
                 if (found == null) {
                     found = binding;
                 } else {
-                    log.debug("already found a matching binding, ignoring additional match", .{});
+                    log.debug("already found a matching xkb_binding, ignoring additional match", .{});
+                }
+            }
+        }
+    }
+
+    return found;
+}
+
+pub fn matchPointerBinding(
+    seat: *Seat,
+    button: u32,
+) ?*PointerBinding {
+    const wlr_keyboard = seat.wlr_seat.getKeyboard() orelse return null;
+    // XXX this is not ok, we need to store current modifiers per-Keyboard ourselves
+    const modifiers = wlr_keyboard.getModifiers();
+
+    var found: ?*PointerBinding = null;
+    {
+        var it = seat.pointer_bindings.iterator(.forward);
+        while (it.next()) |binding| {
+            if (binding.match(button, modifiers)) {
+                if (found == null) {
+                    found = binding;
+                } else {
+                    log.debug("already found a matching pointer binding, ignoring additional match", .{});
                 }
             }
         }
