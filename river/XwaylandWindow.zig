@@ -234,9 +234,7 @@ fn handleRequestConfigure(
         return;
     }
 
-    xwindow.window.pending.box.width = event.width;
-    xwindow.window.pending.box.height = event.height;
-    server.wm.dirtyPending();
+    @panic("TODO");
 }
 
 fn handleSetOverrideRedirect(listener: *wl.Listener(void)) void {

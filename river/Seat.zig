@@ -238,27 +238,13 @@ pub fn queueEvent(seat: *Seat, event: Event) void {
 pub fn processEvents(seat: *Seat) void {
     assert(server.wm.state == .idle);
 
+    // Only process events while there is no pending state to be sent to the window manager.
+    // The window manager might decide to change focus or redefine keyboard/pointer bindings
+    // in response to the pending update.
     var expect_frame: bool = false;
-    while (seat.event_queue.readItem()) |event| {
-        const pg = server.input_manager.pointer_gestures;
-        switch (event) {
-            .keyboard_key => |ev| ev.keyboard.processKey(&ev.key),
-            .keyboard_modifiers => |ev| ev.keyboard.processModifiers(&ev.modifiers),
-
-            .pointer_motion_relative => |ev| seat.cursor.processMotionRelative(&ev),
-            .pointer_motion_absolute => |ev| seat.cursor.processMotionAbsolute(&ev),
-            .pointer_button => |ev| seat.cursor.processButton(&ev),
-            .pointer_axis => |ev| seat.cursor.processAxis(&ev),
-            .pointer_frame => seat.wlr_seat.pointerNotifyFrame(),
-
-            .pointer_swipe_begin => |ev| pg.sendSwipeBegin(seat.wlr_seat, ev.time_msec, ev.fingers),
-            .pointer_swipe_update => |ev| pg.sendSwipeUpdate(seat.wlr_seat, ev.time_msec, ev.dx, ev.dy),
-            .pointer_swipe_end => |ev| pg.sendSwipeEnd(seat.wlr_seat, ev.time_msec, ev.cancelled),
-
-            .pointer_pinch_begin => |ev| pg.sendPinchBegin(seat.wlr_seat, ev.time_msec, ev.fingers),
-            .pointer_pinch_update => |ev| pg.sendPinchUpdate(seat.wlr_seat, ev.time_msec, ev.dx, ev.dy, ev.scale, ev.rotation),
-            .pointer_pinch_end => |ev| pg.sendPinchEnd(seat.wlr_seat, ev.time_msec, ev.cancelled),
-        }
+    while (!server.wm.pending.dirty or expect_frame) {
+        const event = seat.event_queue.readItem() orelse break;
+        seat.processEvent(event);
 
         // Don't split up pointer events grouped by a frame event
         switch (event) {
@@ -268,17 +254,34 @@ pub fn processEvents(seat: *Seat) void {
             .pointer_axis,
             => {
                 expect_frame = true;
-                continue;
             },
             .pointer_frame => expect_frame = false,
             else => assert(!expect_frame),
         }
+    }
 
-        if (server.wm.pending.dirty) {
-            // Wait for feedback from the window manager before further processing.
-            // The window manager might decide to change focus or redefine keyboard/pointer bindings.
-            break;
-        }
+    assert(!expect_frame);
+}
+
+fn processEvent(seat: *Seat, event: Event) void {
+    const pg = server.input_manager.pointer_gestures;
+    switch (event) {
+        .keyboard_key => |ev| ev.keyboard.processKey(&ev.key),
+        .keyboard_modifiers => |ev| ev.keyboard.processModifiers(&ev.modifiers),
+
+        .pointer_motion_relative => |ev| seat.cursor.processMotionRelative(&ev),
+        .pointer_motion_absolute => |ev| seat.cursor.processMotionAbsolute(&ev),
+        .pointer_button => |ev| seat.cursor.processButton(&ev),
+        .pointer_axis => |ev| seat.cursor.processAxis(&ev),
+        .pointer_frame => seat.wlr_seat.pointerNotifyFrame(),
+
+        .pointer_swipe_begin => |ev| pg.sendSwipeBegin(seat.wlr_seat, ev.time_msec, ev.fingers),
+        .pointer_swipe_update => |ev| pg.sendSwipeUpdate(seat.wlr_seat, ev.time_msec, ev.dx, ev.dy),
+        .pointer_swipe_end => |ev| pg.sendSwipeEnd(seat.wlr_seat, ev.time_msec, ev.cancelled),
+
+        .pointer_pinch_begin => |ev| pg.sendPinchBegin(seat.wlr_seat, ev.time_msec, ev.fingers),
+        .pointer_pinch_update => |ev| pg.sendPinchUpdate(seat.wlr_seat, ev.time_msec, ev.dx, ev.dy, ev.scale, ev.rotation),
+        .pointer_pinch_end => |ev| pg.sendPinchEnd(seat.wlr_seat, ev.time_msec, ev.cancelled),
     }
 }
 

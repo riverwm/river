@@ -279,6 +279,18 @@ pub fn closing(window: *Window) void {
     window.dirtyPending();
 }
 
+pub fn setDimensions(window: *Window, width: i32, height: i32) void {
+    window.pending.box.width = width;
+    window.pending.box.height = height;
+
+    window.inflight.box.width = width;
+    window.inflight.box.height = height;
+
+    if (width != window.sent.box.width or height != window.sent.box.height) {
+        window.dirtyPending();
+    }
+}
+
 pub fn setDecorationHint(window: *Window, hint: river.WindowV1.DecorationHint) void {
     window.pending.decoration_hint = hint;
     if (hint != window.sent.decoration_hint) {
@@ -345,7 +357,8 @@ pub fn sendDirty(window: *Window) void {
             const sent = &window.sent;
 
             // XXX send all dirty pending state
-            if ((pending.box.width != sent.box.width or
+            log.debug("XXXXXXXXXXXXXX pending {any} sent {any}", .{ pending.box, sent.box });
+            if ((new or pending.box.width != sent.box.width or
                 pending.box.height != sent.box.height) and !pending.box.empty())
             {
                 window_v1.sendDimensions(window.pending.box.width, window.pending.box.height);
@@ -545,10 +558,7 @@ pub fn commitTransaction(window: *Window) void {
                 );
             }
 
-            window.inflight.box.width = xwindow.xsurface.width;
-            window.inflight.box.height = xwindow.xsurface.height;
-            window.pending.box.width = xwindow.xsurface.width;
-            window.pending.box.height = xwindow.xsurface.height;
+            window.setDimensions(xwindow.xsurface.width, xwindow.xsurface.height);
 
             window.current = window.inflight;
         },

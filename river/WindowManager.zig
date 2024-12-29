@@ -442,7 +442,7 @@ fn commitTransaction(wm: *WindowManager) void {
     if (wm.committed.dirty) {
         wm.sendConfigures();
     } else if (wm.pending.dirty) {
-        wm.sendUpdate();
+        wm.dirtyPending();
     } else {
         server.input_manager.processEvents();
     }

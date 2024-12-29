@@ -344,10 +344,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
                     });
                 }
 
-                window.inflight.box.width = toplevel.geometry.width;
-                window.inflight.box.height = toplevel.geometry.height;
-                window.pending.box.width = toplevel.geometry.width;
-                window.pending.box.height = toplevel.geometry.height;
+                window.setDimensions(toplevel.geometry.width, toplevel.geometry.height);
                 window.current = window.inflight;
                 window.updateSceneState();
             } else if (old_geometry.x != toplevel.geometry.x or
@@ -369,10 +366,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
                 window.resizeUpdatePosition(toplevel.geometry.width, toplevel.geometry.height);
             }
 
-            window.inflight.box.width = toplevel.geometry.width;
-            window.inflight.box.height = toplevel.geometry.height;
-            window.pending.box.width = toplevel.geometry.width;
-            window.pending.box.height = toplevel.geometry.height;
+            window.setDimensions(toplevel.geometry.width, toplevel.geometry.height);
 
             switch (toplevel.configure_state) {
                 .acked => {
