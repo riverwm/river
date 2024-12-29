@@ -542,6 +542,13 @@ fn handleFrame(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
 }
 
 fn renderAndCommit(output: *Output, scene_output: *wlr.SceneOutput) !void {
+    // TODO(wlroots): replace this with wlr_scene_output_needs_frame()
+    if (!output.wlr_output.needs_frame and !output.gamma_dirty and
+        !scene_output.pending_commit_damage.notEmpty())
+    {
+        return;
+    }
+
     var state = wlr.Output.State.init();
     defer state.finish();
 
