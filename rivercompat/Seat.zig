@@ -35,13 +35,17 @@ const gpa = std.heap.c_allocator;
 wm: *WindowManager,
 seat_v1: *river.SeatV1,
 focused: ?*Window = null,
+link: wl.list.Link,
 
 pub fn create(wm: *WindowManager, seat_v1: *river.SeatV1) void {
     const seat = gpa.create(Seat) catch @panic("OOM");
     seat.* = .{
         .wm = wm,
         .seat_v1 = seat_v1,
+        .link = undefined,
     };
+    wm.seats.append(seat);
+
     seat_v1.setListener(*Seat, handleEvent, seat);
 
     XkbBinding.create(seat, xkb.Keysym.n, .{ .mod4 = true });
@@ -67,8 +71,8 @@ pub fn focusNext(seat: *Seat) void {
         if (seat.wm.windows.length() >= 2) {
             seat.focus(seat.wm.windows.last().?);
         }
-    } else if (seat.wm.windows.first()) |top| {
-        seat.focus(top);
+    } else {
+        seat.focus(seat.wm.windows.first());
     }
 }
 

@@ -99,7 +99,7 @@ pub const WmState = struct {
     },
     maximized: bool = false,
     fullscreen: bool = false, // XXX output
-    closing: bool = false,
+    close: bool = false,
 };
 
 /// The window management protocol object for this window
@@ -394,7 +394,7 @@ fn handleRequest(
             // XXX send protocol error
             window_v1.destroy();
         },
-        .close => uncommitted.closing = true,
+        .close => uncommitted.close = true,
         .get_node => |args| {
             if (window.node.object != null) {
                 // XXX send protocol error
@@ -453,7 +453,7 @@ pub fn commitWmState(window: *Window) void {
         .capabilities = window.uncommitted.capabilities,
         .maximized = window.uncommitted.maximized,
         .fullscreen = window.uncommitted.fullscreen,
-        .closing = window.uncommitted.closing,
+        .close = window.uncommitted.close,
     };
     window.uncommitted.proposed = null;
 }
@@ -616,6 +616,10 @@ pub fn configure(window: *Window) bool {
     if (!window.initialized) return false;
 
     assert(!window.destroying);
+
+    if (window.committed.close) {
+        window.close();
+    }
 
     const activated = blk: {
         var it = server.wm.sent.seats.iterator(.forward);

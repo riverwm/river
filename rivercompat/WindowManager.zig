@@ -28,13 +28,16 @@ const Window = @import("Window.zig");
 
 wm_v1: *river.WindowManagerV1,
 windows: wl.list.Head(Window, .link),
+seats: wl.list.Head(Seat, .link),
 
 pub fn init(wm: *WindowManager, wm_v1: *river.WindowManagerV1) void {
     wm.* = .{
         .wm_v1 = wm_v1,
         .windows = undefined,
+        .seats = undefined,
     };
     wm.windows.init();
+    wm.seats.init();
 
     wm_v1.setListener(*WindowManager, handleEvent, wm);
 }

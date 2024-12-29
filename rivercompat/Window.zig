@@ -49,6 +49,18 @@ fn handleEvent(window_v1: *river.WindowV1, event: river.WindowV1.Event, window: 
     switch (event) {
         .closed => {
             window_v1.destroy();
+
+            window.link.remove();
+            {
+                var it = window.wm.seats.iterator(.forward);
+                while (it.next()) |seat| {
+                    if (seat.focused == window) {
+                        seat.focused = null;
+                        seat.focusNext();
+                    }
+                }
+            }
+
             gpa.destroy(window);
         },
         .dimensions => {},
