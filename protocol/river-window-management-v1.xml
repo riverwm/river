@@ -287,6 +287,10 @@
         river_window_v1.dimensions event. For example, a terminal emulator may
         only allow dimensions that are multiple of the cell size.
 
+        The server must send a dimensions event in response to a
+        propose_dimensions request in the next possible update even if the
+        window dimensions are unchanged since the most recent dimensions event.
+
         This request is double-buffered state and will not be applied until the
         next river_window_manager_v1.commit request.
       </description>
