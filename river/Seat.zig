@@ -123,7 +123,6 @@ pending: struct {
     /// The window clicked on, touched, etc.
     window_interaction: ?*Window = null,
 } = .{},
-link_pending: wl.list.Link,
 
 /// State sent to the window manager client in the latest update sequence.
 sent: struct {
@@ -173,7 +172,6 @@ pub fn create(name: [*:0]const u8) !void {
         // This will be automatically destroyed when the display is destroyed
         .wlr_seat = try wlr.Seat.create(server.wl_server, name),
         .link = undefined,
-        .link_pending = undefined,
         .link_sent = undefined,
         .xkb_bindings = undefined,
         .pointer_bindings = undefined,
@@ -183,7 +181,6 @@ pub fn create(name: [*:0]const u8) !void {
     seat.wlr_seat.data = @intFromPtr(seat);
 
     server.input_manager.seats.append(seat);
-    server.wm.pending.seats.append(seat);
     seat.link_sent.init();
     server.wm.dirtyPending();
 
@@ -206,7 +203,6 @@ pub fn destroy(seat: *Seat) void {
     }
 
     seat.link.remove();
-    seat.link_pending.remove();
     seat.link_sent.remove();
 
     seat.cursor.deinit();
@@ -273,12 +269,6 @@ pub fn sendDirty(seat: *Seat) void {
             seat_v1.setHandler(?*anyopaque, handleRequestInert, null, null);
             seat.object = null;
         }
-
-        seat.link_pending.remove();
-        seat.link_sent.remove();
-        seat.link_pending.init();
-        seat.link_sent.init();
-
         seat.destroy();
         return;
     }

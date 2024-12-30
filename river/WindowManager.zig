@@ -38,8 +38,6 @@ server_destroy: wl.Listener(*wl.Server) = wl.Listener(*wl.Server).init(handleSer
 /// The protocol object of the active window manager, if any.
 object: ?*river.WindowManagerV1 = null,
 
-windows: wl.list.Head(Window, .link),
-
 state: union(enum) {
     idle,
     /// An update event was sent to the window manager but has not yet been acked.
@@ -51,18 +49,15 @@ state: union(enum) {
     inflight_configures: u32,
 } = .idle,
 
+windows: wl.list.Head(Window, .link),
+
 /// Pending state to be sent to the wm in the next update sequence.
 pending: struct {
     /// Pending state has been modified since the last update event sent to the wm.
     dirty: bool = false,
 
-    dirty_windows: wl.list.Head(Window, .link_dirty),
-
-    outputs: wl.list.Head(Output, .link_pending),
     output_config: ?*wlr.OutputConfigurationV1 = null,
-
-    seats: wl.list.Head(Seat, .link_pending),
-},
+} = .{},
 
 /// State sent to the wm in the latest update sequence.
 sent: struct {
@@ -105,11 +100,6 @@ pub fn init(wm: *WindowManager) !void {
     wm.* = .{
         .global = try wl.Global.create(server.wl_server, river.WindowManagerV1, 1, *WindowManager, wm, bind),
         .windows = undefined,
-        .pending = .{
-            .dirty_windows = undefined,
-            .outputs = undefined,
-            .seats = undefined,
-        },
         .sent = .{
             .outputs = undefined,
             .seats = undefined,
@@ -126,9 +116,6 @@ pub fn init(wm: *WindowManager) !void {
         .timeout = timeout,
     };
     wm.windows.init();
-    wm.pending.dirty_windows.init();
-    wm.pending.outputs.init();
-    wm.pending.seats.init();
     wm.sent.outputs.init();
     wm.sent.seats.init();
     wm.uncommitted.render_list.init();
@@ -261,9 +248,9 @@ fn sendUpdate(wm: *WindowManager) void {
 
     log.debug("sending update to window manager", .{});
 
-    wm.autoLayoutOutputs();
+    server.om.autoLayout();
     {
-        var it = wm.pending.outputs.safeIterator(.forward);
+        var it = server.om.outputs.safeIterator(.forward);
         while (it.next()) |output| output.sendDirty();
     }
 
@@ -272,12 +259,12 @@ fn sendUpdate(wm: *WindowManager) void {
     wm.pending.output_config = null;
 
     {
-        var it = wm.pending.dirty_windows.safeIterator(.forward);
+        var it = wm.windows.safeIterator(.forward);
         while (it.next()) |window| window.sendDirty();
     }
 
     {
-        var it = wm.pending.seats.safeIterator(.forward);
+        var it = server.input_manager.seats.safeIterator(.forward);
         while (it.next()) |seat| seat.sendDirty();
     }
 
@@ -293,35 +280,6 @@ fn sendUpdate(wm: *WindowManager) void {
         // Pretend that the non-existent wm client made an empty commit.
         wm.committed.dirty = true;
         wm.sendConfigures();
-    }
-}
-
-fn autoLayoutOutputs(wm: *WindowManager) void {
-    // Find the right most edge of any non-autolayout output.
-    var rightmost_edge: i32 = 0;
-    var row_y: i32 = 0;
-    {
-        var it = wm.pending.outputs.iterator(.forward);
-        while (it.next()) |output| {
-            if (output.pending.auto_layout) continue;
-
-            const x = output.pending.x + output.pending.width();
-            if (x > rightmost_edge) {
-                rightmost_edge = x;
-                row_y = output.pending.y;
-            }
-        }
-    }
-    // Place autolayout outputs in a row starting at the rightmost edge.
-    {
-        var it = wm.pending.outputs.iterator(.forward);
-        while (it.next()) |output| {
-            if (!output.pending.auto_layout) continue;
-
-            output.pending.x = rightmost_edge;
-            output.pending.y = row_y;
-            rightmost_edge += output.pending.width();
-        }
     }
 }
 

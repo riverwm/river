@@ -139,8 +139,6 @@ fn handleManagerApply(_: *wl.Listener(*wlr.OutputConfigurationV1), config: *wlr.
     while (it.next()) |head| {
         const output: *Output = @ptrFromInt(head.state.output.data);
 
-        const prev_state = output.pending.state;
-
         output.pending = .{
             .state = if (head.state.enabled) .enabled else .disabled_hard,
             .mode = blk: {
@@ -160,11 +158,6 @@ fn handleManagerApply(_: *wl.Listener(*wlr.OutputConfigurationV1), config: *wlr.
             .adaptive_sync = head.state.adaptive_sync_enabled,
             .auto_layout = false,
         };
-
-        if (output.pending.state == .enabled and prev_state != .enabled) {
-            output.link_pending.remove();
-            server.wm.pending.outputs.append(output);
-        }
     }
 
     if (server.wm.pending.output_config) |old| {
@@ -230,6 +223,35 @@ fn handleSetGamma(
 
     output.gamma_dirty = true;
     event.output.scheduleFrame();
+}
+
+pub fn autoLayout(om: *OutputManager) void {
+    // Find the right most edge of any non-autolayout output.
+    var rightmost_edge: i32 = 0;
+    var row_y: i32 = 0;
+    {
+        var it = om.outputs.iterator(.forward);
+        while (it.next()) |output| {
+            if (output.pending.auto_layout) continue;
+
+            const x = output.pending.x + output.pending.width();
+            if (x > rightmost_edge) {
+                rightmost_edge = x;
+                row_y = output.pending.y;
+            }
+        }
+    }
+    // Place autolayout outputs in a row starting at the rightmost edge.
+    {
+        var it = om.outputs.iterator(.forward);
+        while (it.next()) |output| {
+            if (!output.pending.auto_layout) continue;
+
+            output.pending.x = rightmost_edge;
+            output.pending.y = row_y;
+            rightmost_edge += output.pending.width();
+        }
+    }
 }
 
 pub fn commitOutputState(om: *OutputManager) void {

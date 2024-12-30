@@ -160,7 +160,6 @@ link: wl.list.Link,
 
 /// Pending state to be sent to the wm in the next update sequence.
 pending: State = .{},
-link_pending: wl.list.Link,
 /// State sent to the wm in the latest update sequence.
 sent: State = .{},
 link_sent: wl.list.Link,
@@ -196,13 +195,11 @@ pub fn create(wlr_output: *wlr.Output) !void {
         .wlr_output = wlr_output,
         .scene_output = scene_output,
         .link = undefined,
-        .link_pending = undefined,
         .link_sent = undefined,
     };
     wlr_output.data = @intFromPtr(output);
 
     server.om.outputs.append(output);
-    server.wm.pending.outputs.append(output);
     output.link_sent.init();
 
     wlr_output.events.destroy.add(&output.destroy);
@@ -281,9 +278,7 @@ pub fn sendDirty(output: *Output) void {
                 output.object = null;
             }
 
-            output.link_pending.remove();
             output.link_sent.remove();
-            output.link_pending.init();
             output.link_sent.init();
 
             if (output.pending.state == .destroying) {

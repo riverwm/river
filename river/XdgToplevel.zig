@@ -307,7 +307,9 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     });
 
     if (toplevel.wlr_toplevel.base.initial_commit) {
-        window.ready();
+        assert(window.pending.state != .ready);
+        window.pending.state = .ready;
+        server.wm.dirtyPending();
         return;
     }
 

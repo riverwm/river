@@ -112,11 +112,6 @@ node: WmNode,
 /// The implementation of this window
 impl: Impl,
 
-/// Link for WindowManager.windows
-link: wl.list.Link,
-/// Link for WindowManager.pending.dirty_windows
-link_dirty: wl.list.Link,
-
 tree: *wlr.SceneTree,
 surface_tree: *wlr.SceneTree,
 saved_surface_tree: *wlr.SceneTree,
@@ -131,6 +126,9 @@ mapped: bool = false,
 /// This indicates that the window should be destroyed when the current
 /// transaction completes. See Window.destroy()
 destroying: bool = false,
+
+/// WindowManager.windows
+link: wl.list.Link,
 
 /// State to be sent to the window manager client in the next update sequence.
 pending: struct {
@@ -193,8 +191,6 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
     window.* = .{
         .node = undefined,
         .impl = impl,
-        .link = undefined,
-        .link_dirty = undefined,
         .tree = tree,
         .surface_tree = try tree.createSceneTree(),
         .saved_surface_tree = try tree.createSceneTree(),
@@ -205,12 +201,12 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
             try tree.createSceneRect(0, 0, &server.config.border_color),
         },
         .popup_tree = popup_tree,
+        .link = undefined,
     };
 
     window.node.init(.window);
 
-    server.wm.windows.prepend(window);
-    window.link_dirty.init();
+    server.wm.windows.append(window);
 
     window.tree.node.setEnabled(false);
     window.popup_tree.node.setEnabled(false);
@@ -243,7 +239,6 @@ pub fn destroy(window: *Window, when: enum { lazy, assert }) void {
         window.popup_tree.node.destroy();
 
         window.link.remove();
-        window.link_dirty.remove();
 
         window.node.deinit();
 
@@ -256,33 +251,10 @@ pub fn destroy(window: *Window, when: enum { lazy, assert }) void {
     }
 }
 
-fn dirtyPending(window: *Window) void {
-    switch (window.pending.state) {
-        .init => {},
-        .ready, .closing => {
-            window.link_dirty.remove();
-            server.wm.pending.dirty_windows.prepend(window);
-            server.wm.dirtyPending();
-        },
-    }
-}
-
-pub fn ready(window: *Window) void {
-    assert(window.pending.state != .ready);
-    window.pending.state = .ready;
-    window.dirtyPending();
-}
-
-pub fn closing(window: *Window) void {
-    assert(window.pending.state != .closing);
-    window.pending.state = .closing;
-    window.dirtyPending();
-}
-
 pub fn setDimensionsHint(window: *Window, hint: DimensionsHint) void {
     window.pending.dimensions_hint = hint;
     if (!meta.eql(window.sent.dimensions_hint, hint)) {
-        window.dirtyPending();
+        server.wm.dirtyPending();
     }
 }
 
@@ -294,14 +266,14 @@ pub fn setDimensions(window: *Window, width: i32, height: i32) void {
     window.inflight.box.height = height;
 
     if (width != window.sent.box.width or height != window.sent.box.height) {
-        window.dirtyPending();
+        server.wm.dirtyPending();
     }
 }
 
 pub fn setDecorationHint(window: *Window, hint: river.WindowV1.DecorationHint) void {
     window.pending.decoration_hint = hint;
     if (hint != window.sent.decoration_hint) {
-        window.dirtyPending();
+        server.wm.dirtyPending();
     }
 }
 
@@ -311,15 +283,13 @@ pub fn setFullscreenRequested(window: *Window, fullscreen_requested: bool) void 
     } else {
         window.pending.fullscreen_requested = .exit;
     }
-    window.dirtyPending();
+    server.wm.dirtyPending();
 }
 
 /// Send dirty pending state as part of an in progress update sequence.
 pub fn sendDirty(window: *Window) void {
-    assert(window.pending.state != .init);
-
     switch (window.pending.state) {
-        .init => unreachable,
+        .init => {},
         .closing => {
             window.pending.state = .init;
             window.initialized = false;
@@ -392,9 +362,6 @@ pub fn sendDirty(window: *Window) void {
             pending.fullscreen_requested = .no_request;
         },
     }
-
-    window.link_dirty.remove();
-    window.link_dirty.init();
 }
 
 fn handleRequestInert(
@@ -815,7 +782,9 @@ pub fn unmap(window: *Window) void {
 
     window.foreign_toplevel_handle.unmap();
 
-    window.closing();
+    assert(window.pending.state != .closing);
+    window.pending.state = .closing;
+    server.wm.dirtyPending();
 }
 
 pub fn notifyTitle(window: *const Window) void {
