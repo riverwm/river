@@ -1091,8 +1091,13 @@ pub fn updateState(cursor: *Cursor) void {
             if (!cursor.hidden) {
                 var now: posix.timespec = undefined;
                 posix.clock_gettime(posix.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
-                const msec: u32 = @intCast(now.tv_sec * std.time.ms_per_s +
-                    @divTrunc(now.tv_nsec, std.time.ns_per_ms));
+                // 2^32-1 milliseconds is ~50 days, which is a realistic uptime.
+                // This means that we must wrap if the monotonic time is greater than
+                // 2^32-1 milliseconds and hope that clients don't get too confused.
+                const msec: u32 = @intCast(@rem(
+                    now.tv_sec *% std.time.ms_per_s +% @divTrunc(now.tv_nsec, std.time.ns_per_ms),
+                    math.maxInt(u32),
+                ));
                 cursor.passthrough(msec);
             }
         },
