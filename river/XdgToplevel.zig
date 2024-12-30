@@ -116,7 +116,8 @@ pub fn create(wlr_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
 }
 
 /// Send a configure event, applying the inflight state of the window.
-pub fn configure(toplevel: *XdgToplevel) bool {
+/// If force is true, a configure will always be sent but not necessarily tracked.
+pub fn configure(toplevel: *XdgToplevel, force: bool) bool {
     switch (toplevel.configure_state) {
         .idle, .timed_out, .timed_out_acked => {},
         .inflight, .acked, .committed => unreachable,
@@ -130,7 +131,7 @@ pub fn configure(toplevel: *XdgToplevel) bool {
     const inflight = &toplevel.window.inflight;
     const current = &toplevel.window.current;
 
-    if (!toplevel.needsConfigure()) {
+    if (!force and !toplevel.needsConfigure()) {
         // If no new configure is required, continue to track a timed out configure
         // from the previous transaction if any.
         switch (toplevel.configure_state) {

@@ -421,8 +421,8 @@ fn commitTransaction(wm: *WindowManager) void {
 
                     window.tree.node.reparent(server.scene.layers.wm);
                     window.tree.node.raiseToTop();
-                    window.tree.node.setEnabled(true);
-                    window.popup_tree.node.setEnabled(true);
+                    window.tree.node.setEnabled(!window.current.hidden);
+                    window.popup_tree.node.setEnabled(!window.current.hidden);
                 },
             }
         }

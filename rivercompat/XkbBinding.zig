@@ -29,17 +29,20 @@ const gpa = std.heap.c_allocator;
 
 seat: *Seat,
 xkb_binding_v1: *river.XkbBindingV1,
+action: Seat.Action,
 
 pub fn create(
     seat: *Seat,
     keysym: u32,
     modifiers: river.SeatV1.Modifiers,
+    action: Seat.Action,
 ) void {
     const xkb_binding_v1 = seat.seat_v1.getXkbBinding(keysym, modifiers) catch @panic("OOM");
     const binding = gpa.create(XkbBinding) catch @panic("OOM");
     binding.* = .{
         .seat = seat,
         .xkb_binding_v1 = xkb_binding_v1,
+        .action = action,
     };
     xkb_binding_v1.setListener(*XkbBinding, handleEvent, binding);
     xkb_binding_v1.enable();
@@ -48,9 +51,7 @@ pub fn create(
 fn handleEvent(xkb_binding_v1: *river.XkbBindingV1, event: river.XkbBindingV1.Event, binding: *XkbBinding) void {
     assert(binding.xkb_binding_v1 == xkb_binding_v1);
     switch (event) {
-        .pressed => {
-            binding.seat.focusNext();
-        },
+        .pressed => binding.seat.execute(binding.action),
         .released => {},
     }
 }

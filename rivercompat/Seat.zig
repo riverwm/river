@@ -48,8 +48,10 @@ pub fn create(wm: *WindowManager, seat_v1: *river.SeatV1) void {
 
     seat_v1.setListener(*Seat, handleEvent, seat);
 
-    XkbBinding.create(seat, xkb.Keysym.n, .{ .mod4 = true });
-    PointerBinding.create(seat, c.BTN_RIGHT, .{ .mod4 = true });
+    XkbBinding.create(seat, xkb.Keysym.n, .{ .mod4 = true }, .focus_next);
+    XkbBinding.create(seat, xkb.Keysym.h, .{ .mod4 = true }, .hide_focused);
+    XkbBinding.create(seat, xkb.Keysym.s, .{ .mod4 = true }, .show_all);
+    PointerBinding.create(seat, c.BTN_RIGHT, .{ .mod4 = true }, .close_focused);
 }
 
 pub fn focus(seat: *Seat, target: ?*Window) void {
@@ -90,6 +92,27 @@ fn handleEvent(seat_v1: *river.SeatV1, event: river.SeatV1.Event, seat: *Seat) v
             const window_v1 = args.window orelse return;
             const window: *Window = @ptrCast(@alignCast(window_v1.getUserData()));
             seat.focus(window);
+        },
+    }
+}
+
+pub const Action = enum {
+    focus_next,
+    close_focused,
+    hide_focused,
+    show_all,
+};
+
+pub fn execute(seat: *Seat, action: Action) void {
+    switch (action) {
+        .focus_next => seat.focusNext(),
+        .close_focused => if (seat.focused) |window| window.window_v1.close(),
+        .hide_focused => if (seat.focused) |window| window.window_v1.hide(),
+        .show_all => {
+            var it = seat.wm.windows.iterator(.forward);
+            while (it.next()) |window| {
+                window.window_v1.show();
+            }
         },
     }
 }
