@@ -395,6 +395,7 @@ fn handleRequest(
             // XXX send protocol error
             seat_v1.destroy();
         },
+
         .focus_window => |args| {
             const data = args.window.getUserData() orelse return;
             const window: *Window = @ptrCast(@alignCast(data));
@@ -402,10 +403,20 @@ fn handleRequest(
         },
         .focus_shell_surface => {},
         .clear_focus => seat.uncommitted.focus = .none,
-        .pointer_move_window => {},
-        .pointer_resize_window => {},
+
+        .move_start_serial => {},
+        .move_start_pointer => {},
+        .move_add_window => {},
+        .move_end => {},
+
+        .resize_start_serial => {},
+        .resize_start_pointer => {},
+        .resize_add_window => {},
+        .resize_end => {},
+
         .pointer_confine_to_region => {},
         .pointer_warp => {},
+
         .get_xkb_binding => |args| {
             XkbBinding.create(
                 seat,
