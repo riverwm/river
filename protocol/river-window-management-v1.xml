@@ -522,9 +522,9 @@
         interactive move be started, perhaps when a client-side rendered
         titlebar is dragged.
 
-        The window manager may use the river_seat_v1.move_add_window and
-        river_seat_v1.move_start_serial requests to start a move or ignore this
-        event entirely.
+        The window manager may use the river_seat_v1.op_start_serial and
+        river_seat_v1.op_add_move_window requests to interactively move the
+        window or ignore this event entirely.
 
         This event is double-buffered state and will be followed by a
         river_window_manager_v1.update event.
@@ -548,9 +548,9 @@
         interactive resize be started, perhaps when the corner of client-side
         rendered decorations is dragged.
 
-        The window manager may use the river_seat_v1.resize_add_window and
-        river_seat_v1.resize_start_serial requests to start a resize or ignore
-        this event entirely.
+        The window manager may use the river_seat_v1.op_start_serial and
+        river_seat_v1.op_add_resize_window requests to interactively resize the
+        window or ignore this event entirely.
 
         This event is double-buffered state and will be followed by a
         river_window_manager_v1.update event.
@@ -1120,25 +1120,28 @@
       <arg name="window" type="object" interface="river_window_v1"/>
     </event>
 
-    <request name="move_start_serial">
-      <description summary="start an interactive move">
-        Start an interactive move with a river_window_v1.move_requested event
-        serial. Windows can be added to the move with the move_add_window
-        request.
+    <request name="op_start_serial">
+      <description summary="start an interactive operation with a serial">
+        Start an interactive seat operation with a serial from either the
+        river_window_v1.move_requested or river_window_v1.resize_requested
+        event.
 
-        All windows must be added after this request and before the next
-        river_window_manager_v1.commit request. Other move_add_window requests
-        will have no effect.
+        A set of windows added to the operation with the op_add_move_window and
+        op_add_resize_window requests will be moved/resized based on input
+        corresponding to the provided serial (e.g. pointer or touch input).
 
-        No windows are implicitly included in the move, even the window that
-        requested the move must be explicitly added with the move_add_window
-        request.
+        All windows must be added to the operation in the same
+        river_window_manager_v1.commit sequence as the op_start_serial request.
 
-        The move continues until the pointer button, touch point or similar
-        corresponding to the given serial is released or the move_end request is
+        No windows are implicitly included in the operation, even the window
+        that requested the move/resize must be explicitly added to the
+        operation.
+
+        The operation continues until the pointer button, touch point or similar
+        corresponding to the given serial is released or the op_end request is
         made and applied with a river_window_management_v1.commit request.
 
-        This request is ignored if a move or resize is already in progress.
+        This request is ignored if an operation is already in progress.
 
         This request is double-buffered state and will not be applied until the
         next river_window_manager_v1.commit request.
@@ -1146,35 +1149,41 @@
       <arg name="serial" type="uint"/>
     </request>
 
-    <request name="move_start_pointer">
-      <description summary="start an interactive pointer move">
-        Start an interactive pointer move. Windows can be added to the move with
-        the move_add_window request.
+    <request name="op_start_pointer">
+      <description summary="start an interactive pointer operation">
+        Start an interactive pointer operation. A set of windows added to the
+        operation with the op_add_move_window and op_add_resize_window requests
+        will be moved/resized based on the movement of the pointer.
 
-        All windows must be added after this request and before the next
-        river_window_manager_v1.commit request. Other move_add_window requests
-        will have no effect.
+        All windows must be added to the operation in the same
+        river_window_manager_v1.commit sequence as the op_start_serial request.
 
-        The pointer move continues until the move_end request is made and
+        The pointer operation continues until the op_end request is made and
         applied with a river_window_management_v1.commit request.
 
-        This request is ignored if a move or resize is already in progress.
+        This request is ignored if an operation is already in progress.
 
         This request is double-buffered state and will not be applied until the
         next river_window_manager_v1.commit request.
       </description>
     </request>
 
-    <request name="move_add_window">
-      <description summary="add a window to an interactive move">
-        This request causes the position of a window to be updated by an in
-        progress interactive move. Multiple windows may be added to a single
-        interactive move and all added windows will have their position updated.
+    <request name="op_add_move_window">
+      <description summary="add movement of a window to an operation">
+        This request causes the position of a window to be updated by an
+        operation started in the same river_window_manager_v1.commit sequence as
+        this request.
 
-        All windows must be added after the move_start_serial or
-        move_start_pointer request and before the next
-        river_window_manager_v1.commit request. Other move_add_window requests
-        will have no effect.
+        Multiple windows may be added to and moved or resized by a single
+        operation.
+
+        If a window is added more than once to a single operation, only the most
+        recent op_add_move_window or op_add_resize_window request will have an
+        effect.
+
+        This request is ignored if not made in the same
+        river_window_manager_v1.commit sequence as the op_start_serial or
+        op_start_pointer request that starts an operation.
 
         This request is double-buffered state and will not be applied until the
         next river_window_manager_v1.commit request.
@@ -1182,74 +1191,25 @@
       <arg name="window" type="object" interface="river_window_v1"/>
     </request>
 
-    <request name="move_end">
-      <description summary="end an interactive move">
-        End an interactive move.
-
-        This request is ignored if there is no move in progress.
-
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
-      </description>
-    </request>
-
-    <request name="resize_start_serial">
-      <description summary="start an interactive resize">
-        Start an interactive resize with a river_window_v1.resize_requested
-        event serial. Windows can be added to the resize with the
-        resize_add_window request.
-
-        All windows must be added after this request and before the next
-        river_window_manager_v1.commit request. Other resize_add_window requests
-        will have no effect.
-
-        No windows are implicitly included in the resize, even the window that
-        requested the resize must be explicitly added with the resize_add_window
-        request.
-
-        The resize continues until the pointer button, touch point or similar
-        corresponding to the given serial is released or the resize_end request
-        is made and applied with a river_window_management_v1.commit request.
-
-        This request is ignored if a move or resize is already in progress.
-
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
-      </description>
-      <arg name="serial" type="uint"/>
-    </request>
-
-    <request name="resize_start_pointer">
-      <description summary="start an interactive pointer resize">
-        Start an interactive pointer resize. Windows can be added to the resize
-        with the resize_add_window request.
-
-        All windows must be added after this request and before the next
-        river_window_manager_v1.commit request. Other resize_add_window requests
-        will have no effect.
-
-        The pointer resize continues until the resize_end request is made and
-        applied with a river_window_management_v1.commit request.
-
-        This request is ignored if a pointer resize or resize is already in
-        progress.
-
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
-      </description>
-    </request>
-
-    <request name="resize_add_window">
-      <description summary="add a window to an interactive resize">
+    <request name="op_add_resize_window">
+      <description summary="add resize of a window to an operation">
         This request causes the position/dimensions of a window to be updated by
-        an in progress interactive resize. Multiple windows may be added to a
-        single interactive resize and all added windows will have their position
-        updated.
+        an operation started in the same river_window_manager_v1.commit sequence
+        as this request.
 
-        All windows must be added after the resize_start_serial or
-        resize_start_pointer request and before the next
-        river_window_manager_v1.commit request. Other resize_add_window requests
-        will have no effect.
+        Multiple windows may be added to and moved or resized by a single
+        operation.
+
+        If a window is added more than once to a single operation, only the most
+        recent op_add_move_window or op_add_resize_window request will have an
+        effect.
+
+        This request is ignored if not made in the same
+        river_window_manager_v1.commit sequence as the op_start_serial or
+        op_start_pointer request that starts an operation.
+
+        The edges argument determines which edges of the window are resized from
+        during the operation.
 
         It is a protocol error to set the edges argument to none. It is also an
         error to set both the top and bottom edges or both the left and right
@@ -1263,11 +1223,11 @@
       <arg name="edges" type="uint" enum="river_window_v1.edges"/>
     </request>
 
-    <request name="resize_end">
-      <description summary="end an interactive resize">
-        End an interactive resize.
+    <request name="op_end">
+      <description summary="end an interactive operation">
+        End an interactive operation.
 
-        This request is ignored if there is no interactive resize in progress.
+        This request is ignored if there is no operation in progress.
 
         This request is double-buffered state and will not be applied until the
         next river_window_manager_v1.commit request.

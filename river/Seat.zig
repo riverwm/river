@@ -394,15 +394,11 @@ fn handleRequest(
         .focus_shell_surface => {},
         .clear_focus => seat.uncommitted.focus = .none,
 
-        .move_start_serial => {},
-        .move_start_pointer => {},
-        .move_add_window => {},
-        .move_end => {},
-
-        .resize_start_serial => {},
-        .resize_start_pointer => {},
-        .resize_add_window => {},
-        .resize_end => {},
+        .op_start_serial => {},
+        .op_start_pointer => {},
+        .op_add_move_window => {},
+        .op_add_resize_window => {},
+        .op_end => {},
 
         .pointer_confine_to_region => {},
         .pointer_warp => {},
