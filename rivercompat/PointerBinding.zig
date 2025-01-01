@@ -29,20 +29,23 @@ const gpa = std.heap.c_allocator;
 
 seat: *Seat,
 pointer_binding_v1: *river.PointerBindingV1,
-action: Seat.Action,
+press_action: Seat.Action,
+release_action: ?Seat.Action,
 
 pub fn create(
     seat: *Seat,
     button: u32,
     modifiers: river.SeatV1.Modifiers,
-    action: Seat.Action,
+    press_action: Seat.Action,
+    release_action: ?Seat.Action,
 ) void {
     const pointer_binding_v1 = seat.seat_v1.getPointerBinding(button, modifiers) catch @panic("OOM");
     const binding = gpa.create(PointerBinding) catch @panic("OOM");
     binding.* = .{
         .seat = seat,
         .pointer_binding_v1 = pointer_binding_v1,
-        .action = action,
+        .press_action = press_action,
+        .release_action = release_action,
     };
     pointer_binding_v1.setListener(*PointerBinding, handleEvent, binding);
     pointer_binding_v1.enable();
@@ -51,7 +54,7 @@ pub fn create(
 fn handleEvent(pointer_binding_v1: *river.PointerBindingV1, event: river.PointerBindingV1.Event, binding: *PointerBinding) void {
     assert(binding.pointer_binding_v1 == pointer_binding_v1);
     switch (event) {
-        .pressed => binding.seat.execute(binding.action),
-        .released => {},
+        .pressed => binding.seat.execute(binding.press_action),
+        .released => if (binding.release_action) |a| binding.seat.execute(a),
     }
 }

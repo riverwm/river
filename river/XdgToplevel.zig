@@ -165,7 +165,7 @@ pub fn configure(toplevel: *XdgToplevel, force: bool) bool {
     });
     _ = wlr_toplevel.setMaximized(inflight.maximized);
     _ = wlr_toplevel.setFullscreen(inflight.fullscreen);
-    _ = wlr_toplevel.setResizing(inflight.resizing);
+    _ = wlr_toplevel.setResizing(inflight.op == .resize);
 
     if (toplevel.decoration) |decoration| {
         _ = decoration.wlr_decoration.setMode(if (inflight.ssd) .server_side else .client_side);
@@ -214,7 +214,7 @@ fn needsConfigure(toplevel: *XdgToplevel) bool {
     if (!std.meta.eql(inflight.capabilities, current.capabilities)) return true;
     if (inflight.maximized != current.maximized) return true;
     if (inflight.fullscreen != current.fullscreen) return true;
-    if (inflight.resizing != current.resizing) return true;
+    if ((inflight.op == .resize) != (current.op == .resize)) return true;
 
     return false;
 }
@@ -362,7 +362,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
         .acked, .timed_out_acked => {
             toplevel.wlr_toplevel.base.getGeometry(&toplevel.geometry);
 
-            if (window.inflight.resizing) {
+            if (false and window.inflight.resizing) {
                 window.resizeUpdatePosition(toplevel.geometry.width, toplevel.geometry.height);
             }
 

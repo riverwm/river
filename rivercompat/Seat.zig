@@ -51,7 +51,8 @@ pub fn create(wm: *WindowManager, seat_v1: *river.SeatV1) void {
     XkbBinding.create(seat, xkb.Keysym.n, .{ .mod4 = true }, .focus_next);
     XkbBinding.create(seat, xkb.Keysym.h, .{ .mod4 = true }, .hide_focused);
     XkbBinding.create(seat, xkb.Keysym.s, .{ .mod4 = true }, .show_all);
-    PointerBinding.create(seat, c.BTN_RIGHT, .{ .mod4 = true }, .close_focused);
+    PointerBinding.create(seat, c.BTN_LEFT, .{ .mod4 = true }, .move_start, .move_end);
+    PointerBinding.create(seat, c.BTN_MIDDLE, .{ .mod4 = true }, .close_focused, null);
 }
 
 pub fn focus(seat: *Seat, target: ?*Window) void {
@@ -101,6 +102,8 @@ pub const Action = enum {
     close_focused,
     hide_focused,
     show_all,
+    move_start,
+    move_end,
 };
 
 pub fn execute(seat: *Seat, action: Action) void {
@@ -114,5 +117,13 @@ pub fn execute(seat: *Seat, action: Action) void {
                 window.window_v1.show();
             }
         },
+        .move_start => {
+            seat.seat_v1.opStartPointer();
+            var it = seat.wm.windows.iterator(.forward);
+            while (it.next()) |window| {
+                seat.seat_v1.opAddMoveWindow(window.window_v1);
+            }
+        },
+        .move_end => seat.seat_v1.opEnd(),
     }
 }

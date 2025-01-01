@@ -293,6 +293,8 @@ fn sendConfigures(wm: *WindowManager) void {
     wm.committed.dirty = false;
 
     {
+        // Order is important here, Seat.applyCommitted() must be called
+        // before configures are sent.
         var it = wm.sent.seats.iterator(.forward);
         while (it.next()) |seat| seat.applyCommitted();
     }

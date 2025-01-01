@@ -106,8 +106,10 @@ fn handleRequest(
         },
         .set_position => |args| switch (node.get()) {
             .window => |window| {
-                window.uncommitted.x = args.x;
-                window.uncommitted.y = args.y;
+                window.uncommitted.position = .{
+                    .x = args.x,
+                    .y = args.y,
+                };
             },
         },
         .place_top => {

@@ -78,13 +78,28 @@ pub const State = struct {
     capabilities: river.WindowV1.Capabilities = .{},
     maximized: bool = false,
     fullscreen: bool = false,
-    resizing: bool = false,
+
+    op: union(enum) {
+        none,
+        move: struct {
+            seat: *Seat,
+            start_x: i32,
+            start_y: i32,
+        },
+        resize: struct {
+            seat: *Seat,
+            edges: river.WindowV1.Edges = .{},
+            start_box: wlr.Box,
+        },
+    } = .none,
 };
 
 pub const WmState = struct {
-    x: i32 = 0,
-    y: i32 = 0,
-    proposed: ?struct {
+    position: ?struct {
+        x: i32,
+        y: i32,
+    } = null,
+    dimensions: ?struct {
         width: u31,
         height: u31,
     } = null,
@@ -101,6 +116,16 @@ pub const WmState = struct {
     maximized: bool = false,
     fullscreen: bool = false, // XXX output
     close: bool = false,
+    op: union(enum) {
+        none,
+        move: struct {
+            seat: *Seat,
+        },
+        resize: struct {
+            seat: *Seat,
+            edges: river.WindowV1.Edges = .{},
+        },
+    } = .none,
 };
 
 /// The window management protocol object for this window
@@ -142,8 +167,8 @@ pending: struct {
         /// Indicates that the closed event will be sent in the next update sequence.
         closing,
     } = .init,
-    dimensions_hint: DimensionsHint = .{},
     box: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+    dimensions_hint: DimensionsHint = .{},
     decoration_hint: river.WindowV1.DecorationHint = .only_supports_csd,
     /// Set back to no_request at the end of each update sequence
     fullscreen_requested: enum {
@@ -158,8 +183,9 @@ pending: struct {
 /// This state is only kept around in order to avoid sending redundant events
 /// to the window manager client.
 sent: struct {
+    position: ?struct { x: i32, y: i32 } = null,
+    dimensions: ?struct { width: i32, height: i32 } = null,
     dimensions_hint: DimensionsHint = .{},
-    box: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
     decoration_hint: river.WindowV1.DecorationHint = .only_supports_csd,
 } = .{},
 
@@ -258,6 +284,15 @@ pub fn setDimensionsHint(window: *Window, hint: DimensionsHint) void {
     }
 }
 
+pub fn setPosition(window: *Window, x: i32, y: i32) void {
+    window.pending.box.x = x;
+    window.pending.box.y = y;
+
+    if (x != window.sent.box.x or y != window.sent.box.y) {
+        server.wm.dirtyPending();
+    }
+}
+
 pub fn setDimensions(window: *Window, width: i32, height: i32) void {
     window.pending.box.width = width;
     window.pending.box.height = height;
@@ -265,7 +300,9 @@ pub fn setDimensions(window: *Window, width: i32, height: i32) void {
     window.inflight.box.width = width;
     window.inflight.box.height = height;
 
-    if (width != window.sent.box.width or height != window.sent.box.height) {
+    if (window.sent.dimensions == null or
+        width != window.sent.dimensions.?.width or height != window.sent.dimensions.?.height)
+    {
         server.wm.dirtyPending();
     }
 }
@@ -334,6 +371,27 @@ pub fn sendDirty(window: *Window) void {
             const sent = &window.sent;
 
             // XXX send all dirty pending state
+            if (new or sent.position == null or
+                pending.box.x != sent.position.?.x or pending.box.y != sent.position.?.y)
+            {
+                if (window.node.object) |node_v1| {
+                    node_v1.sendPosition(pending.box.x, pending.box.y);
+                    sent.position = .{
+                        .x = pending.box.x,
+                        .y = pending.box.y,
+                    };
+                }
+            }
+            if (!pending.box.empty() and (new or sent.dimensions == null or
+                pending.box.width != sent.dimensions.?.width or
+                pending.box.height != sent.dimensions.?.height))
+            {
+                window_v1.sendDimensions(window.pending.box.width, window.pending.box.height);
+                sent.dimensions = .{
+                    .width = pending.box.width,
+                    .height = pending.box.height,
+                };
+            }
             if (new or !meta.eql(pending.dimensions_hint, sent.dimensions_hint)) {
                 window_v1.sendDimensionsHint(
                     pending.dimensions_hint.min_width,
@@ -342,13 +400,6 @@ pub fn sendDirty(window: *Window) void {
                     pending.dimensions_hint.max_height,
                 );
                 sent.dimensions_hint = pending.dimensions_hint;
-            }
-            if ((new or pending.box.width != sent.box.width or
-                pending.box.height != sent.box.height) and !pending.box.empty())
-            {
-                window_v1.sendDimensions(window.pending.box.width, window.pending.box.height);
-                sent.box.width = pending.box.width;
-                sent.box.height = pending.box.height;
             }
             if (new or pending.decoration_hint != sent.decoration_hint) {
                 window_v1.sendDecorationHint(window.pending.decoration_hint);
@@ -400,7 +451,7 @@ fn handleRequest(
             if (args.width < 0 or args.height < 0) {
                 // XXX send protocol error
             }
-            uncommitted.proposed = .{
+            uncommitted.dimensions = .{
                 .width = @intCast(args.width),
                 .height = @intCast(args.height),
             };
@@ -433,14 +484,13 @@ fn handleRequest(
 }
 
 pub fn commitWmState(window: *Window) void {
-    if (!window.initialized and window.uncommitted.proposed != null) {
+    if (!window.initialized and window.uncommitted.dimensions != null) {
         window.initialized = true;
     }
 
     window.committed = .{
-        .x = window.uncommitted.x,
-        .y = window.uncommitted.y,
-        .proposed = window.uncommitted.proposed orelse window.committed.proposed,
+        .position = window.uncommitted.position orelse window.committed.position,
+        .dimensions = window.uncommitted.dimensions orelse window.committed.dimensions,
         .hidden = window.uncommitted.hidden,
         .ssd = window.uncommitted.ssd,
         .border = window.uncommitted.border,
@@ -449,8 +499,83 @@ pub fn commitWmState(window: *Window) void {
         .maximized = window.uncommitted.maximized,
         .fullscreen = window.uncommitted.fullscreen,
         .close = window.uncommitted.close,
+        .op = window.uncommitted.op,
     };
-    window.uncommitted.proposed = null;
+    window.uncommitted.position = null;
+    window.uncommitted.dimensions = null;
+    window.uncommitted.op = .none;
+}
+
+/// Applies committed state from the window manager client to the inflight state.
+/// Returns true if the configure should be waited for by the transaction system.
+pub fn configure(window: *Window) bool {
+    if (!window.initialized) return false;
+
+    assert(!window.destroying);
+
+    if (window.committed.close) {
+        window.close();
+    }
+
+    const activated = blk: {
+        var it = server.wm.sent.seats.iterator(.forward);
+        while (it.next()) |seat| {
+            if (seat.committed.focus == .window and seat.committed.focus.window == window) {
+                break :blk true;
+            }
+        }
+        break :blk false;
+    };
+
+    const committed = &window.committed;
+
+    if (window.inflight.op == .none) {
+        if (committed.position) |position| {
+            window.pending.box.x = position.x;
+            window.pending.box.y = position.y;
+        }
+        if (committed.dimensions) |dimensions| {
+            window.pending.box.width = dimensions.width;
+            window.pending.box.height = dimensions.height;
+        }
+    }
+    window.inflight = .{
+        .box = window.pending.box,
+        .hidden = committed.hidden,
+        .activated = activated,
+        .ssd = committed.ssd,
+        .border = committed.border,
+        .tiled = committed.tiled,
+        .capabilities = committed.capabilities,
+        .maximized = committed.maximized,
+        .fullscreen = committed.fullscreen,
+        .op = window.inflight.op,
+    };
+
+    const track_configure = switch (window.impl) {
+        .toplevel => |*toplevel| toplevel.configure(committed.dimensions != null),
+        .xwayland => |*xwindow| xwindow.configure(),
+        .none => unreachable,
+    };
+
+    // Ensure a position/dimension event is sent if the window manager has
+    // modified them even if the actual position/dimensions do not change.
+    if (committed.position != null) {
+        window.sent.position = null;
+        committed.position = null;
+    }
+    if (committed.dimensions != null) {
+        window.sent.dimensions = null;
+        committed.dimensions = null;
+    }
+    committed.op = .none;
+
+    if (track_configure and window.mapped) {
+        window.saveSurfaceTree();
+        window.sendFrameDone();
+    }
+
+    return track_configure;
 }
 
 /// The change in x/y position of the window during resize cannot be determined
@@ -517,7 +642,7 @@ pub fn commitTransaction(window: *Window) void {
                     // If we did not use the current geometry of the toplevel at this point
                     // we would be rendering the SSD border at initial size X but the surface
                     // would be rendered at size Y.
-                    if (window.inflight.resizing) {
+                    if (false and window.inflight.resizing) {
                         window.resizeUpdatePosition(toplevel.geometry.width, toplevel.geometry.height);
                     }
 
@@ -600,68 +725,6 @@ pub fn updateSceneState(window: *Window) void {
             border.setColor(border_color);
         }
     }
-}
-
-/// Applies committed state from the window manager client to the inflight state.
-/// Returns true if the configure should be waited for by the transaction system.
-pub fn configure(window: *Window) bool {
-    if (!window.initialized) return false;
-
-    assert(!window.destroying);
-
-    if (window.committed.close) {
-        window.close();
-    }
-
-    const activated = blk: {
-        var it = server.wm.sent.seats.iterator(.forward);
-        while (it.next()) |seat| {
-            if (seat.committed.focus == .window and seat.committed.focus.window == window) {
-                break :blk true;
-            }
-        }
-        break :blk false;
-    };
-
-    const committed = &window.committed;
-    window.inflight = .{
-        .box = .{
-            .x = committed.x,
-            .y = committed.y,
-            .width = if (committed.proposed) |p| p.width else window.pending.box.width,
-            .height = if (committed.proposed) |p| p.height else window.pending.box.height,
-        },
-        .hidden = committed.hidden,
-        .activated = activated,
-        .ssd = committed.ssd,
-        .border = committed.border,
-        .tiled = committed.tiled,
-        .capabilities = committed.capabilities,
-        .maximized = committed.maximized,
-        .fullscreen = committed.fullscreen,
-        .resizing = false, // XXX
-    };
-
-    const track_configure = switch (window.impl) {
-        .toplevel => |*toplevel| toplevel.configure(committed.proposed != null),
-        .xwayland => |*xwindow| xwindow.configure(),
-        .none => unreachable,
-    };
-
-    // Ensure a dimensions event is sent if the window manager has proposed dimensions
-    // even if the actual dimensions commited by the window do not change.
-    if (committed.proposed != null) {
-        window.sent.box.width = 0;
-        window.sent.box.height = 0;
-        committed.proposed = null;
-    }
-
-    if (track_configure and window.mapped) {
-        window.saveSurfaceTree();
-        window.sendFrameDone();
-    }
-
-    return track_configure;
 }
 
 /// Returns null if the window is currently being destroyed and no longer has

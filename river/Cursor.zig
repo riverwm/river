@@ -64,9 +64,7 @@ const Mode = union(enum) {
         sx: f64,
         sy: f64,
     },
-    move: struct {
-        window: *Window,
-
+    op: struct {
         /// Window coordinates are stored as i32s as they are in logical pixels.
         /// However, it is possible to move the cursor by a fraction of a
         /// logical pixel and this happens in practice with low dpi, high
@@ -75,34 +73,6 @@ const Mode = union(enum) {
         /// motions to 0.
         delta_x: f64 = 0,
         delta_y: f64 = 0,
-
-        /// Offset from the left edge
-        offset_x: i32,
-        /// Offset from the top edge
-        offset_y: i32,
-    },
-    resize: struct {
-        window: *Window,
-
-        delta_x: f64 = 0,
-        delta_y: f64 = 0,
-
-        /// Total x/y movement of the pointer device since the start of the resize,
-        /// clamped to the bounds of the resize as defined by the window min/max
-        /// dimensions and output dimensions.
-        /// This is not directly tied to the rendered cursor position.
-        x: i32 = 0,
-        y: i32 = 0,
-
-        /// Resize edges, maximum of 2 are set and they may not be opposing edges.
-        edges: wlr.Edges,
-        /// Offset from the left or right edge
-        offset_x: i32,
-        /// Offset from the top or bottom edge
-        offset_y: i32,
-
-        initial_width: u31,
-        initial_height: u31,
     },
 };
 
@@ -115,12 +85,6 @@ const LayoutPoint = struct {
 
 /// Current cursor mode as well as any state needed to implement that mode
 mode: Mode = .passthrough,
-
-/// Set to whatever the current mode is when a transaction is started.
-/// This is necessary to handle termination of move/resize modes properly
-/// since the termination is not complete until a transaction completes and
-/// Window.resizeUpdatePosition() is called.
-inflight_mode: Mode = .passthrough,
 
 seat: *Seat,
 wlr_cursor: *wlr.Cursor,
@@ -315,6 +279,28 @@ fn clearFocus(cursor: *Cursor) void {
     cursor.seat.wlr_seat.pointerNotifyClearFocus();
 }
 
+pub fn startOpPointer(cursor: *Cursor) void {
+    if (cursor.constraint) |constraint| {
+        if (constraint.state == .active) constraint.deactivate();
+    }
+
+    log.debug("entering cursor mode op", .{});
+    cursor.mode = .{ .op = .{} };
+
+    cursor.clearFocus();
+}
+
+pub fn endOpPointer(cursor: *Cursor) void {
+    if (cursor.pressed.count() == 0) {
+        log.debug("entering cursor mode passthrough", .{});
+        cursor.mode = .passthrough;
+        cursor.updateState();
+    } else {
+        log.debug("entering cursor mode ignore", .{});
+        cursor.mode = .ignore;
+    }
+}
+
 pub fn processMotionRelative(cursor: *Cursor, event: *const wlr.Pointer.event.Motion) void {
     server.input_manager.relative_pointer_manager.sendRelativeMotion(
         cursor.seat.wlr_seat,
@@ -362,67 +348,14 @@ pub fn processMotionRelative(cursor: *Cursor, event: *const wlr.Pointer.event.Mo
                 constraint.maybeActivate();
             }
         },
-        .move => |*data| {
+        .op => |*data| {
             dx += data.delta_x;
             dy += data.delta_y;
             data.delta_x = dx - @trunc(dx);
             data.delta_y = dy - @trunc(dy);
 
-            // XXX move window
-
-        },
-        .resize => |*data| {
-            dx += data.delta_x;
-            dy += data.delta_y;
-            data.delta_x = dx - @trunc(dx);
-            data.delta_y = dy - @trunc(dy);
-
-            data.x += @intFromFloat(dx);
-            data.y += @intFromFloat(dy);
-
-            if (true) return; // XXX resize window
-
-            // Modify width/height of the pending box, taking constraints into account
-            // The x/y coordinates of the window will be adjusted as needed in Window.resizeCommit()
-            // based on the dimensions actually committed by the client.
-            const border_width = if (data.window.pending.ssd) server.config.border_width else 0;
-
-            // TODO
-            const output_width: i32 = 1920;
-            const output_height: i32 = 1080;
-
-            const constraints = &data.window.constraints;
-            const box = &data.window.pending.box;
-
-            if (data.edges.left) {
-                const x2 = box.x + box.width;
-                box.width = data.initial_width - data.x;
-                box.width = @max(box.width, constraints.min_width);
-                box.width = @min(box.width, constraints.max_width);
-                box.width = @min(box.width, x2 - border_width);
-                data.x = data.initial_width - box.width;
-            } else if (data.edges.right) {
-                box.width = data.initial_width + data.x;
-                box.width = @max(box.width, constraints.min_width);
-                box.width = @min(box.width, constraints.max_width);
-                box.width = @min(box.width, output_width - border_width - box.x);
-                data.x = box.width - data.initial_width;
-            }
-
-            if (data.edges.top) {
-                const y2 = box.y + box.height;
-                box.height = data.initial_height - data.y;
-                box.height = @max(box.height, constraints.min_height);
-                box.height = @min(box.height, constraints.max_height);
-                box.height = @min(box.height, y2 - border_width);
-                data.y = data.initial_height - box.height;
-            } else if (data.edges.bottom) {
-                box.height = data.initial_height + data.y;
-                box.height = @max(box.height, constraints.min_height);
-                box.height = @min(box.height, constraints.max_height);
-                box.height = @min(box.height, output_height - border_width - box.y);
-                data.y = box.height - data.initial_height;
-            }
+            cursor.wlr_cursor.move(event.device, dx, dy);
+            cursor.seat.updateOp(@intFromFloat(dx), @intFromFloat(dy));
         },
     }
 }
@@ -495,8 +428,8 @@ pub fn processButton(cursor: *Cursor, event: *const wlr.Pointer.event.Button) vo
             .down => {
                 _ = cursor.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
             },
-            // No client has pointer focus while in ignore/move/resize mode.
-            .ignore, .move, .resize => {},
+            // No client has pointer focus while in ignore/op mode.
+            .ignore, .op => {},
         }
     } else {
         assert(event.state == .released);
@@ -508,16 +441,17 @@ pub fn processButton(cursor: *Cursor, event: *const wlr.Pointer.event.Button) vo
 
             switch (cursor.mode) {
                 .passthrough => unreachable,
-                .down => {
-                    _ = cursor.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
+                .down, .ignore => {
+                    if (cursor.mode == .down) {
+                        _ = cursor.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
+                    }
+                    if (cursor.pressed.count() == 0) {
+                        log.debug("exiting cursor mode {s}", .{@tagName(cursor.mode)});
+                        cursor.mode = .passthrough;
+                        cursor.passthrough(event.time_msec);
+                    }
                 },
-                // No client has pointer focus while in ignore/move/resize mode.
-                .ignore, .move, .resize => {},
-            }
-            if (cursor.pressed.count() == 0) {
-                log.debug("exiting cursor mode {s}", .{@tagName(cursor.mode)});
-                cursor.mode = .passthrough;
-                cursor.passthrough(event.time_msec);
+                .op => {},
             }
         } else {
             log.err("ignoring duplicate pointer button {d} release", .{event.button});
@@ -707,19 +641,6 @@ fn handleTabletToolButton(
     tool.button(tablet, event);
 }
 
-pub fn startMove(cursor: *Cursor, window: *Window) void {
-    if (cursor.constraint) |constraint| {
-        if (constraint.state == .active) constraint.deactivate();
-    }
-
-    const new_mode: Mode = .{ .move = .{
-        .window = window,
-        .offset_x = @as(i32, @intFromFloat(cursor.wlr_cursor.x)) - window.current.box.x,
-        .offset_y = @as(i32, @intFromFloat(cursor.wlr_cursor.y)) - window.current.box.y,
-    } };
-    cursor.enterMode(new_mode, window, "move");
-}
-
 pub fn startResize(cursor: *Cursor, window: *Window, proposed_edges: ?wlr.Edges) void {
     if (cursor.constraint) |constraint| {
         if (constraint.state == .active) constraint.deactivate();
@@ -787,21 +708,6 @@ fn computeEdges(cursor: *const Cursor, window: *const Window) wlr.Edges {
     }
 }
 
-fn enterMode(cursor: *Cursor, mode: Mode, _: *Window, xcursor_name: [*:0]const u8) void {
-    assert(cursor.mode == .passthrough or cursor.mode == .down);
-    assert(mode == .move or mode == .resize);
-
-    log.debug("enter {s} cursor mode", .{@tagName(mode)});
-
-    cursor.mode = mode;
-
-    cursor.seat.wlr_seat.pointerNotifyClearFocus();
-    cursor.setXcursor(xcursor_name);
-}
-
-/// Handle potential change in location of windows on the output, as well as
-/// the target window of a cursor operation potentially being moved to a non-visible tag,
-/// becoming fullscreen, etc.
 pub fn updateState(cursor: *Cursor) void {
     if (cursor.constraint) |constraint| {
         constraint.updateState();
@@ -816,54 +722,7 @@ pub fn updateState(cursor: *Cursor) void {
             cursor.passthrough(msec);
         },
         // TODO: Leave down mode if the target surface is no longer visible.
-        .ignore, .down => {},
-        .move, .resize => {
-            // Moving and resizing of windows is handled through the transaction system. Therefore,
-            // we must inspect the inflight_mode instead if a move or a resize is in progress.
-            //
-            // The cases when a move/resize is being started or ended and e.g. mode is resize
-            // while inflight_mode is passthrough or mode is passthrough while inflight_mode
-            // is resize shouldn't need any special handling.
-            //
-            // In the first case, a move/resize has been started along with a transaction but the
-            // transaction hasn't been committed yet so there is nothing to do.
-            //
-            // In the second case, a move/resize has been terminated by the user but the
-            // transaction carrying out the final size/position change is still inflight.
-            // Therefore, the user already expects the cursor to be free from the window and
-            // we should not warp it back to the fixed offset of the move/resize.
-            switch (cursor.inflight_mode) {
-                .passthrough, .ignore, .down => {},
-                inline .move, .resize => |data, mode| {
-
-                    // These conditions are checked in WindowManager.dirtyPending()
-                    assert(!data.window.current.fullscreen);
-
-                    // Keep the cursor locked to the original offset from the edges of the window.
-                    const box = &data.window.current.box;
-                    const new_x: f64 = blk: {
-                        if (mode == .move or data.edges.left) {
-                            break :blk @floatFromInt(data.offset_x + box.x);
-                        } else if (data.edges.right) {
-                            break :blk @floatFromInt(box.x + box.width - data.offset_x);
-                        } else {
-                            break :blk cursor.wlr_cursor.x;
-                        }
-                    };
-                    const new_y: f64 = blk: {
-                        if (mode == .move or data.edges.top) {
-                            break :blk @floatFromInt(data.offset_y + box.y);
-                        } else if (data.edges.bottom) {
-                            break :blk @floatFromInt(box.y + box.height - data.offset_y);
-                        } else {
-                            break :blk cursor.wlr_cursor.y;
-                        }
-                    };
-
-                    cursor.wlr_cursor.warpClosest(null, new_x, new_y);
-                },
-            }
-        },
+        .ignore, .down, .op => {},
     }
 }
 

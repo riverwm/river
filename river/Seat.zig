@@ -74,10 +74,14 @@ pub const Event = union(enum) {
 
 pub const WmState = struct {
     focus: WmFocus = .none,
-    // TODO pointer move/resize state
+    op: union(enum) {
+        none,
+        //TODO start_serial: ?u32,
+        start_pointer,
+        end,
+    } = .none,
     // TODO confine region
     // TODO pointer warp
-    // TODO xkb/pointer bindings
 };
 
 pub const WmFocus = union(enum) {
@@ -142,6 +146,20 @@ pointer_bindings: wl.list.Head(PointerBinding, .link),
 /// Multiple physical mice are handled by the same Cursor
 cursor: Cursor,
 
+op: ?struct {
+    // We always want to process as many input events as possible before sending configures
+    // and starting a transaction. Therefore, we set this flag if a seat operation modifies
+    // pending state and check it at the end of Seat.processEvents() rather than calling
+    // WindowManager.dirtyPending() directly in Seat.updateOp().
+    dirty: bool = false,
+    input: enum {
+        pointer,
+    },
+    /// Coordinates of the cursor/touch point/etc. at the start of the operation.
+    start_x: i32,
+    start_y: i32,
+} = null,
+
 relay: InputRelay,
 
 keyboard_groups: std.TailQueue(KeyboardGroup) = .{},
@@ -202,6 +220,26 @@ pub fn destroy(seat: *Seat) void {
         while (it.next()) |device| assert(device.seat != seat);
     }
 
+    {
+        // Remove pointers to the seat before they become dangling
+        var it = server.wm.windows.iterator(.forward);
+        while (it.next()) |window| {
+            inline for (.{
+                &window.uncommitted,
+                &window.committed,
+                &window.inflight,
+                &window.current,
+            }) |state| {
+                switch (state.op) {
+                    .none => {},
+                    inline .move, .resize => |data| {
+                        if (data.seat == seat) state.op = .none;
+                    },
+                }
+            }
+        }
+    }
+
     seat.link.remove();
     seat.link_sent.remove();
 
@@ -258,6 +296,13 @@ pub fn processEvents(seat: *Seat) void {
             .pointer_pinch_begin => |ev| pg.sendPinchBegin(seat.wlr_seat, ev.time_msec, ev.fingers),
             .pointer_pinch_update => |ev| pg.sendPinchUpdate(seat.wlr_seat, ev.time_msec, ev.dx, ev.dy, ev.scale, ev.rotation),
             .pointer_pinch_end => |ev| pg.sendPinchEnd(seat.wlr_seat, ev.time_msec, ev.cancelled),
+        }
+    }
+
+    if (seat.op) |*op| {
+        if (op.dirty) {
+            server.wm.dirtyPending();
+            op.dirty = false;
         }
     }
 }
@@ -395,10 +440,16 @@ fn handleRequest(
         .clear_focus => seat.uncommitted.focus = .none,
 
         .op_start_serial => {},
-        .op_start_pointer => {},
-        .op_add_move_window => {},
+        .op_start_pointer => seat.uncommitted.op = .start_pointer,
+        .op_add_move_window => |args| {
+            const data = args.window.getUserData() orelse return;
+            const window: *Window = @ptrCast(@alignCast(data));
+            window.uncommitted.op = .{ .move = .{
+                .seat = seat,
+            } };
+        },
         .op_add_resize_window => {},
-        .op_end => {},
+        .op_end => seat.uncommitted.op = .end,
 
         .pointer_confine_to_region => {},
         .pointer_warp => {},
@@ -449,14 +500,71 @@ pub fn commitWmState(seat: *Seat) void {
     }
 
     seat.committed = seat.uncommitted;
+    seat.uncommitted.op = .none;
 }
 
 pub fn applyCommitted(seat: *Seat) void {
-    if (server.lock_manager.state == .unlocked) {
-        switch (seat.committed.focus) {
-            .none => seat.focus(.none),
-            .window => |window| seat.focus(.{ .window = window }),
-        }
+    if (server.lock_manager.state != .unlocked) return;
+
+    switch (seat.committed.focus) {
+        .none => seat.focus(.none),
+        .window => |window| seat.focus(.{ .window = window }),
+    }
+
+    switch (seat.committed.op) {
+        .none => {},
+        .start_pointer => if (seat.op == null) {
+            log.debug("start seat op pointer", .{});
+            seat.op = .{
+                .input = .pointer,
+                .start_x = @intFromFloat(seat.cursor.wlr_cursor.x),
+                .start_y = @intFromFloat(seat.cursor.wlr_cursor.y),
+            };
+            seat.cursor.startOpPointer();
+
+            {
+                var it = server.wm.windows.iterator(.forward);
+                while (it.next()) |window| {
+                    switch (window.committed.op) {
+                        .none => {},
+                        .move => |data| {
+                            if (data.seat == seat) {
+                                assert(window.inflight.op == .none);
+                                window.inflight.op = .{
+                                    .move = .{
+                                        .seat = seat,
+                                        .start_x = window.pending.box.x,
+                                        .start_y = window.pending.box.y,
+                                    },
+                                };
+                            }
+                        },
+                        .resize => {}, // TODO
+                    }
+                }
+            }
+        },
+        .end => if (seat.op) |op| {
+            log.debug("end seat op", .{});
+            seat.op = null;
+            switch (op.input) {
+                .pointer => seat.cursor.endOpPointer(),
+            }
+
+            {
+                var it = server.wm.windows.iterator(.forward);
+                while (it.next()) |window| {
+                    switch (window.inflight.op) {
+                        .none => {},
+                        inline .move, .resize => |data| {
+                            if (data.seat == seat) {
+                                window.inflight.op = .none;
+                            }
+                        },
+                    }
+                }
+            }
+        },
     }
 }
 
@@ -629,6 +737,28 @@ pub fn handleSwitchMapping(
     for (server.config.switch_mappings.items) |mapping| {
         if (std.meta.eql(mapping.switch_type, switch_type) and std.meta.eql(mapping.switch_state, switch_state)) {
             // send trigger
+        }
+    }
+}
+
+pub fn updateOp(seat: *Seat, dx: i32, dy: i32) void {
+    assert(seat.op != null);
+
+    {
+        var it = server.wm.windows.iterator(.forward);
+        while (it.next()) |window| {
+            switch (window.inflight.op) {
+                .none => {},
+                .move => |data| {
+                    if (data.seat != seat) continue;
+
+                    window.pending.box.x += dx;
+                    window.pending.box.y += dy;
+
+                    seat.op.?.dirty = true;
+                },
+                .resize => {}, // TODO
+            }
         }
     }
 }
