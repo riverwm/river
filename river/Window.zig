@@ -595,39 +595,6 @@ pub fn configure(window: *Window) bool {
     return track_configure;
 }
 
-/// The change in x/y position of the window during resize cannot be determined
-/// until the size of the buffer actually committed is known. Clients are permitted
-/// by the protocol to take a size smaller than that requested by the compositor in
-/// order to maintain an aspect ratio or similar (mpv does this for example).
-pub fn resizeUpdatePosition(window: *Window, width: i32, height: i32) void {
-    assert(window.inflight.resizing);
-
-    const data = blk: {
-        var it = server.input_manager.seats.iterator(.forward);
-        while (it.next()) |seat| {
-            if (seat.cursor.inflight_mode == .resize and
-                seat.cursor.inflight_mode.resize.window == window)
-            {
-                break :blk seat.cursor.inflight_mode.resize;
-            }
-        } else {
-            // The window resizing state should never be set when the window is
-            // not the target of an interactive resize.
-            unreachable;
-        }
-    };
-
-    if (data.edges.left) {
-        window.inflight.box.x += window.current.box.width - width;
-        window.pending.box.x = window.inflight.box.x;
-    }
-
-    if (data.edges.top) {
-        window.inflight.box.y += window.current.box.height - height;
-        window.pending.box.y = window.inflight.box.y;
-    }
-}
-
 pub fn commitTransaction(window: *Window) void {
     window.foreign_toplevel_handle.update();
 
