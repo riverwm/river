@@ -219,8 +219,16 @@ pub const MapToOutput = struct {
     output_name: ?[]const u8,
 
     fn apply(map_to_output: MapToOutput, device: *InputDevice) void {
+        const output_name = map_to_output.output_name orelse switch (device.wlr_device.type) {
+            .pointer => mem.sliceTo(device.wlr_device.toPointer().output_name, 0),
+            .touch => mem.sliceTo(device.wlr_device.toTouch().output_name, 0),
+            .tablet => null,
+            // These devices do not support being mapped to outputs.
+            .keyboard, .tablet_pad, .@"switch" => return,
+        };
+
         const wlr_output = blk: {
-            if (map_to_output.output_name) |name| {
+            if (output_name) |name| {
                 var it = server.om.output_layout.outputs.iterator(.forward);
                 while (it.next()) |layout_output| {
                     if (mem.eql(u8, mem.span(layout_output.output.name), name)) {
@@ -231,23 +239,16 @@ pub const MapToOutput = struct {
             break :blk null;
         };
 
-        switch (device.wlr_device.type) {
-            .pointer, .touch, .tablet => {
-                log.debug("mapping input '{s}' -> '{s}'", .{
-                    device.identifier,
-                    if (wlr_output) |o| o.name else "<no output>",
-                });
+        log.debug("mapping input '{s}' -> '{s}'", .{
+            device.identifier,
+            if (wlr_output) |o| o.name else "<no output>",
+        });
 
-                device.seat.cursor.wlr_cursor.mapInputToOutput(device.wlr_device, wlr_output);
+        device.seat.cursor.wlr_cursor.mapInputToOutput(device.wlr_device, wlr_output);
 
-                if (device.wlr_device.type == .tablet) {
-                    const tablet: *Tablet = @fieldParentPtr("device", device);
-                    tablet.output_mapping = wlr_output;
-                }
-            },
-
-            // These devices do not support being mapped to outputs.
-            .keyboard, .tablet_pad, .@"switch" => {},
+        if (device.wlr_device.type == .tablet) {
+            const tablet: *Tablet = @fieldParentPtr("device", device);
+            tablet.output_mapping = wlr_output;
         }
     }
 };
