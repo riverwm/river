@@ -355,7 +355,7 @@ pub fn processMotionRelative(cursor: *Cursor, event: *const wlr.Pointer.event.Mo
             data.delta_y = dy - @trunc(dy);
 
             cursor.wlr_cursor.move(event.device, dx, dy);
-            cursor.seat.updateOp(@intFromFloat(dx), @intFromFloat(dy));
+            cursor.seat.updateOp(@intFromFloat(cursor.wlr_cursor.x), @intFromFloat(cursor.wlr_cursor.y));
         },
     }
 }

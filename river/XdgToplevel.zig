@@ -362,10 +362,6 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
         .acked, .timed_out_acked => {
             toplevel.wlr_toplevel.base.getGeometry(&toplevel.geometry);
 
-            if (false and window.inflight.resizing) {
-                window.resizeUpdatePosition(toplevel.geometry.width, toplevel.geometry.height);
-            }
-
             window.setDimensions(toplevel.geometry.width, toplevel.geometry.height);
 
             switch (toplevel.configure_state) {

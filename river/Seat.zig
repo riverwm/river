@@ -448,7 +448,14 @@ fn handleRequest(
                 .seat = seat,
             } };
         },
-        .op_add_resize_window => {},
+        .op_add_resize_window => |args| {
+            const data = args.window.getUserData() orelse return;
+            const window: *Window = @ptrCast(@alignCast(data));
+            window.uncommitted.op = .{ .resize = .{
+                .seat = seat,
+                .edges = args.edges,
+            } };
+        },
         .op_end => seat.uncommitted.op = .end,
 
         .pointer_confine_to_region => {},
@@ -539,7 +546,18 @@ pub fn applyCommitted(seat: *Seat) void {
                                 };
                             }
                         },
-                        .resize => {}, // TODO
+                        .resize => |data| {
+                            if (data.seat == seat) {
+                                assert(window.inflight.op == .none);
+                                window.inflight.op = .{
+                                    .resize = .{
+                                        .seat = seat,
+                                        .edges = data.edges,
+                                        .start_box = window.pending.box,
+                                    },
+                                };
+                            }
+                        },
                     }
                 }
             }
@@ -741,8 +759,12 @@ pub fn handleSwitchMapping(
     }
 }
 
-pub fn updateOp(seat: *Seat, dx: i32, dy: i32) void {
-    assert(seat.op != null);
+pub fn updateOp(seat: *Seat, x: i32, y: i32) void {
+    const op = seat.op.?;
+
+    // Total dx/dy since operation start
+    const dx = x - op.start_x;
+    const dy = y - op.start_y;
 
     {
         var it = server.wm.windows.iterator(.forward);
@@ -752,12 +774,33 @@ pub fn updateOp(seat: *Seat, dx: i32, dy: i32) void {
                 .move => |data| {
                     if (data.seat != seat) continue;
 
-                    window.pending.box.x += dx;
-                    window.pending.box.y += dy;
+                    window.pending.box.x = data.start_x + dx;
+                    window.pending.box.y = data.start_y + dy;
 
                     seat.op.?.dirty = true;
                 },
-                .resize => {}, // TODO
+                .resize => |data| {
+                    if (data.seat != seat) continue;
+
+                    // For resize, position is not updated until the window has committed
+                    // its new dimensions. The client may not commit exactly the dimensions
+                    // we request and we need to know the actual committed dimensions to
+                    // correctly place the top left corner in the case of a resize from
+                    // the top or left edge.
+                    if (data.edges.left) {
+                        window.pending.box.width = @max(1, data.start_box.width - dx);
+                    } else if (data.edges.right) {
+                        window.pending.box.width = @max(1, data.start_box.width + dx);
+                    }
+
+                    if (data.edges.top) {
+                        window.pending.box.height = @max(1, data.start_box.height - dy);
+                    } else if (data.edges.bottom) {
+                        window.pending.box.height = @max(1, data.start_box.height + dy);
+                    }
+
+                    seat.op.?.dirty = true;
+                },
             }
         }
     }

@@ -284,15 +284,6 @@ pub fn setDimensionsHint(window: *Window, hint: DimensionsHint) void {
     }
 }
 
-pub fn setPosition(window: *Window, x: i32, y: i32) void {
-    window.pending.box.x = x;
-    window.pending.box.y = y;
-
-    if (x != window.sent.box.x or y != window.sent.box.y) {
-        server.wm.dirtyPending();
-    }
-}
-
 pub fn setDimensions(window: *Window, width: i32, height: i32) void {
     window.pending.box.width = width;
     window.pending.box.height = height;
@@ -300,8 +291,34 @@ pub fn setDimensions(window: *Window, width: i32, height: i32) void {
     window.inflight.box.width = width;
     window.inflight.box.height = height;
 
-    if (window.sent.dimensions == null or
-        width != window.sent.dimensions.?.width or height != window.sent.dimensions.?.height)
+    switch (window.inflight.op) {
+        .none => {},
+        .move => |data| assert(data.seat.op != null),
+        .resize => |data| {
+            assert(data.seat.op != null);
+
+            if (data.edges.left) {
+                window.pending.box.x = data.start_box.x + data.start_box.width - width;
+            } else if (data.edges.right) {
+                window.pending.box.x = data.start_box.x;
+            }
+
+            if (data.edges.top) {
+                window.pending.box.y = data.start_box.y + data.start_box.height - height;
+            } else if (data.edges.bottom) {
+                window.pending.box.y = data.start_box.y;
+            }
+
+            window.inflight.box.x = window.pending.box.x;
+            window.inflight.box.y = window.pending.box.y;
+        },
+    }
+
+    if (window.sent.dimensions == null or window.sent.position == null or
+        width != window.sent.dimensions.?.width or
+        height != window.sent.dimensions.?.height or
+        window.pending.box.x != window.sent.position.?.x or
+        window.pending.box.y != window.sent.position.?.y)
     {
         server.wm.dirtyPending();
     }
@@ -642,13 +659,8 @@ pub fn commitTransaction(window: *Window) void {
                     // If we did not use the current geometry of the toplevel at this point
                     // we would be rendering the SSD border at initial size X but the surface
                     // would be rendered at size Y.
-                    if (false and window.inflight.resizing) {
-                        window.resizeUpdatePosition(toplevel.geometry.width, toplevel.geometry.height);
-                    }
-
+                    window.setDimensions(toplevel.geometry.width, toplevel.geometry.height);
                     window.current = window.inflight;
-                    window.current.box.width = toplevel.geometry.width;
-                    window.current.box.height = toplevel.geometry.height;
                 },
                 .idle, .committed => {
                     toplevel.configure_state = .idle;
