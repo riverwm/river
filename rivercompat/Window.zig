@@ -42,6 +42,15 @@ pub fn create(window_v1: *river.WindowV1, wm: *WindowManager) void {
     wm.windows.append(window);
     window_v1.setListener(*Window, handleEvent, window);
     window.node_v1.placeTop();
+    window_v1.useSsd();
+    window_v1.setBorders(
+        .{ .left = true, .bottom = true, .top = false, .right = true },
+        6, // width
+        std.math.maxInt(u32),
+        std.math.maxInt(u32),
+        std.math.maxInt(u32),
+        std.math.maxInt(u32),
+    );
 }
 
 fn handleEvent(window_v1: *river.WindowV1, event: river.WindowV1.Event, window: *Window) void {

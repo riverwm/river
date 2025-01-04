@@ -139,8 +139,12 @@ impl: Impl,
 tree: *wlr.SceneTree,
 surface_tree: *wlr.SceneTree,
 saved_surface_tree: *wlr.SceneTree,
-/// Order is left, right, top, bottom
-borders: [4]*wlr.SceneRect,
+border: struct {
+    left: *wlr.SceneRect,
+    right: *wlr.SceneRect,
+    top: *wlr.SceneRect,
+    bottom: *wlr.SceneRect,
+},
 popup_tree: *wlr.SceneTree,
 
 /// Set to true once the window manager client has made its first commit
@@ -216,11 +220,11 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
         .tree = tree,
         .surface_tree = try tree.createSceneTree(),
         .saved_surface_tree = try tree.createSceneTree(),
-        .borders = .{
-            try tree.createSceneRect(0, 0, &server.config.border_color),
-            try tree.createSceneRect(0, 0, &server.config.border_color),
-            try tree.createSceneRect(0, 0, &server.config.border_color),
-            try tree.createSceneRect(0, 0, &server.config.border_color),
+        .border = .{
+            .left = try tree.createSceneRect(0, 0, &.{ 0, 0, 0, 0 }),
+            .right = try tree.createSceneRect(0, 0, &.{ 0, 0, 0, 0 }),
+            .top = try tree.createSceneRect(0, 0, &.{ 0, 0, 0, 0 }),
+            .bottom = try tree.createSceneRect(0, 0, &.{ 0, 0, 0, 0 }),
         },
         .popup_tree = popup_tree,
         .link = undefined,
@@ -636,7 +640,65 @@ pub fn updateSceneState(window: *Window) void {
     window.tree.node.setPosition(box.x, box.y);
     window.popup_tree.node.setPosition(box.x, box.y);
 
-    // TODO borders
+    // f32 cannot represent all u32 values exactly, therefore we must initially use f64
+    // (which can) and then cast to f32, potentially losing precision.
+    const border = &window.sent.border;
+    const color: [4]f32 = .{
+        @floatCast(@as(f64, @floatFromInt(border.r)) / math.maxInt(u32)),
+        @floatCast(@as(f64, @floatFromInt(border.g)) / math.maxInt(u32)),
+        @floatCast(@as(f64, @floatFromInt(border.b)) / math.maxInt(u32)),
+        @floatCast(@as(f64, @floatFromInt(border.a)) / math.maxInt(u32)),
+    };
+
+    var left: wlr.Box = .{
+        .x = -@as(i32, border.width),
+        .y = 0,
+        .width = border.width,
+        .height = box.height,
+    };
+    var right: wlr.Box = .{
+        .x = box.width,
+        .y = 0,
+        .width = border.width,
+        .height = box.height,
+    };
+    const top: wlr.Box = .{
+        .x = 0,
+        .y = -@as(i32, border.width),
+        .width = box.width,
+        .height = border.width,
+    };
+    const bottom: wlr.Box = .{
+        .x = 0,
+        .y = box.height,
+        .width = box.width,
+        .height = border.width,
+    };
+
+    // Use left and right scene rects to draw the corners if needed
+    if (border.edges.top) {
+        left.y -= border.width;
+        left.height += border.width;
+        right.y -= border.width;
+        right.height += border.width;
+    }
+    if (border.edges.bottom) {
+        left.height += border.width;
+        right.height += border.width;
+    }
+
+    inline for (.{
+        .{ .name = "left", .box = left },
+        .{ .name = "right", .box = right },
+        .{ .name = "top", .box = top },
+        .{ .name = "bottom", .box = bottom },
+    }) |edge| {
+        const rect = @field(window.border, edge.name);
+        rect.node.setEnabled(@field(border.edges, edge.name));
+        rect.node.setPosition(edge.box.x, edge.box.y);
+        rect.setSize(edge.box.width, edge.box.height);
+        rect.setColor(&color);
+    }
 }
 
 /// Returns null if the window is currently being destroyed and no longer has

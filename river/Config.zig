@@ -31,12 +31,6 @@ const Switch = @import("Switch.zig");
 /// Color of background in RGBA with premultiplied alpha (alpha should only affect nested sessions)
 background_color: [4]f32 = [_]f32{ 0.0, 0.16862745, 0.21176471, 1.0 }, // Solarized base03
 
-/// Width of borders in pixels
-border_width: u31 = 2,
-
-/// Color of border in RGBA with premultiplied alpha
-border_color: [4]f32 = [_]f32{ 0.34509804, 0.43137255, 0.45882353, 1.0 }, // Solarized base01
-
 switch_mappings: std.ArrayListUnmanaged(struct {
     switch_type: Switch.Type,
     switch_state: Switch.State,
