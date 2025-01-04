@@ -277,19 +277,16 @@ fn sendUpdate(wm: *WindowManager) void {
 
         wm.startTimeoutTimer();
     } else {
-        // Pretend that the non-existent wm client made an empty commit.
-        wm.committed.dirty = true;
         wm.sendConfigures();
     }
 }
 
-fn sendConfigures(wm: *WindowManager) void {
+pub fn sendConfigures(wm: *WindowManager) void {
     switch (wm.state) {
         .idle, .update_acked => {},
         .update_sent, .inflight_configures => unreachable,
     }
 
-    assert(wm.committed.dirty);
     wm.committed.dirty = false;
 
     {

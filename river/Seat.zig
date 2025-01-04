@@ -272,10 +272,16 @@ pub fn queueEvent(seat: *Seat, event: Event) void {
 pub fn processEvents(seat: *Seat) void {
     assert(server.wm.state == .idle);
 
-    // Only process events while there is no pending state to be sent to the window manager.
+    // Only process events while there is no pending state to be sent to the window manager
+    // and no transaction in progress.
+    //
     // The window manager might decide to change focus or redefine keyboard/pointer bindings
-    // in response to the pending update.
-    while (!server.wm.pending.dirty) {
+    // in response to the pending update, which can affect further processing of events.
+    //
+    // Allowing event processing while there is a transaction in progress would require keeping
+    // track of additional state to differentiate pending state modified since the transaction
+    // was started. I don't see an advantage to that additional complexity.
+    while (server.wm.state == .idle and !server.wm.pending.dirty) {
         const event = seat.event_queue.readItem() orelse break;
 
         const pg = server.input_manager.pointer_gestures;
@@ -301,8 +307,8 @@ pub fn processEvents(seat: *Seat) void {
 
     if (seat.op) |*op| {
         if (op.dirty) {
-            server.wm.dirtyPending();
             op.dirty = false;
+            server.wm.sendConfigures();
         }
     }
 }
