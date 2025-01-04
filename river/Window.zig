@@ -29,7 +29,6 @@ const river = @import("wayland").server.river;
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
-const ForeignToplevelHandle = @import("ForeignToplevelHandle.zig");
 const Output = @import("Output.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
 const Seat = @import("Seat.zig");
@@ -67,8 +66,8 @@ pub const Border = struct {
 };
 
 pub const State = struct {
-    /// The output-relative coordinates of the window and dimensions requested by river.
-    box: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+    width: ?u31 = null,
+    height: ?u31 = null,
     hidden: bool = false,
     /// True if the window has keyboard focus from at least one seat.
     activated: bool = false,
@@ -130,7 +129,7 @@ pub const WmState = struct {
 
 /// The window management protocol object for this window
 /// Created after the window is ready to be configured.
-/// Lifetime is managed through pending.state
+/// Lifetime is managed through wm_pending.state
 object: ?*river.WindowV1 = null,
 node: WmNode,
 
@@ -156,7 +155,7 @@ destroying: bool = false,
 link: wl.list.Link,
 
 /// State to be sent to the window manager client in the next update sequence.
-pending: struct {
+wm_pending: struct {
     state: enum {
         /// Indicates that there is currently no associated river_window_v1
         /// object.
@@ -182,7 +181,7 @@ pending: struct {
 /// State sent to the window manager client in the latest update sequence.
 /// This state is only kept around in order to avoid sending redundant events
 /// to the window manager client.
-sent: struct {
+wm_sent: struct {
     position: ?struct { x: i32, y: i32 } = null,
     dimensions: ?struct { width: i32, height: i32 } = null,
     dimensions_hint: DimensionsHint = .{},
@@ -194,13 +193,10 @@ uncommitted: WmState = .{},
 /// State requested by the window manager client and committed.
 committed: WmState = .{},
 
-/// State sent to the window as part of a transaction.
-inflight: State = .{},
-
-/// The current state represented by the scene graph.
-current: State = .{},
-
-foreign_toplevel_handle: ForeignToplevelHandle = .{},
+/// State to be sent to the window in the next configure.
+pending: State = .{},
+/// State sent to the window in the latest configure.
+sent: State = .{},
 
 pub fn create(impl: Impl) error{OutOfMemory}!*Window {
     assert(impl != .none);
@@ -250,7 +246,7 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
 pub fn destroy(window: *Window, when: enum { lazy, assert }) void {
     assert(window.impl == .none);
     assert(!window.mapped);
-    switch (window.pending.state) {
+    switch (window.wm_pending.state) {
         .init, .closing => {},
         .ready => unreachable,
     }
@@ -278,74 +274,67 @@ pub fn destroy(window: *Window, when: enum { lazy, assert }) void {
 }
 
 pub fn setDimensionsHint(window: *Window, hint: DimensionsHint) void {
-    window.pending.dimensions_hint = hint;
-    if (!meta.eql(window.sent.dimensions_hint, hint)) {
+    window.wm_pending.dimensions_hint = hint;
+    if (!meta.eql(window.wm_sent.dimensions_hint, hint)) {
         server.wm.dirtyPending();
     }
 }
 
 pub fn setDimensions(window: *Window, width: i32, height: i32) void {
-    window.pending.box.width = width;
-    window.pending.box.height = height;
+    window.wm_pending.box.width = width;
+    window.wm_pending.box.height = height;
 
-    window.inflight.box.width = width;
-    window.inflight.box.height = height;
-
-    switch (window.inflight.op) {
-        .none => {},
-        .move => |data| assert(data.seat.op != null),
+    switch (window.sent.op) {
+        .none, .move => {},
         .resize => |data| {
             assert(data.seat.op != null);
 
             if (data.edges.left) {
-                window.pending.box.x = data.start_box.x + data.start_box.width - width;
+                window.wm_pending.box.x = data.start_box.x + data.start_box.width - width;
             } else if (data.edges.right) {
-                window.pending.box.x = data.start_box.x;
+                window.wm_pending.box.x = data.start_box.x;
             }
 
             if (data.edges.top) {
-                window.pending.box.y = data.start_box.y + data.start_box.height - height;
+                window.wm_pending.box.y = data.start_box.y + data.start_box.height - height;
             } else if (data.edges.bottom) {
-                window.pending.box.y = data.start_box.y;
+                window.wm_pending.box.y = data.start_box.y;
             }
-
-            window.inflight.box.x = window.pending.box.x;
-            window.inflight.box.y = window.pending.box.y;
         },
     }
 
-    if (window.sent.dimensions == null or window.sent.position == null or
-        width != window.sent.dimensions.?.width or
-        height != window.sent.dimensions.?.height or
-        window.pending.box.x != window.sent.position.?.x or
-        window.pending.box.y != window.sent.position.?.y)
+    if (window.wm_sent.dimensions == null or window.wm_sent.position == null or
+        width != window.wm_sent.dimensions.?.width or
+        height != window.wm_sent.dimensions.?.height or
+        window.wm_pending.box.x != window.wm_sent.position.?.x or
+        window.wm_pending.box.y != window.wm_sent.position.?.y)
     {
         server.wm.dirtyPending();
     }
 }
 
 pub fn setDecorationHint(window: *Window, hint: river.WindowV1.DecorationHint) void {
-    window.pending.decoration_hint = hint;
-    if (hint != window.sent.decoration_hint) {
+    window.wm_pending.decoration_hint = hint;
+    if (hint != window.wm_sent.decoration_hint) {
         server.wm.dirtyPending();
     }
 }
 
 pub fn setFullscreenRequested(window: *Window, fullscreen_requested: bool) void {
     if (fullscreen_requested) {
-        window.pending.fullscreen_requested = .fullscreen;
+        window.wm_pending.fullscreen_requested = .fullscreen;
     } else {
-        window.pending.fullscreen_requested = .exit;
+        window.wm_pending.fullscreen_requested = .exit;
     }
     server.wm.dirtyPending();
 }
 
 /// Send dirty pending state as part of an in progress update sequence.
 pub fn sendDirty(window: *Window) void {
-    switch (window.pending.state) {
+    switch (window.wm_pending.state) {
         .init => {},
         .closing => {
-            window.pending.state = .init;
+            window.wm_pending.state = .init;
             window.initialized = false;
             window.uncommitted = .{};
             window.committed = .{};
@@ -384,8 +373,8 @@ pub fn sendDirty(window: *Window) void {
             };
             errdefer comptime unreachable;
 
-            const pending = &window.pending;
-            const sent = &window.sent;
+            const pending = &window.wm_pending;
+            const sent = &window.wm_sent;
 
             // XXX send all dirty pending state
             if (new or sent.position == null or
@@ -403,7 +392,7 @@ pub fn sendDirty(window: *Window) void {
                 pending.box.width != sent.dimensions.?.width or
                 pending.box.height != sent.dimensions.?.height))
             {
-                window_v1.sendDimensions(window.pending.box.width, window.pending.box.height);
+                window_v1.sendDimensions(window.wm_pending.box.width, window.wm_pending.box.height);
                 sent.dimensions = .{
                     .width = pending.box.width,
                     .height = pending.box.height,
@@ -419,7 +408,7 @@ pub fn sendDirty(window: *Window) void {
                 sent.dimensions_hint = pending.dimensions_hint;
             }
             if (new or pending.decoration_hint != sent.decoration_hint) {
-                window_v1.sendDecorationHint(window.pending.decoration_hint);
+                window_v1.sendDecorationHint(window.wm_pending.decoration_hint);
                 sent.decoration_hint = pending.decoration_hint;
             }
             switch (pending.fullscreen_requested) {
@@ -546,18 +535,9 @@ pub fn configure(window: *Window) bool {
 
     const committed = &window.committed;
 
-    if (window.inflight.op == .none) {
-        if (committed.position) |position| {
-            window.pending.box.x = position.x;
-            window.pending.box.y = position.y;
-        }
-        if (committed.dimensions) |dimensions| {
-            window.pending.box.width = dimensions.width;
-            window.pending.box.height = dimensions.height;
-        }
-    }
-    window.inflight = .{
-        .box = window.pending.box,
+    window.pending = .{
+        .width = window.pending.width,
+        .height = window.pending.height,
         .hidden = committed.hidden,
         .activated = activated,
         .ssd = committed.ssd,
@@ -566,26 +546,36 @@ pub fn configure(window: *Window) bool {
         .capabilities = committed.capabilities,
         .maximized = committed.maximized,
         .fullscreen = committed.fullscreen,
-        .op = window.inflight.op,
-    };
-
-    const track_configure = switch (window.impl) {
-        .toplevel => |*toplevel| toplevel.configure(committed.dimensions != null),
-        .xwayland => |*xwindow| xwindow.configure(),
-        .none => unreachable,
+        .op = window.pending.op,
     };
 
     // Ensure a position/dimension event is sent if the window manager has
     // modified them even if the actual position/dimensions do not change.
-    if (committed.position != null) {
-        window.sent.position = null;
+    if (committed.position) |position| {
+        if (window.pending.op == .none) {
+            window.wm_pending.box.x = position.x;
+            window.wm_pending.box.y = position.y;
+        }
+
+        window.wm_sent.position = null;
         committed.position = null;
     }
-    if (committed.dimensions != null) {
-        window.sent.dimensions = null;
+    if (committed.dimensions) |dimensions| {
+        if (window.pending.op == .none) {
+            window.pending.width = dimensions.width;
+            window.pending.height = dimensions.height;
+        }
+
+        window.wm_sent.dimensions = null;
         committed.dimensions = null;
     }
     committed.op = .none;
+
+    const track_configure = switch (window.impl) {
+        .toplevel => |*toplevel| toplevel.configure(),
+        .xwayland => |*xwindow| xwindow.configure(),
+        .none => unreachable,
+    };
 
     if (track_configure and window.mapped) {
         window.saveSurfaceTree();
@@ -596,8 +586,6 @@ pub fn configure(window: *Window) bool {
 }
 
 pub fn commitTransaction(window: *Window) void {
-    window.foreign_toplevel_handle.update();
-
     switch (window.impl) {
         .toplevel => |*toplevel| {
             switch (toplevel.configure_state) {
@@ -626,84 +614,29 @@ pub fn commitTransaction(window: *Window) void {
                     // If we did not use the current geometry of the toplevel at this point
                     // we would be rendering the SSD border at initial size X but the surface
                     // would be rendered at size Y.
-                    window.setDimensions(toplevel.geometry.width, toplevel.geometry.height);
-                    window.current = window.inflight;
                 },
                 .idle, .committed => {
                     toplevel.configure_state = .idle;
-                    window.current = window.inflight;
                 },
                 .timed_out, .timed_out_acked => unreachable,
             }
+            window.setDimensions(toplevel.geometry.width, toplevel.geometry.height);
         },
         .xwayland => |xwindow| {
-            if (window.inflight.resizing) {
-                window.resizeUpdatePosition(
-                    xwindow.xsurface.width,
-                    xwindow.xsurface.height,
-                );
-            }
-
             window.setDimensions(xwindow.xsurface.width, xwindow.xsurface.height);
-
-            window.current = window.inflight;
         },
-        // This may seem pointless at first glance, but is in fact necessary
-        // to prevent an assertion failure in Root.commitTransaction() as that
-        // function assumes that the inflight tags/output will be applied by
-        // Window.commitTransaction() even for windows being destroyed.
-        .none => window.current = window.inflight,
+        .none => {},
     }
 
     window.updateSceneState();
 }
 
 pub fn updateSceneState(window: *Window) void {
-    const box = &window.current.box;
+    const box = &window.wm_pending.box;
     window.tree.node.setPosition(box.x, box.y);
     window.popup_tree.node.setPosition(box.x, box.y);
 
-    {
-        const config = &server.config;
-        const border_width: c_int = config.border_width;
-        const border_color = &config.border_color;
-
-        // Order is left, right, top, bottom
-        // left and right borders include the corners, top and bottom do not.
-        var border_boxes = [4]wlr.Box{
-            .{
-                .x = -border_width,
-                .y = -border_width,
-                .width = border_width,
-                .height = box.height + 2 * border_width,
-            },
-            .{
-                .x = box.width,
-                .y = -border_width,
-                .width = border_width,
-                .height = box.height + 2 * border_width,
-            },
-            .{
-                .x = 0,
-                .y = -border_width,
-                .width = box.width,
-                .height = border_width,
-            },
-            .{
-                .x = 0,
-                .y = box.height,
-                .width = box.width,
-                .height = border_width,
-            },
-        };
-
-        for (&window.borders, &border_boxes) |border, *border_box| {
-            border.node.setEnabled(window.current.ssd and !window.current.fullscreen);
-            border.node.setPosition(border_box.x, border_box.y);
-            border.setSize(border_box.width, border_box.height);
-            border.setColor(border_color);
-        }
-    }
+    // TODO borders
 }
 
 /// Returns null if the window is currently being destroyed and no longer has
@@ -809,8 +742,6 @@ pub fn map(window: *Window) !void {
 
     assert(!window.mapped and !window.destroying);
     window.mapped = true;
-
-    window.foreign_toplevel_handle.map();
 }
 
 /// Called by the impl when the surface will no longer be displayed
@@ -822,21 +753,17 @@ pub fn unmap(window: *Window) void {
     assert(window.mapped and !window.destroying);
     window.mapped = false;
 
-    window.foreign_toplevel_handle.unmap();
-
-    assert(window.pending.state != .closing);
-    window.pending.state = .closing;
+    assert(window.wm_pending.state != .closing);
+    window.wm_pending.state = .closing;
     server.wm.dirtyPending();
 }
 
 pub fn notifyTitle(window: *const Window) void {
-    if (window.foreign_toplevel_handle.wlr_handle) |wlr_handle| {
-        if (window.getTitle()) |title| wlr_handle.setTitle(title);
-    }
+    // TODO
+    _ = window;
 }
 
 pub fn notifyAppId(window: Window) void {
-    if (window.foreign_toplevel_handle.wlr_handle) |wlr_handle| {
-        if (window.getAppId()) |app_id| wlr_handle.setAppId(app_id);
-    }
+    // TODO
+    _ = window;
 }

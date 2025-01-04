@@ -116,8 +116,7 @@ pub fn create(wlr_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
 }
 
 /// Send a configure event, applying the inflight state of the window.
-/// If force is true, a configure will always be sent but not necessarily tracked.
-pub fn configure(toplevel: *XdgToplevel, force: bool) bool {
+pub fn configure(toplevel: *XdgToplevel) bool {
     switch (toplevel.configure_state) {
         .idle, .timed_out, .timed_out_acked => {},
         .inflight, .acked, .committed => unreachable,
@@ -128,10 +127,9 @@ pub fn configure(toplevel: *XdgToplevel, force: bool) bool {
         .timed_out, .timed_out_acked, .committed => unreachable,
     };
 
-    const inflight = &toplevel.window.inflight;
-    const current = &toplevel.window.current;
+    const pending = &toplevel.window.pending;
 
-    if (!force and !toplevel.needsConfigure()) {
+    if (!toplevel.needsConfigure()) {
         // If no new configure is required, continue to track a timed out configure
         // from the previous transaction if any.
         switch (toplevel.configure_state) {
@@ -150,41 +148,43 @@ pub fn configure(toplevel: *XdgToplevel, force: bool) bool {
 
     const wlr_toplevel = toplevel.wlr_toplevel;
 
-    _ = wlr_toplevel.setActivated(inflight.activated);
+    _ = wlr_toplevel.setActivated(pending.activated);
     _ = wlr_toplevel.setTiled(.{
-        .top = inflight.tiled.top,
-        .bottom = inflight.tiled.bottom,
-        .left = inflight.tiled.left,
-        .right = inflight.tiled.right,
+        .top = pending.tiled.top,
+        .bottom = pending.tiled.bottom,
+        .left = pending.tiled.left,
+        .right = pending.tiled.right,
     });
     _ = wlr_toplevel.setWmCapabilities(.{
-        .window_menu = inflight.capabilities.window_menu,
-        .maximize = inflight.capabilities.maximize,
-        .fullscreen = inflight.capabilities.fullscreen,
-        .minimize = inflight.capabilities.minimize,
+        .window_menu = pending.capabilities.window_menu,
+        .maximize = pending.capabilities.maximize,
+        .fullscreen = pending.capabilities.fullscreen,
+        .minimize = pending.capabilities.minimize,
     });
-    _ = wlr_toplevel.setMaximized(inflight.maximized);
-    _ = wlr_toplevel.setFullscreen(inflight.fullscreen);
-    _ = wlr_toplevel.setResizing(inflight.op == .resize);
-
+    _ = wlr_toplevel.setMaximized(pending.maximized);
+    _ = wlr_toplevel.setFullscreen(pending.fullscreen);
+    _ = wlr_toplevel.setResizing(pending.op == .resize);
     if (toplevel.decoration) |decoration| {
-        _ = decoration.wlr_decoration.setMode(if (inflight.ssd) .server_side else .client_side);
+        _ = decoration.wlr_decoration.setMode(if (pending.ssd) .server_side else .client_side);
     }
 
-    // We need to call this wlroots function even if the inflight dimensions
-    // match the current dimensions in order to prevent wlroots internal state
-    // from getting out of sync in the case where a client has resized the toplevel.
-    const configure_serial = wlr_toplevel.setSize(inflight.box.width, inflight.box.height);
+    const width: u31 = pending.width orelse switch (toplevel.configure_state) {
+        .idle => @intCast(toplevel.geometry.width),
+        .timed_out, .timed_out_acked => toplevel.window.sent.width.?,
+        .inflight, .acked, .committed => unreachable,
+    };
+    const height: u31 = pending.height orelse switch (toplevel.configure_state) {
+        .idle => @intCast(toplevel.geometry.height),
+        .timed_out, .timed_out_acked => toplevel.window.sent.height.?,
+        .inflight, .acked, .committed => unreachable,
+    };
+    const configure_serial = wlr_toplevel.setSize(width, height);
 
-    // Only track configures with the transaction system if they affect the dimensions of the window.
-    // If the configure state is not idle this means we are currently tracking a timed out
-    // configure from a previous transaction and should instead track the newly sent configure.
-    if (inflight.box.width != 0 and inflight.box.width == current.box.width and
-        inflight.box.height != 0 and inflight.box.height == current.box.height and
-        toplevel.configure_state == .idle)
-    {
-        return false;
-    }
+    toplevel.window.sent = toplevel.window.pending;
+    toplevel.window.sent.width = width;
+    toplevel.window.sent.height = height;
+    toplevel.window.pending.width = null;
+    toplevel.window.pending.height = null;
 
     toplevel.configure_state = .{
         .inflight = configure_serial,
@@ -194,27 +194,18 @@ pub fn configure(toplevel: *XdgToplevel, force: bool) bool {
 }
 
 fn needsConfigure(toplevel: *XdgToplevel) bool {
-    const inflight = &toplevel.window.inflight;
-    const current = &toplevel.window.current;
+    const pending = &toplevel.window.pending;
+    const sent = &toplevel.window.sent;
 
-    // Never send configures to hidden windows.
-    // If transitioning from hidden to not-hidden, send a configure.
-    if (inflight.hidden) return false;
-    if (current.hidden) return true;
-
-    if (inflight.box.width == 0 or inflight.box.width != current.box.width or
-        inflight.box.height == 0 or inflight.box.height != current.box.height)
-    {
-        return true;
-    }
-
-    if (inflight.activated != current.activated) return true;
-    if (inflight.ssd != current.ssd) return true;
-    if (!std.meta.eql(inflight.tiled, current.tiled)) return true;
-    if (!std.meta.eql(inflight.capabilities, current.capabilities)) return true;
-    if (inflight.maximized != current.maximized) return true;
-    if (inflight.fullscreen != current.fullscreen) return true;
-    if ((inflight.op == .resize) != (current.op == .resize)) return true;
+    if (pending.width != null) return true;
+    if (pending.height != null) return true;
+    if (pending.activated != sent.activated) return true;
+    if (pending.ssd != sent.ssd) return true;
+    if (!std.meta.eql(pending.tiled, sent.tiled)) return true;
+    if (!std.meta.eql(pending.capabilities, sent.capabilities)) return true;
+    if (pending.maximized != sent.maximized) return true;
+    if (pending.fullscreen != sent.fullscreen) return true;
+    if ((pending.op == .resize) != (sent.op == .resize)) return true;
 
     return false;
 }
@@ -307,8 +298,8 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     });
 
     if (toplevel.wlr_toplevel.base.initial_commit) {
-        assert(window.pending.state != .ready);
-        window.pending.state = .ready;
+        assert(window.wm_pending.state != .ready);
+        window.wm_pending.state = .ready;
         server.wm.dirtyPending();
         return;
     }
@@ -330,22 +321,8 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
                     "client initiated size change: {}x{} -> {}x{}",
                     .{ old_geometry.width, old_geometry.height, toplevel.geometry.width, toplevel.geometry.height },
                 );
-                // TODO check tiled state
-                if (!window.current.fullscreen) {
-                    // It seems that a disappointingly high number of clients have a buggy
-                    // response to configure events. They ack the configure immediately but then
-                    // proceed to make one or more wl_surface.commit requests with the old size
-                    // before updating the size of the surface. This obviously makes river's
-                    // efforts towards frame perfection futile for such clients. However, in the
-                    // interest of best serving river's users we will fix up their size here after
-                    // logging a shame message.
-                    log.err("client with app-id '{s}' is buggy and initiated size change while tiled or fullscreen, shame on it", .{
-                        window.getAppId() orelse "",
-                    });
-                }
 
                 window.setDimensions(toplevel.geometry.width, toplevel.geometry.height);
-                window.current = window.inflight;
                 window.updateSceneState();
             } else if (old_geometry.x != toplevel.geometry.x or
                 old_geometry.y != toplevel.geometry.y)
@@ -371,7 +348,6 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
                 },
                 .timed_out_acked => {
                     toplevel.configure_state = .idle;
-                    window.current = window.inflight;
                     window.updateSceneState();
                 },
                 else => unreachable,

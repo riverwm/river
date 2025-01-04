@@ -227,8 +227,8 @@ pub fn destroy(seat: *Seat) void {
             inline for (.{
                 &window.uncommitted,
                 &window.committed,
-                &window.inflight,
-                &window.current,
+                &window.pending,
+                &window.sent,
             }) |state| {
                 switch (state.op) {
                     .none => {},
@@ -536,24 +536,24 @@ pub fn applyCommitted(seat: *Seat) void {
                         .none => {},
                         .move => |data| {
                             if (data.seat == seat) {
-                                assert(window.inflight.op == .none);
-                                window.inflight.op = .{
+                                assert(window.pending.op == .none);
+                                window.pending.op = .{
                                     .move = .{
                                         .seat = seat,
-                                        .start_x = window.pending.box.x,
-                                        .start_y = window.pending.box.y,
+                                        .start_x = window.wm_pending.box.x,
+                                        .start_y = window.wm_pending.box.y,
                                     },
                                 };
                             }
                         },
                         .resize => |data| {
                             if (data.seat == seat) {
-                                assert(window.inflight.op == .none);
-                                window.inflight.op = .{
+                                assert(window.pending.op == .none);
+                                window.pending.op = .{
                                     .resize = .{
                                         .seat = seat,
                                         .edges = data.edges,
-                                        .start_box = window.pending.box,
+                                        .start_box = window.wm_pending.box,
                                     },
                                 };
                             }
@@ -572,11 +572,11 @@ pub fn applyCommitted(seat: *Seat) void {
             {
                 var it = server.wm.windows.iterator(.forward);
                 while (it.next()) |window| {
-                    switch (window.inflight.op) {
+                    switch (window.pending.op) {
                         .none => {},
                         inline .move, .resize => |data| {
                             if (data.seat == seat) {
-                                window.inflight.op = .none;
+                                window.pending.op = .none;
                             }
                         },
                     }
@@ -769,13 +769,13 @@ pub fn updateOp(seat: *Seat, x: i32, y: i32) void {
     {
         var it = server.wm.windows.iterator(.forward);
         while (it.next()) |window| {
-            switch (window.inflight.op) {
+            switch (window.pending.op) {
                 .none => {},
                 .move => |data| {
                     if (data.seat != seat) continue;
 
-                    window.pending.box.x = data.start_x + dx;
-                    window.pending.box.y = data.start_y + dy;
+                    window.wm_pending.box.x = data.start_x + dx;
+                    window.wm_pending.box.y = data.start_y + dy;
 
                     seat.op.?.dirty = true;
                 },
@@ -788,15 +788,15 @@ pub fn updateOp(seat: *Seat, x: i32, y: i32) void {
                     // correctly place the top left corner in the case of a resize from
                     // the top or left edge.
                     if (data.edges.left) {
-                        window.pending.box.width = @max(1, data.start_box.width - dx);
+                        window.pending.width = @max(1, data.start_box.width - dx);
                     } else if (data.edges.right) {
-                        window.pending.box.width = @max(1, data.start_box.width + dx);
+                        window.pending.width = @max(1, data.start_box.width + dx);
                     }
 
                     if (data.edges.top) {
-                        window.pending.box.height = @max(1, data.start_box.height - dy);
+                        window.pending.height = @max(1, data.start_box.height - dy);
                     } else if (data.edges.bottom) {
-                        window.pending.box.height = @max(1, data.start_box.height + dy);
+                        window.pending.height = @max(1, data.start_box.height + dy);
                     }
 
                     seat.op.?.dirty = true;
