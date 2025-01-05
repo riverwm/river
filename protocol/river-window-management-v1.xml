@@ -287,6 +287,10 @@
         logical coordinate space. The width and height must be strictly greater
         than zero.
 
+        Note that the dimensions of a river_window_v1 refer to the dimensions of
+        the window content and are unaffected by the presence of borders or
+        decoration surfaces.
+
         This event is double-buffered state and will be followed by a
         river_window_manager_v1.update event.
       </description>
@@ -311,6 +315,10 @@
         The server must send a dimensions event in response to a
         propose_dimensions request in the next possible update even if the
         window dimensions are unchanged since the most recent dimensions event.
+
+        Note that the dimensions of a river_window_v1 refer to the dimensions of
+        the window content and are unaffected by the presence of borders or
+        decoration surfaces.
 
         This request is double-buffered state and will not be applied until the
         next river_window_manager_v1.commit request.
@@ -468,6 +476,10 @@
 
         This request completely overrides all previous set_borders requests.
         Only the most recent set_borders request has an effect.
+
+        Note that the position/dimensions of a river_window_v1 refer to the
+        position/dimensions of the window content and are unaffected by the
+        presence of borders or decoration surfaces.
 
         This request is double-buffered state and will not be applied until the
         next river_window_manager_v1.commit request.
@@ -834,6 +846,10 @@
         Set the absolute position of the node in the compositor's logical
         coordinate space. The x and y coordinates may be positive or negative.
 
+        Note that the position of a river_window_v1 refers to the position of
+        the window content and is unaffected by the presence of borders or
+        decoration surfaces.
+
         If this request is never sent, the position of the node is undefined by
         this protocol and left up to the compositor.
 
@@ -849,6 +865,10 @@
         This event indicates the position of the node in the compositor's
         logical coordinate space. The x and y coordinates may be positive or
         negative.
+
+        Note that the position of a river_window_v1 refers to the position of
+        the window content and is unaffected by the presence of borders or
+        decoration surfaces.
 
         While the window manager client usually sets the position of the node,
         there are some cases in which the position must be modified by the
