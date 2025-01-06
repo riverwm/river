@@ -96,7 +96,7 @@ pub fn create(wlr_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
     wlr_toplevel.base.surface.events.unmap.add(&toplevel.unmap);
     errdefer toplevel.unmap.link.remove();
 
-    _ = try window.surface_tree.createSceneXdgSurface(wlr_toplevel.base);
+    _ = try window.surfaces.tree.createSceneXdgSurface(wlr_toplevel.base);
 
     toplevel.window = window;
 

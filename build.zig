@@ -92,8 +92,10 @@ pub fn build(b: *Build) !void {
     const scanner = Scanner.create(b, .{});
 
     scanner.addSystemProtocol("stable/xdg-shell/xdg-shell.xml");
+    scanner.addSystemProtocol("stable/viewporter/viewporter.xml");
     scanner.addSystemProtocol("staging/cursor-shape/cursor-shape-v1.xml");
     scanner.addSystemProtocol("staging/ext-session-lock/ext-session-lock-v1.xml");
+    scanner.addSystemProtocol("staging/single-pixel-buffer/single-pixel-buffer-v1.xml");
     scanner.addSystemProtocol("unstable/pointer-constraints/pointer-constraints-unstable-v1.xml");
     scanner.addSystemProtocol("unstable/pointer-gestures/pointer-gestures-unstable-v1.xml");
     scanner.addSystemProtocol("unstable/tablet/tablet-unstable-v2.xml");
@@ -123,6 +125,8 @@ pub fn build(b: *Build) !void {
     scanner.generate("zxdg_decoration_manager_v1", 1);
     scanner.generate("ext_session_lock_manager_v1", 1);
     scanner.generate("wp_cursor_shape_manager_v1", 1);
+    scanner.generate("wp_viewporter", 1);
+    scanner.generate("wp_single_pixel_buffer_manager_v1", 1);
 
     scanner.generate("river_window_manager_v1", 1);
 

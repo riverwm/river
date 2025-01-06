@@ -23,6 +23,7 @@ const assert = std.debug.assert;
 
 const wayland = @import("wayland");
 const wl = wayland.client.wl;
+const wp = wayland.client.wp;
 const river = wayland.client.river;
 const flags = @import("flags");
 
@@ -40,12 +41,21 @@ const usage =
 
 const Globals = struct {
     wm_v1: ?*river.WindowManagerV1 = null,
+    compositor: ?*wl.Compositor = null,
+    viewporter: ?*wp.Viewporter = null,
+    single_pixel: ?*wp.SinglePixelBufferManagerV1 = null,
 
     fn handleEvent(registry: *wl.Registry, event: wl.Registry.Event, globals: *Globals) void {
         switch (event) {
             .global => |global| {
                 if (mem.orderZ(u8, global.interface, river.WindowManagerV1.interface.name) == .eq) {
                     globals.wm_v1 = registry.bind(global.name, river.WindowManagerV1, 1) catch return;
+                } else if (mem.orderZ(u8, global.interface, wl.Compositor.interface.name) == .eq) {
+                    globals.compositor = registry.bind(global.name, wl.Compositor, 4) catch return;
+                } else if (mem.orderZ(u8, global.interface, wp.Viewporter.interface.name) == .eq) {
+                    globals.viewporter = registry.bind(global.name, wp.Viewporter, 1) catch return;
+                } else if (mem.orderZ(u8, global.interface, wp.SinglePixelBufferManagerV1.interface.name) == .eq) {
+                    globals.single_pixel = registry.bind(global.name, wp.SinglePixelBufferManagerV1, 1) catch return;
                 }
             },
             .global_remove => {},
@@ -88,10 +98,16 @@ pub fn main() !void {
     if (display.roundtrip() != .SUCCESS) fatal("initial roundtrip failed", .{});
 
     const wm_v1 = globals.wm_v1 orelse
-        fatal("wayland compositor does not support river-window-management-v1.\n", .{});
+        fatal("wayland compositor does not support river-window-management-v1", .{});
+    const compositor = globals.compositor orelse
+        fatal("wayland compositor does not support wl_compositor", .{});
+    const viewporter = globals.viewporter orelse
+        fatal("wayland compositor does not support viewporter", .{});
+    const single_pixel = globals.single_pixel orelse
+        fatal("wayland compositor does not support wp-single-pixel-buffer-v1", .{});
 
     var wm: WindowManager = undefined;
-    wm.init(wm_v1);
+    wm.init(wm_v1, compositor, viewporter, single_pixel);
 
     while (true) {
         if (display.dispatch() != .SUCCESS) fatal("failed to dispatch wayland events", .{});

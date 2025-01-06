@@ -26,7 +26,9 @@ const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Output = @import("Output.zig");
+const Scene = @import("Scene.zig");
 const Seat = @import("Seat.zig");
+const ShellSurface = @import("ShellSurface.zig");
 const Window = @import("Window.zig");
 const WmNode = @import("WmNode.zig");
 
@@ -196,6 +198,7 @@ fn handleRequest(
                     wm.committed.render_list.append(node);
                     switch (node.get()) {
                         .window => |window| window.commitWmState(),
+                        .shell_surface => |shell_surface| shell_surface.commitWmState(),
                     }
                 }
             }
@@ -214,7 +217,19 @@ fn handleRequest(
                 .update_sent, .inflight_configures => {},
             }
         },
-        .get_shell_surface => |_| {},
+        .get_shell_surface => |args| {
+            const surface = wlr.Surface.fromWlSurface(args.surface);
+            ShellSurface.create(
+                wm_v1.getClient(),
+                wm_v1.getVersion(),
+                args.id,
+                surface,
+            ) catch {
+                wm_v1.getClient().postNoMemory();
+                log.err("out of memory", .{});
+                return;
+            };
+        },
     }
 }
 
@@ -308,6 +323,7 @@ pub fn sendConfigures(wm: *WindowManager) void {
                         wm.state.inflight_configures += 1;
                     }
                 },
+                .shell_surface => {},
             }
         }
     }
@@ -364,7 +380,7 @@ fn commitTransaction(wm: *WindowManager) void {
     {
         var it = wm.windows.safeIterator(.forward);
         while (it.next()) |window| {
-            window.dropSavedSurfaceTree();
+            window.surfaces.dropSaved();
             if (window.destroying) window.destroy(.assert);
         }
     }
@@ -382,6 +398,12 @@ fn commitTransaction(wm: *WindowManager) void {
                     assert(window.pending.hidden == window.sent.hidden);
                     window.tree.node.setEnabled(!window.pending.hidden);
                     window.popup_tree.node.setEnabled(!window.pending.hidden);
+                },
+                .shell_surface => |shell_surface| {
+                    shell_surface.commitTransaction();
+
+                    shell_surface.tree.node.reparent(server.scene.layers.wm);
+                    shell_surface.tree.node.raiseToTop();
                 },
             }
         }

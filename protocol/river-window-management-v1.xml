@@ -39,6 +39,11 @@
       compositor should use the unavailable event if necessary to enforce this.
     </description>
 
+    <enum name="error">
+      <entry name="role" value="0"
+        summary="given wl_surface already has a role"/>
+    </enum>
+
     <event name="unavailable">
       <description summary="window management unavailable">
         This event indicates that window management is not available to the
@@ -208,6 +213,11 @@
       TODO:
         - window cropping
     </description>
+
+    <enum name="error">
+      <entry name="node_exists" value="0"
+        summary="window already has a node object"/>
+    </enum>
 
     <request name="destroy" type="destructor">
       <description summary="destroy the window object">
@@ -791,6 +801,13 @@
       background image, desktop notifications, launcher, desktop menu, or
       whatever else it wants.
     </description>
+
+    <enum name="error">
+      <entry name="node_exists" value="0"
+        summary="shell surface already has a node object"/>
+      <entry name="no_commit" value="1"
+        summary="failed to commit the surface before the window manager commit"/>
+    </enum>
 
     <request name="destroy" type="destructor">
       <description summary="destroy the shell surface object">

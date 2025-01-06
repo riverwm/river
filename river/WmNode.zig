@@ -25,9 +25,11 @@ const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Window = @import("Window.zig");
+const ShellSurface = @import("ShellSurface.zig");
 
 const Type = union(enum) {
     window: *Window,
+    shell_surface: *ShellSurface,
 };
 const Tag = @typeInfo(Type).Union.tag_type.?;
 
@@ -64,6 +66,7 @@ pub fn deinit(node: *WmNode) void {
 pub fn get(node: *WmNode) Type {
     return switch (node.tag) {
         .window => .{ .window = @fieldParentPtr("node", node) },
+        .shell_surface => .{ .shell_surface = @fieldParentPtr("node", node) },
     };
 }
 
@@ -74,7 +77,7 @@ pub fn createObject(node: *WmNode, client: *wl.Client, version: u32, id: u32) vo
         client.postNoMemory();
         return;
     };
-    node_v1.setHandler(*WmNode, handleRequest, null, node);
+    node_v1.setHandler(*WmNode, handleRequest, handleDestroy, node);
     node.object = node_v1;
 }
 
@@ -93,6 +96,10 @@ fn handleRequestInert(
     if (request == .destroy) node_v1.destroy();
 }
 
+fn handleDestroy(_: *river.NodeV1, node: *WmNode) void {
+    node.object = null;
+}
+
 fn handleRequest(
     node_v1: *river.NodeV1,
     request: river.NodeV1.Request,
@@ -102,7 +109,6 @@ fn handleRequest(
     switch (request) {
         .destroy => {
             node_v1.destroy();
-            node.object = null;
         },
         .set_position => |args| switch (node.get()) {
             .window => |window| {
@@ -110,6 +116,10 @@ fn handleRequest(
                     .x = args.x,
                     .y = args.y,
                 };
+            },
+            .shell_surface => |shell_surface| {
+                shell_surface.uncommitted.x = args.x;
+                shell_surface.uncommitted.y = args.y;
             },
         },
         .place_top => {

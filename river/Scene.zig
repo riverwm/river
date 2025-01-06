@@ -16,6 +16,8 @@
 
 const Scene = @This();
 
+const std = @import("std");
+const assert = std.debug.assert;
 const build_options = @import("build_options");
 const wlr = @import("wlroots");
 
@@ -123,3 +125,56 @@ pub fn at(scene: *const Scene, lx: f64, ly: f64) ?AtResult {
         return null;
     }
 }
+
+pub const SaveableSurfaces = struct {
+    tree: *wlr.SceneTree,
+    saved: *wlr.SceneTree,
+
+    pub fn init(parent: *wlr.SceneTree) !SaveableSurfaces {
+        const surfaces = .{
+            .tree = try parent.createSceneTree(),
+            .saved = try parent.createSceneTree(),
+        };
+        surfaces.saved.node.setEnabled(false);
+        return surfaces;
+    }
+
+    pub fn save(surfaces: SaveableSurfaces) void {
+        if (surfaces.saved.node.enabled) return;
+        assert(surfaces.tree.node.enabled);
+        assert(surfaces.saved.children.empty());
+
+        surfaces.tree.node.forEachBuffer(*wlr.SceneTree, saveSurfaceTreeIter, surfaces.saved);
+
+        surfaces.tree.node.setEnabled(false);
+        surfaces.saved.node.setEnabled(true);
+    }
+
+    fn saveSurfaceTreeIter(
+        buffer: *wlr.SceneBuffer,
+        sx: c_int,
+        sy: c_int,
+        saved: *wlr.SceneTree,
+    ) void {
+        const scene_buffer = saved.createSceneBuffer(buffer.buffer) catch {
+            std.log.err("out of memory", .{});
+            return;
+        };
+        scene_buffer.node.setPosition(sx, sy);
+        scene_buffer.setDestSize(buffer.dst_width, buffer.dst_height);
+        scene_buffer.setSourceBox(&buffer.src_box);
+        scene_buffer.setTransform(buffer.transform);
+    }
+
+    pub fn dropSaved(surfaces: SaveableSurfaces) void {
+        if (!surfaces.saved.node.enabled) return;
+
+        assert(!surfaces.tree.node.enabled);
+
+        var it = surfaces.saved.children.safeIterator(.forward);
+        while (it.next()) |node| node.destroy();
+
+        surfaces.saved.node.setEnabled(false);
+        surfaces.tree.node.setEnabled(true);
+    }
+};

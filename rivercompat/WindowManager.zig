@@ -21,18 +21,33 @@ const assert = std.debug.assert;
 const main = @import("main.zig");
 const wayland = @import("wayland");
 const wl = wayland.client.wl;
+const wp = wayland.client.wp;
 const river = wayland.client.river;
 
 const Seat = @import("Seat.zig");
+const ShellSurface = @import("ShellSurface.zig");
 const Window = @import("Window.zig");
 
 wm_v1: *river.WindowManagerV1,
+compositor: *wl.Compositor,
+viewporter: *wp.Viewporter,
+single_pixel: *wp.SinglePixelBufferManagerV1,
+
 windows: wl.list.Head(Window, .link),
 seats: wl.list.Head(Seat, .link),
 
-pub fn init(wm: *WindowManager, wm_v1: *river.WindowManagerV1) void {
+pub fn init(
+    wm: *WindowManager,
+    wm_v1: *river.WindowManagerV1,
+    compositor: *wl.Compositor,
+    viewporter: *wp.Viewporter,
+    single_pixel: *wp.SinglePixelBufferManagerV1,
+) void {
     wm.* = .{
         .wm_v1 = wm_v1,
+        .compositor = compositor,
+        .viewporter = viewporter,
+        .single_pixel = single_pixel,
         .windows = undefined,
         .seats = undefined,
     };
@@ -40,6 +55,8 @@ pub fn init(wm: *WindowManager, wm_v1: *river.WindowManagerV1) void {
     wm.seats.init();
 
     wm_v1.setListener(*WindowManager, handleEvent, wm);
+
+    ShellSurface.create(wm);
 }
 
 fn handleEvent(wm_v1: *river.WindowManagerV1, event: river.WindowManagerV1.Event, wm: *WindowManager) void {

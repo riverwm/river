@@ -30,6 +30,7 @@ const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Output = @import("Output.zig");
+const Scene = @import("Scene.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
 const Seat = @import("Seat.zig");
 const WmNode = @import("WmNode.zig");
@@ -137,8 +138,8 @@ node: WmNode,
 impl: Impl,
 
 tree: *wlr.SceneTree,
-surface_tree: *wlr.SceneTree,
-saved_surface_tree: *wlr.SceneTree,
+surfaces: Scene.SaveableSurfaces,
+
 border: struct {
     left: *wlr.SceneRect,
     right: *wlr.SceneRect,
@@ -218,8 +219,7 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
         .node = undefined,
         .impl = impl,
         .tree = tree,
-        .surface_tree = try tree.createSceneTree(),
-        .saved_surface_tree = try tree.createSceneTree(),
+        .surfaces = try Scene.SaveableSurfaces.init(tree),
         .border = .{
             .left = try tree.createSceneRect(0, 0, &.{ 0, 0, 0, 0 }),
             .right = try tree.createSceneRect(0, 0, &.{ 0, 0, 0, 0 }),
@@ -236,7 +236,6 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
 
     window.tree.node.setEnabled(false);
     window.popup_tree.node.setEnabled(false);
-    window.saved_surface_tree.node.setEnabled(false);
 
     try SceneNodeData.attach(&window.tree.node, .{ .window = window });
     try SceneNodeData.attach(&window.popup_tree.node, .{ .window = window });
@@ -260,7 +259,7 @@ pub fn destroy(window: *Window, when: enum { lazy, assert }) void {
     // If there are still saved buffers, then this window needs to be kept
     // around until the current transaction completes. This function will be
     // called again in WindowManager.commitTransaction()
-    if (!window.saved_surface_tree.node.enabled) {
+    if (!window.surfaces.saved.node.enabled) {
         window.tree.node.destroy();
         window.popup_tree.node.destroy();
 
@@ -453,7 +452,8 @@ fn handleRequest(
         .close => uncommitted.close = true,
         .get_node => |args| {
             if (window.node.object != null) {
-                // XXX send protocol error
+                window_v1.postError(.node_exists, "window already has a node object");
+                return;
             }
             window.node.createObject(window_v1.getClient(), window_v1.getVersion(), args.id);
         },
@@ -582,7 +582,7 @@ pub fn configure(window: *Window) bool {
     };
 
     if (track_configure and window.mapped) {
-        window.saveSurfaceTree();
+        window.surfaces.save();
         window.sendFrameDone();
     }
 
@@ -720,42 +720,6 @@ pub fn sendFrameDone(window: Window) void {
     window.rootSurface().?.sendFrameDone(&now);
 }
 
-pub fn dropSavedSurfaceTree(window: *Window) void {
-    if (!window.saved_surface_tree.node.enabled) return;
-
-    var it = window.saved_surface_tree.children.safeIterator(.forward);
-    while (it.next()) |node| node.destroy();
-
-    window.saved_surface_tree.node.setEnabled(false);
-    window.surface_tree.node.setEnabled(true);
-}
-
-pub fn saveSurfaceTree(window: *Window) void {
-    assert(!window.saved_surface_tree.node.enabled);
-    assert(window.saved_surface_tree.children.empty());
-
-    window.surface_tree.node.forEachBuffer(*wlr.SceneTree, saveSurfaceTreeIter, window.saved_surface_tree);
-
-    window.surface_tree.node.setEnabled(false);
-    window.saved_surface_tree.node.setEnabled(true);
-}
-
-fn saveSurfaceTreeIter(
-    buffer: *wlr.SceneBuffer,
-    sx: c_int,
-    sy: c_int,
-    saved_surface_tree: *wlr.SceneTree,
-) void {
-    const saved = saved_surface_tree.createSceneBuffer(buffer.buffer) catch {
-        log.err("out of memory", .{});
-        return;
-    };
-    saved.node.setPosition(sx, sy);
-    saved.setDestSize(buffer.dst_width, buffer.dst_height);
-    saved.setSourceBox(&buffer.src_box);
-    saved.setTransform(buffer.transform);
-}
-
 pub fn close(window: Window) void {
     switch (window.impl) {
         .toplevel => |toplevel| toplevel.wlr_toplevel.sendClose(),
@@ -792,12 +756,6 @@ pub fn getAppId(window: Window) ?[*:0]const u8 {
     };
 }
 
-/// Clamp the width/height of the box to the constraints of the window
-pub fn applyConstraints(window: *Window, box: *wlr.Box) void {
-    box.width = math.clamp(box.width, window.constraints.min_width, window.constraints.max_width);
-    box.height = math.clamp(box.height, window.constraints.min_height, window.constraints.max_height);
-}
-
 /// Called by the impl when the surface is ready to be displayed
 pub fn map(window: *Window) !void {
     log.debug("window '{?s}' mapped", .{window.getTitle()});
@@ -810,7 +768,7 @@ pub fn map(window: *Window) !void {
 pub fn unmap(window: *Window) void {
     log.debug("window '{?s}' unmapped", .{window.getTitle()});
 
-    if (!window.saved_surface_tree.node.enabled) window.saveSurfaceTree();
+    window.surfaces.save();
 
     assert(window.mapped and !window.destroying);
     window.mapped = false;
