@@ -84,7 +84,7 @@ pub fn main() anyerror!void {
             posix.exit(1);
         }
     }
-    const enable_xwayland = !result.flags.@"no-xwayland";
+    const runtime_xwayland = !result.flags.@"no-xwayland";
     const startup_command = blk: {
         if (result.flags.c) |command| {
             break :blk try util.gpa.dupeZ(u8, command);
@@ -95,16 +95,24 @@ pub fn main() anyerror!void {
 
     log.info("river version {s}, initializing server", .{build_options.version});
 
-    process.setup();
-
     river_init_wlroots_log(switch (runtime_log_level) {
         .debug => .debug,
         .info => .info,
         .warn, .err => .err,
     });
 
-    try server.init(enable_xwayland);
+    try server.init(runtime_xwayland);
     defer server.deinit();
+
+    // wlroots starts the Xwayland process from an idle event source, the reasoning being that
+    // this gives the compositor time to set up event listeners before Xwayland is actually
+    // started. We want Xwayland to be started by wlroots before we modify our rlimits in
+    // process.setup() since wlroots does not offer a way for us to reset the rlimit post-fork.
+    if (build_options.xwayland and runtime_xwayland) {
+        server.wl_server.getEventLoop().dispatchIdle();
+    }
+
+    process.setup();
 
     try server.start();
 
