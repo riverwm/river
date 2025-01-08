@@ -395,7 +395,6 @@ fn commitTransaction(wm: *WindowManager) void {
                     window.tree.node.reparent(server.scene.layers.wm);
                     window.tree.node.raiseToTop();
 
-                    assert(window.pending.hidden == window.sent.hidden);
                     window.tree.node.setEnabled(!window.pending.hidden);
                     window.popup_tree.node.setEnabled(!window.pending.hidden);
                 },
