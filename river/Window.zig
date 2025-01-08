@@ -181,6 +181,8 @@ wm_pending: struct {
         fullscreen,
         exit,
     } = .no_request,
+    dirty_app_id: bool = false,
+    dirty_title: bool = false,
 } = .{},
 
 /// State sent to the window manager client in the latest update sequence.
@@ -420,6 +422,15 @@ pub fn sendDirty(window: *Window) void {
                 .exit => window_v1.sendExitFullscreenRequested(),
             }
             pending.fullscreen_requested = .no_request;
+
+            if (new or pending.dirty_app_id) {
+                window_v1.sendAppId(window.getAppId());
+                pending.dirty_app_id = false;
+            }
+            if (new or pending.dirty_title) {
+                window_v1.sendTitle(window.getTitle());
+                pending.dirty_title = false;
+            }
         },
     }
 }
@@ -778,12 +789,12 @@ pub fn unmap(window: *Window) void {
     server.wm.dirtyPending();
 }
 
-pub fn notifyTitle(window: *const Window) void {
-    // TODO
-    _ = window;
+pub fn notifyTitle(window: *Window) void {
+    window.wm_pending.dirty_title = true;
+    server.wm.dirtyPending();
 }
 
-pub fn notifyAppId(window: Window) void {
-    // TODO
-    _ = window;
+pub fn notifyAppId(window: *Window) void {
+    window.wm_pending.dirty_app_id = true;
+    server.wm.dirtyPending();
 }
