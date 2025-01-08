@@ -249,14 +249,27 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
 /// mark this window for destruction when the transaction completes. Otherwise
 /// destroy immediately.
 pub fn destroy(window: *Window, when: enum { lazy, assert }) void {
+    // We can't assert(window.wm_pending.state != .ready) since the client may
+    // have exited after making its empty initial commit but before the surface
+    // is mapped.
     assert(window.impl == .none);
     assert(!window.mapped);
-    switch (window.wm_pending.state) {
-        .init, .closing => {},
-        .ready => unreachable,
-    }
+
+    // We may need to send the closed event and make the window_v1/node_v1 objects
+    // inert here if the client exits after the empty initial commit but before
+    // the window is mapped.
+    window.makeInert();
 
     window.destroying = true;
+
+    {
+        var it = server.input_manager.seats.iterator(.forward);
+        while (it.next()) |seat| {
+            if (seat.focused == .window and seat.focused.window == window) {
+                seat.focus(.none);
+            }
+        }
+    }
 
     // If there are still saved buffers, then this window needs to be kept
     // around until the current transaction completes. This function will be
@@ -351,14 +364,7 @@ pub fn sendDirty(window: *Window) void {
             window.node.link_inflight.remove();
             window.node.link_inflight.init();
 
-            if (window.object) |window_v1| {
-                window.object = null;
-                window_v1.sendClosed();
-                window_v1.setHandler(?*anyopaque, handleRequestInert, null, null);
-                window.node.makeInert();
-            } else {
-                assert(window.node.object == null);
-            }
+            window.close();
         },
         .ready => {
             const wm_v1 = server.wm.object orelse return;
@@ -432,6 +438,17 @@ pub fn sendDirty(window: *Window) void {
                 pending.dirty_title = false;
             }
         },
+    }
+}
+
+pub fn makeInert(window: *Window) void {
+    if (window.object) |window_v1| {
+        window.object = null;
+        window_v1.sendClosed();
+        window_v1.setHandler(?*anyopaque, handleRequestInert, null, null);
+        window.node.makeInert();
+    } else {
+        assert(window.node.object == null);
     }
 }
 

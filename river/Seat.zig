@@ -91,10 +91,10 @@ pub const WmFocus = union(enum) {
 };
 
 pub const Focus = union(enum) {
+    none,
     window: *Window,
     override_redirect: if (build_options.xwayland) *XwaylandOverrideRedirect else noreturn,
     lock_surface: *LockSurface,
-    none: void,
 
     pub fn surface(target: Focus) ?*wlr.Surface {
         return switch (target) {

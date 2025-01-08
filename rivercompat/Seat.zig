@@ -50,6 +50,7 @@ pub fn create(wm: *WindowManager, seat_v1: *river.SeatV1) void {
 
     XkbBinding.create(seat, xkb.Keysym.n, .{ .mod4 = true }, .focus_next);
     XkbBinding.create(seat, xkb.Keysym.h, .{ .mod4 = true }, .hide_focused);
+    XkbBinding.create(seat, xkb.Keysym.k, .{ .mod4 = true }, .close_focused);
     XkbBinding.create(seat, xkb.Keysym.s, .{ .mod4 = true }, .show_all);
     PointerBinding.create(seat, c.BTN_LEFT, .{ .mod4 = true }, .move_start, .op_end);
     PointerBinding.create(seat, c.BTN_RIGHT, .{ .mod4 = true }, .resize_start, .op_end);

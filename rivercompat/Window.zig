@@ -53,6 +53,13 @@ pub fn create(window_v1: *river.WindowV1, wm: *WindowManager) void {
         @as(u32, (rgb >> 0) & 0xff) * (0xffff_ffff / 0xff),
         0xffff_ffff,
     );
+
+    {
+        var it = wm.seats.iterator(.forward);
+        while (it.next()) |seat| {
+            seat.focus(window);
+        }
+    }
 }
 
 fn handleEvent(window_v1: *river.WindowV1, event: river.WindowV1.Event, window: *Window) void {
