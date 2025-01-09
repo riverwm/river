@@ -25,10 +25,12 @@ const util = @import("util.zig");
 const LockSurface = @import("LockSurface.zig");
 const InputPopup = @import("InputPopup.zig");
 const Window = @import("Window.zig");
+const ShellSurface = @import("ShellSurface.zig");
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
 pub const Data = union(enum) {
     window: *Window,
+    shell_surface: *ShellSurface,
     lock_surface: *LockSurface,
     override_redirect: if (build_options.xwayland) *XwaylandOverrideRedirect else noreturn,
 };

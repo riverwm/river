@@ -483,7 +483,11 @@ pub fn processAxis(cursor: *Cursor, event: *const wlr.Pointer.event.Axis) void {
 fn interact(cursor: Cursor, result: Scene.AtResult) void {
     switch (result.data) {
         .window => |window| {
-            cursor.seat.pending.window_interaction = window;
+            cursor.seat.pending.interaction = .{ .window = window };
+            server.wm.dirtyPending();
+        },
+        .shell_surface => |shell_surface| {
+            cursor.seat.pending.interaction = .{ .shell_surface = shell_surface };
             server.wm.dirtyPending();
         },
         .lock_surface => |lock_surface| {

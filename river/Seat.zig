@@ -39,6 +39,7 @@ const LockSurface = @import("LockSurface.zig");
 const Output = @import("Output.zig");
 const PointerBinding = @import("PointerBinding.zig");
 const PointerConstraint = @import("PointerConstraint.zig");
+const ShellSurface = @import("ShellSurface.zig");
 const Switch = @import("Switch.zig");
 const Tablet = @import("Tablet.zig");
 const Window = @import("Window.zig");
@@ -87,18 +88,20 @@ pub const WmState = struct {
 pub const WmFocus = union(enum) {
     none,
     window: *Window,
-    // TODO shell_surface: *ShellSurface,
+    shell_surface: *ShellSurface,
 };
 
 pub const Focus = union(enum) {
     none,
     window: *Window,
+    shell_surface: *ShellSurface,
     override_redirect: if (build_options.xwayland) *XwaylandOverrideRedirect else noreturn,
     lock_surface: *LockSurface,
 
     pub fn surface(target: Focus) ?*wlr.Surface {
         return switch (target) {
             .window => |window| window.rootSurface(),
+            .shell_surface => |shell_surface| shell_surface.surface,
             .override_redirect => |override_redirect| override_redirect.xsurface.surface,
             .lock_surface => |lock_surface| lock_surface.wlr_lock_surface.surface,
             .none => null,
@@ -125,7 +128,7 @@ pending: struct {
     /// The window entered/hovered by the pointer, if any
     window: ?*Window = null,
     /// The window clicked on, touched, etc.
-    window_interaction: ?*Window = null,
+    interaction: WmFocus = .none,
 } = .{},
 
 /// State sent to the window manager client in the latest update sequence.
@@ -365,11 +368,18 @@ pub fn sendDirty(seat: *Seat) void {
             }
         }
 
-        if (seat.pending.window_interaction) |window| {
-            if (window.object) |window_v1| {
-                seat_v1.sendWindowInteraction(window_v1);
-                seat.pending.window_interaction = null;
-            }
+        switch (seat.pending.interaction) {
+            .none => {},
+            .window => |window| {
+                if (window.object) |window_v1| {
+                    seat_v1.sendWindowInteraction(window_v1);
+                    seat.pending.interaction = .none;
+                }
+            },
+            .shell_surface => |shell_surface| {
+                seat_v1.sendShellSurfaceInteraction(shell_surface.object);
+                seat.pending.interaction = .none;
+            },
         }
 
         {
@@ -442,7 +452,11 @@ fn handleRequest(
             const window: *Window = @ptrCast(@alignCast(data));
             seat.uncommitted.focus = .{ .window = window };
         },
-        .focus_shell_surface => {},
+        .focus_shell_surface => |args| {
+            const data = args.shell_surface.getUserData() orelse return;
+            const shell_surface: *ShellSurface = @ptrCast(@alignCast(data));
+            seat.uncommitted.focus = .{ .shell_surface = shell_surface };
+        },
         .clear_focus => seat.uncommitted.focus = .none,
 
         .op_start_serial => {},
@@ -522,6 +536,7 @@ pub fn applyCommitted(seat: *Seat) void {
     switch (seat.committed.focus) {
         .none => seat.focus(.none),
         .window => |window| seat.focus(.{ .window = window }),
+        .shell_surface => |shell_surface| seat.focus(.{ .shell_surface = shell_surface }),
     }
 
     switch (seat.committed.op) {
@@ -601,12 +616,12 @@ pub fn focus(seat: *Seat, new_focus: Focus) void {
     // First clear the current focus
     switch (seat.focused) {
         .window => |window| window.destroyPopups(),
-        .override_redirect, .lock_surface, .none => {},
+        .shell_surface, .override_redirect, .lock_surface, .none => {},
     }
 
     // Set the new focus
     switch (new_focus) {
-        .window => assert(server.lock_manager.state != .locked),
+        .window, .shell_surface => assert(server.lock_manager.state != .locked),
         .lock_surface => assert(server.lock_manager.state != .unlocked),
         .override_redirect, .none => {},
     }

@@ -56,6 +56,9 @@ const Globals = struct {
                     globals.viewporter = registry.bind(global.name, wp.Viewporter, 1) catch return;
                 } else if (mem.orderZ(u8, global.interface, wp.SinglePixelBufferManagerV1.interface.name) == .eq) {
                     globals.single_pixel = registry.bind(global.name, wp.SinglePixelBufferManagerV1, 1) catch return;
+                } else if (mem.orderZ(u8, global.interface, wl.Seat.interface.name) == .eq) {
+                    const wl_seat = registry.bind(global.name, wl.Seat, 1) catch return;
+                    _ = wl_seat.getKeyboard() catch return;
                 }
             },
             .global_remove => {},

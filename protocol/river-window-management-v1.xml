@@ -1161,6 +1161,27 @@
       <arg name="window" type="object" interface="river_window_v1"/>
     </event>
 
+    <event name="shell_surface_interaction">
+      <description summary="a shell surface has been interacted with">
+        A shell surface has been interacted with beyond the pointer merely
+        passing over it. This event might be sent due to a pointer button press
+        or due to a touch/tablet tool interaction with the shell_surface.
+
+        There are no guarantees regarding how this event is sent in relation to
+        the pointer_enter and pointer_leave events as the interaction may use
+        touch or tablet tool input.
+
+        Rationale: While the shell surface does receive all wl_pointer,
+        wl_touch, etc. input events for the surface directly, these events do
+        not necessarily trigger an update sequence and therefore do not allow
+        the window manager to update focus in a race-free way.
+
+        This event is double-buffered state and will be followed by a
+        river_window_manager_v1.update event.
+      </description>
+      <arg name="shell_surface" type="object" interface="river_shell_surface_v1"/>
+    </event>
+
     <request name="op_start_serial">
       <description summary="start an interactive operation with a serial">
         Start an interactive seat operation with a serial from either the

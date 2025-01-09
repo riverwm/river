@@ -108,7 +108,7 @@ pub fn update(input_popup: *InputPopup) void {
     const focused = SceneNodeData.fromSurface(focused_surface) orelse return;
 
     const output = switch (focused.data) {
-        .window => @panic("TODO"),
+        .window, .shell_surface => @panic("TODO"),
         .lock_surface => |lock_surface| lock_surface.getOutput(),
         // Xwayland doesn't use the text-input protocol
         .override_redirect => unreachable,
@@ -116,6 +116,7 @@ pub fn update(input_popup: *InputPopup) void {
 
     const popup_tree = switch (focused.data) {
         .window => |window| window.popup_tree,
+        .shell_surface => @panic("TODO"),
         .lock_surface => |_| server.scene.layers.popups, // XXX Do we need per-lock-surface popup trees?
         // Xwayland doesn't use the text-input protocol
         .override_redirect => unreachable,

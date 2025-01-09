@@ -54,10 +54,10 @@ pub fn checkActive(inhibit_manager: *IdleInhibitManager) void {
         const node_data = SceneNodeData.fromSurface(node.data.wlr_inhibitor.surface) orelse continue;
         switch (node_data.data) {
             .window => {
-                inhibited = true;
+                inhibited = true; // XXX be strict
                 break;
             },
-            .lock_surface, .override_redirect => {
+            .shell_surface, .lock_surface, .override_redirect => {
                 inhibited = true;
                 break;
             },

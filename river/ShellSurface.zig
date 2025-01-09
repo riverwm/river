@@ -79,6 +79,8 @@ pub fn create(
     const surfaces = try Scene.SaveableSurfaces.init(tree);
     _ = try surfaces.tree.createSceneSubsurfaceTree(surface);
 
+    try SceneNodeData.attach(&tree.node, .{ .shell_surface = shell_surface });
+
     shell_surface.* = .{
         .object = shell_surface_v1,
         .surface = surface,
@@ -96,6 +98,8 @@ pub fn create(
 fn handleDestroy(_: *river.ShellSurfaceV1, shell_surface: *ShellSurface) void {
     shell_surface.node.makeInert();
     shell_surface.node.deinit();
+
+    shell_surface.tree.node.destroy();
 
     util.gpa.destroy(shell_surface);
 }

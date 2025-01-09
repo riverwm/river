@@ -96,6 +96,10 @@ fn handleEvent(seat_v1: *river.SeatV1, event: river.SeatV1.Event, seat: *Seat) v
             const window: *Window = @ptrCast(@alignCast(window_v1.getUserData()));
             seat.focus(window);
         },
+        .shell_surface_interaction => |args| {
+            const shell_surface_v1 = args.shell_surface orelse return;
+            seat_v1.focusShellSurface(shell_surface_v1);
+        },
     }
 }
 
