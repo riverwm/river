@@ -249,18 +249,22 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
 /// mark this window for destruction when the transaction completes. Otherwise
 /// destroy immediately.
 pub fn destroy(window: *Window, when: enum { lazy, assert }) void {
-    // We can't assert(window.wm_pending.state != .ready) since the client may
-    // have exited after making its empty initial commit but before the surface
-    // is mapped.
     assert(window.impl == .none);
     assert(!window.mapped);
 
-    // We may need to send the closed event and make the window_v1/node_v1 objects
-    // inert here if the client exits after the empty initial commit but before
-    // the window is mapped.
-    window.makeInert();
-
     window.destroying = true;
+
+    // We can't assert(window.wm_pending.state != .ready) since the client may
+    // have exited after making its empty initial commit but before the surface
+    // is mapped.
+    switch (window.wm_pending.state) {
+        .init => {},
+        .closing, .ready => {
+            window.wm_pending.state = .closing;
+            server.wm.dirtyPending();
+            return;
+        },
+    }
 
     {
         var it = server.input_manager.seats.iterator(.forward);
@@ -364,7 +368,7 @@ pub fn sendDirty(window: *Window) void {
             window.node.link_inflight.remove();
             window.node.link_inflight.init();
 
-            window.close();
+            window.makeInert();
         },
         .ready => {
             const wm_v1 = server.wm.object orelse return;
@@ -441,7 +445,7 @@ pub fn sendDirty(window: *Window) void {
     }
 }
 
-pub fn makeInert(window: *Window) void {
+fn makeInert(window: *Window) void {
     if (window.object) |window_v1| {
         window.object = null;
         window_v1.sendClosed();
