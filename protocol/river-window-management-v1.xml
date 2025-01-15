@@ -1174,7 +1174,8 @@
         Rationale: While the shell surface does receive all wl_pointer,
         wl_touch, etc. input events for the surface directly, these events do
         not necessarily trigger an update sequence and therefore do not allow
-        the window manager to update focus in a race-free way.
+        the window manager to update focus or perform other actions in response
+        to the input in a race-free way.
 
         This event is double-buffered state and will be followed by a
         river_window_manager_v1.update event.
