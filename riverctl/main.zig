@@ -110,10 +110,10 @@ fn _main() !void {
 fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, globals: *Globals) void {
     switch (event) {
         .global => |global| {
-            if (mem.orderZ(u8, global.interface, wl.Seat.getInterface().name) == .eq) {
+            if (mem.orderZ(u8, global.interface, wl.Seat.interface.name) == .eq) {
                 assert(globals.seat == null); // TODO: support multiple seats
                 globals.seat = registry.bind(global.name, wl.Seat, 1) catch @panic("out of memory");
-            } else if (mem.orderZ(u8, global.interface, zriver.ControlV1.getInterface().name) == .eq) {
+            } else if (mem.orderZ(u8, global.interface, zriver.ControlV1.interface.name) == .eq) {
                 globals.control = registry.bind(global.name, zriver.ControlV1, 1) catch @panic("out of memory");
             }
         },

@@ -47,7 +47,7 @@ pub fn create(client: *wl.Client, version: u32, id: u32, output: *Output, namesp
         return;
     }
 
-    const node = try util.gpa.create(std.TailQueue(Layout).Node);
+    const node = try util.gpa.create(std.DoublyLinkedList(Layout).Node);
     errdefer util.gpa.destroy(node);
     node.data = .{
         .layout_v3 = layout_v3,
@@ -186,7 +186,7 @@ pub fn destroy(layout: *Layout) void {
     );
 
     // Remove layout from the list
-    const node: *std.TailQueue(Layout).Node = @fieldParentPtr("data", layout);
+    const node: *std.DoublyLinkedList(Layout).Node = @fieldParentPtr("data", layout);
     layout.output.layouts.remove(node);
 
     // If we are the currently active layout of an output, clean up.

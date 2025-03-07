@@ -1089,13 +1089,12 @@ pub fn updateState(cursor: *Cursor) void {
         .passthrough => {
             cursor.updateFocusFollowsCursorTarget();
             if (!cursor.hidden) {
-                var now: posix.timespec = undefined;
-                posix.clock_gettime(posix.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
+                const now = posix.clock_gettime(.MONOTONIC) catch @panic("CLOCK_MONOTONIC not supported");
                 // 2^32-1 milliseconds is ~50 days, which is a realistic uptime.
                 // This means that we must wrap if the monotonic time is greater than
                 // 2^32-1 milliseconds and hope that clients don't get too confused.
                 const msec: u32 = @intCast(@rem(
-                    now.tv_sec *% std.time.ms_per_s +% @divTrunc(now.tv_nsec, std.time.ns_per_ms),
+                    now.sec *% std.time.ms_per_s +% @divTrunc(now.nsec, std.time.ns_per_ms),
                     math.maxInt(u32),
                 ));
                 cursor.passthrough(msec);
@@ -1216,7 +1215,7 @@ fn warp(cursor: *Cursor) void {
     };
     if (!output_layout_box.containsPoint(cursor.wlr_cursor.x, cursor.wlr_cursor.y) or
         (usable_layout_box.containsPoint(cursor.wlr_cursor.x, cursor.wlr_cursor.y) and
-        !target_box.containsPoint(cursor.wlr_cursor.x, cursor.wlr_cursor.y)))
+            !target_box.containsPoint(cursor.wlr_cursor.x, cursor.wlr_cursor.y)))
     {
         const lx: f64 = @floatFromInt(target_box.x + @divTrunc(target_box.width, 2));
         const ly: f64 = @floatFromInt(target_box.y + @divTrunc(target_box.height, 2));

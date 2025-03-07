@@ -100,7 +100,7 @@ pub fn configure(xwayland_view: XwaylandView) bool {
         xwayland_view.xwayland_surface.height == inflight.box.height and
         (inflight.focus != 0) == (current.focus != 0) and
         (output.inflight.fullscreen == xwayland_view.view) ==
-        (current.output != null and current.output.?.current.fullscreen == xwayland_view.view))
+            (current.output != null and current.output.?.current.fullscreen == xwayland_view.view))
     {
         return false;
     }

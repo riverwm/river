@@ -23,6 +23,11 @@ const util = @import("util.zig");
 
 const View = @import("View.zig");
 
+pub const RuleGlobs = struct {
+    app_id_glob: []const u8,
+    title_glob: []const u8,
+};
+
 pub const MaxGlobLen = struct {
     app_id: usize,
     title: usize,
@@ -83,7 +88,7 @@ pub fn RuleList(comptime T: type) type {
             });
         }
 
-        pub fn del(list: *List, rule: struct { app_id_glob: []const u8, title_glob: []const u8 }) ?T {
+        pub fn del(list: *List, rule: RuleGlobs) ?T {
             for (list.rules.items, 0..) |existing, i| {
                 if (mem.eql(u8, rule.app_id_glob, existing.app_id_glob) and
                     mem.eql(u8, rule.title_glob, existing.title_glob))

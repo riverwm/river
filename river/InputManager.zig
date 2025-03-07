@@ -58,7 +58,7 @@ tablet_manager: *wlr.TabletManagerV2,
 configs: std.ArrayList(InputConfig),
 
 devices: wl.list.Head(InputDevice, .link),
-seats: std.TailQueue(Seat) = .{},
+seats: std.DoublyLinkedList(Seat) = .{},
 
 exclusive_client: ?*wl.Client = null,
 
@@ -74,7 +74,7 @@ new_text_input: wl.Listener(*wlr.TextInputV3) =
     wl.Listener(*wlr.TextInputV3).init(handleNewTextInput),
 
 pub fn init(input_manager: *InputManager) !void {
-    const seat_node = try util.gpa.create(std.TailQueue(Seat).Node);
+    const seat_node = try util.gpa.create(std.DoublyLinkedList(Seat).Node);
     errdefer util.gpa.destroy(seat_node);
 
     input_manager.* = .{

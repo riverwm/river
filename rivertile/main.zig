@@ -91,12 +91,12 @@ const gpa = std.heap.c_allocator;
 const Context = struct {
     initialized: bool = false,
     layout_manager: ?*river.LayoutManagerV3 = null,
-    outputs: std.TailQueue(Output) = .{},
+    outputs: std.DoublyLinkedList(Output) = .{},
 
     fn addOutput(context: *Context, registry: *wl.Registry, name: u32) !void {
         const wl_output = try registry.bind(name, wl.Output, 3);
         errdefer wl_output.release();
-        const node = try gpa.create(std.TailQueue(Output).Node);
+        const node = try gpa.create(std.DoublyLinkedList(Output).Node);
         errdefer gpa.destroy(node);
         try node.data.init(context, wl_output, name);
         context.outputs.append(node);
@@ -140,7 +140,7 @@ const Output = struct {
             .namespace_in_use => fatal("namespace 'rivertile' already in use.", .{}),
 
             .user_command => |ev| {
-                var it = mem.tokenize(u8, mem.span(ev.command), " ");
+                var it = mem.tokenizeScalar(u8, mem.span(ev.command), ' ');
                 const raw_cmd = it.next() orelse {
                     std.log.err("not enough arguments", .{});
                     return;
@@ -382,9 +382,9 @@ pub fn main() !void {
 fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, context: *Context) void {
     switch (event) {
         .global => |global| {
-            if (mem.orderZ(u8, global.interface, river.LayoutManagerV3.getInterface().name) == .eq) {
+            if (mem.orderZ(u8, global.interface, river.LayoutManagerV3.interface.name) == .eq) {
                 context.layout_manager = registry.bind(global.name, river.LayoutManagerV3, 1) catch return;
-            } else if (mem.orderZ(u8, global.interface, wl.Output.getInterface().name) == .eq) {
+            } else if (mem.orderZ(u8, global.interface, wl.Output.interface.name) == .eq) {
                 context.addOutput(registry, global.name) catch |err| fatal("failed to bind output: {}", .{err});
             }
         },

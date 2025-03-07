@@ -41,7 +41,7 @@ globs: std.ArrayListUnmanaged([]const u8) = .{},
 pub fn create(seat: *Seat, name: []const u8) !void {
     log.debug("new keyboard group: '{s}'", .{name});
 
-    const node = try util.gpa.create(std.TailQueue(KeyboardGroup).Node);
+    const node = try util.gpa.create(std.DoublyLinkedList(KeyboardGroup).Node);
     errdefer util.gpa.destroy(node);
 
     const wlr_group = try wlr.KeyboardGroup.create();
@@ -72,7 +72,7 @@ pub fn destroy(group: *KeyboardGroup) void {
 
     group.wlr_group.destroy();
 
-    const node: *std.TailQueue(KeyboardGroup).Node = @fieldParentPtr("data", group);
+    const node: *std.DoublyLinkedList(KeyboardGroup).Node = @fieldParentPtr("data", group);
     group.seat.keyboard_groups.remove(node);
     util.gpa.destroy(node);
 }

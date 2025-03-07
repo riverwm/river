@@ -30,7 +30,7 @@ const View = @import("View.zig");
 wlr_manager: *wlr.IdleInhibitManagerV1,
 new_idle_inhibitor: wl.Listener(*wlr.IdleInhibitorV1) =
     wl.Listener(*wlr.IdleInhibitorV1).init(handleNewIdleInhibitor),
-inhibitors: std.TailQueue(IdleInhibitor) = .{},
+inhibitors: std.DoublyLinkedList(IdleInhibitor) = .{},
 
 pub fn init(inhibit_manager: *IdleInhibitManager) !void {
     inhibit_manager.* = .{
@@ -79,7 +79,7 @@ pub fn checkActive(inhibit_manager: *IdleInhibitManager) void {
 
 fn handleNewIdleInhibitor(listener: *wl.Listener(*wlr.IdleInhibitorV1), inhibitor: *wlr.IdleInhibitorV1) void {
     const inhibit_manager: *IdleInhibitManager = @fieldParentPtr("new_idle_inhibitor", listener);
-    const inhibitor_node = util.gpa.create(std.TailQueue(IdleInhibitor).Node) catch return;
+    const inhibitor_node = util.gpa.create(std.DoublyLinkedList(IdleInhibitor).Node) catch return;
     inhibitor_node.data.init(inhibitor, inhibit_manager) catch {
         util.gpa.destroy(inhibitor_node);
         return;

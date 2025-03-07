@@ -1,23 +1,24 @@
 .{
-    .name = "river",
+    .name = .river,
     .version = "0.3.8-dev",
     .paths = .{""},
     .dependencies = .{
-        .@"zig-pixman" = .{
-            .url = "https://codeberg.org/ifreund/zig-pixman/archive/v0.2.0.tar.gz",
-            .hash = "12209db20ce873af176138b76632931def33a10539387cba745db72933c43d274d56",
+        .pixman = .{
+            .url = "https://codeberg.org/ifreund/zig-pixman/archive/v0.3.0.tar.gz",
+            .hash = "pixman-0.3.0-LClMnz2VAAAs7QSCGwLimV5VUYx0JFnX5xWU6HwtMuDX",
         },
-        .@"zig-wayland" = .{
-            .url = "https://codeberg.org/ifreund/zig-wayland/archive/v0.2.0.tar.gz",
-            .hash = "1220687c8c47a48ba285d26a05600f8700d37fc637e223ced3aa8324f3650bf52242",
+        .wayland = .{
+            .url = "https://codeberg.org/ifreund/zig-wayland/archive/v0.3.0.tar.gz",
+            .hash = "wayland-0.3.0-lQa1kjPIAQDmhGYpY-zxiRzQJFHQ2VqhJkQLbKKdt5wl",
         },
-        .@"zig-wlroots" = .{
-            .url = "https://codeberg.org/ifreund/zig-wlroots/archive/v0.18.1.tar.gz",
-            .hash = "122083317b028705b5d27be12976feebf17066a4e51802b3b5e9f970bec580e433e1",
+        .wlroots = .{
+            .url = "https://codeberg.org/ifreund/zig-wlroots/archive/v0.18.2.tar.gz",
+            .hash = "wlroots-0.18.2-jmOlchnIAwBq45_cxU1V3OWErxxJjQZlc9PyJfR-l3uk",
         },
-        .@"zig-xkbcommon" = .{
-            .url = "https://codeberg.org/ifreund/zig-xkbcommon/archive/v0.2.0.tar.gz",
-            .hash = "1220c90b2228d65fd8427a837d31b0add83e9fade1dcfa539bb56fd06f1f8461605f",
+        .xkbcommon = .{
+            .url = "https://codeberg.org/ifreund/zig-xkbcommon/archive/v0.3.0.tar.gz",
+            .hash = "xkbcommon-0.3.0-VDqIe3K9AQB2fG5ZeRcMC9i7kfrp5m2rWgLrmdNn9azr",
         },
     },
+    .fingerprint = 0xf5e3672b8e8d6efc,
 }

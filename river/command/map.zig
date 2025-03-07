@@ -285,7 +285,7 @@ fn parseKeysym(name: [:0]const u8, out: *?[]const u8) !xkb.Keysym {
 }
 
 fn parseModifiers(modifiers_str: []const u8, out: *?[]const u8) !wlr.Keyboard.ModifierMask {
-    var it = mem.split(u8, modifiers_str, "+");
+    var it = mem.splitScalar(u8, modifiers_str, '+');
     var modifiers = wlr.Keyboard.ModifierMask{};
     outer: while (it.next()) |mod_name| {
         if (mem.eql(u8, mod_name, "None")) continue;

@@ -84,7 +84,7 @@ mapping_repeat_timer: *wl.EventSource,
 /// Currently repeating mapping, if any
 repeating_mapping: ?*const Mapping = null,
 
-keyboard_groups: std.TailQueue(KeyboardGroup) = .{},
+keyboard_groups: std.DoublyLinkedList(KeyboardGroup) = .{},
 
 /// Currently focused output. Null only when there are no outputs at all.
 focused_output: ?*Output = null,

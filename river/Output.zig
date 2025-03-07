@@ -171,7 +171,7 @@ previous_tags: u32 = 1 << 0,
 attach_mode: ?Config.AttachMode = null,
 
 /// List of all layouts
-layouts: std.TailQueue(Layout) = .{},
+layouts: std.DoublyLinkedList(Layout) = .{},
 
 /// The current layout namespace of the output. If null,
 /// config.default_layout_namespace should be used instead.
@@ -536,8 +536,7 @@ fn handleFrame(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
         error.CommitFailed => log.err("output commit failed for {s}", .{output.wlr_output.name}),
     };
 
-    var now: posix.timespec = undefined;
-    posix.clock_gettime(posix.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
+    var now = posix.clock_gettime(.MONOTONIC) catch @panic("CLOCK_MONOTONIC not supported");
     scene_output.sendFrameDone(&now);
 }
 

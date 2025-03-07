@@ -303,8 +303,8 @@ fn allowlist(server: *Server, global: *const wl.Global) bool {
     // For other globals I like the current pointer comparison approach as it
     // should catch river accidentally exposing multiple copies of e.g. wl_shm
     // with an assertion failure.
-    return global.getInterface() == wl.Output.getInterface() or
-        global.getInterface() == wl.Seat.getInterface() or
+    return global.getInterface() == wl.Output.interface or
+        global.getInterface() == wl.Seat.interface or
         global == server.shm.global or
         global == server.single_pixel_buffer_manager.global or
         global == server.viewporter.global or

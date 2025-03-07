@@ -26,6 +26,7 @@ const util = @import("../util.zig");
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 const View = @import("../View.zig");
+const RuleGlobs = @import("../rule_list.zig").RuleGlobs;
 
 const Action = enum {
     float,
@@ -157,7 +158,7 @@ pub fn ruleDel(_: *Seat, args: []const [:0]const u8, _: *?[]const u8) Error!void
 
     const action = std.meta.stringToEnum(Action, result.args[0]) orelse return Error.UnknownOption;
 
-    const rule = .{
+    const rule: RuleGlobs = .{
         .app_id_glob = result.flags.@"app-id" orelse "*",
         .title_glob = result.flags.title orelse "*",
     };

@@ -307,7 +307,7 @@ pub fn apply(config: *const InputConfig, device: *InputDevice) void {
     const libinput_device: *c.libinput_device = @ptrCast(device.wlr_device.getLibinputDevice() orelse return);
     log.debug("applying input configuration '{s}' to device '{s}'.", .{ config.glob, device.identifier });
 
-    inline for (@typeInfo(InputConfig).Struct.fields) |field| {
+    inline for (@typeInfo(InputConfig).@"struct".fields) |field| {
         if (comptime mem.eql(u8, field.name, "glob")) continue;
 
         if (@field(config, field.name)) |setting| {
@@ -324,7 +324,7 @@ pub fn apply(config: *const InputConfig, device: *InputDevice) void {
 }
 
 pub fn parse(config: *InputConfig, setting: []const u8, value: []const u8) !void {
-    inline for (@typeInfo(InputConfig).Struct.fields) |field| {
+    inline for (@typeInfo(InputConfig).@"struct".fields) |field| {
         if (comptime mem.eql(u8, field.name, "glob")) continue;
 
         if (mem.eql(u8, setting, field.name)) {
@@ -358,8 +358,8 @@ pub fn parse(config: *InputConfig, setting: []const u8, value: []const u8) !void
                 }
                 config.@"map-to-output" = .{ .output_name = output_name_owned };
             } else {
-                const T = @typeInfo(field.type).Optional.child;
-                if (@typeInfo(T) != .Enum) {
+                const T = @typeInfo(field.type).optional.child;
+                if (@typeInfo(T) != .@"enum") {
                     @compileError("You forgot to implement parsing for an input configuration setting.");
                 }
                 @field(config, field.name) = meta.stringToEnum(T, value) orelse
@@ -376,7 +376,7 @@ pub fn parse(config: *InputConfig, setting: []const u8, value: []const u8) !void
 pub fn write(config: *InputConfig, writer: anytype) !void {
     try writer.print("{s}\n", .{config.glob});
 
-    inline for (@typeInfo(InputConfig).Struct.fields) |field| {
+    inline for (@typeInfo(InputConfig).@"struct".fields) |field| {
         if (comptime mem.eql(u8, field.name, "glob")) continue;
 
         if (comptime mem.eql(u8, field.name, "map-to-output")) {
@@ -396,8 +396,8 @@ pub fn write(config: *InputConfig, writer: anytype) !void {
                     mem.sliceTo(c.libevdev_event_code_get_name(c.EV_KEY, setting.button), 0),
                 });
             } else {
-                const T = @typeInfo(field.type).Optional.child;
-                if (@typeInfo(T) != .Enum) {
+                const T = @typeInfo(field.type).optional.child;
+                if (@typeInfo(T) != .@"enum") {
                     @compileError("You forgot to implement listing for an input configuration setting.");
                 }
                 try writer.print("\t{s}: {s}\n", .{ field.name, @tagName(setting) });

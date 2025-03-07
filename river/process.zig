@@ -29,7 +29,7 @@ pub fn setup() void {
         .mask = posix.empty_sigset,
         .flags = 0,
     };
-    posix.sigaction(posix.SIG.PIPE, &sig_ign, null) catch unreachable;
+    posix.sigaction(posix.SIG.PIPE, &sig_ign, null);
 
     // Most unix systems have a default limit of 1024 file descriptors and it
     // seems unlikely for this default to be universally raised due to the
@@ -68,7 +68,7 @@ pub fn cleanupChild() void {
         .mask = posix.empty_sigset,
         .flags = 0,
     };
-    posix.sigaction(posix.SIG.PIPE, &sig_dfl, null) catch unreachable;
+    posix.sigaction(posix.SIG.PIPE, &sig_dfl, null);
 
     if (original_rlimit) |original| {
         posix.setrlimit(.NOFILE, original) catch {
