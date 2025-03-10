@@ -6,12 +6,6 @@ const mem = std.mem;
 
 const Scanner = @import("wayland").Scanner;
 
-/// While a river release is in development, this string should contain the version in development
-/// with the "-dev" suffix.
-/// When a release is tagged, the "-dev" suffix should be removed for the commit that gets tagged.
-/// Directly after the tagged commit, the version should be bumped and the "-dev" suffix added.
-const version = "0.3.8-dev";
-
 pub fn build(b: *Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -291,3 +285,31 @@ pub fn build(b: *Build) !void {
         test_step.dependOn(&run_globber_test.step);
     }
 }
+
+const version = manifest.version;
+/// Getting rid of this wart requires upstream zig improvements.
+/// See: https://github.com/ziglang/zig/issues/22775
+const manifest: struct {
+    name: @Type(.enum_literal),
+    version: []const u8,
+    paths: []const []const u8,
+    dependencies: struct {
+        pixman: struct {
+            url: []const u8,
+            hash: []const u8,
+        },
+        wayland: struct {
+            url: []const u8,
+            hash: []const u8,
+        },
+        wlroots: struct {
+            url: []const u8,
+            hash: []const u8,
+        },
+        xkbcommon: struct {
+            url: []const u8,
+            hash: []const u8,
+        },
+    },
+    fingerprint: u64,
+} = @import("build.zig.zon");

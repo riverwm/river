@@ -1,5 +1,10 @@
 .{
     .name = .river,
+    // While a river release is in development, this string should contain
+    // the version in development with the "-dev" suffix.
+    // When a release is tagged, the "-dev" suffix should be removed for the
+    // commit that gets tagged. Directly after the tagged commit, the version
+    // should be bumped and the "-dev" suffix added.
     .version = "0.3.9-dev",
     .paths = .{""},
     .dependencies = .{
