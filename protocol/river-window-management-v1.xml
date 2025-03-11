@@ -37,6 +37,57 @@
       This global interface should only be advertised to the window manager
       process. Only one window management client may be active at a time. The
       compositor should use the unavailable event if necessary to enforce this.
+
+      There are two disjoint categories of state managed by this protocol:
+
+      Windowing state influences the communication between the server and
+      individual window clients (e.g. xdg_toplevels). Windowing state includes
+      window dimensions, fullscreen state, keyboard focus, keyboard bindings,
+      and more.
+
+      Rendering state only affects the rendered output of the compositor and
+      does not influence communication between the server and individual window
+      clients. Rendering state includes the position and rendering order of
+      windows, shell surfaces, decoration surfaces, borders, window cropping,
+      and more.
+
+      The main loop of this protocol is as follows:
+
+      1. The server waits for an input event, window state change, etc.
+
+      2. The server sends events indicating all changes since the last
+         update followed by the update_windowing_start event.
+
+      4. The client sends requests modifying windowing state or rendering state
+         (as defined above) followed by the update_windowing_finish request.
+
+      6. The server sends new state to windows and waits for all window size
+         changes. After all windows are ready it sends the new window sizes to
+         the client followed by the update_rendering_start event.
+
+      7. The client sends requests modifying rendering state (as defined above)
+         followed by the update_rendering_finish request.
+
+      After step 7, loop back to step 1 or, if there was a state change since
+      the last update, skip straight to step 2.
+
+      For the purposes of frame perfection, the server may delay rendering new
+      state committed by the windows in step 6 until after step 7 is finished.
+
+      If the window manager client needs to ensure an update sequence is started
+      due to a state change the compositor is not aware of, it may send the
+      update_mark_dirty request.
+
+      It is a protocol error for the client to make an update_windowing_finish
+      or update_rendering_finish request that violates this ordering.
+
+      It is a protocol error to send requests modifying windowing state before
+      the update_windowing_start event or after the update_windowing_finish
+      request.
+
+      It is a protocol error to send requests modifying rendering state before
+      the update_windowing_start event or after the update_rendering_finish
+      request.
     </description>
 
     <enum name="error">
@@ -92,49 +143,77 @@
       </description>
     </request>
 
-    <event name="update">
-      <description summary="all new state has been sent">
-        This event is used to group state update events sent to the client into
-        a single, atomic update.
+    <event name="update_windowing_start">
+      <description summary="start the windowing update sequence phase">
+        This event indicates that the server has sent events indicating all
+        state changes since the last update sequence.
 
-        Since some state changes require action from the window manager client
-        for frame perfection, the client should update the necessary state,
-        ack_update, and commit as soon as possible on receiving an update event.
+        In response to this event, the client should make requests modifying
+        windowing state as it chooses. Then, the client must make the
+        update_windowing_finish request to move the update sequence forward.
 
-        For example, when the dimensions of a window change it may be necessary
-        for the window manager to resize its decoration surfaces to match. In
-        this case the compositor may wait for the window manager client to
-        adjust the decoration surface size, ack_update, and commit before
-        rendering the window at its new size to avoid imperfect frames where the
-        decoration surface size does not match the window size.
+        See the description of the river_window_manager_v1 interface for a
+        complete overview of the update sequence loop.
       </description>
-      <arg name="serial" type="uint"/>
     </event>
 
-    <request name="ack_update">
-      <description summary="ack an update event">
-        If a client makes a river_window_manager_v1.commit request in response
-        to a river_window_manager_v1.update event it must make an ack_update
-        request before the commit request with the serial of that update event.
+    <request name="update_windowing_finish">
+      <description summary="finish the windowing update sequence phase">
+        This request indicates that the client has made all changes to windowing
+        state it wishes to include in the current update sequence and that the
+        server should atomically send these state changes to the windows and
+        continue with the update sequence.
 
-        If the client receives multiple update events before it can respond to
-        one, only the most recent update event must be acked.
+        After sending this request, it is a protocol error for the client to
+        make further changes to windowing state until the next
+        update_windowing_start event is received.
 
-        A client may send multiple ack_update requests before committing. The
-        last request sent before a commit indicates which update event the
-        commit is in response to.
-
-        It is a protocol error to issue multiple ack_update requests referencing
-        the same update event or to issue an ack_update request referencing an
-        update event older than the last update event acked.
+        See the description of the river_window_manager_v1 interface for a
+        complete overview of the update sequence loop.
       </description>
-      <arg name="serial" type="uint"/>
     </request>
 
-    <request name="commit">
-      <description summary="commit double-buffered requested state">
-        This request is used to group state update requests sent to the server
-        into a single, atomic update.
+    <event name="update_rendering_start">
+      <description summary="start the rendering update sequence phase">
+        This event indicates that windows have received and reacted to the
+        windowing state changes sent in the current update sequence and that
+        all new window dimensions have been sent to the window manager client.
+
+        In response to this event, the client should make requests modifying
+        rendering state as it chooses. Then, the client must make the
+        update_rendering_finish request to finish the current update sequence.
+
+        See the description of the river_window_manager_v1 interface for a
+        complete overview of the update sequence loop.
+      </description>
+    </event>
+
+    <request name="update_rendering_finish">
+      <description summary="finish the rendering update sequence phase">
+        This request indicates that the client has made all changes to rendering
+        state it wishes to include in the current update sequence and that the
+        server should atomically apply and display these state changes to the
+        user, completing the current update sequence.
+
+        After sending this request, it is a protocol error for the client to
+        make further changes to rendering state until the next
+        update_windowing_start event is received.
+
+        See the description of the river_window_manager_v1 interface for a
+        complete overview of the update sequence loop.
+      </description>
+    </request>
+
+    <request name="update_mark_dirty">
+      <description summary="Ensure an update sequence is started">
+        This request ensures an update sequence is started and that an
+        update_windowing_start event sent by the server. If this request is
+        made during an ongoing update sequence, a new update sequence will be
+        started as soon as the current one is completed.
+
+        The client may want to use this request due to an internal state change
+        that the compositor is not aware of (e.g. a dbus event) which should
+        affect windowing or rendering state.
       </description>
     </request>
 
@@ -145,8 +224,8 @@
         The window manager may wish to restrict which key bindings are available
         while locked or otherwise use this information.
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
       </description>
     </event>
 
@@ -154,14 +233,17 @@
       <description summary="the session has been unlocked">
         This event indicates that the session has been unlocked.
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
       </description>
     </event>
 
     <event name="window">
       <description summary="new window">
-        A new window has been created by some client.
+        A new window has been created.
+
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
       </description>
       <arg name="id" type="new_id" interface="river_window_v1"/>
     </event>
@@ -171,9 +253,9 @@
         A new logical output has been created, perhaps due to a new physical
         monitor being plugged in or perhaps due to a change in configuration.
 
-        This event is double-buffered state and will be followed by
-        river_output_v1.position and dimensions events as well as a
-        river_window_manager_v1.update event.
+        This event will be followed by river_output_v1.position and dimensions
+        events as well as an update_windowing_start event after all other new
+        state has been sent by the server.
       </description>
       <arg name="id" type="new_id" interface="river_output_v1"/>
     </event>
@@ -182,8 +264,8 @@
       <description summary="new seat">
         A new seat has been created.
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
       </description>
       <arg name="id" type="new_id" interface="river_seat_v1"/>
     </event>
@@ -207,8 +289,8 @@
       an xdg_toplevel or Xwayland window.
 
       A newly created window will not be displayed until the window manager
-      proposes window dimensions (river_window_v1.propose_dimensions) and makes
-      a river_window_manager_v1.commit request.
+      proposes window dimensions with the propose_dimensions request as part of
+      an update sequence and that update sequence completes.
 
       TODO:
         - window cropping
@@ -240,8 +322,8 @@
         sent. The client should destroy this object with the
         river_window_v1.destroy request to free up resources.
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
       </description>
     </event>
 
@@ -254,8 +336,8 @@
         The server will send a river_window_v1.closed event if/when the window
         has been closed.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies windowing state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
     </request>
 
@@ -282,8 +364,8 @@
         The min_width/min_height must be strictly less than or equal to the
         max_width/max_height.
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
       </description>
       <arg name="min_width" type="int"/>
       <arg name="min_height" type="int"/>
@@ -301,8 +383,11 @@
         the window content and are unaffected by the presence of borders or
         decoration surfaces.
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event is sent during update sequences after the
+        update_windowing_finish request and before the update_rendering_start
+        event. It may also be sent at the beginning of an update sequence before
+        the update_windowing_start event if, for example, a window independently
+        decides to change its dimensions.
       </description>
       <arg name="width" type="int"/>
       <arg name="height" type="int"/>
@@ -322,16 +407,16 @@
         river_window_v1.dimensions event. For example, a terminal emulator may
         only allow dimensions that are multiple of the cell size.
 
-        The server must send a dimensions event in response to a
-        propose_dimensions request in the next possible update even if the
+        When a propose_dimensions request is made, the server must send a
+        dimensions event in response during the update sequence even if the
         window dimensions are unchanged since the most recent dimensions event.
 
         Note that the dimensions of a river_window_v1 refer to the dimensions of
         the window content and are unaffected by the presence of borders or
         decoration surfaces.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies windowing state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
       <arg name="width" type="int"/>
       <arg name="height" type="int"/>
@@ -345,8 +430,8 @@
         Newly created windows are considered shown unless explicitly hidden with
         the hide request.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies rendering state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
     </request>
 
@@ -359,8 +444,8 @@
         Newly created windows are considered shown unless explicitly hidden with
         the hide request.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies rendering state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
     </request>
 
@@ -372,8 +457,8 @@
         application ID or if the window cleared its application ID. (Xwayland
         windows may do this for example, though xdg-toplevels may not.)
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
       </description>
       <arg name="app_id" type="string" allow-null="true"/>
     </event>
@@ -386,8 +471,8 @@
         if the window cleared its title. (Xwayland windows may do this for
         example, though xdg-toplevels may not.)
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
       </description>
       <arg name="title" type="string" allow-null="true"/>
     </event>
@@ -405,8 +490,8 @@
         The compositor must guarantee that there are no loops in the window
         tree: a parent must not be the descendant of one of its children.
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
       </description>
       <arg name="parent" type="object" allow-null="true"
         interface="river_window_v1"/>
@@ -431,8 +516,8 @@
         This event may be sent multiple times over the lifetime of the window if
         the window changes its preferences.
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
       </description>
       <arg name="hint" type="uint" enum="decoration_hint"/>
     </event>
@@ -445,8 +530,8 @@
         This is the default if neither this request nor the use_ssd request is
         ever made.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies windowing state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
     </request>
 
@@ -458,8 +543,8 @@
         This request will have no effect if the client only supports client side
         decoration, see the decoration_hint event.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies windowing state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
     </request>
 
@@ -495,8 +580,8 @@
         position/dimensions of the window content and are unaffected by the
         presence of borders or decoration surfaces.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies rendering state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
       <arg name="edges" type="uint" enum="edges"/>
       <arg name="width" type="int"/>
@@ -519,8 +604,8 @@
         part of a tiled layout. If this request is never made, the window is
         informed that it is not part of a tiled layout.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies windowing state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
       <arg name="edges" type="uint" enum="edges"/>
     </request>
@@ -552,8 +637,8 @@
         river_seat_v1.op_add_move_window requests to interactively move the
         window or ignore this event entirely.
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
       </description>
       <arg name="seat" type="object" interface="river_seat_v1"/>
       <arg name="serial" type="uint"/>
@@ -578,8 +663,8 @@
         river_seat_v1.op_add_resize_window requests to interactively resize the
         window or ignore this event entirely.
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
       </description>
       <arg name="seat" type="object" interface="river_seat_v1"/>
       <arg name="serial" type="uint"/>
@@ -607,8 +692,8 @@
         for all new windows. If this request is never made, the compositor will
         inform windows that all capabilities are supported.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies windowing state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
       <arg name="caps" type="uint" enum="capabilities"/>
     </request>
@@ -627,8 +712,8 @@
         The x and y arguments indicate where the window requested that the
         window menu be shown.
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
       </description>
       <arg name="x" type="int" summary="x offset from top left corner"/>
       <arg name="y" type="int" summary="y offset from top left corner"/>
@@ -642,8 +727,8 @@
         The window manager is free to honor this request using
         river_window_v1.inform_maximize or ignore it.
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
       </description>
     </event>
 
@@ -655,8 +740,8 @@
         The window manager is free to honor this request using
         river_window_v1.inform_unmaximized or ignore it.
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
       </description>
     </event>
 
@@ -669,8 +754,8 @@
         The window manager remains responsible for handling the position and
         dimensions of the window while it is maximized.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies windowing state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
     </request>
 
@@ -680,8 +765,8 @@
         information to adapt the style of its client-side window decorations for
         example.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies windowing state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
     </request>
 
@@ -693,8 +778,8 @@
         The window manager is free to honor this request using
         river_window_v1.fullscreen or ignore it.
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
       </description>
       <arg name="output" type="object" allow-null="true"
         interface="river_output_v1" />
@@ -708,8 +793,8 @@
         The window manager is free to honor this request using
         river_window_v1.exit_fullscreen or ignore it.
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
       </description>
     </event>
 
@@ -724,8 +809,8 @@
         shall not affect the current position and dimensions of a fullscreen
         window.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies windowing state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
       <arg name="output" type="object" interface="river_output_v1"/>
     </request>
@@ -738,8 +823,8 @@
         determined by the most recent set_position and propose_dimensions
         requests.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies windowing state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
     </request>
 
@@ -751,8 +836,8 @@
         The window manager is free to ignore this request, hide the window, or
         do whatever else it chooses.
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
       </description>
     </event>
   </interface>
@@ -779,22 +864,25 @@
         If this request is never sent, the x and y offsets are undefined by this
         protocol and left up to the compositor.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies rendering state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
       <arg name="x" type="int"/>
       <arg name="y" type="int"/>
     </request>
 
     <request name="sync_next_commit">
-      <description summary="sync next surface commit to window manager commit">
+      <description summary="sync next commit with other rendering state">
         Synchronize application of the next wl_surface.commit request on the
-        decoration surface with rest of the state atomically updated with the
-        next river_window_manager_v1.commit request.
+        decoration surface with rest of the state atomically applied with the
+        next river_window_manager_v1.update_rendering_finish request.
 
         The client must make a wl_surface.commit request on the decoration
-        surface after this request and before the river_window_manager_v1.commit
+        surface after this request and before the update_rendering_finish
         request, failure to do so is a protocol error.
+
+        This request modifies rendering state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
     </request>
   </interface>
@@ -833,12 +921,15 @@
     <request name="sync_next_commit">
       <description summary="sync next surface commit to window manager commit">
         Synchronize application of the next wl_surface.commit request on the
-        shell surface with rest of the state atomically updated with the next
-        river_window_manager_v1.commit request.
+        shell surface with rest of the rendering state atomically applied with
+        the next river_window_manager_v1.update_rendering_finish request.
 
         The client must make a wl_surface.commit request on the shell surface
-        after this request and before the river_window_manager_v1.commit
-        request, failure to do so is a protocol error.
+        after this request and before the update_rendering_finish request,
+        failure to do so is a protocol error.
+
+        This request modifies rendering state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
     </request>
   </interface>
@@ -874,8 +965,8 @@
         If this request is never sent, the position of the node is undefined by
         this protocol and left up to the compositor.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies rendering state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
       <arg name="x" type="int"/>
       <arg name="y" type="int"/>
@@ -897,8 +988,8 @@
         position. For example, this event is necessary to communicate the
         results of interactive resize to the window manager client.
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
       </description>
       <arg name="x" type="int"/>
       <arg name="y" type="int"/>
@@ -909,8 +1000,8 @@
         This request places the node above all other nodes in the compositor's
         render list.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies rendering state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
     </request>
 
@@ -919,8 +1010,8 @@
         This request places the node below all other nodes in the compositor's
         render list.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies rendering state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
     </request>
 
@@ -931,8 +1022,8 @@
 
         Attempting to place a node above itself has no effect.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies rendering state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
       <arg name="other" type="object" interface="river_node_v1"/>
     </request>
@@ -944,8 +1035,8 @@
 
         Attempting to place a node below itself has no effect.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies rendering state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
       <arg name="other" type="object" interface="river_node_v1"/>
     </request>
@@ -983,8 +1074,8 @@
         This event may be sent because a corresponding physical output has been
         physically unplugged or because some output configuration has changed.
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
       </description>
     </event>
 
@@ -997,12 +1088,12 @@
         This event is sent once when the river_output_v1 is created and again
         whenever the position changes.
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
 
         The server must guarantee that the position and dimensions events do not
         cause the areas of multiple logical outputs to overlap when the
-        corresponding river_window_manager_v1.update event is received.
+        corresponding update_windowing_start event is received.
       </description>
       <arg name="x" type="int"/>
       <arg name="y" type="int"/>
@@ -1017,12 +1108,12 @@
         This event is sent once when the river_output_v1 is created and again
         whenever the dimensions change.
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
 
         The server must guarantee that the position and dimensions events do not
         cause the areas of multiple logical outputs to overlap when the
-        corresponding river_window_manager_v1.update event is received.
+        corresponding update_windowing_start event is received.
       </description>
       <arg name="width" type="int"/>
       <arg name="height" type="int"/>
@@ -1061,8 +1152,8 @@
         The client should destroy this object with the river_seat_v1.destroy
         request to free up resources.
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
       </description>
     </event>
 
@@ -1070,8 +1161,8 @@
       <description summary="give keyboard focus to a window">
         Request that the compositor send keyboard input to the given window.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies windowing state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
       <arg name="window" type="object" interface="river_window_v1"/>
     </request>
@@ -1081,8 +1172,8 @@
         Request that the compositor send keyboard input to the given shell
         surface.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies windowing state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
       <arg name="shell_surface" type="object" interface="river_shell_surface_v1"/>
     </request>
@@ -1091,8 +1182,8 @@
       <description summary="clear keyboard focus">
         Request that the compositor not send keyboard input to any client.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies windowing state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
     </request>
 
@@ -1110,8 +1201,8 @@
         pointer moves between windows, the pointer_leave event for the old
         window must be sent before the pointer_enter event for the new window.
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
       </description>
       <arg name="window" type="object" interface="river_window_v1"/>
     </event>
@@ -1120,8 +1211,8 @@
       <description summary="pointer left a window">
         The seat's pointer left the given window. See pointer_enter for details.
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
       </description>
       <arg name="window" type="object" interface="river_window_v1"/>
     </event>
@@ -1131,12 +1222,12 @@
         The seat's pointer was moved.
 
         Rationale: The motivating window manager feature for this event is the
-        "always" style of focus-follows-cursor. Waiting for the window manager
-        to ack and commit in response to every single pointer motion event is
-        noisy, wasteful, and unnecessary.
+        "always" style of focus-follows-cursor. Carrying out a full update
+        sequence on every single pointer motion event is noisy, wasteful, and
+        unnecessary.
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
       </description>
     </event>
 
@@ -1155,8 +1246,8 @@
         keyboard focus, etc. Rather than expose all pointer, touch, and tablet
         events to window managers, a policy over mechanism approach is taken.
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
       </description>
       <arg name="window" type="object" interface="river_window_v1"/>
     </event>
@@ -1177,8 +1268,8 @@
         the window manager to update focus or perform other actions in response
         to the input in a race-free way.
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
       </description>
       <arg name="shell_surface" type="object" interface="river_shell_surface_v1"/>
     </event>
@@ -1193,8 +1284,8 @@
         op_add_resize_window requests will be moved/resized based on input
         corresponding to the provided serial (e.g. pointer or touch input).
 
-        All windows must be added to the operation in the same
-        river_window_manager_v1.commit sequence as the op_start_serial request.
+        All windows must be added to the operation in the same update sequence
+        as the op_start_serial request.
 
         No windows are implicitly included in the operation, even the window
         that requested the move/resize must be explicitly added to the
@@ -1202,12 +1293,12 @@
 
         The operation continues until the pointer button, touch point or similar
         corresponding to the given serial is released or the op_end request is
-        made and applied with a river_window_management_v1.commit request.
+        made and applied during an update sequence.
 
         This request is ignored if an operation is already in progress.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies windowing state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
       <arg name="serial" type="uint"/>
     </request>
@@ -1218,24 +1309,23 @@
         operation with the op_add_move_window and op_add_resize_window requests
         will be moved/resized based on the movement of the pointer.
 
-        All windows must be added to the operation in the same
-        river_window_manager_v1.commit sequence as the op_start_serial request.
+        All windows must be added to the operation in the same update sequence
+        as the op_start_serial request.
 
-        The pointer operation continues until the op_end request is made and
-        applied with a river_window_management_v1.commit request.
+        The pointer operation continues until the op_end request is made during
+        an update sequence and that update sequence completes.
 
         This request is ignored if an operation is already in progress.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies windowing state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
     </request>
 
     <request name="op_add_move_window">
       <description summary="add movement of a window to an operation">
         This request causes the position of a window to be updated by an
-        operation started in the same river_window_manager_v1.commit sequence as
-        this request.
+        operation started in the same update sequence as this request.
 
         Multiple windows may be added to and moved or resized by a single
         operation.
@@ -1244,12 +1334,11 @@
         recent op_add_move_window or op_add_resize_window request will have an
         effect.
 
-        This request is ignored if not made in the same
-        river_window_manager_v1.commit sequence as the op_start_serial or
-        op_start_pointer request that starts an operation.
+        This request is ignored if not made in the same update sequence as the
+        op_start_serial or op_start_pointer request that starts an operation.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies windowing state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
       <arg name="window" type="object" interface="river_window_v1"/>
     </request>
@@ -1257,8 +1346,7 @@
     <request name="op_add_resize_window">
       <description summary="add resize of a window to an operation">
         This request causes the position/dimensions of a window to be updated by
-        an operation started in the same river_window_manager_v1.commit sequence
-        as this request.
+        an operation started in the same update sequence as this request.
 
         Multiple windows may be added to and moved or resized by a single
         operation.
@@ -1267,9 +1355,8 @@
         recent op_add_move_window or op_add_resize_window request will have an
         effect.
 
-        This request is ignored if not made in the same
-        river_window_manager_v1.commit sequence as the op_start_serial or
-        op_start_pointer request that starts an operation.
+        This request is ignored if not made in the same update sequence as the
+        op_start_serial or op_start_pointer request that starts an operation.
 
         The edges argument determines which edges of the window are resized from
         during the operation.
@@ -1279,8 +1366,8 @@
         edges. Resizing from, for example, both the top and right edges is
         allowed.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies windowing state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
       <arg name="window" type="object" interface="river_window_v1"/>
       <arg name="edges" type="uint" enum="river_window_v1.edges"/>
@@ -1292,8 +1379,8 @@
 
         This request is ignored if there is no operation in progress.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies windowing state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
     </request>
 
@@ -1320,8 +1407,8 @@
         This request may be useful to place bounds on an interactive pointer
         move or resize for example.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies windowing state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
       <arg name="region" type="object" allow-null="true" interface="wl_region"/>
     </request>
@@ -1331,8 +1418,8 @@
         Warp the pointer to the given position in the compositor's logical
         coordinate space.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies windowing state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
       <arg name="x" type="int"/>
       <arg name="y" type="int"/>
@@ -1362,8 +1449,7 @@
         configurable properties.
 
         The new key binding is not enabled until initial configuration is
-        completed, the enable request is made, and the change is committed with
-        a river_window_manager_v1.commit request.
+        completed and the enable request is made during an update sequence.
       </description>
       <arg name="id" type="new_id" interface="river_xkb_binding_v1"/>
       <arg name="keysym" type="uint" summary="an xkbcommon keysym"/>
@@ -1379,8 +1465,7 @@
         linux/input-event-codes.h header file (e.g. BTN_RIGHT).
 
         The new pointer binding is not enabled until initial configuration is
-        completed, the enable request is made, and the change is committed with
-        a river_window_manager_v1.commit request.
+        completed and the enable request is made during an update sequence.
       </description>
       <arg name="id" type="new_id" interface="river_pointer_binding_v1"/>
       <arg name="button" type="uint" summary="a Linux input event code"/>
@@ -1394,8 +1479,7 @@
       and receive events when the key binding is triggered.
 
       The new key binding is not enabled until initial configuration is
-      completed, the enable request is made, and the change is committed with a
-      river_window_manager_v1.commit request.
+      completed and the enable request is made during an update sequence.
 
       Normally, all key events are sent to the surface with keyboard focus by
       the compositor. Key events that trigger a key binding are not sent to the
@@ -1444,8 +1528,8 @@
         completed and the window manager wishes the key binding to be able to be
         triggered.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies windowing state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
     </request>
 
@@ -1454,8 +1538,8 @@
         This request may be used to temporarily disable the key binding. It may
         be later re-enabled with the enable request.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies windowing state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
     </request>
 
@@ -1464,15 +1548,15 @@
         This event indicates that the physical key triggering the binding has
         been pressed.
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
 
-        The compositor should wait for the window manager to ack the update and
-        commit in response before processing further input events. This allows
-        the window manager client to, for example, modify key bindings and
-        keyboard focus without racing against future input events. The window
-        manager should ack and commit as soon as possible as the capacity of the
-        compositor to buffer incoming input events is finite.
+        The compositor should wait for the update sequence to complete before
+        processing further input events. This allows the window manager client
+        to, for example, modify key bindings and keyboard focus without racing
+        against future input events. The window manager should of course respond
+        as soon as possible as the capacity of the compositor to buffer incoming
+        input events is finite.
       </description>
     </event>
 
@@ -1486,15 +1570,15 @@
         event. This event is sent when the "main" key is released, even if the
         modifiers have changed since the pressed event.
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
 
-        The compositor should wait for the window manager to ack the update and
-        commit in response before processing further input events. This allows
-        the window manager client to, for example, modify key bindings and
-        keyboard focus without racing against future input events. The window
-        manager should ack and commit as soon as possible as the capacity of the
-        compositor to buffer incoming input events is finite.
+        The compositor should wait for the update sequence to complete before
+        processing further input events. This allows the window manager client
+        to, for example, modify key bindings and keyboard focus without racing
+        against future input events. The window manager should of course respond
+        as soon as possible as the capacity of the compositor to buffer incoming
+        input events is finite.
       </description>
     </event>
   </interface>
@@ -1504,9 +1588,8 @@
       This object allows the window manager to configure a pointer binding and
       receive events when the binding is triggered.
 
-      The new pointer binding is not enabled until initial configuration is
-      completed, the enable request is made, and the change is committed with a
-      river_window_manager_v1.commit request.
+      The new key binding is not enabled until initial configuration is
+      completed and the enable request is made during an update sequence.
 
       Normally, all pointer button events are sent to the surface with pointer
       focus by the compositor. Pointer button events that trigger a pointer
@@ -1531,8 +1614,8 @@
         completed and the window manager wishes the pointer binding to be able
         to be triggered.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies windowing state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
     </request>
 
@@ -1541,8 +1624,8 @@
         This request may be used to temporarily disable the pointer binding. It
         may be later re-enabled with the enable request.
 
-        This request is double-buffered state and will not be applied until the
-        next river_window_manager_v1.commit request.
+        This request modifies windowing state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
     </request>
 
@@ -1551,15 +1634,15 @@
         This event indicates that the pointer button triggering the binding has
         been pressed.
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
 
-        The compositor should wait for the window manager to ack the update and
-        commit in response before processing further input events. This allows
-        the window manager client to, for example, modify pointer bindings
-        without racing against future input events. The window manager should
-        ack and commit as soon as possible as the capacity of the compositor to
-        buffer incoming input events is finite.
+        The compositor should wait for the update sequence to complete before
+        processing further input events. This allows the window manager client
+        to, for example, modify key bindings and keyboard focus without racing
+        against future input events. The window manager should of course respond
+        as soon as possible as the capacity of the compositor to buffer incoming
+        input events is finite.
       </description>
     </event>
 
@@ -1573,15 +1656,15 @@
         pointer button is released, even if the modifiers have changed since
         the pressed event.
 
-        This event is double-buffered state and will be followed by a
-        river_window_manager_v1.update event.
+        This event will be followed by an update_windowing_start event after all
+        other new state has been sent by the server.
 
-        The compositor should wait for the window manager to ack the update and
-        commit in response before processing further input events. This allows
-        the window manager client to, for example, modify pointer bindings
-        without racing against future input events. The window manager should
-        ack and commit as soon as possible as the capacity of the compositor to
-        buffer incoming input events is finite.
+        The compositor should wait for the update sequence to complete before
+        processing further input events. This allows the window manager client
+        to, for example, modify key bindings and keyboard focus without racing
+        against future input events. The window manager should of course respond
+        as soon as possible as the capacity of the compositor to buffer incoming
+        input events is finite.
       </description>
     </event>
   </interface>
