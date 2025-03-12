@@ -32,8 +32,16 @@ const PointerBinding = @import("PointerBinding.zig");
 
 const gpa = std.heap.c_allocator;
 
+const State = struct {
+    new: bool = false,
+    action: ?Action = null,
+    window_interaction: ?*Window = null,
+    shell_surface_interaction: ?*river.ShellSurfaceV1 = null,
+};
+
 wm: *WindowManager,
 seat_v1: *river.SeatV1,
+pending: State = .{},
 focused: ?*Window = null,
 link: wl.list.Link,
 
@@ -42,43 +50,12 @@ pub fn create(wm: *WindowManager, seat_v1: *river.SeatV1) void {
     seat.* = .{
         .wm = wm,
         .seat_v1 = seat_v1,
+        .pending = .{ .new = true },
         .link = undefined,
     };
     wm.seats.append(seat);
 
     seat_v1.setListener(*Seat, handleEvent, seat);
-
-    XkbBinding.create(seat, xkb.Keysym.n, .{ .mod4 = true }, .focus_next);
-    XkbBinding.create(seat, xkb.Keysym.h, .{ .mod4 = true }, .hide_focused);
-    XkbBinding.create(seat, xkb.Keysym.k, .{ .mod4 = true }, .close_focused);
-    XkbBinding.create(seat, xkb.Keysym.s, .{ .mod4 = true }, .show_all);
-    PointerBinding.create(seat, c.BTN_LEFT, .{ .mod4 = true }, .move_start, .op_end);
-    PointerBinding.create(seat, c.BTN_RIGHT, .{ .mod4 = true }, .resize_start, .op_end);
-    PointerBinding.create(seat, c.BTN_MIDDLE, .{ .mod4 = true }, .close_focused, null);
-}
-
-pub fn focus(seat: *Seat, target: ?*Window) void {
-    if (target) |window| {
-        seat.seat_v1.focusWindow(window.window_v1);
-        seat.focused = window;
-
-        window.link.remove();
-        seat.wm.windows.prepend(window);
-
-        window.node_v1.placeTop();
-    } else {
-        seat.seat_v1.clearFocus();
-    }
-}
-
-pub fn focusNext(seat: *Seat) void {
-    if (seat.focused != null) {
-        if (seat.wm.windows.length() >= 2) {
-            seat.focus(seat.wm.windows.last().?);
-        }
-    } else {
-        seat.focus(seat.wm.windows.first());
-    }
 }
 
 fn handleEvent(seat_v1: *river.SeatV1, event: river.SeatV1.Event, seat: *Seat) void {
@@ -94,13 +71,36 @@ fn handleEvent(seat_v1: *river.SeatV1, event: river.SeatV1.Event, seat: *Seat) v
         .window_interaction => |args| {
             const window_v1 = args.window orelse return;
             const window: *Window = @ptrCast(@alignCast(window_v1.getUserData()));
-            seat.focus(window);
+            assert(seat.pending.window_interaction == null);
+            seat.pending.window_interaction = window;
         },
         .shell_surface_interaction => |args| {
-            const shell_surface_v1 = args.shell_surface orelse return;
-            seat_v1.focusShellSurface(shell_surface_v1);
+            assert(seat.pending.shell_surface_interaction == null);
+            seat.pending.shell_surface_interaction = args.shell_surface orelse return;
         },
     }
+}
+
+pub fn updateWindowing(seat: *Seat) void {
+    if (seat.pending.new) {
+        XkbBinding.create(seat, xkb.Keysym.n, .{ .mod4 = true }, .focus_next);
+        XkbBinding.create(seat, xkb.Keysym.h, .{ .mod4 = true }, .hide_focused);
+        XkbBinding.create(seat, xkb.Keysym.k, .{ .mod4 = true }, .close_focused);
+        XkbBinding.create(seat, xkb.Keysym.s, .{ .mod4 = true }, .show_all);
+        PointerBinding.create(seat, c.BTN_LEFT, .{ .mod4 = true }, .move_start, .op_end);
+        PointerBinding.create(seat, c.BTN_RIGHT, .{ .mod4 = true }, .resize_start, .op_end);
+        PointerBinding.create(seat, c.BTN_MIDDLE, .{ .mod4 = true }, .close_focused, null);
+    }
+    if (seat.pending.window_interaction) |window| {
+        seat.focus(window);
+    }
+    if (seat.pending.shell_surface_interaction) |shell_surface| {
+        seat.seat_v1.focusShellSurface(shell_surface);
+    }
+    if (seat.pending.action) |action| {
+        seat.execute(action);
+    }
+    seat.pending = .{};
 }
 
 pub const Action = enum {
@@ -142,5 +142,29 @@ pub fn execute(seat: *Seat, action: Action) void {
             }
         },
         .op_end => seat.seat_v1.opEnd(),
+    }
+}
+
+pub fn focus(seat: *Seat, target: ?*Window) void {
+    if (target) |window| {
+        seat.seat_v1.focusWindow(window.window_v1);
+        seat.focused = window;
+
+        window.link.remove();
+        seat.wm.windows.prepend(window);
+
+        window.node_v1.placeTop();
+    } else {
+        seat.seat_v1.clearFocus();
+    }
+}
+
+pub fn focusNext(seat: *Seat) void {
+    if (seat.focused != null) {
+        if (seat.wm.windows.length() >= 2) {
+            seat.focus(seat.wm.windows.last().?);
+        }
+    } else {
+        seat.focus(seat.wm.windows.first());
     }
 }

@@ -51,7 +51,10 @@ pub fn create(
 fn handleEvent(xkb_binding_v1: *river.XkbBindingV1, event: river.XkbBindingV1.Event, binding: *XkbBinding) void {
     assert(binding.xkb_binding_v1 == xkb_binding_v1);
     switch (event) {
-        .pressed => binding.seat.execute(binding.action),
+        .pressed => {
+            assert(binding.seat.pending.action == null);
+            binding.seat.pending.action = binding.action;
+        },
         .released => {},
     }
 }

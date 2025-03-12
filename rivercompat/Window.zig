@@ -26,61 +26,32 @@ const WindowManager = @import("WindowManager.zig");
 
 const gpa = std.heap.c_allocator;
 
-wm: *WindowManager,
+const State = struct {
+    new: bool = false,
+    closed: bool = false,
+};
+
 window_v1: *river.WindowV1,
 node_v1: *river.NodeV1,
+pending: State,
 link: wl.list.Link,
 
 pub fn create(window_v1: *river.WindowV1, wm: *WindowManager) void {
     const window = gpa.create(Window) catch @panic("OOM");
     window.* = .{
-        .wm = wm,
         .window_v1 = window_v1,
         .node_v1 = window_v1.getNode() catch @panic("OOM"),
+        .pending = .{ .new = true },
         .link = undefined,
     };
     wm.windows.append(window);
     window_v1.setListener(*Window, handleEvent, window);
-    window.node_v1.placeTop();
-    window_v1.useSsd();
-
-    const rgb = 0x586e75;
-    window_v1.setBorders(
-        .{ .left = true, .bottom = true, .top = false, .right = true },
-        6, // width
-        @as(u32, (rgb >> 16) & 0xff) * (0xffff_ffff / 0xff),
-        @as(u32, (rgb >> 8) & 0xff) * (0xffff_ffff / 0xff),
-        @as(u32, (rgb >> 0) & 0xff) * (0xffff_ffff / 0xff),
-        0xffff_ffff,
-    );
-
-    {
-        var it = wm.seats.iterator(.forward);
-        while (it.next()) |seat| {
-            seat.focus(window);
-        }
-    }
 }
 
 fn handleEvent(window_v1: *river.WindowV1, event: river.WindowV1.Event, window: *Window) void {
     assert(window.window_v1 == window_v1);
     switch (event) {
-        .closed => {
-            window_v1.destroy();
-
-            window.link.remove();
-            {
-                var it = window.wm.seats.iterator(.forward);
-                while (it.next()) |seat| {
-                    if (seat.focused == window) {
-                        seat.focused = null;
-                        seat.focusNext();
-                    }
-                }
-            }
-
-            gpa.destroy(window);
-        },
+        .closed => window.pending.closed = true,
         .dimensions_hint => {},
         .dimensions => {},
         .app_id => {},
@@ -96,4 +67,46 @@ fn handleEvent(window_v1: *river.WindowV1, event: river.WindowV1.Event, window: 
         .exit_fullscreen_requested => {},
         .minimize_requested => {},
     }
+}
+
+pub fn updateWindowing(window: *Window, wm: *WindowManager) void {
+    if (window.pending.closed) {
+        window.window_v1.destroy();
+        window.link.remove();
+        {
+            var it = wm.seats.iterator(.forward);
+            while (it.next()) |seat| {
+                if (seat.focused == window) {
+                    seat.focused = null;
+                    seat.focusNext();
+                }
+            }
+        }
+        gpa.destroy(window);
+        return;
+    }
+
+    if (window.pending.new) {
+        window.node_v1.placeTop();
+        window.window_v1.useSsd();
+
+        const rgb = 0x586e75;
+        window.window_v1.setBorders(
+            .{ .left = true, .bottom = true, .top = false, .right = true },
+            6, // width
+            @as(u32, (rgb >> 16) & 0xff) * (0xffff_ffff / 0xff),
+            @as(u32, (rgb >> 8) & 0xff) * (0xffff_ffff / 0xff),
+            @as(u32, (rgb >> 0) & 0xff) * (0xffff_ffff / 0xff),
+            0xffff_ffff,
+        );
+
+        {
+            var it = wm.seats.iterator(.forward);
+            while (it.next()) |seat| {
+                seat.focus(window);
+            }
+        }
+    }
+
+    window.pending = .{};
 }

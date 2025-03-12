@@ -35,6 +35,7 @@ single_pixel: *wp.SinglePixelBufferManagerV1,
 
 windows: wl.list.Head(Window, .link),
 seats: wl.list.Head(Seat, .link),
+shell_surfaces: wl.list.Head(ShellSurface, .link),
 
 pub fn init(
     wm: *WindowManager,
@@ -50,9 +51,11 @@ pub fn init(
         .single_pixel = single_pixel,
         .windows = undefined,
         .seats = undefined,
+        .shell_surfaces = undefined,
     };
     wm.windows.init();
     wm.seats.init();
+    wm.shell_surfaces.init();
 
     wm_v1.setListener(*WindowManager, handleEvent, wm);
 
@@ -64,16 +67,17 @@ fn handleEvent(wm_v1: *river.WindowManagerV1, event: river.WindowManagerV1.Event
     switch (event) {
         .unavailable => main.fatal("another window manager is already running", .{}),
         .finished => unreachable, // We never send river_window_manager_v1.stop
-        .update => |args| {
-            wm_v1.ackUpdate(args.serial);
-            wm_v1.commit();
+        .update_windowing_start => {
+            wm.updateWindowing();
+            wm_v1.updateWindowingFinish();
+        },
+        .update_rendering_start => {
+            wm.updateRendering();
+            wm_v1.updateWindowingFinish();
         },
         .session_locked => {},
         .session_unlocked => {},
-        .window => |args| {
-            Window.create(args.id, wm);
-            wm.arrange();
-        },
+        .window => |args| Window.create(args.id, wm),
         .output => |args| {
             _ = args;
         },
@@ -83,16 +87,34 @@ fn handleEvent(wm_v1: *river.WindowManagerV1, event: river.WindowManagerV1.Event
     }
 }
 
-pub fn arrange(wm: *WindowManager) void {
+fn updateWindowing(wm: *WindowManager) void {
+    {
+        var it = wm.seats.iterator(.forward);
+        while (it.next()) |seat| {
+            seat.updateWindowing();
+        }
+    }
     {
         var x: i32 = 0;
         var y: i32 = 0;
         var it = wm.windows.iterator(.forward);
         while (it.next()) |window| {
+            window.updateWindowing(wm);
+
             window.node_v1.setPosition(x, y);
             window.window_v1.proposeDimensions(400, 400);
             x += 40;
             y += 40;
         }
     }
+    {
+        var it = wm.shell_surfaces.iterator(.forward);
+        while (it.next()) |shell_surface| {
+            shell_surface.updateWindowing(wm);
+        }
+    }
+}
+
+fn updateRendering(wm: *WindowManager) void {
+    _ = wm;
 }
