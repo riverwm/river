@@ -108,6 +108,19 @@ const LayoutPoint = struct {
     ly: f64,
 };
 
+const Image = union(enum) {
+    /// No cursor image
+    none,
+    /// Name of the current Xcursor shape
+    xcursor: [*:0]const u8,
+    /// Cursor surface configured by a client
+    client: struct {
+        surface: *wlr.Surface,
+        hotspot_x: i32,
+        hotspot_y: i32,
+    },
+};
+
 const log = std.log.scoped(.cursor);
 
 /// Current cursor mode as well as any state needed to implement that mode
@@ -124,9 +137,8 @@ wlr_cursor: *wlr.Cursor,
 
 /// Xcursor manager for the currently configured Xcursor theme.
 xcursor_manager: *wlr.XcursorManager,
-/// Name of the current Xcursor shape, or null if a client has configured a
-/// surface to be used as the cursor shape instead.
-xcursor_name: ?[*:0]const u8 = null,
+image: Image = .none,
+image_surface_destroy: wl.Listener(*wlr.Surface) = .init(handleImageSurfaceDestroy),
 
 /// Number of distinct buttons currently pressed
 pressed_count: u32 = 0,
@@ -286,18 +298,40 @@ pub fn setTheme(cursor: *Cursor, theme: ?[*:0]const u8, _size: ?u32) !void {
     cursor.xcursor_manager.destroy();
     cursor.xcursor_manager = xcursor_manager;
 
-    if (cursor.xcursor_name) |name| {
-        cursor.setXcursor(name);
+    switch (cursor.image) {
+        .none, .client => {},
+        .xcursor => |name| cursor.wlr_cursor.setXcursor(xcursor_manager, name),
     }
 }
 
-pub fn setXcursor(cursor: *Cursor, name: [*:0]const u8) void {
-    cursor.wlr_cursor.setXcursor(cursor.xcursor_manager, name);
-    cursor.xcursor_name = name;
+pub fn setImage(cursor: *Cursor, image: Image) void {
+    switch (cursor.image) {
+        .none, .xcursor => {},
+        .client => {
+            cursor.image_surface_destroy.link.remove();
+        },
+    }
+    cursor.image = image;
+    switch (cursor.image) {
+        .none => cursor.wlr_cursor.unsetImage(),
+        .xcursor => |name| cursor.wlr_cursor.setXcursor(cursor.xcursor_manager, name),
+        .client => |client| {
+            cursor.wlr_cursor.setSurface(client.surface, client.hotspot_x, client.hotspot_y);
+            client.surface.events.destroy.add(&cursor.image_surface_destroy);
+        },
+    }
+}
+
+fn handleImageSurfaceDestroy(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
+    const cursor: *Cursor = @fieldParentPtr("image_surface_destroy", listener);
+    // wlroots calls wlr_cursor_unset_image() automatically
+    // when the cursor surface is destroyed.
+    cursor.image = .none;
+    cursor.image_surface_destroy.link.remove();
 }
 
 fn clearFocus(cursor: *Cursor) void {
-    cursor.setXcursor("default");
+    cursor.setImage(.{ .xcursor = "default" });
     cursor.seat.wlr_seat.pointerNotifyClearFocus();
 }
 
@@ -740,8 +774,15 @@ fn handleRequestSetCursor(
         // on the output that it's currently on and continue to do so as the
         // cursor moves between outputs.
         log.debug("focused client set cursor", .{});
-        cursor.wlr_cursor.setSurface(event.surface, event.hotspot_x, event.hotspot_y);
-        cursor.xcursor_name = null;
+        if (event.surface) |surface| {
+            cursor.setImage(.{ .client = .{
+                .surface = surface,
+                .hotspot_x = event.hotspot_x,
+                .hotspot_y = event.hotspot_y,
+            } });
+        } else {
+            cursor.setImage(.none);
+        }
     }
 }
 
@@ -757,8 +798,6 @@ pub fn hide(cursor: *Cursor) void {
 
     cursor.hidden = true;
     cursor.wlr_cursor.unsetImage();
-    cursor.xcursor_name = null;
-    cursor.seat.wlr_seat.pointerNotifyClearFocus();
     cursor.hide_cursor_timer.timerUpdate(0) catch {
         log.err("failed to update cursor hide timeout", .{});
     };
@@ -770,6 +809,7 @@ pub fn unhide(cursor: *Cursor) void {
     };
     if (!cursor.hidden) return;
     cursor.hidden = false;
+    cursor.setImage(cursor.image);
     cursor.updateState();
 }
 
@@ -868,7 +908,7 @@ fn computeEdges(cursor: *const Cursor, view: *const View) wlr.Edges {
     }
 }
 
-fn enterMode(cursor: *Cursor, mode: Mode, view: *View, xcursor_name: [*:0]const u8) void {
+fn enterMode(cursor: *Cursor, mode: Mode, view: *View, xcursor: [*:0]const u8) void {
     assert(cursor.mode == .passthrough or cursor.mode == .down);
     assert(mode == .move or mode == .resize);
 
@@ -884,7 +924,7 @@ fn enterMode(cursor: *Cursor, mode: Mode, view: *View, xcursor_name: [*:0]const 
     }
 
     cursor.seat.wlr_seat.pointerNotifyClearFocus();
-    cursor.setXcursor(xcursor_name);
+    cursor.setImage(.{ .xcursor = xcursor });
 
     server.root.applyPending();
 }

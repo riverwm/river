@@ -519,7 +519,7 @@ fn handleRequestSetCursorShape(
         // actually has pointer focus first.
         if (focused_client == event.seat_client) {
             const name = wlr.CursorShapeManagerV1.shapeName(event.shape);
-            seat.cursor.setXcursor(name);
+            seat.cursor.setImage(.{ .xcursor = name });
         }
     }
 }
