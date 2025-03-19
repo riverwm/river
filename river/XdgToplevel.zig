@@ -127,7 +127,7 @@ pub fn configure(toplevel: *XdgToplevel) bool {
         .timed_out, .timed_out_acked, .committed => unreachable,
     };
 
-    const pending = &toplevel.window.pending;
+    const scheduled = &toplevel.window.configure_scheduled;
 
     if (!toplevel.needsConfigure()) {
         // If no new configure is required, continue to track a timed out configure
@@ -148,43 +148,43 @@ pub fn configure(toplevel: *XdgToplevel) bool {
 
     const wlr_toplevel = toplevel.wlr_toplevel;
 
-    _ = wlr_toplevel.setActivated(pending.activated);
+    _ = wlr_toplevel.setActivated(scheduled.activated);
     _ = wlr_toplevel.setTiled(.{
-        .top = pending.tiled.top,
-        .bottom = pending.tiled.bottom,
-        .left = pending.tiled.left,
-        .right = pending.tiled.right,
+        .top = scheduled.tiled.top,
+        .bottom = scheduled.tiled.bottom,
+        .left = scheduled.tiled.left,
+        .right = scheduled.tiled.right,
     });
     _ = wlr_toplevel.setWmCapabilities(.{
-        .window_menu = pending.capabilities.window_menu,
-        .maximize = pending.capabilities.maximize,
-        .fullscreen = pending.capabilities.fullscreen,
-        .minimize = pending.capabilities.minimize,
+        .window_menu = scheduled.capabilities.window_menu,
+        .maximize = scheduled.capabilities.maximize,
+        .fullscreen = scheduled.capabilities.fullscreen,
+        .minimize = scheduled.capabilities.minimize,
     });
-    _ = wlr_toplevel.setMaximized(pending.maximized);
-    _ = wlr_toplevel.setFullscreen(pending.fullscreen);
-    _ = wlr_toplevel.setResizing(pending.op == .resize);
+    _ = wlr_toplevel.setMaximized(scheduled.maximized);
+    _ = wlr_toplevel.setFullscreen(scheduled.fullscreen);
+    _ = wlr_toplevel.setResizing(scheduled.resizing);
     if (toplevel.decoration) |decoration| {
-        _ = decoration.wlr_decoration.setMode(if (pending.ssd) .server_side else .client_side);
+        _ = decoration.wlr_decoration.setMode(if (scheduled.ssd) .server_side else .client_side);
     }
 
-    const width: u31 = pending.width orelse switch (toplevel.configure_state) {
+    const width: u31 = scheduled.width orelse switch (toplevel.configure_state) {
         .idle => @intCast(toplevel.geometry.width),
-        .timed_out, .timed_out_acked => toplevel.window.sent.width.?,
+        .timed_out, .timed_out_acked => toplevel.window.configure_sent.width.?,
         .inflight, .acked, .committed => unreachable,
     };
-    const height: u31 = pending.height orelse switch (toplevel.configure_state) {
+    const height: u31 = scheduled.height orelse switch (toplevel.configure_state) {
         .idle => @intCast(toplevel.geometry.height),
-        .timed_out, .timed_out_acked => toplevel.window.sent.height.?,
+        .timed_out, .timed_out_acked => toplevel.window.configure_sent.height.?,
         .inflight, .acked, .committed => unreachable,
     };
     const configure_serial = wlr_toplevel.setSize(width, height);
 
-    toplevel.window.sent = toplevel.window.pending;
-    toplevel.window.sent.width = width;
-    toplevel.window.sent.height = height;
-    toplevel.window.pending.width = null;
-    toplevel.window.pending.height = null;
+    toplevel.window.configure_sent = toplevel.window.configure_scheduled;
+    toplevel.window.configure_sent.width = width;
+    toplevel.window.configure_sent.height = height;
+    toplevel.window.configure_scheduled.width = null;
+    toplevel.window.configure_scheduled.height = null;
 
     toplevel.configure_state = .{
         .inflight = configure_serial,
@@ -194,18 +194,18 @@ pub fn configure(toplevel: *XdgToplevel) bool {
 }
 
 fn needsConfigure(toplevel: *XdgToplevel) bool {
-    const pending = &toplevel.window.pending;
-    const sent = &toplevel.window.sent;
+    const scheduled = &toplevel.window.configure_scheduled;
+    const sent = &toplevel.window.configure_sent;
 
-    if (pending.width != null) return true;
-    if (pending.height != null) return true;
-    if (pending.activated != sent.activated) return true;
-    if (pending.ssd != sent.ssd) return true;
-    if (!std.meta.eql(pending.tiled, sent.tiled)) return true;
-    if (!std.meta.eql(pending.capabilities, sent.capabilities)) return true;
-    if (pending.maximized != sent.maximized) return true;
-    if (pending.fullscreen != sent.fullscreen) return true;
-    if ((pending.op == .resize) != (sent.op == .resize)) return true;
+    if (scheduled.width != null) return true;
+    if (scheduled.height != null) return true;
+    if (scheduled.activated != sent.activated) return true;
+    if (scheduled.ssd != sent.ssd) return true;
+    if (!std.meta.eql(scheduled.tiled, sent.tiled)) return true;
+    if (!std.meta.eql(scheduled.capabilities, sent.capabilities)) return true;
+    if (scheduled.maximized != sent.maximized) return true;
+    if (scheduled.fullscreen != sent.fullscreen) return true;
+    if ((scheduled.resizing) != (sent.resizing)) return true;
 
     return false;
 }
@@ -298,9 +298,9 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     });
 
     if (toplevel.wlr_toplevel.base.initial_commit) {
-        assert(window.wm_pending.state != .ready);
-        window.wm_pending.state = .ready;
-        server.wm.dirtyPending();
+        assert(window.windowing_scheduled.state != .ready);
+        window.windowing_scheduled.state = .ready;
+        server.wm.dirtyWindowing();
         return;
     }
 
@@ -322,13 +322,12 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
                     .{ old_geometry.width, old_geometry.height, toplevel.geometry.width, toplevel.geometry.height },
                 );
 
-                window.setDimensions(toplevel.geometry.width, toplevel.geometry.height);
-                window.updateSceneState();
+                window.setDimensions(@intCast(toplevel.geometry.width), @intCast(toplevel.geometry.height));
             } else if (old_geometry.x != toplevel.geometry.x or
                 old_geometry.y != toplevel.geometry.y)
             {
                 // We need to update the surface clip box to reflect the geometry change.
-                window.updateSceneState();
+                // XXX actually update the clip box
             }
         },
         // If the client has not yet acked our configure, we need to send a
@@ -339,7 +338,8 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
         .acked, .timed_out_acked => {
             toplevel.wlr_toplevel.base.getGeometry(&toplevel.geometry);
 
-            window.setDimensions(toplevel.geometry.width, toplevel.geometry.height);
+            window.rendering_scheduled.width = @intCast(toplevel.geometry.width);
+            window.rendering_scheduled.height = @intCast(toplevel.geometry.height);
 
             switch (toplevel.configure_state) {
                 .acked => {
@@ -348,7 +348,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
                 },
                 .timed_out_acked => {
                     toplevel.configure_state = .idle;
-                    window.updateSceneState();
+                    server.wm.dirtyRendering();
                 },
                 else => unreachable,
             }
@@ -371,7 +371,7 @@ fn handleRequestMove(
 
     // Moving windows with touch or tablet tool is not yet supported.
     if (seat.wlr_seat.validatePointerGrabSerial(null, event.serial)) {
-        // XXX queue pointer_move_requested, dirtyPending()
+        // XXX queue pointer_move_requested, dirtyWindowing()
     }
 }
 
@@ -382,7 +382,7 @@ fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), ev
 
     // Resizing windows with touch or tablet tool is not yet supported.
     if (seat.wlr_seat.validatePointerGrabSerial(null, event.serial)) {
-        // XXX queue pointer_resize_requested, dirtyPending()
+        // XXX queue pointer_resize_requested, dirtyWindowing()
     }
 }
 

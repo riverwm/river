@@ -32,28 +32,25 @@ const Seat = @import("Seat.zig");
 
 const log = std.log.scoped(.input);
 
-const WmState = struct {
-    enabled: bool = false,
-    // This is set for mappings with layout-pinning
-    // If set, the layout with this index is always used to translate the given keycode
-    layout: ?u32 = null,
-};
-
 seat: *Seat,
 object: *river.XkbBindingV1,
 
 keysym: xkb.Keysym,
 modifiers: river.SeatV1.Modifiers,
 
-pending: struct {
+windowing_scheduled: struct {
     state_change: enum {
         none,
         pressed,
         released,
     } = .none,
 } = .{},
-uncommitted: WmState = .{},
-committed: WmState = .{},
+windowing_requested: struct {
+    enabled: bool = false,
+    // This is set for mappings with layout-pinning
+    // If set, the layout with this index is always used to translate the given keycode
+    layout: ?u32 = null,
+} = .{},
 
 /// This bit of state is used to ensure that multiple simultaneous
 /// presses across multiple keyboards do not cause multiple press
@@ -125,9 +122,18 @@ fn handleRequest(
     assert(binding.object == xkb_binding_v1);
     switch (request) {
         .destroy => xkb_binding_v1.destroy(),
-        .set_layout_override => |args| binding.uncommitted.layout = args.layout,
-        .enable => binding.uncommitted.enabled = true,
-        .disable => binding.uncommitted.enabled = false,
+        .set_layout_override => |args| {
+            // XXX protocol error?
+            binding.windowing_requested.layout = args.layout;
+        },
+        .enable => {
+            if (!server.wm.ensureWindowing()) return;
+            binding.windowing_requested.enabled = true;
+        },
+        .disable => {
+            if (!server.wm.ensureWindowing()) return;
+            binding.windowing_requested.enabled = false;
+        },
     }
 }
 
@@ -135,18 +141,18 @@ pub fn pressed(binding: *XkbBinding) void {
     assert(!binding.sent_pressed);
     // Input event processing should not continue after a press/release event
     // until that event is sent to the window manager in an update and acked.
-    assert(binding.pending.state_change == .none);
-    binding.pending.state_change = .pressed;
-    server.wm.dirtyPending();
+    assert(binding.windowing_scheduled.state_change == .none);
+    binding.windowing_scheduled.state_change = .pressed;
+    server.wm.dirtyWindowing();
 }
 
 pub fn released(binding: *XkbBinding) void {
     assert(binding.sent_pressed);
     // Input event processing should not continue after a press/release event
     // until that event is sent to the window manager in an update and acked.
-    assert(binding.pending.state_change == .none);
-    binding.pending.state_change = .released;
-    server.wm.dirtyPending();
+    assert(binding.windowing_scheduled.state_change == .none);
+    binding.windowing_scheduled.state_change = .released;
+    server.wm.dirtyWindowing();
 }
 
 /// Compare binding with given keycode, modifiers and keyboard state
@@ -157,14 +163,14 @@ pub fn match(
     xkb_state: *xkb.State,
     method: enum { no_translate, translate },
 ) bool {
-    if (!binding.committed.enabled) return false;
+    if (!binding.windowing_requested.enabled) return false;
 
     const keymap = xkb_state.getKeymap();
 
     // If the binding has no pinned layout, use the active layout.
     // It doesn't matter if the index is out of range, since xkbcommon
     // will fall back to the active layout if so.
-    const layout = binding.committed.layout orelse xkb_state.keyGetLayout(keycode);
+    const layout = binding.windowing_requested.layout orelse xkb_state.keyGetLayout(keycode);
 
     switch (method) {
         .no_translate => {

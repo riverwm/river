@@ -31,25 +31,22 @@ const Seat = @import("Seat.zig");
 
 const log = std.log.scoped(.input);
 
-const WmState = struct {
-    enabled: bool = false,
-};
-
 seat: *Seat,
 object: *river.PointerBindingV1,
 
 button: u32,
 modifiers: river.SeatV1.Modifiers,
 
-pending: struct {
+windowing_scheduled: struct {
     state_change: enum {
         none,
         pressed,
         released,
     } = .none,
 } = .{},
-uncommitted: WmState = .{},
-committed: WmState = .{},
+windowing_requested: struct {
+    enabled: bool = false,
+} = .{},
 
 /// This bit of state is used to ensure that multiple simultaneous
 /// presses across multiple keyboards do not cause multiple press
@@ -111,8 +108,14 @@ fn handleRequest(
     assert(binding.object == pointer_binding_v1);
     switch (request) {
         .destroy => pointer_binding_v1.destroy(),
-        .enable => binding.uncommitted.enabled = true,
-        .disable => binding.uncommitted.enabled = false,
+        .enable => {
+            if (!server.wm.ensureWindowing()) return;
+            binding.windowing_requested.enabled = true;
+        },
+        .disable => {
+            if (!server.wm.ensureWindowing()) return;
+            binding.windowing_requested.enabled = false;
+        },
     }
 }
 
@@ -120,18 +123,18 @@ pub fn pressed(binding: *PointerBinding) void {
     assert(!binding.sent_pressed);
     // Input event processing should not continue after a press/release event
     // until that event is sent to the window manager in an update and acked.
-    assert(binding.pending.state_change == .none);
-    binding.pending.state_change = .pressed;
-    server.wm.dirtyPending();
+    assert(binding.windowing_scheduled.state_change == .none);
+    binding.windowing_scheduled.state_change = .pressed;
+    server.wm.dirtyWindowing();
 }
 
 pub fn released(binding: *PointerBinding) void {
     assert(binding.sent_pressed);
     // Input event processing should not continue after a press/release event
     // until that event is sent to the window manager in an update and acked.
-    assert(binding.pending.state_change == .none);
-    binding.pending.state_change = .released;
-    server.wm.dirtyPending();
+    assert(binding.windowing_scheduled.state_change == .none);
+    binding.windowing_scheduled.state_change = .released;
+    server.wm.dirtyWindowing();
 }
 
 pub fn match(
@@ -139,7 +142,7 @@ pub fn match(
     button: u32,
     modifiers: wlr.Keyboard.ModifierMask,
 ) bool {
-    if (!binding.committed.enabled) return false;
+    if (!binding.windowing_requested.enabled) return false;
 
     return button == binding.button and
         @as(u32, @bitCast(modifiers)) == @as(u32, @bitCast(binding.modifiers));

@@ -203,7 +203,7 @@ fn handleUnlock(listener: *wl.Listener(void)) void {
 
     handleDestroy(&manager.destroy);
 
-    server.wm.dirtyPending();
+    server.wm.dirtyWindowing();
 }
 
 fn handleDestroy(listener: *wl.Listener(void)) void {

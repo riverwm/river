@@ -73,7 +73,7 @@ fn handleEvent(wm_v1: *river.WindowManagerV1, event: river.WindowManagerV1.Event
         },
         .update_rendering_start => {
             wm.updateRendering();
-            wm_v1.updateWindowingFinish();
+            wm_v1.updateRenderingFinish();
         },
         .session_locked => {},
         .session_unlocked => {},
@@ -95,16 +95,9 @@ fn updateWindowing(wm: *WindowManager) void {
         }
     }
     {
-        var x: i32 = 0;
-        var y: i32 = 0;
         var it = wm.windows.iterator(.forward);
         while (it.next()) |window| {
             window.updateWindowing(wm);
-
-            window.node_v1.setPosition(x, y);
-            window.window_v1.proposeDimensions(400, 400);
-            x += 40;
-            y += 40;
         }
     }
     {

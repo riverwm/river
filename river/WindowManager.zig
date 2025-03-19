@@ -42,52 +42,41 @@ object: ?*river.WindowManagerV1 = null,
 
 state: union(enum) {
     idle,
-    /// An update event was sent to the window manager but has not yet been acked.
-    /// Value is the update serial
-    update_sent: u32,
-    /// An update event was sent to the window manager and has been acked but not yet committed.
-    update_acked,
+    /// Waiting on the window manager client to finish the windowing phase of the update sequence.
+    update_windowing,
     /// The number of configures sent that have not yet been acked
     inflight_configures: u32,
+    /// Waiting on the window manager client to finish the rendering phase of the update sequence.
+    update_rendering,
 } = .idle,
 
 windows: wl.list.Head(Window, .link),
 
-/// Pending state to be sent to the wm in the next update sequence.
-pending: struct {
-    /// Pending state has been modified since the last update event sent to the wm.
+/// Windowing state to be sent to the wm in the next windowing update sequence.
+windowing_scheduled: struct {
+    /// Windowing state has been modified since the last windowing update sequence.
     dirty: bool = false,
 
     output_config: ?*wlr.OutputConfigurationV1 = null,
 } = .{},
 
 /// State sent to the wm in the latest update sequence.
-sent: struct {
+windowing_sent: struct {
     outputs: wl.list.Head(Output, .link_sent),
     output_config: ?*wlr.OutputConfigurationV1 = null,
 
     seats: wl.list.Head(Seat, .link_sent),
 },
 
-/// State sent by the wm but not yet committed with a commit request.
-uncommitted: struct {
-    /// The list is in rendering order, the last node in the list is rendered on top.
-    render_list: wl.list.Head(WmNode, .link_uncommitted),
-},
-
-/// State sent by the wm and committed with a commit request.
-committed: struct {
-    // The wm has committed state since state was last sent to windows.
+/// Rendering state to be sent to the wm in the next rendering update sequence.
+rendering_scheduled: struct {
+    /// Rendering state has been modified since the last rendering update sequence.
     dirty: bool = false,
-    /// The list is in rendering order, the last node in the list is rendered on top.
-    render_list: wl.list.Head(WmNode, .link_committed),
-},
+} = .{},
 
-/// State committed by the wm that has been sent to windows as part of the
-/// current transaction.
-inflight: struct {
-    /// The list is in rendering order, the last node in the list is rendered on top.
-    render_list: wl.list.Head(WmNode, .link_inflight),
+/// The list is in rendering order, the last node in the list is rendered on top.
+rendering_requested: struct {
+    list: wl.list.Head(WmNode, .link),
 },
 
 dirty_idle: ?*wl.EventSource = null,
@@ -102,27 +91,19 @@ pub fn init(wm: *WindowManager) !void {
     wm.* = .{
         .global = try wl.Global.create(server.wl_server, river.WindowManagerV1, 1, *WindowManager, wm, bind),
         .windows = undefined,
-        .sent = .{
+        .windowing_sent = .{
             .outputs = undefined,
             .seats = undefined,
         },
-        .uncommitted = .{
-            .render_list = undefined,
-        },
-        .committed = .{
-            .render_list = undefined,
-        },
-        .inflight = .{
-            .render_list = undefined,
+        .rendering_requested = .{
+            .list = undefined,
         },
         .timeout = timeout,
     };
     wm.windows.init();
-    wm.sent.outputs.init();
-    wm.sent.seats.init();
-    wm.uncommitted.render_list.init();
-    wm.committed.render_list.init();
-    wm.inflight.render_list.init();
+    wm.windowing_sent.outputs.init();
+    wm.windowing_sent.seats.init();
+    wm.rendering_requested.list.init();
 
     server.wl_server.addDestroyListener(&wm.server_destroy);
 }
@@ -149,7 +130,7 @@ fn bind(client: *wl.Client, wm: *WindowManager, version: u32, id: u32) void {
 
     wm.object = object;
     object.setHandler(*WindowManager, handleRequest, handleDestroy, wm);
-    wm.dirtyPending();
+    wm.dirtyWindowing();
 }
 
 fn handleRequestInert(
@@ -180,43 +161,25 @@ fn handleRequest(
             // XXX send protocol error
             wm_v1.destroy();
         },
-        .ack_update => |args| {
-            switch (wm.state) {
-                .update_sent => |serial| {
-                    if (args.serial == serial) {
-                        wm.state = .update_acked;
-                    }
-                },
-                .idle, .update_acked, .inflight_configures => {},
+        .update_windowing_finish => {
+            if (wm.state != .update_windowing) {
+                wm_v1.postError(.update_sequence_order,
+                    \\update_windowing_finish request does not match update_windowing_start
+                );
+                return;
             }
+            wm.updateWindowingFinish();
         },
-        .commit => {
-            {
-                var it = wm.uncommitted.render_list.iterator(.forward);
-                while (it.next()) |node| {
-                    node.link_committed.remove();
-                    wm.committed.render_list.append(node);
-                    switch (node.get()) {
-                        .window => |window| window.commitWmState(),
-                        .shell_surface => |shell_surface| shell_surface.commitWmState(),
-                    }
-                }
+        .update_rendering_finish => {
+            if (wm.state != .update_rendering) {
+                wm_v1.postError(.update_sequence_order,
+                    \\update_rendering_finish request does not match update_rendering_start
+                );
+                return;
             }
-
-            {
-                var it = wm.sent.seats.iterator(.forward);
-                while (it.next()) |seat| seat.commitWmState();
-            }
-
-            wm.committed.dirty = true;
-            switch (wm.state) {
-                .idle, .update_acked => {
-                    wm.cancelTimeoutTimer();
-                    wm.sendConfigures();
-                },
-                .update_sent, .inflight_configures => {},
-            }
+            wm.updateRenderingFinish();
         },
+        .update_mark_dirty => wm.dirtyWindowing(),
         .get_shell_surface => |args| {
             const surface = wlr.Surface.fromWlSurface(args.surface);
             ShellSurface.create(
@@ -233,93 +196,125 @@ fn handleRequest(
     }
 }
 
-pub fn dirtyPending(wm: *WindowManager) void {
-    wm.pending.dirty = true;
+pub fn ensureWindowing(wm: *WindowManager) bool {
+    switch (wm.state) {
+        .update_windowing => return true,
+        .idle, .inflight_configures, .update_rendering => {
+            if (wm.object) |wm_v1| {
+                wm_v1.postError(.update_sequence_order, "invalid modification of windowing state");
+            }
+            return false;
+        },
+    }
+}
+
+pub fn ensureRendering(wm: *WindowManager) bool {
+    switch (wm.state) {
+        .update_windowing, .inflight_configures, .update_rendering => return true,
+        .idle => {
+            if (wm.object) |wm_v1| {
+                wm_v1.postError(.update_sequence_order, "invalid modification of rendering state");
+            }
+            return false;
+        },
+    }
+}
+
+pub fn dirtyWindowing(wm: *WindowManager) void {
+    wm.windowing_scheduled.dirty = true;
 
     if (wm.dirty_idle == null) {
         const event_loop = server.wl_server.getEventLoop();
-        wm.dirty_idle = event_loop.addIdle(*WindowManager, handleDirtyPending, wm) catch {
+        wm.dirty_idle = event_loop.addIdle(*WindowManager, dirtyIdle, wm) catch {
             log.err("out of memory", .{});
             return;
         };
     }
 }
 
-fn handleDirtyPending(wm: *WindowManager) void {
-    assert(wm.pending.dirty);
-    wm.dirty_idle = null;
-    switch (wm.state) {
-        .idle => {
-            assert(!wm.committed.dirty);
-            wm.sendUpdate();
-        },
-        .update_sent, .update_acked, .inflight_configures => {},
+pub fn dirtyRendering(wm: *WindowManager) void {
+    wm.rendering_scheduled.dirty = true;
+
+    if (wm.dirty_idle == null) {
+        const event_loop = server.wl_server.getEventLoop();
+        wm.dirty_idle = event_loop.addIdle(*WindowManager, dirtyIdle, wm) catch {
+            log.err("out of memory", .{});
+            return;
+        };
     }
 }
 
-fn sendUpdate(wm: *WindowManager) void {
-    assert(wm.state == .idle);
-    assert(wm.pending.dirty);
+fn dirtyIdle(wm: *WindowManager) void {
+    assert(wm.windowing_scheduled.dirty or wm.rendering_scheduled.dirty);
+    wm.dirty_idle = null;
+    switch (wm.state) {
+        .idle => {
+            if (wm.rendering_scheduled.dirty) {
+                wm.updateRenderingStart();
+            } else {
+                wm.updateWindowingStart();
+            }
+        },
+        .update_windowing, .inflight_configures, .update_rendering => {},
+    }
+}
 
-    log.debug("sending update to window manager", .{});
+fn updateWindowingStart(wm: *WindowManager) void {
+    assert(wm.state == .idle);
+    assert(wm.windowing_scheduled.dirty);
+
+    log.debug("update windowing start", .{});
 
     server.om.autoLayout();
     {
         var it = server.om.outputs.safeIterator(.forward);
-        while (it.next()) |output| output.sendDirty();
+        while (it.next()) |output| output.updateWindowingStart();
     }
 
-    assert(wm.sent.output_config == null);
-    wm.sent.output_config = wm.pending.output_config;
-    wm.pending.output_config = null;
+    assert(wm.windowing_sent.output_config == null);
+    wm.windowing_sent.output_config = wm.windowing_scheduled.output_config;
+    wm.windowing_scheduled.output_config = null;
 
     {
         var it = wm.windows.safeIterator(.forward);
-        while (it.next()) |window| window.sendDirty();
+        while (it.next()) |window| window.updateWindowingStart();
     }
 
     {
         var it = server.input_manager.seats.safeIterator(.forward);
-        while (it.next()) |seat| seat.sendDirty();
+        while (it.next()) |seat| seat.updateWindowingStart();
     }
 
-    wm.pending.dirty = false;
+    wm.windowing_scheduled.dirty = false;
+    wm.state = .update_windowing;
 
     if (wm.object) |wm_v1| {
-        const serial = server.wl_server.nextSerial();
-        wm_v1.sendUpdate(serial);
-        wm.state = .{ .update_sent = serial };
-
-        wm.startTimeoutTimer();
+        // TODO kill the WM on a very long timeout?
+        wm_v1.sendUpdateWindowingStart();
     } else {
-        wm.sendConfigures();
+        wm.updateWindowingFinish();
     }
 }
 
-pub fn sendConfigures(wm: *WindowManager) void {
-    switch (wm.state) {
-        .idle, .update_acked => {},
-        .update_sent, .inflight_configures => unreachable,
-    }
+pub fn updateWindowingFinish(wm: *WindowManager) void {
+    assert(wm.state == .update_windowing);
 
-    wm.committed.dirty = false;
+    log.debug("update windowing finish", .{});
 
     {
-        // Order is important here, Seat.applyCommitted() must be called
-        // before configures are sent.
-        var it = wm.sent.seats.iterator(.forward);
-        while (it.next()) |seat| seat.applyCommitted();
+        // Order is important here, Seat.updateWindowingFinish() must be called
+        // before Window.updateWindowingFinish() are sent.
+        var it = wm.windowing_sent.seats.iterator(.forward);
+        while (it.next()) |seat| seat.updateWindowingFinish();
     }
 
     wm.state = .{ .inflight_configures = 0 };
     {
-        var it = wm.committed.render_list.iterator(.forward);
+        var it = wm.rendering_requested.list.iterator(.forward);
         while (it.next()) |node| {
-            node.link_inflight.remove();
-            wm.inflight.render_list.append(node);
             switch (node.get()) {
                 .window => |window| {
-                    if (window.configure()) {
+                    if (window.updateWindowingFinish()) {
                         wm.state.inflight_configures += 1;
                     }
                 },
@@ -328,12 +323,12 @@ pub fn sendConfigures(wm: *WindowManager) void {
         }
     }
 
-    log.debug("started transaction with {} configure(s)", .{wm.state.inflight_configures});
+    log.debug("sent {} tracked configure(s)", .{wm.state.inflight_configures});
 
     if (wm.state.inflight_configures > 0) {
         wm.startTimeoutTimer();
     } else {
-        wm.commitTransaction();
+        wm.updateRenderingStart();
     }
 }
 
@@ -351,10 +346,10 @@ fn cancelTimeoutTimer(wm: *WindowManager) void {
 fn handleTimeout(wm: *WindowManager) c_int {
     log.err("timeout occurred, some imperfect frames may be shown", .{});
 
-    assert(wm.state != .idle);
+    assert(wm.state.inflight_configures > 0);
+    wm.state.inflight_configures = 0;
 
-    wm.state = .{ .inflight_configures = 0 };
-    wm.commitTransaction();
+    wm.updateRenderingStart();
 
     return 0;
 }
@@ -363,19 +358,43 @@ pub fn notifyConfigured(wm: *WindowManager) void {
     wm.state.inflight_configures -= 1;
     if (wm.state.inflight_configures == 0) {
         wm.cancelTimeoutTimer();
-        wm.commitTransaction();
+        wm.updateRenderingStart();
     }
 }
 
-/// Apply the inflight state and drop stashed buffers. This means that
-/// the next frame drawn will be the post-transaction state of the
-/// layout. Should only be called after all clients have configured for
-/// the new layout. If called early imperfect frames may be drawn.
-fn commitTransaction(wm: *WindowManager) void {
-    assert(wm.state.inflight_configures == 0);
+fn updateRenderingStart(wm: *WindowManager) void {
+    assert(wm.state == .idle or wm.state.inflight_configures == 0);
+
+    log.debug("update rendering start", .{});
+
+    {
+        var it = wm.rendering_requested.list.iterator(.forward);
+        while (it.next()) |node| {
+            switch (node.get()) {
+                .window => |window| window.updateRenderingStart(),
+                .shell_surface => {},
+            }
+        }
+    }
+
+    wm.state = .update_rendering;
+    wm.rendering_scheduled.dirty = false;
+
+    if (wm.object) |wm_v1| {
+        // TODO kill the WM on a very long timeout?
+        wm_v1.sendUpdateRenderingStart();
+    } else {
+        wm.updateRenderingFinish();
+    }
+}
+
+/// Finish the update sequence and drop stashed buffers. This means that
+/// the next frame drawn will be the post-transaction state.
+fn updateRenderingFinish(wm: *WindowManager) void {
+    assert(wm.state == .update_rendering);
     wm.state = .idle;
 
-    log.debug("commiting transaction", .{});
+    log.debug("update rendering finish", .{});
 
     {
         var it = wm.windows.safeIterator(.forward);
@@ -386,20 +405,17 @@ fn commitTransaction(wm: *WindowManager) void {
     }
 
     {
-        var it = wm.inflight.render_list.iterator(.forward);
+        var it = wm.rendering_requested.list.iterator(.forward);
         while (it.next()) |node| {
             switch (node.get()) {
                 .window => |window| {
-                    window.commitTransaction();
+                    window.updateRenderingFinish();
 
                     window.tree.node.reparent(server.scene.layers.wm);
                     window.tree.node.raiseToTop();
-
-                    window.tree.node.setEnabled(!window.pending.hidden);
-                    window.popup_tree.node.setEnabled(!window.pending.hidden);
                 },
                 .shell_surface => |shell_surface| {
-                    shell_surface.commitTransaction();
+                    shell_surface.updateRenderingFinish();
 
                     shell_surface.tree.node.reparent(server.scene.layers.wm);
                     shell_surface.tree.node.raiseToTop();
@@ -419,10 +435,10 @@ fn commitTransaction(wm: *WindowManager) void {
 
     log.debug("finished committing transaction", .{});
 
-    if (wm.committed.dirty) {
-        wm.sendConfigures();
-    } else if (wm.pending.dirty) {
-        wm.dirtyPending();
+    if (wm.rendering_scheduled.dirty) {
+        wm.dirtyRendering();
+    } else if (wm.windowing_scheduled.dirty) {
+        wm.dirtyWindowing();
     } else {
         server.input_manager.processEvents();
     }

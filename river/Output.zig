@@ -158,9 +158,9 @@ gamma_dirty: bool = false,
 /// Root.outputs
 link: wl.list.Link,
 
-/// Pending state to be sent to the wm in the next update sequence.
-pending: State = .{},
-/// State sent to the wm in the latest update sequence.
+/// State to be sent to the wm in the next windowing update sequence.
+scheduled: State = .{},
+/// State sent to the wm in the latest windowing update sequence.
 sent: State = .{},
 link_sent: wl.list.Link,
 /// State applied to the wlr_output and rendered.
@@ -207,12 +207,12 @@ pub fn create(wlr_output: *wlr.Output) !void {
     wlr_output.events.frame.add(&output.frame);
     wlr_output.events.present.add(&output.present);
 
-    output.pending.state = .enabled;
+    output.scheduled.state = .enabled;
     if (wlr_output.preferredMode()) |preferred_mode| {
-        output.pending.mode = .{ .standard = preferred_mode };
+        output.scheduled.mode = .{ .standard = preferred_mode };
     }
 
-    server.wm.dirtyPending();
+    server.wm.dirtyWindowing();
 }
 
 fn handleDestroy(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
@@ -231,13 +231,13 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) v
 
     output.wlr_output = null;
     output.scene_output = null;
-    output.pending.state = .destroying;
+    output.scheduled.state = .destroying;
 
-    server.wm.dirtyPending();
+    server.wm.dirtyWindowing();
 }
 
-pub fn sendDirty(output: *Output) void {
-    switch (output.pending.state) {
+pub fn updateWindowingStart(output: *Output) void {
+    switch (output.scheduled.state) {
         .enabled, .disabled_soft => {
             if (server.wm.object) |wm_v1| {
                 const new = output.object == null;
@@ -255,7 +255,7 @@ pub fn sendDirty(output: *Output) void {
                 };
                 errdefer comptime unreachable;
 
-                const pending = &output.pending;
+                const pending = &output.scheduled;
                 const sent = &output.sent;
 
                 if (new or pending.width() != sent.width() or pending.height() != sent.height()) {
@@ -266,10 +266,10 @@ pub fn sendDirty(output: *Output) void {
                 }
             }
 
-            output.sent = output.pending;
+            output.sent = output.scheduled;
 
             output.link_sent.remove();
-            server.wm.sent.outputs.append(output);
+            server.wm.windowing_sent.outputs.append(output);
         },
         .disabled_hard, .destroying => {
             if (output.object) |output_v1| {
@@ -281,7 +281,7 @@ pub fn sendDirty(output: *Output) void {
             output.link_sent.remove();
             output.link_sent.init();
 
-            if (output.pending.state == .destroying) {
+            if (output.scheduled.state == .destroying) {
                 util.gpa.destroy(output);
             }
         },
@@ -330,16 +330,16 @@ fn handleRequestState(listener: *wl.Listener(*wlr.Output.event.RequestState), ev
     log.debug("backend requested new mode", .{});
 
     if (event.state.mode) |mode| {
-        output.pending.mode = .{ .standard = mode };
+        output.scheduled.mode = .{ .standard = mode };
     } else {
-        output.pending.mode = .{ .custom = .{
+        output.scheduled.mode = .{ .custom = .{
             .width = event.state.custom_mode.width,
             .height = event.state.custom_mode.height,
             .refresh = event.state.custom_mode.refresh,
         } };
     }
 
-    server.wm.dirtyPending();
+    server.wm.dirtyWindowing();
 }
 
 fn handleFrame(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {

@@ -36,31 +36,21 @@ const Tag = @typeInfo(Type).Union.tag_type.?;
 tag: Tag,
 object: ?*river.NodeV1 = null,
 
-/// WindowManager.uncommitted.render_list
-link_uncommitted: wl.list.Link,
-/// WindowManager.committed.render_list
-link_committed: wl.list.Link,
-/// WindowManager.inflight.render_list
-link_inflight: wl.list.Link,
+/// WindowManager.rendering_requested.list
+link: wl.list.Link,
 
 pub fn init(node: *WmNode, tag: Tag) void {
     node.* = .{
         .tag = tag,
-        .link_uncommitted = undefined,
-        .link_committed = undefined,
-        .link_inflight = undefined,
+        .link = undefined,
     };
-    node.link_uncommitted.init();
-    node.link_committed.init();
-    node.link_inflight.init();
+    node.link.init();
 }
 
 pub fn deinit(node: *WmNode) void {
     assert(node.object == null);
 
-    node.link_uncommitted.remove();
-    node.link_committed.remove();
-    node.link_inflight.remove();
+    node.link.remove();
 }
 
 pub fn get(node: *WmNode) Type {
@@ -110,43 +100,52 @@ fn handleRequest(
         .destroy => {
             node_v1.destroy();
         },
-        .set_position => |args| switch (node.get()) {
-            .window => |window| {
-                window.uncommitted.position = .{
-                    .x = args.x,
-                    .y = args.y,
-                };
-            },
-            .shell_surface => |shell_surface| {
-                shell_surface.uncommitted.x = args.x;
-                shell_surface.uncommitted.y = args.y;
-            },
+        .set_position => |args| {
+            if (!server.wm.ensureRendering()) return;
+            switch (node.get()) {
+                .window => |window| {
+                    window.rendering_requested.position = .{
+                        .x = args.x,
+                        .y = args.y,
+                    };
+                },
+                .shell_surface => |shell_surface| {
+                    shell_surface.rendering_requested.x = args.x;
+                    shell_surface.rendering_requested.y = args.y;
+                },
+            }
         },
         .place_top => {
-            node.link_uncommitted.remove();
-            server.wm.uncommitted.render_list.append(node);
+            if (!server.wm.ensureRendering()) return;
+            node.link.remove();
+            server.wm.rendering_requested.list.append(node);
         },
         .place_bottom => {
-            node.link_uncommitted.remove();
-            server.wm.uncommitted.render_list.prepend(node);
+            if (!server.wm.ensureRendering()) return;
+            node.link.remove();
+            server.wm.rendering_requested.list.prepend(node);
         },
         .place_above => |args| {
+            if (!server.wm.ensureRendering()) return;
+
             const other_data = args.other.getUserData() orelse return;
             const other: *WmNode = @ptrCast(@alignCast(other_data));
 
             if (other == node) return;
 
-            node.link_uncommitted.remove();
-            other.link_uncommitted.insert(&node.link_uncommitted);
+            node.link.remove();
+            other.link.insert(&node.link);
         },
         .place_below => |args| {
+            if (!server.wm.ensureRendering()) return;
+
             const other_data = args.other.getUserData() orelse return;
             const other: *WmNode = @ptrCast(@alignCast(other_data));
 
             if (other == node) return;
 
-            node.link_uncommitted.remove();
-            other.link_uncommitted.prev.?.insert(&node.link_uncommitted);
+            node.link.remove();
+            other.link.prev.?.insert(&node.link);
         },
     }
 }

@@ -66,10 +66,9 @@ pub const Border = struct {
     a: u32 = 0,
 };
 
-pub const State = struct {
+pub const Configure = struct {
     width: ?u31 = null,
     height: ?u31 = null,
-    hidden: bool = false,
     /// True if the window has keyboard focus from at least one seat.
     activated: bool = false,
     ssd: bool = false,
@@ -78,59 +77,12 @@ pub const State = struct {
     capabilities: river.WindowV1.Capabilities = .{},
     maximized: bool = false,
     fullscreen: bool = false,
-
-    op: union(enum) {
-        none,
-        move: struct {
-            seat: *Seat,
-            start_x: i32,
-            start_y: i32,
-        },
-        resize: struct {
-            seat: *Seat,
-            edges: river.WindowV1.Edges = .{},
-            start_box: wlr.Box,
-        },
-    } = .none,
-};
-
-pub const WmState = struct {
-    position: ?struct {
-        x: i32,
-        y: i32,
-    } = null,
-    dimensions: ?struct {
-        width: u31,
-        height: u31,
-    } = null,
-    hidden: bool = false,
-    ssd: bool = false,
-    border: Border = .{},
-    tiled: river.WindowV1.Edges = .{},
-    capabilities: river.WindowV1.Capabilities = .{
-        .window_menu = true,
-        .maximize = true,
-        .fullscreen = true,
-        .minimize = true,
-    },
-    maximized: bool = false,
-    fullscreen: bool = false, // XXX output
-    close: bool = false,
-    op: union(enum) {
-        none,
-        move: struct {
-            seat: *Seat,
-        },
-        resize: struct {
-            seat: *Seat,
-            edges: river.WindowV1.Edges = .{},
-        },
-    } = .none,
+    resizing: bool = false,
 };
 
 /// The window management protocol object for this window
 /// Created after the window is ready to be configured.
-/// Lifetime is managed through wm_pending.state
+/// Lifetime is managed through windowing_scheduled.state
 object: ?*river.WindowV1 = null,
 node: WmNode,
 
@@ -159,8 +111,8 @@ destroying: bool = false,
 /// WindowManager.windows
 link: wl.list.Link,
 
-/// State to be sent to the window manager client in the next update sequence.
-wm_pending: struct {
+/// State to be sent to the wm in the next windowing update sequence.
+windowing_scheduled: struct {
     state: enum {
         /// Indicates that there is currently no associated river_window_v1
         /// object.
@@ -171,7 +123,6 @@ wm_pending: struct {
         /// Indicates that the closed event will be sent in the next update sequence.
         closing,
     } = .init,
-    box: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
     dimensions_hint: DimensionsHint = .{},
     decoration_hint: river.WindowV1.DecorationHint = .only_supports_csd,
     /// Set back to no_request at the end of each update sequence
@@ -185,25 +136,85 @@ wm_pending: struct {
     dirty_title: bool = false,
 } = .{},
 
-/// State sent to the window manager client in the latest update sequence.
+/// State sent to the wm in the latest windowing update sequence.
 /// This state is only kept around in order to avoid sending redundant events
-/// to the window manager client.
-wm_sent: struct {
-    position: ?struct { x: i32, y: i32 } = null,
-    dimensions: ?struct { width: i32, height: i32 } = null,
+/// to the wm.
+windowing_sent: struct {
     dimensions_hint: DimensionsHint = .{},
     decoration_hint: river.WindowV1.DecorationHint = .only_supports_csd,
 } = .{},
 
-/// State requested by the window manager client but not yet committed.
-uncommitted: WmState = .{},
-/// State requested by the window manager client and committed.
-committed: WmState = .{},
+/// Windowing state requested by the wm.
+windowing_requested: struct {
+    dimensions: ?struct {
+        width: u31,
+        height: u31,
+    } = null,
+    ssd: bool = false,
+    tiled: river.WindowV1.Edges = .{},
+    capabilities: river.WindowV1.Capabilities = .{
+        .window_menu = true,
+        .maximize = true,
+        .fullscreen = true,
+        .minimize = true,
+    },
+    maximized: bool = false,
+    fullscreen: bool = false, // XXX output
+    close: bool = false,
+    op: union(enum) {
+        none,
+        move: struct {
+            seat: *Seat,
+        },
+        resize: struct {
+            seat: *Seat,
+            edges: river.WindowV1.Edges = .{},
+        },
+    } = .none,
+} = .{},
 
 /// State to be sent to the window in the next configure.
-pending: State = .{},
+configure_scheduled: Configure = .{},
 /// State sent to the window in the latest configure.
-sent: State = .{},
+configure_sent: Configure = .{},
+
+/// State to be sent to the wm in the next rendering update sequence.
+rendering_scheduled: struct {
+    /// Dimensions committed by the window.
+    width: u31 = 0,
+    height: u31 = 0,
+    /// Send dimensions even if they are unchanged.
+    resend_dimensions: bool = false,
+} = .{},
+
+/// State sent to the wm in the latest rendering update sequence.
+rendering_sent: struct {
+    box: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+} = .{},
+
+/// Rendering state requested by the wm.
+rendering_requested: struct {
+    position: ?struct {
+        x: i32,
+        y: i32,
+    } = null,
+    hidden: bool = false,
+    border: Border = .{},
+} = .{},
+
+op: union(enum) {
+    none,
+    move: struct {
+        seat: *Seat,
+        start_x: i32,
+        start_y: i32,
+    },
+    resize: struct {
+        seat: *Seat,
+        edges: river.WindowV1.Edges = .{},
+        start_box: wlr.Box,
+    },
+} = .none,
 
 pub fn create(impl: Impl) error{OutOfMemory}!*Window {
     assert(impl != .none);
@@ -254,14 +265,14 @@ pub fn destroy(window: *Window, when: enum { lazy, assert }) void {
 
     window.destroying = true;
 
-    // We can't assert(window.wm_pending.state != .ready) since the client may
+    // We can't assert(window.windowing_scheduled.state != .ready) since the client may
     // have exited after making its empty initial commit but before the surface
     // is mapped.
-    switch (window.wm_pending.state) {
+    switch (window.windowing_scheduled.state) {
         .init => {},
         .closing, .ready => {
-            window.wm_pending.state = .closing;
-            server.wm.dirtyPending();
+            window.windowing_scheduled.state = .closing;
+            server.wm.dirtyWindowing();
             return;
         },
     }
@@ -296,77 +307,54 @@ pub fn destroy(window: *Window, when: enum { lazy, assert }) void {
 }
 
 pub fn setDimensionsHint(window: *Window, hint: DimensionsHint) void {
-    window.wm_pending.dimensions_hint = hint;
-    if (!meta.eql(window.wm_sent.dimensions_hint, hint)) {
-        server.wm.dirtyPending();
+    window.windowing_scheduled.dimensions_hint = hint;
+    if (!meta.eql(window.windowing_sent.dimensions_hint, hint)) {
+        server.wm.dirtyWindowing();
     }
 }
 
-pub fn setDimensions(window: *Window, width: i32, height: i32) void {
-    window.wm_pending.box.width = width;
-    window.wm_pending.box.height = height;
+pub fn setDimensions(window: *Window, width: u31, height: u31) void {
+    window.rendering_scheduled.width = width;
+    window.rendering_scheduled.height = height;
 
-    switch (window.sent.op) {
-        .none, .move => {},
-        .resize => |data| {
-            assert(data.seat.op != null);
-
-            if (data.edges.left) {
-                window.wm_pending.box.x = data.start_box.x + data.start_box.width - width;
-            } else if (data.edges.right) {
-                window.wm_pending.box.x = data.start_box.x;
-            }
-
-            if (data.edges.top) {
-                window.wm_pending.box.y = data.start_box.y + data.start_box.height - height;
-            } else if (data.edges.bottom) {
-                window.wm_pending.box.y = data.start_box.y;
-            }
-        },
-    }
-
-    if (window.wm_sent.dimensions == null or window.wm_sent.position == null or
-        width != window.wm_sent.dimensions.?.width or
-        height != window.wm_sent.dimensions.?.height or
-        window.wm_pending.box.x != window.wm_sent.position.?.x or
-        window.wm_pending.box.y != window.wm_sent.position.?.y)
+    if (window.rendering_scheduled.resend_dimensions or
+        window.rendering_scheduled.width != window.rendering_sent.box.width or
+        window.rendering_scheduled.height != window.rendering_sent.box.height)
     {
-        server.wm.dirtyPending();
+        server.wm.dirtyRendering();
     }
 }
 
 pub fn setDecorationHint(window: *Window, hint: river.WindowV1.DecorationHint) void {
-    window.wm_pending.decoration_hint = hint;
-    if (hint != window.wm_sent.decoration_hint) {
-        server.wm.dirtyPending();
+    window.windowing_scheduled.decoration_hint = hint;
+    if (hint != window.windowing_sent.decoration_hint) {
+        server.wm.dirtyWindowing();
     }
 }
 
 pub fn setFullscreenRequested(window: *Window, fullscreen_requested: bool) void {
     if (fullscreen_requested) {
-        window.wm_pending.fullscreen_requested = .fullscreen;
+        window.windowing_scheduled.fullscreen_requested = .fullscreen;
     } else {
-        window.wm_pending.fullscreen_requested = .exit;
+        window.windowing_scheduled.fullscreen_requested = .exit;
     }
-    server.wm.dirtyPending();
+    server.wm.dirtyWindowing();
 }
 
-/// Send dirty pending state as part of an in progress update sequence.
-pub fn sendDirty(window: *Window) void {
-    switch (window.wm_pending.state) {
+/// Send dirty windowing state as part of a windowing update sequence.
+pub fn updateWindowingStart(window: *Window) void {
+    switch (window.windowing_scheduled.state) {
         .init => {},
         .closing => {
-            window.wm_pending.state = .init;
             window.initialized = false;
-            window.uncommitted = .{};
-            window.committed = .{};
+            window.windowing_scheduled.state = .init;
+            window.windowing_sent = .{};
+            window.windowing_requested = .{};
+            window.rendering_sent = .{};
+            window.rendering_requested = .{};
 
-            window.node.link_uncommitted.remove();
-            window.node.link_uncommitted.init();
-            window.node.link_committed.remove();
-            window.node.link_committed.init();
-            window.node.link_inflight.remove();
-            window.node.link_inflight.init();
+            window.node.link.remove();
+            window.node.link.init();
 
             window.makeInert();
         },
@@ -382,37 +370,16 @@ pub fn sendDirty(window: *Window) void {
                 window_v1.setHandler(*Window, handleRequest, handleDestroy, window);
                 wm_v1.sendWindow(window_v1);
 
-                server.wm.uncommitted.render_list.append(&window.node);
+                server.wm.rendering_requested.list.append(&window.node);
 
                 break :blk window_v1;
             };
             errdefer comptime unreachable;
 
-            const pending = &window.wm_pending;
-            const sent = &window.wm_sent;
+            const pending = &window.windowing_scheduled;
+            const sent = &window.windowing_sent;
 
             // XXX send all dirty pending state
-            if (new or sent.position == null or
-                pending.box.x != sent.position.?.x or pending.box.y != sent.position.?.y)
-            {
-                if (window.node.object) |node_v1| {
-                    node_v1.sendPosition(pending.box.x, pending.box.y);
-                    sent.position = .{
-                        .x = pending.box.x,
-                        .y = pending.box.y,
-                    };
-                }
-            }
-            if (!pending.box.empty() and (new or sent.dimensions == null or
-                pending.box.width != sent.dimensions.?.width or
-                pending.box.height != sent.dimensions.?.height))
-            {
-                window_v1.sendDimensions(window.wm_pending.box.width, window.wm_pending.box.height);
-                sent.dimensions = .{
-                    .width = pending.box.width,
-                    .height = pending.box.height,
-                };
-            }
             if (new or !meta.eql(pending.dimensions_hint, sent.dimensions_hint)) {
                 window_v1.sendDimensionsHint(
                     pending.dimensions_hint.min_width,
@@ -423,7 +390,7 @@ pub fn sendDirty(window: *Window) void {
                 sent.dimensions_hint = pending.dimensions_hint;
             }
             if (new or pending.decoration_hint != sent.decoration_hint) {
-                window_v1.sendDecorationHint(window.wm_pending.decoration_hint);
+                window_v1.sendDecorationHint(window.windowing_scheduled.decoration_hint);
                 sent.decoration_hint = pending.decoration_hint;
             }
             switch (pending.fullscreen_requested) {
@@ -475,13 +442,17 @@ fn handleRequest(
     window: *Window,
 ) void {
     assert(window.object == window_v1);
-    const uncommitted = &window.uncommitted;
+    const windowing_requested = &window.windowing_requested;
+    const rendering_requested = &window.rendering_requested;
     switch (request) {
         .destroy => {
             // XXX send protocol error
             window_v1.destroy();
         },
-        .close => uncommitted.close = true,
+        .close => {
+            if (!server.wm.ensureWindowing()) return;
+            windowing_requested.close = true;
+        },
         .get_node => |args| {
             if (window.node.object != null) {
                 window_v1.postError(.node_exists, "window already has a node object");
@@ -490,23 +461,37 @@ fn handleRequest(
             window.node.createObject(window_v1.getClient(), window_v1.getVersion(), args.id);
         },
         .propose_dimensions => |args| {
+            if (!server.wm.ensureWindowing()) return;
             if (args.width < 0 or args.height < 0) {
                 // XXX send protocol error
             }
-            uncommitted.dimensions = .{
+            windowing_requested.dimensions = .{
                 .width = @intCast(args.width),
                 .height = @intCast(args.height),
             };
         },
-        .hide => uncommitted.hidden = true,
-        .show => uncommitted.hidden = false,
-        .use_ssd => uncommitted.ssd = true,
-        .use_csd => uncommitted.ssd = false,
+        .hide => {
+            if (!server.wm.ensureRendering()) return;
+            rendering_requested.hidden = true;
+        },
+        .show => {
+            if (!server.wm.ensureRendering()) return;
+            rendering_requested.hidden = false;
+        },
+        .use_ssd => {
+            if (!server.wm.ensureWindowing()) return;
+            windowing_requested.ssd = true;
+        },
+        .use_csd => {
+            if (!server.wm.ensureWindowing()) return;
+            windowing_requested.ssd = false;
+        },
         .set_borders => |args| {
+            if (!server.wm.ensureRendering()) return;
             if (args.width < 0) {
                 // XXX send protocol error
             }
-            uncommitted.border = .{
+            rendering_requested.border = .{
                 .edges = args.edges,
                 .width = @intCast(args.width),
                 .r = args.r,
@@ -515,97 +500,83 @@ fn handleRequest(
                 .a = args.a,
             };
         },
-        .set_tiled => |args| uncommitted.tiled = args.edges,
+        .set_tiled => |args| {
+            if (!server.wm.ensureWindowing()) return;
+            windowing_requested.tiled = args.edges;
+        },
         .get_decoration_surface => {}, // XXX support decoration surfaces
-        .set_capabilities => |args| uncommitted.capabilities = args.caps,
-        .inform_maximized => uncommitted.maximized = true,
-        .inform_unmaximized => uncommitted.maximized = false,
-        .fullscreen => uncommitted.fullscreen = true,
-        .exit_fullscreen => uncommitted.fullscreen = false,
+        .set_capabilities => |args| {
+            if (!server.wm.ensureWindowing()) return;
+            windowing_requested.capabilities = args.caps;
+        },
+        .inform_maximized => {
+            if (!server.wm.ensureWindowing()) return;
+            windowing_requested.maximized = true;
+        },
+        .inform_unmaximized => {
+            if (!server.wm.ensureWindowing()) return;
+            windowing_requested.maximized = false;
+        },
+        .fullscreen => {
+            if (!server.wm.ensureWindowing()) return;
+            windowing_requested.fullscreen = true;
+        },
+        .exit_fullscreen => {
+            if (!server.wm.ensureWindowing()) return;
+            windowing_requested.fullscreen = false;
+        },
     }
 }
 
-pub fn commitWmState(window: *Window) void {
-    if (!window.initialized and window.uncommitted.dimensions != null) {
-        window.initialized = true;
-    }
-
-    window.committed = .{
-        .position = window.uncommitted.position orelse window.committed.position,
-        .dimensions = window.uncommitted.dimensions orelse window.committed.dimensions,
-        .hidden = window.uncommitted.hidden,
-        .ssd = window.uncommitted.ssd,
-        .border = window.uncommitted.border,
-        .tiled = window.uncommitted.tiled,
-        .capabilities = window.uncommitted.capabilities,
-        .maximized = window.uncommitted.maximized,
-        .fullscreen = window.uncommitted.fullscreen,
-        .close = window.uncommitted.close,
-        .op = window.uncommitted.op,
-    };
-    window.uncommitted.position = null;
-    window.uncommitted.dimensions = null;
-    window.uncommitted.op = .none;
-}
-
-/// Applies committed state from the window manager client to the inflight state.
+/// Applies windowing state from the window manager client  and sends a configure
+/// to the window if necessary.
 /// Returns true if the configure should be waited for by the transaction system.
-pub fn configure(window: *Window) bool {
-    if (!window.initialized) return false;
+pub fn updateWindowingFinish(window: *Window) bool {
+    const windowing_requested = &window.windowing_requested;
+
+    if (!window.initialized) {
+        if (windowing_requested.dimensions != null) {
+            window.initialized = true;
+        } else {
+            return false;
+        }
+    }
 
     assert(!window.destroying);
 
-    if (window.committed.close) {
+    window.configure_scheduled.ssd = windowing_requested.ssd;
+    window.configure_scheduled.tiled = windowing_requested.tiled;
+    window.configure_scheduled.capabilities = windowing_requested.capabilities;
+    window.configure_scheduled.maximized = windowing_requested.maximized;
+    window.configure_scheduled.fullscreen = windowing_requested.fullscreen;
+
+    if (windowing_requested.close) {
         window.close();
     }
 
-    const activated = blk: {
-        var it = server.wm.sent.seats.iterator(.forward);
+    {
+        window.configure_scheduled.activated = false;
+        var it = server.wm.windowing_sent.seats.iterator(.forward);
         while (it.next()) |seat| {
-            if (seat.committed.focus == .window and seat.committed.focus.window == window) {
-                break :blk true;
+            if (seat.windowing_requested.focus == .window and
+                seat.windowing_requested.focus.window == window)
+            {
+                window.configure_scheduled.activated = true;
+                break;
             }
         }
-        break :blk false;
-    };
-
-    const committed = &window.committed;
-
-    window.pending = .{
-        .width = window.pending.width,
-        .height = window.pending.height,
-        .hidden = committed.hidden,
-        .activated = activated,
-        .ssd = committed.ssd,
-        .border = committed.border,
-        .tiled = committed.tiled,
-        .capabilities = committed.capabilities,
-        .maximized = committed.maximized,
-        .fullscreen = committed.fullscreen,
-        .op = window.pending.op,
-    };
-
-    // Ensure a position/dimension event is sent if the window manager has
-    // modified them even if the actual position/dimensions do not change.
-    if (committed.position) |position| {
-        if (window.pending.op == .none) {
-            window.wm_pending.box.x = position.x;
-            window.wm_pending.box.y = position.y;
-        }
-
-        window.wm_sent.position = null;
-        committed.position = null;
     }
-    if (committed.dimensions) |dimensions| {
-        if (window.pending.op == .none) {
-            window.pending.width = dimensions.width;
-            window.pending.height = dimensions.height;
-        }
 
-        window.wm_sent.dimensions = null;
-        committed.dimensions = null;
+    if (windowing_requested.dimensions) |dimensions| {
+        if (window.op == .none) {
+            window.configure_scheduled.width = dimensions.width;
+            window.configure_scheduled.height = dimensions.height;
+        }
+        windowing_requested.dimensions = null;
+        window.rendering_scheduled.resend_dimensions = true;
     }
-    committed.op = .none;
+
+    windowing_requested.op = .none;
 
     const track_configure = switch (window.impl) {
         .toplevel => |*toplevel| toplevel.configure(),
@@ -621,7 +592,7 @@ pub fn configure(window: *Window) bool {
     return track_configure;
 }
 
-pub fn commitTransaction(window: *Window) void {
+pub fn updateRenderingStart(window: *Window) void {
     switch (window.impl) {
         .toplevel => |*toplevel| {
             switch (toplevel.configure_state) {
@@ -656,25 +627,85 @@ pub fn commitTransaction(window: *Window) void {
                 },
                 .timed_out, .timed_out_acked => unreachable,
             }
-            window.setDimensions(toplevel.geometry.width, toplevel.geometry.height);
+            window.rendering_scheduled.width = @intCast(toplevel.geometry.width);
+            window.rendering_scheduled.height = @intCast(toplevel.geometry.height);
         },
         .xwayland => |xwindow| {
-            window.setDimensions(xwindow.xsurface.width, xwindow.xsurface.height);
+            window.rendering_scheduled.width = xwindow.xsurface.width;
+            window.rendering_scheduled.height = xwindow.xsurface.height;
         },
         .none => {},
     }
 
-    window.updateSceneState();
+    const sent = &window.rendering_sent;
+    var scheduled_box: wlr.Box = .{
+        .x = sent.box.x,
+        .y = sent.box.y,
+        .width = window.rendering_scheduled.width,
+        .height = window.rendering_scheduled.height,
+    };
+
+    switch (window.op) {
+        .none => {},
+        .move => |data| {
+            const seat_op = &data.seat.op.?;
+            const dx = seat_op.x - seat_op.start_x;
+            const dy = seat_op.y - seat_op.start_y;
+            scheduled_box.x = data.start_x + dx;
+            scheduled_box.y = data.start_y + dy;
+            log.debug("set x/y for move to {} {}", .{ scheduled_box.x, scheduled_box.y });
+        },
+        .resize => |data| {
+            assert(data.seat.op != null);
+            if (data.edges.left) {
+                scheduled_box.x = data.start_box.x + data.start_box.width - scheduled_box.width;
+            } else if (data.edges.right) {
+                scheduled_box.x = data.start_box.x;
+            }
+            if (data.edges.top) {
+                scheduled_box.y = data.start_box.y + data.start_box.height - scheduled_box.height;
+            } else if (data.edges.bottom) {
+                scheduled_box.y = data.start_box.y;
+            }
+        },
+    }
+
+    if (scheduled_box.x != sent.box.x or scheduled_box.y != sent.box.y) {
+        if (window.node.object) |node_v1| {
+            node_v1.sendPosition(scheduled_box.x, scheduled_box.y);
+        }
+    }
+    if (window.rendering_scheduled.resend_dimensions or
+        scheduled_box.width != sent.box.width or scheduled_box.height != sent.box.height)
+    {
+        if (window.object) |window_v1| {
+            window_v1.sendDimensions(scheduled_box.width, scheduled_box.height);
+            window.rendering_scheduled.resend_dimensions = false;
+        }
+    }
+    sent.box = scheduled_box;
 }
 
-pub fn updateSceneState(window: *Window) void {
-    const box = &window.wm_pending.box;
+pub fn updateRenderingFinish(window: *Window) void {
+    window.tree.node.setEnabled(!window.rendering_requested.hidden);
+    window.popup_tree.node.setEnabled(!window.rendering_requested.hidden);
+
+    const box = &window.rendering_sent.box;
+
+    if (window.rendering_requested.position) |position| {
+        if (window.op == .none) {
+            box.x = position.x;
+            box.y = position.y;
+        }
+        window.rendering_requested.position = null;
+    }
+
     window.tree.node.setPosition(box.x, box.y);
     window.popup_tree.node.setPosition(box.x, box.y);
 
     // f32 cannot represent all u32 values exactly, therefore we must initially use f64
     // (which can) and then cast to f32, potentially losing precision.
-    const border = &window.sent.border;
+    const border = &window.rendering_requested.border;
     const color: [4]f32 = .{
         @floatCast(@as(f64, @floatFromInt(border.r)) / math.maxInt(u32)),
         @floatCast(@as(f64, @floatFromInt(border.g)) / math.maxInt(u32)),
@@ -805,17 +836,17 @@ pub fn unmap(window: *Window) void {
     assert(window.mapped and !window.destroying);
     window.mapped = false;
 
-    assert(window.wm_pending.state != .closing);
-    window.wm_pending.state = .closing;
-    server.wm.dirtyPending();
+    assert(window.windowing_scheduled.state != .closing);
+    window.windowing_scheduled.state = .closing;
+    server.wm.dirtyWindowing();
 }
 
 pub fn notifyTitle(window: *Window) void {
-    window.wm_pending.dirty_title = true;
-    server.wm.dirtyPending();
+    window.windowing_scheduled.dirty_title = true;
+    server.wm.dirtyWindowing();
 }
 
 pub fn notifyAppId(window: *Window) void {
-    window.wm_pending.dirty_app_id = true;
-    server.wm.dirtyPending();
+    window.windowing_scheduled.dirty_app_id = true;
+    server.wm.dirtyWindowing();
 }

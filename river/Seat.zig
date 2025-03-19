@@ -73,18 +73,6 @@ pub const Event = union(enum) {
     pointer_pinch_end: wlr.Pointer.event.PinchEnd,
 };
 
-pub const WmState = struct {
-    focus: WmFocus = .none,
-    op: union(enum) {
-        none,
-        //TODO start_serial: ?u32,
-        start_pointer,
-        end,
-    } = .none,
-    // TODO confine region
-    // TODO pointer warp
-};
-
 pub const WmFocus = union(enum) {
     none,
     window: *Window,
@@ -123,25 +111,33 @@ object: ?*river.SeatV1 = null,
 
 event_queue: EventQueue = EventQueue.init(),
 
-/// State to be sent to the window manager client in the next update sequence.
-pending: struct {
+/// State to be sent to the wm in the next windowing update sequence.
+windowing_scheduled: struct {
     /// The window entered/hovered by the pointer, if any
     window: ?*Window = null,
     /// The window clicked on, touched, etc.
     interaction: WmFocus = .none,
 } = .{},
 
-/// State sent to the window manager client in the latest update sequence.
-sent: struct {
+/// State sent to the wm in the latest windowing update sequence.
+windowing_sent: struct {
     /// The window entered/hovered by the pointer, if any
     window: ?*Window = null,
 } = .{},
 link_sent: wl.list.Link,
 
-/// State requested by the window manager client but not yet committed.
-uncommitted: WmState = .{},
-/// State requested by the window manager client and committed.
-committed: WmState = .{},
+/// Windowing state requested by the wm.
+windowing_requested: struct {
+    focus: WmFocus = .none,
+    op: union(enum) {
+        none,
+        //TODO start_serial: ?u32,
+        start_pointer,
+        end,
+    } = .none,
+    // TODO confine region
+    // TODO pointer warp
+} = .{},
 
 xkb_bindings: wl.list.Head(XkbBinding, .link),
 pointer_bindings: wl.list.Head(PointerBinding, .link),
@@ -152,15 +148,17 @@ cursor: Cursor,
 op: ?struct {
     // We always want to process as many input events as possible before sending configures
     // and starting a transaction. Therefore, we set this flag if a seat operation modifies
-    // pending state and check it at the end of Seat.processEvents() rather than calling
-    // WindowManager.dirtyPending() directly in Seat.updateOp().
-    dirty: bool = false,
+    // Window.pending state and check it at the end of Seat.processEvents() rather than sending
+    // configures directly in Seat.updateOp().
+    need_configures: bool = false,
     input: enum {
         pointer,
     },
     /// Coordinates of the cursor/touch point/etc. at the start of the operation.
     start_x: i32,
     start_y: i32,
+    x: i32,
+    y: i32,
 } = null,
 
 relay: InputRelay,
@@ -203,7 +201,7 @@ pub fn create(name: [*:0]const u8) !void {
 
     server.input_manager.seats.append(seat);
     seat.link_sent.init();
-    server.wm.dirtyPending();
+    server.wm.dirtyWindowing();
 
     seat.xkb_bindings.init();
     seat.pointer_bindings.init();
@@ -228,10 +226,8 @@ pub fn destroy(seat: *Seat) void {
         var it = server.wm.windows.iterator(.forward);
         while (it.next()) |window| {
             inline for (.{
-                &window.uncommitted,
-                &window.committed,
-                &window.pending,
-                &window.sent,
+                &window.windowing_requested,
+                window,
             }) |state| {
                 switch (state.op) {
                     .none => {},
@@ -275,16 +271,12 @@ pub fn queueEvent(seat: *Seat, event: Event) void {
 pub fn processEvents(seat: *Seat) void {
     assert(server.wm.state == .idle);
 
-    // Only process events while there is no pending state to be sent to the window manager
-    // and no transaction in progress.
-    //
+    // Only process events while there is no new windowing state to be sent to the window manager.
     // The window manager might decide to change focus or redefine keyboard/pointer bindings
-    // in response to the pending update, which can affect further processing of events.
-    //
-    // Allowing event processing while there is a transaction in progress would require keeping
-    // track of additional state to differentiate pending state modified since the transaction
-    // was started. I don't see an advantage to that additional complexity.
-    while (server.wm.state == .idle and !server.wm.pending.dirty) {
+    // in response to the windowing update, which can affect further processing of events.
+    while (!server.wm.windowing_scheduled.dirty) {
+        assert(server.wm.state == .idle);
+
         const event = seat.event_queue.readItem() orelse break;
 
         const pg = server.input_manager.pointer_gestures;
@@ -307,16 +299,18 @@ pub fn processEvents(seat: *Seat) void {
             .pointer_pinch_end => |ev| pg.sendPinchEnd(seat.wlr_seat, ev.time_msec, ev.cancelled),
         }
     }
+    assert(server.wm.state == .idle);
 
     if (seat.op) |*op| {
-        if (op.dirty) {
-            op.dirty = false;
-            server.wm.sendConfigures();
+        if (op.need_configures) {
+            op.need_configures = false;
+            server.wm.state = .update_windowing;
+            server.wm.updateWindowingFinish();
         }
     }
 }
 
-pub fn sendDirty(seat: *Seat) void {
+pub fn updateWindowingStart(seat: *Seat) void {
     if (seat.destroying) {
         if (seat.object) |seat_v1| {
             seat_v1.sendRemoved();
@@ -340,52 +334,52 @@ pub fn sendDirty(seat: *Seat) void {
             wm_v1.sendSeat(seat_v1);
 
             seat.link_sent.remove();
-            server.wm.sent.seats.append(seat);
+            server.wm.windowing_sent.seats.append(seat);
 
             break :blk seat_v1;
         };
         errdefer comptime unreachable;
 
         if (new) {
-            if (seat.pending.window) |window| {
+            if (seat.windowing_scheduled.window) |window| {
                 if (window.object) |window_v1| {
                     seat_v1.sendPointerEnter(window_v1);
-                    seat.sent.window = seat.pending.window;
+                    seat.windowing_sent.window = seat.windowing_scheduled.window;
                 }
             }
-        } else if (seat.pending.window != seat.sent.window) {
-            if (seat.sent.window) |window| {
+        } else if (seat.windowing_scheduled.window != seat.windowing_sent.window) {
+            if (seat.windowing_sent.window) |window| {
                 if (window.object) |window_v1| {
                     seat_v1.sendPointerLeave(window_v1);
-                    seat.sent.window = null;
+                    seat.windowing_sent.window = null;
                 }
             }
-            if (seat.pending.window) |window| {
+            if (seat.windowing_scheduled.window) |window| {
                 if (window.object) |window_v1| {
                     seat_v1.sendPointerEnter(window_v1);
-                    seat.sent.window = window;
+                    seat.windowing_sent.window = window;
                 }
             }
         }
 
-        switch (seat.pending.interaction) {
+        switch (seat.windowing_scheduled.interaction) {
             .none => {},
             .window => |window| {
                 if (window.object) |window_v1| {
                     seat_v1.sendWindowInteraction(window_v1);
-                    seat.pending.interaction = .none;
+                    seat.windowing_scheduled.interaction = .none;
                 }
             },
             .shell_surface => |shell_surface| {
                 seat_v1.sendShellSurfaceInteraction(shell_surface.object);
-                seat.pending.interaction = .none;
+                seat.windowing_scheduled.interaction = .none;
             },
         }
 
         {
             var it = seat.xkb_bindings.iterator(.forward);
             while (it.next()) |binding| {
-                switch (binding.pending.state_change) {
+                switch (binding.windowing_scheduled.state_change) {
                     .none => {},
                     .pressed => {
                         assert(!binding.sent_pressed);
@@ -398,13 +392,13 @@ pub fn sendDirty(seat: *Seat) void {
                         binding.object.sendReleased();
                     },
                 }
-                binding.pending.state_change = .none;
+                binding.windowing_scheduled.state_change = .none;
             }
         }
         {
             var it = seat.pointer_bindings.iterator(.forward);
             while (it.next()) |binding| {
-                switch (binding.pending.state_change) {
+                switch (binding.windowing_scheduled.state_change) {
                     .none => {},
                     .pressed => {
                         assert(!binding.sent_pressed);
@@ -417,7 +411,7 @@ pub fn sendDirty(seat: *Seat) void {
                         binding.object.sendReleased();
                     },
                 }
-                binding.pending.state_change = .none;
+                binding.windowing_scheduled.state_change = .none;
             }
         }
     }
@@ -448,35 +442,48 @@ fn handleRequest(
         },
 
         .focus_window => |args| {
+            if (!server.wm.ensureWindowing()) return;
             const data = args.window.getUserData() orelse return;
             const window: *Window = @ptrCast(@alignCast(data));
-            seat.uncommitted.focus = .{ .window = window };
+            seat.windowing_requested.focus = .{ .window = window };
         },
         .focus_shell_surface => |args| {
+            if (!server.wm.ensureWindowing()) return;
             const data = args.shell_surface.getUserData() orelse return;
             const shell_surface: *ShellSurface = @ptrCast(@alignCast(data));
-            seat.uncommitted.focus = .{ .shell_surface = shell_surface };
+            seat.windowing_requested.focus = .{ .shell_surface = shell_surface };
         },
-        .clear_focus => seat.uncommitted.focus = .none,
+        .clear_focus => seat.windowing_requested.focus = .none,
 
-        .op_start_serial => {},
-        .op_start_pointer => seat.uncommitted.op = .start_pointer,
+        .op_start_serial => {
+            if (!server.wm.ensureWindowing()) return;
+            // XXX TODO
+        },
+        .op_start_pointer => {
+            if (!server.wm.ensureWindowing()) return;
+            seat.windowing_requested.op = .start_pointer;
+        },
         .op_add_move_window => |args| {
+            if (!server.wm.ensureWindowing()) return;
             const data = args.window.getUserData() orelse return;
             const window: *Window = @ptrCast(@alignCast(data));
-            window.uncommitted.op = .{ .move = .{
+            window.windowing_requested.op = .{ .move = .{
                 .seat = seat,
             } };
         },
         .op_add_resize_window => |args| {
+            if (!server.wm.ensureWindowing()) return;
             const data = args.window.getUserData() orelse return;
             const window: *Window = @ptrCast(@alignCast(data));
-            window.uncommitted.op = .{ .resize = .{
+            window.windowing_requested.op = .{ .resize = .{
                 .seat = seat,
                 .edges = args.edges,
             } };
         },
-        .op_end => seat.uncommitted.op = .end,
+        .op_end => {
+            if (!server.wm.ensureWindowing()) return;
+            seat.windowing_requested.op = .end;
+        },
 
         .pointer_confine_to_region => {},
         .pointer_warp => {},
@@ -512,34 +519,16 @@ fn handleRequest(
     }
 }
 
-pub fn commitWmState(seat: *Seat) void {
-    {
-        var it = seat.xkb_bindings.iterator(.forward);
-        while (it.next()) |binding| {
-            binding.committed = binding.uncommitted;
-        }
-    }
-    {
-        var it = seat.pointer_bindings.iterator(.forward);
-        while (it.next()) |binding| {
-            binding.committed = binding.uncommitted;
-        }
-    }
-
-    seat.committed = seat.uncommitted;
-    seat.uncommitted.op = .none;
-}
-
-pub fn applyCommitted(seat: *Seat) void {
+pub fn updateWindowingFinish(seat: *Seat) void {
     if (server.lock_manager.state != .unlocked) return;
 
-    switch (seat.committed.focus) {
+    switch (seat.windowing_requested.focus) {
         .none => seat.focus(.none),
         .window => |window| seat.focus(.{ .window = window }),
         .shell_surface => |shell_surface| seat.focus(.{ .shell_surface = shell_surface }),
     }
 
-    switch (seat.committed.op) {
+    switch (seat.windowing_requested.op) {
         .none => {},
         .start_pointer => if (seat.op == null) {
             log.debug("start seat op pointer", .{});
@@ -547,34 +536,36 @@ pub fn applyCommitted(seat: *Seat) void {
                 .input = .pointer,
                 .start_x = @intFromFloat(seat.cursor.wlr_cursor.x),
                 .start_y = @intFromFloat(seat.cursor.wlr_cursor.y),
+                .x = @intFromFloat(seat.cursor.wlr_cursor.x),
+                .y = @intFromFloat(seat.cursor.wlr_cursor.y),
             };
             seat.cursor.startOpPointer();
 
             {
                 var it = server.wm.windows.iterator(.forward);
                 while (it.next()) |window| {
-                    switch (window.committed.op) {
+                    switch (window.windowing_requested.op) {
                         .none => {},
                         .move => |data| {
                             if (data.seat == seat) {
-                                assert(window.pending.op == .none);
-                                window.pending.op = .{
+                                assert(window.op == .none);
+                                window.op = .{
                                     .move = .{
                                         .seat = seat,
-                                        .start_x = window.wm_pending.box.x,
-                                        .start_y = window.wm_pending.box.y,
+                                        .start_x = window.rendering_sent.box.x,
+                                        .start_y = window.rendering_sent.box.y,
                                     },
                                 };
                             }
                         },
                         .resize => |data| {
                             if (data.seat == seat) {
-                                assert(window.pending.op == .none);
-                                window.pending.op = .{
+                                assert(window.op == .none);
+                                window.op = .{
                                     .resize = .{
                                         .seat = seat,
                                         .edges = data.edges,
-                                        .start_box = window.wm_pending.box,
+                                        .start_box = window.rendering_sent.box,
                                     },
                                 };
                             }
@@ -593,11 +584,11 @@ pub fn applyCommitted(seat: *Seat) void {
             {
                 var it = server.wm.windows.iterator(.forward);
                 while (it.next()) |window| {
-                    switch (window.pending.op) {
+                    switch (window.op) {
                         .none => {},
                         inline .move, .resize => |data| {
                             if (data.seat == seat) {
-                                window.pending.op = .none;
+                                window.op = .none;
                             }
                         },
                     }
@@ -605,6 +596,7 @@ pub fn applyCommitted(seat: *Seat) void {
             }
         },
     }
+    seat.windowing_requested.op = .none;
 }
 
 pub fn focus(seat: *Seat, new_focus: Focus) void {
@@ -781,46 +773,45 @@ pub fn handleSwitchMapping(
 }
 
 pub fn updateOp(seat: *Seat, x: i32, y: i32) void {
-    const op = seat.op.?;
+    const op = &seat.op.?;
 
-    // Total dx/dy since operation start
-    const dx = x - op.start_x;
-    const dy = y - op.start_y;
+    op.x = x;
+    op.y = y;
 
+    // Position is not updated until the window has committed its new dimensions.
+    // The client may not commit exactly the dimensions we request and we need
+    // to know the actual committed dimensions to correctly place the top left
+    // corner in the case of a resize from the top or left edge.
     {
         var it = server.wm.windows.iterator(.forward);
         while (it.next()) |window| {
-            switch (window.pending.op) {
+            switch (window.op) {
                 .none => {},
                 .move => |data| {
                     if (data.seat != seat) continue;
 
-                    window.wm_pending.box.x = data.start_x + dx;
-                    window.wm_pending.box.y = data.start_y + dy;
-
-                    seat.op.?.dirty = true;
+                    op.need_configures = true;
                 },
                 .resize => |data| {
                     if (data.seat != seat) continue;
 
-                    // For resize, position is not updated until the window has committed
-                    // its new dimensions. The client may not commit exactly the dimensions
-                    // we request and we need to know the actual committed dimensions to
-                    // correctly place the top left corner in the case of a resize from
-                    // the top or left edge.
+                    // Total dx/dy since operation start
+                    const dx = x - op.start_x;
+                    const dy = y - op.start_y;
+
                     if (data.edges.left) {
-                        window.pending.width = @max(1, data.start_box.width - dx);
+                        window.configure_scheduled.width = @max(1, data.start_box.width - dx);
                     } else if (data.edges.right) {
-                        window.pending.width = @max(1, data.start_box.width + dx);
+                        window.configure_scheduled.width = @max(1, data.start_box.width + dx);
                     }
 
                     if (data.edges.top) {
-                        window.pending.height = @max(1, data.start_box.height - dy);
+                        window.configure_scheduled.height = @max(1, data.start_box.height - dy);
                     } else if (data.edges.bottom) {
-                        window.pending.height = @max(1, data.start_box.height + dy);
+                        window.configure_scheduled.height = @max(1, data.start_box.height + dy);
                     }
 
-                    seat.op.?.dirty = true;
+                    op.need_configures = true;
                 },
             }
         }

@@ -139,7 +139,7 @@ fn handleManagerApply(_: *wl.Listener(*wlr.OutputConfigurationV1), config: *wlr.
     while (it.next()) |head| {
         const output: *Output = @ptrFromInt(head.state.output.data);
 
-        output.pending = .{
+        output.scheduled = .{
             .state = if (head.state.enabled) .enabled else .disabled_hard,
             .mode = blk: {
                 if (head.state.mode) |mode| {
@@ -160,13 +160,13 @@ fn handleManagerApply(_: *wl.Listener(*wlr.OutputConfigurationV1), config: *wlr.
         };
     }
 
-    if (server.wm.pending.output_config) |old| {
+    if (server.wm.windowing_scheduled.output_config) |old| {
         old.sendFailed();
         old.destroy();
     }
-    server.wm.pending.output_config = config;
+    server.wm.windowing_scheduled.output_config = config;
 
-    server.wm.dirtyPending();
+    server.wm.dirtyWindowing();
 }
 
 fn validateConfigCoordinates(config: *wlr.OutputConfigurationV1) bool {
@@ -199,17 +199,17 @@ fn handlePowerManagerSetMode(
         event.output.name,
     });
 
-    switch (output.pending.state) {
+    switch (output.scheduled.state) {
         .enabled => {
-            if (event.mode == .off) output.pending.state = .disabled_soft else return;
+            if (event.mode == .off) output.scheduled.state = .disabled_soft else return;
         },
         .disabled_soft => {
-            if (event.mode == .on) output.pending.state = .enabled else return;
+            if (event.mode == .on) output.scheduled.state = .enabled else return;
         },
         .disabled_hard, .destroying => unreachable,
     }
 
-    server.wm.dirtyPending();
+    server.wm.dirtyWindowing();
 }
 
 fn handleSetGamma(
@@ -232,12 +232,12 @@ pub fn autoLayout(om: *OutputManager) void {
     {
         var it = om.outputs.iterator(.forward);
         while (it.next()) |output| {
-            if (output.pending.auto_layout) continue;
+            if (output.scheduled.auto_layout) continue;
 
-            const x = output.pending.x + output.pending.width();
+            const x = output.scheduled.x + output.scheduled.width();
             if (x > rightmost_edge) {
                 rightmost_edge = x;
-                row_y = output.pending.y;
+                row_y = output.scheduled.y;
             }
         }
     }
@@ -245,11 +245,11 @@ pub fn autoLayout(om: *OutputManager) void {
     {
         var it = om.outputs.iterator(.forward);
         while (it.next()) |output| {
-            if (!output.pending.auto_layout) continue;
+            if (!output.scheduled.auto_layout) continue;
 
-            output.pending.x = rightmost_edge;
-            output.pending.y = row_y;
-            rightmost_edge += output.pending.width();
+            output.scheduled.x = rightmost_edge;
+            output.scheduled.y = row_y;
+            rightmost_edge += output.scheduled.width();
         }
     }
 }
@@ -258,7 +258,7 @@ pub fn commitOutputState(om: *OutputManager) void {
     const wm = &server.wm;
 
     {
-        var it = wm.sent.outputs.iterator(.forward);
+        var it = wm.windowing_sent.outputs.iterator(.forward);
         while (it.next()) |output| {
             const wlr_output = output.wlr_output orelse continue;
             switch (output.sent.state) {
@@ -279,7 +279,7 @@ pub fn commitOutputState(om: *OutputManager) void {
     server.input_manager.reconfigureDevices();
 
     const need_modeset = blk: {
-        var it = wm.sent.outputs.iterator(.forward);
+        var it = wm.windowing_sent.outputs.iterator(.forward);
         while (it.next()) |output| {
             const wlr_output = output.wlr_output orelse continue;
 
@@ -313,7 +313,7 @@ pub fn commitOutputState(om: *OutputManager) void {
         defer for (states.items) |*s| s.base.finish();
 
         {
-            var it = wm.sent.outputs.iterator(.forward);
+            var it = wm.windowing_sent.outputs.iterator(.forward);
             while (it.next()) |output| {
                 const wlr_output = output.wlr_output orelse continue;
                 const state = states.addOne() catch {
@@ -336,20 +336,20 @@ pub fn commitOutputState(om: *OutputManager) void {
             log.err("failed to prepare new output configuration", .{});
             // TODO search for a working fallback
 
-            if (wm.sent.output_config) |config| {
+            if (wm.windowing_sent.output_config) |config| {
                 config.sendFailed();
                 config.destroy();
-                wm.sent.output_config = null;
+                wm.windowing_sent.output_config = null;
             }
 
             {
                 // Revert to last working state on failure
-                var it = wm.sent.outputs.iterator(.forward);
+                var it = wm.windowing_sent.outputs.iterator(.forward);
                 while (it.next()) |output| {
-                    output.pending = output.current;
+                    output.scheduled = output.current;
                     output.sent = output.current;
                 }
-                wm.dirtyPending();
+                wm.dirtyWindowing();
             }
             return;
         }
@@ -366,20 +366,20 @@ pub fn commitOutputState(om: *OutputManager) void {
         if (!server.backend.commit(states.items)) {
             log.err("failed to commit new output configuration", .{});
 
-            if (wm.sent.output_config) |config| {
+            if (wm.windowing_sent.output_config) |config| {
                 config.sendFailed();
                 config.destroy();
-                wm.sent.output_config = null;
+                wm.windowing_sent.output_config = null;
             }
 
             {
                 // Revert to last working state on failure
-                var it = wm.sent.outputs.iterator(.forward);
+                var it = wm.windowing_sent.outputs.iterator(.forward);
                 while (it.next()) |output| {
-                    output.pending = output.current;
+                    output.scheduled = output.current;
                     output.sent = output.current;
                 }
-                wm.dirtyPending();
+                wm.dirtyWindowing();
             }
             return;
         }
@@ -387,14 +387,14 @@ pub fn commitOutputState(om: *OutputManager) void {
         swapchain_manager.apply();
     }
 
-    if (wm.sent.output_config) |config| {
+    if (wm.windowing_sent.output_config) |config| {
         config.sendSucceeded();
         config.destroy();
-        wm.sent.output_config = null;
+        wm.windowing_sent.output_config = null;
     }
 
     {
-        var it = wm.sent.outputs.iterator(.forward);
+        var it = wm.windowing_sent.outputs.iterator(.forward);
         while (it.next()) |output| {
             output.current = output.sent;
 

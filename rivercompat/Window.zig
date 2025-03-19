@@ -106,6 +106,9 @@ pub fn updateWindowing(window: *Window, wm: *WindowManager) void {
                 seat.focus(window);
             }
         }
+
+        window.node_v1.setPosition(20, 20);
+        window.window_v1.proposeDimensions(400, 400);
     }
 
     window.pending = .{};

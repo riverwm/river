@@ -180,7 +180,7 @@ fn handleUnmap(listener: *wl.Listener(void)) void {
         }
     }
 
-    server.wm.dirtyPending();
+    server.wm.dirtyWindowing();
 }
 
 fn handleSetGeometry(listener: *wl.Listener(void)) void {

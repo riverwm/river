@@ -91,7 +91,9 @@
     </description>
 
     <enum name="error">
-      <entry name="role" value="0"
+      <entry name="update_sequence_order" value="0"
+        sumary="request violates update sequence ordering"/>
+      <entry name="role" value="1"
         summary="given wl_surface already has a role"/>
     </enum>
 
@@ -988,8 +990,9 @@
         position. For example, this event is necessary to communicate the
         results of interactive resize to the window manager client.
 
-        This event will be followed by an update_windowing_start event after all
-        other new state has been sent by the server.
+        This event is sent during update sequences after the
+        update_windowing_finish request and before the update_rendering_start
+        event.
       </description>
       <arg name="x" type="int"/>
       <arg name="y" type="int"/>

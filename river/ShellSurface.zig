@@ -32,12 +32,6 @@ const WmNode = @import("WmNode.zig");
 
 const log = std.log.scoped(.wm);
 
-const WmState = struct {
-    x: i32 = 0,
-    y: i32 = 0,
-    sync_next_commit: bool = false,
-};
-
 const role: wlr.Surface.Role = .{
     .name = "river_scene_surface_v1",
     .client_commit = clientCommit,
@@ -52,8 +46,11 @@ tree: *wlr.SceneTree,
 surfaces: Scene.SaveableSurfaces,
 node: WmNode,
 
-uncommitted: WmState = .{},
-committed: WmState = .{},
+rendering_requested: struct {
+    x: i32 = 0,
+    y: i32 = 0,
+    sync_next_commit: bool = false,
+} = .{},
 
 pub fn create(
     client: *wl.Client,
@@ -88,9 +85,8 @@ pub fn create(
         .surfaces = surfaces,
         .node = undefined,
     };
-
     shell_surface.node.init(.shell_surface);
-    server.wm.uncommitted.render_list.append(&shell_surface.node);
+    server.wm.rendering_requested.list.append(&shell_surface.node);
 
     shell_surface_v1.setHandler(*ShellSurface, handleRequest, handleDestroy, shell_surface);
 }
@@ -124,7 +120,8 @@ fn handleRequest(
             );
         },
         .sync_next_commit => {
-            shell_surface.uncommitted.sync_next_commit = true;
+            if (!server.wm.ensureRendering()) return;
+            shell_surface.rendering_requested.sync_next_commit = true;
         },
     }
 }
@@ -135,7 +132,7 @@ fn clientCommit(wlr_surface: *wlr.Surface) callconv(.C) void {
 
     const shell_surface: *ShellSurface = @ptrCast(@alignCast(resource.getUserData()));
 
-    if (shell_surface.uncommitted.sync_next_commit) {
+    if (shell_surface.rendering_requested.sync_next_commit) {
         shell_surface.surfaces.save();
     }
 }
@@ -148,22 +145,19 @@ fn commit(wlr_surface: *wlr.Surface) callconv(.C) void {
     }
 }
 
-pub fn commitWmState(shell_surface: *ShellSurface) void {
-    shell_surface.committed = shell_surface.uncommitted;
-
-    if (shell_surface.uncommitted.sync_next_commit) {
-        shell_surface.uncommitted.sync_next_commit = false;
+pub fn updateRenderingFinish(shell_surface: *ShellSurface) void {
+    const rendering_requested = &shell_surface.rendering_requested;
+    if (rendering_requested.sync_next_commit) {
+        rendering_requested.sync_next_commit = false;
 
         if (!shell_surface.surfaces.saved.node.enabled) {
             shell_surface.object.postError(.no_commit,
-                \\no wl_surface.commit after sync_next_commit and before river_window_manager_v1.commit
+                \\no wl_surface.commit after sync_next_commit and before update_rendering_finish
             );
         }
     }
-}
 
-pub fn commitTransaction(shell_surface: *ShellSurface) void {
     shell_surface.surfaces.dropSaved();
 
-    shell_surface.tree.node.setPosition(shell_surface.committed.x, shell_surface.committed.y);
+    shell_surface.tree.node.setPosition(rendering_requested.x, rendering_requested.y);
 }

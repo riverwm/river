@@ -99,10 +99,10 @@ pub fn configure(xwindow: *XwaylandWindow) bool {
 
     // Sending a 0 width/height to X11 clients is invalid, so fake it
     if (inflight.box.width == 0) {
-        inflight.box.width = xwindow.window.pending.box.width;
+        inflight.box.width = xwindow.window.configure_scheduled.box.width;
     }
     if (inflight.box.height == 0) {
-        inflight.box.height = xwindow.window.pending.box.height;
+        inflight.box.height = xwindow.window.configure_scheduled.box.height;
     }
 
     if (inflight.hidden != current.hidden) {
@@ -194,14 +194,14 @@ pub fn handleMap(listener: *wl.Listener(void)) void {
     };
 
     // XXX this seems like it should be deleted/moved to handleCommit()
-    window.pending.box = .{
+    window.configure_scheduled.box = .{
         .x = 0,
         .y = 0,
         .width = xwindow.xsurface.width,
         .height = xwindow.xsurface.height,
     };
-    window.inflight.box = window.pending.box;
-    window.current.box = window.pending.box;
+    window.inflight.box = window.configure_scheduled.box;
+    window.current.box = window.configure_scheduled.box;
 
     window.map() catch {
         log.err("out of memory", .{});
