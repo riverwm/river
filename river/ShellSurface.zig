@@ -33,7 +33,7 @@ const WmNode = @import("WmNode.zig");
 const log = std.log.scoped(.wm);
 
 const role: wlr.Surface.Role = .{
-    .name = "river_scene_surface_v1",
+    .name = "river_shell_surface_v1",
     .client_commit = clientCommit,
     .commit = commit,
     .unmap = null,

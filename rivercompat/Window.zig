@@ -18,31 +18,57 @@ const Window = @This();
 
 const std = @import("std");
 const assert = std.debug.assert;
+const math = std.math;
 const wayland = @import("wayland");
 const wl = wayland.client.wl;
+const wp = wayland.client.wp;
 const river = wayland.client.river;
 
 const WindowManager = @import("WindowManager.zig");
 
 const gpa = std.heap.c_allocator;
 
-const State = struct {
-    new: bool = false,
-    closed: bool = false,
-};
-
 window_v1: *river.WindowV1,
 node_v1: *river.NodeV1,
-pending: State,
+windowing: struct {
+    new: bool = false,
+    closed: bool = false,
+},
+rendering: struct {
+    x: i32 = 0,
+    y: i32 = 0,
+    width: i32 = 0,
+    height: i32 = 0,
+} = .{},
 link: wl.list.Link,
+
+shadow_surface: *wl.Surface,
+shadow_decoration: *river.DecorationV1,
+shadow_viewport: *wp.Viewport,
+shadow_buffer: *wl.Buffer,
 
 pub fn create(window_v1: *river.WindowV1, wm: *WindowManager) void {
     const window = gpa.create(Window) catch @panic("OOM");
+
+    const shadow_surface = wm.compositor.createSurface() catch @panic("OOM");
+    const shadow_decoration = window_v1.getDecorationBelow(shadow_surface) catch @panic("OOM");
+    const shadow_viewport = wm.viewporter.getViewport(shadow_surface) catch @panic("OOM");
+    const shadow_buffer = wm.single_pixel.createU32RgbaBuffer(
+        0,
+        0,
+        0,
+        @intFromFloat(0.75 * math.maxInt(u32)),
+    ) catch @panic("OOM");
+
     window.* = .{
         .window_v1 = window_v1,
         .node_v1 = window_v1.getNode() catch @panic("OOM"),
-        .pending = .{ .new = true },
+        .windowing = .{ .new = true },
         .link = undefined,
+        .shadow_surface = shadow_surface,
+        .shadow_decoration = shadow_decoration,
+        .shadow_viewport = shadow_viewport,
+        .shadow_buffer = shadow_buffer,
     };
     wm.windows.append(window);
     window_v1.setListener(*Window, handleEvent, window);
@@ -51,9 +77,12 @@ pub fn create(window_v1: *river.WindowV1, wm: *WindowManager) void {
 fn handleEvent(window_v1: *river.WindowV1, event: river.WindowV1.Event, window: *Window) void {
     assert(window.window_v1 == window_v1);
     switch (event) {
-        .closed => window.pending.closed = true,
+        .closed => window.windowing.closed = true,
         .dimensions_hint => {},
-        .dimensions => {},
+        .dimensions => |args| {
+            window.rendering.width = args.width;
+            window.rendering.height = args.height;
+        },
         .app_id => {},
         .title => {},
         .parent => {},
@@ -70,7 +99,7 @@ fn handleEvent(window_v1: *river.WindowV1, event: river.WindowV1.Event, window: 
 }
 
 pub fn updateWindowing(window: *Window, wm: *WindowManager) void {
-    if (window.pending.closed) {
+    if (window.windowing.closed) {
         window.window_v1.destroy();
         window.link.remove();
         {
@@ -86,7 +115,7 @@ pub fn updateWindowing(window: *Window, wm: *WindowManager) void {
         return;
     }
 
-    if (window.pending.new) {
+    if (window.windowing.new) {
         window.node_v1.placeTop();
         window.window_v1.useSsd();
 
@@ -111,5 +140,17 @@ pub fn updateWindowing(window: *Window, wm: *WindowManager) void {
         window.window_v1.proposeDimensions(400, 400);
     }
 
-    window.pending = .{};
+    window.windowing = .{};
+}
+
+pub fn updateRendering(window: *Window, wm: *WindowManager) void {
+    _ = wm;
+    {
+        window.shadow_surface.attach(window.shadow_buffer, 0, 0);
+        window.shadow_surface.damageBuffer(0, 0, math.maxInt(i32), math.maxInt(i32));
+        window.shadow_viewport.setDestination(window.rendering.width, window.rendering.height);
+        window.shadow_decoration.setOffset(20, 20);
+        window.shadow_decoration.syncNextCommit();
+        window.shadow_surface.commit();
+    }
 }

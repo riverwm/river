@@ -109,5 +109,10 @@ fn updateWindowing(wm: *WindowManager) void {
 }
 
 fn updateRendering(wm: *WindowManager) void {
-    _ = wm;
+    {
+        var it = wm.windows.iterator(.forward);
+        while (it.next()) |window| {
+            window.updateRendering(wm);
+        }
+    }
 }

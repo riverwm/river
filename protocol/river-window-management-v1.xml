@@ -612,9 +612,21 @@
       <arg name="edges" type="uint" enum="edges"/>
     </request>
 
-    <request name="get_decoration_surface">
-      <description summary="assign the river_decoration_v1 surface role">
-        Create a window decoration surface for the window and assign the
+    <request name="get_decoration_above">
+      <description summary="create a decoration surface above the window">
+        Create a window decoration surface above the window and assign the
+        river_decoration_v1 role to the surface.
+
+        Providing a wl_surface which already has a role or already has a buffer
+        attached or committed is a protocol error.
+      </description>
+      <arg name="id" type="new_id" interface="river_decoration_v1"/>
+      <arg name="surface" type="object" interface="wl_surface"/>
+    </request>
+
+    <request name="get_decoration_below">
+      <description summary="create a decoration surface below the window">
+        Create a window decoration surface below the window and assign the
         river_decoration_v1 role to the surface.
 
         Providing a wl_surface which already has a role or already has a buffer
@@ -846,10 +858,21 @@
 
   <interface name="river_decoration_v1" version="1">
     <description summary="a window decoration">
-      This surface is rendered above the window's content and above the window's
-      borders. The relative ordering of multiple decoration surfaces for the
-      same window is undefined by this protocol and left up to the compositor.
+      The rendering order of windows with decorations is follows:
+
+      1. Decorations created with get_decoration_below at the bottom
+      2. Window content
+      3. Borders configured with river_window_v1.set_borders
+      4. Decorations created with get_decoration_above at the top
+
+      The relative ordering of decoration surfaces above/below a window is
+      undefined by this protocol and left up to the compositor.
     </description>
+
+    <enum name="error">
+      <entry name="no_commit" value="0"
+        summary="failed to commit the surface before the window manager commit"/>
+    </enum>
 
     <request name="destroy" type="destructor">
       <description summary="destroy the decoration object">

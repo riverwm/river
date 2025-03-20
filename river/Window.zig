@@ -29,6 +29,7 @@ const river = @import("wayland").server.river;
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
+const Decoration = @import("Decoration.zig");
 const Output = @import("Output.zig");
 const Scene = @import("Scene.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
@@ -89,7 +90,13 @@ node: WmNode,
 /// The implementation of this window
 impl: Impl,
 
+/// This is the root scene tree for the window.
+/// The trees in the following fields are in rendering order.
 tree: *wlr.SceneTree,
+
+decorations_below: wl.list.Head(Decoration, .link),
+decorations_below_tree: *wlr.SceneTree,
+
 surfaces: Scene.SaveableSurfaces,
 
 border: struct {
@@ -98,6 +105,10 @@ border: struct {
     top: *wlr.SceneRect,
     bottom: *wlr.SceneRect,
 },
+
+decorations_above: wl.list.Head(Decoration, .link),
+decorations_above_tree: *wlr.SceneTree,
+
 popup_tree: *wlr.SceneTree,
 
 /// Set to true once the window manager client has made its first commit
@@ -232,6 +243,8 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
         .node = undefined,
         .impl = impl,
         .tree = tree,
+        .decorations_below = undefined,
+        .decorations_below_tree = try tree.createSceneTree(),
         .surfaces = try Scene.SaveableSurfaces.init(tree),
         .border = .{
             .left = try tree.createSceneRect(0, 0, &.{ 0, 0, 0, 0 }),
@@ -239,11 +252,16 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
             .top = try tree.createSceneRect(0, 0, &.{ 0, 0, 0, 0 }),
             .bottom = try tree.createSceneRect(0, 0, &.{ 0, 0, 0, 0 }),
         },
+        .decorations_above = undefined,
+        .decorations_above_tree = try tree.createSceneTree(),
         .popup_tree = popup_tree,
         .link = undefined,
     };
 
     window.node.init(.window);
+
+    window.decorations_below.init();
+    window.decorations_above.init();
 
     server.wm.windows.append(window);
 
@@ -504,7 +522,29 @@ fn handleRequest(
             if (!server.wm.ensureWindowing()) return;
             windowing_requested.tiled = args.edges;
         },
-        .get_decoration_surface => {}, // XXX support decoration surfaces
+        inline .get_decoration_above, .get_decoration_below => |args, req| {
+            const above = req == .get_decoration_above;
+            const surface = wlr.Surface.fromWlSurface(args.surface);
+            const decoration = Decoration.create(
+                window_v1.getClient(),
+                window_v1.getVersion(),
+                args.id,
+                surface,
+                if (above) window.decorations_above_tree else window.decorations_below_tree,
+            ) catch |err| switch (err) {
+                error.OutOfMemory, error.ResourceCreateFailed => {
+                    window_v1.getClient().postNoMemory();
+                    log.err("out of memory", .{});
+                    return;
+                },
+                error.AlreadyHasRole => return,
+            };
+            if (above) {
+                window.decorations_above.append(decoration);
+            } else {
+                window.decorations_below.append(decoration);
+            }
+        },
         .set_capabilities => |args| {
             if (!server.wm.ensureWindowing()) return;
             windowing_requested.capabilities = args.caps;
@@ -653,7 +693,6 @@ pub fn updateRenderingStart(window: *Window) void {
             const dy = seat_op.y - seat_op.start_y;
             scheduled_box.x = data.start_x + dx;
             scheduled_box.y = data.start_y + dy;
-            log.debug("set x/y for move to {} {}", .{ scheduled_box.x, scheduled_box.y });
         },
         .resize => |data| {
             assert(data.seat.op != null);
@@ -761,6 +800,11 @@ pub fn updateRenderingFinish(window: *Window) void {
         rect.node.setPosition(edge.box.x, edge.box.y);
         rect.setSize(edge.box.width, edge.box.height);
         rect.setColor(&color);
+    }
+
+    inline for (.{ &window.decorations_above, &window.decorations_below }) |decorations| {
+        var it = decorations.iterator(.forward);
+        while (it.next()) |decoration| decoration.updateRenderingFinish();
     }
 }
 
