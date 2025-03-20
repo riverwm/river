@@ -170,6 +170,7 @@ fn handleRequest(
             }
             wm.updateWindowingFinish();
         },
+        .update_windowing_dirty => wm.dirtyWindowing(),
         .update_rendering_finish => {
             if (wm.state != .update_rendering) {
                 wm_v1.postError(.update_sequence_order,
@@ -179,7 +180,6 @@ fn handleRequest(
             }
             wm.updateRenderingFinish();
         },
-        .update_mark_dirty => wm.dirtyWindowing(),
         .get_shell_surface => |args| {
             const surface = wlr.Surface.fromWlSurface(args.surface);
             ShellSurface.create(
