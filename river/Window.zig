@@ -294,6 +294,7 @@ pub fn destroy(window: *Window, when: enum { lazy, assert }) void {
             return;
         },
     }
+    assert(window.object == null);
 
     {
         var it = server.input_manager.seats.iterator(.forward);
@@ -436,6 +437,10 @@ fn makeInert(window: *Window) void {
         window_v1.sendClosed();
         window_v1.setHandler(?*anyopaque, handleRequestInert, null, null);
         window.node.makeInert();
+        inline for (.{ &window.decorations_above, &window.decorations_below }) |decorations| {
+            var it = decorations.safeIterator(.forward);
+            while (it.next()) |decoration| decoration.destroy();
+        }
     } else {
         assert(window.node.object == null);
     }

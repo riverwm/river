@@ -95,7 +95,7 @@ fn updateWindowing(wm: *WindowManager) void {
         }
     }
     {
-        var it = wm.windows.iterator(.forward);
+        var it = wm.windows.safeIterator(.forward);
         while (it.next()) |window| {
             window.updateWindowing(wm);
         }

@@ -87,10 +87,23 @@ pub fn create(
     return decoration;
 }
 
-fn handleDestroy(_: *river.DecorationV1, decoration: *Decoration) void {
+pub fn destroy(decoration: *Decoration) void {
+    decoration.object.setHandler(?*anyopaque, handleRequestInert, null, null);
     decoration.tree.node.destroy();
-
+    decoration.link.remove();
     util.gpa.destroy(decoration);
+}
+
+fn handleRequestInert(
+    node_v1: *river.DecorationV1,
+    request: river.DecorationV1.Request,
+    _: ?*anyopaque,
+) void {
+    if (request == .destroy) node_v1.destroy();
+}
+
+fn handleDestroy(_: *river.DecorationV1, decoration: *Decoration) void {
+    decoration.destroy();
 }
 
 fn handleRequest(
