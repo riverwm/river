@@ -714,8 +714,10 @@ pub fn updateRenderingStart(window: *Window) void {
             node_v1.sendPosition(scheduled_box.x, scheduled_box.y);
         }
     }
-    if (window.rendering_scheduled.resend_dimensions or
-        scheduled_box.width != sent.box.width or scheduled_box.height != sent.box.height)
+    // The check for 0 width/height is necessary to handle timeout of the first configure sent.
+    if (!scheduled_box.empty() and
+        (window.rendering_scheduled.resend_dimensions or
+        scheduled_box.width != sent.box.width or scheduled_box.height != sent.box.height))
     {
         if (window.object) |window_v1| {
             window_v1.sendDimensions(scheduled_box.width, scheduled_box.height);

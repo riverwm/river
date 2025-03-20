@@ -145,7 +145,8 @@ pub fn updateWindowing(window: *Window, wm: *WindowManager) void {
 
 pub fn updateRendering(window: *Window, wm: *WindowManager) void {
     _ = wm;
-    {
+
+    if (window.rendering.width != 0 and window.rendering.height != 0) {
         window.shadow_surface.attach(window.shadow_buffer, 0, 0);
         window.shadow_surface.damageBuffer(0, 0, math.maxInt(i32), math.maxInt(i32));
         window.shadow_viewport.setDestination(window.rendering.width, window.rendering.height);
