@@ -24,6 +24,7 @@ const wl = wayland.client.wl;
 const wp = wayland.client.wp;
 const river = wayland.client.river;
 
+const Output = @import("Output.zig");
 const WindowManager = @import("WindowManager.zig");
 
 const gpa = std.heap.c_allocator;
@@ -40,7 +41,13 @@ rendering: struct {
     width: i32 = 0,
     height: i32 = 0,
 } = .{},
+
+output: ?*Output = null,
+tags: u32 = 0,
+
 link: wl.list.Link,
+link_focus: wl.list.Link,
+link_wm: wl.list.Link,
 
 shadow_surface: *wl.Surface,
 shadow_decoration: *river.DecorationV1,
@@ -65,12 +72,17 @@ pub fn create(window_v1: *river.WindowV1, wm: *WindowManager) void {
         .node_v1 = window_v1.getNode() catch @panic("OOM"),
         .windowing = .{ .new = true },
         .link = undefined,
+        .link_focus = undefined,
+        .link_wm = undefined,
         .shadow_surface = shadow_surface,
         .shadow_decoration = shadow_decoration,
         .shadow_viewport = shadow_viewport,
         .shadow_buffer = shadow_buffer,
     };
     wm.windows.append(window);
+    window.link_focus.init();
+    window.link_wm.init();
+
     window_v1.setListener(*Window, handleEvent, window);
 }
 
@@ -106,8 +118,7 @@ pub fn updateWindowing(window: *Window, wm: *WindowManager) void {
             var it = wm.seats.iterator(.forward);
             while (it.next()) |seat| {
                 if (seat.focused == window) {
-                    seat.focused = null;
-                    seat.focusNext();
+                    seat.focus(null);
                 }
             }
         }
@@ -116,7 +127,6 @@ pub fn updateWindowing(window: *Window, wm: *WindowManager) void {
     }
 
     if (window.windowing.new) {
-        window.node_v1.placeTop();
         window.window_v1.useSsd();
 
         const rgb = 0x586e75;
@@ -129,15 +139,26 @@ pub fn updateWindowing(window: *Window, wm: *WindowManager) void {
             0xffff_ffff,
         );
 
-        {
-            var it = wm.seats.iterator(.forward);
-            while (it.next()) |seat| {
-                seat.focus(window);
+        if (if (wm.seats.first()) |seat| seat.focused_output else null) |output| {
+            window.output = output;
+            window.tags = output.tags;
+            window.link_wm.remove();
+            window.link_focus.remove();
+            output.stack_focus.prepend(window);
+            output.stack_wm.prepend(window);
+            {
+                var it = wm.seats.iterator(.forward);
+                while (it.next()) |seat| {
+                    seat.focus(window);
+                }
             }
+        } else {
+            window.tags = (1 << 0); // XXX
+            window.link_wm.remove();
+            window.link_focus.remove();
+            wm.fallback_stack_focus.prepend(window);
+            wm.fallback_stack_wm.prepend(window);
         }
-
-        window.node_v1.setPosition(20, 20);
-        window.window_v1.proposeDimensions(400, 400);
     }
 
     window.windowing = .{};

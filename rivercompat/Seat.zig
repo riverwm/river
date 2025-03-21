@@ -25,6 +25,7 @@ const river = wayland.client.river;
 
 const c = @import("c.zig");
 
+const Output = @import("Output.zig");
 const Window = @import("Window.zig");
 const WindowManager = @import("WindowManager.zig");
 const XkbBinding = @import("XkbBinding.zig");
@@ -43,6 +44,7 @@ wm: *WindowManager,
 seat_v1: *river.SeatV1,
 pending: State = .{},
 focused: ?*Window = null,
+focused_output: ?*Output = null,
 link: wl.list.Link,
 
 pub fn create(wm: *WindowManager, seat_v1: *river.SeatV1) void {
@@ -83,6 +85,8 @@ fn handleEvent(seat_v1: *river.SeatV1, event: river.SeatV1.Event, seat: *Seat) v
 
 pub fn updateWindowing(seat: *Seat) void {
     if (seat.pending.new) {
+        seat.focused_output = seat.wm.outputs.first();
+
         XkbBinding.create(seat, xkb.Keysym.n, .{ .mod4 = true }, .focus_next);
         XkbBinding.create(seat, xkb.Keysym.h, .{ .mod4 = true }, .hide_focused);
         XkbBinding.create(seat, xkb.Keysym.k, .{ .mod4 = true }, .close_focused);
@@ -115,7 +119,7 @@ pub const Action = enum {
 
 pub fn execute(seat: *Seat, action: Action) void {
     switch (action) {
-        .focus_next => seat.focusNext(),
+        .focus_next => {}, // XXX
         .close_focused => if (seat.focused) |window| window.window_v1.close(),
         .hide_focused => if (seat.focused) |window| window.window_v1.hide(),
         .show_all => {
@@ -145,26 +149,34 @@ pub fn execute(seat: *Seat, action: Action) void {
     }
 }
 
-pub fn focus(seat: *Seat, target: ?*Window) void {
+pub fn focus(seat: *Seat, _target: ?*Window) void {
+    if (seat.focused_output == null) return;
+    if (seat.wm.session_locked) return;
+
+    var target = _target;
     if (target) |window| {
+        if (window.output == null or window.output.?.tags & window.tags == 0) {
+            target = null;
+        } else if (window.output.? != seat.focused_output.?) {
+            seat.focused_output = window.output;
+        }
+    }
+
+    if (target == null) {
+        var it = seat.focused_output.?.stack_focus.iterator(.forward);
+        while (it.next()) |window| {
+            if (window.tags & seat.focused_output.?.tags != 0) {
+                target = window;
+                break;
+            }
+        }
+    }
+
+    if (target) |window| {
+        window.link_focus.remove();
+        seat.focused_output.?.stack_focus.prepend(window);
         seat.seat_v1.focusWindow(window.window_v1);
-        seat.focused = window;
-
-        window.link.remove();
-        seat.wm.windows.prepend(window);
-
-        window.node_v1.placeTop();
     } else {
         seat.seat_v1.clearFocus();
-    }
-}
-
-pub fn focusNext(seat: *Seat) void {
-    if (seat.focused != null) {
-        if (seat.wm.windows.length() >= 2) {
-            seat.focus(seat.wm.windows.last().?);
-        }
-    } else {
-        seat.focus(seat.wm.windows.first());
     }
 }
