@@ -22,7 +22,8 @@ const assert = std.debug.assert;
 const gpa = std.heap.c_allocator;
 
 border_width: u31 = 3,
-border_color: u32 = 0x586e75,
+border_color_unfocused: u32 = 0x586e75,
+border_color_focused: u32 = 0x93a1a1,
 
 main_count: u31 = 1,
 main_location: enum { left, right, top, bottom } = .left,

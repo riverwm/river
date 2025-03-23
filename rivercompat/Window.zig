@@ -134,15 +134,6 @@ pub fn updateWindowing(window: *Window) void {
     if (window.windowing.new) {
         window.window_v1.useSsd();
 
-        window.window_v1.setBorders(
-            .{ .left = true, .bottom = true, .top = true, .right = true },
-            wm.config.border_width,
-            @as(u32, (wm.config.border_color >> 16) & 0xff) * (0xffff_ffff / 0xff),
-            @as(u32, (wm.config.border_color >> 8) & 0xff) * (0xffff_ffff / 0xff),
-            @as(u32, (wm.config.border_color >> 0) & 0xff) * (0xffff_ffff / 0xff),
-            0xffff_ffff,
-        );
-
         if (if (wm.seats.first()) |seat| seat.focused_output else null) |output| {
             window.output = output;
             window.tags = output.tags;
@@ -177,6 +168,29 @@ pub fn updateRendering(window: *Window) void {
         window.shadow_decoration.syncNextCommit();
         window.shadow_surface.commit();
     }
+
+    {
+        var it = wm.seats.iterator(.forward);
+        while (it.next()) |seat| {
+            if (seat.focused == window) {
+                window.setBorders(wm.config.border_color_focused);
+                break;
+            }
+        } else {
+            window.setBorders(wm.config.border_color_unfocused);
+        }
+    }
+}
+
+fn setBorders(window: *Window, rgb: u32) void {
+    window.window_v1.setBorders(
+        .{ .left = true, .bottom = true, .top = true, .right = true },
+        wm.config.border_width,
+        @as(u32, (rgb >> 16) & 0xff) * (0xffff_ffff / 0xff),
+        @as(u32, (rgb >> 8) & 0xff) * (0xffff_ffff / 0xff),
+        @as(u32, (rgb >> 0) & 0xff) * (0xffff_ffff / 0xff),
+        0xffff_ffff,
+    );
 }
 
 pub const Box = struct {
