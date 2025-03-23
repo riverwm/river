@@ -25,8 +25,8 @@ const wp = wayland.client.wp;
 const river = wayland.client.river;
 
 const Output = @import("Output.zig");
-const WindowManager = @import("WindowManager.zig");
 
+const wm = &@import("root").wm;
 const gpa = std.heap.c_allocator;
 
 window_v1: *river.WindowV1,
@@ -35,12 +35,11 @@ windowing: struct {
     new: bool = false,
     closed: bool = false,
 },
-rendering: struct {
-    x: i32 = 0,
-    y: i32 = 0,
-    width: i32 = 0,
-    height: i32 = 0,
-} = .{},
+
+x: i32 = 0,
+y: i32 = 0,
+width: i32 = 0,
+height: i32 = 0,
 
 output: ?*Output = null,
 tags: u32 = 0,
@@ -54,7 +53,7 @@ shadow_decoration: *river.DecorationV1,
 shadow_viewport: *wp.Viewport,
 shadow_buffer: *wl.Buffer,
 
-pub fn create(window_v1: *river.WindowV1, wm: *WindowManager) void {
+pub fn create(window_v1: *river.WindowV1) void {
     const window = gpa.create(Window) catch @panic("OOM");
 
     const shadow_surface = wm.compositor.createSurface() catch @panic("OOM");
@@ -92,8 +91,8 @@ fn handleEvent(window_v1: *river.WindowV1, event: river.WindowV1.Event, window: 
         .closed => window.windowing.closed = true,
         .dimensions_hint => {},
         .dimensions => |args| {
-            window.rendering.width = args.width;
-            window.rendering.height = args.height;
+            window.width = args.width;
+            window.height = args.height;
         },
         .app_id => {},
         .title => {},
@@ -110,7 +109,7 @@ fn handleEvent(window_v1: *river.WindowV1, event: river.WindowV1.Event, window: 
     }
 }
 
-pub fn updateWindowing(window: *Window, wm: *WindowManager) void {
+pub fn updateWindowing(window: *Window) void {
     if (window.windowing.closed) {
         window.window_v1.destroy();
         window.link.remove();
@@ -129,13 +128,12 @@ pub fn updateWindowing(window: *Window, wm: *WindowManager) void {
     if (window.windowing.new) {
         window.window_v1.useSsd();
 
-        const rgb = 0x586e75;
         window.window_v1.setBorders(
-            .{ .left = true, .bottom = true, .top = false, .right = true },
-            6, // width
-            @as(u32, (rgb >> 16) & 0xff) * (0xffff_ffff / 0xff),
-            @as(u32, (rgb >> 8) & 0xff) * (0xffff_ffff / 0xff),
-            @as(u32, (rgb >> 0) & 0xff) * (0xffff_ffff / 0xff),
+            .{ .left = true, .bottom = true, .top = true, .right = true },
+            wm.config.border_width,
+            @as(u32, (wm.config.border_color >> 16) & 0xff) * (0xffff_ffff / 0xff),
+            @as(u32, (wm.config.border_color >> 8) & 0xff) * (0xffff_ffff / 0xff),
+            @as(u32, (wm.config.border_color >> 0) & 0xff) * (0xffff_ffff / 0xff),
             0xffff_ffff,
         );
 
@@ -164,15 +162,30 @@ pub fn updateWindowing(window: *Window, wm: *WindowManager) void {
     window.windowing = .{};
 }
 
-pub fn updateRendering(window: *Window, wm: *WindowManager) void {
-    _ = wm;
-
-    if (window.rendering.width != 0 and window.rendering.height != 0) {
+pub fn updateRendering(window: *Window) void {
+    if (window.width != 0 and window.height != 0) {
         window.shadow_surface.attach(window.shadow_buffer, 0, 0);
         window.shadow_surface.damageBuffer(0, 0, math.maxInt(i32), math.maxInt(i32));
-        window.shadow_viewport.setDestination(window.rendering.width, window.rendering.height);
-        window.shadow_decoration.setOffset(20, 20);
+        window.shadow_viewport.setDestination(window.width + 2 * wm.config.border_width, window.height + 2 * wm.config.border_width);
+        window.shadow_decoration.setOffset(10 - wm.config.border_width, 10 - wm.config.border_width);
         window.shadow_decoration.syncNextCommit();
         window.shadow_surface.commit();
     }
+}
+
+pub const Box = struct {
+    x: i32,
+    y: i32,
+    width: u31,
+    height: u31,
+};
+
+pub fn layout(
+    window: *Window,
+    box: Box,
+) void {
+    window.x = box.x + wm.config.border_width;
+    window.y = box.y + wm.config.border_width;
+    window.node_v1.setPosition(window.x, window.y);
+    window.window_v1.proposeDimensions(box.width - 2 * wm.config.border_width, box.height - 2 * wm.config.border_width);
 }

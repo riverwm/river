@@ -27,10 +27,10 @@ const c = @import("c.zig");
 
 const Output = @import("Output.zig");
 const Window = @import("Window.zig");
-const WindowManager = @import("WindowManager.zig");
 const XkbBinding = @import("XkbBinding.zig");
 const PointerBinding = @import("PointerBinding.zig");
 
+const wm = &@import("root").wm;
 const gpa = std.heap.c_allocator;
 
 const State = struct {
@@ -40,17 +40,15 @@ const State = struct {
     shell_surface_interaction: ?*river.ShellSurfaceV1 = null,
 };
 
-wm: *WindowManager,
 seat_v1: *river.SeatV1,
 pending: State = .{},
 focused: ?*Window = null,
 focused_output: ?*Output = null,
 link: wl.list.Link,
 
-pub fn create(wm: *WindowManager, seat_v1: *river.SeatV1) void {
+pub fn create(seat_v1: *river.SeatV1) void {
     const seat = gpa.create(Seat) catch @panic("OOM");
     seat.* = .{
-        .wm = wm,
         .seat_v1 = seat_v1,
         .pending = .{ .new = true },
         .link = undefined,
@@ -85,7 +83,7 @@ fn handleEvent(seat_v1: *river.SeatV1, event: river.SeatV1.Event, seat: *Seat) v
 
 pub fn updateWindowing(seat: *Seat) void {
     if (seat.pending.new) {
-        seat.focused_output = seat.wm.outputs.first();
+        seat.focused_output = wm.outputs.first();
 
         XkbBinding.create(seat, xkb.Keysym.n, .{ .mod4 = true }, .focus_next);
         XkbBinding.create(seat, xkb.Keysym.h, .{ .mod4 = true }, .hide_focused);
@@ -123,21 +121,21 @@ pub fn execute(seat: *Seat, action: Action) void {
         .close_focused => if (seat.focused) |window| window.window_v1.close(),
         .hide_focused => if (seat.focused) |window| window.window_v1.hide(),
         .show_all => {
-            var it = seat.wm.windows.iterator(.forward);
+            var it = wm.windows.iterator(.forward);
             while (it.next()) |window| {
                 window.window_v1.show();
             }
         },
         .move_start => {
             seat.seat_v1.opStartPointer();
-            var it = seat.wm.windows.iterator(.forward);
+            var it = wm.windows.iterator(.forward);
             while (it.next()) |window| {
                 seat.seat_v1.opAddMoveWindow(window.window_v1);
             }
         },
         .resize_start => {
             seat.seat_v1.opStartPointer();
-            var it = seat.wm.windows.iterator(.forward);
+            var it = wm.windows.iterator(.forward);
             while (it.next()) |window| {
                 seat.seat_v1.opAddResizeWindow(window.window_v1, .{
                     .top = true,
@@ -151,7 +149,7 @@ pub fn execute(seat: *Seat, action: Action) void {
 
 pub fn focus(seat: *Seat, _target: ?*Window) void {
     if (seat.focused_output == null) return;
-    if (seat.wm.session_locked) return;
+    if (wm.session_locked) return;
 
     var target = _target;
     if (target) |window| {

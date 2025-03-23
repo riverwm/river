@@ -24,9 +24,10 @@ const wl = wayland.client.wl;
 const wp = wayland.client.wp;
 const river = wayland.client.river;
 
+const Background = @import("Background.zig");
+const Config = @import("Config.zig");
 const Output = @import("Output.zig");
 const Seat = @import("Seat.zig");
-const ShellSurface = @import("ShellSurface.zig");
 const Window = @import("Window.zig");
 
 wm_v1: *river.WindowManagerV1,
@@ -39,7 +40,9 @@ session_locked: bool = false,
 windows: wl.list.Head(Window, .link),
 seats: wl.list.Head(Seat, .link),
 outputs: wl.list.Head(Output, .link),
-shell_surfaces: wl.list.Head(ShellSurface, .link),
+
+config: Config = .{},
+background: Background,
 
 fallback_stack_wm: wl.list.Head(Window, .link_wm),
 fallback_stack_focus: wl.list.Head(Window, .link_focus),
@@ -59,20 +62,18 @@ pub fn init(
         .windows = undefined,
         .seats = undefined,
         .outputs = undefined,
-        .shell_surfaces = undefined,
+        .background = undefined,
         .fallback_stack_wm = undefined,
         .fallback_stack_focus = undefined,
     };
     wm.windows.init();
     wm.seats.init();
     wm.outputs.init();
-    wm.shell_surfaces.init();
+    wm.background.init();
     wm.fallback_stack_wm.init();
     wm.fallback_stack_focus.init();
 
     wm_v1.setListener(*WindowManager, handleEvent, wm);
-
-    ShellSurface.create(wm);
 }
 
 fn handleEvent(wm_v1: *river.WindowManagerV1, event: river.WindowManagerV1.Event, wm: *WindowManager) void {
@@ -90,17 +91,18 @@ fn handleEvent(wm_v1: *river.WindowManagerV1, event: river.WindowManagerV1.Event
         },
         .session_locked => wm.session_locked = true,
         .session_unlocked => wm.session_locked = false,
-        .window => |args| Window.create(args.id, wm),
-        .output => |args| Output.create(wm, args.id),
-        .seat => |args| Seat.create(wm, args.id),
+        .window => |args| Window.create(args.id),
+        .output => |args| Output.create(args.id),
+        .seat => |args| Seat.create(args.id),
     }
 }
 
 fn updateWindowing(wm: *WindowManager) void {
+    wm.background.updateWindowing();
     {
         var it = wm.outputs.iterator(.forward);
         while (it.next()) |output| {
-            output.updateWindowing(wm);
+            output.updateWindowing();
         }
     }
     {
@@ -112,13 +114,7 @@ fn updateWindowing(wm: *WindowManager) void {
     {
         var it = wm.windows.safeIterator(.forward);
         while (it.next()) |window| {
-            window.updateWindowing(wm);
-        }
-    }
-    {
-        var it = wm.shell_surfaces.iterator(.forward);
-        while (it.next()) |shell_surface| {
-            shell_surface.updateWindowing(wm);
+            window.updateWindowing();
         }
     }
 
@@ -134,7 +130,7 @@ fn updateRendering(wm: *WindowManager) void {
     {
         var it = wm.windows.iterator(.forward);
         while (it.next()) |window| {
-            window.updateRendering(wm);
+            window.updateRendering();
         }
     }
 }

@@ -66,9 +66,7 @@ const Globals = struct {
     }
 };
 
-const Output = struct {
-    output_v1: *river.OutputV1,
-};
+pub var wm: WindowManager = undefined;
 
 pub fn main() !void {
     const result = flags.parser([*:0]const u8, &[_]flags.Flag{
@@ -109,7 +107,6 @@ pub fn main() !void {
     const single_pixel = globals.single_pixel orelse
         fatal("wayland compositor does not support wp-single-pixel-buffer-v1", .{});
 
-    var wm: WindowManager = undefined;
     wm.init(wm_v1, compositor, viewporter, single_pixel);
 
     while (true) {

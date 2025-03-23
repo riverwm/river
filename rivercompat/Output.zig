@@ -23,11 +23,10 @@ const wl = wayland.client.wl;
 const river = wayland.client.river;
 
 const Window = @import("Window.zig");
-const WindowManager = @import("WindowManager.zig");
 
+const wm = &@import("root").wm;
 const gpa = std.heap.c_allocator;
 
-wm: *WindowManager,
 output_v1: *river.OutputV1,
 pending: struct {
     new: bool = false,
@@ -45,10 +44,9 @@ stack_wm: wl.list.Head(Window, .link_wm),
 
 link: wl.list.Link,
 
-pub fn create(wm: *WindowManager, output_v1: *river.OutputV1) void {
+pub fn create(output_v1: *river.OutputV1) void {
     const output = gpa.create(Output) catch @panic("OOM");
     output.* = .{
-        .wm = wm,
         .output_v1 = output_v1,
         .pending = .{ .new = true },
         .stack_focus = undefined,
@@ -77,7 +75,7 @@ fn handleEvent(output_v1: *river.OutputV1, event: river.OutputV1.Event, output: 
     }
 }
 
-pub fn updateWindowing(output: *Output, wm: *WindowManager) void {
+pub fn updateWindowing(output: *Output) void {
     if (output.pending.removed) {
         // XXX
         output.output_v1.destroy();
@@ -109,14 +107,6 @@ pub fn updateWindowing(output: *Output, wm: *WindowManager) void {
     output.pending = .{};
 }
 
-const config = struct {
-    const main_count = 1;
-    const main_location: enum { left, right, top, bottom } = .left;
-    const outer_padding = 10;
-    const window_padding = 10;
-    const main_ratio = 0.60;
-};
-
 pub fn layout(output: *Output) void {
     var count: u31 = 0;
     {
@@ -129,16 +119,16 @@ pub fn layout(output: *Output) void {
     }
     if (count == 0) return;
 
-    const main_count = @min(config.main_count, count);
+    const main_count = @min(wm.config.main_count, count);
     const secondary_count = count -| main_count;
 
-    const usable_width = switch (config.main_location) {
-        .left, .right => output.width -| (2 *| config.outer_padding),
-        .top, .bottom => output.height -| (2 *| config.outer_padding),
+    const usable_width = switch (wm.config.main_location) {
+        .left, .right => output.width -| (2 *| wm.config.outer_padding),
+        .top, .bottom => output.height -| (2 *| wm.config.outer_padding),
     };
-    const usable_height = switch (config.main_location) {
-        .left, .right => output.height -| (2 *| config.outer_padding),
-        .top, .bottom => output.width -| (2 *| config.outer_padding),
+    const usable_height = switch (wm.config.main_location) {
+        .left, .right => output.height -| (2 *| wm.config.outer_padding),
+        .top, .bottom => output.width -| (2 *| wm.config.outer_padding),
     };
 
     // to make things pixel-perfect, we make the first main and first secondary
@@ -152,7 +142,7 @@ pub fn layout(output: *Output) void {
     var secondary_height_rem: u31 = undefined;
 
     if (secondary_count > 0) {
-        main_width = @intFromFloat(config.main_ratio * @as(f64, @floatFromInt(usable_width)));
+        main_width = @intFromFloat(wm.config.main_ratio * @as(f64, @floatFromInt(usable_width)));
         main_height = usable_height / main_count;
         main_height_rem = usable_height % main_count;
 
@@ -189,29 +179,38 @@ pub fn layout(output: *Output) void {
                 height = secondary_height + if (i == main_count) secondary_height_rem else 0;
             }
 
-            x +|= config.window_padding;
-            y +|= config.window_padding;
-            width -|= 2 *| config.window_padding;
-            height -|= 2 *| config.window_padding;
+            x +|= wm.config.window_padding;
+            y +|= wm.config.window_padding;
+            width -|= 2 *| wm.config.window_padding;
+            height -|= 2 *| wm.config.window_padding;
 
-            switch (config.main_location) {
-                .left => {
-                    window.node_v1.setPosition(x +| config.outer_padding, y +| config.outer_padding);
-                    window.window_v1.proposeDimensions(width, height);
-                },
-                .right => {
-                    window.node_v1.setPosition(usable_width - width - x +| config.outer_padding, y +| config.outer_padding);
-                    window.window_v1.proposeDimensions(width, height);
-                },
-                .top => {
-                    window.node_v1.setPosition(y +| config.outer_padding, x +| config.outer_padding);
-                    window.window_v1.proposeDimensions(height, width);
-                },
-                .bottom => {
-                    window.node_v1.setPosition(y +| config.outer_padding, usable_width - width - x +| config.outer_padding);
-                    window.window_v1.proposeDimensions(height, width);
-                },
+            switch (wm.config.main_location) {
+                .left => window.layout(.{
+                    .x = x +| wm.config.outer_padding,
+                    .y = y +| wm.config.outer_padding,
+                    .width = width,
+                    .height = height,
+                }),
+                .right => window.layout(.{
+                    .x = usable_width - width - x +| wm.config.outer_padding,
+                    .y = y +| wm.config.outer_padding,
+                    .width = width,
+                    .height = height,
+                }),
+                .top => window.layout(.{
+                    .x = y +| wm.config.outer_padding,
+                    .y = x +| wm.config.outer_padding,
+                    .width = height,
+                    .height = width,
+                }),
+                .bottom => window.layout(.{
+                    .x = y +| wm.config.outer_padding,
+                    .y = usable_width - width - x +| wm.config.outer_padding,
+                    .width = height,
+                    .height = width,
+                }),
             }
+            window.window_v1.setTiled(.{ .top = true, .bottom = true, .left = true, .right = true });
         }
     }
 
