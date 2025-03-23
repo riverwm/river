@@ -399,8 +399,15 @@ fn updateRenderingFinish(wm: *WindowManager) void {
     {
         var it = wm.windows.safeIterator(.forward);
         while (it.next()) |window| {
-            window.surfaces.dropSaved();
-            if (window.destroying) window.destroy(.assert);
+            // If a window is unmapped during a rendering update, we need to retain the saved
+            // buffers until after the next windowing update (in which the closed event will
+            // be sent) for frame perfection.
+            if (window.windowing_scheduled.state != .closing) {
+                window.surfaces.dropSaved();
+            }
+            if (window.destroying) {
+                window.destroy(.force);
+            }
         }
     }
 

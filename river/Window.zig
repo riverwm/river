@@ -274,10 +274,11 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
     return window;
 }
 
-/// If saved buffers of the window are currently in use by a transaction,
-/// mark this window for destruction when the transaction completes. Otherwise
-/// destroy immediately.
-pub fn destroy(window: *Window, when: enum { lazy, assert }) void {
+/// It's safe to destroy the window after we no longer need the saved buffers for frame perfection.
+/// We no longer need the saved buffers after the windowing update sequence in
+/// which the closed event was sent is completed and the following rendering update
+/// sequence is completed as well.
+pub fn destroy(window: *Window, when: enum { lazy, force }) void {
     assert(window.impl == .none);
     assert(!window.mapped);
 
@@ -305,9 +306,10 @@ pub fn destroy(window: *Window, when: enum { lazy, assert }) void {
         }
     }
 
-    // If there are still saved buffers, then this window needs to be kept
-    // around until the current transaction completes. This function will be
-    // called again in WindowManager.commitTransaction()
+    if (when == .force) {
+        window.surfaces.dropSaved();
+    }
+
     if (!window.surfaces.saved.node.enabled) {
         window.tree.node.destroy();
         window.popup_tree.node.destroy();
@@ -317,11 +319,6 @@ pub fn destroy(window: *Window, when: enum { lazy, assert }) void {
         window.node.deinit();
 
         util.gpa.destroy(window);
-    } else {
-        switch (when) {
-            .lazy => {},
-            .assert => unreachable,
-        }
     }
 }
 

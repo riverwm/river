@@ -81,7 +81,7 @@ pub fn create(wlr_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
         .window = undefined,
         .wlr_toplevel = wlr_toplevel,
     } });
-    errdefer window.destroy(.assert);
+    errdefer window.destroy(.force);
 
     const toplevel = &window.impl.toplevel;
 
