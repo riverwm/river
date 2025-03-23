@@ -102,6 +102,9 @@ pub fn main() !void {
     };
     defer display.disconnect();
 
+    // Things get really noisy if all children started by the wm also have WAYLAND_DEBUG set.
+    _ = unsetenv("WAYLAND_DEBUG");
+
     var globals: Globals = .{};
     const registry = try display.getRegistry();
     registry.setListener(*Globals, Globals.handleEvent, &globals);
@@ -133,3 +136,5 @@ fn fatalPrintUsage(comptime format: []const u8, args: anytype) noreturn {
     std.io.getStdErr().writeAll(usage) catch {};
     posix.exit(1);
 }
+
+extern fn unsetenv(name: [*:0]const u8) c_int;
