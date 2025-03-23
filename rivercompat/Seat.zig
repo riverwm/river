@@ -174,7 +174,9 @@ pub fn focus(seat: *Seat, _target: ?*Window) void {
         window.link_focus.remove();
         seat.focused_output.?.stack_focus.prepend(window);
         seat.seat_v1.focusWindow(window.window_v1);
+        seat.focused = window;
     } else {
         seat.seat_v1.clearFocus();
+        seat.focused = null;
     }
 }

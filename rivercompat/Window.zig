@@ -113,6 +113,8 @@ pub fn updateWindowing(window: *Window) void {
     if (window.windowing.closed) {
         window.window_v1.destroy();
         window.link.remove();
+        window.link_focus.remove();
+        window.link_wm.remove();
         {
             var it = wm.seats.iterator(.forward);
             while (it.next()) |seat| {
@@ -180,10 +182,7 @@ pub const Box = struct {
     height: u31,
 };
 
-pub fn layout(
-    window: *Window,
-    box: Box,
-) void {
+pub fn layout(window: *Window, box: Box) void {
     window.x = box.x + wm.config.border_width;
     window.y = box.y + wm.config.border_width;
     window.node_v1.setPosition(window.x, window.y);

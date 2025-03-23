@@ -26,15 +26,11 @@ const river = wayland.client.river;
 
 const wm = &@import("root").wm;
 
-const State = struct {
-    new: bool = false,
-};
-
+new: bool,
 surface: *wl.Surface,
 viewport: *wp.Viewport,
 shell_surface_v1: *river.ShellSurfaceV1,
 node: *river.NodeV1,
-pending: State,
 
 pub fn init(background: *Background) void {
     const surface = wm.compositor.createSurface() catch @panic("OOM");
@@ -42,16 +38,16 @@ pub fn init(background: *Background) void {
     const shell_surface_v1 = wm.wm_v1.getShellSurface(surface) catch @panic("OOM");
 
     background.* = .{
+        .new = true,
         .surface = surface,
         .viewport = viewport,
         .shell_surface_v1 = shell_surface_v1,
         .node = shell_surface_v1.getNode() catch @panic("OOM"),
-        .pending = .{ .new = true },
     };
 }
 
 pub fn updateWindowing(background: *Background) void {
-    if (background.pending.new) {
+    if (background.new) {
         background.node.placeBottom();
         background.node.setPosition(0, 0);
         background.shell_surface_v1.syncNextCommit();
@@ -72,4 +68,5 @@ pub fn updateWindowing(background: *Background) void {
         background.viewport.setDestination(math.maxInt(i32) / 2, math.maxInt(i32) / 2);
         background.surface.commit();
     }
+    background.new = false;
 }
