@@ -87,6 +87,15 @@ pub fn main() !void {
         posix.exit(0);
     }
 
+    // Avoid the need to waitpid after fork/exec.
+    // This approach doesn't need any cleanup post-fork/pre-exec as the
+    // handler remains default and the SA_NOCLDWAIT flag is reset.
+    posix.sigaction(posix.SIG.CHLD, &.{
+        .handler = .{ .handler = posix.SIG.DFL },
+        .mask = posix.empty_sigset,
+        .flags = posix.SA.NOCLDWAIT,
+    }, null) catch unreachable;
+
     const display = wl.Display.connect(null) catch {
         std.debug.print("Unable to connect to Wayland server.\n", .{});
         posix.exit(1);

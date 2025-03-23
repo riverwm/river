@@ -85,9 +85,13 @@ pub fn updateWindowing(seat: *Seat) void {
     if (seat.pending.new) {
         seat.focused_output = wm.outputs.first();
 
-        XkbBinding.create(seat, xkb.Keysym.n, .{ .mod4 = true }, .focus_next);
+        // These are my personal keybindings which probably only make sense on my weird keyboard layout
+        XkbBinding.create(seat, xkb.Keysym.space, .{ .mod4 = true, .mod1 = true }, .{ .spawn = "foot" });
+        XkbBinding.create(seat, xkb.Keysym.u, .{ .mod4 = true, .mod1 = true }, .close_focused);
+        XkbBinding.create(seat, xkb.Keysym.a, .{ .mod4 = true }, .focus_prev);
+        XkbBinding.create(seat, xkb.Keysym.e, .{ .mod4 = true }, .focus_next);
+
         XkbBinding.create(seat, xkb.Keysym.h, .{ .mod4 = true }, .hide_focused);
-        XkbBinding.create(seat, xkb.Keysym.k, .{ .mod4 = true }, .close_focused);
         XkbBinding.create(seat, xkb.Keysym.s, .{ .mod4 = true }, .show_all);
         PointerBinding.create(seat, c.BTN_LEFT, .{ .mod4 = true }, .move_start, .op_end);
         PointerBinding.create(seat, c.BTN_RIGHT, .{ .mod4 = true }, .resize_start, .op_end);
@@ -105,7 +109,8 @@ pub fn updateWindowing(seat: *Seat) void {
     seat.pending = .{};
 }
 
-pub const Action = enum {
+pub const Action = union(enum) {
+    focus_prev,
     focus_next,
     close_focused,
     hide_focused,
@@ -113,11 +118,14 @@ pub const Action = enum {
     move_start,
     resize_start,
     op_end,
+    /// slice must have a static lifetime
+    spawn: [:0]const u8,
 };
 
 pub fn execute(seat: *Seat, action: Action) void {
     switch (action) {
-        .focus_next => {}, // XXX
+        .focus_prev => seat.focus(seat.actionTarget(.prev)),
+        .focus_next => seat.focus(seat.actionTarget(.next)),
         .close_focused => if (seat.focused) |window| window.window_v1.close(),
         .hide_focused => if (seat.focused) |window| window.window_v1.hide(),
         .show_all => {
@@ -144,6 +152,17 @@ pub fn execute(seat: *Seat, action: Action) void {
             }
         },
         .op_end => seat.seat_v1.opEnd(),
+        .spawn => |command| {
+            if (std.posix.fork()) |pid| {
+                if (pid == 0) {
+                    std.posix.execveZ("/bin/sh", &.{ "/bin/sh", "-c", command, null }, std.c.environ) catch {
+                        std.c._exit(1);
+                    };
+                }
+            } else |err| {
+                std.log.err("fork() failed: {s}", .{@errorName(err)});
+            }
+        },
     }
 }
 
@@ -178,5 +197,33 @@ pub fn focus(seat: *Seat, _target: ?*Window) void {
     } else {
         seat.seat_v1.clearFocus();
         seat.focused = null;
+    }
+}
+
+fn actionTarget(seat: *Seat, comptime dir: enum { next, prev }) ?*Window {
+    const output = seat.focused_output orelse return null;
+    if (seat.focused) |focused| {
+        var it = output.stack_wm.iterator(switch (dir) {
+            .next => .forward,
+            .prev => .reverse,
+        });
+        while (it.next()) |window| {
+            if (window == focused) break;
+        } else {
+            unreachable;
+        }
+        // Return the next window in the stack matching the tags if any.
+        while (it.next()) |window| {
+            if (output.tags & window.tags != 0) return window;
+        }
+        // Wrap and return the first window in the stack matching the tags if
+        // any is found before completing the loop back to the focused window.
+        while (it.next()) |window| {
+            if (window == focused) return null;
+            if (output.tags & window.tags != 0) return window;
+        }
+        unreachable;
+    } else {
+        return output.stack_wm.first();
     }
 }
