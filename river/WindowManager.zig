@@ -406,7 +406,7 @@ fn updateRenderingFinish(wm: *WindowManager) void {
                 window.surfaces.dropSaved();
             }
             if (window.destroying) {
-                window.destroy(.force);
+                window.destroy();
             }
         }
     }

@@ -278,11 +278,9 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
 /// We no longer need the saved buffers after the windowing update sequence in
 /// which the closed event was sent is completed and the following rendering update
 /// sequence is completed as well.
-pub fn destroy(window: *Window, when: enum { lazy, force }) void {
+pub fn destroy(window: *Window) void {
     assert(window.impl == .none);
     assert(!window.mapped);
-
-    window.destroying = true;
 
     // We can't assert(window.windowing_scheduled.state != .ready) since the client may
     // have exited after making its empty initial commit but before the surface
@@ -306,20 +304,14 @@ pub fn destroy(window: *Window, when: enum { lazy, force }) void {
         }
     }
 
-    if (when == .force) {
-        window.surfaces.dropSaved();
-    }
+    window.tree.node.destroy();
+    window.popup_tree.node.destroy();
 
-    if (!window.surfaces.saved.node.enabled) {
-        window.tree.node.destroy();
-        window.popup_tree.node.destroy();
+    window.link.remove();
 
-        window.link.remove();
+    window.node.deinit();
 
-        window.node.deinit();
-
-        util.gpa.destroy(window);
-    }
+    util.gpa.destroy(window);
 }
 
 pub fn setDimensionsHint(window: *Window, hint: DimensionsHint) void {
