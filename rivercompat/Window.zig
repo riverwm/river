@@ -123,6 +123,10 @@ pub fn updateWindowing(window: *Window) void {
                 }
             }
         }
+        window.shadow_decoration.destroy();
+        window.shadow_viewport.destroy();
+        window.shadow_surface.destroy();
+        window.shadow_buffer.destroy();
         gpa.destroy(window);
         return;
     }

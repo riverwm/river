@@ -304,6 +304,11 @@ pub fn destroy(window: *Window) void {
         }
     }
 
+    inline for (.{ &window.decorations_above, &window.decorations_below }) |decorations| {
+        var it = decorations.safeIterator(.forward);
+        while (it.next()) |decoration| decoration.destroy();
+    }
+
     window.tree.node.destroy();
     window.popup_tree.node.destroy();
 
@@ -427,8 +432,8 @@ fn makeInert(window: *Window) void {
         window_v1.setHandler(?*anyopaque, handleRequestInert, null, null);
         window.node.makeInert();
         inline for (.{ &window.decorations_above, &window.decorations_below }) |decorations| {
-            var it = decorations.safeIterator(.forward);
-            while (it.next()) |decoration| decoration.destroy();
+            var it = decorations.iterator(.forward);
+            while (it.next()) |decoration| decoration.makeInert();
         }
     } else {
         assert(window.node.object == null);

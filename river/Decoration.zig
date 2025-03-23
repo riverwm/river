@@ -38,7 +38,7 @@ const role: wlr.Surface.Role = .{
     .destroy = null,
 };
 
-object: *river.DecorationV1,
+object: ?*river.DecorationV1,
 surface: *wlr.Surface,
 tree: *wlr.SceneTree,
 surfaces: Scene.SaveableSurfaces,
@@ -88,10 +88,18 @@ pub fn create(
 }
 
 pub fn destroy(decoration: *Decoration) void {
-    decoration.object.setHandler(?*anyopaque, handleRequestInert, null, null);
+    assert(decoration.object == null);
     decoration.tree.node.destroy();
     decoration.link.remove();
     util.gpa.destroy(decoration);
+}
+
+pub fn makeInert(decoration: *Decoration) void {
+    if (decoration.object) |object| {
+        object.setHandler(?*anyopaque, handleRequestInert, null, null);
+        decoration.object = null;
+    }
+    decoration.surfaces.save();
 }
 
 fn handleRequestInert(
@@ -103,6 +111,7 @@ fn handleRequestInert(
 }
 
 fn handleDestroy(_: *river.DecorationV1, decoration: *Decoration) void {
+    decoration.object = null;
     decoration.destroy();
 }
 
@@ -149,9 +158,11 @@ pub fn updateRenderingFinish(decoration: *Decoration) void {
         rendering_requested.sync_next_commit = false;
 
         if (!decoration.surfaces.saved.node.enabled) {
-            decoration.object.postError(.no_commit,
-                \\no wl_surface.commit after sync_next_commit and before update_rendering_finish
-            );
+            if (decoration.object) |object| {
+                object.postError(.no_commit,
+                    \\no wl_surface.commit after sync_next_commit and before update_rendering_finish
+                );
+            }
         }
     }
 
