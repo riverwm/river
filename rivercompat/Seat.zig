@@ -44,6 +44,7 @@ seat_v1: *river.SeatV1,
 pending: State = .{},
 focused: ?*Window = null,
 focused_output: ?*Output = null,
+hovered: ?*Window = null,
 link: wl.list.Link,
 
 pub fn create(seat_v1: *river.SeatV1) void {
@@ -65,8 +66,18 @@ fn handleEvent(seat_v1: *river.SeatV1, event: river.SeatV1.Event, seat: *Seat) v
             seat_v1.destroy();
             gpa.destroy(seat);
         },
-        .pointer_enter => {},
-        .pointer_leave => {},
+        .pointer_enter => |args| {
+            const window_v1 = args.window orelse return;
+            const window: *Window = @ptrCast(@alignCast(window_v1.getUserData()));
+            seat.hovered = window;
+        },
+        .pointer_leave => |args| {
+            const window_v1 = args.window orelse return;
+            const window: *Window = @ptrCast(@alignCast(window_v1.getUserData()));
+            if (seat.hovered == window) {
+                seat.hovered = null;
+            }
+        },
         .pointer_activity => {},
         .window_interaction => |args| {
             const window_v1 = args.window orelse return;
@@ -142,9 +153,8 @@ pub fn execute(seat: *Seat, action: Action) void {
             }
         },
         .resize_start => {
-            seat.seat_v1.opStartPointer();
-            var it = wm.windows.iterator(.forward);
-            while (it.next()) |window| {
+            if (seat.hovered) |window| {
+                seat.seat_v1.opStartPointer();
                 seat.seat_v1.opAddResizeWindow(window.window_v1, .{
                     .top = true,
                     .left = true,

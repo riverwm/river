@@ -301,6 +301,12 @@ pub fn destroy(window: *Window) void {
             if (seat.focused == .window and seat.focused.window == window) {
                 seat.focus(.none);
             }
+            if (seat.windowing_scheduled.window == window) {
+                seat.windowing_scheduled.window = null;
+            }
+            if (seat.windowing_sent.window == window) {
+                seat.windowing_sent.window = null;
+            }
         }
     }
 

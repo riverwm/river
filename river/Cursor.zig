@@ -329,6 +329,7 @@ pub fn processMotionRelative(cursor: *Cursor, event: *const wlr.Pointer.event.Mo
 
             switch (cursor.mode) {
                 .passthrough => {
+                    cursor.updateHovered();
                     cursor.passthrough(event.time_msec);
                 },
                 .ignore => {},
@@ -357,6 +358,35 @@ pub fn processMotionRelative(cursor: *Cursor, event: *const wlr.Pointer.event.Mo
             cursor.wlr_cursor.move(event.device, dx, dy);
             cursor.seat.updateOp(@intFromFloat(cursor.wlr_cursor.x), @intFromFloat(cursor.wlr_cursor.y));
         },
+    }
+}
+
+fn updateHovered(cursor: *Cursor) void {
+    if (server.scene.at(cursor.wlr_cursor.x, cursor.wlr_cursor.y)) |result| {
+        switch (result.data) {
+            .window => |window| {
+                switch (window.impl) {
+                    .toplevel => |toplevel| {
+                        // Exclude input regions of the toplevel that extend beyond the window
+                        if (result.surface != null and result.surface.?.getRootSurface() == toplevel.wlr_toplevel.base.surface) {
+                            if (window.rendering_sent.box.containsPoint(cursor.wlr_cursor.x, cursor.wlr_cursor.y)) {
+                                cursor.seat.windowing_scheduled.window = window;
+                            }
+                        } else {
+                            cursor.seat.windowing_scheduled.window = window;
+                        }
+                    },
+                    .xwayland => cursor.seat.windowing_scheduled.window = window,
+                    .none => {},
+                }
+            },
+            .shell_surface, .lock_surface => cursor.seat.windowing_scheduled.window = null,
+            .override_redirect => {
+                assert(build_options.xwayland);
+                assert(server.xwayland != null);
+                cursor.seat.windowing_scheduled.window = null;
+            },
+        }
     }
 }
 
@@ -652,6 +682,8 @@ pub fn updateState(cursor: *Cursor) void {
 
     switch (cursor.mode) {
         .passthrough => {
+            cursor.updateHovered();
+
             var now: posix.timespec = undefined;
             posix.clock_gettime(posix.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
             const msec: u32 = @intCast(now.tv_sec * std.time.ms_per_s +
