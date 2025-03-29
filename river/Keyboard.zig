@@ -101,16 +101,9 @@ pub fn init(keyboard: *Keyboard, seat: *Seat, wlr_device: *wlr.InputDevice) !voi
     // wlroots will log a more detailed error if this fails.
     if (!wlr_keyboard.setKeymap(server.config.keymap)) return error.OutOfMemory;
 
-    // Add to keyboard-group, if applicable.
-    var group_it = seat.keyboard_groups.first;
-    outer: while (group_it) |group_node| : (group_it = group_node.next) {
-        for (group_node.data.globs.items) |glob| {
-            if (globber.match(glob, keyboard.device.identifier)) {
-                // wlroots will log an error if this fails explaining the reason.
-                _ = group_node.data.wlr_group.addKeyboard(wlr_keyboard);
-                break :outer;
-            }
-        }
+    if (wlr.KeyboardGroup.fromKeyboard(wlr_keyboard) == null) {
+        // wlroots will log an error on failure
+        _ = seat.keyboard_group.addKeyboard(wlr_keyboard);
     }
 
     wlr_keyboard.setRepeatInfo(server.config.repeat_rate, server.config.repeat_delay);

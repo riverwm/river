@@ -4,10 +4,6 @@ function __riverctl_completion ()
 	if [ "${COMP_CWORD}" -eq 1 ]
 	then
 		OPTS=" \
-			keyboard-group-create \
-			keyboard-group-destroy \
-			keyboard-group-add \
-			keyboard-group-remove \
 			keyboard-layout \
 			keyboard-layout-file \
 			close \

@@ -454,25 +454,6 @@ matches everything while _\*\*_ and the empty string are invalid.
 	following URL:
 	https://xkbcommon.org/doc/current/keymap-text-format-v1.html
 
-*keyboard-group-create* _group_name_
-	Create a keyboard group. A keyboard group collects multiple keyboards in
-	a single logical keyboard. This means that all state, like the active
-	modifiers, is shared between the keyboards in a group.
-
-*keyboard-group-destroy* _group_name_
-	Destroy the keyboard group with the given name. All attached keyboards
-	will be released, making them act as separate devices again.
-
-*keyboard-group-add* _group_name_ _input_device_name_
-	Add a keyboard to a keyboard group, identified by the keyboard's
-	input device name. Any currently connected and future keyboards with
-	the given name will be added to the group. Simple globbing patterns are
-	supported, see the rules section for further information on globs.
-
-*keyboard-group-remove* _group_name_ _input_device_name_
-	Remove a keyboard from a keyboard group, identified by the keyboard's
-	input device name.
-
 The _input_ command can be used to create a configuration rule for an input
 device identified by its _name_.
 The _name_ of an input device consists of its type, its decimal vendor id,

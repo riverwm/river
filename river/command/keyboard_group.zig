@@ -24,77 +24,13 @@ const util = @import("../util.zig");
 
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
-const KeyboardGroup = @import("../KeyboardGroup.zig");
 
-pub fn keyboardGroupCreate(
-    seat: *Seat,
-    args: []const [:0]const u8,
-    out: *?[]const u8,
-) Error!void {
-    if (args.len < 2) return Error.NotEnoughArguments;
-    if (args.len > 2) return Error.TooManyArguments;
+pub const keyboardGroupCreate = keyboardGroupDeprecated;
+pub const keyboardGroupDestroy = keyboardGroupDeprecated;
+pub const keyboardGroupAdd = keyboardGroupDeprecated;
+pub const keyboardGroupRemove = keyboardGroupDeprecated;
 
-    if (keyboardGroupFromName(seat, args[1]) != null) {
-        const msg = try util.gpa.dupe(u8, "error: failed to create keybaord group: group of same name already exists\n");
-        out.* = msg;
-        return;
-    }
-
-    try KeyboardGroup.create(seat, args[1]);
-}
-
-pub fn keyboardGroupDestroy(
-    seat: *Seat,
-    args: []const [:0]const u8,
-    out: *?[]const u8,
-) Error!void {
-    if (args.len < 2) return Error.NotEnoughArguments;
-    if (args.len > 2) return Error.TooManyArguments;
-    const group = keyboardGroupFromName(seat, args[1]) orelse {
-        const msg = try util.gpa.dupe(u8, "error: no keyboard group with that name exists\n");
-        out.* = msg;
-        return;
-    };
-    group.destroy();
-}
-
-pub fn keyboardGroupAdd(
-    seat: *Seat,
-    args: []const [:0]const u8,
-    out: *?[]const u8,
-) Error!void {
-    if (args.len < 3) return Error.NotEnoughArguments;
-    if (args.len > 3) return Error.TooManyArguments;
-
-    const group = keyboardGroupFromName(seat, args[1]) orelse {
-        const msg = try util.gpa.dupe(u8, "error: no keyboard group with that name exists\n");
-        out.* = msg;
-        return;
-    };
-    try globber.validate(args[2]);
-    try group.addIdentifier(args[2]);
-}
-
-pub fn keyboardGroupRemove(
-    seat: *Seat,
-    args: []const [:0]const u8,
-    out: *?[]const u8,
-) Error!void {
-    if (args.len < 3) return Error.NotEnoughArguments;
-    if (args.len > 3) return Error.TooManyArguments;
-
-    const group = keyboardGroupFromName(seat, args[1]) orelse {
-        const msg = try util.gpa.dupe(u8, "error: no keyboard group with that name exists\n");
-        out.* = msg;
-        return;
-    };
-    try group.removeIdentifier(args[2]);
-}
-
-fn keyboardGroupFromName(seat: *Seat, name: []const u8) ?*KeyboardGroup {
-    var it = seat.keyboard_groups.first;
-    while (it) |node| : (it = node.next) {
-        if (mem.eql(u8, node.data.name, name)) return &node.data;
-    }
-    return null;
+fn keyboardGroupDeprecated(_: *Seat, _: []const [:0]const u8, out: *?[]const u8) Error!void {
+    out.* = try util.gpa.dupe(u8, "warning: explicit keyboard groups are deprecated, " ++
+        "all keyboards are now automatically added to a single group\n");
 }

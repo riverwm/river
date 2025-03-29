@@ -62,11 +62,6 @@ _riverctl_commands()
         'set-repeat:Set the keyboard repeat rate and repeat delay'
         'set-cursor-warp:Set the cursor warp mode.'
         'xcursor-theme:Set the xcursor theme'
-        # Keyboard groups
-        'keyboard-group-create:Create a keyboard group'
-        'keyboard-group-destroy:Destroy a keyboard group'
-        'keyboard-group-add:Add a keyboard to a keyboard group'
-        'keyboard-group-remove:Remove a keyboard from a keyboard group'
         'keyboard-layout:Set the keyboard layout'
         'keyboard-layout-file:Set the keyboard layout from a file'
         # Input

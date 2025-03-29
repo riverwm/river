@@ -33,7 +33,6 @@ const InputDevice = @import("InputDevice.zig");
 const InputManager = @import("InputManager.zig");
 const InputRelay = @import("InputRelay.zig");
 const Keyboard = @import("Keyboard.zig");
-const KeyboardGroup = @import("KeyboardGroup.zig");
 const LayerSurface = @import("LayerSurface.zig");
 const LockSurface = @import("LockSurface.zig");
 const Mapping = @import("Mapping.zig");
@@ -84,7 +83,7 @@ mapping_repeat_timer: *wl.EventSource,
 /// Currently repeating mapping, if any
 repeating_mapping: ?*const Mapping = null,
 
-keyboard_groups: std.DoublyLinkedList(KeyboardGroup) = .{},
+keyboard_group: *wlr.KeyboardGroup,
 
 /// Currently focused output. Null only when there are no outputs at all.
 focused_output: ?*Output = null,
@@ -121,11 +120,14 @@ pub fn init(seat: *Seat, name: [*:0]const u8) !void {
         .cursor = undefined,
         .relay = undefined,
         .mapping_repeat_timer = mapping_repeat_timer,
+        .keyboard_group = try wlr.KeyboardGroup.create(),
     };
     seat.wlr_seat.data = @intFromPtr(seat);
 
     try seat.cursor.init(seat);
     seat.relay.init();
+
+    try seat.tryAddDevice(&seat.keyboard_group.keyboard.base);
 
     seat.wlr_seat.events.request_set_selection.add(&seat.request_set_selection);
     seat.wlr_seat.events.request_start_drag.add(&seat.request_start_drag);
@@ -142,9 +144,7 @@ pub fn deinit(seat: *Seat) void {
     seat.cursor.deinit();
     seat.mapping_repeat_timer.remove();
 
-    while (seat.keyboard_groups.first) |node| {
-        node.data.destroy();
-    }
+    seat.keyboard_group.destroy();
 
     seat.request_set_selection.link.remove();
     seat.request_start_drag.link.remove();
