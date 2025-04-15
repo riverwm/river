@@ -461,8 +461,8 @@
         Newly created windows are considered shown unless explicitly hidden with
         the hide request.
 
-        This request modifies rendering state and may only be made as part of a
-        rendering update sequence, see the river_window_manager_v1 description.
+        This request modifies rendering state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
     </request>
 
@@ -475,8 +475,8 @@
         Newly created windows are considered shown unless explicitly hidden with
         the hide request.
 
-        This request modifies rendering state and may only be made as part of a
-        rendering update sequence, see the river_window_manager_v1 description.
+        This request modifies rendering state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
     </request>
 
@@ -611,8 +611,8 @@
         position/dimensions of the window content and are unaffected by the
         presence of borders or decoration surfaces.
 
-        This request modifies rendering state and may only be made as part of a
-        rendering update sequence, see the river_window_manager_v1 description.
+        This request modifies rendering state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
       <arg name="edges" type="uint" enum="edges"/>
       <arg name="width" type="int"/>
@@ -918,8 +918,8 @@
         If this request is never sent, the x and y offsets are undefined by this
         protocol and left up to the compositor.
 
-        This request modifies rendering state and may only be made as part of a
-        rendering update sequence, see the river_window_manager_v1 description.
+        This request modifies rendering state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
       <arg name="x" type="int"/>
       <arg name="y" type="int"/>
@@ -935,8 +935,8 @@
         surface after this request and before the update_rendering_finish
         request, failure to do so is a protocol error.
 
-        This request modifies rendering state and may only be made as part of a
-        rendering update sequence, see the river_window_manager_v1 description.
+        This request modifies rendering state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
     </request>
   </interface>
@@ -982,8 +982,8 @@
         after this request and before the update_rendering_finish request,
         failure to do so is a protocol error.
 
-        This request modifies rendering state and may only be made as part of a
-        rendering update sequence, see the river_window_manager_v1 description.
+        This request modifies rendering state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
     </request>
   </interface>
@@ -1019,8 +1019,8 @@
         If this request is never sent, the position of the node is undefined by
         this protocol and left up to the compositor.
 
-        This request modifies rendering state and may only be made as part of a
-        rendering update sequence, see the river_window_manager_v1 description.
+        This request modifies rendering state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
       <arg name="x" type="int"/>
       <arg name="y" type="int"/>
@@ -1054,8 +1054,8 @@
         This request places the node above all other nodes in the compositor's
         render list.
 
-        This request modifies rendering state and may only be made as part of a
-        rendering update sequence, see the river_window_manager_v1 description.
+        This request modifies rendering state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
     </request>
 
@@ -1064,8 +1064,8 @@
         This request places the node below all other nodes in the compositor's
         render list.
 
-        This request modifies rendering state and may only be made as part of a
-        rendering update sequence, see the river_window_manager_v1 description.
+        This request modifies rendering state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
     </request>
 
@@ -1076,8 +1076,8 @@
 
         Attempting to place a node above itself has no effect.
 
-        This request modifies rendering state and may only be made as part of a
-        rendering update sequence, see the river_window_manager_v1 description.
+        This request modifies rendering state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
       <arg name="other" type="object" interface="river_node_v1"/>
     </request>
@@ -1089,8 +1089,8 @@
 
         Attempting to place a node below itself has no effect.
 
-        This request modifies rendering state and may only be made as part of a
-        rendering update sequence, see the river_window_manager_v1 description.
+        This request modifies rendering state and may only be made as part of an
+        update sequence, see the river_window_manager_v1 description.
       </description>
       <arg name="other" type="object" interface="river_node_v1"/>
     </request>
