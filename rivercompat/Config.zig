@@ -24,6 +24,7 @@ const gpa = std.heap.c_allocator;
 border_width: u31 = 3,
 border_color_unfocused: u32 = 0x586e75,
 border_color_focused: u32 = 0x93a1a1,
+border_color_hovered: u32 = 0xdc322f,
 
 main_count: u31 = 1,
 main_location: enum { left, right, top, bottom } = .left,

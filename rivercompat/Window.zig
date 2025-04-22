@@ -172,7 +172,10 @@ pub fn updateRendering(window: *Window) void {
     {
         var it = wm.seats.iterator(.forward);
         while (it.next()) |seat| {
-            if (seat.focused == window) {
+            if (seat.hovered == window) {
+                window.setBorders(wm.config.border_color_hovered);
+                break;
+            } else if (seat.focused == window) {
                 window.setBorders(wm.config.border_color_focused);
                 break;
             }

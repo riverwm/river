@@ -362,6 +362,7 @@ pub fn processMotionRelative(cursor: *Cursor, event: *const wlr.Pointer.event.Mo
 }
 
 fn updateHovered(cursor: *Cursor) void {
+    const old = cursor.seat.windowing_scheduled.window;
     if (server.scene.at(cursor.wlr_cursor.x, cursor.wlr_cursor.y)) |result| {
         switch (result.data) {
             .window => |window| {
@@ -387,6 +388,12 @@ fn updateHovered(cursor: *Cursor) void {
                 cursor.seat.windowing_scheduled.window = null;
             },
         }
+    } else {
+        cursor.seat.windowing_scheduled.window = null;
+    }
+
+    if (cursor.seat.windowing_scheduled.window != old) {
+        server.wm.dirtyWindowing();
     }
 }
 
