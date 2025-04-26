@@ -233,6 +233,8 @@ pub fn deinit(server: *Server) void {
 
     server.wl_server.destroyClients();
 
+    server.input_manager.new_input.link.remove();
+    server.root.new_output.link.remove();
     server.backend.destroy();
 
     // The scene graph needs to be destroyed after the backend but before the renderer
@@ -499,7 +501,7 @@ fn handleRequestSetCursorShape(
     _: *wl.Listener(*wlr.CursorShapeManagerV1.event.RequestSetShape),
     event: *wlr.CursorShapeManagerV1.event.RequestSetShape,
 ) void {
-    const seat: *Seat = @ptrFromInt(event.seat_client.seat.data);
+    const seat: *Seat = @alignCast(@ptrCast(event.seat_client.seat.data));
 
     if (event.tablet_tool) |wp_tool| {
         assert(event.device_type == .tablet_tool);

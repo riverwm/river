@@ -97,8 +97,6 @@ power_manager_set_mode: wl.Listener(*wlr.OutputPowerManagerV1.event.SetMode) =
     wl.Listener(*wlr.OutputPowerManagerV1.event.SetMode).init(handlePowerManagerSetMode),
 
 gamma_control_manager: *wlr.GammaControlManagerV1,
-gamma_control_set_gamma: wl.Listener(*wlr.GammaControlManagerV1.event.SetGamma) =
-    wl.Listener(*wlr.GammaControlManagerV1.event.SetGamma).init(handleSetGamma),
 
 /// A list of all outputs
 all_outputs: wl.list.Head(Output, .all_link),
@@ -122,6 +120,9 @@ pub fn init(root: *Root) !void {
 
     const scene = try wlr.Scene.create();
     errdefer scene.tree.node.destroy();
+
+    const gamma_control_manager = try wlr.GammaControlManagerV1.create(server.wl_server);
+    scene.setGammaControlManagerV1(gamma_control_manager);
 
     const interactive_content = try scene.tree.createSceneTree();
     const drag_icons = try scene.tree.createSceneTree();
@@ -163,11 +164,11 @@ pub fn init(root: *Root) !void {
         .all_outputs = undefined,
         .active_outputs = undefined,
 
-        .presentation = try wlr.Presentation.create(server.wl_server, server.backend),
+        .presentation = try wlr.Presentation.create(server.wl_server, server.backend, 2),
         .xdg_output_manager = try wlr.XdgOutputManagerV1.create(server.wl_server, output_layout),
         .output_manager = try wlr.OutputManagerV1.create(server.wl_server),
         .power_manager = try wlr.OutputPowerManagerV1.create(server.wl_server),
-        .gamma_control_manager = try wlr.GammaControlManagerV1.create(server.wl_server),
+        .gamma_control_manager = gamma_control_manager,
         .transaction_timeout = transaction_timeout,
     };
     root.hidden.pending.focus_stack.init();
@@ -187,10 +188,14 @@ pub fn init(root: *Root) !void {
     root.output_manager.events.@"test".add(&root.manager_test);
     root.output_layout.events.change.add(&root.layout_change);
     root.power_manager.events.set_mode.add(&root.power_manager_set_mode);
-    root.gamma_control_manager.events.set_gamma.add(&root.gamma_control_set_gamma);
 }
 
 pub fn deinit(root: *Root) void {
+    root.manager_apply.link.remove();
+    root.manager_test.link.remove();
+    root.layout_change.link.remove();
+    root.power_manager_set_mode.link.remove();
+
     root.output_layout.destroy();
     root.transaction_timeout.remove();
 }
@@ -323,7 +328,7 @@ pub fn deactivateOutput(root: *Root, output: *Output) void {
         var it = tree.children.safeIterator(.forward);
         while (it.next()) |scene_node| {
             assert(scene_node.type == .tree);
-            if (@as(?*SceneNodeData, @ptrFromInt(scene_node.data))) |node_data| {
+            if (@as(?*SceneNodeData, @alignCast(@ptrCast(scene_node.data)))) |node_data| {
                 node_data.data.layer_surface.wlr_layer_surface.destroy();
             }
         }
@@ -795,7 +800,7 @@ fn processOutputConfig(
     var it = config.heads.iterator(.forward);
     while (it.next()) |head| {
         const wlr_output = head.state.output;
-        const output: *Output = @ptrFromInt(wlr_output.data);
+        const output: *Output = @alignCast(@ptrCast(wlr_output.data));
 
         var proposed_state = wlr.Output.State.init();
         head.state.apply(&proposed_state);
@@ -834,7 +839,7 @@ fn handlePowerManagerSetMode(
     event: *wlr.OutputPowerManagerV1.event.SetMode,
 ) void {
     // The output may have been destroyed, in which case there is nothing to do
-    const output = @as(?*Output, @ptrFromInt(event.output.data)) orelse return;
+    const output: *Output = @alignCast(@ptrCast(event.output.data orelse return));
 
     std.log.debug("client requested dpms {s} for output {s}", .{
         @tagName(event.mode),
@@ -864,18 +869,4 @@ fn handlePowerManagerSetMode(
     }
 
     output.updateLockRenderStateOnEnableDisable();
-    output.gamma_dirty = true;
-}
-
-fn handleSetGamma(
-    _: *wl.Listener(*wlr.GammaControlManagerV1.event.SetGamma),
-    event: *wlr.GammaControlManagerV1.event.SetGamma,
-) void {
-    // The output may have been destroyed, in which case there is nothing to do
-    const output = @as(?*Output, @ptrFromInt(event.output.data)) orelse return;
-
-    std.log.debug("client requested to set gamma", .{});
-
-    output.gamma_dirty = true;
-    output.wlr_output.scheduleFrame();
 }

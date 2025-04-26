@@ -84,7 +84,7 @@ fn handleRequest(control_v1: *zriver.ControlV1, request: zriver.ControlV1.Reques
             };
         },
         .run_command => |run_command| {
-            const seat: *Seat = @ptrFromInt(wlr.Seat.Client.fromWlSeat(run_command.seat).?.seat.data);
+            const seat: *Seat = @alignCast(@ptrCast(wlr.Seat.Client.fromWlSeat(run_command.seat).?.seat.data));
 
             const callback = zriver.CommandCallbackV1.create(
                 control_v1.getClient(),

@@ -47,7 +47,7 @@ commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit)
 node_destroy: wl.Listener(void) = wl.Listener(void).init(handleNodeDestroy),
 
 pub fn create(wlr_constraint: *wlr.PointerConstraintV1) error{OutOfMemory}!void {
-    const seat: *Seat = @ptrFromInt(wlr_constraint.seat.data);
+    const seat: *Seat = @alignCast(@ptrCast(wlr_constraint.seat.data));
 
     const constraint = try util.gpa.create(PointerConstraint);
     errdefer util.gpa.destroy(constraint);
@@ -55,7 +55,7 @@ pub fn create(wlr_constraint: *wlr.PointerConstraintV1) error{OutOfMemory}!void 
     constraint.* = .{
         .wlr_constraint = wlr_constraint,
     };
-    wlr_constraint.data = @intFromPtr(constraint);
+    wlr_constraint.data = constraint;
 
     wlr_constraint.events.destroy.add(&constraint.destroy);
     wlr_constraint.surface.events.commit.add(&constraint.commit);
@@ -70,7 +70,7 @@ pub fn create(wlr_constraint: *wlr.PointerConstraintV1) error{OutOfMemory}!void 
 }
 
 pub fn maybeActivate(constraint: *PointerConstraint) void {
-    const seat: *Seat = @ptrFromInt(constraint.wlr_constraint.seat.data);
+    const seat: *Seat = @alignCast(@ptrCast(constraint.wlr_constraint.seat.data));
 
     assert(seat.cursor.constraint == constraint);
 
@@ -102,7 +102,7 @@ pub fn maybeActivate(constraint: *PointerConstraint) void {
 
 /// Called when the cursor position or content in the scene graph changes
 pub fn updateState(constraint: *PointerConstraint) void {
-    const seat: *Seat = @ptrFromInt(constraint.wlr_constraint.seat.data);
+    const seat: *Seat = @alignCast(@ptrCast(constraint.wlr_constraint.seat.data));
 
     constraint.maybeActivate();
 
@@ -154,7 +154,7 @@ pub fn confine(constraint: *PointerConstraint, dx: *f64, dy: *f64) void {
 }
 
 pub fn deactivate(constraint: *PointerConstraint) void {
-    const seat: *Seat = @ptrFromInt(constraint.wlr_constraint.seat.data);
+    const seat: *Seat = @alignCast(@ptrCast(constraint.wlr_constraint.seat.data));
 
     assert(seat.cursor.constraint == constraint);
     assert(constraint.state == .active);
@@ -167,7 +167,7 @@ pub fn deactivate(constraint: *PointerConstraint) void {
 }
 
 fn warpToHintIfSet(constraint: *PointerConstraint) void {
-    const seat: *Seat = @ptrFromInt(constraint.wlr_constraint.seat.data);
+    const seat: *Seat = @alignCast(@ptrCast(constraint.wlr_constraint.seat.data));
 
     if (constraint.wlr_constraint.current.cursor_hint.enabled) {
         var lx: i32 = undefined;
@@ -190,7 +190,7 @@ fn handleNodeDestroy(listener: *wl.Listener(void)) void {
 
 fn handleDestroy(listener: *wl.Listener(*wlr.PointerConstraintV1), _: *wlr.PointerConstraintV1) void {
     const constraint: *PointerConstraint = @fieldParentPtr("destroy", listener);
-    const seat: *Seat = @ptrFromInt(constraint.wlr_constraint.seat.data);
+    const seat: *Seat = @alignCast(@ptrCast(constraint.wlr_constraint.seat.data));
 
     if (constraint.state == .active) {
         // We can't simply call deactivate() here as it calls sendDeactivated(),
@@ -215,7 +215,7 @@ fn handleDestroy(listener: *wl.Listener(*wlr.PointerConstraintV1), _: *wlr.Point
 // the surface changes.
 fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     const constraint: *PointerConstraint = @fieldParentPtr("commit", listener);
-    const seat: *Seat = @ptrFromInt(constraint.wlr_constraint.seat.data);
+    const seat: *Seat = @alignCast(@ptrCast(constraint.wlr_constraint.seat.data));
 
     switch (constraint.state) {
         .active => |state| {

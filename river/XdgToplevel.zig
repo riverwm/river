@@ -100,8 +100,8 @@ pub fn create(wlr_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
 
     toplevel.view = view;
 
-    wlr_toplevel.base.data = @intFromPtr(toplevel);
-    wlr_toplevel.base.surface.data = @intFromPtr(&view.tree.node);
+    wlr_toplevel.base.data = toplevel;
+    wlr_toplevel.base.surface.data = &view.tree.node;
 
     // Add listeners that are active over the toplevel's entire lifetime
     wlr_toplevel.events.destroy.add(&toplevel.destroy);
@@ -216,7 +216,7 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
     toplevel.new_popup.link.remove();
 
     // The wlr_surface may outlive the wlr_xdg_toplevel so we must clean up the user data.
-    toplevel.wlr_toplevel.base.surface.data = 0;
+    toplevel.wlr_toplevel.base.surface.data = null;
 
     const view = toplevel.view;
     view.impl = .none;
@@ -235,7 +235,7 @@ fn handleMap(listener: *wl.Listener(void)) void {
     toplevel.wlr_toplevel.events.set_title.add(&toplevel.set_title);
     toplevel.wlr_toplevel.events.set_app_id.add(&toplevel.set_app_id);
 
-    toplevel.wlr_toplevel.base.getGeometry(&toplevel.geometry);
+    toplevel.geometry = toplevel.wlr_toplevel.base.geometry;
 
     view.pending.box = .{
         .x = 0,
@@ -338,7 +338,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     switch (toplevel.configure_state) {
         .idle, .committed, .timed_out => {
             const old_geometry = toplevel.geometry;
-            toplevel.wlr_toplevel.base.getGeometry(&toplevel.geometry);
+            toplevel.geometry = toplevel.wlr_toplevel.base.geometry;
 
             const size_changed = toplevel.geometry.width != old_geometry.width or
                 toplevel.geometry.height != old_geometry.height;
@@ -381,7 +381,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
         // stashed buffer from when the transaction started.
         .inflight => view.sendFrameDone(),
         .acked, .timed_out_acked => {
-            toplevel.wlr_toplevel.base.getGeometry(&toplevel.geometry);
+            toplevel.geometry = toplevel.wlr_toplevel.base.geometry;
 
             if (view.inflight.resizing) {
                 view.resizeUpdatePosition(toplevel.geometry.width, toplevel.geometry.height);
@@ -423,7 +423,7 @@ fn handleRequestMove(
     event: *wlr.XdgToplevel.event.Move,
 ) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("request_move", listener);
-    const seat: *Seat = @ptrFromInt(event.seat.seat.data);
+    const seat: *Seat = @alignCast(@ptrCast(event.seat.seat.data));
     const view = toplevel.view;
 
     if (view.pending.fullscreen) return;
@@ -446,7 +446,7 @@ fn handleRequestMove(
 
 fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), event: *wlr.XdgToplevel.event.Resize) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("request_resize", listener);
-    const seat: *Seat = @ptrFromInt(event.seat.seat.data);
+    const seat: *Seat = @alignCast(@ptrCast(event.seat.seat.data));
     const view = toplevel.view;
 
     if (view.pending.fullscreen) return;

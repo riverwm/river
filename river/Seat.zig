@@ -122,7 +122,7 @@ pub fn init(seat: *Seat, name: [*:0]const u8) !void {
         .mapping_repeat_timer = mapping_repeat_timer,
         .keyboard_group = try wlr.KeyboardGroup.create(),
     };
-    seat.wlr_seat.data = @intFromPtr(seat);
+    seat.wlr_seat.data = seat;
 
     try seat.cursor.init(seat);
     seat.relay.init();
@@ -284,7 +284,7 @@ pub fn setFocusRaw(seat: *Seat, new_focus: FocusTarget) void {
             if (seat.cursor.constraint) |constraint| {
                 assert(constraint.wlr_constraint == wlr_constraint);
             } else {
-                seat.cursor.constraint = @ptrFromInt(wlr_constraint.data);
+                seat.cursor.constraint = @alignCast(@ptrCast(wlr_constraint.data));
                 assert(seat.cursor.constraint != null);
             }
         }
@@ -312,7 +312,7 @@ pub fn keyboardEnterOrLeave(seat: *Seat, target_surface: ?*wlr.Surface) void {
 
 fn keyboardNotifyEnter(seat: *Seat, wlr_surface: *wlr.Surface) void {
     if (seat.wlr_seat.getKeyboard()) |wlr_keyboard| {
-        const keyboard: *Keyboard = @ptrFromInt(wlr_keyboard.data);
+        const keyboard: *Keyboard = @alignCast(@ptrCast(wlr_keyboard.data));
 
         var keycodes: std.BoundedArray(u32, Keyboard.Pressed.capacity) = .{};
         for (keyboard.pressed.keys.constSlice()) |item| {

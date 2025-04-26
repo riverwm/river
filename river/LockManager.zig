@@ -266,7 +266,7 @@ pub fn updateLockSurfaceSize(manager: *LockManager, output: *Output) void {
 
     var it = lock.surfaces.iterator(.forward);
     while (it.next()) |wlr_lock_surface| {
-        const lock_surface: *LockSurface = @ptrFromInt(wlr_lock_surface.data);
+        const lock_surface: *LockSurface = @alignCast(@ptrCast(wlr_lock_surface.data));
         if (output == lock_surface.getOutput()) {
             lock_surface.configure();
         }

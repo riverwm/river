@@ -68,7 +68,7 @@ fn handleRequest(
         .get_layout => |req| {
             // Ignore if the output is inert
             const wlr_output = wlr.Output.fromWlOutput(req.output) orelse return;
-            const output: *Output = @ptrFromInt(wlr_output.data);
+            const output: *Output = @alignCast(@ptrCast(wlr_output.data));
 
             log.debug("bind layout '{s}' on output '{s}'", .{ req.namespace, output.wlr_output.name });
 

@@ -120,7 +120,7 @@ fn mapImpl(override_redirect: *XwaylandOverrideRedirect) error{OutOfMemory}!void
         .override_redirect = override_redirect,
     });
 
-    surface.data = @intFromPtr(&override_redirect.surface_tree.?.node);
+    surface.data = &override_redirect.surface_tree.?.node;
 
     override_redirect.surface_tree.?.node.setPosition(
         override_redirect.xwayland_surface.x,
@@ -159,7 +159,7 @@ fn handleUnmap(listener: *wl.Listener(void)) void {
 
     override_redirect.set_geometry.link.remove();
 
-    override_redirect.xwayland_surface.surface.?.data = 0;
+    override_redirect.xwayland_surface.surface.?.data = null;
     override_redirect.surface_tree.?.node.destroy();
     override_redirect.surface_tree = null;
 

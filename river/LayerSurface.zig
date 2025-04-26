@@ -43,7 +43,7 @@ commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit)
 new_popup: wl.Listener(*wlr.XdgPopup) = wl.Listener(*wlr.XdgPopup).init(handleNewPopup),
 
 pub fn create(wlr_layer_surface: *wlr.LayerSurfaceV1) error{OutOfMemory}!void {
-    const output: *Output = @ptrFromInt(wlr_layer_surface.output.?.data);
+    const output: *Output = @alignCast(@ptrCast(wlr_layer_surface.output.?.data));
     const layer_surface = try util.gpa.create(LayerSurface);
     errdefer util.gpa.destroy(layer_surface);
 
@@ -59,7 +59,7 @@ pub fn create(wlr_layer_surface: *wlr.LayerSurfaceV1) error{OutOfMemory}!void {
     try SceneNodeData.attach(&layer_surface.scene_layer_surface.tree.node, .{ .layer_surface = layer_surface });
     try SceneNodeData.attach(&layer_surface.popup_tree.node, .{ .layer_surface = layer_surface });
 
-    wlr_layer_surface.surface.data = @intFromPtr(&layer_surface.scene_layer_surface.tree.node);
+    wlr_layer_surface.surface.data = &layer_surface.scene_layer_surface.tree.node;
 
     wlr_layer_surface.events.destroy.add(&layer_surface.destroy);
     wlr_layer_surface.surface.events.map.add(&layer_surface.map);
@@ -88,7 +88,7 @@ fn handleDestroy(listener: *wl.Listener(*wlr.LayerSurfaceV1), _: *wlr.LayerSurfa
     layer_surface.popup_tree.node.destroy();
 
     // The wlr_surface may outlive the wlr_layer_surface so we must clean up the user data.
-    layer_surface.wlr_layer_surface.surface.data = 0;
+    layer_surface.wlr_layer_surface.surface.data = null;
 
     util.gpa.destroy(layer_surface);
 }
@@ -156,7 +156,7 @@ fn handleKeyboardInteractiveExclusive(output: *Output, consider: ?*LayerSurface)
         var it = tree.children.iterator(.reverse);
         while (it.next()) |node| {
             assert(node.type == .tree);
-            if (@as(?*SceneNodeData, @ptrFromInt(node.data))) |node_data| {
+            if (@as(?*SceneNodeData, @alignCast(@ptrCast(node.data)))) |node_data| {
                 const layer_surface = node_data.data.layer_surface;
                 const wlr_layer_surface = layer_surface.wlr_layer_surface;
                 if (wlr_layer_surface.surface.mapped and

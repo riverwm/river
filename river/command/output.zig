@@ -109,7 +109,7 @@ fn getOutput(seat: *Seat, str: []const u8) !?*Output {
                 .previous => link.prev.?,
             };
         }
-        return @as(*Output, @fieldParentPtr("active_link", link));
+        return @fieldParentPtr("active_link", link);
     } else if (std.meta.stringToEnum(wlr.OutputLayout.Direction, str)) |direction| { // Spacial direction
         var focus_box: wlr.Box = undefined;
         server.root.output_layout.getBox(seat.focused_output.?.wlr_output, &focus_box);
@@ -121,7 +121,7 @@ fn getOutput(seat: *Seat, str: []const u8) !?*Output {
             @floatFromInt(focus_box.x + @divTrunc(focus_box.width, 2)),
             @floatFromInt(focus_box.y + @divTrunc(focus_box.height, 2)),
         ) orelse return null;
-        return @as(*Output, @ptrFromInt(wlr_output.data));
+        return @alignCast(@ptrCast(wlr_output.data));
     } else {
         // Check if an output matches by name
         var it = server.root.active_outputs.iterator(.forward);

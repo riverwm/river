@@ -60,7 +60,7 @@ distribution.
 - [zig](https://ziglang.org/download/) 0.14
 - wayland
 - wayland-protocols
-- [wlroots](https://gitlab.freedesktop.org/wlroots/wlroots) 0.18
+- [wlroots](https://gitlab.freedesktop.org/wlroots/wlroots) 0.19
 - xkbcommon
 - libevdev
 - pixman

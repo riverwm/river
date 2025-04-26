@@ -59,7 +59,7 @@ set_cursor: wl.Listener(*wlr.TabletV2TabletTool.event.SetCursor) =
     wl.Listener(*wlr.TabletV2TabletTool.event.SetCursor).init(handleSetCursor),
 
 pub fn get(wlr_seat: *wlr.Seat, wlr_tool: *wlr.TabletTool) error{OutOfMemory}!*TabletTool {
-    if (@as(?*TabletTool, @ptrFromInt(wlr_tool.data))) |tool| {
+    if (@as(?*TabletTool, @alignCast(@ptrCast(wlr_tool.data)))) |tool| {
         return tool;
     } else {
         return TabletTool.create(wlr_seat, wlr_tool);
@@ -81,7 +81,7 @@ fn create(wlr_seat: *wlr.Seat, wlr_tool: *wlr.TabletTool) error{OutOfMemory}!*Ta
         .wlr_cursor = wlr_cursor,
     };
 
-    wlr_tool.data = @intFromPtr(tool);
+    wlr_tool.data = tool;
 
     wlr_tool.events.destroy.add(&tool.destroy);
     tool.wp_tool.events.set_cursor.add(&tool.set_cursor);
@@ -92,7 +92,7 @@ fn create(wlr_seat: *wlr.Seat, wlr_tool: *wlr.TabletTool) error{OutOfMemory}!*Ta
 fn handleDestroy(listener: *wl.Listener(*wlr.TabletTool), _: *wlr.TabletTool) void {
     const tool: *TabletTool = @fieldParentPtr("destroy", listener);
 
-    tool.wp_tool.wlr_tool.data = 0;
+    tool.wp_tool.wlr_tool.data = null;
 
     tool.wlr_cursor.destroy();
 

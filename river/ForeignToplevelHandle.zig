@@ -89,7 +89,7 @@ fn handleForeignActivate(
 ) void {
     const handle: *ForeignToplevelHandle = @fieldParentPtr("foreign_activate", listener);
     const view: *View = @fieldParentPtr("foreign_toplevel_handle", handle);
-    const seat: *Seat = @ptrFromInt(event.seat.data);
+    const seat: *Seat = @alignCast(@ptrCast(event.seat.data));
 
     seat.focus(view);
     server.root.applyPending();

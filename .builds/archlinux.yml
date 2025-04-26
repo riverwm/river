@@ -21,18 +21,11 @@ packages:
   - xz
 sources:
   - https://codeberg.org/river/river
-  - https://gitlab.freedesktop.org/wayland/wayland.git
   - https://gitlab.freedesktop.org/wlroots/wlroots.git
 tasks:
   - install_deps: |
-      cd wayland
-      git checkout 1.23.0
-      meson setup build -Ddocumentation=false -Dtests=false --prefix /usr
-      sudo ninja -C build install
-      cd ..
-
       cd wlroots
-      git checkout 0.18.0
+      git checkout 0.19.0
       meson setup build --auto-features=enabled -Drenderers=gles2 \
             -Dcolor-management=disabled -Dlibliftoff=disabled \
             -Dexamples=false -Dwerror=false -Db_ndebug=false \

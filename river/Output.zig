@@ -125,10 +125,6 @@ lock_render_state: enum {
     lock_surface,
 } = .blanked,
 
-/// Set to true if a gamma control client makes a set gamma request.
-/// This request is handled while rendering the next frame in handleFrame().
-gamma_dirty: bool = false,
-
 /// The state of the output that is directly acted upon/modified through user input.
 ///
 /// Pending state will be copied to the inflight state and communicated to clients
@@ -295,7 +291,7 @@ pub fn create(wlr_output: *wlr.Output) !void {
         },
         .status = undefined,
     };
-    wlr_output.data = @intFromPtr(output);
+    wlr_output.data = output;
 
     output.pending.focus_stack.init();
     output.pending.wm_stack.init();
@@ -364,7 +360,7 @@ fn sendLayerConfigures(
         var it = tree.children.safeIterator(.forward);
         while (it.next()) |node| {
             assert(node.type == .tree);
-            if (@as(?*SceneNodeData, @ptrFromInt(node.data))) |node_data| {
+            if (@as(?*SceneNodeData, @alignCast(@ptrCast(node.data)))) |node_data| {
                 const layer_surface = node_data.data.layer_surface;
 
                 if (!layer_surface.wlr_layer_surface.initialized) continue;
@@ -433,7 +429,7 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
 
     if (output.layout_namespace) |namespace| util.gpa.free(namespace);
 
-    output.wlr_output.data = 0;
+    output.wlr_output.data = null;
 
     util.gpa.destroy(output);
 
@@ -480,7 +476,6 @@ pub fn applyState(output: *Output, state: *wlr.Output.State) error{CommitFailed}
 
 fn handleEnableDisable(output: *Output) void {
     output.updateLockRenderStateOnEnableDisable();
-    output.gamma_dirty = true;
 
     if (output.wlr_output.enabled) {
         // Add the output to root.active_outputs and the output layout if it has not
@@ -532,7 +527,6 @@ fn handleFrame(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
 
     // TODO this should probably be retried on failure
     output.renderAndCommit(scene_output) catch |err| switch (err) {
-        error.OutOfMemory => log.err("out of memory", .{}),
         error.CommitFailed => log.err("output commit failed for {s}", .{output.wlr_output.name}),
     };
 
@@ -541,33 +535,12 @@ fn handleFrame(listener: *wl.Listener(*wlr.Output), _: *wlr.Output) void {
 }
 
 fn renderAndCommit(output: *Output, scene_output: *wlr.SceneOutput) !void {
-    // TODO(wlroots): replace this with wlr_scene_output_needs_frame()
-    if (!output.wlr_output.needs_frame and !output.gamma_dirty and
-        !scene_output.pending_commit_damage.notEmpty())
-    {
-        return;
-    }
+    if (!scene_output.needsFrame()) return;
 
     var state = wlr.Output.State.init();
     defer state.finish();
 
     if (!scene_output.buildState(&state, null)) return error.CommitFailed;
-
-    if (output.gamma_dirty) {
-        const control = server.root.gamma_control_manager.getControl(output.wlr_output);
-        if (!wlr.GammaControlV1.apply(control, &state)) return error.OutOfMemory;
-
-        // TODO(wlroots): remove this isHeadless() workaround after upstream fix is available
-        // in a release: https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/4868
-        if (!output.wlr_output.testState(&state) or output.wlr_output.isHeadless()) {
-            wlr.GammaControlV1.sendFailedAndDestroy(control);
-            state.clearGammaLut();
-            // If the backend does not support gamma LUTs it will reject any
-            // state with the gamma LUT committed bit set even if the state
-            // has a null LUT. The wayland backend for example has this behavior.
-            state.committed.gamma_lut = false;
-        }
-    }
 
     if (output.current.fullscreen) |fullscreen| {
         if (fullscreen.allowTearing()) {
@@ -582,8 +555,6 @@ fn renderAndCommit(output: *Output, scene_output: *wlr.SceneOutput) !void {
     }
 
     if (!output.wlr_output.commitState(&state)) return error.CommitFailed;
-
-    output.gamma_dirty = false;
 
     if (server.lock_manager.state == .locked or
         (server.lock_manager.state == .waiting_for_lock_surfaces and output.locked_content.node.enabled) or
