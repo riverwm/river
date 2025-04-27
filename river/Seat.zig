@@ -146,11 +146,7 @@ pointer_bindings: wl.list.Head(PointerBinding, .link),
 cursor: Cursor,
 
 op: ?struct {
-    // We always want to process as many input events as possible before sending configures
-    // and starting a transaction. Therefore, we set this flag if a seat operation modifies
-    // Window.pending state and check it at the end of Seat.processEvents() rather than sending
-    // configures directly in Seat.updateOp().
-    need_configures: bool = false,
+    dirty: bool = false,
     input: enum {
         pointer,
     },
@@ -221,24 +217,6 @@ pub fn destroy(seat: *Seat) void {
         while (it.next()) |device| assert(device.seat != seat);
     }
 
-    {
-        // Remove pointers to the seat before they become dangling
-        var it = server.wm.windows.iterator(.forward);
-        while (it.next()) |window| {
-            inline for (.{
-                &window.windowing_requested,
-                window,
-            }) |state| {
-                switch (state.op) {
-                    .none => {},
-                    inline .move, .resize => |data| {
-                        if (data.seat == seat) state.op = .none;
-                    },
-                }
-            }
-        }
-    }
-
     seat.link.remove();
     seat.link_sent.remove();
 
@@ -302,10 +280,9 @@ pub fn processEvents(seat: *Seat) void {
     assert(server.wm.state == .idle);
 
     if (seat.op) |*op| {
-        if (op.need_configures) {
-            op.need_configures = false;
-            server.wm.state = .update_windowing;
-            server.wm.updateWindowingFinish();
+        if (op.dirty) {
+            op.dirty = false;
+            server.wm.dirtyWindowing();
         }
     }
 }
@@ -374,6 +351,10 @@ pub fn updateWindowingStart(seat: *Seat) void {
                 seat_v1.sendShellSurfaceInteraction(shell_surface.object);
                 seat.windowing_scheduled.interaction = .none;
             },
+        }
+
+        if (seat.op) |op| {
+            seat_v1.sendOpDelta(op.x - op.start_x, op.y - op.start_y);
         }
 
         {
@@ -463,23 +444,6 @@ fn handleRequest(
             if (!server.wm.ensureWindowing()) return;
             seat.windowing_requested.op = .start_pointer;
         },
-        .op_add_move_window => |args| {
-            if (!server.wm.ensureWindowing()) return;
-            const data = args.window.getUserData() orelse return;
-            const window: *Window = @ptrCast(@alignCast(data));
-            window.windowing_requested.op = .{ .move = .{
-                .seat = seat,
-            } };
-        },
-        .op_add_resize_window => |args| {
-            if (!server.wm.ensureWindowing()) return;
-            const data = args.window.getUserData() orelse return;
-            const window: *Window = @ptrCast(@alignCast(data));
-            window.windowing_requested.op = .{ .resize = .{
-                .seat = seat,
-                .edges = args.edges,
-            } };
-        },
         .op_end => {
             if (!server.wm.ensureWindowing()) return;
             seat.windowing_requested.op = .end;
@@ -540,59 +504,12 @@ pub fn updateWindowingFinish(seat: *Seat) void {
                 .y = @intFromFloat(seat.cursor.wlr_cursor.y),
             };
             seat.cursor.startOpPointer();
-
-            {
-                var it = server.wm.windows.iterator(.forward);
-                while (it.next()) |window| {
-                    switch (window.windowing_requested.op) {
-                        .none => {},
-                        .move => |data| {
-                            if (data.seat == seat) {
-                                assert(window.op == .none);
-                                window.op = .{
-                                    .move = .{
-                                        .seat = seat,
-                                        .start_x = window.rendering_sent.box.x,
-                                        .start_y = window.rendering_sent.box.y,
-                                    },
-                                };
-                            }
-                        },
-                        .resize => |data| {
-                            if (data.seat == seat) {
-                                assert(window.op == .none);
-                                window.op = .{
-                                    .resize = .{
-                                        .seat = seat,
-                                        .edges = data.edges,
-                                        .start_box = window.rendering_sent.box,
-                                    },
-                                };
-                            }
-                        },
-                    }
-                }
-            }
         },
         .end => if (seat.op) |op| {
             log.debug("end seat op", .{});
             seat.op = null;
             switch (op.input) {
                 .pointer => seat.cursor.endOpPointer(),
-            }
-
-            {
-                var it = server.wm.windows.iterator(.forward);
-                while (it.next()) |window| {
-                    switch (window.op) {
-                        .none => {},
-                        inline .move, .resize => |data| {
-                            if (data.seat == seat) {
-                                window.op = .none;
-                            }
-                        },
-                    }
-                }
             }
         },
     }
@@ -774,48 +691,9 @@ pub fn handleSwitchMapping(
 
 pub fn updateOp(seat: *Seat, x: i32, y: i32) void {
     const op = &seat.op.?;
-
     op.x = x;
     op.y = y;
-
-    // Position is not updated until the window has committed its new dimensions.
-    // The client may not commit exactly the dimensions we request and we need
-    // to know the actual committed dimensions to correctly place the top left
-    // corner in the case of a resize from the top or left edge.
-    {
-        var it = server.wm.windows.iterator(.forward);
-        while (it.next()) |window| {
-            switch (window.op) {
-                .none => {},
-                .move => |data| {
-                    if (data.seat != seat) continue;
-
-                    op.need_configures = true;
-                },
-                .resize => |data| {
-                    if (data.seat != seat) continue;
-
-                    // Total dx/dy since operation start
-                    const dx = x - op.start_x;
-                    const dy = y - op.start_y;
-
-                    if (data.edges.left) {
-                        window.configure_scheduled.width = @max(1, data.start_box.width - dx);
-                    } else if (data.edges.right) {
-                        window.configure_scheduled.width = @max(1, data.start_box.width + dx);
-                    }
-
-                    if (data.edges.top) {
-                        window.configure_scheduled.height = @max(1, data.start_box.height - dy);
-                    } else if (data.edges.bottom) {
-                        window.configure_scheduled.height = @max(1, data.start_box.height + dy);
-                    }
-
-                    op.need_configures = true;
-                },
-            }
-        }
-    }
+    op.dirty = true;
 }
 
 pub fn addDevice(seat: *Seat, wlr_device: *wlr.InputDevice) void {

@@ -112,7 +112,7 @@ pub fn layout(output: *Output) void {
     {
         var it = output.stack_wm.iterator(.forward);
         while (it.next()) |window| {
-            if (window.tags & output.tags != 0) {
+            if (window.tags & output.tags != 0 and window.op == .none) {
                 count += 1;
             }
         }
@@ -160,6 +160,7 @@ pub fn layout(output: *Output) void {
         var it = output.stack_wm.iterator(.forward);
         while (it.next()) |window| {
             if (window.tags & output.tags == 0) continue;
+            if (window.op != .none) continue;
             defer i += 1;
 
             var x: i32 = undefined;

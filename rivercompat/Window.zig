@@ -25,6 +25,7 @@ const wp = wayland.client.wp;
 const river = wayland.client.river;
 
 const Output = @import("Output.zig");
+const Seat = @import("Seat.zig");
 
 const wm = &@import("root").wm;
 const gpa = std.heap.c_allocator;
@@ -36,13 +37,23 @@ windowing: struct {
     closed: bool = false,
 },
 
-x: i32 = 0,
-y: i32 = 0,
-width: i32 = 0,
-height: i32 = 0,
+box: Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
 
 output: ?*Output = null,
 tags: u32 = 0,
+
+op: union(enum) {
+    none,
+    move: struct {
+        seat: *Seat,
+        start_x: i32,
+        start_y: i32,
+    },
+    resize: struct {
+        seat: *Seat,
+        start_box: Box,
+    },
+} = .none,
 
 link: wl.list.Link,
 link_focus: wl.list.Link,
@@ -91,8 +102,10 @@ fn handleEvent(window_v1: *river.WindowV1, event: river.WindowV1.Event, window: 
         .closed => window.windowing.closed = true,
         .dimensions_hint => {},
         .dimensions => |args| {
-            window.width = args.width;
-            window.height = args.height;
+            window.box.width = @intCast(args.width);
+            window.box.height = @intCast(args.height);
+            window.box.width += 2 * wm.config.border_width;
+            window.box.height += 2 * wm.config.border_width;
         },
         .app_id => {},
         .title => {},
@@ -156,17 +169,46 @@ pub fn updateWindowing(window: *Window) void {
         }
     }
 
+    switch (window.op) {
+        .none, .move => {},
+        .resize => |op| {
+            window.window_v1.setTiled(.{ .top = false, .bottom = false, .left = false, .right = false });
+            // resize from top left corner
+            window.proposeDimensions(
+                @max(1, op.start_box.width - op.seat.op.?.dx),
+                @max(1, op.start_box.height - op.seat.op.?.dy),
+            );
+        },
+    }
+
     window.windowing = .{};
 }
 
 pub fn updateRendering(window: *Window) void {
-    if (window.width != 0 and window.height != 0) {
+    if (window.box.width != 0 and window.box.height != 0) {
         window.shadow_surface.attach(window.shadow_buffer, 0, 0);
         window.shadow_surface.damageBuffer(0, 0, math.maxInt(i32), math.maxInt(i32));
-        window.shadow_viewport.setDestination(window.width + 2 * wm.config.border_width, window.height + 2 * wm.config.border_width);
+        window.shadow_viewport.setDestination(window.box.width + 2 * wm.config.border_width, window.box.height + 2 * wm.config.border_width);
         window.shadow_decoration.setOffset(10 - wm.config.border_width, 10 - wm.config.border_width);
         window.shadow_decoration.syncNextCommit();
         window.shadow_surface.commit();
+    }
+
+    switch (window.op) {
+        .none => {},
+        .move => |op| {
+            window.setPosition(
+                op.seat.op.?.dx + op.start_x,
+                op.seat.op.?.dy + op.start_y,
+            );
+        },
+        .resize => |op| {
+            // resize from top left corner
+            window.setPosition(
+                op.start_box.x + (@as(i32, op.start_box.width) - window.box.width),
+                op.start_box.y + (@as(i32, op.start_box.height) - window.box.height),
+            );
+        },
     }
 
     {
@@ -204,8 +246,21 @@ pub const Box = struct {
 };
 
 pub fn layout(window: *Window, box: Box) void {
-    window.x = box.x + wm.config.border_width;
-    window.y = box.y + wm.config.border_width;
-    window.node_v1.setPosition(window.x, window.y);
-    window.window_v1.proposeDimensions(box.width - 2 * wm.config.border_width, box.height - 2 * wm.config.border_width);
+    window.setPosition(box.x, box.y);
+    window.proposeDimensions(box.width, box.height);
+}
+
+pub fn setPosition(window: *Window, x: i32, y: i32) void {
+    window.box.x = x;
+    window.box.y = y;
+    window.node_v1.setPosition(x + wm.config.border_width, y + wm.config.border_width);
+}
+
+pub fn proposeDimensions(window: *Window, width: u31, height: u31) void {
+    window.box.width = width;
+    window.box.height = height;
+    window.window_v1.proposeDimensions(
+        @max(1, @as(i32, width) - 2 * wm.config.border_width),
+        @max(1, @as(i32, height) - 2 * wm.config.border_width),
+    );
 }

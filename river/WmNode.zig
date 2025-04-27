@@ -104,10 +104,8 @@ fn handleRequest(
             if (!server.wm.ensureRendering()) return;
             switch (node.get()) {
                 .window => |window| {
-                    window.rendering_requested.position = .{
-                        .x = args.x,
-                        .y = args.y,
-                    };
+                    window.rendering_requested.x = args.x;
+                    window.rendering_requested.y = args.y;
                 },
                 .shell_surface => |shell_surface| {
                     shell_surface.rendering_requested.x = args.x;

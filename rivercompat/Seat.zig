@@ -38,10 +38,16 @@ const State = struct {
     action: ?Action = null,
     window_interaction: ?*Window = null,
     shell_surface_interaction: ?*river.ShellSurfaceV1 = null,
+    op_dx: i32 = 0,
+    op_dy: i32 = 0,
 };
 
 seat_v1: *river.SeatV1,
 pending: State = .{},
+op: ?struct {
+    dx: i32 = 0,
+    dy: i32 = 0,
+} = null,
 focused: ?*Window = null,
 focused_output: ?*Output = null,
 hovered: ?*Window = null,
@@ -77,6 +83,10 @@ fn handleEvent(seat_v1: *river.SeatV1, event: river.SeatV1.Event, seat: *Seat) v
             if (seat.hovered == window) {
                 seat.hovered = null;
             }
+        },
+        .op_delta => |args| {
+            seat.op.?.dx = args.dx;
+            seat.op.?.dy = args.dy;
         },
         .pointer_activity => {},
         .window_interaction => |args| {
@@ -146,22 +156,53 @@ pub fn execute(seat: *Seat, action: Action) void {
             }
         },
         .move_start => {
+            if (seat.op != null) return;
+            seat.op = .{};
             seat.seat_v1.opStartPointer();
             var it = wm.windows.iterator(.forward);
             while (it.next()) |window| {
-                seat.seat_v1.opAddMoveWindow(window.window_v1);
+                if (window.op == .none) {
+                    window.op = .{ .move = .{
+                        .seat = seat,
+                        .start_x = window.box.x,
+                        .start_y = window.box.y,
+                    } };
+                }
             }
         },
         .resize_start => {
-            if (seat.hovered) |window| {
-                seat.seat_v1.opStartPointer();
-                seat.seat_v1.opAddResizeWindow(window.window_v1, .{
-                    .top = true,
-                    .left = true,
-                });
+            if (seat.op != null) return;
+            seat.op = .{};
+            seat.seat_v1.opStartPointer();
+            var it = wm.windows.iterator(.forward);
+            while (it.next()) |window| {
+                if (window.op == .none) {
+                    window.op = .{ .resize = .{
+                        .seat = seat,
+                        .start_box = window.box,
+                    } };
+                    window.window_v1.informResizeStart();
+                }
             }
         },
-        .op_end => seat.seat_v1.opEnd(),
+        .op_end => {
+            seat.op = null;
+            seat.seat_v1.opEnd();
+            var it = wm.windows.iterator(.forward);
+            while (it.next()) |window| {
+                switch (window.op) {
+                    .none => {},
+                    inline .move, .resize => |op| {
+                        if (op.seat == seat) {
+                            window.op = .none;
+                        }
+                        if (window.op == .resize) {
+                            window.window_v1.informResizeEnd();
+                        }
+                    },
+                }
+            }
+        },
         .spawn => |command| {
             if (std.posix.fork()) |pid| {
                 if (pid == 0) {

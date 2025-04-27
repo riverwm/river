@@ -676,9 +676,8 @@
         interactive move be started, perhaps when a client-side rendered
         titlebar is dragged.
 
-        The window manager may use the river_seat_v1.op_start_serial and
-        river_seat_v1.op_add_move_window requests to interactively move the
-        window or ignore this event entirely.
+        The window manager may use the river_seat_v1.op_start_serial request to
+        interactively move the window or ignore this event entirely.
 
         This event will be followed by an update_windowing_start event after all
         other new state has been sent by the server.
@@ -702,9 +701,8 @@
         interactive resize be started, perhaps when the corner of client-side
         rendered decorations is dragged.
 
-        The window manager may use the river_seat_v1.op_start_serial and
-        river_seat_v1.op_add_resize_window requests to interactively resize the
-        window or ignore this event entirely.
+        The window manager may use the river_seat_v1.op_start_serial request to
+        interactively resize the window or ignore this event entirely.
 
         This event will be followed by an update_windowing_start event after all
         other new state has been sent by the server.
@@ -713,6 +711,31 @@
       <arg name="serial" type="uint"/>
       <arg name="edges" type="uint" enum="edges"/>
     </event>
+
+    <request name="inform_resize_start">
+      <description summary="inform the window it is being resized">
+        Inform the window that it is being resized. The window manager should
+        use this request to inform windows that are the target of an interactive
+        resize for example.
+
+        The window manager remains responsible for handling the position and
+        dimensions of the window while it is resizing.
+
+        This request modifies windowing state and may only be made as part of a
+        windowing update sequence, see the river_window_manager_v1 description.
+      </description>
+    </request>
+
+    <request name="inform_resize_end">
+      <description summary="inform the window it no longer being resized">
+        Inform the window that it is no longer being resized. The window manager
+        should use this request to inform windows that are the target of an
+        interactive resize that the interactive resize has ended for example.
+
+        This request modifies windowing state and may only be made as part of a
+        windowing update sequence, see the river_window_manager_v1 description.
+      </description>
+    </request>
 
     <enum name="capabilities" bitfield="true">
       <entry name="window_menu" value="1"/>
@@ -1026,29 +1049,6 @@
       <arg name="y" type="int"/>
     </request>
 
-    <event name="position">
-      <description summary="the absolute position of the node has changed">
-        This event indicates the position of the node in the compositor's
-        logical coordinate space. The x and y coordinates may be positive or
-        negative.
-
-        Note that the position of a river_window_v1 refers to the position of
-        the window content and is unaffected by the presence of borders or
-        decoration surfaces.
-
-        While the window manager client usually sets the position of the node,
-        there are some cases in which the position must be modified by the
-        server in which case this event is sent to inform the client of the new
-        position. For example, this event is necessary to communicate the
-        results of interactive resize to the window manager client.
-
-        This event is sent as part of a rendering update sequence before the
-        update_rendering_start event.
-      </description>
-      <arg name="x" type="int"/>
-      <arg name="y" type="int"/>
-    </event>
-
     <request name="place_top">
       <description summary="place node above all other nodes">
         This request places the node above all other nodes in the compositor's
@@ -1334,22 +1334,19 @@
         river_window_v1.move_requested or river_window_v1.resize_requested
         event.
 
-        A set of windows added to the operation with the op_add_move_window and
-        op_add_resize_window requests will be moved/resized based on input
+        During the operation, op_delta events will be sent based on input
         corresponding to the provided serial (e.g. pointer or touch input).
 
-        All windows must be added to the operation in the same windowing update
-        sequence as the op_start_serial request.
-
-        No windows are implicitly included in the operation, even the window
-        that requested the move/resize must be explicitly added to the
-        operation.
+        The window manager may use this operation to implement interactive
+        move/resize of windows by setting the position of windows and proposing
+        dimensions based off of the op_delta events.
 
         The operation continues until the pointer button, touch point or similar
         corresponding to the given serial is released or the op_end request is
         made and applied during a windowing update sequence.
 
-        This request is ignored if an operation is already in progress.
+        This request is ignored if an operation is already in progress for a
+        given river_seat_v1.
 
         This request modifies windowing state and may only be made as part of a
         windowing update sequence, see the river_window_manager_v1 description.
@@ -1359,12 +1356,12 @@
 
     <request name="op_start_pointer">
       <description summary="start an interactive pointer operation">
-        Start an interactive pointer operation. A set of windows added to the
-        operation with the op_add_move_window and op_add_resize_window requests
-        will be moved/resized based on the movement of the pointer.
+        Start an interactive pointer operation. During the operation, op_delta
+        events will be sent based on pointer input.
 
-        All windows must be added to the operation in the same windowing update
-        sequence as the op_start_serial request.
+        The window manager may use this operation to implement interactive
+        move/resize of windows by setting the position of windows and proposing
+        dimensions based off of the op_delta events.
 
         The pointer operation continues until the op_end request is made during
         a windowing update sequence and that update sequence is finished.
@@ -1375,59 +1372,14 @@
       </description>
     </request>
 
-    <request name="op_add_move_window">
-      <description summary="add movement of a window to an operation">
-        This request causes the position of a window to be updated by an
-        operation started in the same windowing update sequence as this request.
-
-        Multiple windows may be added to and moved or resized by a single
-        operation.
-
-        If a window is added more than once to a single operation, only the most
-        recent op_add_move_window or op_add_resize_window request will have an
-        effect.
-
-        This request is ignored if not made in the same windowing update
-        sequence as the op_start_serial or op_start_pointer request that starts
-        an operation.
-
-        This request modifies windowing state and may only be made as part of a
-        windowing update sequence, see the river_window_manager_v1 description.
+    <event name="op_delta">
+      <description summary="total cumulative motion since op start">
+        This event indicates the total change in position since the start of the
+        operation of the pointer/touch point/etc.
       </description>
-      <arg name="window" type="object" interface="river_window_v1"/>
-    </request>
-
-    <request name="op_add_resize_window">
-      <description summary="add resize of a window to an operation">
-        This request causes the position/dimensions of a window to be updated by
-        an operation started in the same windowing update sequence as this
-        request.
-
-        Multiple windows may be added to and moved or resized by a single
-        operation.
-
-        If a window is added more than once to a single operation, only the most
-        recent op_add_move_window or op_add_resize_window request will have an
-        effect.
-
-        This request is ignored if not made in the same windowing update
-        sequence as the op_start_serial or op_start_pointer request that starts
-        an operation.
-
-        The edges argument determines which edges of the window are resized from
-        during the operation.
-
-        It is a protocol error to set the edges argument to none. It is also an
-        error to set both the top and bottom edges or both the left and right
-        edges. Resizing from, for example, both the top and right edges is
-        allowed.
-
-        This request modifies windowing state and may only be made as part of a
-        windowing update sequence, see the river_window_manager_v1 description.
-      </description>
-      <arg name="window" type="object" interface="river_window_v1"/>
-      <arg name="edges" type="uint" enum="river_window_v1.edges"/>
-    </request>
+      <arg name="dx" type="int" summary="total change in x"/>
+      <arg name="dy" type="int" summary="total change in y"/>
+    </event>
 
     <request name="op_end">
       <description summary="end an interactive operation">

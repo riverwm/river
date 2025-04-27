@@ -370,7 +370,7 @@ fn updateHovered(cursor: *Cursor) void {
                     .toplevel => |toplevel| {
                         // Exclude input regions of the toplevel that extend beyond the window
                         if (result.surface != null and result.surface.?.getRootSurface() == toplevel.wlr_toplevel.base.surface) {
-                            if (window.rendering_sent.box.containsPoint(cursor.wlr_cursor.x, cursor.wlr_cursor.y)) {
+                            if (window.box.containsPoint(cursor.wlr_cursor.x, cursor.wlr_cursor.y)) {
                                 cursor.seat.windowing_scheduled.window = window;
                             }
                         } else {

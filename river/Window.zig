@@ -169,19 +169,10 @@ windowing_requested: struct {
         .fullscreen = true,
         .minimize = true,
     },
+    resizing: bool = false,
     maximized: bool = false,
     fullscreen: bool = false, // XXX output
     close: bool = false,
-    op: union(enum) {
-        none,
-        move: struct {
-            seat: *Seat,
-        },
-        resize: struct {
-            seat: *Seat,
-            edges: river.WindowV1.Edges = .{},
-        },
-    } = .none,
 } = .{},
 
 /// State to be sent to the window in the next configure.
@@ -200,32 +191,20 @@ rendering_scheduled: struct {
 
 /// State sent to the wm in the latest rendering update sequence.
 rendering_sent: struct {
-    box: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+    width: u31 = 0,
+    height: u31 = 0,
 } = .{},
 
 /// Rendering state requested by the wm.
 rendering_requested: struct {
-    position: ?struct {
-        x: i32,
-        y: i32,
-    } = null,
+    x: i32 = 0,
+    y: i32 = 0,
     hidden: bool = false,
     border: Border = .{},
 } = .{},
 
-op: union(enum) {
-    none,
-    move: struct {
-        seat: *Seat,
-        start_x: i32,
-        start_y: i32,
-    },
-    resize: struct {
-        seat: *Seat,
-        edges: river.WindowV1.Edges = .{},
-        start_box: wlr.Box,
-    },
-} = .none,
+/// The currently rendered position/dimensions of the window in the scene graph
+box: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
 
 pub fn create(impl: Impl) error{OutOfMemory}!*Window {
     assert(impl != .none);
@@ -337,8 +316,8 @@ pub fn setDimensions(window: *Window, width: u31, height: u31) void {
     window.rendering_scheduled.height = height;
 
     if (window.rendering_scheduled.resend_dimensions or
-        window.rendering_scheduled.width != window.rendering_sent.box.width or
-        window.rendering_scheduled.height != window.rendering_sent.box.height)
+        window.rendering_scheduled.width != window.rendering_sent.width or
+        window.rendering_scheduled.height != window.rendering_sent.height)
     {
         server.wm.dirtyRendering();
     }
@@ -550,6 +529,14 @@ fn handleRequest(
                 window.decorations_below.append(decoration);
             }
         },
+        .inform_resize_start => {
+            if (!server.wm.ensureWindowing()) return;
+            windowing_requested.resizing = true;
+        },
+        .inform_resize_end => {
+            if (!server.wm.ensureWindowing()) return;
+            windowing_requested.resizing = false;
+        },
         .set_capabilities => |args| {
             if (!server.wm.ensureWindowing()) return;
             windowing_requested.capabilities = args.caps;
@@ -592,6 +579,7 @@ pub fn updateWindowingFinish(window: *Window) bool {
     window.configure_scheduled.ssd = windowing_requested.ssd;
     window.configure_scheduled.tiled = windowing_requested.tiled;
     window.configure_scheduled.capabilities = windowing_requested.capabilities;
+    window.configure_scheduled.resizing = windowing_requested.resizing;
     window.configure_scheduled.maximized = windowing_requested.maximized;
     window.configure_scheduled.fullscreen = windowing_requested.fullscreen;
 
@@ -613,15 +601,11 @@ pub fn updateWindowingFinish(window: *Window) bool {
     }
 
     if (windowing_requested.dimensions) |dimensions| {
-        if (window.op == .none) {
-            window.configure_scheduled.width = dimensions.width;
-            window.configure_scheduled.height = dimensions.height;
-        }
+        window.configure_scheduled.width = dimensions.width;
+        window.configure_scheduled.height = dimensions.height;
         windowing_requested.dimensions = null;
         window.rendering_scheduled.resend_dimensions = true;
     }
-
-    windowing_requested.op = .none;
 
     const track_configure = switch (window.impl) {
         .toplevel => |*toplevel| toplevel.configure(),
@@ -642,12 +626,6 @@ pub fn updateRenderingStart(window: *Window) void {
         .toplevel => |*toplevel| {
             switch (toplevel.configure_state) {
                 .inflight, .acked => {
-                    switch (toplevel.configure_state) {
-                        .inflight => |serial| toplevel.configure_state = .{ .timed_out = serial },
-                        .acked => toplevel.configure_state = .timed_out_acked,
-                        else => unreachable,
-                    }
-
                     // The transaction has timed out for the xdg toplevel, which means a commit
                     // in response to the configure with the inflight width/height has not yet
                     // been made. It may seem that we should therefore leave the current.box
@@ -666,11 +644,18 @@ pub fn updateRenderingStart(window: *Window) void {
                     // If we did not use the current geometry of the toplevel at this point
                     // we would be rendering the SSD border at initial size X but the surface
                     // would be rendered at size Y.
+                    switch (toplevel.configure_state) {
+                        .inflight => |serial| toplevel.configure_state = .{ .timed_out = serial },
+                        .acked => toplevel.configure_state = .timed_out_acked,
+                        else => unreachable,
+                    }
                 },
-                .idle, .committed => {
+                .committed => {
                     toplevel.configure_state = .idle;
                 },
-                .timed_out, .timed_out_acked => unreachable,
+                // A timed_out or timed_out_acked value is possible in the case of a
+                // windowing update followed by two rendering updates for example.
+                .idle, .timed_out, .timed_out_acked => {},
             }
             window.rendering_scheduled.width = @intCast(toplevel.geometry.width);
             window.rendering_scheduled.height = @intCast(toplevel.geometry.height);
@@ -683,71 +668,35 @@ pub fn updateRenderingStart(window: *Window) void {
     }
 
     const sent = &window.rendering_sent;
-    var scheduled_box: wlr.Box = .{
-        .x = sent.box.x,
-        .y = sent.box.y,
-        .width = window.rendering_scheduled.width,
-        .height = window.rendering_scheduled.height,
-    };
+    const scheduled = &window.rendering_scheduled;
 
-    switch (window.op) {
-        .none => {},
-        .move => |data| {
-            const seat_op = &data.seat.op.?;
-            const dx = seat_op.x - seat_op.start_x;
-            const dy = seat_op.y - seat_op.start_y;
-            scheduled_box.x = data.start_x + dx;
-            scheduled_box.y = data.start_y + dy;
-        },
-        .resize => |data| {
-            assert(data.seat.op != null);
-            if (data.edges.left) {
-                scheduled_box.x = data.start_box.x + data.start_box.width - scheduled_box.width;
-            } else if (data.edges.right) {
-                scheduled_box.x = data.start_box.x;
-            }
-            if (data.edges.top) {
-                scheduled_box.y = data.start_box.y + data.start_box.height - scheduled_box.height;
-            } else if (data.edges.bottom) {
-                scheduled_box.y = data.start_box.y;
-            }
-        },
-    }
-
-    if (scheduled_box.x != sent.box.x or scheduled_box.y != sent.box.y) {
-        if (window.node.object) |node_v1| {
-            node_v1.sendPosition(scheduled_box.x, scheduled_box.y);
-        }
-    }
     // The check for 0 width/height is necessary to handle timeout of the first configure sent.
-    if (!scheduled_box.empty() and
-        (window.rendering_scheduled.resend_dimensions or
-        scheduled_box.width != sent.box.width or scheduled_box.height != sent.box.height))
+    if (scheduled.width != 0 and scheduled.height != 0 and
+        (scheduled.resend_dimensions or
+        scheduled.width != sent.width or scheduled.height != sent.height))
     {
         if (window.object) |window_v1| {
-            window_v1.sendDimensions(scheduled_box.width, scheduled_box.height);
+            window_v1.sendDimensions(scheduled.width, scheduled.height);
             window.rendering_scheduled.resend_dimensions = false;
         }
     }
-    sent.box = scheduled_box;
+    sent.width = scheduled.width;
+    sent.height = scheduled.height;
 }
 
 pub fn updateRenderingFinish(window: *Window) void {
     window.tree.node.setEnabled(!window.rendering_requested.hidden);
     window.popup_tree.node.setEnabled(!window.rendering_requested.hidden);
 
-    const box = &window.rendering_sent.box;
+    window.box = .{
+        .x = window.rendering_requested.x,
+        .y = window.rendering_requested.y,
+        .width = window.rendering_sent.width,
+        .height = window.rendering_sent.height,
+    };
 
-    if (window.rendering_requested.position) |position| {
-        if (window.op == .none) {
-            box.x = position.x;
-            box.y = position.y;
-        }
-        window.rendering_requested.position = null;
-    }
-
-    window.tree.node.setPosition(box.x, box.y);
-    window.popup_tree.node.setPosition(box.x, box.y);
+    window.tree.node.setPosition(window.box.x, window.box.y);
+    window.popup_tree.node.setPosition(window.box.x, window.box.y);
 
     // f32 cannot represent all u32 values exactly, therefore we must initially use f64
     // (which can) and then cast to f32, potentially losing precision.
@@ -763,24 +712,24 @@ pub fn updateRenderingFinish(window: *Window) void {
         .x = -@as(i32, border.width),
         .y = 0,
         .width = border.width,
-        .height = box.height,
+        .height = window.box.height,
     };
     var right: wlr.Box = .{
-        .x = box.width,
+        .x = window.box.width,
         .y = 0,
         .width = border.width,
-        .height = box.height,
+        .height = window.box.height,
     };
     const top: wlr.Box = .{
         .x = 0,
         .y = -@as(i32, border.width),
-        .width = box.width,
+        .width = window.box.width,
         .height = border.width,
     };
     const bottom: wlr.Box = .{
         .x = 0,
-        .y = box.height,
-        .width = box.width,
+        .y = window.box.height,
+        .width = window.box.width,
         .height = border.width,
     };
 
