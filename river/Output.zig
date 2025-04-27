@@ -67,7 +67,7 @@ pub const State = struct {
     } = .none,
     scale: f32 = 1,
     transform: wl.Output.Transform = .normal,
-    adaptive_sync: bool = true,
+    adaptive_sync: bool,
     auto_layout: bool = true,
 
     /// Width in the logical coordinate space
@@ -110,15 +110,19 @@ pub const State = struct {
         return @intFromFloat(physical / state.scale);
     }
 
-    pub fn apply(state: *const State, wlr_state: *wlr.Output.State) void {
+    pub fn applyNoModeset(state: *const State, wlr_state: *wlr.Output.State) void {
+        wlr_state.setScale(state.scale);
+        wlr_state.setTransform(state.transform);
+    }
+
+    pub fn applyModeset(state: *const State, wlr_state: *wlr.Output.State) void {
+        state.applyNoModeset(wlr_state);
         wlr_state.setEnabled(state.state == .enabled);
         switch (state.mode) {
             .standard => |mode| wlr_state.setMode(mode),
             .custom => |mode| wlr_state.setCustomMode(mode.width, mode.height, mode.refresh),
             .none => {},
         }
-        wlr_state.setScale(state.scale);
-        wlr_state.setTransform(state.transform);
         wlr_state.setAdaptiveSyncEnabled(state.adaptive_sync);
     }
 };
@@ -159,12 +163,12 @@ gamma_dirty: bool = false,
 link: wl.list.Link,
 
 /// State to be sent to the wm in the next windowing update sequence.
-scheduled: State = .{},
+scheduled: State,
 /// State sent to the wm in the latest windowing update sequence.
-sent: State = .{},
+sent: State,
 link_sent: wl.list.Link,
 /// State applied to the wlr_output and rendered.
-current: State = .{},
+current: State,
 
 destroy: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleDestroy),
 request_state: wl.Listener(*wlr.Output.event.RequestState) = wl.Listener(*wlr.Output.event.RequestState).init(handleRequestState),
@@ -194,6 +198,9 @@ pub fn create(wlr_output: *wlr.Output) !void {
     output.* = .{
         .wlr_output = wlr_output,
         .scene_output = scene_output,
+        .scheduled = .{ .adaptive_sync = wlr_output.adaptive_sync_status == .enabled },
+        .sent = .{ .adaptive_sync = wlr_output.adaptive_sync_status == .enabled },
+        .current = .{ .adaptive_sync = wlr_output.adaptive_sync_status == .enabled },
         .link = undefined,
         .link_sent = undefined,
     };
@@ -362,7 +369,7 @@ fn renderAndCommit(output: *Output) !void {
     var state = wlr.Output.State.init();
     defer state.finish();
 
-    output.current.apply(&state);
+    output.current.applyNoModeset(&state);
 
     if (output.gamma_dirty) {
         const control = server.om.gamma_control_manager.getControl(wlr_output);

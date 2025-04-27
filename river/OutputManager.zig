@@ -324,7 +324,7 @@ pub fn commitOutputState(om: *OutputManager) void {
                 state.output = wlr_output;
                 state.base = wlr.Output.State.init();
 
-                output.sent.apply(&state.base);
+                output.sent.applyModeset(&state.base);
             }
         }
 
