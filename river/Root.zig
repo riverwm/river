@@ -124,6 +124,8 @@ pub fn init(root: *Root) !void {
     const gamma_control_manager = try wlr.GammaControlManagerV1.create(server.wl_server);
     scene.setGammaControlManagerV1(gamma_control_manager);
 
+    if (server.linux_dmabuf) |linux_dmabuf| scene.setLinuxDmabufV1(linux_dmabuf);
+
     const interactive_content = try scene.tree.createSceneTree();
     const drag_icons = try scene.tree.createSceneTree();
     const hidden_tree = try scene.tree.createSceneTree();
