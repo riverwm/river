@@ -63,6 +63,7 @@ security_context_manager: *wlr.SecurityContextManagerV1,
 shm: *wlr.Shm,
 drm: ?*wlr.Drm = null,
 linux_dmabuf: ?*wlr.LinuxDmabufV1 = null,
+linux_drm_syncobj_manager: ?*wlr.LinuxDrmSyncobjManagerV1 = null,
 single_pixel_buffer_manager: *wlr.SinglePixelBufferManagerV1,
 
 viewporter: *wlr.Viewporter,
@@ -188,6 +189,12 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
 
         server.linux_dmabuf = try wlr.LinuxDmabufV1.createWithRenderer(wl_server, 4, renderer);
     }
+    if (renderer.features.timeline and backend.features.timeline) {
+        const drm_fd = renderer.getDrmFd();
+        if (drm_fd >= 0) {
+            server.linux_drm_syncobj_manager = wlr.LinuxDrmSyncobjManagerV1.create(wl_server, 1, drm_fd);
+        }
+    }
 
     if (build_options.xwayland and runtime_xwayland) {
         server.xwayland = try wlr.Xwayland.create(wl_server, compositor, false);
@@ -296,7 +303,12 @@ fn globalFilter(client: *const wl.Client, global: *const wl.Global, server: *Ser
 /// Returns true if the global is allowlisted for security contexts
 fn allowlist(server: *Server, global: *const wl.Global) bool {
     if (server.drm) |drm| if (global == drm.global) return true;
-    if (server.linux_dmabuf) |linux_dmabuf| if (global == linux_dmabuf.global) return true;
+    if (server.linux_dmabuf) |linux_dmabuf| {
+        if (global == linux_dmabuf.global) return true;
+    }
+    if (server.linux_drm_syncobj_manager) |linux_drm_syncobj_manager| {
+        if (global == linux_drm_syncobj_manager.global) return true;
+    }
 
     // We must use the getInterface() approach for dynamically created globals
     // such as wl_output and wl_seat since the wl_global_create() function will
