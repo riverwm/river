@@ -82,6 +82,7 @@ fn handleDestroy(listener: *wl.Listener(*wlr.LayerSurfaceV1), _: *wlr.LayerSurfa
     layer_surface.map.link.remove();
     layer_surface.unmap.link.remove();
     layer_surface.commit.link.remove();
+    layer_surface.new_popup.link.remove();
 
     layer_surface.destroyPopups();
 
