@@ -139,6 +139,7 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
     xwayland_view.dissociate.link.remove();
     xwayland_view.request_configure.link.remove();
     xwayland_view.set_override_redirect.link.remove();
+    xwayland_view.set_decorations.link.remove();
 
     const view = xwayland_view.view;
     view.impl = .none;
