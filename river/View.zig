@@ -446,7 +446,11 @@ pub fn updateSceneState(view: *View) void {
         for (&view.borders, &border_boxes) |border, *border_box| {
             border_box.x += box.x;
             border_box.y += box.y;
-            _ = border_box.intersection(border_box, &output_box);
+            if (!border_box.intersection(border_box, &output_box)) {
+                // TODO(wlroots): remove this redundant code after fixed upstream
+                // https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/5084
+                border_box.* = .{ .x = 0, .y = 0, .width = 0, .height = 0 };
+            }
             border_box.x -= box.x;
             border_box.y -= box.y;
 
