@@ -139,7 +139,6 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
     xwayland_view.dissociate.link.remove();
     xwayland_view.request_configure.link.remove();
     xwayland_view.set_override_redirect.link.remove();
-    xwayland_view.set_decorations.link.remove();
 
     const view = xwayland_view.view;
     view.impl = .none;
@@ -221,6 +220,7 @@ fn handleUnmap(listener: *wl.Listener(void)) void {
     // Remove listeners that are only active while mapped
     xwayland_view.set_title.link.remove();
     xwayland_view.set_class.link.remove();
+    xwayland_view.set_decorations.link.remove();
     xwayland_view.request_fullscreen.link.remove();
     xwayland_view.request_minimize.link.remove();
 
