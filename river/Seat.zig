@@ -325,11 +325,9 @@ pub fn updateWindowingStart(seat: *Seat) void {
                 }
             }
         } else if (seat.windowing_scheduled.window != seat.windowing_sent.window) {
-            if (seat.windowing_sent.window) |window| {
-                if (window.object) |window_v1| {
-                    seat_v1.sendPointerLeave(window_v1);
-                    seat.windowing_sent.window = null;
-                }
+            if (seat.windowing_sent.window != null) {
+                seat_v1.sendPointerLeave();
+                seat.windowing_sent.window = null;
             }
             if (seat.windowing_scheduled.window) |window| {
                 if (window.object) |window_v1| {

@@ -77,13 +77,7 @@ fn handleEvent(seat_v1: *river.SeatV1, event: river.SeatV1.Event, seat: *Seat) v
             const window: *Window = @ptrCast(@alignCast(window_v1.getUserData()));
             seat.hovered = window;
         },
-        .pointer_leave => |args| {
-            const window_v1 = args.window orelse return;
-            const window: *Window = @ptrCast(@alignCast(window_v1.getUserData()));
-            if (seat.hovered == window) {
-                seat.hovered = null;
-            }
-        },
+        .pointer_leave => seat.hovered = null,
         .op_delta => |args| {
             seat.op.?.dx = args.dx;
             seat.op.?.dy = args.dy;

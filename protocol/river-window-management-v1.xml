@@ -1262,13 +1262,13 @@
     </event>
 
     <event name="pointer_leave">
-      <description summary="pointer left a window">
-        The seat's pointer left the given window. See pointer_enter for details.
+      <description summary="pointer left the entered window">
+        The seat's pointer left the window for which pointer_enter was most
+        recently sent. See pointer_enter for details.
 
         This event will be followed by an update_windowing_start event after all
         other new state has been sent by the server.
       </description>
-      <arg name="window" type="object" interface="river_window_v1"/>
     </event>
 
     <event name="pointer_activity">
