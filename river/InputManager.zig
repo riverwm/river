@@ -151,7 +151,7 @@ pub fn reconfigureDevices(input_manager: *InputManager) void {
 fn handleNewInput(listener: *wl.Listener(*wlr.InputDevice), wlr_device: *wlr.InputDevice) void {
     const input_manager: *InputManager = @fieldParentPtr("new_input", listener);
 
-    input_manager.defaultSeat().addDevice(wlr_device);
+    input_manager.defaultSeat().addDevice(wlr_device, false);
 }
 
 fn handleNewVirtualPointer(
@@ -169,7 +169,7 @@ fn handleNewVirtualPointer(
         log.debug("Ignoring output suggestion from virtual pointer", .{});
     }
 
-    input_manager.defaultSeat().addDevice(&event.new_pointer.pointer.base);
+    input_manager.defaultSeat().addDevice(&event.new_pointer.pointer.base, true);
 }
 
 fn handleNewVirtualKeyboard(
@@ -177,7 +177,7 @@ fn handleNewVirtualKeyboard(
     virtual_keyboard: *wlr.VirtualKeyboardV1,
 ) void {
     const seat: *Seat = @alignCast(@ptrCast(virtual_keyboard.seat.data));
-    seat.addDevice(&virtual_keyboard.keyboard.base);
+    seat.addDevice(&virtual_keyboard.keyboard.base, true);
 }
 
 fn handleNewConstraint(

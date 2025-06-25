@@ -202,7 +202,7 @@ pub fn create(name: [*:0]const u8) !void {
     try seat.cursor.init(seat);
     seat.relay.init();
 
-    try seat.tryAddDevice(&seat.keyboard_group.keyboard.base);
+    try seat.tryAddDevice(&seat.keyboard_group.keyboard.base, false);
 
     seat.wlr_seat.events.request_set_selection.add(&seat.request_set_selection);
     seat.wlr_seat.events.request_start_drag.add(&seat.request_start_drag);
@@ -695,19 +695,19 @@ pub fn updateOp(seat: *Seat, x: i32, y: i32) void {
     op.dirty = true;
 }
 
-pub fn addDevice(seat: *Seat, wlr_device: *wlr.InputDevice) void {
-    seat.tryAddDevice(wlr_device) catch |err| switch (err) {
+pub fn addDevice(seat: *Seat, wlr_device: *wlr.InputDevice, virtual: bool) void {
+    seat.tryAddDevice(wlr_device, virtual) catch |err| switch (err) {
         error.OutOfMemory => log.err("out of memory", .{}),
     };
 }
 
-fn tryAddDevice(seat: *Seat, wlr_device: *wlr.InputDevice) !void {
+fn tryAddDevice(seat: *Seat, wlr_device: *wlr.InputDevice, virtual: bool) !void {
     switch (wlr_device.type) {
         .keyboard => {
             const keyboard = try util.gpa.create(Keyboard);
             errdefer util.gpa.destroy(keyboard);
 
-            try keyboard.init(seat, wlr_device);
+            try keyboard.init(seat, wlr_device, virtual);
 
             seat.wlr_seat.setKeyboard(keyboard.device.wlr_device.toKeyboard());
             if (seat.wlr_seat.keyboard_state.focused_surface) |wlr_surface| {

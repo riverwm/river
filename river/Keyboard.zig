@@ -96,7 +96,7 @@ pressed: Pressed = .{},
 key: wl.Listener(*wlr.Keyboard.event.Key) = .init(queueKey),
 modifiers: wl.Listener(*wlr.Keyboard) = .init(queueModifiers),
 
-pub fn init(keyboard: *Keyboard, seat: *Seat, wlr_device: *wlr.InputDevice) !void {
+pub fn init(keyboard: *Keyboard, seat: *Seat, wlr_device: *wlr.InputDevice, virtual: bool) !void {
     keyboard.* = .{
         .device = undefined,
     };
@@ -106,12 +106,14 @@ pub fn init(keyboard: *Keyboard, seat: *Seat, wlr_device: *wlr.InputDevice) !voi
     const wlr_keyboard = keyboard.device.wlr_device.toKeyboard();
     wlr_keyboard.data = keyboard;
 
-    // wlroots will log a more detailed error if this fails.
-    if (!wlr_keyboard.setKeymap(server.config.keymap)) return error.OutOfMemory;
+    if (!virtual) {
+        // wlroots will log a more detailed error if this fails.
+        if (!wlr_keyboard.setKeymap(server.config.keymap)) return error.OutOfMemory;
 
-    if (wlr.KeyboardGroup.fromKeyboard(wlr_keyboard) == null) {
-        // wlroots will log an error on failure
-        _ = seat.keyboard_group.addKeyboard(wlr_keyboard);
+        if (wlr.KeyboardGroup.fromKeyboard(wlr_keyboard) == null) {
+            // wlroots will log an error on failure
+            _ = seat.keyboard_group.addKeyboard(wlr_keyboard);
+        }
     }
 
     wlr_keyboard.setRepeatInfo(server.config.repeat_rate, server.config.repeat_delay);
