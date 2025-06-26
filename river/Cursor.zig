@@ -1279,7 +1279,7 @@ fn warp(cursor: *Cursor) void {
     };
     if (!output_layout_box.containsPoint(cursor.wlr_cursor.x, cursor.wlr_cursor.y) or
         (usable_layout_box.containsPoint(cursor.wlr_cursor.x, cursor.wlr_cursor.y) and
-        !target_box.containsPoint(cursor.wlr_cursor.x, cursor.wlr_cursor.y)))
+            !target_box.containsPoint(cursor.wlr_cursor.x, cursor.wlr_cursor.y)))
     {
         const lx: f64 = @floatFromInt(target_box.x + @divTrunc(target_box.width, 2));
         const ly: f64 = @floatFromInt(target_box.y + @divTrunc(target_box.height, 2));
