@@ -243,6 +243,18 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
     const window = toplevel.window;
     window.impl = .none;
     window.destroying = true;
+    switch (window.windowing_scheduled.state) {
+        .init, .closing => {},
+        // This can happen if the xdg toplevel is destroyed after the initial
+        // commit but before the window is mapped. In this case, the state is
+        // not set to .closing by handleUnmap() since handleUnmap() is not
+        // called due to the window not being mapped.
+        .ready => {
+            assert(!window.initialized);
+            assert(!window.mapped);
+            window.windowing_scheduled.state = .init;
+        },
+    }
 }
 
 fn handleMap(listener: *wl.Listener(void)) void {
