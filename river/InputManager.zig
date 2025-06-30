@@ -176,9 +176,45 @@ fn handleNewVirtualKeyboard(
     _: *wl.Listener(*wlr.VirtualKeyboardV1),
     virtual_keyboard: *wlr.VirtualKeyboardV1,
 ) void {
-    const seat: *Seat = @alignCast(@ptrCast(virtual_keyboard.seat.data));
-    seat.addDevice(&virtual_keyboard.keyboard.base, true);
+    const no_keymap = util.gpa.create(NoKeymapVirtKeyboard) catch {
+        log.err("out of memory", .{});
+        return;
+    };
+    errdefer util.gpa.destroy(no_keymap);
+
+    no_keymap.* = .{
+        .virtual_keyboard = virtual_keyboard,
+    };
+    virtual_keyboard.keyboard.base.events.destroy.add(&no_keymap.destroy);
+    virtual_keyboard.keyboard.events.keymap.add(&no_keymap.keymap);
 }
+
+/// Ignore virtual keyboards completely until the client sets a keymap
+/// Yes, wlroots should probably do this for us.
+const NoKeymapVirtKeyboard = struct {
+    virtual_keyboard: *wlr.VirtualKeyboardV1,
+    destroy: wl.Listener(*wlr.InputDevice) = .init(handleDestroy),
+    keymap: wl.Listener(*wlr.Keyboard) = .init(handleKeymap),
+
+    fn handleDestroy(listener: *wl.Listener(*wlr.InputDevice), _: *wlr.InputDevice) void {
+        const no_keymap: *NoKeymapVirtKeyboard = @fieldParentPtr("destroy", listener);
+
+        no_keymap.destroy.link.remove();
+        no_keymap.keymap.link.remove();
+
+        util.gpa.destroy(no_keymap);
+    }
+
+    fn handleKeymap(listener: *wl.Listener(*wlr.Keyboard), _: *wlr.Keyboard) void {
+        const no_keymap: *NoKeymapVirtKeyboard = @fieldParentPtr("keymap", listener);
+        const virtual_keyboard = no_keymap.virtual_keyboard;
+
+        handleDestroy(&no_keymap.destroy, &virtual_keyboard.keyboard.base);
+
+        const seat: *Seat = @alignCast(@ptrCast(virtual_keyboard.seat.data));
+        seat.addDevice(&virtual_keyboard.keyboard.base, true);
+    }
+};
 
 fn handleNewConstraint(
     _: *wl.Listener(*wlr.PointerConstraintV1),
