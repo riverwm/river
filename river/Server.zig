@@ -85,6 +85,8 @@ screencopy_manager: *wlr.ScreencopyManagerV1,
 
 foreign_toplevel_manager: *wlr.ForeignToplevelManagerV1,
 
+foreign_toplevel_list: *wlr.ExtForeignToplevelListV1,
+
 tearing_control_manager: *wlr.TearingControlManagerV1,
 
 alpha_modifier: *wlr.AlphaModifierV1,
@@ -163,6 +165,8 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
         .screencopy_manager = try wlr.ScreencopyManagerV1.create(wl_server),
 
         .foreign_toplevel_manager = try wlr.ForeignToplevelManagerV1.create(wl_server),
+
+        .foreign_toplevel_list = try wlr.ExtForeignToplevelListV1.create(wl_server, 1),
 
         .tearing_control_manager = try wlr.TearingControlManagerV1.create(wl_server, 1),
 
@@ -344,6 +348,7 @@ fn blocklist(server: *Server, global: *const wl.Global) bool {
     return global == server.security_context_manager.global or
         global == server.layer_shell.global or
         global == server.foreign_toplevel_manager.global or
+        global == server.foreign_toplevel_list.global or
         global == server.screencopy_manager.global or
         global == server.export_dmabuf_manager.global or
         global == server.data_control_manager.global or

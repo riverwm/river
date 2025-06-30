@@ -181,6 +181,8 @@ post_fullscreen_box: wlr.Box = undefined,
 
 foreign_toplevel_handle: ForeignToplevelHandle = .{},
 
+ext_foreign_toplevel_handle: ?*wlr.ExtForeignToplevelHandleV1 = null,
+
 /// Connector name of the output this view occupied before an evacuation.
 output_before_evac: ?[]const u8 = null,
 
@@ -656,6 +658,15 @@ pub fn map(view: *View) !void {
     assert(!view.mapped and !view.destroying);
     view.mapped = true;
 
+    if (wlr.ExtForeignToplevelHandleV1.create(server.foreign_toplevel_list, &.{
+        .title = view.getTitle(),
+        .app_id = view.getAppId(),
+    })) |handle| {
+        view.ext_foreign_toplevel_handle = handle;
+    } else |_| {
+        log.err("failed to create ext foreign toplevel handle", .{});
+    }
+
     view.foreign_toplevel_handle.map();
 
     if (server.config.rules.float.match(view)) |float| {
@@ -745,6 +756,10 @@ pub fn unmap(view: *View) void {
     assert(view.mapped and !view.destroying);
     view.mapped = false;
 
+    if (view.ext_foreign_toplevel_handle) |handle| {
+        handle.destroy();
+        view.ext_foreign_toplevel_handle = null;
+    }
     view.foreign_toplevel_handle.unmap();
 
     server.root.applyPending();
@@ -754,6 +769,14 @@ pub fn notifyTitle(view: *const View) void {
     if (view.foreign_toplevel_handle.wlr_handle) |wlr_handle| {
         if (view.getTitle()) |title| wlr_handle.setTitle(title);
     }
+
+    if (view.ext_foreign_toplevel_handle) |handle| {
+        handle.updateState(&.{
+            .title = view.getTitle(),
+            .app_id = view.getAppId(),
+        });
+    }
+
     // Send title to all status listeners attached to a seat which focuses this view
     var seat_it = server.input_manager.seats.first;
     while (seat_it) |seat_node| : (seat_it = seat_node.next) {
@@ -769,5 +792,12 @@ pub fn notifyTitle(view: *const View) void {
 pub fn notifyAppId(view: View) void {
     if (view.foreign_toplevel_handle.wlr_handle) |wlr_handle| {
         if (view.getAppId()) |app_id| wlr_handle.setAppId(app_id);
+    }
+
+    if (view.ext_foreign_toplevel_handle) |handle| {
+        handle.updateState(&.{
+            .title = view.getTitle(),
+            .app_id = view.getAppId(),
+        });
     }
 }
