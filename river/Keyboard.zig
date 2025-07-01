@@ -62,7 +62,7 @@ pub const Pressed = struct {
         // Furthermore, wlroots will continue to forward key press/release events to river if more
         // than 32 keys are pressed. Therefore river chooses to ignore keypresses that would take
         // the keyboard beyond 32 simultaneously pressed keys.
-        assert(capacity == @typeInfo(std.meta.fieldInfo(wlr.Keyboard, .keycodes).type).Array.len);
+        assert(capacity == @typeInfo(std.meta.fieldInfo(wlr.Keyboard, .keycodes).type).array.len);
     }
 
     keys: std.BoundedArray(Key, capacity) = .{},

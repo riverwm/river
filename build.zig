@@ -4,13 +4,7 @@ const Build = std.Build;
 const fs = std.fs;
 const mem = std.mem;
 
-const Scanner = @import("zig-wayland").Scanner;
-
-/// While a river release is in development, this string should contain the version in development
-/// with the "-dev" suffix.
-/// When a release is tagged, the "-dev" suffix should be removed for the commit that gets tagged.
-/// Directly after the tagged commit, the version should be bumped and the "-dev" suffix added.
-const version = "0.4.0-dev";
+const Scanner = @import("wayland").Scanner;
 
 pub fn build(b: *Build) !void {
     const target = b.standardTargetOptions(.{});
@@ -71,7 +65,7 @@ pub fn build(b: *Build) !void {
                 .Inherit,
             ) catch break :blk version;
 
-            var it = mem.split(u8, mem.trim(u8, git_describe_long, &std.ascii.whitespace), "-");
+            var it = mem.splitSequence(u8, mem.trim(u8, git_describe_long, &std.ascii.whitespace), "-");
             _ = it.next().?; // previous tag
             const commit_count = it.next().?;
             const commit_hash = it.next().?;
@@ -137,10 +131,10 @@ pub fn build(b: *Build) !void {
 
     const wayland = b.createModule(.{ .root_source_file = scanner.result });
 
-    const xkbcommon = b.dependency("zig-xkbcommon", .{}).module("xkbcommon");
-    const pixman = b.dependency("zig-pixman", .{}).module("pixman");
+    const xkbcommon = b.dependency("xkbcommon", .{}).module("xkbcommon");
+    const pixman = b.dependency("pixman", .{}).module("pixman");
 
-    const wlroots = b.dependency("zig-wlroots", .{}).module("wlroots");
+    const wlroots = b.dependency("wlroots", .{}).module("wlroots");
     wlroots.addImport("wayland", wayland);
     wlroots.addImport("xkbcommon", xkbcommon);
     wlroots.addImport("pixman", pixman);
@@ -316,3 +310,31 @@ pub fn build(b: *Build) !void {
         test_step.dependOn(&run_globber_test.step);
     }
 }
+
+const version = manifest.version;
+/// Getting rid of this wart requires upstream zig improvements.
+/// See: https://github.com/ziglang/zig/issues/22775
+const manifest: struct {
+    name: @Type(.enum_literal),
+    version: []const u8,
+    paths: []const []const u8,
+    dependencies: struct {
+        pixman: struct {
+            url: []const u8,
+            hash: []const u8,
+        },
+        wayland: struct {
+            url: []const u8,
+            hash: []const u8,
+        },
+        wlroots: struct {
+            url: []const u8,
+            hash: []const u8,
+        },
+        xkbcommon: struct {
+            url: []const u8,
+            hash: []const u8,
+        },
+    },
+    fingerprint: u64,
+} = @import("build.zig.zon");

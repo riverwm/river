@@ -673,7 +673,7 @@ pub fn updateRenderingStart(window: *Window) void {
     // The check for 0 width/height is necessary to handle timeout of the first configure sent.
     if (scheduled.width != 0 and scheduled.height != 0 and
         (scheduled.resend_dimensions or
-        scheduled.width != sent.width or scheduled.height != sent.height))
+            scheduled.width != sent.width or scheduled.height != sent.height))
     {
         if (window.object) |window_v1| {
             window_v1.sendDimensions(scheduled.width, scheduled.height);
@@ -778,8 +778,7 @@ pub fn rootSurface(window: Window) ?*wlr.Surface {
 pub fn sendFrameDone(window: Window) void {
     assert(window.mapped and !window.destroying);
 
-    var now: posix.timespec = undefined;
-    posix.clock_gettime(posix.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
+    var now = posix.clock_gettime(posix.CLOCK.MONOTONIC) catch @panic("CLOCK_MONOTONIC not supported");
     window.rootSurface().?.sendFrameDone(&now);
 }
 

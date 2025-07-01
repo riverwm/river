@@ -41,10 +41,10 @@ tasks:
       cd ..
 
       # Eat Github's resources rather than the Zig Software Foundation's resources!
-      wget -nv https://github.com/ifreund/zig-tarball-mirror/releases/download/0.13.0/zig-linux-x86_64-0.13.0.tar.xz
-      tar xf zig-linux-x86_64-0.13.0.tar.xz
-      sudo mv zig-linux-x86_64-0.13.0/zig /usr/bin/
-      sudo mv zig-linux-x86_64-0.13.0/lib /usr/lib/zig
+      wget -nv https://github.com/ifreund/zig-tarball-mirror/releases/download/0.14.0/zig-linux-x86_64-0.14.0.tar.xz
+      tar xf zig-linux-x86_64-0.14.0.tar.xz
+      sudo mv zig-linux-x86_64-0.14.0/zig /usr/bin/
+      sudo mv zig-linux-x86_64-0.14.0/lib /usr/lib/zig
   - build: |
       cd river
       zig build --summary all

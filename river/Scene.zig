@@ -131,7 +131,7 @@ pub const SaveableSurfaces = struct {
     saved: *wlr.SceneTree,
 
     pub fn init(parent: *wlr.SceneTree) !SaveableSurfaces {
-        const surfaces = .{
+        const surfaces: SaveableSurfaces = .{
             .tree = try parent.createSceneTree(),
             .saved = try parent.createSceneTree(),
         };

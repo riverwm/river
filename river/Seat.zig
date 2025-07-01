@@ -159,7 +159,7 @@ op: ?struct {
 
 relay: InputRelay,
 
-keyboard_groups: std.TailQueue(KeyboardGroup) = .{},
+keyboard_groups: std.DoublyLinkedList(KeyboardGroup) = .{},
 
 focused: Focus = .none,
 

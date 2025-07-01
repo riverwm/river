@@ -42,21 +42,21 @@ pub fn parser(comptime Arg: type, comptime flags: []const Flag) type {
                         .boolean => .{
                             .name = flag.name,
                             .type = bool,
-                            .default_value = &false,
+                            .default_value_ptr = &false,
                             .is_comptime = false,
                             .alignment = @alignOf(bool),
                         },
                         .arg => .{
                             .name = flag.name,
                             .type = ?[:0]const u8,
-                            .default_value = &@as(?[:0]const u8, null),
+                            .default_value_ptr = &@as(?[:0]const u8, null),
                             .is_comptime = false,
                             .alignment = @alignOf(?[:0]const u8),
                         },
                     };
                     fields = fields ++ [_]std.builtin.Type.StructField{field};
                 }
-                break :flags_type @Type(.{ .Struct = .{
+                break :flags_type @Type(.{ .@"struct" = .{
                     .layout = .auto,
                     .fields = fields,
                     .decls = &.{},

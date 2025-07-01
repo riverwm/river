@@ -72,7 +72,7 @@ pub fn destroy(group: *KeyboardGroup) void {
 
     group.wlr_group.destroy();
 
-    const node: *std.TailQueue(KeyboardGroup).Node = @fieldParentPtr("data", group);
+    const node: *std.DoublyLinkedList(KeyboardGroup).Node = @fieldParentPtr("data", group);
     group.seat.keyboard_groups.remove(node);
     util.gpa.destroy(node);
 }

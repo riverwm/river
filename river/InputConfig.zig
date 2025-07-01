@@ -295,7 +295,7 @@ pub fn apply(config: *const InputConfig, device: *InputDevice) void {
     const libinput_device: *c.libinput_device = @ptrCast(device.wlr_device.getLibinputDevice() orelse return);
     log.debug("applying input configuration '{s}' to device '{s}'.", .{ config.glob, device.identifier });
 
-    inline for (@typeInfo(InputConfig).Struct.fields) |field| {
+    inline for (@typeInfo(InputConfig).@"struct".fields) |field| {
         if (comptime mem.eql(u8, field.name, "glob")) continue;
 
         if (@field(config, field.name)) |setting| {

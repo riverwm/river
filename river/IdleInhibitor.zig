@@ -49,7 +49,7 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
 
     inhibitor.destroy.link.remove();
 
-    const node: *std.TailQueue(IdleInhibitor).Node = @fieldParentPtr("data", inhibitor);
+    const node: *std.DoublyLinkedList(IdleInhibitor).Node = @fieldParentPtr("data", inhibitor);
     server.idle_inhibit_manager.inhibitors.remove(node);
 
     inhibitor.inhibit_manager.checkActive();

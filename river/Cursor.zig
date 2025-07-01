@@ -691,10 +691,9 @@ pub fn updateState(cursor: *Cursor) void {
         .passthrough => {
             cursor.updateHovered();
 
-            var now: posix.timespec = undefined;
-            posix.clock_gettime(posix.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported");
-            const msec: u32 = @intCast(now.tv_sec * std.time.ms_per_s +
-                @divTrunc(now.tv_nsec, std.time.ns_per_ms));
+            const now = posix.clock_gettime(posix.CLOCK.MONOTONIC) catch @panic("CLOCK_MONOTONIC not supported");
+            const msec: u32 = @intCast(now.sec * std.time.ms_per_s +
+                @divTrunc(now.nsec, std.time.ns_per_ms));
             cursor.passthrough(msec);
         },
         // TODO: Leave down mode if the target surface is no longer visible.

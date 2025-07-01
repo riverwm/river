@@ -31,7 +31,7 @@ const Type = union(enum) {
     window: *Window,
     shell_surface: *ShellSurface,
 };
-const Tag = @typeInfo(Type).Union.tag_type.?;
+const Tag = @typeInfo(Type).@"union".tag_type.?;
 
 tag: Tag,
 object: ?*river.NodeV1 = null,

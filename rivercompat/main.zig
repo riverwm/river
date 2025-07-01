@@ -94,7 +94,7 @@ pub fn main() !void {
         .handler = .{ .handler = posix.SIG.DFL },
         .mask = posix.empty_sigset,
         .flags = posix.SA.NOCLDWAIT,
-    }, null) catch unreachable;
+    }, null);
 
     const display = wl.Display.connect(null) catch {
         std.debug.print("Unable to connect to Wayland server.\n", .{});
