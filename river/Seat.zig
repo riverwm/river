@@ -315,6 +315,17 @@ pub fn updateWindowingStart(seat: *Seat) void {
         errdefer comptime unreachable;
 
         if (new) {
+            // TODO(wlroots): send on bind if wl_seat global not yet bound:
+            // https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/5099
+            const client = seat_v1.getClient();
+            if (seat.wlr_seat.clientForWlClient(client)) |seat_client| {
+                if (seat_client.resources.first()) |wl_seat| {
+                    seat_v1.sendWlSeat(wl_seat);
+                }
+            }
+        }
+
+        if (new) {
             if (seat.windowing_scheduled.window) |window| {
                 if (window.object) |window_v1| {
                     seat_v1.sendPointerEnter(window_v1);

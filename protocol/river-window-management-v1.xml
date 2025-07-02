@@ -1235,6 +1235,30 @@
       </description>
     </event>
 
+    <event name="wl_seat">
+      <description summary="corresponding wl_seat">
+        The wl_seat object corresponding to the river_seat_v1.
+
+        This event is sent exactly once. The wl_seat associated with a
+        river_seat_v1 cannot change. It is guaranteed that there is a 1-to-1
+        mapping between wl_seat and river_seat_v1 objects.
+
+        Note that this event will only be sent after the client binds the
+        wl_seat global. It is guaranteed that the corresponding wl_seat is
+        advertised before the river_window_manager_v1.seat event is sent.
+
+        The global_remove event for the corresponding wl_seat may be sent before
+        the river_seat_v1.remove event. This is due to the fact that
+        river_seat_v1 state changes are synced to the river window management
+        update sequence while changes to globals are not.
+
+        Rationale: The window manager may want to trigger windowing state
+        changes based on normal input events received by its shell surfaces for
+        example.
+      </description>
+      <arg name="wl_seat" type="object" interface="wl_seat"/>
+    </event>
+
     <request name="focus_window">
       <description summary="give keyboard focus to a window">
         Request that the compositor send keyboard input to the given window.

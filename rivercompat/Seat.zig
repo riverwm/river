@@ -72,6 +72,7 @@ fn handleEvent(seat_v1: *river.SeatV1, event: river.SeatV1.Event, seat: *Seat) v
             seat_v1.destroy();
             gpa.destroy(seat);
         },
+        .wl_seat => {},
         .pointer_enter => |args| {
             const window_v1 = args.window orelse return;
             const window: *Window = @ptrCast(@alignCast(window_v1.getUserData()));
