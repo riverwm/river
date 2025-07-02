@@ -41,10 +41,10 @@ state: union(enum) {
     },
 } = .inactive,
 
-destroy: wl.Listener(*wlr.PointerConstraintV1) = wl.Listener(*wlr.PointerConstraintV1).init(handleDestroy),
-commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
+destroy: wl.Listener(*wlr.PointerConstraintV1) = .init(handleDestroy),
+commit: wl.Listener(*wlr.Surface) = .init(handleCommit),
 
-node_destroy: wl.Listener(void) = wl.Listener(void).init(handleNodeDestroy),
+node_destroy: wl.Listener(void) = .init(handleNodeDestroy),
 
 pub fn create(wlr_constraint: *wlr.PointerConstraintV1) error{OutOfMemory}!void {
     const seat: *Seat = @ptrFromInt(wlr_constraint.seat.data);

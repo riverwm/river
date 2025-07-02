@@ -41,7 +41,7 @@ const default_seat_name = "default";
 
 const log = std.log.scoped(.input);
 
-new_input: wl.Listener(*wlr.InputDevice) = wl.Listener(*wlr.InputDevice).init(handleNewInput),
+new_input: wl.Listener(*wlr.InputDevice) = .init(handleNewInput),
 
 idle_notifier: *wlr.IdleNotifierV1,
 relative_pointer_manager: *wlr.RelativePointerManagerV1,
@@ -60,16 +60,11 @@ configs: std.ArrayList(InputConfig),
 devices: wl.list.Head(InputDevice, .link),
 seats: wl.list.Head(Seat, .link),
 
-new_virtual_pointer: wl.Listener(*wlr.VirtualPointerManagerV1.event.NewPointer) =
-    wl.Listener(*wlr.VirtualPointerManagerV1.event.NewPointer).init(handleNewVirtualPointer),
-new_virtual_keyboard: wl.Listener(*wlr.VirtualKeyboardV1) =
-    wl.Listener(*wlr.VirtualKeyboardV1).init(handleNewVirtualKeyboard),
-new_constraint: wl.Listener(*wlr.PointerConstraintV1) =
-    wl.Listener(*wlr.PointerConstraintV1).init(handleNewConstraint),
-new_input_method: wl.Listener(*wlr.InputMethodV2) =
-    wl.Listener(*wlr.InputMethodV2).init(handleNewInputMethod),
-new_text_input: wl.Listener(*wlr.TextInputV3) =
-    wl.Listener(*wlr.TextInputV3).init(handleNewTextInput),
+new_virtual_pointer: wl.Listener(*wlr.VirtualPointerManagerV1.event.NewPointer) = .init(handleNewVirtualPointer),
+new_virtual_keyboard: wl.Listener(*wlr.VirtualKeyboardV1) = .init(handleNewVirtualKeyboard),
+new_constraint: wl.Listener(*wlr.PointerConstraintV1) = .init(handleNewConstraint),
+new_input_method: wl.Listener(*wlr.InputMethodV2) = .init(handleNewInputMethod),
+new_text_input: wl.Listener(*wlr.TextInputV3) = .init(handleNewTextInput),
 
 pub fn init(input_manager: *InputManager) !void {
     input_manager.* = .{

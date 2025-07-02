@@ -56,11 +56,10 @@ lock: ?*wlr.SessionLockV1 = null,
 /// been blanked.
 lock_surfaces_timer: *wl.EventSource,
 
-new_lock: wl.Listener(*wlr.SessionLockV1) = wl.Listener(*wlr.SessionLockV1).init(handleLock),
-unlock: wl.Listener(void) = wl.Listener(void).init(handleUnlock),
-destroy: wl.Listener(void) = wl.Listener(void).init(handleDestroy),
-new_surface: wl.Listener(*wlr.SessionLockSurfaceV1) =
-    wl.Listener(*wlr.SessionLockSurfaceV1).init(handleSurface),
+new_lock: wl.Listener(*wlr.SessionLockV1) = .init(handleLock),
+unlock: wl.Listener(void) = .init(handleUnlock),
+destroy: wl.Listener(void) = .init(handleDestroy),
+new_surface: wl.Listener(*wlr.SessionLockSurfaceV1) = .init(handleSurface),
 
 pub fn init(manager: *LockManager) !void {
     const event_loop = server.wl_server.getEventLoop();

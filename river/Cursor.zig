@@ -107,50 +107,32 @@ constraint: ?*PointerConstraint = null,
 /// This information is necessary for proper touch dnd support if there are multiple touch points.
 touch_points: std.AutoHashMapUnmanaged(i32, LayoutPoint) = .{},
 
-request_set_cursor: wl.Listener(*wlr.Seat.event.RequestSetCursor) =
-    wl.Listener(*wlr.Seat.event.RequestSetCursor).init(handleRequestSetCursor),
+request_set_cursor: wl.Listener(*wlr.Seat.event.RequestSetCursor) = .init(handleRequestSetCursor),
 
-motion_relative: wl.Listener(*wlr.Pointer.event.Motion) =
-    wl.Listener(*wlr.Pointer.event.Motion).init(queueMotionRelative),
-motion_absolute: wl.Listener(*wlr.Pointer.event.MotionAbsolute) =
-    wl.Listener(*wlr.Pointer.event.MotionAbsolute).init(queueMotionAbsolute),
-button: wl.Listener(*wlr.Pointer.event.Button) =
-    wl.Listener(*wlr.Pointer.event.Button).init(queueButton),
-axis: wl.Listener(*wlr.Pointer.event.Axis) = wl.Listener(*wlr.Pointer.event.Axis).init(queueAxis),
-frame: wl.Listener(*wlr.Cursor) = wl.Listener(*wlr.Cursor).init(queueFrame),
+motion_relative: wl.Listener(*wlr.Pointer.event.Motion) = .init(queueMotionRelative),
+motion_absolute: wl.Listener(*wlr.Pointer.event.MotionAbsolute) = .init(queueMotionAbsolute),
+button: wl.Listener(*wlr.Pointer.event.Button) = .init(queueButton),
+axis: wl.Listener(*wlr.Pointer.event.Axis) = .init(queueAxis),
+frame: wl.Listener(*wlr.Cursor) = .init(queueFrame),
 
-swipe_begin: wl.Listener(*wlr.Pointer.event.SwipeBegin) =
-    wl.Listener(*wlr.Pointer.event.SwipeBegin).init(queueSwipeBegin),
-swipe_update: wl.Listener(*wlr.Pointer.event.SwipeUpdate) =
-    wl.Listener(*wlr.Pointer.event.SwipeUpdate).init(queueSwipeUpdate),
-swipe_end: wl.Listener(*wlr.Pointer.event.SwipeEnd) =
-    wl.Listener(*wlr.Pointer.event.SwipeEnd).init(queueSwipeEnd),
+swipe_begin: wl.Listener(*wlr.Pointer.event.SwipeBegin) = .init(queueSwipeBegin),
+swipe_update: wl.Listener(*wlr.Pointer.event.SwipeUpdate) = .init(queueSwipeUpdate),
+swipe_end: wl.Listener(*wlr.Pointer.event.SwipeEnd) = .init(queueSwipeEnd),
 
-pinch_begin: wl.Listener(*wlr.Pointer.event.PinchBegin) =
-    wl.Listener(*wlr.Pointer.event.PinchBegin).init(queuePinchBegin),
-pinch_update: wl.Listener(*wlr.Pointer.event.PinchUpdate) =
-    wl.Listener(*wlr.Pointer.event.PinchUpdate).init(queuePinchUpdate),
-pinch_end: wl.Listener(*wlr.Pointer.event.PinchEnd) =
-    wl.Listener(*wlr.Pointer.event.PinchEnd).init(queuePinchEnd),
+pinch_begin: wl.Listener(*wlr.Pointer.event.PinchBegin) = .init(queuePinchBegin),
+pinch_update: wl.Listener(*wlr.Pointer.event.PinchUpdate) = .init(queuePinchUpdate),
+pinch_end: wl.Listener(*wlr.Pointer.event.PinchEnd) = .init(queuePinchEnd),
 
-touch_down: wl.Listener(*wlr.Touch.event.Down) =
-    wl.Listener(*wlr.Touch.event.Down).init(handleTouchDown),
-touch_motion: wl.Listener(*wlr.Touch.event.Motion) =
-    wl.Listener(*wlr.Touch.event.Motion).init(handleTouchMotion),
-touch_up: wl.Listener(*wlr.Touch.event.Up) =
-    wl.Listener(*wlr.Touch.event.Up).init(handleTouchUp),
-touch_cancel: wl.Listener(*wlr.Touch.event.Cancel) =
-    wl.Listener(*wlr.Touch.event.Cancel).init(handleTouchCancel),
-touch_frame: wl.Listener(void) = wl.Listener(void).init(handleTouchFrame),
+touch_down: wl.Listener(*wlr.Touch.event.Down) = .init(handleTouchDown),
+touch_motion: wl.Listener(*wlr.Touch.event.Motion) = .init(handleTouchMotion),
+touch_up: wl.Listener(*wlr.Touch.event.Up) = .init(handleTouchUp),
+touch_cancel: wl.Listener(*wlr.Touch.event.Cancel) = .init(handleTouchCancel),
+touch_frame: wl.Listener(void) = .init(handleTouchFrame),
 
-tablet_tool_axis: wl.Listener(*wlr.Tablet.event.Axis) =
-    wl.Listener(*wlr.Tablet.event.Axis).init(handleTabletToolAxis),
-tablet_tool_proximity: wl.Listener(*wlr.Tablet.event.Proximity) =
-    wl.Listener(*wlr.Tablet.event.Proximity).init(handleTabletToolProximity),
-tablet_tool_tip: wl.Listener(*wlr.Tablet.event.Tip) =
-    wl.Listener(*wlr.Tablet.event.Tip).init(handleTabletToolTip),
-tablet_tool_button: wl.Listener(*wlr.Tablet.event.Button) =
-    wl.Listener(*wlr.Tablet.event.Button).init(handleTabletToolButton),
+tablet_tool_axis: wl.Listener(*wlr.Tablet.event.Axis) = .init(handleTabletToolAxis),
+tablet_tool_proximity: wl.Listener(*wlr.Tablet.event.Proximity) = .init(handleTabletToolProximity),
+tablet_tool_tip: wl.Listener(*wlr.Tablet.event.Tip) = .init(handleTabletToolTip),
+tablet_tool_button: wl.Listener(*wlr.Tablet.event.Button) = .init(handleTabletToolButton),
 
 pub fn init(cursor: *Cursor, seat: *Seat) !void {
     const wlr_cursor = try wlr.Cursor.create();

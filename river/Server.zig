@@ -91,16 +91,12 @@ wm: WindowManager,
 
 xwayland: if (build_options.xwayland) ?*wlr.Xwayland else void = if (build_options.xwayland) null,
 new_xsurface: if (build_options.xwayland) wl.Listener(*wlr.XwaylandSurface) else void =
-    if (build_options.xwayland) wl.Listener(*wlr.XwaylandSurface).init(handleNewXwaylandSurface),
+    if (build_options.xwayland) .init(handleNewXwaylandSurface),
 
-new_xdg_toplevel: wl.Listener(*wlr.XdgToplevel) =
-    wl.Listener(*wlr.XdgToplevel).init(handleNewXdgToplevel),
-new_toplevel_decoration: wl.Listener(*wlr.XdgToplevelDecorationV1) =
-    wl.Listener(*wlr.XdgToplevelDecorationV1).init(handleNewToplevelDecoration),
-request_activate: wl.Listener(*wlr.XdgActivationV1.event.RequestActivate) =
-    wl.Listener(*wlr.XdgActivationV1.event.RequestActivate).init(handleRequestActivate),
-request_set_cursor_shape: wl.Listener(*wlr.CursorShapeManagerV1.event.RequestSetShape) =
-    wl.Listener(*wlr.CursorShapeManagerV1.event.RequestSetShape).init(handleRequestSetCursorShape),
+new_xdg_toplevel: wl.Listener(*wlr.XdgToplevel) = .init(handleNewXdgToplevel),
+new_toplevel_decoration: wl.Listener(*wlr.XdgToplevelDecorationV1) = .init(handleNewToplevelDecoration),
+request_activate: wl.Listener(*wlr.XdgActivationV1.event.RequestActivate) = .init(handleRequestActivate),
+request_set_cursor_shape: wl.Listener(*wlr.CursorShapeManagerV1.event.RequestSetShape) = .init(handleRequestSetCursorShape),
 
 pub fn init(server: *Server, runtime_xwayland: bool) !void {
     // We intentionally don't try to prevent memory leaks on error in this function

@@ -50,7 +50,7 @@ pub const TabletState = enum {
 
 device: InputDevice,
 
-toggle: wl.Listener(*wlr.Switch.event.Toggle) = wl.Listener(*wlr.Switch.event.Toggle).init(handleToggle),
+toggle: wl.Listener(*wlr.Switch.event.Toggle) = .init(handleToggle),
 
 pub fn init(switch_device: *Switch, seat: *Seat, wlr_device: *wlr.InputDevice) !void {
     switch_device.* = .{

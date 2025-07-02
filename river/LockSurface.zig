@@ -33,8 +33,8 @@ lock: *wlr.SessionLockV1,
 
 idle_update_focus: ?*wl.EventSource = null,
 
-map: wl.Listener(void) = wl.Listener(void).init(handleMap),
-surface_destroy: wl.Listener(void) = wl.Listener(void).init(handleDestroy),
+map: wl.Listener(void) = .init(handleMap),
+surface_destroy: wl.Listener(void) = .init(handleDestroy),
 
 pub fn create(wlr_lock_surface: *wlr.SessionLockSurfaceV1, lock: *wlr.SessionLockV1) error{OutOfMemory}!void {
     const lock_surface = try util.gpa.create(LockSurface);

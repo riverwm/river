@@ -29,7 +29,7 @@ const SceneNodeData = @import("SceneNodeData.zig");
 wlr_drag_icon: *wlr.Drag.Icon,
 scene_drag_icon: *wlr.SceneTree,
 
-destroy: wl.Listener(*wlr.Drag.Icon) = wl.Listener(*wlr.Drag.Icon).init(handleDestroy),
+destroy: wl.Listener(*wlr.Drag.Icon) = .init(handleDestroy),
 
 pub fn create(wlr_drag_icon: *wlr.Drag.Icon, cursor: *Cursor) error{OutOfMemory}!void {
     const scene_drag_icon = try server.scene.drag_icons.createSceneDragIcon(wlr_drag_icon);

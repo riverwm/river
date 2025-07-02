@@ -28,8 +28,7 @@ const SceneNodeData = @import("SceneNodeData.zig");
 const Window = @import("Window.zig");
 
 wlr_manager: *wlr.IdleInhibitManagerV1,
-new_idle_inhibitor: wl.Listener(*wlr.IdleInhibitorV1) =
-    wl.Listener(*wlr.IdleInhibitorV1).init(handleNewIdleInhibitor),
+new_idle_inhibitor: wl.Listener(*wlr.IdleInhibitorV1) = .init(handleNewIdleInhibitor),
 inhibitors: std.DoublyLinkedList(IdleInhibitor) = .{},
 
 pub fn init(inhibit_manager: *IdleInhibitManager) !void {

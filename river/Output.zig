@@ -170,10 +170,10 @@ link_sent: wl.list.Link,
 /// State applied to the wlr_output and rendered.
 current: State,
 
-destroy: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleDestroy),
-request_state: wl.Listener(*wlr.Output.event.RequestState) = wl.Listener(*wlr.Output.event.RequestState).init(handleRequestState),
-frame: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleFrame),
-present: wl.Listener(*wlr.Output.event.Present) = wl.Listener(*wlr.Output.event.Present).init(handlePresent),
+destroy: wl.Listener(*wlr.Output) = .init(handleDestroy),
+request_state: wl.Listener(*wlr.Output.event.RequestState) = .init(handleRequestState),
+frame: wl.Listener(*wlr.Output) = .init(handleFrame),
+present: wl.Listener(*wlr.Output.event.Present) = .init(handlePresent),
 
 pub fn create(wlr_output: *wlr.Output) !void {
     const output = try util.gpa.create(Output);

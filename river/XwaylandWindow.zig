@@ -40,22 +40,20 @@ xsurface: *wlr.XwaylandSurface,
 surface_tree: ?*wlr.SceneTree = null,
 
 // Active over entire lifetime
-destroy: wl.Listener(void) = wl.Listener(void).init(handleDestroy),
-request_configure: wl.Listener(*wlr.XwaylandSurface.event.Configure) =
-    wl.Listener(*wlr.XwaylandSurface.event.Configure).init(handleRequestConfigure),
-set_override_redirect: wl.Listener(void) = wl.Listener(void).init(handleSetOverrideRedirect),
-associate: wl.Listener(void) = wl.Listener(void).init(handleAssociate),
-dissociate: wl.Listener(void) = wl.Listener(void).init(handleDissociate),
-set_title: wl.Listener(void) = wl.Listener(void).init(handleSetTitle),
-set_class: wl.Listener(void) = wl.Listener(void).init(handleSetClass),
-set_decorations: wl.Listener(void) = wl.Listener(void).init(handleSetDecorations),
-request_fullscreen: wl.Listener(void) = wl.Listener(void).init(handleRequestFullscreen),
-request_minimize: wl.Listener(*wlr.XwaylandSurface.event.Minimize) =
-    wl.Listener(*wlr.XwaylandSurface.event.Minimize).init(handleRequestMinimize),
+destroy: wl.Listener(void) = .init(handleDestroy),
+request_configure: wl.Listener(*wlr.XwaylandSurface.event.Configure) = .init(handleRequestConfigure),
+set_override_redirect: wl.Listener(void) = .init(handleSetOverrideRedirect),
+associate: wl.Listener(void) = .init(handleAssociate),
+dissociate: wl.Listener(void) = .init(handleDissociate),
+set_title: wl.Listener(void) = .init(handleSetTitle),
+set_class: wl.Listener(void) = .init(handleSetClass),
+set_decorations: wl.Listener(void) = .init(handleSetDecorations),
+request_fullscreen: wl.Listener(void) = .init(handleRequestFullscreen),
+request_minimize: wl.Listener(*wlr.XwaylandSurface.event.Minimize) = .init(handleRequestMinimize),
 
 // Active while the xsurfaceis associated with a wlr_surface
-map: wl.Listener(void) = wl.Listener(void).init(handleMap),
-unmap: wl.Listener(void) = wl.Listener(void).init(handleUnmap),
+map: wl.Listener(void) = .init(handleMap),
+unmap: wl.Listener(void) = .init(handleUnmap),
 
 pub fn create(xsurface: *wlr.XwaylandSurface) error{OutOfMemory}!void {
     log.debug("new xwayland window: title='{?s}', class='{?s}'", .{

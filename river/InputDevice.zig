@@ -38,7 +38,7 @@ const log = std.log.scoped(.input);
 seat: *Seat,
 wlr_device: *wlr.InputDevice,
 
-destroy: wl.Listener(*wlr.InputDevice) = wl.Listener(*wlr.InputDevice).init(handleDestroy),
+destroy: wl.Listener(*wlr.InputDevice) = .init(handleDestroy),
 
 /// Careful: The identifier is not unique! A physical input device may have
 /// multiple logical input devices with the exact same vendor id, product id

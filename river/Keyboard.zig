@@ -93,8 +93,8 @@ device: InputDevice,
 /// Pressed keys along with where their press event has been sent
 pressed: Pressed = .{},
 
-key: wl.Listener(*wlr.Keyboard.event.Key) = wl.Listener(*wlr.Keyboard.event.Key).init(queueKey),
-modifiers: wl.Listener(*wlr.Keyboard) = wl.Listener(*wlr.Keyboard).init(queueModifiers),
+key: wl.Listener(*wlr.Keyboard.event.Key) = .init(queueKey),
+modifiers: wl.Listener(*wlr.Keyboard) = .init(queueModifiers),
 
 pub fn init(keyboard: *Keyboard, seat: *Seat, wlr_device: *wlr.InputDevice) !void {
     keyboard.* = .{

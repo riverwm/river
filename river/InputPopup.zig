@@ -34,10 +34,10 @@ input_relay: *InputRelay,
 wlr_popup: *wlr.InputPopupSurfaceV2,
 surface_tree: *wlr.SceneTree,
 
-destroy: wl.Listener(void) = wl.Listener(void).init(handleDestroy),
-map: wl.Listener(void) = wl.Listener(void).init(handleMap),
-unmap: wl.Listener(void) = wl.Listener(void).init(handleUnmap),
-commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
+destroy: wl.Listener(void) = .init(handleDestroy),
+map: wl.Listener(void) = .init(handleMap),
+unmap: wl.Listener(void) = .init(handleUnmap),
+commit: wl.Listener(*wlr.Surface) = .init(handleCommit),
 
 pub fn create(wlr_popup: *wlr.InputPopupSurfaceV2, input_relay: *InputRelay) !void {
     const input_popup = try util.gpa.create(InputPopup);

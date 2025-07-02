@@ -59,20 +59,17 @@ configure_state: union(enum) {
 } = .idle,
 
 // Listeners that are always active over the window's lifetime
-destroy: wl.Listener(void) = wl.Listener(void).init(handleDestroy),
-ack_configure: wl.Listener(*wlr.XdgSurface.Configure) =
-    wl.Listener(*wlr.XdgSurface.Configure).init(handleAckConfigure),
-map: wl.Listener(void) = wl.Listener(void).init(handleMap),
-unmap: wl.Listener(void) = wl.Listener(void).init(handleUnmap),
-commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
-new_popup: wl.Listener(*wlr.XdgPopup) = wl.Listener(*wlr.XdgPopup).init(handleNewPopup),
-request_fullscreen: wl.Listener(void) = wl.Listener(void).init(handleRequestFullscreen),
-request_move: wl.Listener(*wlr.XdgToplevel.event.Move) =
-    wl.Listener(*wlr.XdgToplevel.event.Move).init(handleRequestMove),
-request_resize: wl.Listener(*wlr.XdgToplevel.event.Resize) =
-    wl.Listener(*wlr.XdgToplevel.event.Resize).init(handleRequestResize),
-set_title: wl.Listener(void) = wl.Listener(void).init(handleSetTitle),
-set_app_id: wl.Listener(void) = wl.Listener(void).init(handleSetAppId),
+destroy: wl.Listener(void) = .init(handleDestroy),
+ack_configure: wl.Listener(*wlr.XdgSurface.Configure) = .init(handleAckConfigure),
+map: wl.Listener(void) = .init(handleMap),
+unmap: wl.Listener(void) = .init(handleUnmap),
+commit: wl.Listener(*wlr.Surface) = .init(handleCommit),
+new_popup: wl.Listener(*wlr.XdgPopup) = .init(handleNewPopup),
+request_fullscreen: wl.Listener(void) = .init(handleRequestFullscreen),
+request_move: wl.Listener(*wlr.XdgToplevel.event.Move) = .init(handleRequestMove),
+request_resize: wl.Listener(*wlr.XdgToplevel.event.Resize) = .init(handleRequestResize),
+set_title: wl.Listener(void) = .init(handleSetTitle),
+set_app_id: wl.Listener(void) = .init(handleSetAppId),
 
 pub fn create(wlr_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
     log.debug("new xdg_toplevel", .{});

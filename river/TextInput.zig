@@ -33,14 +33,10 @@ link: wl.list.Link,
 
 wlr_text_input: *wlr.TextInputV3,
 
-enable: wl.Listener(*wlr.TextInputV3) =
-    wl.Listener(*wlr.TextInputV3).init(handleEnable),
-commit: wl.Listener(*wlr.TextInputV3) =
-    wl.Listener(*wlr.TextInputV3).init(handleCommit),
-disable: wl.Listener(*wlr.TextInputV3) =
-    wl.Listener(*wlr.TextInputV3).init(handleDisable),
-destroy: wl.Listener(*wlr.TextInputV3) =
-    wl.Listener(*wlr.TextInputV3).init(handleDestroy),
+enable: wl.Listener(*wlr.TextInputV3) = .init(handleEnable),
+commit: wl.Listener(*wlr.TextInputV3) = .init(handleCommit),
+disable: wl.Listener(*wlr.TextInputV3) = .init(handleDisable),
+destroy: wl.Listener(*wlr.TextInputV3) = .init(handleDestroy),
 
 pub fn create(wlr_text_input: *wlr.TextInputV3) !void {
     const seat: *Seat = @ptrFromInt(wlr_text_input.seat.data);

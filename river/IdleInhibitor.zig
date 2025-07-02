@@ -28,7 +28,7 @@ const IdleInhibitManager = @import("IdleInhibitManager.zig");
 inhibit_manager: *IdleInhibitManager,
 wlr_inhibitor: *wlr.IdleInhibitorV1,
 
-destroy: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleDestroy),
+destroy: wl.Listener(*wlr.Surface) = .init(handleDestroy),
 
 pub fn init(
     inhibitor: *IdleInhibitor,

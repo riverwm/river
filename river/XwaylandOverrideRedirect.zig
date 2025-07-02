@@ -35,19 +35,18 @@ xsurface: *wlr.XwaylandSurface,
 surface_tree: ?*wlr.SceneTree = null,
 
 // Active over entire lifetime
-request_configure: wl.Listener(*wlr.XwaylandSurface.event.Configure) =
-    wl.Listener(*wlr.XwaylandSurface.event.Configure).init(handleRequestConfigure),
-destroy: wl.Listener(void) = wl.Listener(void).init(handleDestroy),
-set_override_redirect: wl.Listener(void) = wl.Listener(void).init(handleSetOverrideRedirect),
-associate: wl.Listener(void) = wl.Listener(void).init(handleAssociate),
-dissociate: wl.Listener(void) = wl.Listener(void).init(handleDissociate),
+request_configure: wl.Listener(*wlr.XwaylandSurface.event.Configure) = .init(handleRequestConfigure),
+destroy: wl.Listener(void) = .init(handleDestroy),
+set_override_redirect: wl.Listener(void) = .init(handleSetOverrideRedirect),
+associate: wl.Listener(void) = .init(handleAssociate),
+dissociate: wl.Listener(void) = .init(handleDissociate),
 
 // Active while the xsurface is associated with a wlr_surface
-map: wl.Listener(void) = wl.Listener(void).init(handleMap),
-unmap: wl.Listener(void) = wl.Listener(void).init(handleUnmap),
+map: wl.Listener(void) = .init(handleMap),
+unmap: wl.Listener(void) = .init(handleUnmap),
 
 // Active while mapped
-set_geometry: wl.Listener(void) = wl.Listener(void).init(handleSetGeometry),
+set_geometry: wl.Listener(void) = .init(handleSetGeometry),
 
 pub fn create(xsurface: *wlr.XwaylandSurface) error{OutOfMemory}!void {
     log.debug("new xwayland override redirect: title='{?s}', class='{?s}'", .{

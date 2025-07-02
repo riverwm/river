@@ -37,7 +37,7 @@ pub const Data = union(enum) {
 
 node: *wlr.SceneNode,
 data: Data,
-destroy: wl.Listener(void) = wl.Listener(void).init(handleDestroy),
+destroy: wl.Listener(void) = .init(handleDestroy),
 
 pub fn attach(node: *wlr.SceneNode, data: Data) error{OutOfMemory}!void {
     const scene_node_data = try util.gpa.create(SceneNodeData);

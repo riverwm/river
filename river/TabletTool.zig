@@ -54,9 +54,8 @@ mode: Mode = .passthrough,
 tilt_x: f64 = 0,
 tilt_y: f64 = 0,
 
-destroy: wl.Listener(*wlr.TabletTool) = wl.Listener(*wlr.TabletTool).init(handleDestroy),
-set_cursor: wl.Listener(*wlr.TabletV2TabletTool.event.SetCursor) =
-    wl.Listener(*wlr.TabletV2TabletTool.event.SetCursor).init(handleSetCursor),
+destroy: wl.Listener(*wlr.TabletTool) = .init(handleDestroy),
+set_cursor: wl.Listener(*wlr.TabletV2TabletTool.event.SetCursor) = .init(handleSetCursor),
 
 pub fn get(wlr_seat: *wlr.Seat, wlr_tool: *wlr.TabletTool) error{OutOfMemory}!*TabletTool {
     if (@as(?*TabletTool, @ptrFromInt(wlr_tool.data))) |tool| {

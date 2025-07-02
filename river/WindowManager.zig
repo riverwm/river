@@ -35,7 +35,7 @@ const WmNode = @import("WmNode.zig");
 const log = std.log.scoped(.wm);
 
 global: *wl.Global,
-server_destroy: wl.Listener(*wl.Server) = wl.Listener(*wl.Server).init(handleServerDestroy),
+server_destroy: wl.Listener(*wl.Server) = .init(handleServerDestroy),
 
 /// The protocol object of the active window manager, if any.
 object: ?*river.WindowManagerV1 = null,

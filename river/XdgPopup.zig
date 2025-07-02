@@ -34,10 +34,10 @@ root: *wlr.SceneTree,
 
 tree: *wlr.SceneTree,
 
-destroy: wl.Listener(void) = wl.Listener(void).init(handleDestroy),
-commit: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleCommit),
-new_popup: wl.Listener(*wlr.XdgPopup) = wl.Listener(*wlr.XdgPopup).init(handleNewPopup),
-reposition: wl.Listener(void) = wl.Listener(void).init(handleReposition),
+destroy: wl.Listener(void) = .init(handleDestroy),
+commit: wl.Listener(*wlr.Surface) = .init(handleCommit),
+new_popup: wl.Listener(*wlr.XdgPopup) = .init(handleNewPopup),
+reposition: wl.Listener(void) = .init(handleReposition),
 
 // TODO check if popup is set_reactive and reposition on parent movement.
 pub fn create(

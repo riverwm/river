@@ -28,10 +28,8 @@ const XdgToplevel = @import("XdgToplevel.zig");
 
 wlr_decoration: *wlr.XdgToplevelDecorationV1,
 
-destroy: wl.Listener(*wlr.XdgToplevelDecorationV1) =
-    wl.Listener(*wlr.XdgToplevelDecorationV1).init(handleDestroy),
-request_mode: wl.Listener(*wlr.XdgToplevelDecorationV1) =
-    wl.Listener(*wlr.XdgToplevelDecorationV1).init(handleRequestMode),
+destroy: wl.Listener(*wlr.XdgToplevelDecorationV1) = wl.Listener(*wlr.XdgToplevelDecorationV1).init(handleDestroy),
+request_mode: wl.Listener(*wlr.XdgToplevelDecorationV1) = wl.Listener(*wlr.XdgToplevelDecorationV1).init(handleRequestMode),
 
 pub fn init(wlr_decoration: *wlr.XdgToplevelDecorationV1) void {
     const toplevel: *XdgToplevel = @ptrFromInt(wlr_decoration.toplevel.base.data);

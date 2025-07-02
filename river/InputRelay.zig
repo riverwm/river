@@ -46,17 +46,12 @@ input_popups: wl.list.Head(InputPopup, .link),
 /// Always null if there is no input method.
 text_input: ?*TextInput = null,
 
-input_method_commit: wl.Listener(*wlr.InputMethodV2) =
-    wl.Listener(*wlr.InputMethodV2).init(handleInputMethodCommit),
-grab_keyboard: wl.Listener(*wlr.InputMethodV2.KeyboardGrab) =
-    wl.Listener(*wlr.InputMethodV2.KeyboardGrab).init(handleInputMethodGrabKeyboard),
-input_method_destroy: wl.Listener(*wlr.InputMethodV2) =
-    wl.Listener(*wlr.InputMethodV2).init(handleInputMethodDestroy),
-input_method_new_popup: wl.Listener(*wlr.InputPopupSurfaceV2) =
-    wl.Listener(*wlr.InputPopupSurfaceV2).init(handleInputMethodNewPopup),
+input_method_commit: wl.Listener(*wlr.InputMethodV2) = .init(handleInputMethodCommit),
+grab_keyboard: wl.Listener(*wlr.InputMethodV2.KeyboardGrab) = .init(handleInputMethodGrabKeyboard),
+input_method_destroy: wl.Listener(*wlr.InputMethodV2) = .init(handleInputMethodDestroy),
+input_method_new_popup: wl.Listener(*wlr.InputPopupSurfaceV2) = .init(handleInputMethodNewPopup),
 
-grab_keyboard_destroy: wl.Listener(*wlr.InputMethodV2.KeyboardGrab) =
-    wl.Listener(*wlr.InputMethodV2.KeyboardGrab).init(handleInputMethodGrabKeyboardDestroy),
+grab_keyboard_destroy: wl.Listener(*wlr.InputMethodV2.KeyboardGrab) = .init(handleInputMethodGrabKeyboardDestroy),
 
 pub fn init(relay: *InputRelay) void {
     relay.* = .{ .text_inputs = undefined, .input_popups = undefined };

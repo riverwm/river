@@ -36,7 +36,7 @@ const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
 const log = std.log.scoped(.output);
 
-new_output: wl.Listener(*wlr.Output) = wl.Listener(*wlr.Output).init(handleNewOutput),
+new_output: wl.Listener(*wlr.Output) = .init(handleNewOutput),
 
 output_layout: *wlr.OutputLayout,
 
@@ -44,18 +44,14 @@ presentation: *wlr.Presentation,
 xdg_output_manager: *wlr.XdgOutputManagerV1,
 
 wlr_output_manager: *wlr.OutputManagerV1,
-manager_apply: wl.Listener(*wlr.OutputConfigurationV1) =
-    wl.Listener(*wlr.OutputConfigurationV1).init(handleManagerApply),
-manager_test: wl.Listener(*wlr.OutputConfigurationV1) =
-    wl.Listener(*wlr.OutputConfigurationV1).init(handleManagerTest),
+manager_apply: wl.Listener(*wlr.OutputConfigurationV1) = .init(handleManagerApply),
+manager_test: wl.Listener(*wlr.OutputConfigurationV1) = .init(handleManagerTest),
 
 power_manager: *wlr.OutputPowerManagerV1,
-power_manager_set_mode: wl.Listener(*wlr.OutputPowerManagerV1.event.SetMode) =
-    wl.Listener(*wlr.OutputPowerManagerV1.event.SetMode).init(handlePowerManagerSetMode),
+power_manager_set_mode: wl.Listener(*wlr.OutputPowerManagerV1.event.SetMode) = .init(handlePowerManagerSetMode),
 
 gamma_control_manager: *wlr.GammaControlManagerV1,
-gamma_control_set_gamma: wl.Listener(*wlr.GammaControlManagerV1.event.SetGamma) =
-    wl.Listener(*wlr.GammaControlManagerV1.event.SetGamma).init(handleSetGamma),
+gamma_control_set_gamma: wl.Listener(*wlr.GammaControlManagerV1.event.SetGamma) = .init(handleSetGamma),
 
 /// All Outputs that have a corresponding wlr_output.
 outputs: wl.list.Head(Output, .link),
