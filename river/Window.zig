@@ -368,6 +368,7 @@ pub fn updateWindowingStart(window: *Window) void {
                 window_v1.setHandler(*Window, handleRequest, handleDestroy, window);
                 wm_v1.sendWindow(window_v1);
 
+                window.node.link.remove();
                 server.wm.rendering_requested.list.append(&window.node);
 
                 break :blk window_v1;
@@ -436,6 +437,10 @@ fn handleRequestInert(
 fn handleDestroy(_: *river.WindowV1, window: *Window) void {
     window.object = null;
     window.node.makeInert();
+    inline for (.{ &window.decorations_above, &window.decorations_below }) |decorations| {
+        var it = decorations.iterator(.forward);
+        while (it.next()) |decoration| decoration.makeInert();
+    }
 }
 
 fn handleRequest(

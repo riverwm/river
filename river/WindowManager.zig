@@ -142,7 +142,14 @@ fn handleRequestInert(
 }
 
 fn handleDestroy(_: *river.WindowManagerV1, wm: *WindowManager) void {
+    log.debug("active river_window_manager_v1 destroyed", .{});
     wm.object = null;
+    switch (wm.state) {
+        .idle => {},
+        .inflight_configures => {},
+        .update_windowing => wm.updateWindowingFinish(),
+        .update_rendering => wm.updateRenderingFinish(),
+    }
 }
 
 fn handleRequest(
@@ -303,7 +310,7 @@ pub fn updateWindowingFinish(wm: *WindowManager) void {
 
     {
         // Order is important here, Seat.updateWindowingFinish() must be called
-        // before Window.updateWindowingFinish() are sent.
+        // before Window.updateWindowingFinish().
         var it = wm.windowing_sent.seats.iterator(.forward);
         while (it.next()) |seat| seat.updateWindowingFinish();
     }
