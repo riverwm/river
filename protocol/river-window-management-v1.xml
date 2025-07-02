@@ -1133,6 +1133,30 @@
       </description>
     </event>
 
+    <event name="wl_output">
+      <description summary="corresponding wl_output">
+        The wl_output object corresponding to the river_output_v1.
+
+        This event is sent exactly once. The wl_output associated with a
+        river_output_v1 cannot change. It is guaranteed that there is a 1-to-1
+        mapping between wl_output and river_output_v1 objects.
+
+        Note that this event will only be sent after the client binds the
+        wl_output global. It is guaranteed that the corresponding wl_output is
+        advertised before the river_window_manager_v1.output event is sent.
+
+        The global_remove event for the corresponding wl_output may be sent
+        before the river_output_v1.remove event. This is due to the fact that
+        river_output_v1 state changes are synced to the river window management
+        update sequence while changes to globals are not.
+
+        Rationale: The window manager may need information provided by the
+        wl_output interface such as the name/description. It also may need the
+        wl_output object to start screencopy for example.
+      </description>
+      <arg name="wl_output" type="object" interface="wl_output"/>
+    </event>
+
     <event name="position">
       <description summary="output position">
         This event indicates the position of the output in the compositor's

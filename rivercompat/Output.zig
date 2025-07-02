@@ -64,6 +64,7 @@ fn handleEvent(output_v1: *river.OutputV1, event: river.OutputV1.Event, output: 
     assert(output.output_v1 == output_v1);
     switch (event) {
         .removed => output.pending.removed = true,
+        .wl_output => {},
         .position => |args| {
             output.x = args.x;
             output.y = args.y;

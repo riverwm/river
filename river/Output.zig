@@ -132,6 +132,7 @@ wlr_output: ?*wlr.Output,
 scene_output: ?*wlr.SceneOutput,
 
 object: ?*river.OutputV1 = null,
+sent_wl_output: bool = false,
 
 /// Tracks the currently presented frame on the output as it pertains to ext-session-lock.
 /// The output is initially considered blanked:
@@ -171,6 +172,7 @@ link_sent: wl.list.Link,
 current: State,
 
 destroy: wl.Listener(*wlr.Output) = .init(handleDestroy),
+bind: wl.Listener(*wlr.Output.event.Bind) = .init(handleBind),
 request_state: wl.Listener(*wlr.Output.event.RequestState) = .init(handleRequestState),
 frame: wl.Listener(*wlr.Output) = .init(handleFrame),
 present: wl.Listener(*wlr.Output.event.Present) = .init(handlePresent),
@@ -210,6 +212,7 @@ pub fn create(wlr_output: *wlr.Output) !void {
     output.link_sent.init();
 
     wlr_output.events.destroy.add(&output.destroy);
+    wlr_output.events.bind.add(&output.bind);
     wlr_output.events.request_state.add(&output.request_state);
     wlr_output.events.frame.add(&output.frame);
     wlr_output.events.present.add(&output.present);
@@ -230,6 +233,7 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) v
     output.link.remove();
 
     output.destroy.link.remove();
+    output.bind.link.remove();
     output.request_state.link.remove();
     output.frame.link.remove();
     output.present.link.remove();
@@ -241,6 +245,20 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) v
     output.scheduled.state = .destroying;
 
     server.wm.dirtyWindowing();
+}
+
+fn handleBind(listener: *wl.Listener(*wlr.Output.event.Bind), event: *wlr.Output.event.Bind) void {
+    const output: *Output = @fieldParentPtr("bind", listener);
+    // Guard against a client binding the same wl_output global more than once.
+    if (output.sent_wl_output) {
+        return;
+    }
+    if (output.object) |output_v1| {
+        if (output_v1.getClient() == event.resource.getClient()) {
+            output_v1.sendWlOutput(event.resource);
+            output.sent_wl_output = true;
+        }
+    }
 }
 
 pub fn updateWindowingStart(output: *Output) void {
@@ -264,6 +282,20 @@ pub fn updateWindowingStart(output: *Output) void {
 
                 const pending = &output.scheduled;
                 const sent = &output.sent;
+
+                if (new) {
+                    const client = output_v1.getClient();
+                    var it = output.wlr_output.?.resources.iterator(.forward);
+                    while (it.next()) |wl_output| {
+                        if (client == wl_output.getClient()) {
+                            output_v1.sendWlOutput(wl_output);
+                            output.sent_wl_output = true;
+                            break;
+                        }
+                    } else {
+                        output.sent_wl_output = false;
+                    }
+                }
 
                 if (new or pending.width() != sent.width() or pending.height() != sent.height()) {
                     output_v1.sendDimensions(pending.width(), pending.height());
