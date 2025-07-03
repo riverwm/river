@@ -97,7 +97,7 @@ fn handleEvent(seat_v1: *river.SeatV1, event: river.SeatV1.Event, seat: *Seat) v
     }
 }
 
-pub fn updateWindowing(seat: *Seat) void {
+pub fn manage(seat: *Seat) void {
     if (seat.pending.new) {
         seat.focused_output = wm.outputs.first();
 

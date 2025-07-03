@@ -152,7 +152,7 @@ fn commit(wlr_surface: *wlr.Surface) callconv(.C) void {
     }
 }
 
-pub fn updateRenderingFinish(decoration: *Decoration) void {
+pub fn renderFinish(decoration: *Decoration) void {
     const rendering_requested = &decoration.rendering_requested;
     if (rendering_requested.sync_next_commit) {
         rendering_requested.sync_next_commit = false;

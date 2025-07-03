@@ -81,13 +81,13 @@ fn handleEvent(wm_v1: *river.WindowManagerV1, event: river.WindowManagerV1.Event
     switch (event) {
         .unavailable => main.fatal("another window manager is already running", .{}),
         .finished => unreachable, // We never send river_window_manager_v1.stop
-        .update_windowing_start => {
-            wm.updateWindowing();
-            wm_v1.updateWindowingFinish();
+        .manage_start => {
+            wm.manage();
+            wm_v1.manageFinish();
         },
-        .update_rendering_start => {
-            wm.updateRendering();
-            wm_v1.updateRenderingFinish();
+        .render_start => {
+            wm.render();
+            wm_v1.renderFinish();
         },
         .session_locked => wm.session_locked = true,
         .session_unlocked => wm.session_locked = false,
@@ -97,24 +97,24 @@ fn handleEvent(wm_v1: *river.WindowManagerV1, event: river.WindowManagerV1.Event
     }
 }
 
-fn updateWindowing(wm: *WindowManager) void {
-    wm.background.updateWindowing();
+fn manage(wm: *WindowManager) void {
+    wm.background.manage();
     {
         var it = wm.outputs.iterator(.forward);
         while (it.next()) |output| {
-            output.updateWindowing();
+            output.manage();
         }
     }
     {
         var it = wm.seats.iterator(.forward);
         while (it.next()) |seat| {
-            seat.updateWindowing();
+            seat.manage();
         }
     }
     {
         var it = wm.windows.safeIterator(.forward);
         while (it.next()) |window| {
-            window.updateWindowing();
+            window.manage();
         }
     }
 
@@ -126,11 +126,11 @@ fn updateWindowing(wm: *WindowManager) void {
     }
 }
 
-fn updateRendering(wm: *WindowManager) void {
+fn render(wm: *WindowManager) void {
     {
         var it = wm.windows.iterator(.forward);
         while (it.next()) |window| {
-            window.updateRendering();
+            window.render();
         }
     }
 }

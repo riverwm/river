@@ -38,14 +38,14 @@ object: *river.XkbBindingV1,
 keysym: xkb.Keysym,
 modifiers: river.SeatV1.Modifiers,
 
-windowing_scheduled: struct {
+wm_scheduled: struct {
     state_change: enum {
         none,
         pressed,
         released,
     } = .none,
 } = .{},
-windowing_requested: struct {
+wm_requested: struct {
     enabled: bool = false,
     // This is set for mappings with layout-pinning
     // If set, the layout with this index is always used to translate the given keycode
@@ -124,15 +124,15 @@ fn handleRequest(
         .destroy => xkb_binding_v1.destroy(),
         .set_layout_override => |args| {
             // XXX protocol error?
-            binding.windowing_requested.layout = args.layout;
+            binding.wm_requested.layout = args.layout;
         },
         .enable => {
             if (!server.wm.ensureWindowing()) return;
-            binding.windowing_requested.enabled = true;
+            binding.wm_requested.enabled = true;
         },
         .disable => {
             if (!server.wm.ensureWindowing()) return;
-            binding.windowing_requested.enabled = false;
+            binding.wm_requested.enabled = false;
         },
     }
 }
@@ -141,8 +141,8 @@ pub fn pressed(binding: *XkbBinding) void {
     assert(!binding.sent_pressed);
     // Input event processing should not continue after a press/release event
     // until that event is sent to the window manager in an update and acked.
-    assert(binding.windowing_scheduled.state_change == .none);
-    binding.windowing_scheduled.state_change = .pressed;
+    assert(binding.wm_scheduled.state_change == .none);
+    binding.wm_scheduled.state_change = .pressed;
     server.wm.dirtyWindowing();
 }
 
@@ -150,8 +150,8 @@ pub fn released(binding: *XkbBinding) void {
     assert(binding.sent_pressed);
     // Input event processing should not continue after a press/release event
     // until that event is sent to the window manager in an update and acked.
-    assert(binding.windowing_scheduled.state_change == .none);
-    binding.windowing_scheduled.state_change = .released;
+    assert(binding.wm_scheduled.state_change == .none);
+    binding.wm_scheduled.state_change = .released;
     server.wm.dirtyWindowing();
 }
 
@@ -163,14 +163,14 @@ pub fn match(
     xkb_state: *xkb.State,
     method: enum { no_translate, translate },
 ) bool {
-    if (!binding.windowing_requested.enabled) return false;
+    if (!binding.wm_requested.enabled) return false;
 
     const keymap = xkb_state.getKeymap();
 
     // If the binding has no pinned layout, use the active layout.
     // It doesn't matter if the index is out of range, since xkbcommon
     // will fall back to the active layout if so.
-    const layout = binding.windowing_requested.layout orelse xkb_state.keyGetLayout(keycode);
+    const layout = binding.wm_requested.layout orelse xkb_state.keyGetLayout(keycode);
 
     switch (method) {
         .no_translate => {

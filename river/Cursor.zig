@@ -344,7 +344,7 @@ pub fn processMotionRelative(cursor: *Cursor, event: *const wlr.Pointer.event.Mo
 }
 
 fn updateHovered(cursor: *Cursor) void {
-    const old = cursor.seat.windowing_scheduled.window;
+    const old = cursor.seat.wm_scheduled.window;
     if (server.scene.at(cursor.wlr_cursor.x, cursor.wlr_cursor.y)) |result| {
         switch (result.data) {
             .window => |window| {
@@ -353,28 +353,28 @@ fn updateHovered(cursor: *Cursor) void {
                         // Exclude input regions of the toplevel that extend beyond the window
                         if (result.surface != null and result.surface.?.getRootSurface() == toplevel.wlr_toplevel.base.surface) {
                             if (window.box.containsPoint(cursor.wlr_cursor.x, cursor.wlr_cursor.y)) {
-                                cursor.seat.windowing_scheduled.window = window;
+                                cursor.seat.wm_scheduled.window = window;
                             }
                         } else {
-                            cursor.seat.windowing_scheduled.window = window;
+                            cursor.seat.wm_scheduled.window = window;
                         }
                     },
-                    .xwayland => cursor.seat.windowing_scheduled.window = window,
+                    .xwayland => cursor.seat.wm_scheduled.window = window,
                     .none => {},
                 }
             },
-            .shell_surface, .lock_surface => cursor.seat.windowing_scheduled.window = null,
+            .shell_surface, .lock_surface => cursor.seat.wm_scheduled.window = null,
             .override_redirect => {
                 assert(build_options.xwayland);
                 assert(server.xwayland != null);
-                cursor.seat.windowing_scheduled.window = null;
+                cursor.seat.wm_scheduled.window = null;
             },
         }
     } else {
-        cursor.seat.windowing_scheduled.window = null;
+        cursor.seat.wm_scheduled.window = null;
     }
 
-    if (cursor.seat.windowing_scheduled.window != old) {
+    if (cursor.seat.wm_scheduled.window != old) {
         server.wm.dirtyWindowing();
     }
 }
@@ -502,11 +502,11 @@ pub fn processAxis(cursor: *Cursor, event: *const wlr.Pointer.event.Axis) void {
 fn interact(cursor: Cursor, result: Scene.AtResult) void {
     switch (result.data) {
         .window => |window| {
-            cursor.seat.windowing_scheduled.interaction = .{ .window = window };
+            cursor.seat.wm_scheduled.interaction = .{ .window = window };
             server.wm.dirtyWindowing();
         },
         .shell_surface => |shell_surface| {
-            cursor.seat.windowing_scheduled.interaction = .{ .shell_surface = shell_surface };
+            cursor.seat.wm_scheduled.interaction = .{ .shell_surface = shell_surface };
             server.wm.dirtyWindowing();
         },
         .lock_surface => |lock_surface| {

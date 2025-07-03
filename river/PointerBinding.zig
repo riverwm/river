@@ -37,14 +37,14 @@ object: *river.PointerBindingV1,
 button: u32,
 modifiers: river.SeatV1.Modifiers,
 
-windowing_scheduled: struct {
+wm_scheduled: struct {
     state_change: enum {
         none,
         pressed,
         released,
     } = .none,
 } = .{},
-windowing_requested: struct {
+wm_requested: struct {
     enabled: bool = false,
 } = .{},
 
@@ -110,11 +110,11 @@ fn handleRequest(
         .destroy => pointer_binding_v1.destroy(),
         .enable => {
             if (!server.wm.ensureWindowing()) return;
-            binding.windowing_requested.enabled = true;
+            binding.wm_requested.enabled = true;
         },
         .disable => {
             if (!server.wm.ensureWindowing()) return;
-            binding.windowing_requested.enabled = false;
+            binding.wm_requested.enabled = false;
         },
     }
 }
@@ -123,8 +123,8 @@ pub fn pressed(binding: *PointerBinding) void {
     assert(!binding.sent_pressed);
     // Input event processing should not continue after a press/release event
     // until that event is sent to the window manager in an update and acked.
-    assert(binding.windowing_scheduled.state_change == .none);
-    binding.windowing_scheduled.state_change = .pressed;
+    assert(binding.wm_scheduled.state_change == .none);
+    binding.wm_scheduled.state_change = .pressed;
     server.wm.dirtyWindowing();
 }
 
@@ -132,8 +132,8 @@ pub fn released(binding: *PointerBinding) void {
     assert(binding.sent_pressed);
     // Input event processing should not continue after a press/release event
     // until that event is sent to the window manager in an update and acked.
-    assert(binding.windowing_scheduled.state_change == .none);
-    binding.windowing_scheduled.state_change = .released;
+    assert(binding.wm_scheduled.state_change == .none);
+    binding.wm_scheduled.state_change = .released;
     server.wm.dirtyWindowing();
 }
 
@@ -142,7 +142,7 @@ pub fn match(
     button: u32,
     modifiers: wlr.Keyboard.ModifierMask,
 ) bool {
-    if (!binding.windowing_requested.enabled) return false;
+    if (!binding.wm_requested.enabled) return false;
 
     return button == binding.button and
         @as(u32, @bitCast(modifiers)) == @as(u32, @bitCast(binding.modifiers));

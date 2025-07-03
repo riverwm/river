@@ -145,7 +145,7 @@ fn commit(wlr_surface: *wlr.Surface) callconv(.C) void {
     }
 }
 
-pub fn updateRenderingFinish(shell_surface: *ShellSurface) void {
+pub fn renderFinish(shell_surface: *ShellSurface) void {
     const rendering_requested = &shell_surface.rendering_requested;
     if (rendering_requested.sync_next_commit) {
         rendering_requested.sync_next_commit = false;

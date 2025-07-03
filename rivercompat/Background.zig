@@ -46,7 +46,7 @@ pub fn init(background: *Background) void {
     };
 }
 
-pub fn updateWindowing(background: *Background) void {
+pub fn manage(background: *Background) void {
     if (background.new) {
         background.node.placeBottom();
         background.node.setPosition(0, 0);

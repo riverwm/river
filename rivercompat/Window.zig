@@ -32,7 +32,7 @@ const gpa = std.heap.c_allocator;
 
 window_v1: *river.WindowV1,
 node_v1: *river.NodeV1,
-windowing: struct {
+pending: struct {
     new: bool = false,
     closed: bool = false,
 },
@@ -80,7 +80,7 @@ pub fn create(window_v1: *river.WindowV1) void {
     window.* = .{
         .window_v1 = window_v1,
         .node_v1 = window_v1.getNode() catch @panic("OOM"),
-        .windowing = .{ .new = true },
+        .pending = .{ .new = true },
         .link = undefined,
         .link_focus = undefined,
         .link_wm = undefined,
@@ -99,7 +99,7 @@ pub fn create(window_v1: *river.WindowV1) void {
 fn handleEvent(window_v1: *river.WindowV1, event: river.WindowV1.Event, window: *Window) void {
     assert(window.window_v1 == window_v1);
     switch (event) {
-        .closed => window.windowing.closed = true,
+        .closed => window.pending.closed = true,
         .dimensions_hint => {},
         .dimensions => |args| {
             window.box.width = @intCast(args.width);
@@ -122,8 +122,8 @@ fn handleEvent(window_v1: *river.WindowV1, event: river.WindowV1.Event, window: 
     }
 }
 
-pub fn updateWindowing(window: *Window) void {
-    if (window.windowing.closed) {
+pub fn manage(window: *Window) void {
+    if (window.pending.closed) {
         window.window_v1.destroy();
         window.link.remove();
         window.link_focus.remove();
@@ -144,7 +144,7 @@ pub fn updateWindowing(window: *Window) void {
         return;
     }
 
-    if (window.windowing.new) {
+    if (window.pending.new) {
         window.window_v1.useSsd();
 
         if (if (wm.seats.first()) |seat| seat.focused_output else null) |output| {
@@ -181,10 +181,10 @@ pub fn updateWindowing(window: *Window) void {
         },
     }
 
-    window.windowing = .{};
+    window.pending = .{};
 }
 
-pub fn updateRendering(window: *Window) void {
+pub fn render(window: *Window) void {
     if (window.box.width != 0 and window.box.height != 0) {
         window.shadow_surface.attach(window.shadow_buffer, 0, 0);
         window.shadow_surface.damageBuffer(0, 0, math.maxInt(i32), math.maxInt(i32));

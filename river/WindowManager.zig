@@ -42,35 +42,35 @@ object: ?*river.WindowManagerV1 = null,
 
 state: union(enum) {
     idle,
-    /// Waiting on the window manager client to finish the windowing phase of the update sequence.
-    update_windowing,
+    /// Waiting on the window manager client to send manage_finish.
+    manage,
     /// The number of configures sent that have not yet been acked
     inflight_configures: u32,
-    /// Waiting on the window manager client to finish the rendering phase of the update sequence.
-    update_rendering,
+    /// Waiting on the window manager client to send render_finish.
+    render,
 } = .idle,
 
 windows: wl.list.Head(Window, .link),
 
-/// Windowing state to be sent to the wm in the next windowing update sequence.
-windowing_scheduled: struct {
-    /// Windowing state has been modified since the last windowing update sequence.
+/// State to be sent to the wm in the next manage sequence.
+wm_scheduled: struct {
+    /// State has been modified since the last manage sequence.
     dirty: bool = false,
 
     output_config: ?*wlr.OutputConfigurationV1 = null,
 } = .{},
 
 /// State sent to the wm in the latest update sequence.
-windowing_sent: struct {
+wm_sent: struct {
     outputs: wl.list.Head(Output, .link_sent),
     output_config: ?*wlr.OutputConfigurationV1 = null,
 
     seats: wl.list.Head(Seat, .link_sent),
 },
 
-/// Rendering state to be sent to the wm in the next rendering update sequence.
+/// Rendering state to be sent to the wm in the next render sequence.
 rendering_scheduled: struct {
-    /// Rendering state has been modified since the last rendering update sequence.
+    /// Rendering state has been modified since the last render sequence.
     dirty: bool = false,
 } = .{},
 
@@ -91,7 +91,7 @@ pub fn init(wm: *WindowManager) !void {
     wm.* = .{
         .global = try wl.Global.create(server.wl_server, river.WindowManagerV1, 1, *WindowManager, wm, bind),
         .windows = undefined,
-        .windowing_sent = .{
+        .wm_sent = .{
             .outputs = undefined,
             .seats = undefined,
         },
@@ -101,8 +101,8 @@ pub fn init(wm: *WindowManager) !void {
         .timeout = timeout,
     };
     wm.windows.init();
-    wm.windowing_sent.outputs.init();
-    wm.windowing_sent.seats.init();
+    wm.wm_sent.outputs.init();
+    wm.wm_sent.seats.init();
     wm.rendering_requested.list.init();
 
     server.wl_server.addDestroyListener(&wm.server_destroy);
@@ -147,8 +147,8 @@ fn handleDestroy(_: *river.WindowManagerV1, wm: *WindowManager) void {
     switch (wm.state) {
         .idle => {},
         .inflight_configures => {},
-        .update_windowing => wm.updateWindowingFinish(),
-        .update_rendering => wm.updateRenderingFinish(),
+        .manage => wm.manageFinish(),
+        .render => wm.renderFinish(),
     }
 }
 
@@ -168,24 +168,24 @@ fn handleRequest(
             // XXX send protocol error
             wm_v1.destroy();
         },
-        .update_windowing_finish => {
-            if (wm.state != .update_windowing) {
-                wm_v1.postError(.update_sequence_order,
-                    \\update_windowing_finish request does not match update_windowing_start
+        .manage_finish => {
+            if (wm.state != .manage) {
+                wm_v1.postError(.sequence_order,
+                    \\manage_finish request does not match manage_start
                 );
                 return;
             }
-            wm.updateWindowingFinish();
+            wm.manageFinish();
         },
-        .update_windowing_dirty => wm.dirtyWindowing(),
-        .update_rendering_finish => {
-            if (wm.state != .update_rendering) {
-                wm_v1.postError(.update_sequence_order,
-                    \\update_rendering_finish request does not match update_rendering_start
+        .manage_dirty => wm.dirtyWindowing(),
+        .render_finish => {
+            if (wm.state != .render) {
+                wm_v1.postError(.sequence_order,
+                    \\render_finish request does not match render_start
                 );
                 return;
             }
-            wm.updateRenderingFinish();
+            wm.renderFinish();
         },
         .get_shell_surface => |args| {
             const surface = wlr.Surface.fromWlSurface(args.surface);
@@ -205,10 +205,10 @@ fn handleRequest(
 
 pub fn ensureWindowing(wm: *WindowManager) bool {
     switch (wm.state) {
-        .update_windowing => return true,
-        .idle, .inflight_configures, .update_rendering => {
+        .manage => return true,
+        .idle, .inflight_configures, .render => {
             if (wm.object) |wm_v1| {
-                wm_v1.postError(.update_sequence_order, "invalid modification of windowing state");
+                wm_v1.postError(.sequence_order, "invalid modification of window management state");
             }
             return false;
         },
@@ -217,10 +217,10 @@ pub fn ensureWindowing(wm: *WindowManager) bool {
 
 pub fn ensureRendering(wm: *WindowManager) bool {
     switch (wm.state) {
-        .update_windowing, .inflight_configures, .update_rendering => return true,
+        .manage, .inflight_configures, .render => return true,
         .idle => {
             if (wm.object) |wm_v1| {
-                wm_v1.postError(.update_sequence_order, "invalid modification of rendering state");
+                wm_v1.postError(.sequence_order, "invalid modification of rendering state");
             }
             return false;
         },
@@ -228,7 +228,7 @@ pub fn ensureRendering(wm: *WindowManager) bool {
 }
 
 pub fn dirtyWindowing(wm: *WindowManager) void {
-    wm.windowing_scheduled.dirty = true;
+    wm.wm_scheduled.dirty = true;
 
     if (wm.dirty_idle == null) {
         const event_loop = server.wl_server.getEventLoop();
@@ -252,67 +252,67 @@ pub fn dirtyRendering(wm: *WindowManager) void {
 }
 
 fn dirtyIdle(wm: *WindowManager) void {
-    assert(wm.windowing_scheduled.dirty or wm.rendering_scheduled.dirty);
+    assert(wm.wm_scheduled.dirty or wm.rendering_scheduled.dirty);
     wm.dirty_idle = null;
     switch (wm.state) {
         .idle => {
             if (wm.rendering_scheduled.dirty) {
-                wm.updateRenderingStart();
+                wm.renderStart();
             } else {
-                wm.updateWindowingStart();
+                wm.manageStart();
             }
         },
-        .update_windowing, .inflight_configures, .update_rendering => {},
+        .manage, .inflight_configures, .render => {},
     }
 }
 
-fn updateWindowingStart(wm: *WindowManager) void {
+fn manageStart(wm: *WindowManager) void {
     assert(wm.state == .idle);
-    assert(wm.windowing_scheduled.dirty);
+    assert(wm.wm_scheduled.dirty);
 
-    log.debug("update windowing start", .{});
+    log.debug("manage sequence start", .{});
 
     server.om.autoLayout();
     {
         var it = server.om.outputs.safeIterator(.forward);
-        while (it.next()) |output| output.updateWindowingStart();
+        while (it.next()) |output| output.manageStart();
     }
 
-    assert(wm.windowing_sent.output_config == null);
-    wm.windowing_sent.output_config = wm.windowing_scheduled.output_config;
-    wm.windowing_scheduled.output_config = null;
+    assert(wm.wm_sent.output_config == null);
+    wm.wm_sent.output_config = wm.wm_scheduled.output_config;
+    wm.wm_scheduled.output_config = null;
 
     {
         var it = wm.windows.safeIterator(.forward);
-        while (it.next()) |window| window.updateWindowingStart();
+        while (it.next()) |window| window.manageStart();
     }
 
     {
         var it = server.input_manager.seats.safeIterator(.forward);
-        while (it.next()) |seat| seat.updateWindowingStart();
+        while (it.next()) |seat| seat.manageStart();
     }
 
-    wm.windowing_scheduled.dirty = false;
-    wm.state = .update_windowing;
+    wm.wm_scheduled.dirty = false;
+    wm.state = .manage;
 
     if (wm.object) |wm_v1| {
         // TODO kill the WM on a very long timeout?
-        wm_v1.sendUpdateWindowingStart();
+        wm_v1.sendManageStart();
     } else {
-        wm.updateWindowingFinish();
+        wm.manageFinish();
     }
 }
 
-pub fn updateWindowingFinish(wm: *WindowManager) void {
-    assert(wm.state == .update_windowing);
+pub fn manageFinish(wm: *WindowManager) void {
+    assert(wm.state == .manage);
 
-    log.debug("update windowing finish", .{});
+    log.debug("manage sequence finish", .{});
 
     {
-        // Order is important here, Seat.updateWindowingFinish() must be called
-        // before Window.updateWindowingFinish().
-        var it = wm.windowing_sent.seats.iterator(.forward);
-        while (it.next()) |seat| seat.updateWindowingFinish();
+        // Order is important here, Seat.manageFinish() must be called
+        // before Window.manageFinish().
+        var it = wm.wm_sent.seats.iterator(.forward);
+        while (it.next()) |seat| seat.manageFinish();
     }
 
     wm.state = .{ .inflight_configures = 0 };
@@ -321,7 +321,7 @@ pub fn updateWindowingFinish(wm: *WindowManager) void {
         while (it.next()) |node| {
             switch (node.get()) {
                 .window => |window| {
-                    if (window.updateWindowingFinish()) {
+                    if (window.manageFinish()) {
                         wm.state.inflight_configures += 1;
                     }
                 },
@@ -335,7 +335,7 @@ pub fn updateWindowingFinish(wm: *WindowManager) void {
     if (wm.state.inflight_configures > 0) {
         wm.startTimeoutTimer();
     } else {
-        wm.updateRenderingStart();
+        wm.renderStart();
     }
 }
 
@@ -356,7 +356,7 @@ fn handleTimeout(wm: *WindowManager) c_int {
     assert(wm.state.inflight_configures > 0);
     wm.state.inflight_configures = 0;
 
-    wm.updateRenderingStart();
+    wm.renderStart();
 
     return 0;
 }
@@ -365,51 +365,51 @@ pub fn notifyConfigured(wm: *WindowManager) void {
     wm.state.inflight_configures -= 1;
     if (wm.state.inflight_configures == 0) {
         wm.cancelTimeoutTimer();
-        wm.updateRenderingStart();
+        wm.renderStart();
     }
 }
 
-fn updateRenderingStart(wm: *WindowManager) void {
+fn renderStart(wm: *WindowManager) void {
     assert(wm.state == .idle or wm.state.inflight_configures == 0);
 
-    log.debug("update rendering start", .{});
+    log.debug("render sequence start", .{});
 
     {
         var it = wm.rendering_requested.list.iterator(.forward);
         while (it.next()) |node| {
             switch (node.get()) {
-                .window => |window| window.updateRenderingStart(),
+                .window => |window| window.renderStart(),
                 .shell_surface => {},
             }
         }
     }
 
-    wm.state = .update_rendering;
+    wm.state = .render;
     wm.rendering_scheduled.dirty = false;
 
     if (wm.object) |wm_v1| {
         // TODO kill the WM on a very long timeout?
-        wm_v1.sendUpdateRenderingStart();
+        wm_v1.sendRenderStart();
     } else {
-        wm.updateRenderingFinish();
+        wm.renderFinish();
     }
 }
 
 /// Finish the update sequence and drop stashed buffers. This means that
 /// the next frame drawn will be the post-transaction state.
-fn updateRenderingFinish(wm: *WindowManager) void {
-    assert(wm.state == .update_rendering);
+fn renderFinish(wm: *WindowManager) void {
+    assert(wm.state == .render);
     wm.state = .idle;
 
-    log.debug("update rendering finish", .{});
+    log.debug("render sequence finish", .{});
 
     {
         var it = wm.windows.safeIterator(.forward);
         while (it.next()) |window| {
-            // If a window is unmapped during a rendering update, we need to retain the saved
-            // buffers until after the next windowing update (in which the closed event will
+            // If a window is unmapped during a render sequence, we need to retain the saved
+            // buffers until after the next manage sequence (in which the closed event will
             // be sent) for frame perfection.
-            if (window.windowing_scheduled.state != .closing) {
+            if (window.wm_scheduled.state != .closing) {
                 window.surfaces.dropSaved();
             }
             if (window.destroying) {
@@ -423,13 +423,13 @@ fn updateRenderingFinish(wm: *WindowManager) void {
         while (it.next()) |node| {
             switch (node.get()) {
                 .window => |window| {
-                    window.updateRenderingFinish();
+                    window.renderFinish();
 
                     window.tree.node.reparent(server.scene.layers.wm);
                     window.tree.node.raiseToTop();
                 },
                 .shell_surface => |shell_surface| {
-                    shell_surface.updateRenderingFinish();
+                    shell_surface.renderFinish();
 
                     shell_surface.tree.node.reparent(server.scene.layers.wm);
                     shell_surface.tree.node.raiseToTop();
@@ -451,7 +451,7 @@ fn updateRenderingFinish(wm: *WindowManager) void {
 
     if (wm.rendering_scheduled.dirty) {
         wm.dirtyRendering();
-    } else if (wm.windowing_scheduled.dirty) {
+    } else if (wm.wm_scheduled.dirty) {
         wm.dirtyWindowing();
     } else {
         server.input_manager.processEvents();

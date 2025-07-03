@@ -163,9 +163,9 @@ gamma_dirty: bool = false,
 /// Root.outputs
 link: wl.list.Link,
 
-/// State to be sent to the wm in the next windowing update sequence.
+/// State to be sent to the wm in the next manage sequence.
 scheduled: State,
-/// State sent to the wm in the latest windowing update sequence.
+/// State sent to the wm in the latest manage sequence.
 sent: State,
 link_sent: wl.list.Link,
 /// State applied to the wlr_output and rendered.
@@ -261,7 +261,7 @@ fn handleBind(listener: *wl.Listener(*wlr.Output.event.Bind), event: *wlr.Output
     }
 }
 
-pub fn updateWindowingStart(output: *Output) void {
+pub fn manageStart(output: *Output) void {
     switch (output.scheduled.state) {
         .enabled, .disabled_soft => {
             if (server.wm.object) |wm_v1| {
@@ -308,7 +308,7 @@ pub fn updateWindowingStart(output: *Output) void {
             output.sent = output.scheduled;
 
             output.link_sent.remove();
-            server.wm.windowing_sent.outputs.append(output);
+            server.wm.wm_sent.outputs.append(output);
         },
         .disabled_hard, .destroying => {
             if (output.object) |output_v1| {

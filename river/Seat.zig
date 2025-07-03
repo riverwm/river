@@ -111,23 +111,23 @@ object: ?*river.SeatV1 = null,
 
 event_queue: EventQueue = EventQueue.init(),
 
-/// State to be sent to the wm in the next windowing update sequence.
-windowing_scheduled: struct {
+/// State to be sent to the wm in the next manage sequence.
+wm_scheduled: struct {
     /// The window entered/hovered by the pointer, if any
     window: ?*Window = null,
     /// The window clicked on, touched, etc.
     interaction: WmFocus = .none,
 } = .{},
 
-/// State sent to the wm in the latest windowing update sequence.
-windowing_sent: struct {
+/// State sent to the wm in the latest manage sequence.
+wm_sent: struct {
     /// The window entered/hovered by the pointer, if any
     window: ?*Window = null,
 } = .{},
 link_sent: wl.list.Link,
 
 /// Windowing state requested by the wm.
-windowing_requested: struct {
+wm_requested: struct {
     focus: WmFocus = .none,
     op: union(enum) {
         none,
@@ -246,10 +246,10 @@ pub fn queueEvent(seat: *Seat, event: Event) void {
 pub fn processEvents(seat: *Seat) void {
     assert(server.wm.state == .idle);
 
-    // Only process events while there is no new windowing state to be sent to the window manager.
+    // Only process events while there is no new state to be sent to the window manager.
     // The window manager might decide to change focus or redefine keyboard/pointer bindings
-    // in response to the windowing update, which can affect further processing of events.
-    while (!server.wm.windowing_scheduled.dirty) {
+    // in response, which can affect further processing of events.
+    while (!server.wm.wm_scheduled.dirty) {
         assert(server.wm.state == .idle);
 
         const event = seat.event_queue.readItem() orelse break;
@@ -284,7 +284,7 @@ pub fn processEvents(seat: *Seat) void {
     }
 }
 
-pub fn updateWindowingStart(seat: *Seat) void {
+pub fn manageStart(seat: *Seat) void {
     if (seat.destroying) {
         if (seat.object) |seat_v1| {
             seat_v1.sendRemoved();
@@ -308,7 +308,7 @@ pub fn updateWindowingStart(seat: *Seat) void {
             wm_v1.sendSeat(seat_v1);
 
             seat.link_sent.remove();
-            server.wm.windowing_sent.seats.append(seat);
+            server.wm.wm_sent.seats.append(seat);
 
             break :blk seat_v1;
         };
@@ -326,36 +326,36 @@ pub fn updateWindowingStart(seat: *Seat) void {
         }
 
         if (new) {
-            if (seat.windowing_scheduled.window) |window| {
+            if (seat.wm_scheduled.window) |window| {
                 if (window.object) |window_v1| {
                     seat_v1.sendPointerEnter(window_v1);
-                    seat.windowing_sent.window = seat.windowing_scheduled.window;
+                    seat.wm_sent.window = seat.wm_scheduled.window;
                 }
             }
-        } else if (seat.windowing_scheduled.window != seat.windowing_sent.window) {
-            if (seat.windowing_sent.window != null) {
+        } else if (seat.wm_scheduled.window != seat.wm_sent.window) {
+            if (seat.wm_sent.window != null) {
                 seat_v1.sendPointerLeave();
-                seat.windowing_sent.window = null;
+                seat.wm_sent.window = null;
             }
-            if (seat.windowing_scheduled.window) |window| {
+            if (seat.wm_scheduled.window) |window| {
                 if (window.object) |window_v1| {
                     seat_v1.sendPointerEnter(window_v1);
-                    seat.windowing_sent.window = window;
+                    seat.wm_sent.window = window;
                 }
             }
         }
 
-        switch (seat.windowing_scheduled.interaction) {
+        switch (seat.wm_scheduled.interaction) {
             .none => {},
             .window => |window| {
                 if (window.object) |window_v1| {
                     seat_v1.sendWindowInteraction(window_v1);
-                    seat.windowing_scheduled.interaction = .none;
+                    seat.wm_scheduled.interaction = .none;
                 }
             },
             .shell_surface => |shell_surface| {
                 seat_v1.sendShellSurfaceInteraction(shell_surface.object);
-                seat.windowing_scheduled.interaction = .none;
+                seat.wm_scheduled.interaction = .none;
             },
         }
 
@@ -366,7 +366,7 @@ pub fn updateWindowingStart(seat: *Seat) void {
         {
             var it = seat.xkb_bindings.iterator(.forward);
             while (it.next()) |binding| {
-                switch (binding.windowing_scheduled.state_change) {
+                switch (binding.wm_scheduled.state_change) {
                     .none => {},
                     .pressed => {
                         assert(!binding.sent_pressed);
@@ -379,13 +379,13 @@ pub fn updateWindowingStart(seat: *Seat) void {
                         binding.object.sendReleased();
                     },
                 }
-                binding.windowing_scheduled.state_change = .none;
+                binding.wm_scheduled.state_change = .none;
             }
         }
         {
             var it = seat.pointer_bindings.iterator(.forward);
             while (it.next()) |binding| {
-                switch (binding.windowing_scheduled.state_change) {
+                switch (binding.wm_scheduled.state_change) {
                     .none => {},
                     .pressed => {
                         assert(!binding.sent_pressed);
@@ -398,7 +398,7 @@ pub fn updateWindowingStart(seat: *Seat) void {
                         binding.object.sendReleased();
                     },
                 }
-                binding.windowing_scheduled.state_change = .none;
+                binding.wm_scheduled.state_change = .none;
             }
         }
     }
@@ -432,15 +432,15 @@ fn handleRequest(
             if (!server.wm.ensureWindowing()) return;
             const data = args.window.getUserData() orelse return;
             const window: *Window = @ptrCast(@alignCast(data));
-            seat.windowing_requested.focus = .{ .window = window };
+            seat.wm_requested.focus = .{ .window = window };
         },
         .focus_shell_surface => |args| {
             if (!server.wm.ensureWindowing()) return;
             const data = args.shell_surface.getUserData() orelse return;
             const shell_surface: *ShellSurface = @ptrCast(@alignCast(data));
-            seat.windowing_requested.focus = .{ .shell_surface = shell_surface };
+            seat.wm_requested.focus = .{ .shell_surface = shell_surface };
         },
-        .clear_focus => seat.windowing_requested.focus = .none,
+        .clear_focus => seat.wm_requested.focus = .none,
 
         .op_start_serial => {
             if (!server.wm.ensureWindowing()) return;
@@ -448,11 +448,11 @@ fn handleRequest(
         },
         .op_start_pointer => {
             if (!server.wm.ensureWindowing()) return;
-            seat.windowing_requested.op = .start_pointer;
+            seat.wm_requested.op = .start_pointer;
         },
         .op_end => {
             if (!server.wm.ensureWindowing()) return;
-            seat.windowing_requested.op = .end;
+            seat.wm_requested.op = .end;
         },
 
         .pointer_confine_to_region => {},
@@ -489,16 +489,16 @@ fn handleRequest(
     }
 }
 
-pub fn updateWindowingFinish(seat: *Seat) void {
+pub fn manageFinish(seat: *Seat) void {
     if (server.lock_manager.state != .unlocked) return;
 
-    switch (seat.windowing_requested.focus) {
+    switch (seat.wm_requested.focus) {
         .none => seat.focus(.none),
         .window => |window| seat.focus(.{ .window = window }),
         .shell_surface => |shell_surface| seat.focus(.{ .shell_surface = shell_surface }),
     }
 
-    switch (seat.windowing_requested.op) {
+    switch (seat.wm_requested.op) {
         .none => {},
         .start_pointer => if (seat.op == null) {
             log.debug("start seat op pointer", .{});
@@ -519,7 +519,7 @@ pub fn updateWindowingFinish(seat: *Seat) void {
             }
         },
     }
-    seat.windowing_requested.op = .none;
+    seat.wm_requested.op = .none;
 }
 
 pub fn focus(seat: *Seat, new_focus: Focus) void {

@@ -76,7 +76,7 @@ fn handleEvent(output_v1: *river.OutputV1, event: river.OutputV1.Event, output: 
     }
 }
 
-pub fn updateWindowing(output: *Output) void {
+pub fn manage(output: *Output) void {
     if (output.pending.removed) {
         // XXX
         output.output_v1.destroy();

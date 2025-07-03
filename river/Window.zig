@@ -83,7 +83,7 @@ pub const Configure = struct {
 
 /// The window management protocol object for this window
 /// Created after the window is ready to be configured.
-/// Lifetime is managed through windowing_scheduled.state
+/// Lifetime is managed through wm_scheduled.state
 object: ?*river.WindowV1 = null,
 node: WmNode,
 
@@ -122,8 +122,8 @@ destroying: bool = false,
 /// WindowManager.windows
 link: wl.list.Link,
 
-/// State to be sent to the wm in the next windowing update sequence.
-windowing_scheduled: struct {
+/// State to be sent to the wm in the next manage sequence.
+wm_scheduled: struct {
     state: enum {
         /// Indicates that there is currently no associated river_window_v1
         /// object.
@@ -147,16 +147,16 @@ windowing_scheduled: struct {
     dirty_title: bool = false,
 } = .{},
 
-/// State sent to the wm in the latest windowing update sequence.
+/// State sent to the wm in the latest manage sequence.
 /// This state is only kept around in order to avoid sending redundant events
 /// to the wm.
-windowing_sent: struct {
+wm_sent: struct {
     dimensions_hint: DimensionsHint = .{},
     decoration_hint: river.WindowV1.DecorationHint = .only_supports_csd,
 } = .{},
 
 /// Windowing state requested by the wm.
-windowing_requested: struct {
+wm_requested: struct {
     dimensions: ?struct {
         width: u31,
         height: u31,
@@ -180,7 +180,7 @@ configure_scheduled: Configure = .{},
 /// State sent to the window in the latest configure.
 configure_sent: Configure = .{},
 
-/// State to be sent to the wm in the next rendering update sequence.
+/// State to be sent to the wm in the next render sequence.
 rendering_scheduled: struct {
     /// Dimensions committed by the window.
     width: u31 = 0,
@@ -189,7 +189,7 @@ rendering_scheduled: struct {
     resend_dimensions: bool = false,
 } = .{},
 
-/// State sent to the wm in the latest rendering update sequence.
+/// State sent to the wm in the latest render sequence.
 rendering_sent: struct {
     width: u31 = 0,
     height: u31 = 0,
@@ -253,21 +253,21 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
     return window;
 }
 
-/// It's safe to destroy the window after we no longer need the saved buffers for frame perfection.
-/// We no longer need the saved buffers after the windowing update sequence in
-/// which the closed event was sent is completed and the following rendering update
-/// sequence is completed as well.
+/// It's safe to destroy the window after we no longer need the saved buffers
+/// for frame perfection. We no longer need the saved buffers after the manage
+/// sequence in which the closed event was sent is completed and the following
+/// render sequence is completed as well.
 pub fn destroy(window: *Window) void {
     assert(window.impl == .none);
     assert(!window.mapped);
 
-    // We can't assert(window.windowing_scheduled.state != .ready) since the client may
+    // We can't assert(window.wm_scheduled.state != .ready) since the client may
     // have exited after making its empty initial commit but before the surface
     // is mapped.
-    switch (window.windowing_scheduled.state) {
+    switch (window.wm_scheduled.state) {
         .init => {},
         .closing, .ready => {
-            window.windowing_scheduled.state = .closing;
+            window.wm_scheduled.state = .closing;
             server.wm.dirtyWindowing();
             return;
         },
@@ -280,11 +280,11 @@ pub fn destroy(window: *Window) void {
             if (seat.focused == .window and seat.focused.window == window) {
                 seat.focus(.none);
             }
-            if (seat.windowing_scheduled.window == window) {
-                seat.windowing_scheduled.window = null;
+            if (seat.wm_scheduled.window == window) {
+                seat.wm_scheduled.window = null;
             }
-            if (seat.windowing_sent.window == window) {
-                seat.windowing_sent.window = null;
+            if (seat.wm_sent.window == window) {
+                seat.wm_sent.window = null;
             }
         }
     }
@@ -305,8 +305,8 @@ pub fn destroy(window: *Window) void {
 }
 
 pub fn setDimensionsHint(window: *Window, hint: DimensionsHint) void {
-    window.windowing_scheduled.dimensions_hint = hint;
-    if (!meta.eql(window.windowing_sent.dimensions_hint, hint)) {
+    window.wm_scheduled.dimensions_hint = hint;
+    if (!meta.eql(window.wm_sent.dimensions_hint, hint)) {
         server.wm.dirtyWindowing();
     }
 }
@@ -324,30 +324,30 @@ pub fn setDimensions(window: *Window, width: u31, height: u31) void {
 }
 
 pub fn setDecorationHint(window: *Window, hint: river.WindowV1.DecorationHint) void {
-    window.windowing_scheduled.decoration_hint = hint;
-    if (hint != window.windowing_sent.decoration_hint) {
+    window.wm_scheduled.decoration_hint = hint;
+    if (hint != window.wm_sent.decoration_hint) {
         server.wm.dirtyWindowing();
     }
 }
 
 pub fn setFullscreenRequested(window: *Window, fullscreen_requested: bool) void {
     if (fullscreen_requested) {
-        window.windowing_scheduled.fullscreen_requested = .fullscreen;
+        window.wm_scheduled.fullscreen_requested = .fullscreen;
     } else {
-        window.windowing_scheduled.fullscreen_requested = .exit;
+        window.wm_scheduled.fullscreen_requested = .exit;
     }
     server.wm.dirtyWindowing();
 }
 
-/// Send dirty windowing state as part of a windowing update sequence.
-pub fn updateWindowingStart(window: *Window) void {
-    switch (window.windowing_scheduled.state) {
+/// Send dirty state as part of a manage sequence.
+pub fn manageStart(window: *Window) void {
+    switch (window.wm_scheduled.state) {
         .init => {},
         .closing => {
             window.initialized = false;
-            window.windowing_scheduled.state = .init;
-            window.windowing_sent = .{};
-            window.windowing_requested = .{};
+            window.wm_scheduled.state = .init;
+            window.wm_sent = .{};
+            window.wm_requested = .{};
             window.rendering_sent = .{};
             window.rendering_requested = .{};
 
@@ -375,8 +375,8 @@ pub fn updateWindowingStart(window: *Window) void {
             };
             errdefer comptime unreachable;
 
-            const pending = &window.windowing_scheduled;
-            const sent = &window.windowing_sent;
+            const pending = &window.wm_scheduled;
+            const sent = &window.wm_sent;
 
             // XXX send all dirty pending state
             if (new or !meta.eql(pending.dimensions_hint, sent.dimensions_hint)) {
@@ -389,7 +389,7 @@ pub fn updateWindowingStart(window: *Window) void {
                 sent.dimensions_hint = pending.dimensions_hint;
             }
             if (new or pending.decoration_hint != sent.decoration_hint) {
-                window_v1.sendDecorationHint(window.windowing_scheduled.decoration_hint);
+                window_v1.sendDecorationHint(window.wm_scheduled.decoration_hint);
                 sent.decoration_hint = pending.decoration_hint;
             }
             switch (pending.fullscreen_requested) {
@@ -449,7 +449,7 @@ fn handleRequest(
     window: *Window,
 ) void {
     assert(window.object == window_v1);
-    const windowing_requested = &window.windowing_requested;
+    const wm_requested = &window.wm_requested;
     const rendering_requested = &window.rendering_requested;
     switch (request) {
         .destroy => {
@@ -458,7 +458,7 @@ fn handleRequest(
         },
         .close => {
             if (!server.wm.ensureWindowing()) return;
-            windowing_requested.close = true;
+            wm_requested.close = true;
         },
         .get_node => |args| {
             if (window.node.object != null) {
@@ -472,7 +472,7 @@ fn handleRequest(
             if (args.width < 0 or args.height < 0) {
                 // XXX send protocol error
             }
-            windowing_requested.dimensions = .{
+            wm_requested.dimensions = .{
                 .width = @intCast(args.width),
                 .height = @intCast(args.height),
             };
@@ -487,11 +487,11 @@ fn handleRequest(
         },
         .use_ssd => {
             if (!server.wm.ensureWindowing()) return;
-            windowing_requested.ssd = true;
+            wm_requested.ssd = true;
         },
         .use_csd => {
             if (!server.wm.ensureWindowing()) return;
-            windowing_requested.ssd = false;
+            wm_requested.ssd = false;
         },
         .set_borders => |args| {
             if (!server.wm.ensureRendering()) return;
@@ -509,7 +509,7 @@ fn handleRequest(
         },
         .set_tiled => |args| {
             if (!server.wm.ensureWindowing()) return;
-            windowing_requested.tiled = args.edges;
+            wm_requested.tiled = args.edges;
         },
         inline .get_decoration_above, .get_decoration_below => |args, req| {
             const above = req == .get_decoration_above;
@@ -536,43 +536,43 @@ fn handleRequest(
         },
         .inform_resize_start => {
             if (!server.wm.ensureWindowing()) return;
-            windowing_requested.resizing = true;
+            wm_requested.resizing = true;
         },
         .inform_resize_end => {
             if (!server.wm.ensureWindowing()) return;
-            windowing_requested.resizing = false;
+            wm_requested.resizing = false;
         },
         .set_capabilities => |args| {
             if (!server.wm.ensureWindowing()) return;
-            windowing_requested.capabilities = args.caps;
+            wm_requested.capabilities = args.caps;
         },
         .inform_maximized => {
             if (!server.wm.ensureWindowing()) return;
-            windowing_requested.maximized = true;
+            wm_requested.maximized = true;
         },
         .inform_unmaximized => {
             if (!server.wm.ensureWindowing()) return;
-            windowing_requested.maximized = false;
+            wm_requested.maximized = false;
         },
         .fullscreen => {
             if (!server.wm.ensureWindowing()) return;
-            windowing_requested.fullscreen = true;
+            wm_requested.fullscreen = true;
         },
         .exit_fullscreen => {
             if (!server.wm.ensureWindowing()) return;
-            windowing_requested.fullscreen = false;
+            wm_requested.fullscreen = false;
         },
     }
 }
 
-/// Applies windowing state from the window manager client  and sends a configure
+/// Applies window management state from the window manager and sends a configure
 /// to the window if necessary.
 /// Returns true if the configure should be waited for by the transaction system.
-pub fn updateWindowingFinish(window: *Window) bool {
-    const windowing_requested = &window.windowing_requested;
+pub fn manageFinish(window: *Window) bool {
+    const wm_requested = &window.wm_requested;
 
     if (!window.initialized) {
-        if (windowing_requested.dimensions != null) {
+        if (wm_requested.dimensions != null) {
             window.initialized = true;
         } else {
             return false;
@@ -581,23 +581,23 @@ pub fn updateWindowingFinish(window: *Window) bool {
 
     assert(!window.destroying);
 
-    window.configure_scheduled.ssd = windowing_requested.ssd;
-    window.configure_scheduled.tiled = windowing_requested.tiled;
-    window.configure_scheduled.capabilities = windowing_requested.capabilities;
-    window.configure_scheduled.resizing = windowing_requested.resizing;
-    window.configure_scheduled.maximized = windowing_requested.maximized;
-    window.configure_scheduled.fullscreen = windowing_requested.fullscreen;
+    window.configure_scheduled.ssd = wm_requested.ssd;
+    window.configure_scheduled.tiled = wm_requested.tiled;
+    window.configure_scheduled.capabilities = wm_requested.capabilities;
+    window.configure_scheduled.resizing = wm_requested.resizing;
+    window.configure_scheduled.maximized = wm_requested.maximized;
+    window.configure_scheduled.fullscreen = wm_requested.fullscreen;
 
-    if (windowing_requested.close) {
+    if (wm_requested.close) {
         window.close();
     }
 
     {
         window.configure_scheduled.activated = false;
-        var it = server.wm.windowing_sent.seats.iterator(.forward);
+        var it = server.wm.wm_sent.seats.iterator(.forward);
         while (it.next()) |seat| {
-            if (seat.windowing_requested.focus == .window and
-                seat.windowing_requested.focus.window == window)
+            if (seat.wm_requested.focus == .window and
+                seat.wm_requested.focus.window == window)
             {
                 window.configure_scheduled.activated = true;
                 break;
@@ -605,10 +605,10 @@ pub fn updateWindowingFinish(window: *Window) bool {
         }
     }
 
-    if (windowing_requested.dimensions) |dimensions| {
+    if (wm_requested.dimensions) |dimensions| {
         window.configure_scheduled.width = dimensions.width;
         window.configure_scheduled.height = dimensions.height;
-        windowing_requested.dimensions = null;
+        wm_requested.dimensions = null;
         window.rendering_scheduled.resend_dimensions = true;
     }
 
@@ -626,7 +626,7 @@ pub fn updateWindowingFinish(window: *Window) bool {
     return track_configure;
 }
 
-pub fn updateRenderingStart(window: *Window) void {
+pub fn renderStart(window: *Window) void {
     switch (window.impl) {
         .toplevel => |*toplevel| {
             switch (toplevel.configure_state) {
@@ -659,7 +659,7 @@ pub fn updateRenderingStart(window: *Window) void {
                     toplevel.configure_state = .idle;
                 },
                 // A timed_out or timed_out_acked value is possible in the case of a
-                // windowing update followed by two rendering updates for example.
+                // manage sequence followed by two render sequences for example.
                 .idle, .timed_out, .timed_out_acked => {},
             }
             window.rendering_scheduled.width = @intCast(toplevel.geometry.width);
@@ -689,7 +689,7 @@ pub fn updateRenderingStart(window: *Window) void {
     sent.height = scheduled.height;
 }
 
-pub fn updateRenderingFinish(window: *Window) void {
+pub fn renderFinish(window: *Window) void {
     window.tree.node.setEnabled(!window.rendering_requested.hidden);
     window.popup_tree.node.setEnabled(!window.rendering_requested.hidden);
 
@@ -765,7 +765,7 @@ pub fn updateRenderingFinish(window: *Window) void {
 
     inline for (.{ &window.decorations_above, &window.decorations_below }) |decorations| {
         var it = decorations.iterator(.forward);
-        while (it.next()) |decoration| decoration.updateRenderingFinish();
+        while (it.next()) |decoration| decoration.renderFinish();
     }
 }
 
@@ -840,17 +840,17 @@ pub fn unmap(window: *Window) void {
     assert(window.mapped and !window.destroying);
     window.mapped = false;
 
-    assert(window.windowing_scheduled.state != .closing);
-    window.windowing_scheduled.state = .closing;
+    assert(window.wm_scheduled.state != .closing);
+    window.wm_scheduled.state = .closing;
     server.wm.dirtyWindowing();
 }
 
 pub fn notifyTitle(window: *Window) void {
-    window.windowing_scheduled.dirty_title = true;
+    window.wm_scheduled.dirty_title = true;
     server.wm.dirtyWindowing();
 }
 
 pub fn notifyAppId(window: *Window) void {
-    window.windowing_scheduled.dirty_app_id = true;
+    window.wm_scheduled.dirty_app_id = true;
     server.wm.dirtyWindowing();
 }
