@@ -307,6 +307,7 @@ fn allowlist(server: *Server, global: *const wl.Global) bool {
 /// Returns true if the global is blocked for security contexts
 fn blocklist(server: *Server, global: *const wl.Global) bool {
     return global == server.security_context_manager.global or
+        global == server.wm.global or
         global == server.foreign_toplevel_manager.global or
         global == server.screencopy_manager.global or
         global == server.export_dmabuf_manager.global or
