@@ -80,10 +80,24 @@ pub const Configure = struct {
 };
 
 /// The window management protocol object for this window
-/// Created after the window is ready to be configured.
-/// Lifetime is managed through wm_scheduled.state
+/// Created in manageStart() when state is .ready
+/// Set to null in manageStart() when state is .closing
 object: ?*river.WindowV1 = null,
 node: WmNode,
+
+state: enum {
+    /// Initial state, also returned to after closed event is sent.
+    init,
+    /// The window is ready to be configured.
+    /// The river_window_v1 will be created in the next manage sequence.
+    ready,
+    /// The first configure has been sent but the window is not yet mapped.
+    initialized,
+    /// The window is mapped.
+    mapped,
+    /// The closed event will be sent in the next manage sequence.
+    closing,
+} = .init,
 
 /// The implementation of this window
 impl: Impl,
@@ -109,26 +123,11 @@ decorations_above_tree: *wlr.SceneTree,
 
 popup_tree: *wlr.SceneTree,
 
-/// Set to true once the window manager client has made its first commit
-/// proposing dimensions for a new river_window_v1 object.
-initialized: bool = false,
-mapped: bool = false,
-
 /// WindowManager.windows
 link: wl.list.Link,
 
 /// State to be sent to the wm in the next manage sequence.
 wm_scheduled: struct {
-    state: enum {
-        /// Indicates that there is currently no associated river_window_v1
-        /// object.
-        init,
-        /// Indicates that the window is ready to be configured.
-        /// Create a river_window_v1 object if needed and send events.
-        ready,
-        /// Indicates that the closed event will be sent in the next update sequence.
-        closing,
-    } = .init,
     dimensions_hint: DimensionsHint = .{},
     decoration_hint: river.WindowV1.DecorationHint = .only_supports_csd,
     /// Set back to no_request at the end of each update sequence
@@ -254,15 +253,14 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
 /// render sequence is completed as well.
 pub fn destroy(window: *Window) void {
     assert(window.impl == .destroying);
-    assert(!window.mapped);
 
-    switch (window.wm_scheduled.state) {
+    switch (window.state) {
         .init => {},
         .closing => {
             server.wm.dirtyWindowing();
             return;
         },
-        .ready => unreachable,
+        .ready, .initialized, .mapped => unreachable,
     }
     assert(window.object == null);
 
@@ -333,11 +331,10 @@ pub fn setFullscreenRequested(window: *Window, fullscreen_requested: bool) void 
 
 /// Send dirty state as part of a manage sequence.
 pub fn manageStart(window: *Window) void {
-    switch (window.wm_scheduled.state) {
+    switch (window.state) {
         .init => {},
         .closing => {
-            window.initialized = false;
-            window.wm_scheduled.state = .init;
+            window.state = .init;
             window.wm_sent = .{};
             window.wm_requested = .{};
             window.rendering_sent = .{};
@@ -348,10 +345,12 @@ pub fn manageStart(window: *Window) void {
 
             window.makeInert();
         },
-        .ready => {
+        .ready, .initialized, .mapped => {
             const wm_v1 = server.wm.object orelse return;
             const new = window.object == null;
             const window_v1 = window.object orelse blk: {
+                assert(window.state == .ready);
+
                 const window_v1 = river.WindowV1.create(wm_v1.getClient(), wm_v1.getVersion(), 0) catch {
                     log.err("out of memory", .{});
                     return; // try again next update
@@ -566,16 +565,20 @@ pub fn manageFinish(window: *Window) bool {
     // This can happen if the window is destroyed after being sent to the wm but
     // before being mapped.
     if (window.impl == .destroying) {
-        assert(window.wm_scheduled.state == .closing);
+        assert(window.state == .closing);
         return false;
     }
 
-    if (!window.initialized) {
-        if (wm_requested.dimensions != null) {
-            window.initialized = true;
-        } else {
-            return false;
-        }
+    switch (window.state) {
+        .init => unreachable,
+        .ready => {
+            if (wm_requested.dimensions == null) {
+                return false;
+            }
+            window.state = .initialized;
+        },
+        .initialized, .mapped => {},
+        .closing => return false,
     }
 
     window.configure_scheduled.ssd = wm_requested.ssd;
@@ -615,7 +618,7 @@ pub fn manageFinish(window: *Window) bool {
         .destroying => unreachable,
     };
 
-    if (track_configure and window.mapped) {
+    if (track_configure and window.state == .mapped) {
         window.surfaces.save();
         window.sendFrameDone();
     }
@@ -778,7 +781,8 @@ pub fn rootSurface(window: Window) ?*wlr.Surface {
 }
 
 pub fn sendFrameDone(window: Window) void {
-    assert(window.mapped and window.impl != .destroying);
+    assert(window.state == .mapped);
+    assert(window.impl != .destroying);
 
     var now = posix.clock_gettime(posix.CLOCK.MONOTONIC) catch @panic("CLOCK_MONOTONIC not supported");
     window.rootSurface().?.sendFrameDone(&now);
@@ -821,9 +825,9 @@ pub fn getAppId(window: Window) ?[*:0]const u8 {
 /// Called by the impl when the surface is ready to be displayed
 pub fn map(window: *Window) !void {
     log.debug("window '{?s}' mapped", .{window.getTitle()});
-
-    assert(!window.mapped and window.impl != .destroying);
-    window.mapped = true;
+    assert(window.impl != .destroying);
+    assert(window.state == .initialized);
+    window.state = .mapped;
 }
 
 /// Called by the impl when the surface will no longer be displayed
@@ -832,11 +836,10 @@ pub fn unmap(window: *Window) void {
 
     window.surfaces.save();
 
-    assert(window.mapped and window.impl != .destroying);
-    window.mapped = false;
+    assert(window.impl != .destroying);
+    assert(window.state == .mapped);
+    window.state = .closing;
 
-    assert(window.wm_scheduled.state != .closing);
-    window.wm_scheduled.state = .closing;
     server.wm.dirtyWindowing();
 }
 

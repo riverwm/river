@@ -239,17 +239,16 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
 
     const window = toplevel.window;
     window.impl = .destroying;
-    switch (window.wm_scheduled.state) {
+    switch (window.state) {
         .init, .closing => {},
         // This can happen if the xdg toplevel is destroyed after the initial
-        // commit but before the window is mapped. In this case, the state is
-        // not set to .closing by handleUnmap() since handleUnmap() is not
-        // called due to the window not being mapped.
-        .ready => {
-            assert(!window.mapped);
-            window.wm_scheduled.state = .closing;
+        // commit but before the window is mapped.
+        .ready, .initialized => {
+            window.state = .closing;
             server.wm.dirtyWindowing();
         },
+        // State must have been set to closing in Window.unmap()
+        .mapped => unreachable,
     }
 }
 
@@ -306,13 +305,13 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     });
 
     if (toplevel.wlr_toplevel.base.initial_commit) {
-        assert(window.wm_scheduled.state != .ready);
-        window.wm_scheduled.state = .ready;
+        assert(window.state != .ready);
+        window.state = .ready;
         server.wm.dirtyWindowing();
         return;
     }
 
-    if (!window.mapped) {
+    if (window.state != .mapped) {
         return;
     }
 

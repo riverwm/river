@@ -409,7 +409,7 @@ fn renderFinish(wm: *WindowManager) void {
             // If a window is unmapped during a render sequence, we need to retain the saved
             // buffers until after the next manage sequence (in which the closed event will
             // be sent) for frame perfection.
-            if (window.wm_scheduled.state != .closing) {
+            if (window.state != .closing) {
                 window.surfaces.dropSaved();
             }
             if (window.impl == .destroying) {
