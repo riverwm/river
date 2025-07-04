@@ -247,7 +247,6 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
         // not set to .closing by handleUnmap() since handleUnmap() is not
         // called due to the window not being mapped.
         .ready => {
-            assert(!window.initialized);
             assert(!window.mapped);
             window.wm_scheduled.state = .init;
         },
