@@ -412,7 +412,7 @@ fn renderFinish(wm: *WindowManager) void {
             if (window.wm_scheduled.state != .closing) {
                 window.surfaces.dropSaved();
             }
-            if (window.destroying) {
+            if (window.impl == .destroying) {
                 window.destroy();
             }
         }

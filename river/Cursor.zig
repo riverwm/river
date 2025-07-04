@@ -360,7 +360,7 @@ fn updateHovered(cursor: *Cursor) void {
                         }
                     },
                     .xwayland => cursor.seat.wm_scheduled.window = window,
-                    .none => {},
+                    .destroying => {},
                 }
             },
             .shell_surface, .lock_surface => cursor.seat.wm_scheduled.window = null,

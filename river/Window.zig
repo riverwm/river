@@ -53,9 +53,7 @@ const Impl = union(enum) {
     /// This state is assigned during destruction after the xdg toplevel
     /// has been destroyed but while the transaction system is still rendering
     /// saved surfaces of the window.
-    /// The toplevel could simply be set to undefined instead, but using a
-    /// tag like this gives us better safety checks.
-    none,
+    destroying,
 };
 
 pub const Border = struct {
@@ -115,9 +113,6 @@ popup_tree: *wlr.SceneTree,
 /// proposing dimensions for a new river_window_v1 object.
 initialized: bool = false,
 mapped: bool = false,
-/// This indicates that the window should be destroyed when the current
-/// transaction completes. See Window.destroy()
-destroying: bool = false,
 
 /// WindowManager.windows
 link: wl.list.Link,
@@ -207,7 +202,7 @@ rendering_requested: struct {
 box: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
 
 pub fn create(impl: Impl) error{OutOfMemory}!*Window {
-    assert(impl != .none);
+    assert(impl != .destroying);
 
     const window = try util.gpa.create(Window);
     errdefer util.gpa.destroy(window);
@@ -258,19 +253,16 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
 /// sequence in which the closed event was sent is completed and the following
 /// render sequence is completed as well.
 pub fn destroy(window: *Window) void {
-    assert(window.impl == .none);
+    assert(window.impl == .destroying);
     assert(!window.mapped);
 
-    // We can't assert(window.wm_scheduled.state != .ready) since the client may
-    // have exited after making its empty initial commit but before the surface
-    // is mapped.
     switch (window.wm_scheduled.state) {
         .init => {},
-        .closing, .ready => {
-            window.wm_scheduled.state = .closing;
+        .closing => {
             server.wm.dirtyWindowing();
             return;
         },
+        .ready => unreachable,
     }
     assert(window.object == null);
 
@@ -573,7 +565,7 @@ pub fn manageFinish(window: *Window) bool {
 
     // This can happen if the window is destroyed after being sent to the wm but
     // before being mapped.
-    if (window.destroying) {
+    if (window.impl == .destroying) {
         assert(window.wm_scheduled.state == .closing);
         return false;
     }
@@ -620,7 +612,7 @@ pub fn manageFinish(window: *Window) bool {
     const track_configure = switch (window.impl) {
         .toplevel => |*toplevel| toplevel.configure(),
         .xwayland => |*xwindow| xwindow.configure(),
-        .none => unreachable,
+        .destroying => unreachable,
     };
 
     if (track_configure and window.mapped) {
@@ -674,7 +666,7 @@ pub fn renderStart(window: *Window) void {
             window.rendering_scheduled.width = xwindow.xsurface.width;
             window.rendering_scheduled.height = xwindow.xsurface.height;
         },
-        .none => {},
+        .destroying => {},
     }
 
     const sent = &window.rendering_sent;
@@ -781,12 +773,12 @@ pub fn rootSurface(window: Window) ?*wlr.Surface {
     return switch (window.impl) {
         .toplevel => |toplevel| toplevel.wlr_toplevel.base.surface,
         .xwayland => |xwindow| xwindow.xsurface.surface,
-        .none => null,
+        .destroying => null,
     };
 }
 
 pub fn sendFrameDone(window: Window) void {
-    assert(window.mapped and !window.destroying);
+    assert(window.mapped and window.impl != .destroying);
 
     var now = posix.clock_gettime(posix.CLOCK.MONOTONIC) catch @panic("CLOCK_MONOTONIC not supported");
     window.rootSurface().?.sendFrameDone(&now);
@@ -796,35 +788,33 @@ pub fn close(window: Window) void {
     switch (window.impl) {
         .toplevel => |toplevel| toplevel.wlr_toplevel.sendClose(),
         .xwayland => |xwindow| xwindow.xsurface.close(),
-        .none => {},
+        .destroying => {},
     }
 }
 
 pub fn destroyPopups(window: Window) void {
     switch (window.impl) {
         .toplevel => |toplevel| toplevel.destroyPopups(),
-        .xwayland, .none => {},
+        .xwayland, .destroying => {},
     }
 }
 
 /// Return the current title of the window if any.
 pub fn getTitle(window: Window) ?[*:0]const u8 {
-    assert(!window.destroying);
     return switch (window.impl) {
         .toplevel => |toplevel| toplevel.wlr_toplevel.title,
         .xwayland => |xwindow| xwindow.xsurface.title,
-        .none => unreachable,
+        .destroying => unreachable,
     };
 }
 
 /// Return the current app_id of the window if any.
 pub fn getAppId(window: Window) ?[*:0]const u8 {
-    assert(!window.destroying);
     return switch (window.impl) {
         .toplevel => |toplevel| toplevel.wlr_toplevel.app_id,
         // X11 clients don't have an app_id but the class serves a similar role.
         .xwayland => |xwindow| xwindow.xsurface.class,
-        .none => unreachable,
+        .destroying => unreachable,
     };
 }
 
@@ -832,7 +822,7 @@ pub fn getAppId(window: Window) ?[*:0]const u8 {
 pub fn map(window: *Window) !void {
     log.debug("window '{?s}' mapped", .{window.getTitle()});
 
-    assert(!window.mapped and !window.destroying);
+    assert(!window.mapped and window.impl != .destroying);
     window.mapped = true;
 }
 
@@ -842,7 +832,7 @@ pub fn unmap(window: *Window) void {
 
     window.surfaces.save();
 
-    assert(window.mapped and !window.destroying);
+    assert(window.mapped and window.impl != .destroying);
     window.mapped = false;
 
     assert(window.wm_scheduled.state != .closing);

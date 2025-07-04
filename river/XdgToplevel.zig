@@ -238,8 +238,7 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
     toplevel.wlr_toplevel.base.surface.data = 0;
 
     const window = toplevel.window;
-    window.impl = .none;
-    window.destroying = true;
+    window.impl = .destroying;
     switch (window.wm_scheduled.state) {
         .init, .closing => {},
         // This can happen if the xdg toplevel is destroyed after the initial
