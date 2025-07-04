@@ -571,6 +571,13 @@ fn handleRequest(
 pub fn manageFinish(window: *Window) bool {
     const wm_requested = &window.wm_requested;
 
+    // This can happen if the window is destroyed after being sent to the wm but
+    // before being mapped.
+    if (window.destroying) {
+        assert(window.wm_scheduled.state == .closing);
+        return false;
+    }
+
     if (!window.initialized) {
         if (wm_requested.dimensions != null) {
             window.initialized = true;
@@ -578,8 +585,6 @@ pub fn manageFinish(window: *Window) bool {
             return false;
         }
     }
-
-    assert(!window.destroying);
 
     window.configure_scheduled.ssd = wm_requested.ssd;
     window.configure_scheduled.tiled = wm_requested.tiled;

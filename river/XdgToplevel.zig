@@ -248,7 +248,8 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
         // called due to the window not being mapped.
         .ready => {
             assert(!window.mapped);
-            window.wm_scheduled.state = .init;
+            window.wm_scheduled.state = .closing;
+            server.wm.dirtyWindowing();
         },
     }
 }
