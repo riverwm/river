@@ -412,6 +412,11 @@ fn renderFinish(wm: *WindowManager) void {
             if (window.state != .closing) {
                 window.surfaces.dropSaved();
             }
+            // Ensure windows that are closed but not yet destroyed don't have
+            // their borders/decorations rendered.
+            if (window.state == .init) {
+                window.tree.node.reparent(server.scene.hidden_tree);
+            }
             if (window.impl == .destroying) {
                 window.destroy();
             }
