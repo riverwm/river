@@ -349,8 +349,6 @@ pub fn manageStart(window: *Window) void {
             const wm_v1 = server.wm.object orelse return;
             const new = window.object == null;
             const window_v1 = window.object orelse blk: {
-                assert(window.state == .ready);
-
                 const window_v1 = river.WindowV1.create(wm_v1.getClient(), wm_v1.getVersion(), 0) catch {
                     log.err("out of memory", .{});
                     return; // try again next update
