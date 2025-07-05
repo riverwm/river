@@ -21,6 +21,8 @@ const assert = std.debug.assert;
 const build_options = @import("build_options");
 const wlr = @import("wlroots");
 
+const server = &@import("main.zig").server;
+
 const SceneNodeData = @import("SceneNodeData.zig");
 
 wlr_scene: *wlr.Scene,
@@ -60,6 +62,8 @@ layers: struct {
 pub fn init(scene: *Scene) !void {
     const wlr_scene = try wlr.Scene.create();
     errdefer wlr_scene.tree.node.destroy();
+
+    if (server.linux_dmabuf) |linux_dmabuf| wlr_scene.setLinuxDmabufV1(linux_dmabuf);
 
     const interactive_tree = try wlr_scene.tree.createSceneTree();
     const drag_icons = try wlr_scene.tree.createSceneTree();
