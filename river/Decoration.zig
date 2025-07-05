@@ -145,9 +145,7 @@ fn clientCommit(wlr_surface: *wlr.Surface) callconv(.C) void {
 }
 
 fn commit(wlr_surface: *wlr.Surface) callconv(.C) void {
-    if (wlr_surface.unmap_commit) {
-        wlr_surface.unmap();
-    } else if (wlr_surface.hasBuffer()) {
+    if (wlr_surface.hasBuffer()) {
         wlr_surface.map();
     }
 }

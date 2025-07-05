@@ -51,7 +51,6 @@ power_manager: *wlr.OutputPowerManagerV1,
 power_manager_set_mode: wl.Listener(*wlr.OutputPowerManagerV1.event.SetMode) = .init(handlePowerManagerSetMode),
 
 gamma_control_manager: *wlr.GammaControlManagerV1,
-gamma_control_set_gamma: wl.Listener(*wlr.GammaControlManagerV1.event.SetGamma) = .init(handleSetGamma),
 
 /// All Outputs that have a corresponding wlr_output.
 outputs: wl.list.Head(Output, .link),
@@ -60,15 +59,18 @@ pub fn init(om: *OutputManager) !void {
     const output_layout = try wlr.OutputLayout.create(server.wl_server);
     errdefer output_layout.destroy();
 
+    const gamma_control_manager = try wlr.GammaControlManagerV1.create(server.wl_server);
+    server.scene.wlr_scene.setGammaControlManagerV1(gamma_control_manager);
+
     om.* = .{
         .output_layout = output_layout,
         .outputs = undefined,
 
-        .presentation = try wlr.Presentation.create(server.wl_server, server.backend),
+        .presentation = try wlr.Presentation.create(server.wl_server, server.backend, 2),
         .xdg_output_manager = try wlr.XdgOutputManagerV1.create(server.wl_server, output_layout),
         .wlr_output_manager = try wlr.OutputManagerV1.create(server.wl_server),
         .power_manager = try wlr.OutputPowerManagerV1.create(server.wl_server),
-        .gamma_control_manager = try wlr.GammaControlManagerV1.create(server.wl_server),
+        .gamma_control_manager = gamma_control_manager,
     };
 
     om.outputs.init();
@@ -77,10 +79,13 @@ pub fn init(om: *OutputManager) !void {
     om.wlr_output_manager.events.apply.add(&om.manager_apply);
     om.wlr_output_manager.events.@"test".add(&om.manager_test);
     om.power_manager.events.set_mode.add(&om.power_manager_set_mode);
-    om.gamma_control_manager.events.set_gamma.add(&om.gamma_control_set_gamma);
 }
 
 pub fn deinit(om: *OutputManager) void {
+    om.manager_apply.link.remove();
+    om.manager_test.link.remove();
+    om.power_manager_set_mode.link.remove();
+
     om.output_layout.destroy();
 }
 
@@ -133,7 +138,7 @@ fn handleManagerApply(_: *wl.Listener(*wlr.OutputConfigurationV1), config: *wlr.
 
     var it = config.heads.iterator(.forward);
     while (it.next()) |head| {
-        const output: *Output = @ptrFromInt(head.state.output.data);
+        const output: *Output = @alignCast(@ptrCast(head.state.output.data));
 
         output.scheduled = .{
             .state = if (head.state.enabled) .enabled else .disabled_hard,
@@ -188,7 +193,7 @@ fn handlePowerManagerSetMode(
     event: *wlr.OutputPowerManagerV1.event.SetMode,
 ) void {
     // The output may have been destroyed, in which case there is nothing to do
-    const output = @as(?*Output, @ptrFromInt(event.output.data)) orelse return;
+    const output = @as(?*Output, @alignCast(@ptrCast(event.output.data))) orelse return;
 
     log.debug("client requested dpms {s} for output {s}", .{
         @tagName(event.mode),
@@ -206,19 +211,6 @@ fn handlePowerManagerSetMode(
     }
 
     server.wm.dirtyWindowing();
-}
-
-fn handleSetGamma(
-    _: *wl.Listener(*wlr.GammaControlManagerV1.event.SetGamma),
-    event: *wlr.GammaControlManagerV1.event.SetGamma,
-) void {
-    // The output may have been destroyed, in which case there is nothing to do
-    const output = @as(?*Output, @ptrFromInt(event.output.data)) orelse return;
-
-    log.debug("client requested to set gamma", .{});
-
-    output.gamma_dirty = true;
-    event.output.scheduleFrame();
 }
 
 pub fn autoLayout(om: *OutputManager) void {
@@ -351,7 +343,7 @@ pub fn commitOutputState(om: *OutputManager) void {
         }
 
         for (states.items) |*state| {
-            const output: *Output = @ptrFromInt(state.output.data);
+            const output: *Output = @alignCast(@ptrCast(state.output.data));
             if (!output.scene_output.?.buildState(&state.base, &.{
                 .swapchain = swapchain_manager.getSwapchain(state.output),
             })) {

@@ -42,7 +42,7 @@ pub fn create(wlr_drag_icon: *wlr.Drag.Icon, cursor: *Cursor) error{OutOfMemory}
         .wlr_drag_icon = wlr_drag_icon,
         .scene_drag_icon = scene_drag_icon,
     };
-    scene_drag_icon.node.data = @intFromPtr(drag_icon);
+    scene_drag_icon.node.data = drag_icon;
 
     drag_icon.updatePosition(cursor);
 

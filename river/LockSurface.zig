@@ -44,14 +44,14 @@ pub fn create(wlr_lock_surface: *wlr.SessionLockSurfaceV1, lock: *wlr.SessionLoc
         .wlr_lock_surface = wlr_lock_surface,
         .lock = lock,
     };
-    wlr_lock_surface.data = @intFromPtr(lock_surface);
+    wlr_lock_surface.data = lock_surface;
 
     const tree = try server.scene.locked_tree.createSceneSubsurfaceTree(wlr_lock_surface.surface);
     errdefer tree.node.destroy();
 
     try SceneNodeData.attach(&tree.node, .{ .lock_surface = lock_surface });
 
-    wlr_lock_surface.surface.data = @intFromPtr(&tree.node);
+    wlr_lock_surface.surface.data = &tree.node;
 
     wlr_lock_surface.surface.events.map.add(&lock_surface.map);
     wlr_lock_surface.events.destroy.add(&lock_surface.surface_destroy);
@@ -64,7 +64,7 @@ pub fn destroy(lock_surface: *LockSurface) void {
         var surface_it = lock_surface.lock.surfaces.iterator(.forward);
         const new_focus: Seat.Focus = while (surface_it.next()) |surface| {
             if (surface != lock_surface.wlr_lock_surface)
-                break .{ .lock_surface = @ptrFromInt(surface.data) };
+                break .{ .lock_surface = @alignCast(@ptrCast(surface.data)) };
         } else .none;
 
         var seat_it = server.input_manager.seats.iterator(.forward);
@@ -84,13 +84,13 @@ pub fn destroy(lock_surface: *LockSurface) void {
     lock_surface.surface_destroy.link.remove();
 
     // The wlr_surface may outlive the wlr_lock_surface so we must clean up the user data.
-    lock_surface.wlr_lock_surface.surface.data = 0;
+    lock_surface.wlr_lock_surface.surface.data = null;
 
     util.gpa.destroy(lock_surface);
 }
 
 pub fn getOutput(lock_surface: *LockSurface) *Output {
-    return @ptrFromInt(lock_surface.wlr_lock_surface.output.data);
+    return @alignCast(@ptrCast(lock_surface.wlr_lock_surface.output.data));
 }
 
 pub fn configure(lock_surface: *LockSurface) void {

@@ -92,6 +92,8 @@ pub fn create(
 }
 
 fn handleDestroy(_: *river.ShellSurfaceV1, shell_surface: *ShellSurface) void {
+    shell_surface.surface.unmap();
+
     shell_surface.node.makeInert();
     shell_surface.node.deinit();
 
@@ -138,9 +140,7 @@ fn clientCommit(wlr_surface: *wlr.Surface) callconv(.C) void {
 }
 
 fn commit(wlr_surface: *wlr.Surface) callconv(.C) void {
-    if (wlr_surface.unmap_commit) {
-        wlr_surface.unmap();
-    } else if (wlr_surface.hasBuffer()) {
+    if (wlr_surface.hasBuffer()) {
         wlr_surface.map();
     }
 }

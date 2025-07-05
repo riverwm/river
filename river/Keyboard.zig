@@ -104,7 +104,7 @@ pub fn init(keyboard: *Keyboard, seat: *Seat, wlr_device: *wlr.InputDevice) !voi
     errdefer keyboard.device.deinit();
 
     const wlr_keyboard = keyboard.device.wlr_device.toKeyboard();
-    wlr_keyboard.data = @intFromPtr(keyboard);
+    wlr_keyboard.data = keyboard;
 
     // wlroots will log a more detailed error if this fails.
     if (!wlr_keyboard.setKeymap(server.config.keymap)) return error.OutOfMemory;

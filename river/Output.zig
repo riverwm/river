@@ -156,10 +156,6 @@ lock_render_state: enum {
     lock_surface,
 } = .blanked,
 
-/// Set to true if a gamma control client makes a set gamma request.
-/// This request is handled while rendering the next frame in handleFrame().
-gamma_dirty: bool = false,
-
 /// Root.outputs
 link: wl.list.Link,
 
@@ -206,7 +202,7 @@ pub fn create(wlr_output: *wlr.Output) !void {
         .link = undefined,
         .link_sent = undefined,
     };
-    wlr_output.data = @intFromPtr(output);
+    wlr_output.data = output;
 
     server.om.outputs.append(output);
     output.link_sent.init();
@@ -238,7 +234,7 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) v
     output.frame.link.remove();
     output.present.link.remove();
 
-    wlr_output.data = 0;
+    wlr_output.data = null;
 
     output.wlr_output = null;
     output.scene_output = null;
@@ -386,7 +382,6 @@ fn handleFrame(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) voi
 
     // TODO this should probably be retried on failure
     output.renderAndCommit() catch |err| switch (err) {
-        error.OutOfMemory => log.err("out of memory", .{}),
         error.CommitFailed => log.err("output commit failed for {s}", .{wlr_output.name}),
     };
 
@@ -395,6 +390,8 @@ fn handleFrame(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) voi
 }
 
 fn renderAndCommit(output: *Output) !void {
+    if (!output.scene_output.?.needsFrame()) return;
+
     const wlr_output = output.wlr_output.?;
 
     var state = wlr.Output.State.init();
@@ -402,25 +399,9 @@ fn renderAndCommit(output: *Output) !void {
 
     output.current.applyNoModeset(&state);
 
-    if (output.gamma_dirty) {
-        const control = server.om.gamma_control_manager.getControl(wlr_output);
-        if (!wlr.GammaControlV1.apply(control, &state)) return error.OutOfMemory;
-
-        if (!wlr_output.testState(&state)) {
-            wlr.GammaControlV1.sendFailedAndDestroy(control);
-            state.clearGammaLut();
-            // If the backend does not support gamma LUTs it will reject any
-            // state with the gamma LUT committed bit set even if the state
-            // has a null LUT. The wayland backend for example has this behavior.
-            state.committed.gamma_lut = false;
-        }
-    }
-
     if (!output.scene_output.?.buildState(&state, null)) return error.CommitFailed;
 
     if (!wlr_output.commitState(&state)) return error.CommitFailed;
-
-    output.gamma_dirty = false;
 
     const lock_surface_mapped = blk: {
         if (server.lock_manager.lockSurfaceFromOutput(output)) |lock_surface| {

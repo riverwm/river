@@ -181,6 +181,30 @@ pub fn init(cursor: *Cursor, seat: *Seat) !void {
 }
 
 pub fn deinit(cursor: *Cursor) void {
+    cursor.axis.link.remove();
+    cursor.button.link.remove();
+    cursor.frame.link.remove();
+    cursor.motion_absolute.link.remove();
+    cursor.motion_relative.link.remove();
+    cursor.swipe_begin.link.remove();
+    cursor.swipe_update.link.remove();
+    cursor.swipe_end.link.remove();
+    cursor.pinch_begin.link.remove();
+    cursor.pinch_update.link.remove();
+    cursor.pinch_end.link.remove();
+    cursor.request_set_cursor.link.remove();
+
+    cursor.touch_down.link.remove();
+    cursor.touch_motion.link.remove();
+    cursor.touch_up.link.remove();
+    cursor.touch_cancel.link.remove();
+    cursor.touch_frame.link.remove();
+
+    cursor.tablet_tool_axis.link.remove();
+    cursor.tablet_tool_proximity.link.remove();
+    cursor.tablet_tool_tip.link.remove();
+    cursor.tablet_tool_button.link.remove();
+
     cursor.xcursor_manager.destroy();
     cursor.wlr_cursor.destroy();
     cursor.pressed.deinit(util.gpa);
@@ -480,7 +504,7 @@ pub fn processButton(cursor: *Cursor, event: *const wlr.Pointer.event.Button) vo
 }
 
 pub fn processAxis(cursor: *Cursor, event: *const wlr.Pointer.event.Axis) void {
-    const device: *InputDevice = @ptrFromInt(event.device.data);
+    const device: *InputDevice = @alignCast(@ptrCast(event.device.data));
     cursor.seat.wlr_seat.pointerNotifyAxis(
         event.time_msec,
         event.orientation,
@@ -612,7 +636,7 @@ fn handleTabletToolAxis(
     _: *wl.Listener(*wlr.Tablet.event.Axis),
     event: *wlr.Tablet.event.Axis,
 ) void {
-    const device: *InputDevice = @ptrFromInt(event.device.data);
+    const device: *InputDevice = @alignCast(@ptrCast(event.device.data));
     const tablet: *Tablet = @fieldParentPtr("device", device);
 
     device.seat.handleActivity();
@@ -626,7 +650,7 @@ fn handleTabletToolProximity(
     _: *wl.Listener(*wlr.Tablet.event.Proximity),
     event: *wlr.Tablet.event.Proximity,
 ) void {
-    const device: *InputDevice = @ptrFromInt(event.device.data);
+    const device: *InputDevice = @alignCast(@ptrCast(event.device.data));
     const tablet: *Tablet = @fieldParentPtr("device", device);
 
     device.seat.handleActivity();
@@ -640,7 +664,7 @@ fn handleTabletToolTip(
     _: *wl.Listener(*wlr.Tablet.event.Tip),
     event: *wlr.Tablet.event.Tip,
 ) void {
-    const device: *InputDevice = @ptrFromInt(event.device.data);
+    const device: *InputDevice = @alignCast(@ptrCast(event.device.data));
     const tablet: *Tablet = @fieldParentPtr("device", device);
 
     device.seat.handleActivity();
@@ -654,7 +678,7 @@ fn handleTabletToolButton(
     _: *wl.Listener(*wlr.Tablet.event.Button),
     event: *wlr.Tablet.event.Button,
 ) void {
-    const device: *InputDevice = @ptrFromInt(event.device.data);
+    const device: *InputDevice = @alignCast(@ptrCast(event.device.data));
     const tablet: *Tablet = @fieldParentPtr("device", device);
 
     device.seat.handleActivity();
@@ -707,7 +731,7 @@ fn passthrough(cursor: *Cursor, time: u32) void {
 fn updateDragIcons(cursor: *Cursor) void {
     var it = server.scene.drag_icons.children.iterator(.forward);
     while (it.next()) |node| {
-        const icon = @as(*DragIcon, @ptrFromInt(node.data));
+        const icon = @as(*DragIcon, @alignCast(@ptrCast(node.data)));
 
         if (icon.wlr_drag_icon.drag.seat == cursor.seat.wlr_seat) {
             icon.updatePosition(cursor);

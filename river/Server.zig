@@ -197,6 +197,9 @@ pub fn deinit(server: *Server) void {
     server.request_activate.link.remove();
     server.request_set_cursor_shape.link.remove();
 
+    server.input_manager.new_input.link.remove();
+    server.om.new_output.link.remove();
+
     if (build_options.xwayland) {
         if (server.xwayland) |xwayland| {
             server.new_xsurface.link.remove();
@@ -374,7 +377,7 @@ fn handleRequestSetCursorShape(
     _: *wl.Listener(*wlr.CursorShapeManagerV1.event.RequestSetShape),
     event: *wlr.CursorShapeManagerV1.event.RequestSetShape,
 ) void {
-    const seat: *Seat = @ptrFromInt(event.seat_client.seat.data);
+    const seat: *Seat = @alignCast(@ptrCast(event.seat_client.seat.data));
 
     if (event.tablet_tool) |wp_tool| {
         assert(event.device_type == .tablet_tool);

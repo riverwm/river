@@ -190,7 +190,7 @@ pub fn create(name: [*:0]const u8) !void {
         .cursor = undefined,
         .relay = undefined,
     };
-    seat.wlr_seat.data = @intFromPtr(seat);
+    seat.wlr_seat.data = seat;
 
     server.input_manager.seats.append(seat);
     seat.link_sent.init();
@@ -561,7 +561,7 @@ pub fn focus(seat: *Seat, new_focus: Focus) void {
             if (seat.cursor.constraint) |constraint| {
                 assert(constraint.wlr_constraint == wlr_constraint);
             } else {
-                seat.cursor.constraint = @ptrFromInt(wlr_constraint.data);
+                seat.cursor.constraint = @alignCast(@ptrCast(wlr_constraint.data));
                 assert(seat.cursor.constraint != null);
             }
         }
@@ -581,7 +581,7 @@ pub fn keyboardEnterOrLeave(seat: *Seat, target_surface: ?*wlr.Surface) void {
 
 fn keyboardNotifyEnter(seat: *Seat, wlr_surface: *wlr.Surface) void {
     if (seat.wlr_seat.getKeyboard()) |wlr_keyboard| {
-        const keyboard: *Keyboard = @ptrFromInt(wlr_keyboard.data);
+        const keyboard: *Keyboard = @alignCast(@ptrCast(wlr_keyboard.data));
 
         var keycodes: std.BoundedArray(u32, Keyboard.Pressed.capacity) = .{};
         for (keyboard.pressed.keys.constSlice()) |item| {

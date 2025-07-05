@@ -183,7 +183,7 @@ pub fn handleMap(listener: *wl.Listener(void)) void {
 
     const xsurface = xwindow.xsurface;
     const surface = xsurface.surface.?;
-    surface.data = @intFromPtr(&window.tree.node);
+    surface.data = &window.tree.node;
 
     xwindow.surface_tree = window.surface_tree.createSceneSubsurfaceTree(surface) catch {
         log.err("out of memory", .{});
@@ -210,7 +210,7 @@ pub fn handleMap(listener: *wl.Listener(void)) void {
 fn handleUnmap(listener: *wl.Listener(void)) void {
     const xwindow: *XwaylandWindow = @fieldParentPtr("unmap", listener);
 
-    xwindow.xsurface.surface.?.data = 0;
+    xwindow.xsurface.surface.?.data = null;
 
     xwindow.window.unmap();
 

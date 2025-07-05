@@ -97,8 +97,8 @@ pub fn create(wlr_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
 
     toplevel.window = window;
 
-    wlr_toplevel.base.data = @intFromPtr(toplevel);
-    wlr_toplevel.base.surface.data = @intFromPtr(&window.tree.node);
+    wlr_toplevel.base.data = toplevel;
+    wlr_toplevel.base.surface.data = &window.tree.node;
 
     wlr_toplevel.events.destroy.add(&toplevel.destroy);
     wlr_toplevel.base.events.ack_configure.add(&toplevel.ack_configure);
@@ -235,7 +235,7 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
     toplevel.set_app_id.link.remove();
 
     // The wlr_surface may outlive the wlr_xdg_toplevel so we must clean up the user data.
-    toplevel.wlr_toplevel.base.surface.data = 0;
+    toplevel.wlr_toplevel.base.surface.data = null;
 
     const window = toplevel.window;
     window.impl = .destroying;
@@ -318,7 +318,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     switch (toplevel.configure_state) {
         .idle, .committed, .timed_out => {
             const old_geometry = toplevel.geometry;
-            toplevel.wlr_toplevel.base.getGeometry(&toplevel.geometry);
+            toplevel.geometry = toplevel.wlr_toplevel.base.geometry;
 
             const size_changed = toplevel.geometry.width != old_geometry.width or
                 toplevel.geometry.height != old_geometry.height;
@@ -343,7 +343,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
         // stashed buffer from when the transaction started.
         .inflight => window.sendFrameDone(),
         .acked, .timed_out_acked => {
-            toplevel.wlr_toplevel.base.getGeometry(&toplevel.geometry);
+            toplevel.geometry = toplevel.wlr_toplevel.base.geometry;
 
             window.rendering_scheduled.width = @intCast(toplevel.geometry.width);
             window.rendering_scheduled.height = @intCast(toplevel.geometry.height);
@@ -374,7 +374,7 @@ fn handleRequestMove(
 ) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("request_move", listener);
     _ = toplevel;
-    const seat: *Seat = @ptrFromInt(event.seat.seat.data);
+    const seat: *Seat = @alignCast(@ptrCast(event.seat.seat.data));
 
     // Moving windows with touch or tablet tool is not yet supported.
     if (seat.wlr_seat.validatePointerGrabSerial(null, event.serial)) {
@@ -385,7 +385,7 @@ fn handleRequestMove(
 fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), event: *wlr.XdgToplevel.event.Resize) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("request_resize", listener);
     _ = toplevel;
-    const seat: *Seat = @ptrFromInt(event.seat.seat.data);
+    const seat: *Seat = @alignCast(@ptrCast(event.seat.seat.data));
 
     // Resizing windows with touch or tablet tool is not yet supported.
     if (seat.wlr_seat.validatePointerGrabSerial(null, event.serial)) {

@@ -86,7 +86,7 @@ pub fn init(device: *InputDevice, seat: *Seat, wlr_device: *wlr.InputDevice) !vo
         .link = undefined,
     };
 
-    wlr_device.data = @intFromPtr(device);
+    wlr_device.data = device;
 
     wlr_device.events.destroy.add(&device.destroy);
 
@@ -117,7 +117,7 @@ pub fn deinit(device: *InputDevice) void {
         device.seat.updateCapabilities();
     }
 
-    device.wlr_device.data = 0;
+    device.wlr_device.data = null;
 
     device.* = undefined;
 }

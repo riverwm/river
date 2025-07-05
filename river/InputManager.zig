@@ -176,7 +176,7 @@ fn handleNewVirtualKeyboard(
     _: *wl.Listener(*wlr.VirtualKeyboardV1),
     virtual_keyboard: *wlr.VirtualKeyboardV1,
 ) void {
-    const seat: *Seat = @ptrFromInt(virtual_keyboard.seat.data);
+    const seat: *Seat = @alignCast(@ptrCast(virtual_keyboard.seat.data));
     seat.addDevice(&virtual_keyboard.keyboard.base);
 }
 
@@ -191,7 +191,7 @@ fn handleNewConstraint(
 }
 
 fn handleNewInputMethod(_: *wl.Listener(*wlr.InputMethodV2), input_method: *wlr.InputMethodV2) void {
-    const seat: *Seat = @ptrFromInt(input_method.seat.data);
+    const seat: *Seat = @alignCast(@ptrCast(input_method.seat.data));
 
     log.debug("new input method on seat {s}", .{seat.wlr_seat.name});
 
