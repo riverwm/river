@@ -1129,15 +1129,15 @@
 
     <event name="wl_output">
       <description summary="corresponding wl_output">
-        The wl_output object corresponding to the river_output_v1.
+        The wl_output object corresponding to the river_output_v1. The argument
+        is the global name of the wl_output advertised with wl_registry.global.
+
+        It is guaranteed that the corresponding wl_output is advertised before
+        this event is sent.
 
         This event is sent exactly once. The wl_output associated with a
         river_output_v1 cannot change. It is guaranteed that there is a 1-to-1
         mapping between wl_output and river_output_v1 objects.
-
-        Note that this event will only be sent after the client binds the
-        wl_output global. It is guaranteed that the corresponding wl_output is
-        advertised before the river_window_manager_v1.output event is sent.
 
         The global_remove event for the corresponding wl_output may be sent
         before the river_output_v1.remove event. This is due to the fact that
@@ -1148,7 +1148,7 @@
         wl_output interface such as the name/description. It also may need the
         wl_output object to start screencopy for example.
       </description>
-      <arg name="wl_output" type="object" interface="wl_output"/>
+      <arg name="name" type="uint" summary="name of the wl_output global"/>
     </event>
 
     <event name="position">
@@ -1231,15 +1231,15 @@
 
     <event name="wl_seat">
       <description summary="corresponding wl_seat">
-        The wl_seat object corresponding to the river_seat_v1.
+        The wl_seat object corresponding to the river_seat_v1. The argument is
+        the global name of the wl_seat advertised with wl_registry.global.
+
+        It is guaranteed that the corresponding wl_seat is advertised before
+        this event is sent.
 
         This event is sent exactly once. The wl_seat associated with a
         river_seat_v1 cannot change. It is guaranteed that there is a 1-to-1
         mapping between wl_seat and river_seat_v1 objects.
-
-        Note that this event will only be sent after the client binds the
-        wl_seat global. It is guaranteed that the corresponding wl_seat is
-        advertised before the river_window_manager_v1.seat event is sent.
 
         The global_remove event for the corresponding wl_seat may be sent before
         the river_seat_v1.remove event. This is due to the fact that
@@ -1250,7 +1250,7 @@
         state changes based on normal input events received by its shell
         surfaces for example.
       </description>
-      <arg name="wl_seat" type="object" interface="wl_seat"/>
+      <arg name="name" type="uint" summary="name of the wl_seat global"/>
     </event>
 
     <request name="focus_window">
