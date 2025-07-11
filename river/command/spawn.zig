@@ -17,7 +17,7 @@
 const std = @import("std");
 const posix = std.posix;
 
-const c = @import("../c.zig");
+const c = @import("../c.zig").c;
 const util = @import("../util.zig");
 const process = @import("../process.zig");
 

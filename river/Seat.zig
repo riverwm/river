@@ -91,7 +91,7 @@ focused_output: ?*Output = null,
 focused: FocusTarget = .none,
 
 /// List of status tracking objects relaying changes to this seat to clients.
-status_trackers: std.SinglyLinkedList(SeatStatus) = .{},
+status_trackers: wl.list.Head(SeatStatus, .link),
 
 /// The currently in progress drag operation type.
 drag: enum {
@@ -109,7 +109,13 @@ drag_destroy: wl.Listener(*wlr.Drag) = wl.Listener(*wlr.Drag).init(handleDragDes
 request_set_primary_selection: wl.Listener(*wlr.Seat.event.RequestSetPrimarySelection) =
     wl.Listener(*wlr.Seat.event.RequestSetPrimarySelection).init(handleRequestSetPrimarySelection),
 
-pub fn init(seat: *Seat, name: [*:0]const u8) !void {
+// InputManager.seats
+link: wl.list.Link = undefined,
+
+pub fn create(name: [*:0]const u8) !void {
+    const seat = try util.gpa.create(Seat);
+    errdefer util.gpa.destroy(seat);
+
     const event_loop = server.wl_server.getEventLoop();
     const mapping_repeat_timer = try event_loop.addTimer(*Seat, handleMappingRepeatTimeout, seat);
     errdefer mapping_repeat_timer.remove();
@@ -121,8 +127,13 @@ pub fn init(seat: *Seat, name: [*:0]const u8) !void {
         .relay = undefined,
         .mapping_repeat_timer = mapping_repeat_timer,
         .keyboard_group = try wlr.KeyboardGroup.create(),
+        .status_trackers = undefined,
+        .link = undefined,
     };
     seat.wlr_seat.data = seat;
+
+    server.input_manager.seats.append(seat);
+    seat.status_trackers.init();
 
     try seat.cursor.init(seat);
     seat.relay.init();
@@ -135,7 +146,7 @@ pub fn init(seat: *Seat, name: [*:0]const u8) !void {
     seat.wlr_seat.events.request_set_primary_selection.add(&seat.request_set_primary_selection);
 }
 
-pub fn deinit(seat: *Seat) void {
+pub fn destroy(seat: *Seat) void {
     {
         var it = server.input_manager.devices.iterator(.forward);
         while (it.next()) |device| assert(device.seat != seat);
@@ -151,6 +162,10 @@ pub fn deinit(seat: *Seat) void {
     seat.start_drag.link.remove();
     if (seat.drag != .none) seat.drag_destroy.link.remove();
     seat.request_set_primary_selection.link.remove();
+
+    seat.link.remove();
+
+    util.gpa.destroy(seat);
 }
 
 /// Set the current focus. If a visible view is passed it will be focused.
@@ -295,8 +310,10 @@ pub fn setFocusRaw(seat: *Seat, new_focus: FocusTarget) void {
     seat.cursor.may_need_warp = true;
 
     // Inform any clients tracking status of the change
-    var it = seat.status_trackers.first;
-    while (it) |node| : (it = node.next) node.data.sendFocusedView();
+    var it = seat.status_trackers.iterator(.forward);
+    while (it.next()) |tracker| {
+        tracker.sendFocusedView();
+    }
 }
 
 /// Send keyboard enter/leave events and handle pointer constraints
@@ -314,14 +331,15 @@ fn keyboardNotifyEnter(seat: *Seat, wlr_surface: *wlr.Surface) void {
     if (seat.wlr_seat.getKeyboard()) |wlr_keyboard| {
         const keyboard: *Keyboard = @alignCast(@ptrCast(wlr_keyboard.data));
 
-        var keycodes: std.BoundedArray(u32, Keyboard.Pressed.capacity) = .{};
-        for (keyboard.pressed.keys.constSlice()) |item| {
+        var buffer: [Keyboard.Pressed.capacity]u32 = undefined;
+        var keycodes: std.ArrayList(u32) = .initBuffer(&buffer);
+        for (keyboard.pressed.slice()) |item| {
             if (item.consumer == .focus) keycodes.appendAssumeCapacity(item.code);
         }
 
         seat.wlr_seat.keyboardNotifyEnter(
             wlr_surface,
-            keycodes.constSlice(),
+            keycodes.items,
             &wlr_keyboard.modifiers,
         );
     } else {
@@ -334,15 +352,15 @@ pub fn focusOutput(seat: *Seat, output: ?*Output) void {
     if (seat.focused_output == output) return;
 
     if (seat.focused_output) |old| {
-        var it = seat.status_trackers.first;
-        while (it) |node| : (it = node.next) node.data.sendOutput(old, .unfocused);
+        var it = seat.status_trackers.iterator(.forward);
+        while (it.next()) |tracker| tracker.sendOutput(old, .unfocused);
     }
 
     seat.focused_output = output;
 
     if (seat.focused_output) |new| {
-        var it = seat.status_trackers.first;
-        while (it) |node| : (it = node.next) node.data.sendOutput(new, .focused);
+        var it = seat.status_trackers.iterator(.forward);
+        while (it.next()) |tracker| tracker.sendOutput(new, .focused);
     }
 
     // Depending on configuration and cursor position, changing output focus
@@ -357,9 +375,9 @@ pub fn handleActivity(seat: Seat) void {
 pub fn enterMode(seat: *Seat, mode_id: u32) void {
     seat.mode_id = mode_id;
 
-    var it = seat.status_trackers.first;
-    while (it) |node| : (it = node.next) {
-        node.data.sendMode(server.config.modes.items[mode_id].name);
+    var it = seat.status_trackers.iterator(.forward);
+    while (it.next()) |tracker| {
+        tracker.sendMode(server.config.modes.items[mode_id].name);
     }
 }
 
@@ -453,8 +471,8 @@ pub fn runCommand(seat: *Seat, args: []const [:0]const u8) void {
         return;
     };
     if (out) |s| {
-        const stdout = std.io.getStdOut().writer();
-        stdout.print("{s}", .{s}) catch |err| {
+        var stdout = std.fs.File.stdout().writer(&.{});
+        stdout.interface.print("{s}", .{s}) catch |err| {
             std.log.scoped(.command).err("{s}: write to stdout failed {}", .{ args[0], err });
         };
     }

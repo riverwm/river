@@ -91,15 +91,12 @@ const gpa = std.heap.c_allocator;
 const Context = struct {
     initialized: bool = false,
     layout_manager: ?*river.LayoutManagerV3 = null,
-    outputs: std.DoublyLinkedList(Output) = .{},
+    outputs: wl.list.Head(Output, .link),
 
     fn addOutput(context: *Context, registry: *wl.Registry, name: u32) !void {
         const wl_output = try registry.bind(name, wl.Output, 3);
         errdefer wl_output.release();
-        const node = try gpa.create(std.DoublyLinkedList(Output).Node);
-        errdefer gpa.destroy(node);
-        try node.data.init(context, wl_output, name);
-        context.outputs.append(node);
+        try Output.create(context, wl_output, name);
     }
 };
 
@@ -113,15 +110,21 @@ const Output = struct {
 
     layout: *river.LayoutV3 = undefined,
 
-    fn init(output: *Output, context: *Context, wl_output: *wl.Output, name: u32) !void {
+    link: wl.list.Link,
+
+    fn create(context: *Context, wl_output: *wl.Output, name: u32) !void {
+        const output = try gpa.create(Output);
+        errdefer gpa.destroy(output);
         output.* = .{
             .wl_output = wl_output,
             .name = name,
             .main_location = default_main_location,
             .main_count = default_main_count,
             .main_ratio = default_main_ratio,
+            .link = undefined,
         };
         if (context.initialized) try output.getLayout(context);
+        context.outputs.append(output);
     }
 
     fn getLayout(output: *Output, context: *Context) !void {
@@ -130,9 +133,11 @@ const Output = struct {
         output.layout.setListener(*Output, layoutListener, output);
     }
 
-    fn deinit(output: *Output) void {
+    fn destroy(output: *Output) void {
         output.wl_output.release();
         output.layout.destroy();
+        output.link.remove();
+        gpa.destroy(output);
     }
 
     fn layoutListener(layout: *river.LayoutV3, event: river.LayoutV3.Event, output: *Output) void {
@@ -312,17 +317,17 @@ pub fn main() !void {
         .{ .name = "main-count", .kind = .arg },
         .{ .name = "main-ratio", .kind = .arg },
     }).parse(std.os.argv[1..]) catch {
-        try std.io.getStdErr().writeAll(usage);
+        try std.fs.File.stderr().writeAll(usage);
         posix.exit(1);
     };
     if (result.flags.h) {
-        try std.io.getStdOut().writeAll(usage);
+        try std.fs.File.stdout().writeAll(usage);
         posix.exit(0);
     }
     if (result.args.len != 0) fatalPrintUsage("unknown option '{s}'", .{result.args[0]});
 
     if (result.flags.version) {
-        try std.io.getStdOut().writeAll(@import("build_options").version ++ "\n");
+        try std.fs.File.stdout().writeAll(@import("build_options").version ++ "\n");
         posix.exit(0);
     }
     if (result.flags.@"view-padding") |raw| {
@@ -356,7 +361,10 @@ pub fn main() !void {
     };
     defer display.disconnect();
 
-    var context: Context = .{};
+    var context: Context = .{
+        .outputs = undefined,
+    };
+    context.outputs.init();
 
     const registry = try display.getRegistry();
     registry.setListener(*Context, registryListener, &context);
@@ -368,9 +376,8 @@ pub fn main() !void {
 
     context.initialized = true;
 
-    var it = context.outputs.first;
-    while (it) |node| : (it = node.next) {
-        const output = &node.data;
+    var it = context.outputs.iterator(.forward);
+    while (it.next()) |output| {
         try output.getLayout(&context);
     }
 
@@ -389,13 +396,10 @@ fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, context: *
             }
         },
         .global_remove => |ev| {
-            var it = context.outputs.first;
-            while (it) |node| : (it = node.next) {
-                const output = &node.data;
+            var it = context.outputs.safeIterator(.forward);
+            while (it.next()) |output| {
                 if (output.name == ev.name) {
-                    context.outputs.remove(node);
-                    output.deinit();
-                    gpa.destroy(node);
+                    output.destroy();
                     break;
                 }
             }
@@ -410,7 +414,7 @@ fn fatal(comptime format: []const u8, args: anytype) noreturn {
 
 fn fatalPrintUsage(comptime format: []const u8, args: anytype) noreturn {
     std.log.err(format, args);
-    std.io.getStdErr().writeAll(usage) catch {};
+    std.fs.File.stderr().writeAll(usage) catch {};
     posix.exit(1);
 }
 

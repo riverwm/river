@@ -277,11 +277,12 @@ pub fn resizeUpdatePosition(view: *View, width: i32, height: i32) void {
     assert(view.inflight.resizing);
 
     const data = blk: {
-        var it = server.input_manager.seats.first;
-        while (it) |node| : (it = node.next) {
-            const cursor = &node.data.cursor;
-            if (cursor.inflight_mode == .resize and cursor.inflight_mode.resize.view == view) {
-                break :blk cursor.inflight_mode.resize;
+        var it = server.input_manager.seats.iterator(.forward);
+        while (it.next()) |seat| {
+            if (seat.cursor.inflight_mode == .resize and
+                seat.cursor.inflight_mode.resize.view == view)
+            {
+                break :blk seat.cursor.inflight_mode.resize;
             }
         } else {
             // The view resizing state should never be set when the view is
@@ -710,8 +711,8 @@ pub fn map(view: *View) !void {
     if (output) |o| {
         view.setPendingOutput(o);
 
-        var it = server.input_manager.seats.first;
-        while (it) |seat_node| : (it = seat_node.next) seat_node.data.focus(view);
+        var it = server.input_manager.seats.iterator(.forward);
+        while (it.next()) |seat| seat.focus(view);
     } else {
         log.debug("no output available for newly mapped view, adding to fallback stacks", .{});
 
@@ -778,12 +779,12 @@ pub fn notifyTitle(view: *const View) void {
     }
 
     // Send title to all status listeners attached to a seat which focuses this view
-    var seat_it = server.input_manager.seats.first;
-    while (seat_it) |seat_node| : (seat_it = seat_node.next) {
-        if (seat_node.data.focused == .view and seat_node.data.focused.view == view) {
-            var client_it = seat_node.data.status_trackers.first;
-            while (client_it) |client_node| : (client_it = client_node.next) {
-                client_node.data.sendFocusedView();
+    var seat_it = server.input_manager.seats.iterator(.forward);
+    while (seat_it.next()) |seat| {
+        if (seat.focused == .view and seat.focused.view == view) {
+            var it = seat.status_trackers.iterator(.forward);
+            while (it.next()) |tracker| {
+                tracker.sendFocusedView();
             }
         }
     }

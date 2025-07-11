@@ -22,7 +22,7 @@ const wlr = @import("wlroots");
 const xkb = @import("xkbcommon");
 const flags = @import("flags");
 
-const c = @import("../c.zig");
+const c = @import("../c.zig").c;
 const server = &@import("../main.zig").server;
 const util = @import("../util.zig");
 

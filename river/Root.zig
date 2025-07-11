@@ -337,9 +337,8 @@ pub fn deactivateOutput(root: *Root, output: *Output) void {
     }
 
     // If any seat has the removed output focused, focus the fallback one
-    var seat_it = server.input_manager.seats.first;
-    while (seat_it) |seat_node| : (seat_it = seat_node.next) {
-        const seat = &seat_node.data;
+    var seat_it = server.input_manager.seats.iterator(.forward);
+    while (seat_it.next()) |seat| {
         if (seat.focused_output == output) {
             seat.focusOutput(fallback_output);
         }
@@ -353,7 +352,7 @@ pub fn deactivateOutput(root: *Root, output: *Output) void {
         output.inflight.layout_demand = null;
         root.notifyLayoutDemandDone();
     }
-    while (output.layouts.first) |node| node.data.destroy();
+    while (output.layouts.first()) |layout| layout.destroy();
 
     // We must call reconfigureDevices here to unmap devices that might be mapped to this output
     // in order to prevent a segfault in wlroots.
@@ -397,9 +396,8 @@ pub fn activateOutput(root: *Root, output: *Output) void {
         }
         {
             // Focus the new output with all seats
-            var it = server.input_manager.seats.first;
-            while (it) |seat_node| : (it = seat_node.next) {
-                const seat = &seat_node.data;
+            var it = server.input_manager.seats.iterator(.forward);
+            while (it.next()) |seat| {
                 seat.focusOutput(output);
             }
         }
@@ -435,8 +433,8 @@ pub fn applyPending(root: *Root) void {
         // state consistent. Instead of having focus(null) calls spread all
         // around the codebase and risk forgetting one, always ensure focus
         // state is synchronized here.
-        var it = server.input_manager.seats.first;
-        while (it) |node| : (it = node.next) node.data.focus(null);
+        var it = server.input_manager.seats.iterator(.forward);
+        while (it.next()) |seat| seat.focus(null);
     }
 
     // If there is already a transaction inflight, wait until it completes.
@@ -546,11 +544,9 @@ pub fn applyPending(root: *Root) void {
     }
 
     {
-        var it = server.input_manager.seats.first;
-        while (it) |node| : (it = node.next) {
-            const cursor = &node.data.cursor;
-
-            switch (cursor.mode) {
+        var it = server.input_manager.seats.iterator(.forward);
+        while (it.next()) |seat| {
+            switch (seat.cursor.mode) {
                 .passthrough, .down => {},
                 inline .move, .resize => |data| {
                     if (data.view.inflight.output == null or
@@ -558,14 +554,14 @@ pub fn applyPending(root: *Root) void {
                         (!data.view.inflight.float and data.view.inflight.output.?.layout != null) or
                         data.view.inflight.fullscreen)
                     {
-                        cursor.mode = .passthrough;
+                        seat.cursor.mode = .passthrough;
                         data.view.pending.resizing = false;
                         data.view.inflight.resizing = false;
                     }
                 },
             }
 
-            cursor.inflight_mode = cursor.mode;
+            seat.cursor.inflight_mode = seat.cursor.mode;
         }
     }
 
@@ -710,8 +706,8 @@ fn commitTransaction(root: *Root) void {
     }
 
     {
-        var it = server.input_manager.seats.first;
-        while (it) |node| : (it = node.next) node.data.cursor.updateState();
+        var it = server.input_manager.seats.iterator(.forward);
+        while (it.next()) |seat| seat.cursor.updateState();
     }
 
     {

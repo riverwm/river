@@ -55,10 +55,10 @@ tablet_manager: *wlr.TabletManagerV2,
 
 /// List of input device configurations. Ordered by glob generality, with
 /// the most general towards the start and the most specific towards the end.
-configs: std.ArrayList(InputConfig),
+configs: std.ArrayList(InputConfig) = .{},
 
 devices: wl.list.Head(InputDevice, .link),
-seats: std.DoublyLinkedList(Seat) = .{},
+seats: wl.list.Head(Seat, .link),
 
 exclusive_client: ?*wl.Client = null,
 
@@ -74,9 +74,6 @@ new_text_input: wl.Listener(*wlr.TextInputV3) =
     wl.Listener(*wlr.TextInputV3).init(handleNewTextInput),
 
 pub fn init(input_manager: *InputManager) !void {
-    const seat_node = try util.gpa.create(std.DoublyLinkedList(Seat).Node);
-    errdefer util.gpa.destroy(seat_node);
-
     input_manager.* = .{
         // These are automatically freed when the display is destroyed
         .idle_notifier = try wlr.IdleNotifierV1.create(server.wl_server),
@@ -88,14 +85,14 @@ pub fn init(input_manager: *InputManager) !void {
         .input_method_manager = try wlr.InputMethodManagerV2.create(server.wl_server),
         .text_input_manager = try wlr.TextInputManagerV3.create(server.wl_server),
         .tablet_manager = try wlr.TabletManagerV2.create(server.wl_server),
-        .configs = std.ArrayList(InputConfig).init(util.gpa),
 
+        .seats = undefined,
         .devices = undefined,
     };
+    input_manager.seats.init();
     input_manager.devices.init();
 
-    input_manager.seats.prepend(seat_node);
-    try seat_node.data.init(default_seat_name);
+    try Seat.create(default_seat_name);
 
     if (build_options.xwayland) {
         if (server.xwayland) |xwayland| {
@@ -121,19 +118,18 @@ pub fn deinit(input_manager: *InputManager) void {
     input_manager.new_input_method.link.remove();
     input_manager.new_text_input.link.remove();
 
-    while (input_manager.seats.pop()) |seat_node| {
-        seat_node.data.deinit();
-        util.gpa.destroy(seat_node);
+    while (input_manager.seats.first()) |seat| {
+        seat.destroy();
     }
 
     for (input_manager.configs.items) |*config| {
         config.deinit();
     }
-    input_manager.configs.deinit();
+    input_manager.configs.deinit(util.gpa);
 }
 
-pub fn defaultSeat(input_manager: InputManager) *Seat {
-    return &input_manager.seats.first.?.data;
+pub fn defaultSeat(input_manager: *InputManager) *Seat {
+    return input_manager.seats.first().?;
 }
 
 /// Returns true if input is currently allowed on the passed surface.

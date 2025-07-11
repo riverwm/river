@@ -28,31 +28,38 @@ const IdleInhibitManager = @import("IdleInhibitManager.zig");
 inhibit_manager: *IdleInhibitManager,
 wlr_inhibitor: *wlr.IdleInhibitorV1,
 
-destroy: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleDestroy),
+listen_destroy: wl.Listener(*wlr.Surface) = wl.Listener(*wlr.Surface).init(handleDestroy),
 
-pub fn init(
-    inhibitor: *IdleInhibitor,
-    wlr_inhibitor: *wlr.IdleInhibitorV1,
-    inhibit_manager: *IdleInhibitManager,
-) !void {
+link: wl.list.Link,
+
+pub fn create(wlr_inhibitor: *wlr.IdleInhibitorV1, inhibit_manager: *IdleInhibitManager) !void {
+    const inhibitor = try util.gpa.create(IdleInhibitor);
+    errdefer util.gpa.destroy(inhibitor);
+
     inhibitor.* = .{
         .inhibit_manager = inhibit_manager,
         .wlr_inhibitor = wlr_inhibitor,
+        .link = undefined,
     };
-    wlr_inhibitor.events.destroy.add(&inhibitor.destroy);
+    wlr_inhibitor.events.destroy.add(&inhibitor.listen_destroy);
+
+    inhibit_manager.inhibitors.append(inhibitor);
 
     inhibit_manager.checkActive();
 }
 
-fn handleDestroy(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
-    const inhibitor: *IdleInhibitor = @fieldParentPtr("destroy", listener);
+pub fn destroy(inhibitor: *IdleInhibitor) void {
+    inhibitor.listen_destroy.link.remove();
 
-    inhibitor.destroy.link.remove();
-
-    const node: *std.DoublyLinkedList(IdleInhibitor).Node = @fieldParentPtr("data", inhibitor);
-    server.idle_inhibit_manager.inhibitors.remove(node);
+    inhibitor.link.remove();
 
     inhibitor.inhibit_manager.checkActive();
 
-    util.gpa.destroy(node);
+    util.gpa.destroy(inhibitor);
+}
+
+fn handleDestroy(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
+    const inhibitor: *IdleInhibitor = @fieldParentPtr("listen_destroy", listener);
+
+    inhibitor.destroy();
 }

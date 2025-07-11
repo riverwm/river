@@ -35,9 +35,8 @@ pub fn cursor(
         if (args.len < 3) return Error.NotEnoughArguments;
         if (args.len > 3) return Error.TooManyArguments;
         server.config.cursor_hide_timeout = try std.fmt.parseInt(u31, args[2], 10);
-        var seat_it = server.input_manager.seats.first;
-        while (seat_it) |seat_node| : (seat_it = seat_node.next) {
-            const seat = &seat_node.data;
+        var seat_it = server.input_manager.seats.iterator(.forward);
+        while (seat_it.next()) |seat| {
             seat.cursor.unhide();
         }
     } else if (std.mem.eql(u8, "when-typing", args[1])) {

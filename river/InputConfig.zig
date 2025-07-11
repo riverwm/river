@@ -25,7 +25,7 @@ const wlr = @import("wlroots");
 
 const log = std.log.scoped(.input_config);
 
-const c = @import("c.zig");
+const c = @import("c.zig").c;
 
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
@@ -373,7 +373,7 @@ pub fn parse(config: *InputConfig, setting: []const u8, value: []const u8) !void
     return error.UnknownCommand;
 }
 
-pub fn write(config: *InputConfig, writer: anytype) !void {
+pub fn write(config: *InputConfig, writer: *std.Io.Writer) !void {
     try writer.print("{s}\n", .{config.glob});
 
     inline for (@typeInfo(InputConfig).@"struct".fields) |field| {

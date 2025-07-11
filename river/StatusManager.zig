@@ -88,25 +88,21 @@ fn handleRequest(
             const wlr_seat = wlr.Seat.Client.fromWlSeat(req.seat) orelse return;
             const seat: *Seat = @alignCast(@ptrCast(wlr_seat.seat.data));
 
-            const node = util.gpa.create(std.SinglyLinkedList(SeatStatus).Node) catch {
-                status_manager_v1.getClient().postNoMemory();
-                log.err("out of memory", .{});
-                return;
-            };
-
             const seat_status = zriver.SeatStatusV1.create(
                 status_manager_v1.getClient(),
                 status_manager_v1.getVersion(),
                 req.id,
             ) catch {
                 status_manager_v1.getClient().postNoMemory();
-                util.gpa.destroy(node);
                 log.err("out of memory", .{});
                 return;
             };
 
-            node.data.init(seat, seat_status);
-            seat.status_trackers.prepend(node);
+            SeatStatus.create(seat, seat_status) catch {
+                status_manager_v1.getClient().postNoMemory();
+                log.err("out of memory", .{});
+                return;
+            };
         },
     }
 }

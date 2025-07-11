@@ -18,14 +18,13 @@ const build_options = @import("build_options");
 const std = @import("std");
 const mem = std.mem;
 const fs = std.fs;
-const io = std.io;
 const log = std.log;
 const posix = std.posix;
 const builtin = @import("builtin");
 const wlr = @import("wlroots");
 const flags = @import("flags");
 
-const c = @import("c.zig");
+const c = @import("c.zig").c;
 const util = @import("util.zig");
 const process = @import("process.zig");
 
@@ -52,21 +51,21 @@ pub fn main() anyerror!void {
         .{ .name = "log-level", .kind = .arg },
         .{ .name = "no-xwayland", .kind = .boolean },
     }).parse(std.os.argv[1..]) catch {
-        try io.getStdErr().writeAll(usage);
+        try fs.File.stderr().writeAll(usage);
         posix.exit(1);
     };
     if (result.flags.h) {
-        try io.getStdOut().writeAll(usage);
+        try fs.File.stdout().writeAll(usage);
         posix.exit(0);
     }
     if (result.args.len != 0) {
         log.err("unknown option '{s}'", .{result.args[0]});
-        try io.getStdErr().writeAll(usage);
+        try fs.File.stderr().writeAll(usage);
         posix.exit(1);
     }
 
     if (result.flags.version) {
-        try io.getStdOut().writeAll(build_options.version ++ "\n");
+        try fs.File.stdout().writeAll(build_options.version ++ "\n");
         posix.exit(0);
     }
     if (result.flags.@"log-level") |level| {
@@ -80,7 +79,7 @@ pub fn main() anyerror!void {
             runtime_log_level = .debug;
         } else {
             log.err("invalid log level '{s}'", .{level});
-            try io.getStdErr().writeAll(usage);
+            try fs.File.stderr().writeAll(usage);
             posix.exit(1);
         }
     }
@@ -189,8 +188,8 @@ pub fn logFn(
 
     const scope_prefix = if (scope == .default) ": " else "(" ++ @tagName(scope) ++ "): ";
 
-    const stderr = io.getStdErr().writer();
-    stderr.print(level.asText() ++ scope_prefix ++ format ++ "\n", args) catch {};
+    var stderr = fs.File.stderr().writer(&.{});
+    stderr.interface.print(level.asText() ++ scope_prefix ++ format ++ "\n", args) catch {};
 }
 
 /// See wlroots_log_wrapper.c

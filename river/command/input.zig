@@ -34,8 +34,8 @@ pub fn listInputs(
 ) Error!void {
     if (args.len > 1) return error.TooManyArguments;
 
-    var input_list = std.ArrayList(u8).init(util.gpa);
-    const writer = input_list.writer();
+    var aw: std.Io.Writer.Allocating = .init(util.gpa);
+
     var prev = false;
 
     var it = server.input_manager.devices.iterator(.forward);
@@ -46,16 +46,16 @@ pub fn listInputs(
             }
         } else false;
 
-        if (prev) try input_list.appendSlice("\n");
+        if (prev) try aw.writer.writeByte('\n');
         prev = true;
 
-        try writer.print("{s}\n\tconfigured: {}\n", .{
+        try aw.writer.print("{s}\n\tconfigured: {}\n", .{
             device.identifier,
             configured,
         });
     }
 
-    out.* = try input_list.toOwnedSlice();
+    out.* = try aw.toOwnedSlice();
 }
 
 pub fn listInputConfigs(
@@ -65,15 +65,14 @@ pub fn listInputConfigs(
 ) Error!void {
     if (args.len > 1) return error.TooManyArguments;
 
-    var input_list = std.ArrayList(u8).init(util.gpa);
-    const writer = input_list.writer();
+    var aw: std.Io.Writer.Allocating = .init(util.gpa);
 
     for (server.input_manager.configs.items, 0..) |*input_config, i| {
-        if (i > 0) try writer.writeByte('\n');
-        try input_config.write(writer);
+        if (i > 0) try aw.writer.writeByte('\n');
+        try input_config.write(&aw.writer);
     }
 
-    out.* = try input_list.toOwnedSlice();
+    out.* = try aw.toOwnedSlice();
 }
 
 pub fn input(
@@ -99,7 +98,7 @@ pub fn input(
         };
         errdefer util.gpa.free(input_config.glob);
 
-        try server.input_manager.configs.ensureUnusedCapacity(1);
+        try server.input_manager.configs.ensureUnusedCapacity(util.gpa, 1);
 
         try input_config.parse(args[2], args[3]);
 

@@ -31,8 +31,19 @@ const View = @import("View.zig");
 seat: *Seat,
 seat_status_v1: *zriver.SeatStatusV1,
 
-pub fn init(seat_status: *SeatStatus, seat: *Seat, seat_status_v1: *zriver.SeatStatusV1) void {
-    seat_status.* = .{ .seat = seat, .seat_status_v1 = seat_status_v1 };
+link: wl.list.Link,
+
+pub fn create(seat: *Seat, seat_status_v1: *zriver.SeatStatusV1) !void {
+    const seat_status = try util.gpa.create(SeatStatus);
+    errdefer util.gpa.destroy(seat_status);
+
+    seat_status.* = .{
+        .seat = seat,
+        .seat_status_v1 = seat_status_v1,
+        .link = undefined,
+    };
+    seat.status_trackers.append(seat_status);
+    errdefer comptime unreachable;
 
     seat_status_v1.setHandler(*SeatStatus, handleRequest, handleDestroy, seat_status);
 
@@ -49,9 +60,8 @@ fn handleRequest(seat_status_v1: *zriver.SeatStatusV1, request: zriver.SeatStatu
 }
 
 fn handleDestroy(_: *zriver.SeatStatusV1, seat_status: *SeatStatus) void {
-    const node: *std.SinglyLinkedList(SeatStatus).Node = @fieldParentPtr("data", seat_status);
-    seat_status.seat.status_trackers.remove(node);
-    util.gpa.destroy(node);
+    seat_status.link.remove();
+    util.gpa.destroy(seat_status);
 }
 
 pub fn sendOutput(seat_status: SeatStatus, output: *Output, state: enum { focused, unfocused }) void {

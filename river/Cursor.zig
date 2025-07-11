@@ -26,7 +26,7 @@ const wayland = @import("wayland");
 const wl = wayland.server.wl;
 const zwlr = wayland.server.zwlr;
 
-const c = @import("c.zig");
+const c = @import("c.zig").c;
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
@@ -296,7 +296,7 @@ pub fn setTheme(cursor: *Cursor, theme: ?[*:0]const u8, _size: ?u32) !void {
     // If this cursor belongs to the default seat, set the xcursor environment
     // variables as well as the xwayland cursor theme.
     if (cursor.seat == server.input_manager.defaultSeat()) {
-        const size_str = try std.fmt.allocPrintZ(util.gpa, "{}", .{size});
+        const size_str = try std.fmt.allocPrintSentinel(util.gpa, "{}", .{size}, 0);
         defer util.gpa.free(size_str);
         if (c.setenv("XCURSOR_SIZE", size_str.ptr, 1) < 0) return error.OutOfMemory;
         if (theme) |t| if (c.setenv("XCURSOR_THEME", t, 1) < 0) return error.OutOfMemory;
@@ -378,8 +378,8 @@ fn handleAxis(listener: *wl.Listener(*wlr.Pointer.event.Axis), event: *wlr.Point
             // @intFromFloat() call safe due to the max/min i32 not being exactly representable
             // by an f32. Dividing by 2 is a low effort way to ensure the value is in bounds and
             // allow users to set their scroll-factor to inf without crashing river.
-            math.minInt(i32) / 2,
-            math.maxInt(i32) / 2,
+            @as(f32, @floatFromInt(math.minInt(i32) / 2)),
+            @as(f32, @floatFromInt(math.maxInt(i32) / 2)),
         )),
         event.source,
         event.relative_direction,

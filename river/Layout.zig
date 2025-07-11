@@ -38,6 +38,9 @@ layout_v3: *river.LayoutV3,
 namespace: []const u8,
 output: *Output,
 
+// Output.layouts
+link: wl.list.Link,
+
 pub fn create(client: *wl.Client, version: u32, id: u32, output: *Output, namespace: []const u8) !void {
     const layout_v3 = try river.LayoutV3.create(client, version, id);
 
@@ -47,21 +50,22 @@ pub fn create(client: *wl.Client, version: u32, id: u32, output: *Output, namesp
         return;
     }
 
-    const node = try util.gpa.create(std.DoublyLinkedList(Layout).Node);
-    errdefer util.gpa.destroy(node);
-    node.data = .{
+    const layout = try util.gpa.create(Layout);
+    errdefer util.gpa.destroy(layout);
+    layout.* = .{
         .layout_v3 = layout_v3,
         .namespace = try util.gpa.dupe(u8, namespace),
         .output = output,
+        .link = undefined,
     };
-    output.layouts.append(node);
+    output.layouts.append(layout);
 
-    layout_v3.setHandler(*Layout, handleRequest, handleDestroy, &node.data);
+    layout_v3.setHandler(*Layout, handleRequest, handleDestroy, layout);
 
     // If the namespace matches that of the output, set the layout as
     // the active one of the output and arrange it.
     if (mem.eql(u8, namespace, output.layoutNamespace())) {
-        output.layout = &node.data;
+        output.layout = layout;
         server.root.applyPending();
     }
 }
@@ -71,17 +75,17 @@ pub fn create(client: *wl.Client, version: u32, id: u32, output: *Output, namesp
 fn namespaceInUse(namespace: []const u8, output: *Output, client: *wl.Client) bool {
     var output_it = server.root.active_outputs.iterator(.forward);
     while (output_it.next()) |o| {
-        var layout_it = output.layouts.first;
+        var layout_it = output.layouts.iterator(.forward);
         if (o == output) {
             // On this output, no other layout can have our namespace.
-            while (layout_it) |layout_node| : (layout_it = layout_node.next) {
-                if (mem.eql(u8, namespace, layout_node.data.namespace)) return true;
+            while (layout_it.next()) |layout| {
+                if (mem.eql(u8, namespace, layout.namespace)) return true;
             }
         } else {
             // Layouts on other outputs may share the namespace, if they come from the same client.
-            while (layout_it) |layout_node| : (layout_it = layout_node.next) {
-                if (mem.eql(u8, namespace, layout_node.data.namespace) and
-                    client != layout_node.data.layout_v3.getClient()) return true;
+            while (layout_it.next()) |layout| {
+                if (mem.eql(u8, namespace, layout.namespace) and
+                    client != layout.layout_v3.getClient()) return true;
             }
         }
     }
@@ -185,9 +189,7 @@ pub fn destroy(layout: *Layout) void {
         .{ layout.namespace, layout.output.wlr_output.name },
     );
 
-    // Remove layout from the list
-    const node: *std.DoublyLinkedList(Layout).Node = @fieldParentPtr("data", layout);
-    layout.output.layouts.remove(node);
+    layout.link.remove();
 
     // If we are the currently active layout of an output, clean up.
     if (layout.output.layout == layout) {
@@ -208,5 +210,5 @@ pub fn destroy(layout: *Layout) void {
     layout.layout_v3.setHandler(?*anyopaque, handleRequestInert, null, null);
 
     util.gpa.free(layout.namespace);
-    util.gpa.destroy(node);
+    util.gpa.destroy(layout);
 }

@@ -57,7 +57,7 @@ To compile river first ensure that you have the following dependencies
 installed. The "development" versions are required if applicable to your
 distribution.
 
-- [zig](https://ziglang.org/download/) 0.14
+- [zig](https://ziglang.org/download/) 0.15
 - wayland
 - wayland-protocols
 - [wlroots](https://gitlab.freedesktop.org/wlroots/wlroots) 0.19

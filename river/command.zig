@@ -122,6 +122,7 @@ pub const Error = error{
     CannotParseFile,
     UnknownOption,
     ConflictingOptions,
+    WriteFailed,
     OutOfMemory,
     Other,
 };
@@ -165,7 +166,7 @@ pub fn errToMsg(err: Error) [:0]const u8 {
         Error.InvalidValue => "invalid value",
         Error.CannotReadFile => "cannot read file",
         Error.CannotParseFile => "cannot parse file",
-        Error.OutOfMemory => "out of memory",
+        Error.WriteFailed, Error.OutOfMemory => "out of memory",
         Error.Other => unreachable,
     };
 }

@@ -57,33 +57,52 @@ pub const Pressed = struct {
         assert(capacity == @typeInfo(std.meta.fieldInfo(wlr.Keyboard, .keycodes).type).array.len);
     }
 
-    keys: std.BoundedArray(Key, capacity) = .{},
+    keys: [capacity]Key,
+    len: usize,
+
+    const empty: Pressed = .{ .keys = undefined, .len = 0 };
+
+    pub fn slice(pressed: *Pressed) []Key {
+        return pressed.keys[0..pressed.len];
+    }
 
     fn contains(pressed: *Pressed, code: u32) bool {
-        for (pressed.keys.constSlice()) |item| {
+        for (pressed.slice()) |item| {
             if (item.code == code) return true;
         }
         return false;
     }
 
     fn addAssumeCapacity(pressed: *Pressed, new: Key) void {
+        assert(pressed.len < pressed.keys.len);
         assert(!pressed.contains(new.code));
-        pressed.keys.appendAssumeCapacity(new);
+        pressed.keys[pressed.len] = new;
+        pressed.len += 1;
     }
 
     fn remove(pressed: *Pressed, code: u32) ?KeyConsumer {
-        for (pressed.keys.constSlice(), 0..) |item, idx| {
-            if (item.code == code) return pressed.keys.swapRemove(idx).consumer;
+        for (pressed.slice(), 0..) |item, idx| {
+            if (item.code == code) return pressed.swapRemove(idx).consumer;
         }
 
         return null;
+    }
+
+    fn swapRemove(pressed: *Pressed, index: usize) Key {
+        defer pressed.len -= 1;
+        if (index == pressed.len - 1) {
+            return pressed.keys[index];
+        }
+        const ret = pressed.keys[index];
+        pressed.keys[index] = pressed.keys[pressed.len - 1];
+        return ret;
     }
 };
 
 device: InputDevice,
 
 /// Pressed keys along with where their press event has been sent
-pressed: Pressed = .{},
+pressed: Pressed = .empty,
 
 key: wl.Listener(*wlr.Keyboard.event.Key) = wl.Listener(*wlr.Keyboard.event.Key).init(handleKey),
 modifiers: wl.Listener(*wlr.Keyboard) = wl.Listener(*wlr.Keyboard).init(handleModifiers),
@@ -203,7 +222,9 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
         // Ignore key presses beyond 32 simultaneously pressed keys (see comments in Pressed).
         // We must ensure capacity before calling handleMapping() to ensure that we either run
         // both the press and release mapping for certain key or neither mapping.
-        keyboard.pressed.keys.ensureUnusedCapacity(1) catch return;
+        if (keyboard.pressed.len >= keyboard.pressed.keys.len) {
+            return;
+        }
 
         if (keyboard.device.seat.handleMapping(keycode, modifiers, released, xkb_state)) {
             break :blk .mapping;

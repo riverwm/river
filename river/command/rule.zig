@@ -15,6 +15,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
+const assert = std.debug.assert;
 const fmt = std.fmt;
 
 const globber = @import("globber");
@@ -217,6 +218,12 @@ fn apply_tearing_rules() void {
     }
 }
 
+fn alignLeft(buf: []const u8, width: usize, writer: *std.io.Writer) Error!void {
+    assert(buf.len <= width);
+    try writer.writeAll(buf);
+    try writer.splatByteAll(' ', width - buf.len);
+}
+
 pub fn listRules(_: *Seat, args: []const [:0]const u8, out: *?[]const u8) Error!void {
     if (args.len < 2) return error.NotEnoughArguments;
     if (args.len > 2) return error.TooManyArguments;
@@ -237,11 +244,12 @@ pub fn listRules(_: *Seat, args: []const [:0]const u8, out: *?[]const u8) Error!
     const app_id_column_max = 2 + @max("app-id".len, max_glob_len.app_id);
     const title_column_max = 2 + @max("title".len, max_glob_len.title);
 
-    var buffer = std.ArrayList(u8).init(util.gpa);
-    const writer = buffer.writer();
+    var buffer = std.io.Writer.Allocating.init(util.gpa);
+    defer buffer.deinit();
+    const writer = &buffer.writer;
 
-    try fmt.formatBuf("title", .{ .width = title_column_max, .alignment = .left }, writer);
-    try fmt.formatBuf("app-id", .{ .width = app_id_column_max, .alignment = .left }, writer);
+    try alignLeft("title", title_column_max, writer);
+    try alignLeft("app-id", app_id_column_max, writer);
     try writer.writeAll("action\n");
 
     switch (rule_list) {
@@ -255,8 +263,8 @@ pub fn listRules(_: *Seat, args: []const [:0]const u8, out: *?[]const u8) Error!
                 else => unreachable,
             };
             for (rules) |rule| {
-                try fmt.formatBuf(rule.title_glob, .{ .width = title_column_max, .alignment = .left }, writer);
-                try fmt.formatBuf(rule.app_id_glob, .{ .width = app_id_column_max, .alignment = .left }, writer);
+                try alignLeft(rule.title_glob, title_column_max, writer);
+                try alignLeft(rule.app_id_glob, app_id_column_max, writer);
                 try writer.print("{s}\n", .{switch (list) {
                     .float => if (rule.value) "float" else "no-float",
                     .ssd => if (rule.value) "ssd" else "csd",
@@ -269,22 +277,22 @@ pub fn listRules(_: *Seat, args: []const [:0]const u8, out: *?[]const u8) Error!
         },
         .tags => {
             for (server.config.rules.tags.rules.items) |rule| {
-                try fmt.formatBuf(rule.title_glob, .{ .width = title_column_max, .alignment = .left }, writer);
-                try fmt.formatBuf(rule.app_id_glob, .{ .width = app_id_column_max, .alignment = .left }, writer);
+                try alignLeft(rule.title_glob, title_column_max, writer);
+                try alignLeft(rule.app_id_glob, app_id_column_max, writer);
                 try writer.print("{b}\n", .{rule.value});
             }
         },
         .position => {
             for (server.config.rules.position.rules.items) |rule| {
-                try fmt.formatBuf(rule.title_glob, .{ .width = title_column_max, .alignment = .left }, writer);
-                try fmt.formatBuf(rule.app_id_glob, .{ .width = app_id_column_max, .alignment = .left }, writer);
+                try alignLeft(rule.title_glob, title_column_max, writer);
+                try alignLeft(rule.app_id_glob, app_id_column_max, writer);
                 try writer.print("{d},{d}\n", .{ rule.value.x, rule.value.y });
             }
         },
         .dimensions => {
             for (server.config.rules.dimensions.rules.items) |rule| {
-                try fmt.formatBuf(rule.title_glob, .{ .width = title_column_max, .alignment = .left }, writer);
-                try fmt.formatBuf(rule.app_id_glob, .{ .width = app_id_column_max, .alignment = .left }, writer);
+                try alignLeft(rule.title_glob, title_column_max, writer);
+                try alignLeft(rule.app_id_glob, app_id_column_max, writer);
                 try writer.print("{d}x{d}\n", .{ rule.value.width, rule.value.height });
             }
         },

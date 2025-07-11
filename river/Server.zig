@@ -24,7 +24,7 @@ const posix = std.posix;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
-const c = @import("c.zig");
+const c = @import("c.zig").c;
 const util = @import("util.zig");
 
 const Config = @import("Config.zig");

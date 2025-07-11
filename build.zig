@@ -12,7 +12,6 @@ pub fn build(b: *Build) !void {
 
     const strip = b.option(bool, "strip", "Omit debug information") orelse false;
     const pie = b.option(bool, "pie", "Build a Position Independent Executable") orelse false;
-    const llvm = !(b.option(bool, "no-llvm", "(expirimental) Use non-LLVM x86 Zig backend") orelse false);
 
     const omit_frame_pointer = switch (optimize) {
         .Debug, .ReleaseSafe => false,
@@ -150,12 +149,12 @@ pub fn build(b: *Build) !void {
     {
         const river = b.addExecutable(.{
             .name = "river",
-            .root_source_file = b.path("river/main.zig"),
-            .target = target,
-            .optimize = optimize,
-            .strip = strip,
-            .use_llvm = llvm,
-            .use_lld = llvm,
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("river/main.zig"),
+                .target = target,
+                .optimize = optimize,
+                .strip = strip,
+            }),
         });
         river.root_module.addOptions("build_options", options);
 
@@ -188,12 +187,12 @@ pub fn build(b: *Build) !void {
     {
         const riverctl = b.addExecutable(.{
             .name = "riverctl",
-            .root_source_file = b.path("riverctl/main.zig"),
-            .target = target,
-            .optimize = optimize,
-            .strip = strip,
-            .use_llvm = llvm,
-            .use_lld = llvm,
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("riverctl/main.zig"),
+                .target = target,
+                .optimize = optimize,
+                .strip = strip,
+            }),
         });
         riverctl.root_module.addOptions("build_options", options);
 
@@ -211,12 +210,12 @@ pub fn build(b: *Build) !void {
     {
         const rivertile = b.addExecutable(.{
             .name = "rivertile",
-            .root_source_file = b.path("rivertile/main.zig"),
-            .target = target,
-            .optimize = optimize,
-            .strip = strip,
-            .use_llvm = llvm,
-            .use_lld = llvm,
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("rivertile/main.zig"),
+                .target = target,
+                .optimize = optimize,
+                .strip = strip,
+            }),
         });
         rivertile.root_module.addOptions("build_options", options);
 
@@ -275,9 +274,11 @@ pub fn build(b: *Build) !void {
 
     {
         const globber_test = b.addTest(.{
-            .root_source_file = b.path("common/globber.zig"),
-            .target = target,
-            .optimize = optimize,
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("common/globber.zig"),
+                .target = target,
+                .optimize = optimize,
+            }),
         });
         const run_globber_test = b.addRunArtifact(globber_test);
 

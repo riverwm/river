@@ -68,9 +68,8 @@ pub fn destroy(lock_surface: *LockSurface) void {
                 break .{ .lock_surface = @alignCast(@ptrCast(surface.data)) };
         } else .none;
 
-        var seat_it = server.input_manager.seats.first;
-        while (seat_it) |node| : (seat_it = node.next) {
-            const seat = &node.data;
+        var seat_it = server.input_manager.seats.iterator(.forward);
+        while (seat_it.next()) |seat| {
             if (seat.focused == .lock_surface and seat.focused.lock_surface == lock_surface) {
                 seat.setFocusRaw(new_focus);
             }
@@ -122,9 +121,8 @@ fn handleMap(listener: *wl.Listener(void)) void {
 }
 
 fn updateFocus(lock_surface: *LockSurface) void {
-    var it = server.input_manager.seats.first;
-    while (it) |node| : (it = node.next) {
-        const seat = &node.data;
+    var it = server.input_manager.seats.iterator(.forward);
+    while (it.next()) |seat| {
         if (seat.focused != .lock_surface) {
             seat.setFocusRaw(.{ .lock_surface = lock_surface });
         }

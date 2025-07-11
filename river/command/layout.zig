@@ -71,9 +71,8 @@ pub fn sendLayoutCmd(
     const output = seat.focused_output orelse return;
     const target_namespace = args[1];
 
-    var it = output.layouts.first;
-    const layout = while (it) |node| : (it = node.next) {
-        const layout = &node.data;
+    var it = output.layouts.iterator(.forward);
+    const layout = while (it.next()) |layout| {
         if (mem.eql(u8, layout.namespace, target_namespace)) break layout;
     } else return;
 

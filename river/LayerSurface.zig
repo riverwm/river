@@ -173,10 +173,8 @@ fn handleKeyboardInteractiveExclusive(output: *Output, consider: ?*LayerSurface)
         assert(s.wlr_layer_surface.current.keyboard_interactive != .none);
     }
 
-    var it = server.input_manager.seats.first;
-    while (it) |node| : (it = node.next) {
-        const seat = &node.data;
-
+    var it = server.input_manager.seats.iterator(.forward);
+    while (it.next()) |seat| {
         if (seat.focused_output == output) {
             if (to_focus) |s| {
                 // If we found a surface on the output that requires focus, grab the focus of all
