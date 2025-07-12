@@ -159,7 +159,7 @@ pub fn configure(toplevel: *XdgToplevel) bool {
         .minimize = scheduled.capabilities.minimize,
     });
     _ = wlr_toplevel.setMaximized(scheduled.maximized);
-    _ = wlr_toplevel.setFullscreen(scheduled.fullscreen);
+    _ = wlr_toplevel.setFullscreen(scheduled.inform_fullscreen);
     _ = wlr_toplevel.setResizing(scheduled.resizing);
     if (toplevel.decoration) |decoration| {
         _ = decoration.wlr_decoration.setMode(if (scheduled.ssd) .server_side else .client_side);
@@ -201,7 +201,7 @@ fn needsConfigure(toplevel: *XdgToplevel) bool {
     if (!std.meta.eql(scheduled.tiled, sent.tiled)) return true;
     if (!std.meta.eql(scheduled.capabilities, sent.capabilities)) return true;
     if (scheduled.maximized != sent.maximized) return true;
-    if (scheduled.fullscreen != sent.fullscreen) return true;
+    if (scheduled.inform_fullscreen != sent.inform_fullscreen) return true;
     if ((scheduled.resizing) != (sent.resizing)) return true;
 
     return false;
@@ -365,7 +365,17 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
 
 fn handleRequestFullscreen(listener: *wl.Listener(void)) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("request_fullscreen", listener);
-    toplevel.window.setFullscreenRequested(toplevel.wlr_toplevel.requested.fullscreen);
+    if (toplevel.wlr_toplevel.requested.fullscreen) {
+        if (toplevel.wlr_toplevel.requested.fullscreen_output) |wlr_output| {
+            const output: *Output = @ptrCast(@alignCast(wlr_output.data));
+            toplevel.window.wm_scheduled.fullscreen_requested = .{ .fullscreen = output };
+        } else {
+            toplevel.window.wm_scheduled.fullscreen_requested = .{ .fullscreen = null };
+        }
+    } else {
+        toplevel.window.wm_scheduled.fullscreen_requested = .exit;
+    }
+    server.wm.dirtyWindowing();
 }
 
 fn handleRequestMove(

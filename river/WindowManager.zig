@@ -424,18 +424,26 @@ fn renderFinish(wm: *WindowManager) void {
     }
 
     {
+        var found_fullscreen: bool = false;
         var it = wm.rendering_requested.list.iterator(.forward);
         while (it.next()) |node| {
             switch (node.get()) {
                 .window => |window| {
                     window.renderFinish();
-
                     window.tree.node.reparent(server.scene.layers.wm);
-                    window.tree.node.raiseToTop();
+                    if (window.wm_requested.fullscreen != null) {
+                        found_fullscreen = true;
+                        window.tree.node.raiseToTop();
+                    }
+                    // Rendering order for windows below the top fullscreen window
+                    // (if present) does not matter, as they will be fully obscured
+                    // by the opaque black fullscreen background rect.
+                    if (!found_fullscreen) {
+                        window.tree.node.raiseToTop();
+                    }
                 },
                 .shell_surface => |shell_surface| {
                     shell_surface.renderFinish();
-
                     shell_surface.tree.node.reparent(server.scene.layers.wm);
                     shell_surface.tree.node.raiseToTop();
                 },

@@ -70,44 +70,20 @@ pub const State = struct {
     adaptive_sync: bool,
     auto_layout: bool = true,
 
-    /// Width in the logical coordinate space
-    pub fn width(state: *const State) i32 {
-        const physical: f32 = blk: {
-            if (@mod(@intFromEnum(state.transform), 2) == 0) {
-                break :blk @floatFromInt(switch (state.mode) {
-                    .standard => |mode| mode.width,
-                    .custom => |mode| mode.width,
-                    .none => 0,
-                });
-            } else {
-                break :blk @floatFromInt(switch (state.mode) {
-                    .standard => |mode| mode.height,
-                    .custom => |mode| mode.height,
-                    .none => 0,
-                });
-            }
+    /// Width/height in the logical coordinate space
+    pub fn dimensions(state: *const State) struct { u31, u31 } {
+        var w: i32, var h: i32 = switch (state.mode) {
+            .standard => |mode| .{ mode.width, mode.height },
+            .custom => |mode| .{ mode.width, mode.height },
+            .none => .{ 0, 0 },
         };
-        return @intFromFloat(physical / state.scale);
-    }
-
-    /// Height in the logical coordinate space
-    pub fn height(state: *const State) i32 {
-        const physical: f32 = blk: {
-            if (@mod(@intFromEnum(state.transform), 2) == 0) {
-                break :blk @floatFromInt(switch (state.mode) {
-                    .standard => |mode| mode.height,
-                    .custom => |mode| mode.height,
-                    .none => 0,
-                });
-            } else {
-                break :blk @floatFromInt(switch (state.mode) {
-                    .standard => |mode| mode.width,
-                    .custom => |mode| mode.width,
-                    .none => 0,
-                });
-            }
+        if (@mod(@intFromEnum(state.transform), 2) != 0) {
+            mem.swap(i32, &w, &h);
+        }
+        return .{
+            @intFromFloat(@as(f32, @floatFromInt(w)) / state.scale),
+            @intFromFloat(@as(f32, @floatFromInt(h)) / state.scale),
         };
-        return @intFromFloat(physical / state.scale);
     }
 
     pub fn applyNoModeset(state: *const State, wlr_state: *wlr.Output.State) void {
@@ -270,8 +246,11 @@ pub fn manageStart(output: *Output) void {
                     output_v1.sendWlOutput(wlr_output.global.?.getName(output_v1.getClient()));
                 }
 
-                if (new or pending.width() != sent.width() or pending.height() != sent.height()) {
-                    output_v1.sendDimensions(pending.width(), pending.height());
+                const pending_width, const pending_height = pending.dimensions();
+                const sent_width, const sent_height = sent.dimensions();
+
+                if (new or pending_width != sent_width or pending_height != sent_height) {
+                    output_v1.sendDimensions(pending_width, pending_height);
                 }
                 if (new or pending.x != sent.x or pending.y != sent.y) {
                     output_v1.sendPosition(pending.x, pending.y);
@@ -294,6 +273,22 @@ pub fn manageStart(output: *Output) void {
             output.link_sent.init();
 
             if (output.scheduled.state == .destroying) {
+                {
+                    var it = server.wm.windows.iterator(.forward);
+                    while (it.next()) |window| {
+                        switch (window.wm_scheduled.fullscreen_requested) {
+                            .fullscreen => |output_hint| {
+                                if (output_hint == output) {
+                                    window.wm_scheduled.fullscreen_requested = .{ .fullscreen = null };
+                                }
+                            },
+                            .no_request, .exit => {},
+                        }
+                        if (window.wm_requested.fullscreen == output) {
+                            window.wm_requested.fullscreen = null;
+                        }
+                    }
+                }
                 util.gpa.destroy(output);
             }
         },

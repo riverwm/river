@@ -222,7 +222,7 @@ pub fn autoLayout(om: *OutputManager) void {
         while (it.next()) |output| {
             if (output.scheduled.auto_layout) continue;
 
-            const x = output.scheduled.x + output.scheduled.width();
+            const x = output.scheduled.x + output.scheduled.dimensions()[0];
             if (x > rightmost_edge) {
                 rightmost_edge = x;
                 row_y = output.scheduled.y;
@@ -237,7 +237,7 @@ pub fn autoLayout(om: *OutputManager) void {
 
             output.scheduled.x = rightmost_edge;
             output.scheduled.y = row_y;
-            rightmost_edge += output.scheduled.width();
+            rightmost_edge += output.scheduled.dimensions()[0];
         }
     }
 }

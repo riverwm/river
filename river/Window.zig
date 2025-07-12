@@ -56,6 +56,12 @@ const Impl = union(enum) {
     destroying,
 };
 
+pub const FullscreenRequest = union(enum) {
+    no_request,
+    fullscreen: ?*Output,
+    exit,
+};
+
 pub const Border = struct {
     edges: river.WindowV1.Edges = .{},
     width: u31 = 0,
@@ -75,7 +81,7 @@ pub const Configure = struct {
     tiled: river.WindowV1.Edges = .{},
     capabilities: river.WindowV1.Capabilities = .{},
     maximized: bool = false,
-    fullscreen: bool = false,
+    inform_fullscreen: bool = false,
     resizing: bool = false,
 };
 
@@ -106,6 +112,11 @@ impl: Impl,
 /// The trees in the following fields are in rendering order.
 tree: *wlr.SceneTree,
 
+/// Opaque black rectangle used as the background while this window is rendered fullscreen.
+/// TODO consider using one of these per output rather than one per window to save memory
+/// if the complexity tradeoff is worth it.
+fullscreen_background: *wlr.SceneRect,
+
 decorations_below: wl.list.Head(Decoration, .link),
 decorations_below_tree: *wlr.SceneTree,
 
@@ -131,12 +142,7 @@ wm_scheduled: struct {
     dimensions_hint: DimensionsHint = .{},
     decoration_hint: river.WindowV1.DecorationHint = .only_supports_csd,
     /// Set back to no_request at the end of each update sequence
-    fullscreen_requested: enum {
-        no_request,
-        /// TODO output hint
-        fullscreen,
-        exit,
-    } = .no_request,
+    fullscreen_requested: FullscreenRequest = .no_request,
     dirty_app_id: bool = false,
     dirty_title: bool = false,
 } = .{},
@@ -165,7 +171,8 @@ wm_requested: struct {
     },
     resizing: bool = false,
     maximized: bool = false,
-    fullscreen: bool = false, // XXX output
+    fullscreen: ?*Output = null,
+    inform_fullscreen: bool = false,
     close: bool = false,
 } = .{},
 
@@ -216,6 +223,7 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
         .node = undefined,
         .impl = impl,
         .tree = tree,
+        .fullscreen_background = try tree.createSceneRect(0, 0, &.{ 0, 0, 0, 1 }),
         .decorations_below = undefined,
         .decorations_below_tree = try tree.createSceneTree(),
         .surfaces = try Scene.SaveableSurfaces.init(tree),
@@ -240,6 +248,7 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
 
     window.tree.node.setEnabled(false);
     window.popup_tree.node.setEnabled(false);
+    window.fullscreen_background.node.setEnabled(false);
 
     try SceneNodeData.attach(&window.tree.node, .{ .window = window });
     try SceneNodeData.attach(&window.popup_tree.node, .{ .window = window });
@@ -320,15 +329,6 @@ pub fn setDecorationHint(window: *Window, hint: river.WindowV1.DecorationHint) v
     }
 }
 
-pub fn setFullscreenRequested(window: *Window, fullscreen_requested: bool) void {
-    if (fullscreen_requested) {
-        window.wm_scheduled.fullscreen_requested = .fullscreen;
-    } else {
-        window.wm_scheduled.fullscreen_requested = .exit;
-    }
-    server.wm.dirtyWindowing();
-}
-
 /// Send dirty state as part of a manage sequence.
 pub fn manageStart(window: *Window) void {
     switch (window.state) {
@@ -383,7 +383,13 @@ pub fn manageStart(window: *Window) void {
             }
             switch (pending.fullscreen_requested) {
                 .no_request => {},
-                .fullscreen => window_v1.sendFullscreenRequested(null),
+                .fullscreen => |output_hint| {
+                    if (output_hint) |output| {
+                        window_v1.sendFullscreenRequested(output.object);
+                    } else {
+                        window_v1.sendFullscreenRequested(null);
+                    }
+                },
                 .exit => window_v1.sendExitFullscreenRequested(),
             }
             pending.fullscreen_requested = .no_request;
@@ -543,13 +549,23 @@ fn handleRequest(
             if (!server.wm.ensureWindowing()) return;
             wm_requested.maximized = false;
         },
-        .fullscreen => {
+        .inform_fullscreen => {
             if (!server.wm.ensureWindowing()) return;
-            wm_requested.fullscreen = true;
+            wm_requested.inform_fullscreen = true;
+        },
+        .inform_not_fullscreen => {
+            if (!server.wm.ensureWindowing()) return;
+            wm_requested.inform_fullscreen = false;
+        },
+        .fullscreen => |args| {
+            if (!server.wm.ensureWindowing()) return;
+            const data = args.output.getUserData() orelse return;
+            const output: *Output = @ptrCast(@alignCast(data));
+            wm_requested.fullscreen = output;
         },
         .exit_fullscreen => {
             if (!server.wm.ensureWindowing()) return;
-            wm_requested.fullscreen = false;
+            wm_requested.fullscreen = null;
         },
     }
 }
@@ -584,7 +600,7 @@ pub fn manageFinish(window: *Window) bool {
     window.configure_scheduled.capabilities = wm_requested.capabilities;
     window.configure_scheduled.resizing = wm_requested.resizing;
     window.configure_scheduled.maximized = wm_requested.maximized;
-    window.configure_scheduled.fullscreen = wm_requested.fullscreen;
+    window.configure_scheduled.inform_fullscreen = wm_requested.inform_fullscreen;
 
     if (wm_requested.close) {
         window.close();
@@ -603,12 +619,21 @@ pub fn manageFinish(window: *Window) bool {
         }
     }
 
-    if (wm_requested.dimensions) |dimensions| {
+    if (wm_requested.fullscreen) |output| {
+        // XXX don't configure again if these dimensions were already sent.
+        const width, const height = output.sent.dimensions();
+        if (window.configure_sent.width != width) {
+            window.configure_scheduled.width = width;
+        }
+        if (window.configure_sent.height != height) {
+            window.configure_scheduled.height = height;
+        }
+    } else if (wm_requested.dimensions) |dimensions| {
         window.configure_scheduled.width = dimensions.width;
         window.configure_scheduled.height = dimensions.height;
-        wm_requested.dimensions = null;
         window.rendering_scheduled.resend_dimensions = true;
     }
+    wm_requested.dimensions = null;
 
     const track_configure = switch (window.impl) {
         .toplevel => |*toplevel| toplevel.configure(),
@@ -697,6 +722,16 @@ pub fn renderFinish(window: *Window) void {
         .width = window.rendering_sent.width,
         .height = window.rendering_sent.height,
     };
+
+    if (window.wm_requested.fullscreen) |output| {
+        window.box.x = output.sent.x;
+        window.box.y = output.sent.y;
+        window.fullscreen_background.node.setEnabled(true);
+        const width, const height = output.sent.dimensions();
+        window.fullscreen_background.setSize(width, height);
+    } else {
+        window.fullscreen_background.node.setEnabled(false);
+    }
 
     window.tree.node.setPosition(window.box.x, window.box.y);
     window.popup_tree.node.setPosition(window.box.x, window.box.y);

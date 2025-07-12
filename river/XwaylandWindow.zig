@@ -278,7 +278,12 @@ fn handleSetDecorations(listener: *wl.Listener(void)) void {
 
 fn handleRequestFullscreen(listener: *wl.Listener(void)) void {
     const xwindow: *XwaylandWindow = @fieldParentPtr("request_fullscreen", listener);
-    xwindow.window.setFullscreenRequested(xwindow.xsurface.fullscreen);
+    if (xwindow.xsurface.fullscreen) {
+        xwindow.window.wm_scheduled.fullscreen_requested = .{ .fullscreen = null };
+    } else {
+        xwindow.window.wm_scheduled.fullscreen_requested = .exit;
+    }
+    server.wm.dirtyWindowing();
 }
 
 /// Some X11 clients will minimize themselves regardless of how we respond.

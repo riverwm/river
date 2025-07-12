@@ -806,7 +806,7 @@
     </event>
 
     <request name="inform_maximized">
-      <description summary="inform the window it is maximized">
+      <description summary="inform the window that it is maximized">
         Inform the window that it is maximized. The window might use this
         information to adapt the style of its client-side window decorations for
         example.
@@ -820,7 +820,7 @@
     </request>
 
     <request name="inform_unmaximized">
-      <description summary="inform the window it is unmaximized">
+      <description summary="inform the window that it is unmaximized">
         Inform the window that it is unmaximized. The window might use this
         information to adapt the style of its client-side window decorations for
         example.
@@ -858,16 +858,56 @@
       </description>
     </event>
 
+    <request name="inform_fullscreen">
+      <description summary="inform the window that it is fullscreen">
+        Inform the window that it is fullscreen. The window might use this
+        information to adapt the style of its client-side window decorations for
+        example.
+
+        This request does not affect the size/position of the window or cause it
+        to become the only window rendered, see the river_window_v1.fullscreen
+        and exit_fullscreen requests for that.
+
+        This request modifies window management state and may only be made as
+        part of a manage sequence, see the river_window_manager_v1 description.
+      </description>
+    </request>
+
+    <request name="inform_not_fullscreen">
+      <description summary="inform the window that it is not fullscreen">
+        Inform the window that it is not fullscreen. The window might use this
+        information to adapt the style of its client-side window decorations for
+        example.
+
+        This request does not affect the size/position of the window or cause it
+        to become the only window rendered, see the river_window_v1.fullscreen
+        and exit_fullscreen requests for that.
+
+        This request modifies window management state and may only be made as
+        part of a manage sequence, see the river_window_manager_v1 description.
+      </description>
+    </request>
+
     <request name="fullscreen">
       <description summary="make the window fullscreen">
         Make the window fullscreen on the given output. If multiple windows are
         fullscreen on the same output at the same time only the "top" window in
         rendering order shall be displayed.
 
+        All river_shell_surface_v1 objects above the top fullscreen window in
+        the rendering order will continue to be rendered.
+
         The compositor will handle the position and dimensions of the window
         while it is fullscreen. The set_position and propose_dimensions requests
         shall not affect the current position and dimensions of a fullscreen
         window.
+
+        If the output on which a window is currently fullscreen is removed, the
+        windowing state is modified as if there were an exit_fullscreen request
+        made in the same manage sequence as the river_output_v1.removed event.
+
+        This request does not inform the window that it is fullscreen, see the
+        river_window_v1.inform_fullscreen and inform_not_fullscreen requests.
 
         This request modifies window management state and may only be made as
         part of a manage sequence, see the river_window_manager_v1 description.
@@ -879,9 +919,16 @@
       <description summary="make the window not fullscreen">
         Make the window not fullscreen.
 
-        The new, post-fullscreen position and dimensions of the window will be
-        determined by the most recent set_position and propose_dimensions
-        requests.
+        The position and dimensions are undefined after this request is made
+        until a manage sequence in which the window manager makes the
+        propose_dimensions and set_position requests is completed.
+
+        The window manager should make propose_dimensions and set_position
+        requests in the same manage sequence as the exit_fullscreen request for
+        frame perfection.
+
+        This request does not inform the window that it is fullscreen, see the
+        river_window_v1.inform_fullscreen and inform_not_fullscreen requests.
 
         This request modifies window management state and may only be made as
         part of a manage sequence, see the river_window_manager_v1 description.
