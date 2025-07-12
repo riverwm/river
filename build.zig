@@ -307,8 +307,16 @@ pub fn build(b: *Build) !void {
         });
         const run_globber_test = b.addRunArtifact(globber_test);
 
+        const slotmap_test = b.addTest(.{
+            .root_source_file = b.path("common/slotmap.zig"),
+            .target = target,
+            .optimize = optimize,
+        });
+        const run_slotmap_test = b.addRunArtifact(slotmap_test);
+
         const test_step = b.step("test", "Run the tests");
         test_step.dependOn(&run_globber_test.step);
+        test_step.dependOn(&run_slotmap_test.step);
     }
 }
 
