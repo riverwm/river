@@ -620,7 +620,6 @@ pub fn manageFinish(window: *Window) bool {
     }
 
     if (wm_requested.fullscreen) |output| {
-        // XXX don't configure again if these dimensions were already sent.
         const width, const height = output.sent.dimensions();
         if (window.configure_sent.width != width) {
             window.configure_scheduled.width = width;

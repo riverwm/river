@@ -437,7 +437,7 @@ fn handleRequest(
 
         .op_start_serial => {
             if (!server.wm.ensureWindowing()) return;
-            // XXX TODO
+            // TODO
         },
         .op_start_pointer => {
             if (!server.wm.ensureWindowing()) return;

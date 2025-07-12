@@ -311,9 +311,6 @@
       proposes window dimensions with the propose_dimensions request as part of
       a manage sequence, the server replies with a dimensions event as part of
       a render sequence, and that render sequence is finished.
-
-      TODO:
-        - window cropping
     </description>
 
     <enum name="error">
