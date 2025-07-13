@@ -48,8 +48,7 @@
       Rendering state only affects the rendered output of the compositor and
       does not influence communication between the server and individual window
       clients. Rendering state includes the position and rendering order of
-      windows, shell surfaces, decoration surfaces, borders, window cropping,
-      and more.
+      windows, shell surfaces, decoration surfaces, borders, and more.
 
       Window management state may only be modified by the window manager as part
       of a manage sequence. A manage sequence is started with the manage_start
