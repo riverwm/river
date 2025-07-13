@@ -34,7 +34,6 @@ const InputDevice = @import("InputDevice.zig");
 const InputManager = @import("InputManager.zig");
 const InputRelay = @import("InputRelay.zig");
 const Keyboard = @import("Keyboard.zig");
-const KeyboardGroup = @import("KeyboardGroup.zig");
 const LockSurface = @import("LockSurface.zig");
 const Output = @import("Output.zig");
 const PointerBinding = @import("PointerBinding.zig");
@@ -159,7 +158,7 @@ op: ?struct {
 
 relay: InputRelay,
 
-keyboard_groups: std.DoublyLinkedList(KeyboardGroup) = .{},
+keyboard_group: *wlr.KeyboardGroup,
 
 focused: Focus = .none,
 
@@ -189,6 +188,7 @@ pub fn create(name: [*:0]const u8) !void {
         .pointer_bindings = undefined,
         .cursor = undefined,
         .relay = undefined,
+        .keyboard_group = try wlr.KeyboardGroup.create(),
     };
     seat.wlr_seat.data = seat;
 
@@ -201,6 +201,8 @@ pub fn create(name: [*:0]const u8) !void {
 
     try seat.cursor.init(seat);
     seat.relay.init();
+
+    try seat.tryAddDevice(&seat.keyboard_group.keyboard.base);
 
     seat.wlr_seat.events.request_set_selection.add(&seat.request_set_selection);
     seat.wlr_seat.events.request_start_drag.add(&seat.request_start_drag);
@@ -219,9 +221,7 @@ pub fn destroy(seat: *Seat) void {
 
     seat.cursor.deinit();
 
-    while (seat.keyboard_groups.first) |node| {
-        node.data.destroy();
-    }
+    seat.keyboard_group.destroy();
 
     seat.request_set_selection.link.remove();
     seat.request_start_drag.link.remove();
