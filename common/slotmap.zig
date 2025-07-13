@@ -28,26 +28,24 @@ pub fn SlotMap(comptime T: type) type {
 
         const Slot = struct {
             generation: u32,
-            data: union {
-                // Valid if generation is even.
+            data: union(enum) {
                 value: T,
                 // Index of the next free slot or slots.items.len + 1 if
-                // this is the last free slot. Valid if generation is odd.
+                // this is the last free slot.
                 next_free: u32,
             },
-
-            fn hasValue(slot: *const Slot) bool {
-                return slot.generation % 2 == 0;
-            }
         };
 
         slots: std.ArrayListUnmanaged(Slot),
+        /// Number of values stored in the map.
+        count: u32,
         /// Index of the first free slot or slots.items.len + 1 if there
         /// is no free slot.
         first_free: u32,
 
         pub const empty: Map = .{
             .slots = .empty,
+            .count = 0,
             .first_free = 1,
         };
 
@@ -59,31 +57,28 @@ pub fn SlotMap(comptime T: type) type {
             if (map.first_free < map.slots.items.len) {
                 const index = map.first_free;
                 const slot = &map.slots.items[index];
-                assert(!slot.hasValue());
                 map.first_free = slot.data.next_free;
-                slot.* = .{
-                    .generation = slot.generation + 1,
-                    .data = .{ .value = value },
-                };
+                slot.data = .{ .value = value };
+                map.count += 1;
                 return .{
-                    .index = index,
                     .generation = slot.generation,
+                    .index = index,
                 };
             }
             try map.slots.append(gpa, .{
                 .generation = 0,
                 .data = .{ .value = value },
             });
+            map.count += 1;
             map.first_free += 1;
             return .{
-                .index = @intCast(map.slots.items.len - 1),
                 .generation = 0,
+                .index = @intCast(map.slots.items.len - 1),
             };
         }
 
         pub fn get(map: *Map, key: Key) ?T {
             if (map.getSlot(key)) |slot| {
-                assert(slot.hasValue());
                 return slot.data.value;
             }
             return null;
@@ -91,11 +86,12 @@ pub fn SlotMap(comptime T: type) type {
 
         pub fn remove(map: *Map, key: Key) void {
             if (map.getSlot(key)) |slot| {
-                assert(slot.hasValue());
+                assert(slot.data == .value);
                 slot.* = .{
                     .generation = slot.generation +% 1,
                     .data = .{ .next_free = map.first_free },
                 };
+                map.count -= 1;
                 map.first_free = key.index;
             }
         }
@@ -108,6 +104,26 @@ pub fn SlotMap(comptime T: type) type {
             }
             return null;
         }
+
+        pub const Iterator = struct {
+            map: *Map,
+            index: u32,
+
+            pub fn next(it: *Iterator) ?T {
+                while (it.index < it.map.slots.items.len) {
+                    defer it.index += 1;
+                    switch (it.map.slots.items[it.index].data) {
+                        .value => |value| return value,
+                        .next_free => {},
+                    }
+                }
+                return null;
+            }
+        };
+
+        pub fn iterator(map: *Map) Iterator {
+            return .{ .map = map, .index = 0 };
+        }
     };
 }
 
@@ -119,44 +135,103 @@ test "basic" {
     defer map.deinit(testing.allocator);
 
     const five = try map.put(testing.allocator, 5);
-    try testing.expectEqual(@as(?u32, 5), map.get(five));
-    try testing.expectEqual(@as(?u32, 5), map.get(five));
+    try testing.expectEqual(5, map.get(five));
+    try testing.expectEqual(5, map.get(five));
 
     map.remove(five);
-    try testing.expectEqual(@as(?u32, null), map.get(five));
+    try testing.expectEqual(null, map.get(five));
 
     map.remove(five);
-    try testing.expectEqual(@as(?u32, null), map.get(five));
+    try testing.expectEqual(null, map.get(five));
 
     const six = try map.put(testing.allocator, 6);
-    try testing.expectEqual(@as(?u32, 6), map.get(six));
-    try testing.expectEqual(@as(?u32, null), map.get(five));
-    try testing.expectEqual(@as(?u32, 6), map.get(six));
+    try testing.expectEqual(6, map.get(six));
+    try testing.expectEqual(null, map.get(five));
+    try testing.expectEqual(6, map.get(six));
 
     map.remove(five);
-    try testing.expectEqual(@as(?u32, null), map.get(five));
-    try testing.expectEqual(@as(?u32, 6), map.get(six));
+    try testing.expectEqual(null, map.get(five));
+    try testing.expectEqual(6, map.get(six));
 
     const seven = try map.put(testing.allocator, 7);
     const eight = try map.put(testing.allocator, 8);
     const nine = try map.put(testing.allocator, 9);
-    try testing.expectEqual(@as(?u32, null), map.get(five));
-    try testing.expectEqual(@as(?u32, 6), map.get(six));
-    try testing.expectEqual(@as(?u32, 7), map.get(seven));
-    try testing.expectEqual(@as(?u32, 8), map.get(eight));
-    try testing.expectEqual(@as(?u32, 9), map.get(nine));
+    try testing.expectEqual(null, map.get(five));
+    try testing.expectEqual(6, map.get(six));
+    try testing.expectEqual(7, map.get(seven));
+    try testing.expectEqual(8, map.get(eight));
+    try testing.expectEqual(9, map.get(nine));
 
     map.remove(five);
     map.remove(eight);
-    try testing.expectEqual(@as(?u32, null), map.get(five));
-    try testing.expectEqual(@as(?u32, 6), map.get(six));
-    try testing.expectEqual(@as(?u32, 7), map.get(seven));
-    try testing.expectEqual(@as(?u32, null), map.get(eight));
-    try testing.expectEqual(@as(?u32, 9), map.get(nine));
+    try testing.expectEqual(null, map.get(five));
+    try testing.expectEqual(6, map.get(six));
+    try testing.expectEqual(7, map.get(seven));
+    try testing.expectEqual(null, map.get(eight));
+    try testing.expectEqual(9, map.get(nine));
 
-    try testing.expectEqual(@as(?u32, null), map.get(five));
-    try testing.expectEqual(@as(?u32, 6), map.get(six));
-    try testing.expectEqual(@as(?u32, 7), map.get(seven));
-    try testing.expectEqual(@as(?u32, null), map.get(eight));
-    try testing.expectEqual(@as(?u32, 9), map.get(nine));
+    try testing.expectEqual(null, map.get(five));
+    try testing.expectEqual(6, map.get(six));
+    try testing.expectEqual(7, map.get(seven));
+    try testing.expectEqual(null, map.get(eight));
+    try testing.expectEqual(9, map.get(nine));
+}
+
+test "iteration" {
+    const testing = std.testing;
+
+    var map: SlotMap(u64) = .empty;
+    defer map.deinit(testing.allocator);
+
+    const five = try map.put(testing.allocator, 5);
+    const six = try map.put(testing.allocator, 6);
+    const seven = try map.put(testing.allocator, 7);
+    const eight = try map.put(testing.allocator, 8);
+    const nine = try map.put(testing.allocator, 9);
+
+    try testing.expectEqual(5, map.get(five));
+    try testing.expectEqual(6, map.get(six));
+    try testing.expectEqual(7, map.get(seven));
+    try testing.expectEqual(8, map.get(eight));
+    try testing.expectEqual(9, map.get(nine));
+    try expectIterate(&.{ 5, 6, 7, 8, 9 }, &map);
+
+    map.remove(seven);
+    try testing.expectEqual(5, map.get(five));
+    try testing.expectEqual(6, map.get(six));
+    try testing.expectEqual(null, map.get(seven));
+    try testing.expectEqual(8, map.get(eight));
+    try testing.expectEqual(9, map.get(nine));
+    try expectIterate(&.{ 5, 6, 8, 9 }, &map);
+
+    const ten = try map.put(testing.allocator, 10);
+    try testing.expectEqual(5, map.get(five));
+    try testing.expectEqual(6, map.get(six));
+    try testing.expectEqual(null, map.get(seven));
+    try testing.expectEqual(8, map.get(eight));
+    try testing.expectEqual(9, map.get(nine));
+    try testing.expectEqual(10, map.get(ten));
+    try expectIterate(&.{ 5, 6, 10, 8, 9 }, &map);
+
+    map.remove(five);
+    map.remove(nine);
+    map.remove(six);
+    try testing.expectEqual(null, map.get(five));
+    try testing.expectEqual(null, map.get(six));
+    try testing.expectEqual(null, map.get(seven));
+    try testing.expectEqual(8, map.get(eight));
+    try testing.expectEqual(null, map.get(nine));
+    try testing.expectEqual(10, map.get(ten));
+    try expectIterate(&.{ 10, 8 }, &map);
+}
+
+fn expectIterate(expected: []const u64, map: *SlotMap(u64)) !void {
+    var it = map.iterator();
+    var i: u32 = 0;
+    while (it.next()) |value| : (i += 1) {
+        try std.testing.expect(i < expected.len);
+        try std.testing.expectEqual(expected[i], value);
+    }
+    try std.testing.expectEqual(i, map.count);
+    try std.testing.expectEqual(i, expected.len);
 }
