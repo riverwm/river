@@ -97,7 +97,10 @@ pub const Focus = union(enum) {
 };
 
 /// XXX experiment with different sizes here, consider making dynamic
-/// XXX Clean out events for destroyed input devices
+/// XXX There's a bug here when a keyboard is destroyed while events
+/// for that keyboard are still in the queue. We need our own separate
+/// keyboard state anyways for proper modifier handling (currently modifiers
+/// effectively bypass the queue due to how wlr_keyboard is implemented).
 const EventQueue = std.fifo.LinearFifo(Event, .{ .Static = 1024 });
 
 wlr_seat: *wlr.Seat,
