@@ -431,6 +431,7 @@ fn renderFinish(wm: *WindowManager) void {
                 .window => |window| {
                     window.renderFinish();
                     window.tree.node.reparent(server.scene.layers.wm);
+                    window.popup_tree.node.reparent(server.scene.layers.popups);
                     if (window.wm_requested.fullscreen != null) {
                         found_fullscreen = true;
                         window.tree.node.raiseToTop();
