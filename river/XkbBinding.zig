@@ -98,14 +98,11 @@ pub fn create(
 
 fn handleDestroy(_: *river.XkbBindingV1, binding: *XkbBinding) void {
     {
-        var it = server.input_manager.devices.iterator(.forward);
-        while (it.next()) |device| {
-            if (device.seat == binding.seat and device.wlr_device.type == .keyboard) {
-                const keyboard: *Keyboard = @fieldParentPtr("device", device);
-                for (keyboard.pressed.keys.slice()) |*key| {
-                    if (key.consumer == .binding and key.consumer.binding == binding) {
-                        key.consumer.binding = null;
-                    }
+        var it = binding.seat.keyboard_groups.iterator(.forward);
+        while (it.next()) |group| {
+            for (group.pressed.keys.slice()) |*key| {
+                if (key.consumer == .binding and key.consumer.binding == binding) {
+                    key.consumer.binding = null;
                 }
             }
         }

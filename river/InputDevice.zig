@@ -90,19 +90,15 @@ pub fn init(device: *InputDevice, seat: *Seat, wlr_device: *wlr.InputDevice) !vo
 
     wlr_device.events.destroy.add(&device.destroy);
 
-    // Keyboard groups are implemented as "virtual" input devices which we don't want to expose
-    // in riverctl list-inputs as they can't be configured.
-    if (!isKeyboardGroup(wlr_device)) {
-        // Apply all matching input device configuration.
-        for (server.input_manager.configs.items) |input_config| {
-            if (globber.match(identifier, input_config.glob)) {
-                input_config.apply(device);
-            }
+    // Apply all matching input device configuration.
+    for (server.input_manager.configs.items) |input_config| {
+        if (globber.match(identifier, input_config.glob)) {
+            input_config.apply(device);
         }
-
-        server.input_manager.devices.append(device);
-        seat.updateCapabilities();
     }
+
+    server.input_manager.devices.append(device);
+    seat.updateCapabilities();
 
     log.debug("new input device: {s}", .{identifier});
 }
@@ -112,19 +108,12 @@ pub fn deinit(device: *InputDevice) void {
 
     util.gpa.free(device.identifier);
 
-    if (!isKeyboardGroup(device.wlr_device)) {
-        device.link.remove();
-        device.seat.updateCapabilities();
-    }
+    device.link.remove();
+    device.seat.updateCapabilities();
 
     device.wlr_device.data = null;
 
     device.* = undefined;
-}
-
-fn isKeyboardGroup(wlr_device: *wlr.InputDevice) bool {
-    return wlr_device.type == .keyboard and
-        wlr.KeyboardGroup.fromKeyboard(wlr_device.toKeyboard()) != null;
 }
 
 fn handleDestroy(listener: *wl.Listener(*wlr.InputDevice), _: *wlr.InputDevice) void {
@@ -135,8 +124,7 @@ fn handleDestroy(listener: *wl.Listener(*wlr.InputDevice), _: *wlr.InputDevice) 
     switch (device.wlr_device.type) {
         .keyboard => {
             const keyboard: *Keyboard = @fieldParentPtr("device", device);
-            keyboard.deinit();
-            util.gpa.destroy(keyboard);
+            keyboard.deviceDestroy();
         },
         .pointer, .touch => {
             device.deinit();

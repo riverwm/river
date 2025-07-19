@@ -34,6 +34,7 @@ const InputDevice = @import("InputDevice.zig");
 const InputManager = @import("InputManager.zig");
 const InputRelay = @import("InputRelay.zig");
 const Keyboard = @import("Keyboard.zig");
+const KeyboardGroup = @import("KeyboardGroup.zig");
 const LockSurface = @import("LockSurface.zig");
 const Output = @import("Output.zig");
 const PointerBinding = @import("PointerBinding.zig");
@@ -55,6 +56,11 @@ pub const Event = union(enum) {
     keyboard_modifiers: struct {
         keyboard: *Keyboard,
         modifiers: wlr.Keyboard.Modifiers,
+    },
+    /// This event is really just for virtual keyboards, which set their own keymaps.
+    keyboard_keymap: struct {
+        keyboard: *Keyboard,
+        keymap: *xkb.Keymap,
     },
 
     pointer_motion_relative: wlr.Pointer.event.Motion,
@@ -97,10 +103,6 @@ pub const Focus = union(enum) {
 };
 
 /// XXX experiment with different sizes here, consider making dynamic
-/// XXX There's a bug here when a keyboard is destroyed while events
-/// for that keyboard are still in the queue. We need our own separate
-/// keyboard state anyways for proper modifier handling (currently modifiers
-/// effectively bypass the queue due to how wlr_keyboard is implemented).
 const EventQueue = std.fifo.LinearFifo(Event, .{ .Static = 1024 });
 
 wlr_seat: *wlr.Seat,
@@ -161,7 +163,7 @@ op: ?struct {
 
 relay: InputRelay,
 
-keyboard_group: *wlr.KeyboardGroup,
+keyboard_groups: wl.list.Head(KeyboardGroup, .link),
 
 focused: Focus = .none,
 
@@ -191,7 +193,7 @@ pub fn create(name: [*:0]const u8) !void {
         .pointer_bindings = undefined,
         .cursor = undefined,
         .relay = undefined,
-        .keyboard_group = try wlr.KeyboardGroup.create(),
+        .keyboard_groups = undefined,
     };
     seat.wlr_seat.data = seat;
 
@@ -205,7 +207,7 @@ pub fn create(name: [*:0]const u8) !void {
     try seat.cursor.init(seat);
     seat.relay.init();
 
-    try seat.tryAddDevice(&seat.keyboard_group.keyboard.base, false);
+    seat.keyboard_groups.init();
 
     seat.wlr_seat.events.request_set_selection.add(&seat.request_set_selection);
     seat.wlr_seat.events.request_start_drag.add(&seat.request_start_drag);
@@ -224,8 +226,6 @@ pub fn destroy(seat: *Seat) void {
 
     seat.cursor.deinit();
 
-    seat.keyboard_group.destroy();
-
     seat.request_set_selection.link.remove();
     seat.request_start_drag.link.remove();
     seat.start_drag.link.remove();
@@ -233,12 +233,12 @@ pub fn destroy(seat: *Seat) void {
     seat.request_set_primary_selection.link.remove();
 }
 
-pub fn queueEvent(seat: *Seat, event: Event) void {
+pub fn queueEvent(seat: *Seat, event: Event) !void {
     seat.handleActivity();
 
     seat.event_queue.writeItem(event) catch {
         log.err("dropping {s} event, no space in event queue", .{@tagName(event)});
-        return;
+        return error.QueueFull;
     };
 
     if (server.wm.state == .idle) {
@@ -260,7 +260,8 @@ pub fn processEvents(seat: *Seat) void {
         const pg = server.input_manager.pointer_gestures;
         switch (event) {
             .keyboard_key => |ev| ev.keyboard.processKey(&ev.key),
-            .keyboard_modifiers => |ev| ev.keyboard.processModifiers(&ev.modifiers),
+            .keyboard_modifiers => |ev| ev.keyboard.processModifiers(ev.modifiers),
+            .keyboard_keymap => |ev| ev.keyboard.processKeymap(ev.keymap),
 
             .pointer_motion_relative => |ev| seat.cursor.processMotionRelative(&ev),
             .pointer_motion_absolute => |ev| seat.cursor.processMotionAbsolute(&ev),
@@ -577,18 +578,17 @@ pub fn keyboardEnterOrLeave(seat: *Seat, target_surface: ?*wlr.Surface) void {
 
 fn keyboardNotifyEnter(seat: *Seat, wlr_surface: *wlr.Surface) void {
     if (seat.wlr_seat.getKeyboard()) |wlr_keyboard| {
-        const keyboard: *Keyboard = @alignCast(@ptrCast(wlr_keyboard.data));
+        const group: *KeyboardGroup = @alignCast(@ptrCast(wlr_keyboard.data));
 
-        var keycodes: std.BoundedArray(u32, Keyboard.Pressed.capacity) = .{};
-        for (keyboard.pressed.keys.constSlice()) |item| {
+        var keycodes: std.BoundedArray(u32, KeyboardGroup.Pressed.capacity) = .{};
+        for (group.pressed.keys.constSlice()) |item| {
             if (item.consumer == .focus) keycodes.appendAssumeCapacity(item.code);
         }
 
         seat.wlr_seat.keyboardNotifyEnter(
             wlr_surface,
             keycodes.constSlice(),
-            // XXX this is not ok, use our own stored modifiers
-            &wlr_keyboard.modifiers,
+            &group.state.modifiers,
         );
     } else {
         seat.wlr_seat.keyboardNotifyEnter(wlr_surface, &.{}, null);
@@ -707,12 +707,9 @@ pub fn addDevice(seat: *Seat, wlr_device: *wlr.InputDevice, virtual: bool) void 
 fn tryAddDevice(seat: *Seat, wlr_device: *wlr.InputDevice, virtual: bool) !void {
     switch (wlr_device.type) {
         .keyboard => {
-            const keyboard = try util.gpa.create(Keyboard);
-            errdefer util.gpa.destroy(keyboard);
+            const keyboard = try Keyboard.create(seat, wlr_device, virtual);
 
-            try keyboard.init(seat, wlr_device, virtual);
-
-            seat.wlr_seat.setKeyboard(keyboard.device.wlr_device.toKeyboard());
+            seat.wlr_seat.setKeyboard(&keyboard.group.state);
             if (seat.wlr_seat.keyboard_state.focused_surface) |wlr_surface| {
                 seat.keyboardNotifyEnter(wlr_surface);
             }

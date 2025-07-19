@@ -741,55 +741,55 @@ fn updateDragIcons(cursor: *Cursor) void {
 
 fn queueMotionRelative(listener: *wl.Listener(*wlr.Pointer.event.Motion), event: *wlr.Pointer.event.Motion) void {
     const cursor: *Cursor = @fieldParentPtr("motion_relative", listener);
-    cursor.seat.queueEvent(.{ .pointer_motion_relative = event.* });
+    cursor.seat.queueEvent(.{ .pointer_motion_relative = event.* }) catch {};
 }
 
 fn queueMotionAbsolute(listener: *wl.Listener(*wlr.Pointer.event.MotionAbsolute), event: *wlr.Pointer.event.MotionAbsolute) void {
     const cursor: *Cursor = @fieldParentPtr("motion_absolute", listener);
-    cursor.seat.queueEvent(.{ .pointer_motion_absolute = event.* });
+    cursor.seat.queueEvent(.{ .pointer_motion_absolute = event.* }) catch {};
 }
 
 fn queueButton(listener: *wl.Listener(*wlr.Pointer.event.Button), event: *wlr.Pointer.event.Button) void {
     const cursor: *Cursor = @fieldParentPtr("button", listener);
-    cursor.seat.queueEvent(.{ .pointer_button = event.* });
+    cursor.seat.queueEvent(.{ .pointer_button = event.* }) catch {};
 }
 
 fn queueAxis(listener: *wl.Listener(*wlr.Pointer.event.Axis), event: *wlr.Pointer.event.Axis) void {
     const cursor: *Cursor = @fieldParentPtr("axis", listener);
-    cursor.seat.queueEvent(.{ .pointer_axis = event.* });
+    cursor.seat.queueEvent(.{ .pointer_axis = event.* }) catch {};
 }
 
 fn queueFrame(listener: *wl.Listener(*wlr.Cursor), _: *wlr.Cursor) void {
     const cursor: *Cursor = @fieldParentPtr("frame", listener);
-    cursor.seat.queueEvent(.pointer_frame);
+    cursor.seat.queueEvent(.pointer_frame) catch {};
 }
 
 fn queuePinchBegin(listener: *wl.Listener(*wlr.Pointer.event.PinchBegin), event: *wlr.Pointer.event.PinchBegin) void {
     const cursor: *Cursor = @fieldParentPtr("pinch_begin", listener);
-    cursor.seat.queueEvent(.{ .pointer_pinch_begin = event.* });
+    cursor.seat.queueEvent(.{ .pointer_pinch_begin = event.* }) catch {};
 }
 
 fn queuePinchUpdate(listener: *wl.Listener(*wlr.Pointer.event.PinchUpdate), event: *wlr.Pointer.event.PinchUpdate) void {
     const cursor: *Cursor = @fieldParentPtr("pinch_update", listener);
-    cursor.seat.queueEvent(.{ .pointer_pinch_update = event.* });
+    cursor.seat.queueEvent(.{ .pointer_pinch_update = event.* }) catch {};
 }
 
 fn queuePinchEnd(listener: *wl.Listener(*wlr.Pointer.event.PinchEnd), event: *wlr.Pointer.event.PinchEnd) void {
     const cursor: *Cursor = @fieldParentPtr("pinch_end", listener);
-    cursor.seat.queueEvent(.{ .pointer_pinch_end = event.* });
+    cursor.seat.queueEvent(.{ .pointer_pinch_end = event.* }) catch {};
 }
 
 fn queueSwipeBegin(listener: *wl.Listener(*wlr.Pointer.event.SwipeBegin), event: *wlr.Pointer.event.SwipeBegin) void {
     const cursor: *Cursor = @fieldParentPtr("swipe_begin", listener);
-    cursor.seat.queueEvent(.{ .pointer_swipe_begin = event.* });
+    cursor.seat.queueEvent(.{ .pointer_swipe_begin = event.* }) catch {};
 }
 
 fn queueSwipeUpdate(listener: *wl.Listener(*wlr.Pointer.event.SwipeUpdate), event: *wlr.Pointer.event.SwipeUpdate) void {
     const cursor: *Cursor = @fieldParentPtr("swipe_update", listener);
-    cursor.seat.queueEvent(.{ .pointer_swipe_update = event.* });
+    cursor.seat.queueEvent(.{ .pointer_swipe_update = event.* }) catch {};
 }
 
 fn queueSwipeEnd(listener: *wl.Listener(*wlr.Pointer.event.SwipeEnd), event: *wlr.Pointer.event.SwipeEnd) void {
     const cursor: *Cursor = @fieldParentPtr("swipe_end", listener);
-    cursor.seat.queueEvent(.{ .pointer_swipe_end = event.* });
+    cursor.seat.queueEvent(.{ .pointer_swipe_end = event.* }) catch {};
 }
