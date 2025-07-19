@@ -658,7 +658,6 @@ pub fn matchPointerBinding(
     button: u32,
 ) ?*PointerBinding {
     const wlr_keyboard = seat.wlr_seat.getKeyboard() orelse return null;
-    // XXX this is not ok, we need to store current modifiers per-Keyboard ourselves
     const modifiers = wlr_keyboard.getModifiers();
 
     var found: ?*PointerBinding = null;
