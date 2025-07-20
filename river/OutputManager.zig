@@ -259,6 +259,7 @@ pub fn commitOutputState(om: *OutputManager) void {
                 },
                 .disabled_hard, .destroying => {
                     om.output_layout.remove(wlr_output);
+                    output.sent_wl_output = false;
                 },
             }
         }

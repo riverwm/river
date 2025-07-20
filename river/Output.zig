@@ -139,6 +139,7 @@ scheduled: State,
 /// State sent to the wm in the latest manage sequence.
 sent: State,
 link_sent: wl.list.Link,
+sent_wl_output: bool = false,
 /// State applied to the wlr_output and rendered.
 current: State,
 
@@ -239,11 +240,12 @@ pub fn manageStart(output: *Output) void {
                 const pending = &output.scheduled;
                 const sent = &output.sent;
 
-                if (new) {
-                    // Ensure that the wl_output global has been created,
-                    // this is a noop if it already has been.
-                    wlr_output.createGlobal(server.wl_server);
-                    output_v1.sendWlOutput(wlr_output.global.?.getName(output_v1.getClient()));
+                if (!output.sent_wl_output) {
+                    // wl_output globals are created/destroyed by the wlroots output layout.
+                    if (wlr_output.global) |global| {
+                        output_v1.sendWlOutput(global.getName(output_v1.getClient()));
+                        output.sent_wl_output = true;
+                    }
                 }
 
                 const pending_width, const pending_height = pending.dimensions();
