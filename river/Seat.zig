@@ -421,7 +421,6 @@ fn handleRequest(
     assert(seat.object == seat_v1);
     switch (request) {
         .destroy => {
-            // XXX send protocol error
             seat_v1.destroy();
         },
 

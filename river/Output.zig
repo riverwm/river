@@ -316,10 +316,7 @@ fn handleRequest(
 ) void {
     assert(output.object == output_v1);
     switch (request) {
-        .destroy => {
-            // XXX send protocol error
-            output_v1.destroy();
-        },
+        .destroy => output_v1.destroy(),
     }
 }
 

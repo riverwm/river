@@ -120,7 +120,7 @@ fn handleRequest(
     switch (request) {
         .destroy => xkb_binding_v1.destroy(),
         .set_layout_override => |args| {
-            // XXX protocol error?
+            if (!server.wm.ensureWindowing()) return;
             binding.wm_requested.layout = args.layout;
         },
         .enable => {

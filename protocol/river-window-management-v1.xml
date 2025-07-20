@@ -315,6 +315,10 @@
     <enum name="error">
       <entry name="node_exists" value="0"
         summary="window already has a node object"/>
+      <entry name="invalid_dimensions" value="1"
+        summary="proposed dimensions out of bounds"/>
+      <entry name="invalid_border" value="2"
+        summary="invalid arg to set_borders"/>
     </enum>
 
     <request name="destroy" type="destructor">
@@ -1571,8 +1575,8 @@
       This object allows the window manager to configure a xkbcommon key binding
       and receive events when the key binding is triggered.
 
-      The new key binding is not enabled until initial configuration is
-      completed and the enable request is made during a manage sequence.
+      The new key binding is not enabled until the enable request is made during
+      a manage sequence.
 
       Normally, all key events are sent to the surface with keyboard focus by
       the compositor. Key events that trigger a key binding are not sent to the
@@ -1605,12 +1609,11 @@
         The layout argument is a 0-indexed xkbcommon layout number for the
         keyboard that generated the key event.
 
-        If this request is not made before the enable request the currently
-        active xkb layout of the keyboard that generated the key event will be
-        used.
+        If this request is never made, the currently active xkb layout of the
+        keyboard that generated the key event will be used.
 
-        It is a protocol error to make this request after the first enable
-        request.
+        This request modifies window management state and may only be made as
+        part of a manage sequence, see the river_window_manager_v1 description.
       </description>
       <arg name="layout" type="uint" summary="0-indexed xkbcommon layout"/>
     </request>
@@ -1681,8 +1684,8 @@
       This object allows the window manager to configure a pointer binding and
       receive events when the binding is triggered.
 
-      The new pointer binding is not enabled until initial configuration is
-      completed and the enable request is made during a manage sequence.
+      The new pointer binding is not enabled until the enable request is made
+      during a manage sequence.
 
       Normally, all pointer button events are sent to the surface with pointer
       focus by the compositor. Pointer button events that trigger a pointer

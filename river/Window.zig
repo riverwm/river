@@ -447,10 +447,7 @@ fn handleRequest(
     const wm_requested = &window.wm_requested;
     const rendering_requested = &window.rendering_requested;
     switch (request) {
-        .destroy => {
-            // XXX send protocol error
-            window_v1.destroy();
-        },
+        .destroy => window_v1.destroy(),
         .close => {
             if (!server.wm.ensureWindowing()) return;
             wm_requested.close = true;
@@ -465,7 +462,7 @@ fn handleRequest(
         .propose_dimensions => |args| {
             if (!server.wm.ensureWindowing()) return;
             if (args.width < 0 or args.height < 0) {
-                // XXX send protocol error
+                window_v1.postError(.invalid_dimensions, "dimensions must be greater than or equal to 0 ");
             }
             wm_requested.dimensions = .{
                 .width = @intCast(args.width),
@@ -491,7 +488,7 @@ fn handleRequest(
         .set_borders => |args| {
             if (!server.wm.ensureRendering()) return;
             if (args.width < 0) {
-                // XXX send protocol error
+                window_v1.postError(.invalid_border, "border width must be greater than or equal to 0 ");
             }
             rendering_requested.border = .{
                 .edges = args.edges,

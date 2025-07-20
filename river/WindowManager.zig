@@ -164,10 +164,7 @@ fn handleRequest(
             wm_v1.sendFinished();
             wm_v1.setHandler(?*anyopaque, handleRequestInert, null, null);
         },
-        .destroy => {
-            // XXX send protocol error
-            wm_v1.destroy();
-        },
+        .destroy => wm_v1.destroy(),
         .manage_finish => {
             if (wm.state != .manage) {
                 wm_v1.postError(.sequence_order,
@@ -296,7 +293,6 @@ fn manageStart(wm: *WindowManager) void {
     wm.state = .manage;
 
     if (wm.object) |wm_v1| {
-        // TODO kill the WM on a very long timeout?
         wm_v1.sendManageStart();
     } else {
         wm.manageFinish();
@@ -388,7 +384,6 @@ fn renderStart(wm: *WindowManager) void {
     wm.rendering_scheduled.dirty = false;
 
     if (wm.object) |wm_v1| {
-        // TODO kill the WM on a very long timeout?
         wm_v1.sendRenderStart();
     } else {
         wm.renderFinish();
