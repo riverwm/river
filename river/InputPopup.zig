@@ -107,13 +107,6 @@ pub fn update(input_popup: *InputPopup) void {
 
     const focused = SceneNodeData.fromSurface(focused_surface) orelse return;
 
-    const output = switch (focused.data) {
-        .window, .shell_surface => @panic("TODO"),
-        .lock_surface => |lock_surface| lock_surface.getOutput(),
-        // Xwayland doesn't use the text-input protocol
-        .override_redirect => unreachable,
-    };
-
     const popup_tree = switch (focused.data) {
         .window => |window| window.popup_tree,
         .shell_surface => @panic("TODO"),
@@ -137,11 +130,16 @@ pub fn update(input_popup: *InputPopup) void {
     var focused_y: c_int = undefined;
     _ = focused.node.coords(&focused_x, &focused_y);
 
-    var output_box: wlr.Box = undefined;
-    server.om.output_layout.getBox(output.wlr_output, &output_box);
-
     // Relative to the surface with the active text input
     var cursor_box = text_input.wlr_text_input.current.cursor_rectangle;
+
+    const wlr_output = server.om.outputAt(
+        @floatFromInt(focused_x + cursor_box.x),
+        @floatFromInt(focused_y + cursor_box.y),
+    ) orelse return;
+
+    var output_box: wlr.Box = undefined;
+    server.om.output_layout.getBox(wlr_output, &output_box);
 
     // Adjust to be relative to the output
     cursor_box.x += focused_x - output_box.x;

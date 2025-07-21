@@ -102,6 +102,14 @@ fn handleNewOutput(_: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
     };
 }
 
+/// Returns null if there are no outputs in the output layout
+pub fn outputAt(om: *OutputManager, lx: f64, ly: f64) ?*wlr.Output {
+    var output_lx: f64 = undefined;
+    var output_ly: f64 = undefined;
+    om.output_layout.closestPoint(null, lx, ly, &output_lx, &output_ly);
+    return om.output_layout.outputAt(output_lx, output_ly);
+}
+
 fn handleManagerTest(_: *wl.Listener(*wlr.OutputConfigurationV1), config: *wlr.OutputConfigurationV1) void {
     defer config.destroy();
 

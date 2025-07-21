@@ -99,21 +99,10 @@ fn handleReposition(listener: *wl.Listener(void)) void {
     var root_ly: c_int = undefined;
     _ = xdg_popup.root.node.coords(&root_lx, &root_ly);
 
-    const wlr_output = switch (SceneNodeData.fromNode(&xdg_popup.root.node).?.data) {
-        .window => |_| blk: {
-            var lx: f64 = undefined;
-            var ly: f64 = undefined;
-            server.om.output_layout.closestPoint(
-                null,
-                @as(f64, @floatFromInt(root_lx + xdg_popup.wlr_popup.scheduled.geometry.x)),
-                @as(f64, @floatFromInt(root_ly + xdg_popup.wlr_popup.scheduled.geometry.y)),
-                &lx,
-                &ly,
-            );
-            break :blk server.om.output_layout.outputAt(lx, ly).?;
-        },
-        .shell_surface, .lock_surface, .override_redirect => unreachable,
-    };
+    const wlr_output = server.om.outputAt(
+        @floatFromInt(root_lx + xdg_popup.wlr_popup.scheduled.geometry.x),
+        @floatFromInt(root_ly + xdg_popup.wlr_popup.scheduled.geometry.y),
+    ) orelse return;
 
     var box: wlr.Box = undefined;
     server.om.output_layout.getBox(wlr_output, &box);
