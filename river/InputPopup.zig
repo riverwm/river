@@ -109,8 +109,9 @@ pub fn update(input_popup: *InputPopup) void {
 
     const popup_tree = switch (focused.data) {
         .window => |window| window.popup_tree,
-        .shell_surface => @panic("TODO"),
-        .lock_surface => |_| server.scene.layers.popups, // XXX Do we need per-lock-surface popup trees?
+        .shell_surface => |shell_surface| shell_surface.popup_tree,
+        // TODO fix positioning for lock surfaces not at 0,0 in layout coords
+        .lock_surface => |_| server.scene.layers.popups,
         // Xwayland doesn't use the text-input protocol
         .override_redirect => unreachable,
     };

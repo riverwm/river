@@ -441,6 +441,7 @@ fn renderFinish(wm: *WindowManager) void {
                 .shell_surface => |shell_surface| {
                     shell_surface.renderFinish();
                     shell_surface.tree.node.reparent(server.scene.layers.wm);
+                    shell_surface.popup_tree.node.reparent(server.scene.layers.popups);
                     shell_surface.tree.node.raiseToTop();
                 },
             }

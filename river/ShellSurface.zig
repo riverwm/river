@@ -44,6 +44,7 @@ object: *river.ShellSurfaceV1,
 surface: *wlr.Surface,
 tree: *wlr.SceneTree,
 surfaces: Scene.SaveableSurfaces,
+popup_tree: *wlr.SceneTree,
 node: WmNode,
 
 rendering_requested: struct {
@@ -73,16 +74,21 @@ pub fn create(
     const tree = try server.scene.hidden_tree.createSceneTree();
     errdefer tree.node.destroy();
 
+    const popup_tree = try server.scene.hidden_tree.createSceneTree();
+    errdefer popup_tree.node.destroy();
+
     const surfaces = try Scene.SaveableSurfaces.init(tree);
     _ = try surfaces.tree.createSceneSubsurfaceTree(surface);
 
     try SceneNodeData.attach(&tree.node, .{ .shell_surface = shell_surface });
+    try SceneNodeData.attach(&popup_tree.node, .{ .shell_surface = shell_surface });
 
     shell_surface.* = .{
         .object = shell_surface_v1,
         .surface = surface,
         .tree = tree,
         .surfaces = surfaces,
+        .popup_tree = popup_tree,
         .node = undefined,
     };
     shell_surface.node.init(.shell_surface);
@@ -98,6 +104,7 @@ fn handleDestroy(_: *river.ShellSurfaceV1, shell_surface: *ShellSurface) void {
     shell_surface.node.deinit();
 
     shell_surface.tree.node.destroy();
+    shell_surface.popup_tree.node.destroy();
 
     util.gpa.destroy(shell_surface);
 }
@@ -160,4 +167,5 @@ pub fn renderFinish(shell_surface: *ShellSurface) void {
     shell_surface.surfaces.dropSaved();
 
     shell_surface.tree.node.setPosition(rendering_requested.x, rendering_requested.y);
+    shell_surface.popup_tree.node.setPosition(rendering_requested.x, rendering_requested.y);
 }
