@@ -659,33 +659,30 @@
       <arg name="surface" type="object" interface="wl_surface"/>
     </request>
 
-    <event name="move_requested">
-      <description summary="the window requested interactive move">
+    <event name="pointer_move_requested">
+      <description summary="window requested interactive pointer move">
         This event informs the window manager that the window has requested to
-        be interactively moved using the pointer. The seat argument indicates
-        the seat for the move and the serial argument identifies the input event
-        (e.g. pointer button press or touch) that started the move.
+        be interactively moved using the pointer. The seat argument indicates the
+        seat for the move.
 
         The xdg-shell protocol for example allows windows to request that an
         interactive move be started, perhaps when a client-side rendered
         titlebar is dragged.
 
-        The window manager may use the river_seat_v1.op_start_serial request to
+        The window manager may use the river_seat_v1.op_start_pointer request to
         interactively move the window or ignore this event entirely.
 
         This event will be followed by a manage_start event after all other new
         state has been sent by the server.
       </description>
       <arg name="seat" type="object" interface="river_seat_v1"/>
-      <arg name="serial" type="uint"/>
     </event>
 
-    <event name="resize_requested">
-      <description summary="the window requested interactive resize">
+    <event name="pointer_resize_requested">
+      <description summary="window requested interactive pointer resize">
         This event informs the window manager that the window has requested to
         be interactively resized using the pointer. The seat argument indicates
-        the seat for the resize and the serial argument identifies the input
-        event (e.g. pointer button press or touch) that started the resize.
+        the seat for the resize.
 
         The edges argument indicates which edges the window has requested to be
         resized from. The edges argument will never be none and will never have
@@ -695,14 +692,13 @@
         interactive resize be started, perhaps when the corner of client-side
         rendered decorations is dragged.
 
-        The window manager may use the river_seat_v1.op_start_serial request to
+        The window manager may use the river_seat_v1.op_start_pointer request to
         interactively resize the window or ignore this event entirely.
 
         This event will be followed by a manage_start event after all other new
         state has been sent by the server.
       </description>
       <arg name="seat" type="object" interface="river_seat_v1"/>
-      <arg name="serial" type="uint"/>
       <arg name="edges" type="uint" enum="edges"/>
     </event>
 
@@ -1417,44 +1413,21 @@
       <arg name="shell_surface" type="object" interface="river_shell_surface_v1"/>
     </event>
 
-    <request name="op_start_serial">
-      <description summary="start an interactive operation with a serial">
-        Start an interactive seat operation with a serial from either the
-        river_window_v1.move_requested or river_window_v1.resize_requested
-        event.
-
-        During the operation, op_delta events will be sent based on input
-        corresponding to the provided serial (e.g. pointer or touch input).
-
-        The window manager may use this operation to implement interactive
-        move/resize of windows by setting the position of windows and proposing
-        dimensions based off of the op_delta events.
-
-        The operation continues until the pointer button, touch point or similar
-        corresponding to the given serial is released or the op_end request is
-        made and applied during a manage sequence.
-
-        This request is ignored if an operation is already in progress for a
-        given river_seat_v1.
-
-        This request modifies window management state and may only be made as
-        part of a manage sequence, see the river_window_manager_v1 description.
-      </description>
-      <arg name="serial" type="uint"/>
-    </request>
-
     <request name="op_start_pointer">
       <description summary="start an interactive pointer operation">
         Start an interactive pointer operation. During the operation, op_delta
         events will be sent based on pointer input.
 
+        When all pointer buttons are released, the op_release event is sent.
+
+        The pointer operation continues until the op_end request is made during
+        a manage sequence and that manage sequence is finished.
+
         The window manager may use this operation to implement interactive
         move/resize of windows by setting the position of windows and proposing
         dimensions based off of the op_delta events.
 
-        The pointer operation continues until the op_end request is made during
-        a manage sequence and that manage sequence is finished. This request is
-        ignored if an operation is already in progress.
+        This request is ignored if an operation is already in progress.
 
         This request modifies window management state and may only be made as
         part of a manage sequence, see the river_window_manager_v1 description.
@@ -1465,9 +1438,27 @@
       <description summary="total cumulative motion since op start">
         This event indicates the total change in position since the start of the
         operation of the pointer/touch point/etc.
+
+        This event will be followed by a manage_start event after all other new
+        state has been sent by the server.
       </description>
       <arg name="dx" type="int" summary="total change in x"/>
       <arg name="dy" type="int" summary="total change in y"/>
+    </event>
+
+    <event name="op_release">
+      <description summary="operation input has been released">
+        The input driving the current interactive operation has been released.
+        For a pointer op for example, all pointer buttons have been released.
+
+        Depending on the op type, op_delta events may continue to be sent until
+        the op is ended with the op_end request.
+
+        This event is sent at most once during an interactive operation.
+
+        This event will be followed by a manage_start event after all other new
+        state has been sent by the server.
+      </description>
     </event>
 
     <request name="op_end">

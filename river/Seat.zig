@@ -121,6 +121,7 @@ wm_scheduled: struct {
     window: ?*Window = null,
     /// The window clicked on, touched, etc.
     interaction: WmFocus = .none,
+    op_release: bool = false,
 } = .{},
 
 /// State sent to the wm in the latest manage sequence.
@@ -135,7 +136,6 @@ wm_requested: struct {
     focus: WmFocus = .none,
     op: union(enum) {
         none,
-        //TODO start_serial: ?u32,
         start_pointer,
         end,
     } = .none,
@@ -151,6 +151,7 @@ cursor: Cursor,
 
 op: ?struct {
     dirty: bool = false,
+    sent_release: bool = false,
     input: enum {
         pointer,
     },
@@ -356,8 +357,14 @@ pub fn manageStart(seat: *Seat) void {
             },
         }
 
-        if (seat.op) |op| {
+        if (seat.op) |*op| {
             seat_v1.sendOpDelta(op.x - op.start_x, op.y - op.start_y);
+
+            if (seat.wm_scheduled.op_release and !op.sent_release) {
+                seat_v1.sendOpRelease();
+                seat.wm_scheduled.op_release = false;
+                op.sent_release = true;
+            }
         }
 
         {
@@ -411,6 +418,7 @@ fn handleRequestInert(
 
 fn handleDestroy(_: *river.SeatV1, seat: *Seat) void {
     seat.object = null;
+    seat.opEnd();
 }
 
 fn handleRequest(
@@ -438,10 +446,6 @@ fn handleRequest(
         },
         .clear_focus => seat.wm_requested.focus = .none,
 
-        .op_start_serial => {
-            if (!server.wm.ensureWindowing()) return;
-            // TODO
-        },
         .op_start_pointer => {
             if (!server.wm.ensureWindowing()) return;
             seat.wm_requested.op = .start_pointer;
@@ -496,7 +500,8 @@ pub fn manageFinish(seat: *Seat) void {
 
     switch (seat.wm_requested.op) {
         .none => {},
-        .start_pointer => if (seat.op == null) {
+        .start_pointer,
+        => if (seat.op == null) {
             log.debug("start seat op pointer", .{});
             seat.op = .{
                 .input = .pointer,
@@ -505,15 +510,9 @@ pub fn manageFinish(seat: *Seat) void {
                 .x = @intFromFloat(seat.cursor.wlr_cursor.x),
                 .y = @intFromFloat(seat.cursor.wlr_cursor.y),
             };
-            seat.cursor.startOpPointer();
+            seat.cursor.opStartPointer();
         },
-        .end => if (seat.op) |op| {
-            log.debug("end seat op", .{});
-            seat.op = null;
-            switch (op.input) {
-                .pointer => seat.cursor.endOpPointer(),
-            }
-        },
+        .end => seat.opEnd(),
     }
     seat.wm_requested.op = .none;
 }
@@ -689,11 +688,21 @@ pub fn handleSwitchMapping(
     }
 }
 
-pub fn updateOp(seat: *Seat, x: i32, y: i32) void {
+pub fn opUpdate(seat: *Seat, x: i32, y: i32) void {
     const op = &seat.op.?;
     op.x = x;
     op.y = y;
     op.dirty = true;
+}
+
+pub fn opEnd(seat: *Seat) void {
+    if (seat.op) |op| {
+        log.debug("end seat op", .{});
+        seat.op = null;
+        switch (op.input) {
+            .pointer => seat.cursor.opEndPointer(),
+        }
+    }
 }
 
 pub fn addDevice(seat: *Seat, wlr_device: *wlr.InputDevice, virtual: bool) void {

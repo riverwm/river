@@ -383,23 +383,26 @@ fn handleRequestMove(
     event: *wlr.XdgToplevel.event.Move,
 ) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("request_move", listener);
-    _ = toplevel;
     const seat: *Seat = @alignCast(@ptrCast(event.seat.seat.data));
 
     // Moving windows with touch or tablet tool is not yet supported.
     if (seat.wlr_seat.validatePointerGrabSerial(null, event.serial)) {
-        // XXX queue pointer_move_requested, dirtyWindowing()
+        toplevel.window.wm_scheduled.pointer_move_requested = seat;
+        server.wm.dirtyWindowing();
     }
 }
 
 fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), event: *wlr.XdgToplevel.event.Resize) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("request_resize", listener);
-    _ = toplevel;
     const seat: *Seat = @alignCast(@ptrCast(event.seat.seat.data));
 
     // Resizing windows with touch or tablet tool is not yet supported.
     if (seat.wlr_seat.validatePointerGrabSerial(null, event.serial)) {
-        // XXX queue pointer_resize_requested, dirtyWindowing()
+        toplevel.window.wm_scheduled.pointer_resize_requested = .{
+            .seat = seat,
+            .edges = @bitCast(event.edges),
+        };
+        server.wm.dirtyWindowing();
     }
 }
 

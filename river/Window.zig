@@ -145,6 +145,11 @@ wm_scheduled: struct {
     fullscreen_requested: FullscreenRequest = .no_request,
     dirty_app_id: bool = false,
     dirty_title: bool = false,
+    pointer_move_requested: ?*Seat = null,
+    pointer_resize_requested: ?struct {
+        seat: *Seat,
+        edges: river.WindowV1.Edges,
+    } = null,
 } = .{},
 
 /// State sent to the wm in the latest manage sequence.
@@ -364,24 +369,24 @@ pub fn manageStart(window: *Window) void {
             };
             errdefer comptime unreachable;
 
-            const pending = &window.wm_scheduled;
+            const scheduled = &window.wm_scheduled;
             const sent = &window.wm_sent;
 
-            // XXX send all dirty pending state
-            if (new or !meta.eql(pending.dimensions_hint, sent.dimensions_hint)) {
+            // XXX send all dirty scheduled state
+            if (new or !meta.eql(scheduled.dimensions_hint, sent.dimensions_hint)) {
                 window_v1.sendDimensionsHint(
-                    pending.dimensions_hint.min_width,
-                    pending.dimensions_hint.min_height,
-                    pending.dimensions_hint.max_width,
-                    pending.dimensions_hint.max_height,
+                    scheduled.dimensions_hint.min_width,
+                    scheduled.dimensions_hint.min_height,
+                    scheduled.dimensions_hint.max_width,
+                    scheduled.dimensions_hint.max_height,
                 );
-                sent.dimensions_hint = pending.dimensions_hint;
+                sent.dimensions_hint = scheduled.dimensions_hint;
             }
-            if (new or pending.decoration_hint != sent.decoration_hint) {
+            if (new or scheduled.decoration_hint != sent.decoration_hint) {
                 window_v1.sendDecorationHint(window.wm_scheduled.decoration_hint);
-                sent.decoration_hint = pending.decoration_hint;
+                sent.decoration_hint = scheduled.decoration_hint;
             }
-            switch (pending.fullscreen_requested) {
+            switch (scheduled.fullscreen_requested) {
                 .no_request => {},
                 .fullscreen => |output_hint| {
                     if (output_hint) |output| {
@@ -392,16 +397,31 @@ pub fn manageStart(window: *Window) void {
                 },
                 .exit => window_v1.sendExitFullscreenRequested(),
             }
-            pending.fullscreen_requested = .no_request;
+            scheduled.fullscreen_requested = .no_request;
 
-            if (new or pending.dirty_app_id) {
+            if (new or scheduled.dirty_app_id) {
                 window_v1.sendAppId(window.getAppId());
-                pending.dirty_app_id = false;
+                scheduled.dirty_app_id = false;
             }
-            if (new or pending.dirty_title) {
+            if (new or scheduled.dirty_title) {
                 window_v1.sendTitle(window.getTitle());
-                pending.dirty_title = false;
+                scheduled.dirty_title = false;
             }
+
+            if (scheduled.pointer_move_requested) |seat| {
+                if (seat.object) |seat_v1| {
+                    log.debug("send pointer move requested", .{});
+                    window_v1.sendPointerMoveRequested(seat_v1);
+                }
+            }
+            scheduled.pointer_move_requested = null;
+            if (scheduled.pointer_resize_requested) |data| {
+                if (data.seat.object) |seat_v1| {
+                    log.debug("send pointer resize requested", .{});
+                    window_v1.sendPointerResizeRequested(seat_v1, data.edges);
+                }
+            }
+            scheduled.pointer_resize_requested = null;
         },
     }
 }

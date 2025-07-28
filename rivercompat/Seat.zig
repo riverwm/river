@@ -83,6 +83,7 @@ fn handleEvent(seat_v1: *river.SeatV1, event: river.SeatV1.Event, seat: *Seat) v
             seat.op.?.dx = args.dx;
             seat.op.?.dy = args.dy;
         },
+        .op_release => {},
         .pointer_activity => {},
         .window_interaction => |args| {
             const window_v1 = args.window orelse return;

@@ -285,7 +285,7 @@ fn clearFocus(cursor: *Cursor) void {
     cursor.seat.wlr_seat.pointerNotifyClearFocus();
 }
 
-pub fn startOpPointer(cursor: *Cursor) void {
+pub fn opStartPointer(cursor: *Cursor) void {
     if (cursor.constraint) |constraint| {
         if (constraint.state == .active) constraint.deactivate();
     }
@@ -296,7 +296,7 @@ pub fn startOpPointer(cursor: *Cursor) void {
     cursor.clearFocus();
 }
 
-pub fn endOpPointer(cursor: *Cursor) void {
+pub fn opEndPointer(cursor: *Cursor) void {
     if (cursor.pressed.count() == 0) {
         log.debug("entering cursor mode passthrough", .{});
         cursor.mode = .passthrough;
@@ -362,7 +362,7 @@ pub fn processMotionRelative(cursor: *Cursor, event: *const wlr.Pointer.event.Mo
             data.delta_y = dy - @trunc(dy);
 
             cursor.wlr_cursor.move(event.device, dx, dy);
-            cursor.seat.updateOp(@intFromFloat(cursor.wlr_cursor.x), @intFromFloat(cursor.wlr_cursor.y));
+            cursor.seat.opUpdate(@intFromFloat(cursor.wlr_cursor.x), @intFromFloat(cursor.wlr_cursor.y));
         },
     }
 }
@@ -494,7 +494,12 @@ pub fn processButton(cursor: *Cursor, event: *const wlr.Pointer.event.Button) vo
                         cursor.passthrough(event.time_msec);
                     }
                 },
-                .op => {},
+                .op => {
+                    if (cursor.pressed.count() == 0) {
+                        cursor.seat.wm_scheduled.op_release = true;
+                        server.wm.dirtyWindowing();
+                    }
+                },
             }
         } else {
             log.err("ignoring duplicate pointer button {d} release", .{event.button});
