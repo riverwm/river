@@ -66,6 +66,8 @@ unmap: wl.Listener(void) = .init(handleUnmap),
 commit: wl.Listener(*wlr.Surface) = .init(handleCommit),
 new_popup: wl.Listener(*wlr.XdgPopup) = .init(handleNewPopup),
 request_fullscreen: wl.Listener(void) = .init(handleRequestFullscreen),
+request_maximize: wl.Listener(void) = .init(handleRequestMaximize),
+request_minimize: wl.Listener(void) = .init(handleRequestMinimize),
 request_move: wl.Listener(*wlr.XdgToplevel.event.Move) = .init(handleRequestMove),
 request_resize: wl.Listener(*wlr.XdgToplevel.event.Resize) = .init(handleRequestResize),
 set_title: wl.Listener(void) = .init(handleSetTitle),
@@ -106,6 +108,8 @@ pub fn create(wlr_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
     wlr_toplevel.base.surface.events.commit.add(&toplevel.commit);
     wlr_toplevel.base.events.new_popup.add(&toplevel.new_popup);
     wlr_toplevel.events.request_fullscreen.add(&toplevel.request_fullscreen);
+    wlr_toplevel.events.request_maximize.add(&toplevel.request_maximize);
+    wlr_toplevel.events.request_minimize.add(&toplevel.request_minimize);
     wlr_toplevel.events.request_move.add(&toplevel.request_move);
     wlr_toplevel.events.request_resize.add(&toplevel.request_resize);
     wlr_toplevel.events.set_title.add(&toplevel.set_title);
@@ -229,6 +233,8 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
     toplevel.commit.link.remove();
     toplevel.new_popup.link.remove();
     toplevel.request_fullscreen.link.remove();
+    toplevel.request_maximize.link.remove();
+    toplevel.request_minimize.link.remove();
     toplevel.request_move.link.remove();
     toplevel.request_resize.link.remove();
     toplevel.set_title.link.remove();
@@ -375,6 +381,22 @@ fn handleRequestFullscreen(listener: *wl.Listener(void)) void {
     } else {
         toplevel.window.wm_scheduled.fullscreen_requested = .exit;
     }
+    server.wm.dirtyWindowing();
+}
+
+fn handleRequestMaximize(listener: *wl.Listener(void)) void {
+    const toplevel: *XdgToplevel = @fieldParentPtr("request_maximize", listener);
+    if (toplevel.wlr_toplevel.requested.maximized) {
+        toplevel.window.wm_scheduled.maximize_requested = .maximize;
+    } else {
+        toplevel.window.wm_scheduled.maximize_requested = .unmaximize;
+    }
+    server.wm.dirtyWindowing();
+}
+
+fn handleRequestMinimize(listener: *wl.Listener(void)) void {
+    const toplevel: *XdgToplevel = @fieldParentPtr("request_minimize", listener);
+    toplevel.window.wm_scheduled.minimize_requested = true;
     server.wm.dirtyWindowing();
 }
 

@@ -143,6 +143,12 @@ wm_scheduled: struct {
     decoration_hint: river.WindowV1.DecorationHint = .only_supports_csd,
     /// Set back to no_request at the end of each update sequence
     fullscreen_requested: FullscreenRequest = .no_request,
+    maximize_requested: enum {
+        no_request,
+        maximize,
+        unmaximize,
+    } = .no_request,
+    minimize_requested: bool = false,
     dirty_app_id: bool = false,
     dirty_title: bool = false,
     pointer_move_requested: ?*Seat = null,
@@ -386,6 +392,7 @@ pub fn manageStart(window: *Window) void {
                 window_v1.sendDecorationHint(window.wm_scheduled.decoration_hint);
                 sent.decoration_hint = scheduled.decoration_hint;
             }
+
             switch (scheduled.fullscreen_requested) {
                 .no_request => {},
                 .fullscreen => |output_hint| {
@@ -398,6 +405,16 @@ pub fn manageStart(window: *Window) void {
                 .exit => window_v1.sendExitFullscreenRequested(),
             }
             scheduled.fullscreen_requested = .no_request;
+            switch (scheduled.maximize_requested) {
+                .no_request => {},
+                .maximize => window_v1.sendMaximizeRequested(),
+                .unmaximize => window_v1.sendUnmaximizeRequested(),
+            }
+            scheduled.maximize_requested = .no_request;
+            if (scheduled.minimize_requested) {
+                window_v1.sendMinimizeRequested();
+            }
+            scheduled.minimize_requested = false;
 
             if (new or scheduled.dirty_app_id) {
                 window_v1.sendAppId(window.getAppId());
