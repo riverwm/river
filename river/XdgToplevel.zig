@@ -70,6 +70,7 @@ request_maximize: wl.Listener(void) = .init(handleRequestMaximize),
 request_minimize: wl.Listener(void) = .init(handleRequestMinimize),
 request_move: wl.Listener(*wlr.XdgToplevel.event.Move) = .init(handleRequestMove),
 request_resize: wl.Listener(*wlr.XdgToplevel.event.Resize) = .init(handleRequestResize),
+set_parent: wl.Listener(void) = .init(handleSetParent),
 set_title: wl.Listener(void) = .init(handleSetTitle),
 set_app_id: wl.Listener(void) = .init(handleSetAppId),
 
@@ -112,6 +113,7 @@ pub fn create(wlr_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
     wlr_toplevel.events.request_minimize.add(&toplevel.request_minimize);
     wlr_toplevel.events.request_move.add(&toplevel.request_move);
     wlr_toplevel.events.request_resize.add(&toplevel.request_resize);
+    wlr_toplevel.events.set_parent.add(&toplevel.set_parent);
     wlr_toplevel.events.set_title.add(&toplevel.set_title);
     wlr_toplevel.events.set_app_id.add(&toplevel.set_app_id);
 }
@@ -237,6 +239,7 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
     toplevel.request_minimize.link.remove();
     toplevel.request_move.link.remove();
     toplevel.request_resize.link.remove();
+    toplevel.set_parent.link.remove();
     toplevel.set_title.link.remove();
     toplevel.set_app_id.link.remove();
 
@@ -426,6 +429,10 @@ fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), ev
         };
         server.wm.dirtyWindowing();
     }
+}
+
+fn handleSetParent(_: *wl.Listener(void)) void {
+    server.wm.dirtyWindowing();
 }
 
 /// Called when the client sets / updates its title

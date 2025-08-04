@@ -172,6 +172,7 @@ wm_scheduled: struct {
 wm_sent: struct {
     dimensions_hint: DimensionsHint = .{},
     decoration_hint: river.WindowV1.DecorationHint = .only_supports_csd,
+    parent: ?Window.Ref = null,
 } = .{},
 
 /// Windowing state requested by the wm.
@@ -418,6 +419,16 @@ pub fn manageStart(window: *Window) void {
                 window_v1.sendMinimizeRequested();
             }
             scheduled.minimize_requested = false;
+
+            if (window.getParent()) |parent| {
+                if (sent.parent == null or sent.parent.?.get() != parent) {
+                    window_v1.sendParent(parent.object);
+                    sent.parent = parent.ref;
+                }
+            } else if (sent.parent != null) {
+                window_v1.sendParent(null);
+                sent.parent = null;
+            }
 
             if (new or scheduled.dirty_app_id) {
                 window_v1.sendAppId(window.getAppId());
@@ -869,6 +880,17 @@ pub fn destroyPopups(window: Window) void {
     switch (window.impl) {
         .toplevel => |toplevel| toplevel.destroyPopups(),
         .xwayland, .destroying => {},
+    }
+}
+
+pub fn getParent(window: *Window) ?*Window {
+    switch (window.impl) {
+        .toplevel => |toplevel| {
+            const wlr_parent = toplevel.wlr_toplevel.parent orelse return null;
+            const parent: *XdgToplevel = @alignCast(@ptrCast(wlr_parent.base.data));
+            return parent.window;
+        },
+        .xwayland, .destroying => return null,
     }
 }
 
