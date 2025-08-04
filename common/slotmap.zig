@@ -121,6 +121,10 @@ pub fn SlotMap(comptime T: type) type {
             }
         };
 
+        /// Removing values from the map during iteration is safe.
+        /// Adding values to the map during iteration is safe but there is
+        /// no guarantee whether or not values added during iteration will
+        /// be seen by the iterator.
         pub fn iterator(map: *Map) Iterator {
             return .{ .map = map, .index = 0 };
         }
@@ -234,4 +238,40 @@ fn expectIterate(expected: []const u64, map: *SlotMap(u64)) !void {
     }
     try std.testing.expectEqual(i, map.count);
     try std.testing.expectEqual(i, expected.len);
+}
+
+test "remove during iteration" {
+    const testing = std.testing;
+
+    var map: SlotMap(u64) = .empty;
+    defer map.deinit(testing.allocator);
+
+    const five = try map.put(testing.allocator, 5);
+    const six = try map.put(testing.allocator, 6);
+    const seven = try map.put(testing.allocator, 7);
+    const eight = try map.put(testing.allocator, 8);
+    const nine = try map.put(testing.allocator, 9);
+
+    try testing.expectEqual(5, map.get(five));
+    try testing.expectEqual(6, map.get(six));
+    try testing.expectEqual(7, map.get(seven));
+    try testing.expectEqual(8, map.get(eight));
+    try testing.expectEqual(9, map.get(nine));
+    try expectIterate(&.{ 5, 6, 7, 8, 9 }, &map);
+
+    var it = map.iterator();
+    map.remove(five);
+
+    try testing.expectEqual(6, it.next());
+    try testing.expectEqual(null, map.get(five));
+    try testing.expectEqual(6, map.get(six));
+    try testing.expectEqual(7, map.get(seven));
+    try testing.expectEqual(8, map.get(eight));
+    try testing.expectEqual(9, map.get(nine));
+
+    try testing.expectEqual(7, it.next());
+    map.remove(seven);
+    map.remove(nine);
+    map.remove(eight);
+    try testing.expectEqual(null, it.next());
 }
