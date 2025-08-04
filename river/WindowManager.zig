@@ -21,6 +21,7 @@ const assert = std.debug.assert;
 const wl = @import("wayland").server.wl;
 const wlr = @import("wlroots");
 const river = @import("wayland").server.river;
+const SlotMap = @import("slotmap").SlotMap;
 
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
@@ -50,7 +51,7 @@ state: union(enum) {
     render,
 } = .idle,
 
-windows: wl.list.Head(Window, .link),
+windows: SlotMap(*Window) = .empty,
 
 /// State to be sent to the wm in the next manage sequence.
 wm_scheduled: struct {
@@ -90,7 +91,6 @@ pub fn init(wm: *WindowManager) !void {
 
     wm.* = .{
         .global = try wl.Global.create(server.wl_server, river.WindowManagerV1, 1, *WindowManager, wm, bind),
-        .windows = undefined,
         .wm_sent = .{
             .outputs = undefined,
             .seats = undefined,
@@ -100,7 +100,6 @@ pub fn init(wm: *WindowManager) !void {
         },
         .timeout = timeout,
     };
-    wm.windows.init();
     wm.wm_sent.outputs.init();
     wm.wm_sent.seats.init();
     wm.rendering_requested.list.init();
@@ -280,7 +279,7 @@ fn manageStart(wm: *WindowManager) void {
     wm.wm_scheduled.output_config = null;
 
     {
-        var it = wm.windows.safeIterator(.forward);
+        var it = wm.windows.iterator();
         while (it.next()) |window| window.manageStart();
     }
 
@@ -399,7 +398,7 @@ fn renderFinish(wm: *WindowManager) void {
     log.debug("render sequence finish", .{});
 
     {
-        var it = wm.windows.safeIterator(.forward);
+        var it = wm.windows.iterator();
         while (it.next()) |window| {
             // If a window is unmapped during a render sequence, we need to retain the saved
             // buffers until after the next manage sequence (in which the closed event will

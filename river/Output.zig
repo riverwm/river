@@ -276,7 +276,7 @@ pub fn manageStart(output: *Output) void {
 
             if (output.scheduled.state == .destroying) {
                 {
-                    var it = server.wm.windows.iterator(.forward);
+                    var it = server.wm.windows.iterator();
                     while (it.next()) |window| {
                         switch (window.wm_scheduled.fullscreen_requested) {
                             .fullscreen => |output_hint| {

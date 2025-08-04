@@ -148,6 +148,7 @@ pub fn build(b: *Build) !void {
 
     const flags = b.createModule(.{ .root_source_file = b.path("common/flags.zig") });
     const globber = b.createModule(.{ .root_source_file = b.path("common/globber.zig") });
+    const slotmap = b.createModule(.{ .root_source_file = b.path("common/slotmap.zig") });
 
     {
         const river = b.addExecutable(.{
@@ -175,6 +176,7 @@ pub fn build(b: *Build) !void {
         river.root_module.addImport("wlroots", wlroots);
         river.root_module.addImport("flags", flags);
         river.root_module.addImport("globber", globber);
+        river.root_module.addImport("slotmap", slotmap);
 
         river.addCSourceFile(.{
             .file = b.path("river/wlroots_log_wrapper.c"),

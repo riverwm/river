@@ -80,7 +80,7 @@ pub const Event = union(enum) {
 
 pub const WmFocus = union(enum) {
     none,
-    window: *Window,
+    window: Window.Ref,
     shell_surface: *ShellSurface,
 };
 
@@ -118,7 +118,7 @@ event_queue: EventQueue = EventQueue.init(),
 /// State to be sent to the wm in the next manage sequence.
 wm_scheduled: struct {
     /// The window entered/hovered by the pointer, if any
-    window: ?*Window = null,
+    window: ?Window.Ref = null,
     /// The window clicked on, touched, etc.
     interaction: WmFocus = .none,
     op_release: bool = false,
@@ -127,7 +127,7 @@ wm_scheduled: struct {
 /// State sent to the wm in the latest manage sequence.
 wm_sent: struct {
     /// The window entered/hovered by the pointer, if any
-    window: ?*Window = null,
+    window: ?Window.Ref = null,
 } = .{},
 link_sent: wl.list.Link,
 
@@ -324,10 +324,12 @@ pub fn manageStart(seat: *Seat) void {
         }
 
         if (new) {
-            if (seat.wm_scheduled.window) |window| {
-                if (window.object) |window_v1| {
-                    seat_v1.sendPointerEnter(window_v1);
-                    seat.wm_sent.window = seat.wm_scheduled.window;
+            if (seat.wm_scheduled.window) |ref| {
+                if (ref.get()) |window| {
+                    if (window.object) |window_v1| {
+                        seat_v1.sendPointerEnter(window_v1);
+                        seat.wm_sent.window = seat.wm_scheduled.window;
+                    }
                 }
             }
         } else if (seat.wm_scheduled.window != seat.wm_sent.window) {
@@ -335,27 +337,30 @@ pub fn manageStart(seat: *Seat) void {
                 seat_v1.sendPointerLeave();
                 seat.wm_sent.window = null;
             }
-            if (seat.wm_scheduled.window) |window| {
-                if (window.object) |window_v1| {
-                    seat_v1.sendPointerEnter(window_v1);
-                    seat.wm_sent.window = window;
+            if (seat.wm_scheduled.window) |ref| {
+                if (ref.get()) |window| {
+                    if (window.object) |window_v1| {
+                        seat_v1.sendPointerEnter(window_v1);
+                        seat.wm_sent.window = seat.wm_scheduled.window;
+                    }
                 }
             }
         }
 
         switch (seat.wm_scheduled.interaction) {
             .none => {},
-            .window => |window| {
-                if (window.object) |window_v1| {
-                    seat_v1.sendWindowInteraction(window_v1);
-                    seat.wm_scheduled.interaction = .none;
+            .window => |ref| {
+                if (ref.get()) |window| {
+                    if (window.object) |window_v1| {
+                        seat_v1.sendWindowInteraction(window_v1);
+                    }
                 }
             },
             .shell_surface => |shell_surface| {
                 seat_v1.sendShellSurfaceInteraction(shell_surface.object);
-                seat.wm_scheduled.interaction = .none;
             },
         }
+        seat.wm_scheduled.interaction = .none;
 
         if (seat.op) |*op| {
             seat_v1.sendOpDelta(op.x - op.start_x, op.y - op.start_y);
@@ -436,7 +441,7 @@ fn handleRequest(
             if (!server.wm.ensureWindowing()) return;
             const data = args.window.getUserData() orelse return;
             const window: *Window = @ptrCast(@alignCast(data));
-            seat.wm_requested.focus = .{ .window = window };
+            seat.wm_requested.focus = .{ .window = window.ref };
         },
         .focus_shell_surface => |args| {
             if (!server.wm.ensureWindowing()) return;
@@ -494,7 +499,11 @@ pub fn manageFinish(seat: *Seat) void {
 
     switch (seat.wm_requested.focus) {
         .none => seat.focus(.none),
-        .window => |window| seat.focus(.{ .window = window }),
+        .window => |ref| {
+            if (ref.get()) |window| {
+                seat.focus(.{ .window = window });
+            }
+        },
         .shell_surface => |shell_surface| seat.focus(.{ .shell_surface = shell_surface }),
     }
 

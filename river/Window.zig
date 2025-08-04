@@ -25,6 +25,7 @@ const posix = std.posix;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 const river = @import("wayland").server.river;
+const SlotMap = @import("slotmap").SlotMap;
 
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
@@ -85,6 +86,16 @@ pub const Configure = struct {
     resizing: bool = false,
 };
 
+pub const Ref = packed struct {
+    key: SlotMap(*Window).Key,
+
+    pub fn get(ref: Ref) ?*Window {
+        return server.wm.windows.get(ref.key);
+    }
+};
+
+ref: Ref,
+
 /// The window management protocol object for this window
 /// Created in manageStart() when state is .ready
 /// Set to null in manageStart() when state is .closing
@@ -133,9 +144,6 @@ decorations_above: wl.list.Head(Decoration, .link),
 decorations_above_tree: *wlr.SceneTree,
 
 popup_tree: *wlr.SceneTree,
-
-/// WindowManager.windows
-link: wl.list.Link,
 
 /// State to be sent to the wm in the next manage sequence.
 wm_scheduled: struct {
@@ -224,6 +232,9 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
     const window = try util.gpa.create(Window);
     errdefer util.gpa.destroy(window);
 
+    const key = try server.wm.windows.put(util.gpa, window);
+    errdefer server.wm.windows.remove(key);
+
     const tree = try server.scene.hidden_tree.createSceneTree();
     errdefer tree.node.destroy();
 
@@ -231,6 +242,7 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
     errdefer popup_tree.node.destroy();
 
     window.* = .{
+        .ref = .{ .key = key },
         .node = undefined,
         .impl = impl,
         .tree = tree,
@@ -247,15 +259,12 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
         .decorations_above = undefined,
         .decorations_above_tree = try tree.createSceneTree(),
         .popup_tree = popup_tree,
-        .link = undefined,
     };
 
     window.node.init(.window);
 
     window.decorations_below.init();
     window.decorations_above.init();
-
-    server.wm.windows.append(window);
 
     window.tree.node.setEnabled(false);
     window.popup_tree.node.setEnabled(false);
@@ -290,12 +299,6 @@ pub fn destroy(window: *Window) void {
             if (seat.focused == .window and seat.focused.window == window) {
                 seat.focus(.none);
             }
-            if (seat.wm_scheduled.window == window) {
-                seat.wm_scheduled.window = null;
-            }
-            if (seat.wm_sent.window == window) {
-                seat.wm_sent.window = null;
-            }
         }
     }
 
@@ -307,9 +310,9 @@ pub fn destroy(window: *Window) void {
     window.tree.node.destroy();
     window.popup_tree.node.destroy();
 
-    window.link.remove();
-
     window.node.deinit();
+
+    server.wm.windows.remove(window.ref.key);
 
     util.gpa.destroy(window);
 }
@@ -645,7 +648,7 @@ pub fn manageFinish(window: *Window) bool {
         var it = server.wm.wm_sent.seats.iterator(.forward);
         while (it.next()) |seat| {
             if (seat.wm_requested.focus == .window and
-                seat.wm_requested.focus.window == window)
+                seat.wm_requested.focus.window == window.ref)
             {
                 window.configure_scheduled.activated = true;
                 break;

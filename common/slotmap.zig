@@ -21,7 +21,8 @@ pub fn SlotMap(comptime T: type) type {
     return struct {
         const Map = @This();
 
-        pub const Key = struct {
+        /// This is packed just to make == work.
+        pub const Key = packed struct {
             generation: u32,
             index: u32,
         };
@@ -186,6 +187,11 @@ test "iteration" {
 
     var map: SlotMap(u64) = .empty;
     defer map.deinit(testing.allocator);
+
+    {
+        var it = map.iterator();
+        try testing.expectEqual(null, it.next());
+    }
 
     const five = try map.put(testing.allocator, 5);
     const six = try map.put(testing.allocator, 6);

@@ -377,13 +377,13 @@ fn updateHovered(cursor: *Cursor) void {
                         // Exclude input regions of the toplevel that extend beyond the window
                         if (result.surface != null and result.surface.?.getRootSurface() == toplevel.wlr_toplevel.base.surface) {
                             if (window.box.containsPoint(cursor.wlr_cursor.x, cursor.wlr_cursor.y)) {
-                                cursor.seat.wm_scheduled.window = window;
+                                cursor.seat.wm_scheduled.window = window.ref;
                             }
                         } else {
-                            cursor.seat.wm_scheduled.window = window;
+                            cursor.seat.wm_scheduled.window = window.ref;
                         }
                     },
-                    .xwayland => cursor.seat.wm_scheduled.window = window,
+                    .xwayland => cursor.seat.wm_scheduled.window = window.ref,
                     .destroying => {},
                 }
             },
@@ -531,7 +531,7 @@ pub fn processAxis(cursor: *Cursor, event: *const wlr.Pointer.event.Axis) void {
 fn interact(cursor: Cursor, result: Scene.AtResult) void {
     switch (result.data) {
         .window => |window| {
-            cursor.seat.wm_scheduled.interaction = .{ .window = window };
+            cursor.seat.wm_scheduled.interaction = .{ .window = window.ref };
             server.wm.dirtyWindowing();
         },
         .shell_surface => |shell_surface| {
