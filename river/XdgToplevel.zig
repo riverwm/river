@@ -65,6 +65,7 @@ map: wl.Listener(void) = .init(handleMap),
 unmap: wl.Listener(void) = .init(handleUnmap),
 commit: wl.Listener(*wlr.Surface) = .init(handleCommit),
 new_popup: wl.Listener(*wlr.XdgPopup) = .init(handleNewPopup),
+request_show_window_menu: wl.Listener(*wlr.XdgToplevel.event.ShowWindowMenu) = .init(handleRequestShowWindowMenu),
 request_fullscreen: wl.Listener(void) = .init(handleRequestFullscreen),
 request_maximize: wl.Listener(void) = .init(handleRequestMaximize),
 request_minimize: wl.Listener(void) = .init(handleRequestMinimize),
@@ -108,6 +109,7 @@ pub fn create(wlr_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
     wlr_toplevel.base.surface.events.map.add(&toplevel.map);
     wlr_toplevel.base.surface.events.commit.add(&toplevel.commit);
     wlr_toplevel.base.events.new_popup.add(&toplevel.new_popup);
+    wlr_toplevel.events.request_show_window_menu.add(&toplevel.request_show_window_menu);
     wlr_toplevel.events.request_fullscreen.add(&toplevel.request_fullscreen);
     wlr_toplevel.events.request_maximize.add(&toplevel.request_maximize);
     wlr_toplevel.events.request_minimize.add(&toplevel.request_minimize);
@@ -234,6 +236,7 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
     toplevel.unmap.link.remove();
     toplevel.commit.link.remove();
     toplevel.new_popup.link.remove();
+    toplevel.request_show_window_menu.link.remove();
     toplevel.request_fullscreen.link.remove();
     toplevel.request_maximize.link.remove();
     toplevel.request_minimize.link.remove();
@@ -370,6 +373,18 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
             }
         },
     }
+}
+
+fn handleRequestShowWindowMenu(
+    listener: *wl.Listener(*wlr.XdgToplevel.event.ShowWindowMenu),
+    event: *wlr.XdgToplevel.event.ShowWindowMenu,
+) void {
+    const toplevel: *XdgToplevel = @fieldParentPtr("request_show_window_menu", listener);
+    toplevel.window.wm_scheduled.show_window_menu_requested = .{
+        .x = event.x - toplevel.geometry.x,
+        .y = event.y - toplevel.geometry.y,
+    };
+    server.wm.dirtyWindowing();
 }
 
 fn handleRequestFullscreen(listener: *wl.Listener(void)) void {

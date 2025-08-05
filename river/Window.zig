@@ -149,6 +149,7 @@ popup_tree: *wlr.SceneTree,
 wm_scheduled: struct {
     dimensions_hint: DimensionsHint = .{},
     decoration_hint: river.WindowV1.DecorationHint = .only_supports_csd,
+    show_window_menu_requested: ?struct { x: i32, y: i32 } = null,
     /// Set back to no_request at the end of each update sequence
     fullscreen_requested: FullscreenRequest = .no_request,
     maximize_requested: enum {
@@ -382,7 +383,6 @@ pub fn manageStart(window: *Window) void {
             const scheduled = &window.wm_scheduled;
             const sent = &window.wm_sent;
 
-            // XXX send all dirty scheduled state
             if (new or !meta.eql(scheduled.dimensions_hint, sent.dimensions_hint)) {
                 window_v1.sendDimensionsHint(
                     scheduled.dimensions_hint.min_width,
@@ -397,6 +397,10 @@ pub fn manageStart(window: *Window) void {
                 sent.decoration_hint = scheduled.decoration_hint;
             }
 
+            if (scheduled.show_window_menu_requested) |offset| {
+                window_v1.sendShowWindowMenuRequested(offset.x, offset.y);
+                scheduled.show_window_menu_requested = null;
+            }
             switch (scheduled.fullscreen_requested) {
                 .no_request => {},
                 .fullscreen => |output_hint| {
