@@ -31,24 +31,6 @@ pub fn build(b: *Build) !void {
         break :scdoc_found true;
     };
 
-    const bash_completion = b.option(
-        bool,
-        "bash-completion",
-        "Set to true to install bash completion for riverctl. Defaults to true.",
-    ) orelse true;
-
-    const zsh_completion = b.option(
-        bool,
-        "zsh-completion",
-        "Set to true to install zsh completion for riverctl. Defaults to true.",
-    ) orelse true;
-
-    const fish_completion = b.option(
-        bool,
-        "fish-completion",
-        "Set to true to install fish completion for riverctl. Defaults to true.",
-    ) orelse true;
-
     const xwayland = b.option(
         bool,
         "xwayland",
@@ -96,8 +78,6 @@ pub fn build(b: *Build) !void {
     scanner.addSystemProtocol("unstable/xdg-decoration/xdg-decoration-unstable-v1.xml");
 
     scanner.addCustomProtocol(b.path("protocol/river-window-management-v1.xml"));
-    scanner.addCustomProtocol(b.path("protocol/river-control-unstable-v1.xml"));
-    scanner.addCustomProtocol(b.path("protocol/river-layout-v3.xml"));
     scanner.addCustomProtocol(b.path("protocol/wlr-output-power-management-unstable-v1.xml"));
 
     // Some of these versions may be out of date with what wlroots implements.
@@ -123,9 +103,6 @@ pub fn build(b: *Build) !void {
     scanner.generate("wp_single_pixel_buffer_manager_v1", 1);
 
     scanner.generate("river_window_manager_v1", 1);
-
-    scanner.generate("zriver_control_v1", 1);
-    scanner.generate("river_layout_manager_v3", 2);
 
     scanner.generate("zwlr_output_power_manager_v1", 1);
 
@@ -214,52 +191,6 @@ pub fn build(b: *Build) !void {
     }
 
     {
-        const riverctl = b.addExecutable(.{
-            .name = "riverctl",
-            .root_source_file = b.path("riverctl/main.zig"),
-            .target = target,
-            .optimize = optimize,
-            .strip = strip,
-            .use_llvm = llvm,
-            .use_lld = llvm,
-        });
-        riverctl.root_module.addOptions("build_options", options);
-
-        riverctl.root_module.addImport("flags", flags);
-        riverctl.root_module.addImport("wayland", wayland);
-        riverctl.linkLibC();
-        riverctl.linkSystemLibrary("wayland-client");
-
-        riverctl.pie = pie;
-        riverctl.root_module.omit_frame_pointer = omit_frame_pointer;
-
-        b.installArtifact(riverctl);
-    }
-
-    {
-        const rivertile = b.addExecutable(.{
-            .name = "rivertile",
-            .root_source_file = b.path("rivertile/main.zig"),
-            .target = target,
-            .optimize = optimize,
-            .strip = strip,
-            .use_llvm = llvm,
-            .use_lld = llvm,
-        });
-        rivertile.root_module.addOptions("build_options", options);
-
-        rivertile.root_module.addImport("flags", flags);
-        rivertile.root_module.addImport("wayland", wayland);
-        rivertile.linkLibC();
-        rivertile.linkSystemLibrary("wayland-client");
-
-        rivertile.pie = pie;
-        rivertile.root_module.omit_frame_pointer = omit_frame_pointer;
-
-        b.installArtifact(rivertile);
-    }
-
-    {
         const wf = Build.Step.WriteFile.create(b);
         const pc_file = wf.add("river-protocols.pc", b.fmt(
             \\prefix={s}
@@ -272,12 +203,12 @@ pub fn build(b: *Build) !void {
             \\Version: {s}
         , .{ b.install_prefix, full_version }));
 
-        b.installFile("protocol/river-layout-v3.xml", "share/river-protocols/river-layout-v3.xml");
+        b.installFile("protocol/river-window-management-v1.xml", "share/river-protocols/river-window-management-v1.xml");
         b.getInstallStep().dependOn(&b.addInstallFile(pc_file, "share/pkgconfig/river-protocols.pc").step);
     }
 
     if (man_pages) {
-        inline for (.{ "river", "riverctl", "rivertile" }) |page| {
+        inline for (.{"river"}) |page| {
             // Workaround for https://github.com/ziglang/zig/issues/16369
             // Even passing a buffer to std.Build.Step.Run appears to be racy and occasionally deadlocks.
             const scdoc = b.addSystemCommand(&.{ "/bin/sh", "-c", "scdoc < doc/" ++ page ++ ".1.scd" });
@@ -287,18 +218,6 @@ pub fn build(b: *Build) !void {
             const stdout = scdoc.captureStdOut();
             b.getInstallStep().dependOn(&b.addInstallFile(stdout, "share/man/man1/" ++ page ++ ".1").step);
         }
-    }
-
-    if (bash_completion) {
-        b.installFile("completions/bash/riverctl", "share/bash-completion/completions/riverctl");
-    }
-
-    if (zsh_completion) {
-        b.installFile("completions/zsh/_riverctl", "share/zsh/site-functions/_riverctl");
-    }
-
-    if (fish_completion) {
-        b.installFile("completions/fish/riverctl.fish", "share/fish/vendor_completions.d/riverctl.fish");
     }
 
     {

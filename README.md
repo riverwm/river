@@ -87,9 +87,6 @@ Usually this executable is a shell script invoking *riverctl*(1) to create
 mappings, start programs such as a layout generator or status bar, and
 perform other configuration.
 
-An example init script with sane defaults is provided [here](example/init)
-in the example directory.
-
 For complete documentation see the `river(1)`, `riverctl(1)`, and
 `rivertile(1)` man pages.
 

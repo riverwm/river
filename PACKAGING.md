@@ -144,12 +144,6 @@ install() {
 }
 ```
 
-## River specific suggestions
-
-I recommend installing the example init file found at `example/init` to
-`/usr/share/examples/river/init` or similar if your distribution has such
-a convention.
-
 ## Examples
 
 Build for the host architecture and libc ABI:
