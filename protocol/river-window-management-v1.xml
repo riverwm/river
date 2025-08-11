@@ -1531,19 +1531,6 @@
       <entry name="mod5" value="128"/>
     </enum>
 
-    <request name="get_xkb_binding">
-      <description summary="define a new xkbcommon key binding">
-        Define a key binding in terms of an xkbcommon keysym and other
-        configurable properties.
-
-        The new key binding is not enabled until initial configuration is
-        completed and the enable request is made during a manage sequence.
-      </description>
-      <arg name="id" type="new_id" interface="river_xkb_binding_v1"/>
-      <arg name="keysym" type="uint" summary="an xkbcommon keysym"/>
-      <arg name="modifiers" type="uint" enum="modifiers"/>
-    </request>
-
     <request name="get_pointer_binding">
       <description summary="define a new pointer binding">
         Define a pointer binding in terms of a pointer button, modifiers, and
@@ -1559,115 +1546,6 @@
       <arg name="button" type="uint" summary="a Linux input event code"/>
       <arg name="modifiers" type="uint" enum="modifiers"/>
     </request>
-  </interface>
-
-  <interface name="river_xkb_binding_v1" version="1">
-    <description summary="configure a xkb key binding, receive trigger events">
-      This object allows the window manager to configure a xkbcommon key binding
-      and receive events when the key binding is triggered.
-
-      The new key binding is not enabled until the enable request is made during
-      a manage sequence.
-
-      Normally, all key events are sent to the surface with keyboard focus by
-      the compositor. Key events that trigger a key binding are not sent to the
-      surface with keyboard focus.
-
-      If multiple key bindings would be triggered by a single physical key event
-      on the compositor side, it is compositor policy which key binding(s) will
-      receive press/release events or if all of the matched key bindings receive
-      press/release events.
-
-      Key bindings might be matched by the same physical key event due to shared
-      keysym and modifiers. The layout override feature may also cause the same
-      physical key event to trigger two key bindings with different keysyms and
-      different layout overrides configured.
-    </description>
-
-    <request name="destroy" type="destructor">
-      <description summary="destroy the xkb binding object">
-        This request indicates that the client will no longer use the xkb key
-        binding object and that it may be safely destroyed.
-      </description>
-    </request>
-
-    <request name="set_layout_override">
-      <description summary="override currently active xkb layout">
-        Specify an xkb layout that should be used to translate key events for
-        the purpose of triggering this key binding irrespective of the currently
-        active xkb layout.
-
-        The layout argument is a 0-indexed xkbcommon layout number for the
-        keyboard that generated the key event.
-
-        If this request is never made, the currently active xkb layout of the
-        keyboard that generated the key event will be used.
-
-        This request modifies window management state and may only be made as
-        part of a manage sequence, see the river_window_manager_v1 description.
-      </description>
-      <arg name="layout" type="uint" summary="0-indexed xkbcommon layout"/>
-    </request>
-
-    <request name="enable">
-      <description summary="enable the key binding">
-        This request should be made after all initial configuration has been
-        completed and the window manager wishes the key binding to be able to be
-        triggered.
-
-        This request modifies window management state and may only be made as
-        part of a manage sequence, see the river_window_manager_v1 description.
-      </description>
-    </request>
-
-    <request name="disable">
-      <description summary="disable the key binding">
-        This request may be used to temporarily disable the key binding. It may
-        be later re-enabled with the enable request.
-
-        This request modifies window management state and may only be made as
-        part of a manage sequence, see the river_window_manager_v1 description.
-      </description>
-    </request>
-
-    <event name="pressed">
-      <description summary="the key triggering the binding has been pressed">
-        This event indicates that the physical key triggering the binding has
-        been pressed.
-
-        This event will be followed by a manage_start event after all other new
-        state has been sent by the server.
-
-        The compositor should wait for the manage sequence to complete before
-        processing further input events. This allows the window manager client
-        to, for example, modify key bindings and keyboard focus without racing
-        against future input events. The window manager should of course respond
-        as soon as possible as the capacity of the compositor to buffer incoming
-        input events is finite.
-      </description>
-    </event>
-
-    <event name="released">
-      <description summary="the key triggering the binding has been released">
-        This event indicates that the physical key triggering the binding has
-        been released.
-
-        Releasing the modifiers for the binding without releasing the "main"
-        physical key that produces the bound keysym does not trigger the release
-        event. This event is sent when the "main" key is released, even if the
-        modifiers have changed since the pressed event.
-
-        This event will be followed by a manage_start event after all other new
-        state has been sent by the server.
-
-        The compositor should wait for the manage sequence to complete before
-        processing further input events. This allows the window manager client
-        to, for example, modify key bindings and keyboard focus without racing
-        against future input events. The window manager should of course respond
-        as soon as possible as the capacity of the compositor to buffer incoming
-        input events is finite.
-      </description>
-    </event>
   </interface>
 
   <interface name="river_pointer_binding_v1" version="1">

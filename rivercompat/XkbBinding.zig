@@ -22,6 +22,8 @@ const wayland = @import("wayland");
 const wl = wayland.client.wl;
 const river = wayland.client.river;
 
+const wm = &@import("root").wm;
+
 const Seat = @import("Seat.zig");
 const Window = @import("Window.zig");
 
@@ -37,7 +39,7 @@ pub fn create(
     modifiers: river.SeatV1.Modifiers,
     action: Seat.Action,
 ) void {
-    const xkb_binding_v1 = seat.seat_v1.getXkbBinding(keysym, modifiers) catch @panic("OOM");
+    const xkb_binding_v1 = wm.xkb_bindings.getXkbBinding(seat.seat_v1, keysym, modifiers) catch @panic("OOM");
     const binding = gpa.create(XkbBinding) catch @panic("OOM");
     binding.* = .{
         .seat = seat,

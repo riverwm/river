@@ -463,20 +463,6 @@ fn handleRequest(
         .pointer_confine_to_region => {},
         .pointer_warp => {},
 
-        .get_xkb_binding => |args| {
-            XkbBinding.create(
-                seat,
-                seat_v1.getClient(),
-                seat_v1.getVersion(),
-                args.id,
-                @enumFromInt(args.keysym),
-                args.modifiers,
-            ) catch {
-                seat_v1.getClient().postNoMemory();
-                log.err("out of memory", .{});
-                return;
-            };
-        },
         .get_pointer_binding => |args| {
             PointerBinding.create(
                 seat,

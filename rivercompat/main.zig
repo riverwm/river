@@ -41,6 +41,7 @@ const usage =
 
 const Globals = struct {
     wm_v1: ?*river.WindowManagerV1 = null,
+    xkb_bindings: ?*river.XkbBindingsV1 = null,
     compositor: ?*wl.Compositor = null,
     viewporter: ?*wp.Viewporter = null,
     single_pixel: ?*wp.SinglePixelBufferManagerV1 = null,
@@ -50,6 +51,8 @@ const Globals = struct {
             .global => |global| {
                 if (mem.orderZ(u8, global.interface, river.WindowManagerV1.interface.name) == .eq) {
                     globals.wm_v1 = registry.bind(global.name, river.WindowManagerV1, 1) catch return;
+                } else if (mem.orderZ(u8, global.interface, river.XkbBindingsV1.interface.name) == .eq) {
+                    globals.xkb_bindings = registry.bind(global.name, river.XkbBindingsV1, 1) catch return;
                 } else if (mem.orderZ(u8, global.interface, wl.Compositor.interface.name) == .eq) {
                     globals.compositor = registry.bind(global.name, wl.Compositor, 4) catch return;
                 } else if (mem.orderZ(u8, global.interface, wp.Viewporter.interface.name) == .eq) {
@@ -112,6 +115,8 @@ pub fn main() !void {
 
     const wm_v1 = globals.wm_v1 orelse
         fatal("wayland compositor does not support river-window-management-v1", .{});
+    const xkb_bindings = globals.xkb_bindings orelse
+        fatal("wayland compositor does not support river-xkb_bindings-v1", .{});
     const compositor = globals.compositor orelse
         fatal("wayland compositor does not support wl_compositor", .{});
     const viewporter = globals.viewporter orelse
@@ -119,7 +124,7 @@ pub fn main() !void {
     const single_pixel = globals.single_pixel orelse
         fatal("wayland compositor does not support wp-single-pixel-buffer-v1", .{});
 
-    wm.init(wm_v1, compositor, viewporter, single_pixel);
+    wm.init(wm_v1, xkb_bindings, compositor, viewporter, single_pixel);
 
     while (true) {
         if (display.dispatch() != .SUCCESS) fatal("failed to dispatch wayland events", .{});

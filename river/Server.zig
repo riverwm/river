@@ -38,6 +38,7 @@ const SceneNodeData = @import("SceneNodeData.zig");
 const Seat = @import("Seat.zig");
 const TabletTool = @import("TabletTool.zig");
 const WindowManager = @import("WindowManager.zig");
+const XkbBindings = @import("XkbBindings.zig");
 const XdgDecoration = @import("XdgDecoration.zig");
 const XdgToplevel = @import("XdgToplevel.zig");
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
@@ -89,6 +90,7 @@ config: Config,
 idle_inhibit_manager: IdleInhibitManager,
 lock_manager: LockManager,
 wm: WindowManager,
+xkb_bindings: XkbBindings,
 
 xwayland: if (build_options.xwayland) ?*wlr.Xwayland else void = if (build_options.xwayland) null,
 new_xsurface: if (build_options.xwayland) wl.Listener(*wlr.XwaylandSurface) else void =
@@ -155,6 +157,7 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
         .idle_inhibit_manager = undefined,
         .lock_manager = undefined,
         .wm = undefined,
+        .xkb_bindings = undefined,
     };
 
     if (renderer.getTextureFormats(@intFromEnum(wlr.BufferCap.dmabuf)) != null) {
@@ -173,6 +176,7 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
     }
 
     try server.wm.init();
+    try server.xkb_bindings.init();
     try server.scene.init();
     try server.om.init();
     try server.input_manager.init();

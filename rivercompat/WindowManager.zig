@@ -31,6 +31,7 @@ const Seat = @import("Seat.zig");
 const Window = @import("Window.zig");
 
 wm_v1: *river.WindowManagerV1,
+xkb_bindings: *river.XkbBindingsV1,
 compositor: *wl.Compositor,
 viewporter: *wp.Viewporter,
 single_pixel: *wp.SinglePixelBufferManagerV1,
@@ -50,12 +51,14 @@ fallback_stack_focus: wl.list.Head(Window, .link_focus),
 pub fn init(
     wm: *WindowManager,
     wm_v1: *river.WindowManagerV1,
+    xkb_bindings: *river.XkbBindingsV1,
     compositor: *wl.Compositor,
     viewporter: *wp.Viewporter,
     single_pixel: *wp.SinglePixelBufferManagerV1,
 ) void {
     wm.* = .{
         .wm_v1 = wm_v1,
+        .xkb_bindings = xkb_bindings,
         .compositor = compositor,
         .viewporter = viewporter,
         .single_pixel = single_pixel,
