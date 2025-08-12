@@ -16,11 +16,10 @@
     CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
   </copyright>
 
-  <description summary="frame-perfect window management">
-    This protocol allows a single "window manager" client to determine the
-    window management policy of the compositor. State is globally
-    double-buffered allowing for frame perfect state changes involving multiple
-    windows.
+  <description summary="define xkbcommon-based key bindings">
+    This protocol allows the river-window-management-v1 window manager to
+    define key bindings in terms of xkbcommon keysyms and other configurable
+    properties.
 
     The key words "must", "must not", "required", "shall", "shall not",
     "should", "should not", "recommended", "may", and "optional" in this
