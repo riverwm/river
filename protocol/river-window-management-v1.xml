@@ -80,7 +80,7 @@
       manage sequence in between, for example during interactive move/resize of
       windows or if a window independently changes its own dimensions.
 
-      To summarize the main loop of this protocol is as follows:
+      To summarize, the main loop of this protocol is as follows:
 
       1. The server sends events indicating all changes since the last
          manage sequence followed by the manage_start event.

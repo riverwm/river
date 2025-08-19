@@ -802,7 +802,7 @@ fn handleStartDrag(listener: *wl.Listener(*wlr.Drag), wlr_drag: *wlr.Drag) void 
     switch (wlr_drag.grab_type) {
         .keyboard_pointer => {
             seat.drag = .pointer;
-            seat.cursor.mode = .passthrough;
+            seat.cursor.mode = .drag;
         },
         .keyboard_touch => seat.drag = .touch,
         .keyboard => unreachable,

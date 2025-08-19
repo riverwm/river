@@ -51,6 +51,8 @@ const Mode = union(enum) {
     /// This mode is entered when a binding is triggered and exited when there
     /// are no longer any buttons pressed.
     ignore,
+    /// A drag and drop is in progress.
+    drag,
     down: struct {
         // TODO: To handle the surface with pointer focus being moved during
         // down mode we need to store the starting location of the surface as
@@ -330,11 +332,11 @@ pub fn processMotionRelative(cursor: *Cursor, event: *const wlr.Pointer.event.Mo
     }
 
     switch (cursor.mode) {
-        .passthrough, .ignore, .down => {
+        .passthrough, .drag, .ignore, .down => {
             cursor.wlr_cursor.move(event.device, dx, dy);
 
             switch (cursor.mode) {
-                .passthrough => {
+                .passthrough, .drag => {
                     cursor.updateHovered();
                     cursor.passthrough(event.time_msec);
                 },
@@ -467,6 +469,16 @@ pub fn processButton(cursor: *Cursor, event: *const wlr.Pointer.event.Button) vo
                 cursor.clearFocus();
                 return;
             },
+            .drag => {
+                if (server.scene.at(cursor.wlr_cursor.x, cursor.wlr_cursor.y)) |at| {
+                    cursor.interact(at);
+                    if (at.surface != null) {
+                        _ = cursor.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
+                        return;
+                    }
+                }
+                cursor.clearFocus();
+            },
             // Pointer focus does not change while in down mode.
             .down => {
                 _ = cursor.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
@@ -484,8 +496,8 @@ pub fn processButton(cursor: *Cursor, event: *const wlr.Pointer.event.Button) vo
 
             switch (cursor.mode) {
                 .passthrough => unreachable,
-                .down, .ignore => {
-                    if (cursor.mode == .down) {
+                .drag, .down, .ignore => {
+                    if (cursor.mode != .ignore) {
                         _ = cursor.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
                     }
                     if (cursor.pressed.count() == 0) {
@@ -699,7 +711,7 @@ pub fn updateState(cursor: *Cursor) void {
     }
 
     switch (cursor.mode) {
-        .passthrough => {
+        .passthrough, .drag => {
             cursor.updateHovered();
 
             const now = posix.clock_gettime(posix.CLOCK.MONOTONIC) catch @panic("CLOCK_MONOTONIC not supported");
@@ -714,7 +726,7 @@ pub fn updateState(cursor: *Cursor) void {
 
 /// Pass an event on to the surface under the cursor, if any.
 fn passthrough(cursor: *Cursor, time: u32) void {
-    assert(cursor.mode == .passthrough);
+    assert(cursor.mode == .passthrough or cursor.mode == .drag);
 
     if (server.scene.at(cursor.wlr_cursor.x, cursor.wlr_cursor.y)) |result| {
         if (result.data == .lock_surface) {
