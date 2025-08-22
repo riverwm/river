@@ -69,7 +69,7 @@ fn handleRequest(
         .get_river_output_status => |req| {
             // ignore if the output is inert
             const wlr_output = wlr.Output.fromWlOutput(req.output) orelse return;
-            const output: *Output = @alignCast(@ptrCast(wlr_output.data));
+            const output: *Output = @ptrCast(@alignCast(wlr_output.data));
 
             const resource = zriver.OutputStatusV1.create(
                 status_manager_v1.getClient(),
@@ -86,7 +86,7 @@ fn handleRequest(
         .get_river_seat_status => |req| {
             // ignore if the seat is inert
             const wlr_seat = wlr.Seat.Client.fromWlSeat(req.seat) orelse return;
-            const seat: *Seat = @alignCast(@ptrCast(wlr_seat.seat.data));
+            const seat: *Seat = @ptrCast(@alignCast(wlr_seat.seat.data));
 
             const seat_status = zriver.SeatStatusV1.create(
                 status_manager_v1.getClient(),

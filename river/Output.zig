@@ -363,7 +363,7 @@ fn sendLayerConfigures(
         var it = tree.children.safeIterator(.forward);
         while (it.next()) |node| {
             assert(node.type == .tree);
-            if (@as(?*SceneNodeData, @alignCast(@ptrCast(node.data)))) |node_data| {
+            if (@as(?*SceneNodeData, @ptrCast(@alignCast(node.data)))) |node_data| {
                 const layer_surface = node_data.data.layer_surface;
 
                 if (!layer_surface.wlr_layer_surface.initialized) continue;

@@ -595,7 +595,7 @@ pub fn allowTearing(view: *View) bool {
         .window_hint => {
             if (server.config.allow_tearing) {
                 if (view.rootSurface()) |root_surface| {
-                    return server.tearing_control_manager.hintFromSurface(root_surface) == .@"async";
+                    return server.tearing_control_manager.hintFromSurface(root_surface) == .async;
                 }
             }
             return false;

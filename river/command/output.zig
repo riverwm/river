@@ -121,7 +121,7 @@ fn getOutput(seat: *Seat, str: []const u8) !?*Output {
             @floatFromInt(focus_box.x + @divTrunc(focus_box.width, 2)),
             @floatFromInt(focus_box.y + @divTrunc(focus_box.height, 2)),
         ) orelse return null;
-        return @alignCast(@ptrCast(wlr_output.data));
+        return @ptrCast(@alignCast(wlr_output.data));
     } else {
         // Check if an output matches by name
         var it = server.root.active_outputs.iterator(.forward);

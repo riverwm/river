@@ -59,7 +59,7 @@ set_cursor: wl.Listener(*wlr.TabletV2TabletTool.event.SetCursor) =
     wl.Listener(*wlr.TabletV2TabletTool.event.SetCursor).init(handleSetCursor),
 
 pub fn get(wlr_seat: *wlr.Seat, wlr_tool: *wlr.TabletTool) error{OutOfMemory}!*TabletTool {
-    if (@as(?*TabletTool, @alignCast(@ptrCast(wlr_tool.data)))) |tool| {
+    if (@as(?*TabletTool, @ptrCast(@alignCast(wlr_tool.data)))) |tool| {
         return tool;
     } else {
         return TabletTool.create(wlr_seat, wlr_tool);

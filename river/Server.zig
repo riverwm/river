@@ -510,7 +510,7 @@ fn handleRequestSetCursorShape(
     _: *wl.Listener(*wlr.CursorShapeManagerV1.event.RequestSetShape),
     event: *wlr.CursorShapeManagerV1.event.RequestSetShape,
 ) void {
-    const seat: *Seat = @alignCast(@ptrCast(event.seat_client.seat.data));
+    const seat: *Seat = @ptrCast(@alignCast(event.seat_client.seat.data));
 
     if (event.tablet_tool) |wp_tool| {
         assert(event.device_type == .tablet_tool);

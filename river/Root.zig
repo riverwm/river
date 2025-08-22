@@ -330,7 +330,7 @@ pub fn deactivateOutput(root: *Root, output: *Output) void {
         var it = tree.children.safeIterator(.forward);
         while (it.next()) |scene_node| {
             assert(scene_node.type == .tree);
-            if (@as(?*SceneNodeData, @alignCast(@ptrCast(scene_node.data)))) |node_data| {
+            if (@as(?*SceneNodeData, @ptrCast(@alignCast(scene_node.data)))) |node_data| {
                 node_data.data.layer_surface.wlr_layer_surface.destroy();
             }
         }
@@ -798,7 +798,7 @@ fn processOutputConfig(
     var it = config.heads.iterator(.forward);
     while (it.next()) |head| {
         const wlr_output = head.state.output;
-        const output: *Output = @alignCast(@ptrCast(wlr_output.data));
+        const output: *Output = @ptrCast(@alignCast(wlr_output.data));
 
         var proposed_state = wlr.Output.State.init();
         head.state.apply(&proposed_state);
@@ -837,7 +837,7 @@ fn handlePowerManagerSetMode(
     event: *wlr.OutputPowerManagerV1.event.SetMode,
 ) void {
     // The output may have been destroyed, in which case there is nothing to do
-    const output: *Output = @alignCast(@ptrCast(event.output.data orelse return));
+    const output: *Output = @ptrCast(@alignCast(event.output.data orelse return));
 
     std.log.debug("client requested dpms {s} for output {s}", .{
         @tagName(event.mode),

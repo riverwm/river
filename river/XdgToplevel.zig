@@ -423,7 +423,7 @@ fn handleRequestMove(
     event: *wlr.XdgToplevel.event.Move,
 ) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("request_move", listener);
-    const seat: *Seat = @alignCast(@ptrCast(event.seat.seat.data));
+    const seat: *Seat = @ptrCast(@alignCast(event.seat.seat.data));
     const view = toplevel.view;
 
     if (view.pending.fullscreen) return;
@@ -446,7 +446,7 @@ fn handleRequestMove(
 
 fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), event: *wlr.XdgToplevel.event.Resize) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("request_resize", listener);
-    const seat: *Seat = @alignCast(@ptrCast(event.seat.seat.data));
+    const seat: *Seat = @ptrCast(@alignCast(event.seat.seat.data));
     const view = toplevel.view;
 
     if (view.pending.fullscreen) return;

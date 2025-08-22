@@ -362,7 +362,7 @@ fn clearFocus(cursor: *Cursor) void {
 /// Axis event is a scroll wheel or similiar
 fn handleAxis(listener: *wl.Listener(*wlr.Pointer.event.Axis), event: *wlr.Pointer.event.Axis) void {
     const cursor: *Cursor = @fieldParentPtr("axis", listener);
-    const device: *InputDevice = @alignCast(@ptrCast(event.device.data));
+    const device: *InputDevice = @ptrCast(@alignCast(event.device.data));
 
     cursor.seat.handleActivity();
     cursor.unhide();
@@ -482,7 +482,7 @@ fn updateKeyboardFocus(cursor: Cursor, result: Root.AtResult) void {
 /// Requires a call to Root.applyPending()
 fn updateOutputFocus(cursor: Cursor, lx: f64, ly: f64) void {
     if (server.root.output_layout.outputAt(lx, ly)) |wlr_output| {
-        const output: *Output = @alignCast(@ptrCast(wlr_output.data));
+        const output: *Output = @ptrCast(@alignCast(wlr_output.data));
         cursor.seat.focusOutput(output);
     }
 }
@@ -659,7 +659,7 @@ fn handleTabletToolAxis(
     _: *wl.Listener(*wlr.Tablet.event.Axis),
     event: *wlr.Tablet.event.Axis,
 ) void {
-    const device: *InputDevice = @alignCast(@ptrCast(event.device.data));
+    const device: *InputDevice = @ptrCast(@alignCast(event.device.data));
     const tablet: *Tablet = @fieldParentPtr("device", device);
 
     device.seat.handleActivity();
@@ -673,7 +673,7 @@ fn handleTabletToolProximity(
     _: *wl.Listener(*wlr.Tablet.event.Proximity),
     event: *wlr.Tablet.event.Proximity,
 ) void {
-    const device: *InputDevice = @alignCast(@ptrCast(event.device.data));
+    const device: *InputDevice = @ptrCast(@alignCast(event.device.data));
     const tablet: *Tablet = @fieldParentPtr("device", device);
 
     device.seat.handleActivity();
@@ -687,7 +687,7 @@ fn handleTabletToolTip(
     _: *wl.Listener(*wlr.Tablet.event.Tip),
     event: *wlr.Tablet.event.Tip,
 ) void {
-    const device: *InputDevice = @alignCast(@ptrCast(event.device.data));
+    const device: *InputDevice = @ptrCast(@alignCast(event.device.data));
     const tablet: *Tablet = @fieldParentPtr("device", device);
 
     device.seat.handleActivity();
@@ -701,7 +701,7 @@ fn handleTabletToolButton(
     _: *wl.Listener(*wlr.Tablet.event.Button),
     event: *wlr.Tablet.event.Button,
 ) void {
-    const device: *InputDevice = @alignCast(@ptrCast(event.device.data));
+    const device: *InputDevice = @ptrCast(@alignCast(event.device.data));
     const tablet: *Tablet = @fieldParentPtr("device", device);
 
     device.seat.handleActivity();
@@ -1292,7 +1292,7 @@ fn warp(cursor: *Cursor) void {
 fn updateDragIcons(cursor: *Cursor) void {
     var it = server.root.drag_icons.children.iterator(.forward);
     while (it.next()) |node| {
-        const icon: *DragIcon = @alignCast(@ptrCast(node.data));
+        const icon: *DragIcon = @ptrCast(@alignCast(node.data));
 
         if (icon.wlr_drag_icon.drag.seat == cursor.seat.wlr_seat) {
             icon.updatePosition(cursor);

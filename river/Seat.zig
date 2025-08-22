@@ -299,7 +299,7 @@ pub fn setFocusRaw(seat: *Seat, new_focus: FocusTarget) void {
             if (seat.cursor.constraint) |constraint| {
                 assert(constraint.wlr_constraint == wlr_constraint);
             } else {
-                seat.cursor.constraint = @alignCast(@ptrCast(wlr_constraint.data));
+                seat.cursor.constraint = @ptrCast(@alignCast(wlr_constraint.data));
                 assert(seat.cursor.constraint != null);
             }
         }
@@ -329,7 +329,7 @@ pub fn keyboardEnterOrLeave(seat: *Seat, target_surface: ?*wlr.Surface) void {
 
 fn keyboardNotifyEnter(seat: *Seat, wlr_surface: *wlr.Surface) void {
     if (seat.wlr_seat.getKeyboard()) |wlr_keyboard| {
-        const keyboard: *Keyboard = @alignCast(@ptrCast(wlr_keyboard.data));
+        const keyboard: *Keyboard = @ptrCast(@alignCast(wlr_keyboard.data));
 
         var buffer: [Keyboard.Pressed.capacity]u32 = undefined;
         var keycodes: std.ArrayList(u32) = .initBuffer(&buffer);
