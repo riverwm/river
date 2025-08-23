@@ -169,30 +169,6 @@ pub fn build(b: *Build) !void {
     }
 
     {
-        const rivercompat = b.addExecutable(.{
-            .name = "rivercompat",
-            .root_source_file = b.path("rivercompat/main.zig"),
-            .target = target,
-            .optimize = optimize,
-            .strip = strip,
-            .use_llvm = llvm,
-            .use_lld = llvm,
-        });
-        rivercompat.root_module.addOptions("build_options", options);
-
-        rivercompat.root_module.addImport("flags", flags);
-        rivercompat.root_module.addImport("wayland", wayland);
-        rivercompat.root_module.addImport("xkbcommon", xkbcommon);
-        rivercompat.linkLibC();
-        rivercompat.linkSystemLibrary("wayland-client");
-
-        rivercompat.pie = pie;
-        rivercompat.root_module.omit_frame_pointer = omit_frame_pointer;
-
-        b.installArtifact(rivercompat);
-    }
-
-    {
         const wf = Build.Step.WriteFile.create(b);
         const pc_file = wf.add("river-protocols.pc", b.fmt(
             \\prefix={s}
