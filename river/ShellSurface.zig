@@ -135,7 +135,7 @@ fn handleRequest(
     }
 }
 
-fn clientCommit(wlr_surface: *wlr.Surface) callconv(.C) void {
+fn clientCommit(wlr_surface: *wlr.Surface) callconv(.c) void {
     if (wlr_surface.role != &role) return;
     const resource = wlr_surface.role_resource orelse return;
 
@@ -146,7 +146,7 @@ fn clientCommit(wlr_surface: *wlr.Surface) callconv(.C) void {
     }
 }
 
-fn commit(wlr_surface: *wlr.Surface) callconv(.C) void {
+fn commit(wlr_surface: *wlr.Surface) callconv(.c) void {
     if (wlr_surface.hasBuffer()) {
         wlr_surface.map();
     }

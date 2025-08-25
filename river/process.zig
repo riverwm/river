@@ -17,7 +17,7 @@
 const std = @import("std");
 const posix = std.posix;
 
-const c = @import("c.zig");
+const c = @import("c.zig").c;
 
 var original_rlimit: ?posix.rlimit = null;
 
@@ -26,7 +26,7 @@ pub fn setup() void {
     // has had its read end closed by another process.
     const sig_ign = posix.Sigaction{
         .handler = .{ .handler = posix.SIG.IGN },
-        .mask = posix.empty_sigset,
+        .mask = posix.sigemptyset(),
         .flags = 0,
     };
     posix.sigaction(posix.SIG.PIPE, &sig_ign, null);
@@ -61,11 +61,11 @@ pub fn setup() void {
 
 pub fn cleanupChild() void {
     if (c.setsid() < 0) unreachable;
-    if (posix.system.sigprocmask(posix.SIG.SETMASK, &posix.empty_sigset, null) < 0) unreachable;
+    if (posix.system.sigprocmask(posix.SIG.SETMASK, &posix.sigemptyset(), null) < 0) unreachable;
 
     const sig_dfl = posix.Sigaction{
         .handler = .{ .handler = posix.SIG.DFL },
-        .mask = posix.empty_sigset,
+        .mask = posix.sigemptyset(),
         .flags = 0,
     };
     posix.sigaction(posix.SIG.PIPE, &sig_dfl, null);

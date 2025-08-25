@@ -153,7 +153,7 @@ pub fn create(wlr_output: *wlr.Output) !void {
     errdefer util.gpa.destroy(output);
 
     {
-        const title = try fmt.allocPrintZ(util.gpa, "river - {s}", .{wlr_output.name});
+        const title = try fmt.allocPrintSentinel(util.gpa, "river - {s}", .{wlr_output.name}, 0);
         defer util.gpa.free(title);
         if (wlr_output.isWl()) {
             wlr_output.wlSetTitle(title);

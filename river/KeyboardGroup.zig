@@ -41,52 +41,22 @@ const KeyConsumer = union(enum) {
     focus,
 };
 
-pub const Pressed = struct {
-    const Key = struct {
-        /// The raw libinput keycode, not the xkb keycode
-        code: u32,
-        consumer: KeyConsumer,
-        count: u32,
-    };
-
-    pub const capacity = 32;
-
-    comptime {
-        // wlroots uses a buffer of length 32 to track pressed keys and does not track pressed
-        // keys beyond that limit. It seems likely that this can cause some inconsistency within
-        // wlroots in the case that someone has 32 fingers and the hardware supports N-key rollover.
-        //
-        // Furthermore, wlroots will continue to forward key press/release events to river if more
-        // than 32 keys are pressed. Therefore river chooses to ignore keypresses that would take
-        // the keyboard beyond 32 simultaneously pressed keys.
-        assert(capacity == @typeInfo(std.meta.fieldInfo(wlr.Keyboard, .keycodes).type).array.len);
-    }
-
-    keys: std.BoundedArray(Key, capacity) = .{},
-
-    fn get(pressed: *Pressed, code: u32) ?*Key {
-        for (pressed.keys.slice()) |*key| {
-            if (key.code == code) return key;
-        }
-        return null;
-    }
-
-    fn add(pressed: *Pressed, new: Key) void {
-        assert(pressed.get(new.code) == null);
-        pressed.keys.appendAssumeCapacity(new);
-    }
-
-    /// Asserts that the key is present and has count == 0.
-    fn remove(pressed: *Pressed, code: u32) KeyConsumer {
-        for (pressed.keys.constSlice(), 0..) |key, idx| {
-            if (key.code == code) {
-                assert(key.count == 0);
-                return pressed.keys.swapRemove(idx).consumer;
-            }
-        }
-        unreachable;
-    }
+const Press = struct {
+    consumer: KeyConsumer,
+    count: u32,
 };
+
+pub const pressed_count_max = 32;
+comptime {
+    // wlroots uses a buffer of length 32 to track pressed keys and does not track pressed
+    // keys beyond that limit. It seems likely that this can cause some inconsistency within
+    // wlroots in the case that someone has 32 fingers and the hardware supports N-key rollover.
+    //
+    // Furthermore, wlroots will continue to forward key press/release events to river if more
+    // than 32 keys are pressed. Therefore river chooses to ignore keypresses that would take
+    // the keyboard beyond 32 simultaneously pressed keys.
+    assert(pressed_count_max == @typeInfo(std.meta.fieldInfo(wlr.Keyboard, .keycodes).type).array.len);
+}
 
 ref_count: u32 = 1,
 
@@ -100,8 +70,9 @@ virtual: bool,
 /// setting keyboard focus.
 state: wlr.Keyboard,
 
-/// Pressed keys along with where their press event has been sent
-pressed: Pressed = .{},
+/// Maps from pressed libinput keycode (not xkb keycode) to information
+/// about where the press event has been sent.
+pressed: std.AutoArrayHashMapUnmanaged(u32, Press) = .empty,
 
 key: wl.Listener(*wlr.Keyboard.event.Key) = .init(handleKey),
 modifiers: wl.Listener(*wlr.Keyboard) = .init(handleModifiers),
@@ -115,6 +86,10 @@ pub fn create(seat: *Seat, keymap: ?*xkb.Keymap, virtual: bool) !*KeyboardGroup 
         .state = undefined,
         .link = undefined,
     };
+
+    try group.pressed.ensureTotalCapacity(util.gpa, pressed_count_max);
+    errdefer comptime unreachable;
+
     seat.keyboard_groups.append(group);
 
     group.state.init(&.{
@@ -161,11 +136,13 @@ pub fn unref(group: *KeyboardGroup) void {
 
     group.state.finish();
 
+    group.pressed.deinit(util.gpa);
+
     util.gpa.destroy(group);
 }
 
 pub fn processKey(group: *KeyboardGroup, event: *const wlr.Keyboard.event.Key) void {
-    if (group.pressed.get(event.keycode)) |key| {
+    if (group.pressed.getPtr(event.keycode)) |key| {
         assert(key.count > 0);
         if (event.state == .pressed) {
             key.count += 1;
@@ -183,7 +160,7 @@ pub fn processKey(group: *KeyboardGroup, event: *const wlr.Keyboard.event.Key) v
             }
         }
     } else if (event.state == .pressed) {
-        if (group.pressed.keys.ensureUnusedCapacity(1)) {
+        if (group.pressed.count() < pressed_count_max) {
             var key_event: wlr.Keyboard.event.Key = .{
                 .time_msec = event.time_msec,
                 .keycode = event.keycode,
@@ -192,7 +169,7 @@ pub fn processKey(group: *KeyboardGroup, event: *const wlr.Keyboard.event.Key) v
             };
             // Calls handleKey(), which will add to pressed
             group.state.notifyKey(&key_event);
-        } else |_| {}
+        }
     }
     // Release events without a prior press event are ignored.
 }
@@ -211,7 +188,9 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
     const consumer: KeyConsumer = blk: {
         if (event.state == .released) {
             // Decision is made on press; release only follows it
-            break :blk group.pressed.remove(event.keycode);
+            const kv = group.pressed.fetchSwapRemove(event.keycode).?;
+            assert(kv.value.count == 0);
+            break :blk kv.value.consumer;
         }
         // Translate libinput keycode -> xkbcommon
         const xkb_keycode = event.keycode + 8;
@@ -235,8 +214,7 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
     };
 
     if (event.state == .pressed) {
-        group.pressed.add(.{
-            .code = event.keycode,
+        group.pressed.putAssumeCapacityNoClobber(event.keycode, .{
             .consumer = consumer,
             .count = 1,
         });

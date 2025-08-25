@@ -55,7 +55,7 @@ tablet_manager: *wlr.TabletManagerV2,
 
 /// List of input device configurations. Ordered by glob generality, with
 /// the most general towards the start and the most specific towards the end.
-configs: std.ArrayList(InputConfig),
+configs: std.ArrayList(InputConfig) = .empty,
 
 devices: wl.list.Head(InputDevice, .link),
 seats: wl.list.Head(Seat, .link),
@@ -78,7 +78,6 @@ pub fn init(input_manager: *InputManager) !void {
         .input_method_manager = try wlr.InputMethodManagerV2.create(server.wl_server),
         .text_input_manager = try wlr.TextInputManagerV3.create(server.wl_server),
         .tablet_manager = try wlr.TabletManagerV2.create(server.wl_server),
-        .configs = std.ArrayList(InputConfig).init(util.gpa),
 
         .devices = undefined,
         .seats = undefined,
@@ -119,7 +118,7 @@ pub fn deinit(input_manager: *InputManager) void {
     for (input_manager.configs.items) |*config| {
         config.deinit();
     }
-    input_manager.configs.deinit();
+    input_manager.configs.deinit(util.gpa);
 }
 
 pub fn defaultSeat(input_manager: *InputManager) *Seat {

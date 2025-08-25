@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-pub usingnamespace @cImport({
+pub const c = @cImport({
     @cDefine("_POSIX_C_SOURCE", "200809L");
 
     @cInclude("stdlib.h");

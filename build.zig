@@ -12,7 +12,6 @@ pub fn build(b: *Build) !void {
 
     const strip = b.option(bool, "strip", "Omit debug information") orelse false;
     const pie = b.option(bool, "pie", "Build a Position Independent Executable") orelse false;
-    const llvm = !(b.option(bool, "no-llvm", "(expirimental) Use non-LLVM x86 Zig backend") orelse false);
 
     const omit_frame_pointer = switch (optimize) {
         .Debug, .ReleaseSafe => false,
@@ -128,16 +127,17 @@ pub fn build(b: *Build) !void {
     const flags = b.createModule(.{ .root_source_file = b.path("common/flags.zig") });
     const globber = b.createModule(.{ .root_source_file = b.path("common/globber.zig") });
     const slotmap = b.createModule(.{ .root_source_file = b.path("common/slotmap.zig") });
+    const deque = b.createModule(.{ .root_source_file = b.path("common/deque.zig") });
 
     {
         const river = b.addExecutable(.{
             .name = "river",
-            .root_source_file = b.path("river/main.zig"),
-            .target = target,
-            .optimize = optimize,
-            .strip = strip,
-            .use_llvm = llvm,
-            .use_lld = llvm,
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("river/main.zig"),
+                .target = target,
+                .optimize = optimize,
+                .strip = strip,
+            }),
         });
         river.root_module.addOptions("build_options", options);
 
@@ -156,6 +156,7 @@ pub fn build(b: *Build) !void {
         river.root_module.addImport("flags", flags);
         river.root_module.addImport("globber", globber);
         river.root_module.addImport("slotmap", slotmap);
+        river.root_module.addImport("deque", deque);
 
         river.addCSourceFile(.{
             .file = b.path("river/wlroots_log_wrapper.c"),
@@ -200,22 +201,36 @@ pub fn build(b: *Build) !void {
 
     {
         const globber_test = b.addTest(.{
-            .root_source_file = b.path("common/globber.zig"),
-            .target = target,
-            .optimize = optimize,
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("common/globber.zig"),
+                .target = target,
+                .optimize = optimize,
+            }),
         });
         const run_globber_test = b.addRunArtifact(globber_test);
 
         const slotmap_test = b.addTest(.{
-            .root_source_file = b.path("common/slotmap.zig"),
-            .target = target,
-            .optimize = optimize,
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("common/slotmap.zig"),
+                .target = target,
+                .optimize = optimize,
+            }),
         });
         const run_slotmap_test = b.addRunArtifact(slotmap_test);
+
+        const deque_test = b.addTest(.{
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("common/deque.zig"),
+                .target = target,
+                .optimize = optimize,
+            }),
+        });
+        const run_deque_test = b.addRunArtifact(deque_test);
 
         const test_step = b.step("test", "Run the tests");
         test_step.dependOn(&run_globber_test.step);
         test_step.dependOn(&run_slotmap_test.step);
+        test_step.dependOn(&run_deque_test.step);
     }
 }
 

@@ -29,28 +29,30 @@ const Window = @import("Window.zig");
 
 wlr_manager: *wlr.IdleInhibitManagerV1,
 new_idle_inhibitor: wl.Listener(*wlr.IdleInhibitorV1) = .init(handleNewIdleInhibitor),
-inhibitors: std.DoublyLinkedList(IdleInhibitor) = .{},
+inhibitors: wl.list.Head(IdleInhibitor, .link),
 
 pub fn init(inhibit_manager: *IdleInhibitManager) !void {
     inhibit_manager.* = .{
         .wlr_manager = try wlr.IdleInhibitManagerV1.create(server.wl_server),
+        .inhibitors = undefined,
     };
+    inhibit_manager.inhibitors.init();
+
     inhibit_manager.wlr_manager.events.new_inhibitor.add(&inhibit_manager.new_idle_inhibitor);
 }
 
 pub fn deinit(inhibit_manager: *IdleInhibitManager) void {
-    while (inhibit_manager.inhibitors.pop()) |inhibitor| {
-        inhibitor.data.destroy.link.remove();
-        util.gpa.destroy(inhibitor);
+    while (inhibit_manager.inhibitors.first()) |inhibitor| {
+        inhibitor.destroy();
     }
     inhibit_manager.new_idle_inhibitor.link.remove();
 }
 
 pub fn checkActive(inhibit_manager: *IdleInhibitManager) void {
     var inhibited = false;
-    var it = inhibit_manager.inhibitors.first;
-    while (it) |node| : (it = node.next) {
-        const node_data = SceneNodeData.fromSurface(node.data.wlr_inhibitor.surface) orelse continue;
+    var it = inhibit_manager.inhibitors.iterator(.forward);
+    while (it.next()) |inhibitor| {
+        const node_data = SceneNodeData.fromSurface(inhibitor.wlr_inhibitor.surface) orelse continue;
         switch (node_data.data) {
             .window => {
                 inhibited = true; // XXX be strict
@@ -68,13 +70,8 @@ pub fn checkActive(inhibit_manager: *IdleInhibitManager) void {
 
 fn handleNewIdleInhibitor(listener: *wl.Listener(*wlr.IdleInhibitorV1), inhibitor: *wlr.IdleInhibitorV1) void {
     const inhibit_manager: *IdleInhibitManager = @fieldParentPtr("new_idle_inhibitor", listener);
-    const inhibitor_node = util.gpa.create(std.DoublyLinkedList(IdleInhibitor).Node) catch return;
-    inhibitor_node.data.init(inhibitor, inhibit_manager) catch {
-        util.gpa.destroy(inhibitor_node);
+    IdleInhibitor.create(inhibitor, inhibit_manager) catch {
+        std.log.err("out of memory", .{});
         return;
     };
-
-    inhibit_manager.inhibitors.append(inhibitor_node);
-
-    inhibit_manager.checkActive();
 }

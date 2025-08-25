@@ -24,6 +24,7 @@ const wayland = @import("wayland");
 const wl = wayland.server.wl;
 const river = wayland.server.river;
 const xkb = @import("xkbcommon");
+const Deque = @import("deque").Deque;
 
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
@@ -102,9 +103,6 @@ pub const Focus = union(enum) {
     }
 };
 
-/// XXX experiment with different sizes here, consider making dynamic
-const EventQueue = std.fifo.LinearFifo(Event, .{ .Static = 1024 });
-
 wlr_seat: *wlr.Seat,
 
 link: wl.list.Link,
@@ -113,7 +111,7 @@ destroying: bool = false,
 
 object: ?*river.SeatV1 = null,
 
-event_queue: EventQueue = EventQueue.init(),
+event_queue: Deque(Event),
 
 /// State to be sent to the wm in the next manage sequence.
 wm_scheduled: struct {
@@ -185,9 +183,14 @@ pub fn create(name: [*:0]const u8) !void {
     const seat = try util.gpa.create(Seat);
     errdefer util.gpa.destroy(seat);
 
+    // XXX have actual reasoning for choosing this capacity.
+    var event_queue: Deque(Event) = try .initCapacity(util.gpa, 1024);
+    errdefer event_queue.deinit(util.gpa);
+
     seat.* = .{
         // This will be automatically destroyed when the display is destroyed
         .wlr_seat = try wlr.Seat.create(server.wl_server, name),
+        .event_queue = event_queue,
         .link = undefined,
         .link_sent = undefined,
         .xkb_bindings = undefined,
@@ -225,6 +228,7 @@ pub fn destroy(seat: *Seat) void {
     seat.link.remove();
     seat.link_sent.remove();
 
+    seat.event_queue.deinit(util.gpa);
     seat.cursor.deinit();
 
     seat.request_set_selection.link.remove();
@@ -237,7 +241,7 @@ pub fn destroy(seat: *Seat) void {
 pub fn queueEvent(seat: *Seat, event: Event) !void {
     seat.handleActivity();
 
-    seat.event_queue.writeItem(event) catch {
+    seat.event_queue.pushBackBounded(event) catch {
         log.err("dropping {s} event, no space in event queue", .{@tagName(event)});
         return error.QueueFull;
     };
@@ -256,7 +260,7 @@ pub fn processEvents(seat: *Seat) void {
     while (!server.wm.wm_scheduled.dirty) {
         assert(server.wm.state == .idle);
 
-        const event = seat.event_queue.readItem() orelse break;
+        const event = seat.event_queue.popFront() orelse break;
 
         const pg = server.input_manager.pointer_gestures;
         switch (event) {
@@ -573,14 +577,15 @@ fn keyboardNotifyEnter(seat: *Seat, wlr_surface: *wlr.Surface) void {
     if (seat.wlr_seat.getKeyboard()) |wlr_keyboard| {
         const group: *KeyboardGroup = @alignCast(@ptrCast(wlr_keyboard.data));
 
-        var keycodes: std.BoundedArray(u32, KeyboardGroup.Pressed.capacity) = .{};
-        for (group.pressed.keys.constSlice()) |item| {
-            if (item.consumer == .focus) keycodes.appendAssumeCapacity(item.code);
+        var buffer: [KeyboardGroup.pressed_count_max]u32 = undefined;
+        var keycodes: std.ArrayList(u32) = .initBuffer(&buffer);
+        for (group.pressed.keys(), group.pressed.values()) |keycode, press| {
+            if (press.consumer == .focus) keycodes.appendAssumeCapacity(keycode);
         }
 
         seat.wlr_seat.keyboardNotifyEnter(
             wlr_surface,
-            keycodes.constSlice(),
+            keycodes.items,
             &group.state.modifiers,
         );
     } else {

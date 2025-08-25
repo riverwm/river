@@ -25,7 +25,7 @@ const builtin = @import("builtin");
 const wlr = @import("wlroots");
 const flags = @import("flags");
 
-const c = @import("c.zig");
+const c = @import("c.zig").c;
 const util = @import("util.zig");
 const process = @import("process.zig");
 
@@ -53,21 +53,25 @@ pub fn main() anyerror!void {
         .{ .name = "log-scopes", .kind = .arg },
         .{ .name = "no-xwayland", .kind = .boolean },
     }).parse(std.os.argv[1..]) catch {
-        try io.getStdErr().writeAll(usage);
+        try stderr.writeAll(usage);
+        try stderr.flush();
         posix.exit(1);
     };
     if (result.flags.h) {
-        try io.getStdOut().writeAll(usage);
+        try stdout.writeAll(usage);
+        try stdout.flush();
         posix.exit(0);
     }
     if (result.args.len != 0) {
         log.err("unknown option '{s}'", .{result.args[0]});
-        try io.getStdErr().writeAll(usage);
+        try stderr.writeAll(usage);
+        try stderr.flush();
         posix.exit(1);
     }
 
     if (result.flags.version) {
-        try io.getStdOut().writeAll(build_options.version ++ "\n");
+        try stdout.writeAll(build_options.version ++ "\n");
+        try stdout.flush();
         posix.exit(0);
     }
     if (result.flags.@"log-level") |level| {
@@ -81,7 +85,6 @@ pub fn main() anyerror!void {
             runtime_log_level = .debug;
         } else {
             log.err("invalid log level '{s}'", .{level});
-            try io.getStdErr().writeAll(usage);
             posix.exit(1);
         }
     }
@@ -186,6 +189,14 @@ fn defaultInitPath() !?[:0]const u8 {
     return path;
 }
 
+var stderr_buffer: [1024]u8 = undefined;
+var stderr_writer = fs.File.stderr().writer(&stderr_buffer);
+const stderr = &stderr_writer.interface;
+
+var stdout_buffer: [1024]u8 = undefined;
+var stdout_writer = fs.File.stdout().writer(&stdout_buffer);
+const stdout = &stdout_writer.interface;
+
 // Scopes should be added to this list sparingly.
 // Only add new scopes if filtering based on them would be meaningful.
 const LogScope = enum {
@@ -225,8 +236,8 @@ pub fn logFn(
 
     const scope_prefix = if (scope == .default) ": " else "(" ++ @tagName(scope) ++ "): ";
 
-    const stderr = io.getStdErr().writer();
-    stderr.print(level.asText() ++ scope_prefix ++ format ++ "\n", args) catch {};
+    stderr.print(level.asText() ++ scope_prefix ++ format ++ "\n", args) catch return;
+    stderr.flush() catch return;
 }
 
 /// See wlroots_log_wrapper.c

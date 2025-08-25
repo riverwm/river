@@ -100,9 +100,9 @@ fn handleDestroy(_: *river.XkbBindingV1, binding: *XkbBinding) void {
     {
         var it = binding.seat.keyboard_groups.iterator(.forward);
         while (it.next()) |group| {
-            for (group.pressed.keys.slice()) |*key| {
-                if (key.consumer == .binding and key.consumer.binding == binding) {
-                    key.consumer.binding = null;
+            for (group.pressed.values()) |*press| {
+                if (press.consumer == .binding and press.consumer.binding == binding) {
+                    press.consumer.binding = null;
                 }
             }
         }

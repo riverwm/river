@@ -23,7 +23,7 @@ const wayland = @import("wayland");
 const wl = wayland.server.wl;
 const river = wayland.server.river;
 
-const c = @import("c.zig");
+const c = @import("c.zig").c;
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
@@ -72,7 +72,7 @@ pub fn create(
 
     log.debug("new river_pointer_binding_v1: button: {d}({?s}) modifiers: {d}", .{
         button,
-        c.libevdev_event_code_get_name(c.EV_KEY, button),
+        @as(?[*:0]const u8, c.libevdev_event_code_get_name(c.EV_KEY, button)),
         @as(u32, @bitCast(modifiers)),
     });
 

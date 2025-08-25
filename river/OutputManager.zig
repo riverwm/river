@@ -305,15 +305,15 @@ pub fn commitOutputState(om: *OutputManager) void {
     };
 
     if (need_modeset) {
-        var states = std.ArrayList(wlr.Backend.OutputState).init(util.gpa);
-        defer states.deinit();
+        var states: std.ArrayList(wlr.Backend.OutputState) = .empty;
+        defer states.deinit(util.gpa);
         defer for (states.items) |*s| s.base.finish();
 
         {
             var it = wm.wm_sent.outputs.iterator(.forward);
             while (it.next()) |output| {
                 const wlr_output = output.wlr_output orelse continue;
-                const state = states.addOne() catch {
+                const state = states.addOne(util.gpa) catch {
                     log.err("out of memory", .{});
                     return;
                 };

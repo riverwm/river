@@ -25,7 +25,7 @@ const wlr = @import("wlroots");
 
 const log = std.log.scoped(.input);
 
-const c = @import("c.zig");
+const c = @import("c.zig").c;
 
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
