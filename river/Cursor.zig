@@ -822,6 +822,7 @@ pub fn hide(cursor: *Cursor) void {
 
     cursor.hidden = true;
     cursor.wlr_cursor.unsetImage();
+    cursor.seat.wlr_seat.pointerNotifyClearFocus();
     cursor.hide_cursor_timer.timerUpdate(0) catch {
         log.err("failed to update cursor hide timeout", .{});
     };
