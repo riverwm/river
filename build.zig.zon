@@ -5,7 +5,7 @@
     // When a release is tagged, the "-dev" suffix should be removed for the
     // commit that gets tagged. Directly after the tagged commit, the version
     // should be bumped and the "-dev" suffix added.
-    .version = "0.3.12-dev",
+    .version = "0.3.12",
     .paths = .{""},
     .dependencies = .{
         .pixman = .{
