@@ -54,7 +54,7 @@ pub fn attach(node: *wlr.SceneNode, data: Data) error{OutOfMemory}!void {
 pub fn fromNode(node: *wlr.SceneNode) ?*SceneNodeData {
     var n = node;
     while (true) {
-        if (@as(?*SceneNodeData, @alignCast(@ptrCast(n.data)))) |scene_node_data| {
+        if (@as(?*SceneNodeData, @ptrCast(@alignCast(n.data)))) |scene_node_data| {
             return scene_node_data;
         }
         if (n.parent) |parent_tree| {
@@ -66,7 +66,7 @@ pub fn fromNode(node: *wlr.SceneNode) ?*SceneNodeData {
 }
 
 pub fn fromSurface(surface: *wlr.Surface) ?*SceneNodeData {
-    if (@as(?*wlr.SceneNode, @alignCast(@ptrCast(surface.getRootSurface().data)))) |node| {
+    if (@as(?*wlr.SceneNode, @ptrCast(@alignCast(surface.getRootSurface().data)))) |node| {
         return fromNode(node);
     }
     return null;

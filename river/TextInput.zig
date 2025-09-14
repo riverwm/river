@@ -39,7 +39,7 @@ disable: wl.Listener(*wlr.TextInputV3) = .init(handleDisable),
 destroy: wl.Listener(*wlr.TextInputV3) = .init(handleDestroy),
 
 pub fn create(wlr_text_input: *wlr.TextInputV3) !void {
-    const seat: *Seat = @alignCast(@ptrCast(wlr_text_input.seat.data));
+    const seat: *Seat = @ptrCast(@alignCast(wlr_text_input.seat.data));
 
     const text_input = try util.gpa.create(TextInput);
 
@@ -60,7 +60,7 @@ pub fn create(wlr_text_input: *wlr.TextInputV3) !void {
 
 fn handleEnable(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) void {
     const text_input: *TextInput = @fieldParentPtr("enable", listener);
-    const seat: *Seat = @alignCast(@ptrCast(text_input.wlr_text_input.seat.data));
+    const seat: *Seat = @ptrCast(@alignCast(text_input.wlr_text_input.seat.data));
 
     if (text_input.wlr_text_input.focused_surface == null) {
         log.err("client requested to enable text input without focus, ignoring request", .{});
@@ -87,7 +87,7 @@ fn handleEnable(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) v
 
 fn handleCommit(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) void {
     const text_input: *TextInput = @fieldParentPtr("commit", listener);
-    const seat: *Seat = @alignCast(@ptrCast(text_input.wlr_text_input.seat.data));
+    const seat: *Seat = @ptrCast(@alignCast(text_input.wlr_text_input.seat.data));
 
     if (seat.relay.text_input != text_input) {
         log.err("inactive text input tried to commit an update, client bug?", .{});
@@ -101,7 +101,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) v
 
 fn handleDisable(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) void {
     const text_input: *TextInput = @fieldParentPtr("disable", listener);
-    const seat: *Seat = @alignCast(@ptrCast(text_input.wlr_text_input.seat.data));
+    const seat: *Seat = @ptrCast(@alignCast(text_input.wlr_text_input.seat.data));
 
     if (seat.relay.text_input == text_input) {
         seat.relay.disableTextInput();
@@ -110,7 +110,7 @@ fn handleDisable(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) 
 
 fn handleDestroy(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) void {
     const text_input: *TextInput = @fieldParentPtr("destroy", listener);
-    const seat: *Seat = @alignCast(@ptrCast(text_input.wlr_text_input.seat.data));
+    const seat: *Seat = @ptrCast(@alignCast(text_input.wlr_text_input.seat.data));
 
     if (seat.relay.text_input == text_input) {
         seat.relay.disableTextInput();

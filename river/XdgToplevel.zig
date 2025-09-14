@@ -423,7 +423,7 @@ fn handleRequestMove(
     event: *wlr.XdgToplevel.event.Move,
 ) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("request_move", listener);
-    const seat: *Seat = @alignCast(@ptrCast(event.seat.seat.data));
+    const seat: *Seat = @ptrCast(@alignCast(event.seat.seat.data));
 
     // Moving windows with touch or tablet tool is not yet supported.
     if (seat.wlr_seat.validatePointerGrabSerial(null, event.serial)) {
@@ -434,7 +434,7 @@ fn handleRequestMove(
 
 fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), event: *wlr.XdgToplevel.event.Resize) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("request_resize", listener);
-    const seat: *Seat = @alignCast(@ptrCast(event.seat.seat.data));
+    const seat: *Seat = @ptrCast(@alignCast(event.seat.seat.data));
 
     // Resizing windows with touch or tablet tool is not yet supported.
     if (seat.wlr_seat.validatePointerGrabSerial(null, event.serial)) {

@@ -891,7 +891,7 @@ pub fn getParent(window: *Window) ?*Window {
     switch (window.impl) {
         .toplevel => |toplevel| {
             const wlr_parent = toplevel.wlr_toplevel.parent orelse return null;
-            const parent: *XdgToplevel = @alignCast(@ptrCast(wlr_parent.base.data));
+            const parent: *XdgToplevel = @ptrCast(@alignCast(wlr_parent.base.data));
             return parent.window;
         },
         .xwayland, .destroying => return null,

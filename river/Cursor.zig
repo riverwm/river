@@ -521,7 +521,7 @@ pub fn processButton(cursor: *Cursor, event: *const wlr.Pointer.event.Button) vo
 }
 
 pub fn processAxis(cursor: *Cursor, event: *const wlr.Pointer.event.Axis) void {
-    const device: *InputDevice = @alignCast(@ptrCast(event.device.data));
+    const device: *InputDevice = @ptrCast(@alignCast(event.device.data));
     cursor.seat.wlr_seat.pointerNotifyAxis(
         event.time_msec,
         event.orientation,
@@ -653,7 +653,7 @@ fn handleTabletToolAxis(
     _: *wl.Listener(*wlr.Tablet.event.Axis),
     event: *wlr.Tablet.event.Axis,
 ) void {
-    const device: *InputDevice = @alignCast(@ptrCast(event.device.data));
+    const device: *InputDevice = @ptrCast(@alignCast(event.device.data));
     const tablet: *Tablet = @fieldParentPtr("device", device);
 
     device.seat.handleActivity();
@@ -667,7 +667,7 @@ fn handleTabletToolProximity(
     _: *wl.Listener(*wlr.Tablet.event.Proximity),
     event: *wlr.Tablet.event.Proximity,
 ) void {
-    const device: *InputDevice = @alignCast(@ptrCast(event.device.data));
+    const device: *InputDevice = @ptrCast(@alignCast(event.device.data));
     const tablet: *Tablet = @fieldParentPtr("device", device);
 
     device.seat.handleActivity();
@@ -681,7 +681,7 @@ fn handleTabletToolTip(
     _: *wl.Listener(*wlr.Tablet.event.Tip),
     event: *wlr.Tablet.event.Tip,
 ) void {
-    const device: *InputDevice = @alignCast(@ptrCast(event.device.data));
+    const device: *InputDevice = @ptrCast(@alignCast(event.device.data));
     const tablet: *Tablet = @fieldParentPtr("device", device);
 
     device.seat.handleActivity();
@@ -695,7 +695,7 @@ fn handleTabletToolButton(
     _: *wl.Listener(*wlr.Tablet.event.Button),
     event: *wlr.Tablet.event.Button,
 ) void {
-    const device: *InputDevice = @alignCast(@ptrCast(event.device.data));
+    const device: *InputDevice = @ptrCast(@alignCast(event.device.data));
     const tablet: *Tablet = @fieldParentPtr("device", device);
 
     device.seat.handleActivity();
@@ -748,7 +748,7 @@ fn passthrough(cursor: *Cursor, time: u32) void {
 fn updateDragIcons(cursor: *Cursor) void {
     var it = server.scene.drag_icons.children.iterator(.forward);
     while (it.next()) |node| {
-        const icon = @as(*DragIcon, @alignCast(@ptrCast(node.data)));
+        const icon = @as(*DragIcon, @ptrCast(@alignCast(node.data)));
 
         if (icon.wlr_drag_icon.drag.seat == cursor.seat.wlr_seat) {
             icon.updatePosition(cursor);

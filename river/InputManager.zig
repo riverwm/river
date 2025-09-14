@@ -210,7 +210,7 @@ const NoKeymapVirtKeyboard = struct {
 
         handleDestroy(&no_keymap.destroy, &virtual_keyboard.keyboard.base);
 
-        const seat: *Seat = @alignCast(@ptrCast(virtual_keyboard.seat.data));
+        const seat: *Seat = @ptrCast(@alignCast(virtual_keyboard.seat.data));
         seat.addDevice(&virtual_keyboard.keyboard.base, true);
     }
 };
@@ -226,7 +226,7 @@ fn handleNewConstraint(
 }
 
 fn handleNewInputMethod(_: *wl.Listener(*wlr.InputMethodV2), input_method: *wlr.InputMethodV2) void {
-    const seat: *Seat = @alignCast(@ptrCast(input_method.seat.data));
+    const seat: *Seat = @ptrCast(@alignCast(input_method.seat.data));
 
     log.debug("new input method on seat {s}", .{seat.wlr_seat.name});
 

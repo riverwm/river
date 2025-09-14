@@ -146,7 +146,7 @@ fn handleManagerApply(_: *wl.Listener(*wlr.OutputConfigurationV1), config: *wlr.
 
     var it = config.heads.iterator(.forward);
     while (it.next()) |head| {
-        const output: *Output = @alignCast(@ptrCast(head.state.output.data));
+        const output: *Output = @ptrCast(@alignCast(head.state.output.data));
 
         output.scheduled = .{
             .state = if (head.state.enabled) .enabled else .disabled_hard,
@@ -201,7 +201,7 @@ fn handlePowerManagerSetMode(
     event: *wlr.OutputPowerManagerV1.event.SetMode,
 ) void {
     // The output may have been destroyed, in which case there is nothing to do
-    const output = @as(?*Output, @alignCast(@ptrCast(event.output.data))) orelse return;
+    const output = @as(?*Output, @ptrCast(@alignCast(event.output.data))) orelse return;
 
     log.debug("client requested dpms {s} for output {s}", .{
         @tagName(event.mode),
@@ -352,7 +352,7 @@ pub fn commitOutputState(om: *OutputManager) void {
         }
 
         for (states.items) |*state| {
-            const output: *Output = @alignCast(@ptrCast(state.output.data));
+            const output: *Output = @ptrCast(@alignCast(state.output.data));
             if (!output.scene_output.?.buildState(&state.base, &.{
                 .swapchain = swapchain_manager.getSwapchain(state.output),
             })) {

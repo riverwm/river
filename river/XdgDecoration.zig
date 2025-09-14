@@ -32,7 +32,7 @@ destroy: wl.Listener(*wlr.XdgToplevelDecorationV1) = wl.Listener(*wlr.XdgTopleve
 request_mode: wl.Listener(*wlr.XdgToplevelDecorationV1) = wl.Listener(*wlr.XdgToplevelDecorationV1).init(handleRequestMode),
 
 pub fn init(wlr_decoration: *wlr.XdgToplevelDecorationV1) void {
-    const toplevel: *XdgToplevel = @alignCast(@ptrCast(wlr_decoration.toplevel.base.data));
+    const toplevel: *XdgToplevel = @ptrCast(@alignCast(wlr_decoration.toplevel.base.data));
 
     toplevel.decoration = .{ .wlr_decoration = wlr_decoration };
     const decoration = &toplevel.decoration.?;
@@ -46,7 +46,7 @@ pub fn init(wlr_decoration: *wlr.XdgToplevelDecorationV1) void {
 }
 
 pub fn deinit(decoration: *XdgDecoration) void {
-    const toplevel: *XdgToplevel = @alignCast(@ptrCast(decoration.wlr_decoration.toplevel.base.data));
+    const toplevel: *XdgToplevel = @ptrCast(@alignCast(decoration.wlr_decoration.toplevel.base.data));
 
     decoration.destroy.link.remove();
     decoration.request_mode.link.remove();
@@ -70,7 +70,7 @@ fn handleRequestMode(
 ) void {
     const decoration: *XdgDecoration = @fieldParentPtr("request_mode", listener);
 
-    const toplevel: *XdgToplevel = @alignCast(@ptrCast(decoration.wlr_decoration.toplevel.base.data));
+    const toplevel: *XdgToplevel = @ptrCast(@alignCast(decoration.wlr_decoration.toplevel.base.data));
     const window = toplevel.window;
 
     window.setDecorationHint(switch (decoration.wlr_decoration.requested_mode) {
