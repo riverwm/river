@@ -261,10 +261,11 @@ fn globalFilter(client: *const wl.Client, global: *const wl.Global, server: *Ser
     }
 
     // User-configurable allow/block lists are TODO
+    const allowed = server.allowlist(global);
+    const blocked = server.blocklist(global);
+    assert(allowed != blocked);
+
     if (server.security_context_manager.lookupClient(client) != null) {
-        const allowed = server.allowlist(global);
-        const blocked = server.blocklist(global);
-        assert(allowed != blocked);
         return allowed;
     } else {
         return true;
@@ -319,6 +320,7 @@ fn allowlist(server: *Server, global: *const wl.Global) bool {
 fn blocklist(server: *Server, global: *const wl.Global) bool {
     return global == server.security_context_manager.global or
         global == server.wm.global or
+        global == server.xkb_bindings.global or
         global == server.foreign_toplevel_manager.global or
         global == server.screencopy_manager.global or
         global == server.export_dmabuf_manager.global or
