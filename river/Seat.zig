@@ -36,6 +36,8 @@ const InputManager = @import("InputManager.zig");
 const InputRelay = @import("InputRelay.zig");
 const Keyboard = @import("Keyboard.zig");
 const KeyboardGroup = @import("KeyboardGroup.zig");
+const LayerShellSeat = @import("LayerShellSeat.zig");
+const LayerSurface = @import("LayerSurface.zig");
 const LockSurface = @import("LockSurface.zig");
 const Output = @import("Output.zig");
 const PointerBinding = @import("PointerBinding.zig");
@@ -79,18 +81,13 @@ pub const Event = union(enum) {
     pointer_pinch_end: wlr.Pointer.event.PinchEnd,
 };
 
-pub const WmFocus = union(enum) {
-    none,
-    window: Window.Ref,
-    shell_surface: *ShellSurface,
-};
-
 pub const Focus = union(enum) {
     none,
     window: *Window,
     shell_surface: *ShellSurface,
     override_redirect: if (build_options.xwayland) *XwaylandOverrideRedirect else noreturn,
     lock_surface: *LockSurface,
+    layer_surface: *LayerSurface,
 
     pub fn surface(target: Focus) ?*wlr.Surface {
         return switch (target) {
@@ -98,6 +95,7 @@ pub const Focus = union(enum) {
             .shell_surface => |shell_surface| shell_surface.surface,
             .override_redirect => |override_redirect| override_redirect.xsurface.surface,
             .lock_surface => |lock_surface| lock_surface.wlr_lock_surface.surface,
+            .layer_surface => |layer_surface| layer_surface.wlr_layer_surface.surface,
             .none => null,
         };
     }
@@ -110,28 +108,38 @@ link: wl.list.Link,
 destroying: bool = false,
 
 object: ?*river.SeatV1 = null,
+layer_shell: LayerShellSeat = .{},
 
 event_queue: Deque(Event),
 
 /// State to be sent to the wm in the next manage sequence.
 wm_scheduled: struct {
     /// The window entered/hovered by the pointer, if any
-    window: ?Window.Ref = null,
+    hovered: ?Window.Ref = null,
     /// The window clicked on, touched, etc.
-    interaction: WmFocus = .none,
+    interaction: union(enum) {
+        none,
+        window: Window.Ref,
+        shell_surface: *ShellSurface,
+    } = .none,
     op_release: bool = false,
 } = .{},
 
 /// State sent to the wm in the latest manage sequence.
 wm_sent: struct {
     /// The window entered/hovered by the pointer, if any
-    window: ?Window.Ref = null,
+    hovered: ?Window.Ref = null,
 } = .{},
 link_sent: wl.list.Link,
 
 /// Windowing state requested by the wm.
 wm_requested: struct {
-    focus: WmFocus = .none,
+    focus: union(enum) {
+        none,
+        clear,
+        window: Window.Ref,
+        shell_surface: *ShellSurface,
+    } = .none,
     op: union(enum) {
         none,
         start_pointer,
@@ -298,11 +306,14 @@ pub fn manageStart(seat: *Seat) void {
         if (seat.object) |seat_v1| {
             seat_v1.sendRemoved();
             seat_v1.setHandler(?*anyopaque, handleRequestInert, null, null);
+            seat.layer_shell.makeInert();
             seat.object = null;
         }
         seat.destroy();
         return;
     }
+
+    seat.layer_shell.manageStart();
 
     if (server.wm.object) |wm_v1| {
         const new = seat.object == null;
@@ -328,24 +339,24 @@ pub fn manageStart(seat: *Seat) void {
         }
 
         if (new) {
-            if (seat.wm_scheduled.window) |ref| {
+            if (seat.wm_scheduled.hovered) |ref| {
                 if (ref.get()) |window| {
                     if (window.object) |window_v1| {
                         seat_v1.sendPointerEnter(window_v1);
-                        seat.wm_sent.window = seat.wm_scheduled.window;
+                        seat.wm_sent.hovered = seat.wm_scheduled.hovered;
                     }
                 }
             }
-        } else if (seat.wm_scheduled.window != seat.wm_sent.window) {
-            if (seat.wm_sent.window != null) {
+        } else if (seat.wm_scheduled.hovered != seat.wm_sent.hovered) {
+            if (seat.wm_sent.hovered != null) {
                 seat_v1.sendPointerLeave();
-                seat.wm_sent.window = null;
+                seat.wm_sent.hovered = null;
             }
-            if (seat.wm_scheduled.window) |ref| {
+            if (seat.wm_scheduled.hovered) |ref| {
                 if (ref.get()) |window| {
                     if (window.object) |window_v1| {
                         seat_v1.sendPointerEnter(window_v1);
-                        seat.wm_sent.window = seat.wm_scheduled.window;
+                        seat.wm_sent.hovered = seat.wm_scheduled.hovered;
                     }
                 }
             }
@@ -453,7 +464,7 @@ fn handleRequest(
             const shell_surface: *ShellSurface = @ptrCast(@alignCast(data));
             seat.wm_requested.focus = .{ .shell_surface = shell_surface };
         },
-        .clear_focus => seat.wm_requested.focus = .none,
+        .clear_focus => seat.wm_requested.focus = .clear,
 
         .op_start_pointer => {
             if (!server.wm.ensureWindowing()) return;
@@ -487,15 +498,31 @@ fn handleRequest(
 pub fn manageFinish(seat: *Seat) void {
     if (server.lock_manager.state != .unlocked) return;
 
-    switch (seat.wm_requested.focus) {
-        .none => seat.focus(.none),
-        .window => |ref| {
-            if (ref.get()) |window| {
-                seat.focus(.{ .window = window });
-            }
+    switch (seat.layer_shell.sent.focus) {
+        .exclusive => |ref| if (ref.get()) |layer_surface| {
+            seat.focus(.{ .layer_surface = layer_surface });
         },
-        .shell_surface => |shell_surface| seat.focus(.{ .shell_surface = shell_surface }),
+        .non_exclusive, .none => switch (seat.wm_requested.focus) {
+            .none => switch (seat.layer_shell.sent.focus) {
+                .exclusive => unreachable,
+                .non_exclusive => |ref| if (ref.get()) |layer_surface| {
+                    seat.focus(.{ .layer_surface = layer_surface });
+                    seat.layer_shell.sent.focus = .none;
+                },
+                .none => {},
+            },
+            .clear => {
+                seat.focus(.none);
+            },
+            .window => |ref| if (ref.get()) |window| {
+                seat.focus(.{ .window = window });
+            },
+            .shell_surface => |shell_surface| {
+                seat.focus(.{ .shell_surface = shell_surface });
+            },
+        },
     }
+    seat.wm_requested.focus = .none;
 
     switch (seat.wm_requested.op) {
         .none => {},
@@ -525,12 +552,13 @@ pub fn focus(seat: *Seat, new_focus: Focus) void {
     // First clear the current focus
     switch (seat.focused) {
         .window => |window| window.destroyPopups(),
+        .layer_surface => |layer_surface| layer_surface.destroyPopups(),
         .shell_surface, .override_redirect, .lock_surface, .none => {},
     }
 
     // Set the new focus
     switch (new_focus) {
-        .window, .shell_surface => assert(server.lock_manager.state != .locked),
+        .window, .shell_surface, .layer_surface => assert(server.lock_manager.state != .locked),
         .lock_surface => assert(server.lock_manager.state != .unlocked),
         .override_redirect, .none => {},
     }

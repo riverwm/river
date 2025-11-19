@@ -20,6 +20,7 @@ const std = @import("std");
 const assert = std.debug.assert;
 const build_options = @import("build_options");
 const wlr = @import("wlroots");
+const zwlr = @import("wayland").server.zwlr;
 
 const server = &@import("main.zig").server;
 
@@ -128,6 +129,16 @@ pub fn at(scene: *const Scene, lx: f64, ly: f64) ?AtResult {
     } else {
         return null;
     }
+}
+
+pub fn layerSurfaceTree(scene: *Scene, layer: zwlr.LayerShellV1.Layer) *wlr.SceneTree {
+    return switch (layer) {
+        .background => scene.layers.background,
+        .bottom => scene.layers.bottom,
+        .top => scene.layers.top,
+        .overlay => scene.layers.overlay,
+        _ => unreachable,
+    };
 }
 
 pub const SaveableSurfaces = struct {

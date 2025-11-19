@@ -1,6 +1,6 @@
 // This file is part of river, a dynamic tiling wayland compositor.
 //
-// Copyright 2020-2024 The River Developers
+// Copyright 2020-2025 The River Developers
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -31,6 +31,7 @@ const river = wayland.server.river;
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
+const LayerShellOutput = @import("LayerShellOutput.zig");
 const LockSurface = @import("LockSurface.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
 const Window = @import("Window.zig");
@@ -86,6 +87,11 @@ pub const State = struct {
         };
     }
 
+    pub fn box(state: *const State) wlr.Box {
+        const w, const h = state.dimensions();
+        return .{ .x = state.x, .y = state.y, .width = w, .height = h };
+    }
+
     pub fn applyNoModeset(state: *const State, wlr_state: *wlr.Output.State) void {
         wlr_state.setScale(state.scale);
         wlr_state.setTransform(state.transform);
@@ -108,6 +114,7 @@ wlr_output: ?*wlr.Output,
 scene_output: ?*wlr.SceneOutput,
 
 object: ?*river.OutputV1 = null,
+layer_shell: LayerShellOutput = .{},
 
 /// Tracks the currently presented frame on the output as it pertains to ext-session-lock.
 /// The output is initially considered blanked:
@@ -221,6 +228,8 @@ pub fn manageStart(output: *Output) void {
         .enabled, .disabled_soft => {
             const wlr_output = output.wlr_output.?;
 
+            output.layer_shell.manageStart();
+
             if (server.wm.object) |wm_v1| {
                 const new = output.object == null;
                 const output_v1 = output.object orelse blk: {
@@ -237,9 +246,6 @@ pub fn manageStart(output: *Output) void {
                 };
                 errdefer comptime unreachable;
 
-                const pending = &output.scheduled;
-                const sent = &output.sent;
-
                 if (!output.sent_wl_output) {
                     // wl_output globals are created/destroyed by the wlroots output layout.
                     if (wlr_output.global) |global| {
@@ -248,14 +254,17 @@ pub fn manageStart(output: *Output) void {
                     }
                 }
 
-                const pending_width, const pending_height = pending.dimensions();
+                const scheduled = &output.scheduled;
+                const sent = &output.sent;
+
+                const scheduled_width, const scheduled_height = scheduled.dimensions();
                 const sent_width, const sent_height = sent.dimensions();
 
-                if (new or pending_width != sent_width or pending_height != sent_height) {
-                    output_v1.sendDimensions(pending_width, pending_height);
+                if (new or scheduled_width != sent_width or scheduled_height != sent_height) {
+                    output_v1.sendDimensions(scheduled_width, scheduled_height);
                 }
-                if (new or pending.x != sent.x or pending.y != sent.y) {
-                    output_v1.sendPosition(pending.x, pending.y);
+                if (new or scheduled.x != sent.x or scheduled.y != sent.y) {
+                    output_v1.sendPosition(scheduled.x, scheduled.y);
                 }
             }
 
@@ -268,6 +277,7 @@ pub fn manageStart(output: *Output) void {
             if (output.object) |output_v1| {
                 output_v1.sendRemoved();
                 output_v1.setHandler(?*anyopaque, handleRequestInert, null, null);
+                output.layer_shell.makeInert();
                 output.object = null;
             }
 

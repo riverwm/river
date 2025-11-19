@@ -39,6 +39,7 @@ const Seat = @import("Seat.zig");
 const TabletTool = @import("TabletTool.zig");
 const WindowManager = @import("WindowManager.zig");
 const XkbBindings = @import("XkbBindings.zig");
+const LayerShell = @import("LayerShell.zig");
 const XdgDecoration = @import("XdgDecoration.zig");
 const XdgToplevel = @import("XdgToplevel.zig");
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
@@ -91,6 +92,7 @@ idle_inhibit_manager: IdleInhibitManager,
 lock_manager: LockManager,
 wm: WindowManager,
 xkb_bindings: XkbBindings,
+layer_shell: LayerShell,
 
 xwayland: if (build_options.xwayland) ?*wlr.Xwayland else void = if (build_options.xwayland) null,
 new_xsurface: if (build_options.xwayland) wl.Listener(*wlr.XwaylandSurface) else void =
@@ -158,6 +160,7 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
         .lock_manager = undefined,
         .wm = undefined,
         .xkb_bindings = undefined,
+        .layer_shell = undefined,
     };
 
     if (renderer.getTextureFormats(@intFromEnum(wlr.BufferCap.dmabuf)) != null) {
@@ -177,6 +180,7 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
 
     try server.wm.init();
     try server.xkb_bindings.init();
+    try server.layer_shell.init();
     try server.scene.init();
     try server.om.init();
     try server.input_manager.init();
@@ -227,6 +231,7 @@ pub fn deinit(server: *Server) void {
     server.input_manager.deinit();
     server.idle_inhibit_manager.deinit();
     server.lock_manager.deinit();
+    server.layer_shell.deinit();
 
     server.wl_server.destroy();
 
@@ -320,6 +325,8 @@ fn allowlist(server: *Server, global: *const wl.Global) bool {
 fn blocklist(server: *Server, global: *const wl.Global) bool {
     return global == server.security_context_manager.global or
         global == server.wm.global or
+        global == server.layer_shell.global or
+        global == server.layer_shell.wlr_shell.global or
         global == server.xkb_bindings.global or
         global == server.foreign_toplevel_manager.global or
         global == server.screencopy_manager.global or

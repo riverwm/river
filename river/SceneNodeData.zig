@@ -23,6 +23,7 @@ const wl = @import("wayland").server.wl;
 const util = @import("util.zig");
 
 const LockSurface = @import("LockSurface.zig");
+const LayerSurface = @import("LayerSurface.zig");
 const InputPopup = @import("InputPopup.zig");
 const Window = @import("Window.zig");
 const ShellSurface = @import("ShellSurface.zig");
@@ -32,6 +33,7 @@ pub const Data = union(enum) {
     window: *Window,
     shell_surface: *ShellSurface,
     lock_surface: *LockSurface,
+    layer_surface: *LayerSurface,
     override_redirect: if (build_options.xwayland) *XwaylandOverrideRedirect else noreturn,
 };
 

@@ -58,7 +58,7 @@ pub fn checkActive(inhibit_manager: *IdleInhibitManager) void {
                 inhibited = true; // XXX be strict
                 break;
             },
-            .shell_surface, .lock_surface, .override_redirect => {
+            .shell_surface, .lock_surface, .layer_surface, .override_redirect => {
                 inhibited = true;
                 break;
             },

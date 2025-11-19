@@ -112,6 +112,7 @@ pub fn update(input_popup: *InputPopup) void {
         .shell_surface => |shell_surface| shell_surface.popup_tree,
         // TODO fix positioning for lock surfaces not at 0,0 in layout coords
         .lock_surface => |_| server.scene.layers.popups,
+        .layer_surface => |layer_surface| layer_surface.popup_tree,
         // Xwayland doesn't use the text-input protocol
         .override_redirect => unreachable,
     };
