@@ -662,9 +662,7 @@ pub fn manageFinish(window: *Window) bool {
         window.configure_scheduled.activated = false;
         var it = server.wm.wm_sent.seats.iterator(.forward);
         while (it.next()) |seat| {
-            if (seat.wm_requested.focus == .window and
-                seat.wm_requested.focus.window == window.ref)
-            {
+            if (seat.focused == .window and seat.focused.window == window) {
                 window.configure_scheduled.activated = true;
                 break;
             }
