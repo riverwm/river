@@ -385,7 +385,7 @@ fn updateHovered(cursor: *Cursor) void {
                             cursor.seat.wm_scheduled.hovered = window.ref;
                         }
                     },
-                    .xwayland => cursor.seat.wm_scheduled.window = window.ref,
+                    .xwayland => cursor.seat.wm_scheduled.hovered = window.ref,
                     .destroying => {},
                 }
             },

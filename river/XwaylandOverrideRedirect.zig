@@ -153,7 +153,7 @@ pub fn focusIfDesired(override_redirect: *XwaylandOverrideRedirect) void {
         {
             seat.keyboardEnterOrLeave(override_redirect.xsurface.surface);
         } else {
-            seat.setFocusRaw(.{ .override_redirect = override_redirect });
+            seat.focus(.{ .override_redirect = override_redirect });
         }
     }
 }

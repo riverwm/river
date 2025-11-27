@@ -1,6 +1,6 @@
 // This file is part of river, a dynamic tiling wayland compositor.
 //
-// Copyright 2020 The River Developers
+// Copyright 2020-2025 The River Developers
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -48,10 +48,11 @@ dissociate: wl.Listener(void) = .init(handleDissociate),
 set_title: wl.Listener(void) = .init(handleSetTitle),
 set_class: wl.Listener(void) = .init(handleSetClass),
 set_decorations: wl.Listener(void) = .init(handleSetDecorations),
+request_maximize: wl.Listener(void) = .init(handleRequestMaximize),
 request_fullscreen: wl.Listener(void) = .init(handleRequestFullscreen),
 request_minimize: wl.Listener(*wlr.XwaylandSurface.event.Minimize) = .init(handleRequestMinimize),
 
-// Active while the xsurfaceis associated with a wlr_surface
+// Active while the xsurface is associated with a wlr_surface
 map: wl.Listener(void) = .init(handleMap),
 unmap: wl.Listener(void) = .init(handleUnmap),
 
@@ -65,7 +66,7 @@ pub fn create(xsurface: *wlr.XwaylandSurface) error{OutOfMemory}!void {
         .window = undefined,
         .xsurface = xsurface,
     } });
-    errdefer window.destroy(.assert);
+    errdefer window.destroy();
 
     const xwindow = &window.impl.xwayland;
     xwindow.window = window;
@@ -79,6 +80,7 @@ pub fn create(xsurface: *wlr.XwaylandSurface) error{OutOfMemory}!void {
     xsurface.events.set_title.add(&xwindow.set_title);
     xsurface.events.set_class.add(&xwindow.set_class);
     xsurface.events.set_decorations.add(&xwindow.set_decorations);
+    xsurface.events.request_maximize.add(&xwindow.request_maximize);
     xsurface.events.request_fullscreen.add(&xwindow.request_fullscreen);
     xsurface.events.request_minimize.add(&xwindow.request_minimize);
 
@@ -92,43 +94,49 @@ pub fn create(xsurface: *wlr.XwaylandSurface) error{OutOfMemory}!void {
 
 /// Always returns false as we do not care about frame perfection for Xwayland windows.
 pub fn configure(xwindow: *XwaylandWindow) bool {
-    const inflight = &xwindow.window.inflight;
-    const current = &xwindow.window.current;
+    const window = xwindow.window;
+    const scheduled = &window.configure_scheduled;
+    const sent = &window.configure_sent;
 
     // Sending a 0 width/height to X11 clients is invalid, so fake it
-    if (inflight.box.width == 0) {
-        inflight.box.width = xwindow.window.configure_scheduled.box.width;
+    if (scheduled.width == 0) {
+        scheduled.width = xwindow.xsurface.width;
     }
-    if (inflight.box.height == 0) {
-        inflight.box.height = xwindow.window.configure_scheduled.box.height;
+    if (scheduled.height == 0) {
+        scheduled.height = xwindow.xsurface.height;
     }
+    const width = scheduled.width orelse xwindow.xsurface.width;
+    const height = scheduled.height orelse xwindow.xsurface.height;
 
-    if (inflight.hidden != current.hidden) {
-        xwindow.xsurface.setWithdrawn(inflight.hidden);
-    }
-
-    if (inflight.box.x != current.box.x or
-        inflight.box.y != current.box.y or
-        inflight.box.width != current.box.width or
-        inflight.box.height != current.box.height)
+    // Yes it's technically wrong to send rendering_requested state
+    // here, but we don't care about frame perfection for X11 windows.
+    if (window.rendering_requested.x != xwindow.xsurface.x or
+        window.rendering_requested.y != xwindow.xsurface.y or
+        width != xwindow.xsurface.width or
+        height != xwindow.xsurface.height)
     {
         xwindow.xsurface.configure(
-            math.lossyCast(i16, inflight.box.x),
-            math.lossyCast(i16, inflight.box.y),
-            math.lossyCast(u16, inflight.box.width),
-            math.lossyCast(u16, inflight.box.height),
+            math.lossyCast(i16, window.rendering_requested.x),
+            math.lossyCast(i16, window.rendering_requested.y),
+            math.lossyCast(u16, width),
+            math.lossyCast(u16, height),
         );
     }
 
-    if ((inflight.focus != 0) != (current.focus != 0)) {
-        xwindow.setActivated(inflight.focus != 0);
+    if (scheduled.activated != sent.activated) {
+        xwindow.setActivated(scheduled.activated);
     }
-    if (inflight.maximized != current.maximized) {
-        xwindow.xsurface.setFullscreen(inflight.maximized);
+    if (scheduled.maximized != sent.maximized) {
+        xwindow.xsurface.setFullscreen(scheduled.maximized);
     }
-    if (inflight.fullscreen != current.fullscreen) {
-        xwindow.xsurface.setFullscreen(inflight.fullscreen);
+    if (scheduled.inform_fullscreen != sent.inform_fullscreen) {
+        xwindow.xsurface.setFullscreen(scheduled.inform_fullscreen);
     }
+    window.configure_sent = window.configure_scheduled;
+    window.configure_sent.width = width;
+    window.configure_sent.height = height;
+    window.configure_scheduled.width = null;
+    window.configure_scheduled.height = null;
 
     return false;
 }
@@ -139,9 +147,6 @@ fn setActivated(xwindow: XwaylandWindow, activated: bool) void {
         xwindow.xsurface.setMinimized(false);
     }
     xwindow.xsurface.activate(activated);
-    if (activated) {
-        xwindow.xsurface.restack(null, .above);
-    }
 }
 
 fn handleDestroy(listener: *wl.Listener(void)) void {
@@ -156,12 +161,12 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
     xwindow.set_title.link.remove();
     xwindow.set_class.link.remove();
     xwindow.set_decorations.link.remove();
+    xwindow.request_maximize.link.remove();
     xwindow.request_fullscreen.link.remove();
     xwindow.request_minimize.link.remove();
 
     const window = xwindow.window;
-    window.impl = .none;
-    window.destroy(.lazy);
+    window.impl = .destroying;
 }
 
 fn handleAssociate(listener: *wl.Listener(void)) void {
@@ -180,31 +185,21 @@ fn handleDissociate(listener: *wl.Listener(void)) void {
 pub fn handleMap(listener: *wl.Listener(void)) void {
     const xwindow: *XwaylandWindow = @fieldParentPtr("map", listener);
     const window = xwindow.window;
+    const surface = xwindow.xsurface.surface.?;
 
-    const xsurface = xwindow.xsurface;
-    const surface = xsurface.surface.?;
-    surface.data = &window.tree.node;
-
-    xwindow.surface_tree = window.surface_tree.createSceneSubsurfaceTree(surface) catch {
+    xwindow.surface_tree = window.surfaces.tree.createSceneSubsurfaceTree(surface) catch {
         log.err("out of memory", .{});
         surface.resource.getClient().postNoMemory();
         return;
     };
+    surface.data = &window.tree.node;
 
-    // XXX this seems like it should be deleted/moved to handleCommit()
-    window.configure_scheduled.box = .{
-        .x = 0,
-        .y = 0,
-        .width = xwindow.xsurface.width,
-        .height = xwindow.xsurface.height,
-    };
-    window.inflight.box = window.configure_scheduled.box;
-    window.current.box = window.configure_scheduled.box;
-
+    window.state = .initialized;
     window.map() catch {
         log.err("out of memory", .{});
         surface.resource.getClient().postNoMemory();
     };
+    server.wm.dirtyWindowing();
 }
 
 fn handleUnmap(listener: *wl.Listener(void)) void {
@@ -232,7 +227,7 @@ fn handleRequestConfigure(
         return;
     }
 
-    @panic("TODO");
+    _ = xwindow.configure();
 }
 
 fn handleSetOverrideRedirect(listener: *wl.Listener(void)) void {
@@ -276,6 +271,16 @@ fn handleSetDecorations(listener: *wl.Listener(void)) void {
     }
 }
 
+fn handleRequestMaximize(listener: *wl.Listener(void)) void {
+    const xwindow: *XwaylandWindow = @fieldParentPtr("request_maximize", listener);
+    if (xwindow.xsurface.maximized_vert or xwindow.xsurface.maximized_horz) {
+        xwindow.window.wm_scheduled.maximize_requested = .maximize;
+    } else {
+        xwindow.window.wm_scheduled.maximize_requested = .unmaximize;
+    }
+    server.wm.dirtyWindowing();
+}
+
 fn handleRequestFullscreen(listener: *wl.Listener(void)) void {
     const xwindow: *XwaylandWindow = @fieldParentPtr("request_fullscreen", listener);
     if (xwindow.xsurface.fullscreen) {
@@ -296,4 +301,6 @@ fn handleRequestMinimize(
 ) void {
     const xwindow: *XwaylandWindow = @fieldParentPtr("request_minimize", listener);
     xwindow.xsurface.setMinimized(event.minimize);
+    xwindow.window.wm_scheduled.minimize_requested = true;
+    server.wm.dirtyWindowing();
 }
