@@ -76,10 +76,10 @@ pub fn create(
 
     {
         var buffer: [64]u8 = undefined;
-        _ = keysym.getName(&buffer, buffer.len);
+        const len = keysym.getName(&buffer, buffer.len);
         log.debug("new river_xkb_binding_v1: keysym: {d}({s}) modifiers: {d}", .{
             @intFromEnum(keysym),
-            &buffer,
+            buffer[0..@max(0, len)],
             @as(u32, @bitCast(modifiers)),
         });
     }
