@@ -207,6 +207,15 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) v
 
     log.debug("output '{s}' destroyed", .{wlr_output.name});
 
+    {
+        var it = server.layer_shell.surfaces.iterator();
+        while (it.next()) |surface| {
+            if (surface.wlr_layer_surface.output == wlr_output) {
+                surface.wlr_layer_surface.destroy();
+            }
+        }
+    }
+
     output.link.remove();
 
     output.destroy.link.remove();
