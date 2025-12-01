@@ -37,7 +37,7 @@ const role: wlr.Surface.Role = .{
     .client_commit = clientCommit,
     .commit = commit,
     .unmap = null,
-    .destroy = null,
+    .destroy = roleDestroy,
 };
 
 object: *river.ShellSurfaceV1,
@@ -94,10 +94,12 @@ pub fn create(
     shell_surface.node.init(.shell_surface);
     server.wm.rendering_requested.list.append(&shell_surface.node);
 
-    shell_surface_v1.setHandler(*ShellSurface, handleRequest, handleDestroy, shell_surface);
+    shell_surface_v1.setHandler(*ShellSurface, handleRequest, null, shell_surface);
 }
 
-fn handleDestroy(_: *river.ShellSurfaceV1, shell_surface: *ShellSurface) void {
+fn roleDestroy(wlr_surface: *wlr.Surface) callconv(.c) void {
+    const shell_surface = fromWlrSurface(wlr_surface) orelse return;
+
     shell_surface.surface.unmap();
 
     shell_surface.node.makeInert();
@@ -135,12 +137,14 @@ fn handleRequest(
     }
 }
 
+fn fromWlrSurface(wlr_surface: *wlr.Surface) ?*ShellSurface {
+    if (wlr_surface.role != &role) return null;
+    const resource = wlr_surface.role_resource orelse return null;
+    return @ptrCast(@alignCast(resource.getUserData()));
+}
+
 fn clientCommit(wlr_surface: *wlr.Surface) callconv(.c) void {
-    if (wlr_surface.role != &role) return;
-    const resource = wlr_surface.role_resource orelse return;
-
-    const shell_surface: *ShellSurface = @ptrCast(@alignCast(resource.getUserData()));
-
+    const shell_surface = fromWlrSurface(wlr_surface) orelse return;
     if (shell_surface.rendering_requested.sync_next_commit) {
         shell_surface.surfaces.save();
     }
