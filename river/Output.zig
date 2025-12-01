@@ -216,8 +216,6 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) v
         }
     }
 
-    output.link.remove();
-
     output.destroy.link.remove();
     output.request_state.link.remove();
     output.frame.link.remove();
@@ -310,6 +308,8 @@ pub fn manageStart(output: *Output) void {
                         }
                     }
                 }
+                output.link.remove();
+
                 util.gpa.destroy(output);
             }
         },
