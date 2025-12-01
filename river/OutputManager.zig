@@ -415,7 +415,8 @@ fn sendConfig(om: *OutputManager) !void {
 
     var it = om.outputs.iterator(.forward);
     while (it.next()) |output| {
-        const head = try wlr.OutputConfigurationV1.Head.create(config, output.wlr_output.?);
+        const wlr_output = output.wlr_output orelse continue;
+        const head = try wlr.OutputConfigurationV1.Head.create(config, wlr_output);
 
         // It's only necessary to overwrite the state that does not require a modeset.
         // All state that requires a modeset will have already been committed to the wlr_output.
