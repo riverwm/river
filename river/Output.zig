@@ -197,6 +197,10 @@ pub fn create(wlr_output: *wlr.Output) !void {
     output.scheduled.state = .enabled;
     if (wlr_output.preferredMode()) |preferred_mode| {
         output.scheduled.mode = .{ .standard = preferred_mode };
+    } else {
+        // Use a reasonable default so we can assert(mode != .none) for enabled
+        // outputs in manageStart().
+        output.scheduled.mode = .{ .custom = .{ .width = 1280, .height = 720, .refresh = 0 } };
     }
 
     server.wm.dirtyWindowing();
@@ -233,6 +237,9 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) v
 pub fn manageStart(output: *Output) void {
     switch (output.scheduled.state) {
         .enabled, .disabled_soft => {
+            // We cannot send 0 width/height to the window manager client.
+            assert(output.scheduled.mode != .none);
+
             const wlr_output = output.wlr_output.?;
 
             output.layer_shell.manageStart();
