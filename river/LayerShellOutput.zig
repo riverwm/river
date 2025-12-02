@@ -152,8 +152,8 @@ fn sendConfigures(
             const y = layer_surface.scene_layer_surface.tree.node.y;
             layer_surface.popup_tree.node.setPosition(x, y);
             layer_surface.scene_layer_surface.tree.node.subsurfaceTreeSetClip(&.{
-                .x = -x,
-                .y = -y,
+                .x = -(x - output.scheduled.x),
+                .y = -(y - output.scheduled.y),
                 .width = output_width,
                 .height = output_height,
             });

@@ -95,6 +95,9 @@
         the exclusive zones of layer surfaces. Exclusive zones are a hint, the
         window manager is free to ignore this area hint if it wishes.
 
+        The x and y values are in the global coordinate space, not relative to
+        the position of the output.
+
         This event will be followed by a manage_start event after all other new
         state has been sent by the server.
       </description>
