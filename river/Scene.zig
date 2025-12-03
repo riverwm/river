@@ -73,6 +73,7 @@ pub fn init(scene: *Scene) !void {
 
     const normal_tree = try interactive_tree.createSceneTree();
     const locked_tree = try interactive_tree.createSceneTree();
+    locked_tree.node.setEnabled(false);
 
     scene.* = .{
         .wlr_scene = wlr_scene,

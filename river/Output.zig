@@ -400,42 +400,43 @@ fn renderAndCommit(output: *Output) !void {
 
     if (!wlr_output.commitState(&state)) return error.CommitFailed;
 
-    const lock_surface_mapped = blk: {
-        if (server.lock_manager.lockSurfaceFromOutput(output)) |lock_surface| {
-            break :blk lock_surface.wlr_lock_surface.surface.mapped;
-        } else {
-            break :blk false;
-        }
-    };
-
-    if (server.lock_manager.state == .locked or
-        (server.lock_manager.state == .waiting_for_lock_surfaces and lock_surface_mapped) or
-        server.lock_manager.state == .waiting_for_blank)
-    {
-        assert(!server.scene.normal_tree.node.enabled);
-        assert(server.scene.locked_tree.node.enabled);
-
-        switch (server.lock_manager.state) {
-            .unlocked => unreachable,
-            .locked => switch (output.lock_render_state) {
+    switch (server.lock_manager.state) {
+        .unlocked => {
+            if (output.lock_render_state != .unlocked) {
+                output.lock_render_state = .pending_unlock;
+            }
+        },
+        .locked => {
+            assert(!server.scene.normal_tree.node.enabled);
+            switch (output.lock_render_state) {
                 .pending_unlock, .unlocked, .pending_blank, .pending_lock_surface => unreachable,
                 .blanked, .lock_surface => {},
-            },
-            .waiting_for_blank => {
-                if (output.lock_render_state != .blanked) {
-                    output.lock_render_state = .pending_blank;
+            }
+        },
+        .waiting_for_blank => {
+            assert(!server.scene.normal_tree.node.enabled);
+            if (output.lock_render_state != .blanked) {
+                output.lock_render_state = .pending_blank;
+            }
+        },
+        .waiting_for_lock_surfaces => {
+            const lock_surface_mapped = blk: {
+                if (server.lock_manager.lockSurfaceFromOutput(output)) |lock_surface| {
+                    break :blk lock_surface.wlr_lock_surface.surface.mapped;
+                } else {
+                    break :blk false;
                 }
-            },
-            .waiting_for_lock_surfaces => {
+            };
+            if (lock_surface_mapped) {
                 if (output.lock_render_state != .lock_surface) {
                     output.lock_render_state = .pending_lock_surface;
                 }
-            },
-        }
-    } else {
-        if (output.lock_render_state != .unlocked) {
-            output.lock_render_state = .pending_unlock;
-        }
+            } else {
+                if (output.lock_render_state != .unlocked) {
+                    output.lock_render_state = .pending_unlock;
+                }
+            }
+        },
     }
 }
 
@@ -444,24 +445,23 @@ fn handlePresent(
     event: *wlr.Output.event.Present,
 ) void {
     const output: *Output = @fieldParentPtr("present", listener);
-
     if (!event.presented) {
         return;
     }
-
     switch (output.lock_render_state) {
         .pending_unlock => {
             assert(server.lock_manager.state != .locked);
             output.lock_render_state = .unlocked;
         },
         .unlocked => assert(server.lock_manager.state != .locked),
-        .pending_blank, .pending_lock_surface => {
-            output.lock_render_state = switch (output.lock_render_state) {
-                .pending_blank => .blanked,
-                .pending_lock_surface => .lock_surface,
-                .pending_unlock, .unlocked, .blanked, .lock_surface => unreachable,
-            };
-
+        .pending_blank => {
+            output.lock_render_state = .blanked;
+            if (server.lock_manager.state != .locked) {
+                server.lock_manager.maybeLock();
+            }
+        },
+        .pending_lock_surface => {
+            output.lock_render_state = .lock_surface;
             if (server.lock_manager.state != .locked) {
                 server.lock_manager.maybeLock();
             }

@@ -30,6 +30,7 @@ const SceneNodeData = @import("SceneNodeData.zig");
 
 wlr_lock_surface: *wlr.SessionLockSurfaceV1,
 lock: *wlr.SessionLockV1,
+tree: *wlr.SceneTree,
 
 idle_update_focus: ?*wl.EventSource = null,
 
@@ -40,17 +41,17 @@ pub fn create(wlr_lock_surface: *wlr.SessionLockSurfaceV1, lock: *wlr.SessionLoc
     const lock_surface = try util.gpa.create(LockSurface);
     errdefer util.gpa.destroy(lock_surface);
 
-    lock_surface.* = .{
-        .wlr_lock_surface = wlr_lock_surface,
-        .lock = lock,
-    };
-    wlr_lock_surface.data = lock_surface;
-
     const tree = try server.scene.locked_tree.createSceneSubsurfaceTree(wlr_lock_surface.surface);
     errdefer tree.node.destroy();
 
-    try SceneNodeData.attach(&tree.node, .{ .lock_surface = lock_surface });
+    lock_surface.* = .{
+        .wlr_lock_surface = wlr_lock_surface,
+        .lock = lock,
+        .tree = tree,
+    };
+    wlr_lock_surface.data = lock_surface;
 
+    try SceneNodeData.attach(&tree.node, .{ .lock_surface = lock_surface });
     wlr_lock_surface.surface.data = &tree.node;
 
     wlr_lock_surface.surface.events.map.add(&lock_surface.map);
@@ -59,7 +60,7 @@ pub fn create(wlr_lock_surface: *wlr.SessionLockSurfaceV1, lock: *wlr.SessionLoc
     lock_surface.configure();
 }
 
-pub fn destroy(lock_surface: *LockSurface) void {
+fn destroy(lock_surface: *LockSurface) void {
     {
         var surface_it = lock_surface.lock.surfaces.iterator(.forward);
         const new_focus: Seat.Focus = while (surface_it.next()) |surface| {
@@ -102,6 +103,8 @@ pub fn configure(lock_surface: *LockSurface) void {
 
 fn handleMap(listener: *wl.Listener(void)) void {
     const lock_surface: *LockSurface = @fieldParentPtr("map", listener);
+    const output = lock_surface.getOutput();
+    lock_surface.tree.node.setPosition(output.sent.x, output.sent.y);
 
     // Unfortunately the surface commit handlers for the scene subsurface tree corresponding to
     // this lock surface won't be called until after this function returns, which means that we cannot

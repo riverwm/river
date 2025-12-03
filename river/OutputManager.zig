@@ -264,6 +264,9 @@ pub fn commitOutputState(om: *OutputManager) void {
                         log.err("out of memory", .{});
                         continue; // Try again next time
                     };
+                    if (server.lock_manager.lockSurfaceFromOutput(output)) |lock_surface| {
+                        lock_surface.tree.node.setPosition(output.sent.x, output.sent.y);
+                    }
                 },
                 .disabled_hard, .destroying => {
                     om.output_layout.remove(wlr_output);
@@ -279,12 +282,14 @@ pub fn commitOutputState(om: *OutputManager) void {
         var it = wm.wm_sent.outputs.iterator(.forward);
         while (it.next()) |output| {
             const wlr_output = output.wlr_output orelse continue;
-
             switch (output.sent.state) {
                 .enabled => if (!wlr_output.enabled) break :blk true,
-                .disabled_soft, .disabled_hard, .destroying => continue,
+                // Technically disabling an output does not require a modeset,
+                // but handling both enabled and disable here simplifies
+                // lock_render_state tracking.
+                .disabled_soft, .disabled_hard => if (wlr_output.enabled) break :blk true,
+                .destroying => unreachable, // output.wlr_output must be null.
             }
-
             switch (output.sent.mode) {
                 .standard => |mode| {
                     if (mode != wlr_output.current_mode) break :blk true;
@@ -300,7 +305,6 @@ pub fn commitOutputState(om: *OutputManager) void {
                 break :blk true;
             }
         }
-
         break :blk false;
     };
 
@@ -382,6 +386,16 @@ pub fn commitOutputState(om: *OutputManager) void {
         }
 
         swapchain_manager.apply();
+
+        {
+            var it = wm.wm_sent.outputs.iterator(.forward);
+            while (it.next()) |output| {
+                const wlr_output = output.wlr_output orelse continue;
+                if (!wlr_output.enabled) {
+                    output.lock_render_state = .blanked;
+                }
+            }
+        }
     }
 
     if (wm.wm_sent.output_config) |config| {

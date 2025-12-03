@@ -86,6 +86,8 @@ pub fn deinit(manager: *LockManager) void {
 fn handleLock(listener: *wl.Listener(*wlr.SessionLockV1), lock: *wlr.SessionLockV1) void {
     const manager: *LockManager = @fieldParentPtr("new_lock", listener);
 
+    log.debug("session lock client made lock request", .{});
+
     if (manager.lock != null) {
         log.info("denying new session lock client, an active one already exists", .{});
         lock.destroy();
@@ -97,9 +99,8 @@ fn handleLock(listener: *wl.Listener(*wlr.SessionLockV1), lock: *wlr.SessionLock
     if (manager.state == .unlocked) {
         manager.state = .waiting_for_lock_surfaces;
 
-        if (build_options.xwayland) {
-            server.scene.layers.override_redirect.node.setEnabled(false);
-        }
+        assert(!server.scene.locked_tree.node.enabled);
+        server.scene.locked_tree.node.setEnabled(true);
 
         manager.lock_surfaces_timer.timerUpdate(200) catch {
             log.err("error setting lock surfaces timer, imperfect frames may be shown", .{});
@@ -133,7 +134,7 @@ fn handleLockSurfacesTimeout(manager: *LockManager) c_int {
     assert(manager.state == .waiting_for_lock_surfaces);
     manager.state = .waiting_for_blank;
 
-    if (true) @panic("XXX blank all outputs");
+    server.scene.normal_tree.node.setEnabled(false);
 
     // This call is necessary in the case that all outputs in the layout are disabled.
     manager.maybeLock();
@@ -147,7 +148,8 @@ pub fn maybeLock(manager: *LockManager) void {
     {
         var it = server.om.outputs.iterator(.forward);
         while (it.next()) |output| {
-            if (!output.wlr_output.?.enabled) continue;
+            const wlr_output = output.wlr_output orelse continue;
+            if (!wlr_output.enabled) continue;
 
             switch (output.lock_render_state) {
                 .pending_unlock, .unlocked, .pending_blank, .pending_lock_surface => {
@@ -168,6 +170,7 @@ pub fn maybeLock(manager: *LockManager) void {
             // The lock client may have been destroyed, for example due to a protocol error.
             if (manager.lock) |lock| lock.sendLocked();
             manager.state = .locked;
+            server.scene.normal_tree.node.setEnabled(false);
             manager.lock_surfaces_timer.timerUpdate(0) catch {};
         },
         .waiting_for_blank => if (all_outputs_blanked) {
@@ -191,7 +194,7 @@ fn handleUnlock(listener: *wl.Listener(void)) void {
     server.scene.normal_tree.node.setEnabled(true);
 
     assert(server.scene.locked_tree.node.enabled);
-    server.scene.locked_tree.node.setEnabled(true);
+    server.scene.locked_tree.node.setEnabled(false);
 
     {
         var it = server.input_manager.seats.iterator(.forward);
