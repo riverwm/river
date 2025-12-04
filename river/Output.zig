@@ -230,6 +230,9 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) v
 
     output.wlr_output = null;
     output.scene_output = null;
+    output.scheduled.mode = .none;
+    output.sent.mode = .none;
+    output.current.mode = .none;
     output.scheduled.state = .destroying;
 
     server.wm.dirtyWindowing();
