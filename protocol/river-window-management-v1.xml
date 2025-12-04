@@ -1356,20 +1356,6 @@
       </description>
     </event>
 
-    <event name="pointer_activity">
-      <description summary="the pointer was moved">
-        The seat's pointer was moved.
-
-        Rationale: The motivating window manager feature for this event is the
-        "always" style of focus-follows-cursor. Carrying out a full manage
-        sequence on every single pointer motion event is noisy, wasteful, and
-        unnecessary.
-
-        This event will be followed by a manage_start event after all other new
-        state has been sent by the server.
-      </description>
-    </event>
-
     <event name="window_interaction">
       <description summary="a window has been interacted with">
         A window has been interacted with beyond the pointer merely passing over
@@ -1470,47 +1456,6 @@
         This request modifies window management state and may only be made as
         part of a manage sequence, see the river_window_manager_v1 description.
       </description>
-    </request>
-
-    <request name="pointer_confine_to_region">
-      <description summary="prevent the pointer from leaving a region">
-        This request tells the compositor to confine the movement of the pointer
-        to a given region, preventing movement of the input device from moving
-        the pointer outside the region. In addition, the pointer continues to be
-        confined to the bounds of the outputs.
-
-        If the pointer is not inside the given region when this request is made
-        it will have no effect until the pointer is moved inside the region.
-
-        If the pointer is warped to a point outside of the region it will
-        (temporarily) escape confinement. Moving or warping the pointer back
-        inside the region will resume the confinement.
-
-        If the region argument is null the compositor will only confine the
-        cursor to the bounds of the outputs. This is also the behavior if this
-        request is never made.
-
-        The region is defined in the compositor's logical coordinate space.
-
-        This request may be useful to place bounds on an interactive pointer
-        move or resize for example.
-
-        This request modifies window management state and may only be made as
-        part of a manage sequence, see the river_window_manager_v1 description.
-      </description>
-      <arg name="region" type="object" allow-null="true" interface="wl_region"/>
-    </request>
-
-    <request name="pointer_warp">
-      <description summary="warp the pointer to a given position">
-        Warp the pointer to the given position in the compositor's logical
-        coordinate space.
-
-        This request modifies window management state and may only be made as
-        part of a manage sequence, see the river_window_manager_v1 description.
-      </description>
-      <arg name="x" type="int"/>
-      <arg name="y" type="int"/>
     </request>
 
     <enum name="modifiers" bitfield="true">

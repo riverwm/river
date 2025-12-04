@@ -145,8 +145,6 @@ wm_requested: struct {
         start_pointer,
         end,
     } = .none,
-    // TODO confine region
-    // TODO pointer warp
 } = .{},
 
 xkb_bindings: wl.list.Head(XkbBinding, .link),
@@ -475,9 +473,6 @@ fn handleRequest(
             if (!server.wm.ensureWindowing()) return;
             seat.wm_requested.op = .end;
         },
-
-        .pointer_confine_to_region => {},
-        .pointer_warp => {},
 
         .get_pointer_binding => |args| {
             PointerBinding.create(
