@@ -122,7 +122,6 @@ layer_shell: LayerShellOutput = .{},
 /// The output is initially considered blanked:
 /// If using the DRM backend it will be blanked with the initial modeset.
 /// If using the Wayland or X11 backend nothing will be visible until the first frame is rendered.
-/// XXX set this to blanked on enabled->disabled transition
 lock_render_state: enum {
     /// Submitted an unlocked buffer but the buffer has not yet been presented.
     pending_unlock,
@@ -211,7 +210,7 @@ pub fn create(wlr_output: *wlr.Output) !void {
 fn handleDestroy(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) void {
     const output: *Output = @fieldParentPtr("destroy", listener);
 
-    log.debug("output '{s}' destroyed", .{wlr_output.name});
+    log.debug("wlr_output '{s}' destroyed", .{wlr_output.name});
 
     {
         var it = server.layer_shell.surfaces.iterator();
@@ -285,6 +284,7 @@ pub fn manageStart(output: *Output) void {
             }
 
             output.sent = output.scheduled;
+
             output.link_sent.remove();
             server.wm.sent.outputs.append(output);
         },
@@ -299,6 +299,7 @@ pub fn manageStart(output: *Output) void {
             output.sent = output.scheduled;
 
             if (output.scheduled.state == .destroying) {
+                assert(output.wlr_output == null);
                 {
                     var it = server.wm.windows.iterator();
                     while (it.next()) |window| {
