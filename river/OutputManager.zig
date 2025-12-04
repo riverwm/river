@@ -147,9 +147,13 @@ fn handleManagerApply(_: *wl.Listener(*wlr.OutputConfigurationV1), config: *wlr.
     var it = config.heads.iterator(.forward);
     while (it.next()) |head| {
         const output: *Output = @ptrCast(@alignCast(head.state.output.data));
-
+        if (!head.state.enabled) {
+            // Avoid overwriting and losing all other output state on disable.
+            output.scheduled.state = .disabled_hard;
+            continue;
+        }
         output.scheduled = .{
-            .state = if (head.state.enabled) .enabled else .disabled_hard,
+            .state = .enabled,
             .mode = blk: {
                 if (head.state.mode) |mode| {
                     break :blk .{ .standard = mode };
@@ -252,7 +256,6 @@ pub fn autoLayout(om: *OutputManager) void {
 
 pub fn commitOutputState(om: *OutputManager) void {
     const wm = &server.wm;
-
     {
         var it = wm.wm_sent.outputs.iterator(.forward);
         while (it.next()) |output| {
@@ -309,6 +312,8 @@ pub fn commitOutputState(om: *OutputManager) void {
     };
 
     if (need_modeset) {
+        log.debug("committing output state requires modeset", .{});
+
         var states: std.ArrayList(wlr.Backend.OutputState) = .empty;
         defer states.deinit(util.gpa);
         defer for (states.items) |*s| s.base.finish();
@@ -386,16 +391,6 @@ pub fn commitOutputState(om: *OutputManager) void {
         }
 
         swapchain_manager.apply();
-
-        {
-            var it = wm.wm_sent.outputs.iterator(.forward);
-            while (it.next()) |output| {
-                const wlr_output = output.wlr_output orelse continue;
-                if (!wlr_output.enabled) {
-                    output.lock_render_state = .blanked;
-                }
-            }
-        }
     }
 
     if (wm.wm_sent.output_config) |config| {
@@ -405,13 +400,20 @@ pub fn commitOutputState(om: *OutputManager) void {
     }
 
     {
-        var it = wm.wm_sent.outputs.iterator(.forward);
+        var it = wm.wm_sent.outputs.safeIterator(.forward);
         while (it.next()) |output| {
-            output.current = output.sent;
-
             if (output.wlr_output) |wlr_output| {
-                wlr_output.scheduleFrame();
+                if (wlr_output.enabled) {
+                    wlr_output.scheduleFrame();
+                } else {
+                    output.lock_render_state = .blanked;
+                }
             }
+            if (output.sent.state == .disabled_hard) {
+                output.link_sent.remove();
+                output.link_sent.init();
+            }
+            output.current = output.sent;
         }
     }
 

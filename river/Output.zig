@@ -98,8 +98,10 @@ pub const State = struct {
     }
 
     pub fn applyModeset(state: *const State, wlr_state: *wlr.Output.State) void {
+        const enabled = state.state == .enabled;
+        wlr_state.setEnabled(enabled);
+        if (!enabled) return;
         state.applyNoModeset(wlr_state);
-        wlr_state.setEnabled(state.state == .enabled);
         switch (state.mode) {
             .standard => |mode| wlr_state.setMode(mode),
             .custom => |mode| wlr_state.setCustomMode(mode.width, mode.height, mode.refresh),
@@ -283,7 +285,6 @@ pub fn manageStart(output: *Output) void {
             }
 
             output.sent = output.scheduled;
-
             output.link_sent.remove();
             server.wm.wm_sent.outputs.append(output);
         },
@@ -295,8 +296,7 @@ pub fn manageStart(output: *Output) void {
                 output.object = null;
             }
 
-            output.link_sent.remove();
-            output.link_sent.init();
+            output.sent = output.scheduled;
 
             if (output.scheduled.state == .destroying) {
                 {
@@ -316,6 +316,7 @@ pub fn manageStart(output: *Output) void {
                     }
                 }
                 output.link.remove();
+                output.link_sent.remove();
 
                 util.gpa.destroy(output);
             }
