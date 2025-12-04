@@ -166,21 +166,23 @@ pub fn maybeLock(manager: *LockManager) void {
 
     switch (manager.state) {
         .waiting_for_lock_surfaces => if (all_outputs_rendered_lock_surface) {
-            log.info("session locked", .{});
-            // The lock client may have been destroyed, for example due to a protocol error.
-            if (manager.lock) |lock| lock.sendLocked();
-            manager.state = .locked;
+            manager.sendLocked();
             server.scene.normal_tree.node.setEnabled(false);
             manager.lock_surfaces_timer.timerUpdate(0) catch {};
         },
         .waiting_for_blank => if (all_outputs_blanked) {
-            log.info("session locked", .{});
-            // The lock client may have been destroyed, for example due to a protocol error.
-            if (manager.lock) |lock| lock.sendLocked();
-            manager.state = .locked;
+            manager.sendLocked();
         },
         .unlocked, .locked => unreachable,
     }
+}
+
+fn sendLocked(manager: *LockManager) void {
+    log.info("session locked", .{});
+    // The lock client may have been destroyed, for example due to a protocol error.
+    if (manager.lock) |lock| lock.sendLocked();
+    manager.state = .locked;
+    server.wm.dirtyWindowing();
 }
 
 fn handleUnlock(listener: *wl.Listener(void)) void {

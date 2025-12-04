@@ -63,6 +63,8 @@ scheduled: struct {
 
 /// State sent to the wm in the latest update sequence.
 sent: struct {
+    session_locked: bool = false,
+
     outputs: wl.list.Head(Output, .link_sent),
     output_config: ?*wlr.OutputConfigurationV1 = null,
 
@@ -267,6 +269,18 @@ fn manageStart(wm: *WindowManager) void {
     assert(wm.scheduled.dirty);
 
     log.debug("manage sequence start", .{});
+
+    const session_locked = server.lock_manager.state == .locked;
+    if (session_locked != wm.sent.session_locked) {
+        if (wm.object) |wm_v1| {
+            if (session_locked) {
+                wm_v1.sendSessionLocked();
+            } else {
+                wm_v1.sendSessionUnlocked();
+            }
+        }
+        wm.sent.session_locked = session_locked;
+    }
 
     server.om.autoLayout();
     {
