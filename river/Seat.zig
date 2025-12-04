@@ -191,7 +191,8 @@ pub fn create(name: [*:0]const u8) !void {
     const seat = try util.gpa.create(Seat);
     errdefer util.gpa.destroy(seat);
 
-    // XXX have actual reasoning for choosing this capacity.
+    // Empirically, this limit is not hit in practice unless the window manager hangs.
+    // TODO have better reasoning for choosing this capacity.
     var event_queue: Deque(Event) = try .initCapacity(util.gpa, 1024);
     errdefer event_queue.deinit(util.gpa);
 

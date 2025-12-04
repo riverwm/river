@@ -383,7 +383,7 @@ fn handleRequestActivate(
 ) void {
     const node_data = SceneNodeData.fromSurface(event.surface) orelse return;
     switch (node_data.data) {
-        .window => |_| {}, // XXX
+        .window => |_| {}, // TODO support xdg-activation with a rwm extension protocol
         else => |tag| {
             log.info("ignoring xdg-activation-v1 activate request of {s} surface", .{@tagName(tag)});
         },
