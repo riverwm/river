@@ -265,7 +265,7 @@ pub fn processEvents(seat: *Seat) void {
     // Only process events while there is no new state to be sent to the window manager.
     // The window manager might decide to change focus or redefine keyboard/pointer bindings
     // in response, which can affect further processing of events.
-    while (!server.wm.wm_scheduled.dirty) {
+    while (!server.wm.scheduled.dirty) {
         assert(server.wm.state == .idle);
 
         const event = seat.event_queue.popFront() orelse break;
@@ -328,7 +328,7 @@ pub fn manageStart(seat: *Seat) void {
             wm_v1.sendSeat(seat_v1);
 
             seat.link_sent.remove();
-            server.wm.wm_sent.seats.append(seat);
+            server.wm.sent.seats.append(seat);
 
             break :blk seat_v1;
         };

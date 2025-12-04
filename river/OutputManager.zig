@@ -173,11 +173,11 @@ fn handleManagerApply(_: *wl.Listener(*wlr.OutputConfigurationV1), config: *wlr.
         };
     }
 
-    if (server.wm.wm_scheduled.output_config) |old| {
+    if (server.wm.scheduled.output_config) |old| {
         old.sendFailed();
         old.destroy();
     }
-    server.wm.wm_scheduled.output_config = config;
+    server.wm.scheduled.output_config = config;
 
     server.wm.dirtyWindowing();
 }
@@ -257,7 +257,7 @@ pub fn autoLayout(om: *OutputManager) void {
 pub fn commitOutputState(om: *OutputManager) void {
     const wm = &server.wm;
     {
-        var it = wm.wm_sent.outputs.iterator(.forward);
+        var it = wm.sent.outputs.iterator(.forward);
         while (it.next()) |output| {
             const wlr_output = output.wlr_output orelse continue;
             switch (output.sent.state) {
@@ -282,7 +282,7 @@ pub fn commitOutputState(om: *OutputManager) void {
     server.input_manager.reconfigureDevices();
 
     const need_modeset = blk: {
-        var it = wm.wm_sent.outputs.iterator(.forward);
+        var it = wm.sent.outputs.iterator(.forward);
         while (it.next()) |output| {
             const wlr_output = output.wlr_output orelse continue;
             switch (output.sent.state) {
@@ -319,7 +319,7 @@ pub fn commitOutputState(om: *OutputManager) void {
         defer for (states.items) |*s| s.base.finish();
 
         {
-            var it = wm.wm_sent.outputs.iterator(.forward);
+            var it = wm.sent.outputs.iterator(.forward);
             while (it.next()) |output| {
                 const wlr_output = output.wlr_output orelse continue;
                 const state = states.addOne(util.gpa) catch {
@@ -342,15 +342,15 @@ pub fn commitOutputState(om: *OutputManager) void {
             log.err("failed to prepare new output configuration", .{});
             // TODO search for a working fallback
 
-            if (wm.wm_sent.output_config) |config| {
+            if (wm.sent.output_config) |config| {
                 config.sendFailed();
                 config.destroy();
-                wm.wm_sent.output_config = null;
+                wm.sent.output_config = null;
             }
 
             {
                 // Revert to last working state on failure
-                var it = wm.wm_sent.outputs.iterator(.forward);
+                var it = wm.sent.outputs.iterator(.forward);
                 while (it.next()) |output| {
                     output.scheduled = output.current;
                     output.sent = output.current;
@@ -372,15 +372,15 @@ pub fn commitOutputState(om: *OutputManager) void {
         if (!server.backend.commit(states.items)) {
             log.err("failed to commit new output configuration", .{});
 
-            if (wm.wm_sent.output_config) |config| {
+            if (wm.sent.output_config) |config| {
                 config.sendFailed();
                 config.destroy();
-                wm.wm_sent.output_config = null;
+                wm.sent.output_config = null;
             }
 
             {
                 // Revert to last working state on failure
-                var it = wm.wm_sent.outputs.iterator(.forward);
+                var it = wm.sent.outputs.iterator(.forward);
                 while (it.next()) |output| {
                     output.scheduled = output.current;
                     output.sent = output.current;
@@ -393,14 +393,14 @@ pub fn commitOutputState(om: *OutputManager) void {
         swapchain_manager.apply();
     }
 
-    if (wm.wm_sent.output_config) |config| {
+    if (wm.sent.output_config) |config| {
         config.sendSucceeded();
         config.destroy();
-        wm.wm_sent.output_config = null;
+        wm.sent.output_config = null;
     }
 
     {
-        var it = wm.wm_sent.outputs.safeIterator(.forward);
+        var it = wm.sent.outputs.safeIterator(.forward);
         while (it.next()) |output| {
             if (output.wlr_output) |wlr_output| {
                 if (wlr_output.enabled) {

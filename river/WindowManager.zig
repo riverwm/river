@@ -54,7 +54,7 @@ state: union(enum) {
 windows: SlotMap(*Window) = .empty,
 
 /// State to be sent to the wm in the next manage sequence.
-wm_scheduled: struct {
+scheduled: struct {
     /// State has been modified since the last manage sequence.
     dirty: bool = false,
 
@@ -62,7 +62,7 @@ wm_scheduled: struct {
 } = .{},
 
 /// State sent to the wm in the latest update sequence.
-wm_sent: struct {
+sent: struct {
     outputs: wl.list.Head(Output, .link_sent),
     output_config: ?*wlr.OutputConfigurationV1 = null,
 
@@ -91,7 +91,7 @@ pub fn init(wm: *WindowManager) !void {
 
     wm.* = .{
         .global = try wl.Global.create(server.wl_server, river.WindowManagerV1, 1, *WindowManager, wm, bind),
-        .wm_sent = .{
+        .sent = .{
             .outputs = undefined,
             .seats = undefined,
         },
@@ -100,8 +100,8 @@ pub fn init(wm: *WindowManager) !void {
         },
         .timeout = timeout,
     };
-    wm.wm_sent.outputs.init();
-    wm.wm_sent.seats.init();
+    wm.sent.outputs.init();
+    wm.sent.seats.init();
     wm.rendering_requested.list.init();
 
     server.wl_server.addDestroyListener(&wm.server_destroy);
@@ -224,7 +224,7 @@ pub fn ensureRendering(wm: *WindowManager) bool {
 }
 
 pub fn dirtyWindowing(wm: *WindowManager) void {
-    wm.wm_scheduled.dirty = true;
+    wm.scheduled.dirty = true;
 
     if (wm.dirty_idle == null) {
         const event_loop = server.wl_server.getEventLoop();
@@ -248,7 +248,7 @@ pub fn dirtyRendering(wm: *WindowManager) void {
 }
 
 fn dirtyIdle(wm: *WindowManager) void {
-    assert(wm.wm_scheduled.dirty or wm.rendering_scheduled.dirty);
+    assert(wm.scheduled.dirty or wm.rendering_scheduled.dirty);
     wm.dirty_idle = null;
     switch (wm.state) {
         .idle => {
@@ -264,7 +264,7 @@ fn dirtyIdle(wm: *WindowManager) void {
 
 fn manageStart(wm: *WindowManager) void {
     assert(wm.state == .idle);
-    assert(wm.wm_scheduled.dirty);
+    assert(wm.scheduled.dirty);
 
     log.debug("manage sequence start", .{});
 
@@ -274,9 +274,9 @@ fn manageStart(wm: *WindowManager) void {
         while (it.next()) |output| output.manageStart();
     }
 
-    assert(wm.wm_sent.output_config == null);
-    wm.wm_sent.output_config = wm.wm_scheduled.output_config;
-    wm.wm_scheduled.output_config = null;
+    assert(wm.sent.output_config == null);
+    wm.sent.output_config = wm.scheduled.output_config;
+    wm.scheduled.output_config = null;
 
     {
         var it = wm.windows.iterator();
@@ -288,7 +288,7 @@ fn manageStart(wm: *WindowManager) void {
         while (it.next()) |seat| seat.manageStart();
     }
 
-    wm.wm_scheduled.dirty = false;
+    wm.scheduled.dirty = false;
     wm.state = .manage;
 
     if (wm.object) |wm_v1| {
@@ -306,7 +306,7 @@ pub fn manageFinish(wm: *WindowManager) void {
     {
         // Order is important here, Seat.manageFinish() must be called
         // before Window.manageFinish().
-        var it = wm.wm_sent.seats.iterator(.forward);
+        var it = wm.sent.seats.iterator(.forward);
         while (it.next()) |seat| seat.manageFinish();
     }
 
@@ -460,7 +460,7 @@ fn renderFinish(wm: *WindowManager) void {
 
     if (wm.rendering_scheduled.dirty) {
         wm.dirtyRendering();
-    } else if (wm.wm_scheduled.dirty) {
+    } else if (wm.scheduled.dirty) {
         wm.dirtyWindowing();
     } else {
         server.input_manager.processEvents();

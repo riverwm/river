@@ -286,7 +286,7 @@ pub fn manageStart(output: *Output) void {
 
             output.sent = output.scheduled;
             output.link_sent.remove();
-            server.wm.wm_sent.outputs.append(output);
+            server.wm.sent.outputs.append(output);
         },
         .disabled_hard, .destroying => {
             if (output.object) |output_v1| {
