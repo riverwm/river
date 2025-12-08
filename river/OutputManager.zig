@@ -299,7 +299,12 @@ pub fn commitOutputState(om: *OutputManager) void {
                     if (mode.height != wlr_output.height) break :blk true;
                     if (mode.refresh != wlr_output.refresh) break :blk true;
                 },
-                .none => {},
+                .none => unreachable,
+            }
+            // If an output newly exposed to river is already enabled, we
+            // must modeset since the mode is otherwise undefined.
+            if (output.current.mode == .none and output.sent.state == .enabled) {
+                break :blk true;
             }
             if (output.sent.adaptive_sync != (wlr_output.adaptive_sync_status == .enabled)) {
                 break :blk true;
