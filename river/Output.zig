@@ -199,8 +199,13 @@ pub fn create(wlr_output: *wlr.Output) !void {
     if (wlr_output.preferredMode()) |preferred_mode| {
         output.scheduled.mode = .{ .standard = preferred_mode };
     } else {
-        // Use a reasonable default so we can assert(mode != .none) for enabled
-        // outputs in manageStart().
+        // The output does not support modes (i.e. we are not using the DRM backend)
+        // Currently, wlroots does not make it possible for us know the dimensions
+        // requested by the host compositor in the first configure event. Therefore,
+        // we can't do anything but guess until the second configure is sent and
+        // wlroots emits the wlr_output request_state event.
+        // TODO(wlroots): fix this API limitation, for context see
+        // https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/4963
         output.scheduled.mode = .{ .custom = .{ .width = 1280, .height = 720, .refresh = 0 } };
     }
 
