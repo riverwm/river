@@ -202,8 +202,8 @@ fn needsConfigure(toplevel: *XdgToplevel) bool {
     const scheduled = &toplevel.window.configure_scheduled;
     const sent = &toplevel.window.configure_sent;
 
-    if (scheduled.width != null) return true;
-    if (scheduled.height != null) return true;
+    if (scheduled.width != null and scheduled.width != sent.width) return true;
+    if (scheduled.height != null and scheduled.height != sent.height) return true;
     if (scheduled.activated != sent.activated) return true;
     if (scheduled.ssd != sent.ssd) return true;
     if (!std.meta.eql(scheduled.tiled, sent.tiled)) return true;
