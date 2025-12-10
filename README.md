@@ -4,8 +4,13 @@
 
 ## Overview
 
-River is a dynamic tiling Wayland compositor with flexible runtime
-configuration.
+River is a non-monolithic Wayland compositor, it does not combine the compositor
+and window manager into one program. Instead, users can choose any window
+manager implementing the
+[river-window-management-v1](protocol/river-window-management-v1.xml) protocol.
+
+> *If you are looking for the old dynamic tiling version of river, see
+[river-classic](https://codeberg.org/river/river-classic).*
 
 Check [packaging status](https://repology.org/project/river/versions) —
 Join us at [#river](https://web.libera.chat/?channels=#river) on irc.libera.chat —
@@ -18,36 +23,58 @@ which is where the issue tracker may be found and where contributions are accept
 Read-only mirrors exist on [sourcehut](https://git.sr.ht/~ifreund/river)
 and [github](https://github.com/riverwm/river).
 
-*Note: river has not yet seen a stable 1.0 release and it will be necessary to
-make significant breaking changes before 1.0 to realize my longer term plans.
-That said, I do my best to avoid gratuitous breaking changes and bugs/crashes
-should be rare. If you find a bug don't hesitate to
-[open an issue](https://codeberg.org/river/river/issues/new/choose).*
 
 ## Features
 
-Currently river's window management style is quite similar to
-[dwm](http://dwm.suckless.org), [xmonad](https://xmonad.org), and other classic
-dynamic tiling X11 window managers. Windows are automatically arranged in a tiled
-layout and shifted around as windows are opened/closed.
+River defers all window management policy to a separate window manager
+implementing the [river-window-management-v1](protocol/river-window-management-v1.xml)
+protocol. This includes window position/size, pointer/keyboard bindings, focus
+management, window decorations, desktop shell graphics, and more.
 
-Rather than having the tiled layout logic built into the compositor process,
-river uses a [custom Wayland
-protocol](https://codeberg.org/river/river/src/branch/master/protocol/river-layout-v3.xml)
-and separate "layout generator" process. A basic layout generator, `rivertile`,
-is provided but users are encouraged to use community-developed [layout
-generators](https://codeberg.org/river/wiki/src/branch/master/pages/Community-Layouts.md)
-or write their own. Examples in C and Python may be found
-[here](https://codeberg.org/river/river/src/branch/master/contrib).
+River itself provides frame perfect rendering, good performance, support for
+many Wayland protocol extensions, robust Xwayland support, the ability to
+hot-swap window managers, and more.
 
-Tags are used to organize windows rather than workspaces. A window may be
-assigned to one or more tags. Likewise, one or more tags may be displayed on a
-monitor at a time.
+## Motivation
 
-River is configured at runtime using the `riverctl` tool. It can define
-keybindings, set the active layout generator, configure input devices, and more.
-On startup, river runs a user-defined init script which usually runs `riverctl`
-commands to set up the user's configuration.
+Why split the window manager to a separate process? I aim to:
+
+- Significantly lower the barrier of entry to writing a Wayland window manager.
+- Allow implementing Wayland window managers in high-level garbage collected
+  languages without impacting compositor performance and latency.
+- Allow hot-swapping between window managers without restarting the compositor
+  and all Wayland programs.
+- Promote diversity and experimentation in window manager design.
+
+## Current Status
+
+The first release supporting the
+[river-window-management-v1](protocol/river-window-management-v1.xml) protocol
+will be 0.4.0. The protocol is implemented on river's main branch and is already
+robust/feature complete enough for me to use as my daily driver.  There are
+however missing features that need to be implemented before the 0.4.0 release,
+for example input configuration.
+
+Currently the only documentation for the
+[river-window-management-v1](protocol/river-window-management-v1.xml) protocol
+is the protocol specification itself. While this is all developers comfortable
+with writing Wayland clients should need, I'd like to add some more
+beginner-friendly documentation including a well-commented example window
+manager before the 0.4.0 release.
+
+I would also like to get more feedback on the
+[river-window-management-v1](protocol/river-window-management-v1.xml) protocol
+before the 0.4.0 release. If you are working on a window manager and have
+questions/feedback I'd love to hear from you!
+
+With regards to protocol stability, my goal is to never make a backwards
+incompatible change and stay at `v1` forever. I've been iterating on this
+protocol since April 2023 and am quite confident in the design and extensibility
+of the current protocol.
+
+If everything goes well with the 0.4.0 release, I expect the following
+non-bugfix release to be river 1.0.0. After river 1.0.0, all backwards
+incompatible changes will be strictly avoided.
 
 ## Building
 
@@ -83,32 +110,10 @@ On startup river will run an executable file at `$XDG_CONFIG_HOME/river/init`
 if such an executable exists. If `$XDG_CONFIG_HOME` is not set,
 `~/.config/river/init` will be used instead.
 
-Usually this executable is a shell script invoking *riverctl*(1) to create
-mappings, start programs such as a layout generator or status bar, and
-perform other configuration.
+Usually this executable is a shell script which starts the user's window manager
+and any other long-running programs.
 
-For complete documentation see the `river(1)`, `riverctl(1)`, and
-`rivertile(1)` man pages.
-
-## Future Plans
-
-Currently details such as how tags work across multiple monitors are not
-possible for users to configure. It would be possible to extend river's source
-code to allow more flexibility here but this comes at the cost of complexity and
-there will always be someone who prefers something slightly different.
-
-My long term plan to address this is to move as much window management policy as
-possible out of the river compositor process and into the "layout generator"
-process which will need to be renamed to "window manager." This will give users
-much more power and control over river's behavior and also enable some really
-cool workflows. For example, it would be possible to write a window manager in
-lisp and use hot code reloading to edit its behavior it while it is running.
-
-This is a non-trivial architectural change and will take a while to implement. I
-plan to focus on this change for the 0.4.0 release cycle. Unfortunately, it will
-almost certainly break existing river configurations as well. I think the
-benefits outweigh that downside though and I will do my best to offer a
-reasonable upgrade path.
+For complete documentation see the `river(1)` man page.
 
 ## Donate
 
