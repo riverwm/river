@@ -14,8 +14,11 @@ body:
     id: version
     attributes:
       label: river Version
-      description: "The output of `river -version`"
-      placeholder: "0.3.0-dev.293+b77b42f"
+      description: |
+        The output of `river -version`.
+        If the version starts with 0.3, please open an issue on the
+        [river-classic](https://codeberg.org/river/river-classic/) repository instead.
+      placeholder: "0.4.0-dev.247+a050b8b"
     validations:
       required: true
   - type: textarea
