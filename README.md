@@ -4,9 +4,9 @@
 
 ## Overview
 
-River is a non-monolithic Wayland compositor, it does not combine the compositor
-and window manager into one program. Instead, users can choose any window
-manager implementing the
+River is a non-monolithic Wayland compositor. Unlike other Wayland compositors,
+river does not combine the compositor and window manager into one program.
+Instead, users can choose any window manager implementing the
 [river-window-management-v1](protocol/river-window-management-v1.xml) protocol.
 
 > *If you are looking for the old dynamic tiling version of river, see
@@ -22,7 +22,6 @@ which is where the issue tracker may be found and where contributions are accept
 
 Read-only mirrors exist on [sourcehut](https://git.sr.ht/~ifreund/river)
 and [github](https://github.com/riverwm/river).
-
 
 ## Features
 
