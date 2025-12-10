@@ -38,7 +38,7 @@ hot-swap window managers, and more.
 
 Why split the window manager to a separate process? I aim to:
 
-- Significantly lower the barrier of entry to writing a Wayland window manager.
+- Significantly lower the barrier to entry for writing a Wayland window manager.
 - Allow implementing Wayland window managers in high-level garbage collected
   languages without impacting compositor performance and latency.
 - Allow hot-swapping between window managers without restarting the compositor
