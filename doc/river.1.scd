@@ -35,6 +35,19 @@ manager implementing the river-window-management-v1 protocol.
 *-no-xwayland*
 	Disable xwayland at runtime even if river has been built with support.
 
+# KEYBINDINGS
+
+The following keybindings are always active:
+
+*Ctrl+Alt+Delete*
+	Exit river
+
+*Ctrl+Alt+F1* - *Ctrl+Alt+F12*
+	Switch to VT 1-12
+
+Window managers may add additional keybindings but cannot override these builtin
+keybindings.
+
 # CONFIGURATION
 
 On startup river will run an executable file at $XDG_CONFIG_HOME/river/init if
