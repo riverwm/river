@@ -432,7 +432,7 @@ fn renderFinish(wm: *WindowManager) void {
     }
 
     {
-        var found_fullscreen: bool = false;
+        var bottom_fullscreen: ?*Window = null;
         var it = wm.rendering_requested.list.iterator(.forward);
         while (it.next()) |node| {
             switch (node.get()) {
@@ -441,13 +441,13 @@ fn renderFinish(wm: *WindowManager) void {
                     window.tree.node.reparent(server.scene.layers.wm);
                     window.popup_tree.node.reparent(server.scene.layers.popups);
                     if (window.wm_requested.fullscreen != null) {
-                        found_fullscreen = true;
+                        if (bottom_fullscreen == null) {
+                            bottom_fullscreen = window;
+                        }
                         window.tree.node.raiseToTop();
-                    }
-                    // Rendering order for windows below the top fullscreen window
-                    // (if present) does not matter, as they will be fully obscured
-                    // by the opaque black fullscreen background rect.
-                    if (!found_fullscreen) {
+                    } else if (bottom_fullscreen) |bf| {
+                        window.tree.node.placeBelow(&bf.tree.node);
+                    } else {
                         window.tree.node.raiseToTop();
                     }
                 },
