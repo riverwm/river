@@ -232,12 +232,13 @@ fn handleRequestConfigure(
 
 fn handleSetOverrideRedirect(listener: *wl.Listener(void)) void {
     const xwindow: *XwaylandWindow = @fieldParentPtr("set_override_redirect", listener);
+    const xsurface = xwindow.xsurface;
 
     log.debug("xwayland surface set override redirect", .{});
 
-    assert(xwindow.xsurface.override_redirect);
+    assert(xsurface.override_redirect);
 
-    if (xwindow.xsurface.surface) |surface| {
+    if (xsurface.surface) |surface| {
         if (surface.mapped) {
             handleUnmap(&xwindow.unmap);
         }
@@ -245,7 +246,7 @@ fn handleSetOverrideRedirect(listener: *wl.Listener(void)) void {
     }
     handleDestroy(&xwindow.destroy);
 
-    XwaylandOverrideRedirect.create(xwindow.xsurface) catch {
+    XwaylandOverrideRedirect.create(xsurface) catch {
         log.err("out of memory", .{});
         return;
     };
