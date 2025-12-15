@@ -227,7 +227,26 @@ pub fn ensureRendering(wm: *WindowManager) bool {
 
 pub fn dirtyWindowing(wm: *WindowManager) void {
     wm.scheduled.dirty = true;
+    wm.addDirtyIdle();
+}
 
+pub fn cleanWindowing(wm: *WindowManager) void {
+    wm.scheduled.dirty = false;
+    wm.removeDirtyIdle();
+}
+
+pub fn dirtyRendering(wm: *WindowManager) void {
+    wm.rendering_scheduled.dirty = true;
+    wm.addDirtyIdle();
+}
+
+pub fn cleanRendering(wm: *WindowManager) void {
+    wm.rendering_scheduled.dirty = false;
+    wm.removeDirtyIdle();
+}
+
+fn addDirtyIdle(wm: *WindowManager) void {
+    assert(wm.scheduled.dirty or wm.rendering_scheduled.dirty);
     if (wm.dirty_idle == null) {
         const event_loop = server.wl_server.getEventLoop();
         wm.dirty_idle = event_loop.addIdle(*WindowManager, dirtyIdle, wm) catch {
@@ -237,15 +256,12 @@ pub fn dirtyWindowing(wm: *WindowManager) void {
     }
 }
 
-pub fn dirtyRendering(wm: *WindowManager) void {
-    wm.rendering_scheduled.dirty = true;
-
-    if (wm.dirty_idle == null) {
-        const event_loop = server.wl_server.getEventLoop();
-        wm.dirty_idle = event_loop.addIdle(*WindowManager, dirtyIdle, wm) catch {
-            log.err("out of memory", .{});
-            return;
-        };
+fn removeDirtyIdle(wm: *WindowManager) void {
+    if (!wm.scheduled.dirty and !wm.rendering_scheduled.dirty) {
+        if (wm.dirty_idle) |event_source| {
+            event_source.remove();
+            wm.dirty_idle = null;
+        }
     }
 }
 
@@ -267,6 +283,8 @@ fn dirtyIdle(wm: *WindowManager) void {
 fn manageStart(wm: *WindowManager) void {
     assert(wm.state == .idle);
     assert(wm.scheduled.dirty);
+    wm.cleanWindowing();
+    wm.state = .manage;
 
     log.debug("manage sequence start", .{});
 
@@ -301,9 +319,6 @@ fn manageStart(wm: *WindowManager) void {
         var it = server.input_manager.seats.safeIterator(.forward);
         while (it.next()) |seat| seat.manageStart();
     }
-
-    wm.scheduled.dirty = false;
-    wm.state = .manage;
 
     if (wm.object) |wm_v1| {
         wm_v1.sendManageStart();
@@ -379,7 +394,10 @@ pub fn notifyConfigured(wm: *WindowManager) void {
 }
 
 fn renderStart(wm: *WindowManager) void {
-    assert(wm.state == .idle or wm.state.inflight_configures == 0);
+    assert((wm.state == .idle and wm.rendering_scheduled.dirty) or
+        wm.state.inflight_configures == 0);
+    wm.state = .render;
+    wm.cleanRendering();
 
     log.debug("render sequence start", .{});
 
@@ -392,9 +410,6 @@ fn renderStart(wm: *WindowManager) void {
             }
         }
     }
-
-    wm.state = .render;
-    wm.rendering_scheduled.dirty = false;
 
     if (wm.object) |wm_v1| {
         wm_v1.sendRenderStart();
