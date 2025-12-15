@@ -12,7 +12,7 @@ Instead, users can choose any window manager implementing the
 > *If you are looking for the old dynamic tiling version of river, see
 [river-classic](https://codeberg.org/river/river-classic).*
 
-Check [packaging status](https://repology.org/project/river/versions) —
+Check [packaging status](https://repology.org/project/river-compositor/versions) —
 Join us at [#river](https://web.libera.chat/?channels=#river) on irc.libera.chat —
 Read our man pages, [wiki](https://codeberg.org/river/wiki), and
 [Code of Conduct](CODE_OF_CONDUCT.md)
