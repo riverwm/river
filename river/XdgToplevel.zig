@@ -120,7 +120,8 @@ pub fn create(wlr_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
     wlr_toplevel.events.set_app_id.add(&toplevel.set_app_id);
 }
 
-/// Send a configure event, applying the inflight state of the window.
+/// Send a configure event, return true if the configure should be tracked
+/// and current surfaces saved for frame perfection.
 pub fn configure(toplevel: *XdgToplevel) bool {
     switch (toplevel.configure_state) {
         .idle, .timed_out, .timed_out_acked => {},
@@ -190,6 +191,16 @@ pub fn configure(toplevel: *XdgToplevel) bool {
     toplevel.window.configure_sent.height = height;
     toplevel.window.configure_scheduled.width = null;
     toplevel.window.configure_scheduled.height = null;
+
+    // Generally, only track configures (and save surfaces) if there is a
+    // change in size involved. If the configure state is not idle, we are
+    // currently tracking a timed out configure and should instead track the
+    // new one even if there is no change in size involved.
+    if (width == toplevel.geometry.width and height == toplevel.geometry.height and
+        toplevel.configure_state == .idle)
+    {
+        return false;
+    }
 
     toplevel.configure_state = .{
         .inflight = configure_serial,
