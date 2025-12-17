@@ -50,6 +50,8 @@ layers: struct {
     wm: *wlr.SceneTree,
     /// Top layer shell layer
     top: *wlr.SceneTree,
+    /// Fullscreen windows and river shell surfaces placed above them.
+    fullscreen: *wlr.SceneTree,
     /// Overlay layer shell layer
     overlay: *wlr.SceneTree,
     /// Popups from xdg-shell and input-method-v2 clients
@@ -87,6 +89,7 @@ pub fn init(scene: *Scene) !void {
             .bottom = try normal_tree.createSceneTree(),
             .wm = try normal_tree.createSceneTree(),
             .top = try normal_tree.createSceneTree(),
+            .fullscreen = try normal_tree.createSceneTree(),
             .overlay = try normal_tree.createSceneTree(),
             .popups = try normal_tree.createSceneTree(),
             .override_redirect = if (build_options.xwayland) try normal_tree.createSceneTree(),

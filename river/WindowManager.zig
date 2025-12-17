@@ -447,22 +447,17 @@ fn renderFinish(wm: *WindowManager) void {
     }
 
     {
-        var bottom_fullscreen: ?*Window = null;
         var it = wm.rendering_requested.list.iterator(.forward);
         while (it.next()) |node| {
             switch (node.get()) {
                 .window => |window| {
                     window.renderFinish();
-                    window.tree.node.reparent(server.scene.layers.wm);
                     window.popup_tree.node.reparent(server.scene.layers.popups);
                     if (window.wm_requested.fullscreen != null) {
-                        if (bottom_fullscreen == null) {
-                            bottom_fullscreen = window;
-                        }
+                        window.tree.node.reparent(server.scene.layers.fullscreen);
                         window.tree.node.raiseToTop();
-                    } else if (bottom_fullscreen) |bf| {
-                        window.tree.node.placeBelow(&bf.tree.node);
                     } else {
+                        window.tree.node.reparent(server.scene.layers.wm);
                         window.tree.node.raiseToTop();
                     }
                 },
