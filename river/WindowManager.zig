@@ -447,6 +447,7 @@ fn renderFinish(wm: *WindowManager) void {
     }
 
     {
+        var found_fullscreen: bool = false;
         var it = wm.rendering_requested.list.iterator(.forward);
         while (it.next()) |node| {
             switch (node.get()) {
@@ -456,6 +457,7 @@ fn renderFinish(wm: *WindowManager) void {
                     if (window.wm_requested.fullscreen != null) {
                         window.tree.node.reparent(server.scene.layers.fullscreen);
                         window.tree.node.raiseToTop();
+                        found_fullscreen = true;
                     } else {
                         window.tree.node.reparent(server.scene.layers.wm);
                         window.tree.node.raiseToTop();
@@ -463,8 +465,12 @@ fn renderFinish(wm: *WindowManager) void {
                 },
                 .shell_surface => |shell_surface| {
                     shell_surface.renderFinish();
-                    shell_surface.tree.node.reparent(server.scene.layers.wm);
                     shell_surface.popup_tree.node.reparent(server.scene.layers.popups);
+                    if (found_fullscreen) {
+                        shell_surface.tree.node.reparent(server.scene.layers.fullscreen);
+                    } else {
+                        shell_surface.tree.node.reparent(server.scene.layers.wm);
+                    }
                     shell_surface.tree.node.raiseToTop();
                 },
             }
