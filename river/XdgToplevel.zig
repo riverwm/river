@@ -40,8 +40,7 @@ wlr_toplevel: *wlr.XdgToplevel,
 
 decoration: ?XdgDecoration = null,
 
-/// Initialized on map
-geometry: wlr.Box = undefined,
+geometry: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
 
 configure_state: union(enum) {
     /// No configure has been sent since the last configure was acked.
