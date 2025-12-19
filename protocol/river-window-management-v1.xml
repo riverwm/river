@@ -637,8 +637,9 @@
 
     <request name="get_decoration_above">
       <description summary="create a decoration surface above the window">
-        Create a window decoration surface above the window and assign the
-        river_decoration_v1 role to the surface.
+        Create a decoration surface and assign the river_decoration_v1 role to
+        the surface. The created decoration is placed above the window in
+        rendering order, see the description of river_decoration_v1.
 
         Providing a wl_surface which already has a role or already has a buffer
         attached or committed is a protocol error.
@@ -649,8 +650,9 @@
 
     <request name="get_decoration_below">
       <description summary="create a decoration surface below the window">
-        Create a window decoration surface below the window and assign the
-        river_decoration_v1 role to the surface.
+        Create a decoration surface and assign the river_decoration_v1 role to
+        the surface. The created decoration is placed below the window in
+        rendering order, see the description of river_decoration_v1.
 
         Providing a wl_surface which already has a role or already has a buffer
         attached or committed is a protocol error.
