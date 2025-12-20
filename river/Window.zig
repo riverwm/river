@@ -656,6 +656,7 @@ pub fn manageFinish(window: *Window) bool {
 
     if (wm_requested.close) {
         window.close();
+        wm_requested.close = false;
     }
 
     {
