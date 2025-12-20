@@ -124,7 +124,9 @@ fn sendConfigures(
             assert(node.type == .tree);
             const node_data: *SceneNodeData = @ptrCast(@alignCast(node.data orelse continue));
             const layer_surface = node_data.data.layer_surface;
-            if (!layer_surface.wlr_layer_surface.initialized) {
+            if (!layer_surface.wlr_layer_surface.surface.mapped and
+                !layer_surface.wlr_layer_surface.initial_commit)
+            {
                 continue;
             }
             if (layer_surface.wlr_layer_surface.output != output.wlr_output) {
