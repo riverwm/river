@@ -82,6 +82,8 @@ data_control_manager: *wlr.DataControlManagerV1,
 export_dmabuf_manager: *wlr.ExportDmabufManagerV1,
 screencopy_manager: *wlr.ScreencopyManagerV1,
 
+foreign_toplevel_list: *wlr.ExtForeignToplevelListV1,
+
 scene: Scene,
 input_manager: InputManager,
 om: OutputManager,
@@ -146,6 +148,8 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
 
         .export_dmabuf_manager = try wlr.ExportDmabufManagerV1.create(wl_server),
         .screencopy_manager = try wlr.ScreencopyManagerV1.create(wl_server),
+
+        .foreign_toplevel_list = try wlr.ExtForeignToplevelListV1.create(wl_server, 1),
 
         .config = try Config.init(),
 
@@ -325,6 +329,7 @@ fn blocklist(server: *Server, global: *const wl.Global) bool {
         global == server.layer_shell.wlr_shell.global or
         global == server.xkb_bindings.global or
         global == server.screencopy_manager.global or
+        global == server.foreign_toplevel_list.global or
         global == server.export_dmabuf_manager.global or
         global == server.data_control_manager.global or
         global == server.om.wlr_output_manager.global or

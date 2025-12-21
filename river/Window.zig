@@ -228,6 +228,8 @@ rendering_requested: struct {
 /// The currently rendered position/dimensions of the window in the scene graph
 box: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
 
+foreign_toplevel_handle: ?*wlr.ExtForeignToplevelHandleV1 = null,
+
 pub fn create(impl: Impl) error{OutOfMemory}!*Window {
     assert(impl != .destroying);
 
@@ -922,6 +924,15 @@ pub fn map(window: *Window) !void {
     assert(window.impl != .destroying);
     assert(window.state == .initialized);
     window.state = .mapped;
+
+    if (wlr.ExtForeignToplevelHandleV1.create(server.foreign_toplevel_list, &.{
+        .title = window.getTitle(),
+        .app_id = window.getAppId(),
+    })) |handle| {
+        window.foreign_toplevel_handle = handle;
+    } else |_| {
+        log.err("failed to create ext foreign toplevel handle", .{});
+    }
 }
 
 /// Called by the impl when the surface will no longer be displayed
@@ -935,14 +946,33 @@ pub fn unmap(window: *Window) void {
     window.state = .closing;
 
     server.wm.dirtyWindowing();
+
+    if (window.foreign_toplevel_handle) |handle| {
+        handle.destroy();
+        window.foreign_toplevel_handle = null;
+    }
 }
 
 pub fn notifyTitle(window: *Window) void {
     window.wm_scheduled.dirty_title = true;
     server.wm.dirtyWindowing();
+
+    if (window.foreign_toplevel_handle) |handle| {
+        handle.updateState(&.{
+            .title = window.getTitle(),
+            .app_id = window.getAppId(),
+        });
+    }
 }
 
 pub fn notifyAppId(window: *Window) void {
     window.wm_scheduled.dirty_app_id = true;
     server.wm.dirtyWindowing();
+
+    if (window.foreign_toplevel_handle) |handle| {
+        handle.updateState(&.{
+            .title = window.getTitle(),
+            .app_id = window.getAppId(),
+        });
+    }
 }
