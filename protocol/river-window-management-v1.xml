@@ -1493,6 +1493,16 @@
       <arg name="button" type="uint" summary="a Linux input event code"/>
       <arg name="modifiers" type="uint" enum="modifiers"/>
     </request>
+
+    <request name="set_xcursor_theme" since="2">
+      <description summary="set the xcursor theme for the seat">
+        Set the XCursor theme for the seat. This theme is used for cursors
+        rendered by the compositor, but not necessarily for cursors rendered by
+        clients.
+      </description>
+      <arg name="name" type="string"/>
+      <arg name="size" type="uint"/>
+    </request>
   </interface>
 
   <interface name="river_pointer_binding_v1" version="2">

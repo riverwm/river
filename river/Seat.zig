@@ -488,6 +488,16 @@ fn handleRequest(
                 return;
             };
         },
+
+        .set_xcursor_theme => |args| {
+            seat.cursor.setTheme(args.name, args.size) catch |err| switch (err) {
+                error.OutOfMemory => {
+                    seat_v1.getClient().postNoMemory();
+                    log.err("out of memory", .{});
+                    return;
+                },
+            };
+        },
     }
 }
 

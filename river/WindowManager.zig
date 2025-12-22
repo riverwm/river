@@ -92,7 +92,7 @@ pub fn init(wm: *WindowManager) !void {
     errdefer timeout.remove();
 
     wm.* = .{
-        .global = try wl.Global.create(server.wl_server, river.WindowManagerV1, 1, *WindowManager, wm, bind),
+        .global = try wl.Global.create(server.wl_server, river.WindowManagerV1, 2, *WindowManager, wm, bind),
         .sent = .{
             .outputs = undefined,
             .seats = undefined,
