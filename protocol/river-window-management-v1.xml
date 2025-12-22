@@ -32,7 +32,7 @@
     be done by creating a new major version of the extension.
   </description>
 
-  <interface name="river_window_manager_v1" version="1">
+  <interface name="river_window_manager_v1" version="2">
     <description summary="window manager global interface">
       This global interface should only be advertised to the window manager
       process. Only one window management client may be active at a time. The
@@ -301,7 +301,7 @@
     </request>
   </interface>
 
-  <interface name="river_window_v1" version="1">
+  <interface name="river_window_v1" version="2">
     <description summary="a logical window">
       This represents a logical window. For example, a window may correspond to
       an xdg_toplevel or Xwayland window.
@@ -947,7 +947,7 @@
     </event>
   </interface>
 
-  <interface name="river_decoration_v1" version="1">
+  <interface name="river_decoration_v1" version="2">
     <description summary="a window decoration">
       The rendering order of windows with decorations is follows:
 
@@ -1003,7 +1003,7 @@
     </request>
   </interface>
 
-  <interface name="river_shell_surface_v1" version="1">
+  <interface name="river_shell_surface_v1" version="2">
     <description summary="a surface for window manager UI">
       The window manager might use a shell surface to display a status bar,
       background image, desktop notifications, launcher, desktop menu, or
@@ -1050,7 +1050,7 @@
     </request>
   </interface>
 
-  <interface name="river_node_v1" version="1">
+  <interface name="river_node_v1" version="2">
     <description summary="a node in the render list">
       The render list is a list of nodes that determines the rendering order of
       the compositor. Nodes may correspond to windows or shell surfaces. The
@@ -1135,7 +1135,7 @@
     </request>
   </interface>
 
-  <interface name="river_output_v1" version="1">
+  <interface name="river_output_v1" version="2">
     <description summary="a logical output">
       An area in the compositor's logical coordinate space that should be
       treated as a single output for window management purposes. This area may
@@ -1237,7 +1237,7 @@
     </event>
   </interface>
 
-  <interface name="river_seat_v1" version="1">
+  <interface name="river_seat_v1" version="2">
     <description summary="a window management seat">
       This object represents a single user's collection of input devices. It
       allows the window manager to route keyboard input to windows, get
@@ -1495,7 +1495,7 @@
     </request>
   </interface>
 
-  <interface name="river_pointer_binding_v1" version="1">
+  <interface name="river_pointer_binding_v1" version="2">
     <description summary="configure a pointer binding, receive trigger events">
       This object allows the window manager to configure a pointer binding and
       receive events when the binding is triggered.
