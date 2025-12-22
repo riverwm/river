@@ -165,6 +165,7 @@ fn handleRequest(
             wm_v1.sendFinished();
             wm_v1.setHandler(?*anyopaque, handleRequestInert, null, null);
         },
+        // TODO send protocol error to avoid leak on race
         .destroy => wm_v1.destroy(),
         .manage_finish => {
             if (wm.state != .manage) {

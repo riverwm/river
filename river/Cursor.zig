@@ -528,15 +528,7 @@ pub fn processAxis(cursor: *Cursor, event: *const wlr.Pointer.event.Axis) void {
         event.time_msec,
         event.orientation,
         event.delta * device.config.scroll_factor,
-        @intFromFloat(math.clamp(
-            @round(@as(f32, @floatFromInt(event.delta_discrete)) * device.config.scroll_factor),
-            // It seems that clamping to exactly the bounds of an i32 is insufficient to make the
-            // @intFromFloat() call safe due to the max/min i32 not being exactly representable
-            // by an f32. Dividing by 2 is a low effort way to ensure the value is in bounds and
-            // allow users to set their scroll-factor to inf without crashing river.
-            @as(f32, @floatFromInt(math.minInt(i32) / 2)),
-            @as(f32, @floatFromInt(math.maxInt(i32) / 2)),
-        )),
+        math.lossyCast(i32, @as(f64, @floatFromInt(event.delta_discrete)) * device.config.scroll_factor),
         event.source,
         event.relative_direction,
     );

@@ -88,6 +88,19 @@ pub fn create(
     seat.pointer_bindings.append(binding);
 }
 
+pub fn destroy(binding: *PointerBinding) void {
+    binding.object.setHandler(?*anyopaque, handleRequestInert, null, null);
+    handleDestroy(binding.object, binding);
+}
+
+fn handleRequestInert(
+    pointer_binding_v1: *river.PointerBindingV1,
+    request: river.PointerBindingV1.Request,
+    _: ?*anyopaque,
+) void {
+    if (request == .destroy) pointer_binding_v1.destroy();
+}
+
 fn handleDestroy(_: *river.PointerBindingV1, binding: *PointerBinding) void {
     if (binding.seat.cursor.pressed.getPtr(binding.button)) |value_ptr| {
         // It is possible for the window manager to create duplicate pointer bindings.

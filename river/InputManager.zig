@@ -1,6 +1,6 @@
 // This file is part of river, a dynamic tiling wayland compositor.
 //
-// Copyright 2020 - 2021 The River Developers
+// Copyright 2020 - 2025 The River Developers
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -22,6 +22,7 @@ const assert = std.debug.assert;
 const mem = std.mem;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
+const river = @import("wayland").server.river;
 
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
@@ -36,6 +37,9 @@ const TextInput = @import("TextInput.zig");
 const default_seat_name = "default";
 
 const log = std.log.scoped(.input);
+
+global: *wl.Global,
+objects: wl.list.Head(river.InputManagerV1, null),
 
 new_input: wl.Listener(*wlr.InputDevice) = .init(handleNewInput),
 
@@ -60,6 +64,7 @@ new_text_input: wl.Listener(*wlr.TextInputV3) = .init(handleNewTextInput),
 
 pub fn init(input_manager: *InputManager) !void {
     input_manager.* = .{
+        .global = try wl.Global.create(server.wl_server, river.InputManagerV1, 1, *InputManager, input_manager, bind),
         // These are automatically freed when the display is destroyed
         .idle_notifier = try wlr.IdleNotifierV1.create(server.wl_server),
         .relative_pointer_manager = try wlr.RelativePointerManagerV1.create(server.wl_server),
@@ -71,9 +76,11 @@ pub fn init(input_manager: *InputManager) !void {
         .text_input_manager = try wlr.TextInputManagerV3.create(server.wl_server),
         .tablet_manager = try wlr.TabletManagerV2.create(server.wl_server),
 
+        .objects = undefined,
         .devices = undefined,
         .seats = undefined,
     };
+    input_manager.objects.init();
     input_manager.devices.init();
     input_manager.seats.init();
 
@@ -94,7 +101,10 @@ pub fn init(input_manager: *InputManager) !void {
 }
 
 pub fn deinit(input_manager: *InputManager) void {
+    input_manager.global.destroy();
+
     // This function must be called after the backend has been destroyed
+    assert(input_manager.objects.empty());
     assert(input_manager.devices.empty());
 
     input_manager.new_virtual_pointer.link.remove();
@@ -105,6 +115,76 @@ pub fn deinit(input_manager: *InputManager) void {
 
     while (input_manager.seats.first()) |seat| {
         seat.destroy();
+    }
+}
+
+fn bind(client: *wl.Client, im: *InputManager, version: u32, id: u32) void {
+    const im_v1 = river.InputManagerV1.create(client, version, id) catch {
+        client.postNoMemory();
+        log.err("out of memory", .{});
+        return;
+    };
+    im_v1.setHandler(*InputManager, handleRequest, handleDestroy, im);
+    im.objects.append(im_v1);
+    {
+        var it = im.devices.iterator(.forward);
+        while (it.next()) |device| device.createObject(im_v1);
+    }
+}
+
+fn handleRequestInert(
+    im_v1: *river.InputManagerV1,
+    request: river.InputManagerV1.Request,
+    _: ?*anyopaque,
+) void {
+    if (request == .destroy) im_v1.destroy();
+}
+
+fn handleDestroy(im_v1: *river.InputManagerV1, _: *InputManager) void {
+    im_v1.getLink().remove();
+}
+
+fn handleRequest(
+    im_v1: *river.InputManagerV1,
+    request: river.InputManagerV1.Request,
+    im: *InputManager,
+) void {
+    switch (request) {
+        .stop => {
+            im_v1.getLink().remove();
+            im_v1.sendFinished();
+            im_v1.setHandler(?*anyopaque, handleRequestInert, null, null);
+        },
+        .destroy => {
+            im_v1.postError(.invalid_destroy, "destroy before finished event sent");
+        },
+        .create_seat => |args| {
+            var it = im.seats.iterator(.forward);
+            while (it.next()) |seat| {
+                if (mem.orderZ(u8, args.name, seat.wlr_seat.name) == .eq) {
+                    break;
+                }
+            } else {
+                Seat.create(args.name) catch |err| switch (err) {
+                    error.OutOfMemory => {
+                        im_v1.getClient().postNoMemory();
+                        log.err("out of memory", .{});
+                        return;
+                    },
+                };
+            }
+        },
+        .destroy_seat => |args| {
+            var it = im.seats.iterator(.forward);
+            _ = it.next(); // skip default seat
+            while (it.next()) |seat| {
+                if (mem.orderZ(u8, args.name, seat.wlr_seat.name) == .eq) {
+                    seat.destroying = true;
+                    server.wm.dirtyWindowing();
+                    break;
+                }
+            }
+        },
     }
 }
 
@@ -121,19 +201,10 @@ pub fn processEvents(input_manager: *InputManager) void {
     }
 }
 
-/// Reconfigures all devices' libinput configuration as well as their output mapping.
-/// This is called on outputs being added or removed and on the input configuration being changed.
-pub fn reconfigureDevices(input_manager: *InputManager) void {
-    var it = input_manager.devices.iterator(.forward);
-    while (it.next()) |device| {
-        _ = device;
-    }
-}
-
 fn handleNewInput(listener: *wl.Listener(*wlr.InputDevice), wlr_device: *wlr.InputDevice) void {
     const input_manager: *InputManager = @fieldParentPtr("new_input", listener);
 
-    input_manager.defaultSeat().addDevice(wlr_device, false);
+    input_manager.defaultSeat().attachNewDevice(wlr_device, false);
 }
 
 fn handleNewVirtualPointer(
@@ -151,7 +222,7 @@ fn handleNewVirtualPointer(
         log.debug("Ignoring output suggestion from virtual pointer", .{});
     }
 
-    input_manager.defaultSeat().addDevice(&event.new_pointer.pointer.base, true);
+    input_manager.defaultSeat().attachNewDevice(&event.new_pointer.pointer.base, true);
 }
 
 fn handleNewVirtualKeyboard(
@@ -175,10 +246,10 @@ fn handleNewVirtualKeyboard(
 /// Yes, wlroots should probably do this for us.
 const NoKeymapVirtKeyboard = struct {
     virtual_keyboard: *wlr.VirtualKeyboardV1,
-    destroy: wl.Listener(*wlr.InputDevice) = .init(handleDestroy),
+    destroy: wl.Listener(*wlr.InputDevice) = .init(handleVirtKeyboardDestroy),
     keymap: wl.Listener(*wlr.Keyboard) = .init(handleKeymap),
 
-    fn handleDestroy(listener: *wl.Listener(*wlr.InputDevice), _: *wlr.InputDevice) void {
+    fn handleVirtKeyboardDestroy(listener: *wl.Listener(*wlr.InputDevice), _: *wlr.InputDevice) void {
         const no_keymap: *NoKeymapVirtKeyboard = @fieldParentPtr("destroy", listener);
 
         no_keymap.destroy.link.remove();
@@ -191,10 +262,10 @@ const NoKeymapVirtKeyboard = struct {
         const no_keymap: *NoKeymapVirtKeyboard = @fieldParentPtr("keymap", listener);
         const virtual_keyboard = no_keymap.virtual_keyboard;
 
-        handleDestroy(&no_keymap.destroy, &virtual_keyboard.keyboard.base);
+        handleVirtKeyboardDestroy(&no_keymap.destroy, &virtual_keyboard.keyboard.base);
 
         const seat: *Seat = @ptrCast(@alignCast(virtual_keyboard.seat.data));
-        seat.addDevice(&virtual_keyboard.keyboard.base, true);
+        seat.attachNewDevice(&virtual_keyboard.keyboard.base, true);
     }
 };
 

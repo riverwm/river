@@ -234,6 +234,15 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) v
             }
         }
     }
+    {
+        var it = server.input_manager.devices.iterator(.forward);
+        while (it.next()) |device| {
+            if (device.config.map_to_output == wlr_output) {
+                device.config.map_to_output = null;
+                device.seat.cursor.wlr_cursor.mapInputToOutput(device.wlr_device, null);
+            }
+        }
+    }
 
     output.destroy.link.remove();
     output.request_state.link.remove();

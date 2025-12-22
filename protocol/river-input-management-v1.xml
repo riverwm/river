@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="river_input_management_v1">
+  <copyright>
+    Copyright 2025 The River Developers
+
+    Permission to use, copy, modify, and/or distribute this software for any
+    purpose with or without fee is hereby granted, provided that the above
+    copyright notice and this permission notice appear in all copies.
+
+    THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+    WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+    MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+    SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
+    OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
+    CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  </copyright>
+
+  <description summary="configure input devices">
+    This protocol supports creating/destroying seats, assigning input devices to
+    seats, and configuring input devices (e.g. setting keyboard repeat rate).
+
+    The key words "must", "must not", "required", "shall", "shall not",
+    "should", "should not", "recommended", "may", and "optional" in this
+    document are to be interpreted as described in IETF RFC 2119.
+
+    Warning! The protocol described in this file is currently in the testing
+    phase. Backward compatible changes may be added together with the
+    corresponding interface version bump. Backward incompatible changes can only
+    be done by creating a new major version of the extension.
+  </description>
+
+  <interface name="river_input_manager_v1" version="1">
+    <description summary="input manager global interface">
+      Input manager global interface.
+    </description>
+
+    <enum name="error">
+      <entry name="invalid_destroy" value="0"/>
+    </enum>
+
+    <request name="stop">
+      <description summary="stop sending events">
+        This request indicates that the client no longer wishes to receive
+        events on this object.
+
+        The Wayland protocol is asynchronous, which means the server may send
+        further events until the stop request is processed. The client must wait
+        for a river_input_manager_v1.finished event before destroying this
+        object.
+      </description>
+    </request>
+
+    <event name="finished">
+      <description summary="the server has finished with the input manager">
+        This event indicates that the server will send no further events on this
+        object. The client should destroy the object. See
+        river_input_manager_v1.destroy for more information.
+      </description>
+    </event>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the river_input_manager_v1 object">
+        This request should be called after the finished event has been received
+        to complete destruction of the object.
+
+        It is a protocol error to make this request before the finished event
+        has been received.
+
+        If a client wishes to destroy this object it should send a
+        river_input_manager_v1.stop request and wait for a
+        river_input_manager_v1.finished event. Once the finished event is
+        received it is safe to destroy this object and any other objects created
+        through this interface.
+      </description>
+    </request>
+
+    <request name="create_seat">
+      <description summary="create a new seat">
+        Create a new seat with the given name. Has no effect if a seat with the
+        given name already exists.
+
+        The default seat with name "default" always exists and does not need to
+        be explicitly created.
+      </description>
+      <arg name="name" type="string"/>
+    </request>
+
+    <request name="destroy_seat">
+      <description summary="destroy a seat">
+        Destroy the seat with the given name. Has no effect if a seat with the
+        given name does not exist.
+
+        The default seat with name "default" cannot be destroyed and attempting
+        to destroy it will have no effect.
+
+        Any input devices assigned to the destroyed seat at the time of
+        destruction are assigned to the default seat.
+      </description>
+      <arg name="name" type="string"/>
+    </request>
+
+    <event name="input_device">
+      <description summary="new input device">
+        A new input device has been created.
+      </description>
+      <arg name="id" type="new_id" interface="river_input_device_v1"/>
+    </event>
+  </interface>
+
+  <interface name="river_input_device_v1" version="1">
+    <description summary="an input device">
+      An input device represents a physical keyboard, mouse, touchscreen, or
+      drawing tablet tool. It is assigned to exactly one seat at a time.
+      By default, all input devices are assigned to the default seat.
+    </description>
+
+    <enum name="error">
+      <entry name="invalid_repeat_info" value="0"/>
+      <entry name="invalid_scroll_factor" value="1"/>
+      <entry name="invalid_map_to_rectangle" value="2"/>
+    </enum>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the input device object">
+        This request indicates that the client will no longer use the input
+        device object and that it may be safely destroyed.
+      </description>
+    </request>
+
+    <event name="removed">
+      <description summary="the input device is removed">
+        This event indicates that the input device has been removed.
+
+        The server will send no further events on this object and ignore any
+        request (other than river_input_device_v1.destroy) made after this event is
+        sent. The client should destroy this object with the
+        river_input_device_v1.destroy request to free up resources.
+      </description>
+    </event>
+
+    <enum name="type">
+      <entry name="keyboard" value="0"/>
+      <entry name="pointer" value="1"/>
+      <entry name="touch" value="2"/>
+      <entry name="tablet" value="3"/>
+    </enum>
+
+    <event name="type">
+      <description summary="the type of the input device">
+        The type of the input device. This event is sent once when the
+        river_input_device_v1 object is created. The device type cannot
+        change during the lifetime of the object.
+      </description>
+      <arg name="type" type="uint" enum="type"/>
+    </event>
+
+    <event name="name">
+      <description summary="the name of the input device">
+        The name of the input device. This event is sent once when the
+        river_input_device_v1 object is created. The device name cannot
+        change during the lifetime of the object.
+      </description>
+      <arg name="name" type="string"/>
+    </event>
+
+    <request name="assign_to_seat">
+      <description summary="assign the input device to a seat">
+        Assign the input device to a seat. All input devices not explicitly
+        assigned to a seat are considered assigned to the default seat.
+
+        Has no effect if a seat with the given name does not exist.
+      </description>
+      <arg name="name" type="string" summary="name of the seat"/>
+    </request>
+
+    <request name="set_repeat_info">
+      <description summary="set keyboard repeat rate and delay">
+        Set repeat rate and delay for a keyboard input device. Has no effect if
+        the device is not a keyboard.
+
+        Negative values for either rate or delay are illegal. A rate of zero
+        will disable any repeating (regardless of the value of delay).
+      </description>
+      <arg name="rate" type="int" summary="rate in key repeats per second"/>
+      <arg name="delay" type="int" summary="delay in milliseconds"/>
+    </request>
+
+    <request name="set_scroll_factor">
+      <description summary="set scroll factor">
+        Set the scroll factor for a pointer input device. Has no effect if the
+        device is not a pointer.
+
+        For example, a factor of 0.5 will make scrolling twice as slow while a
+        factor of 3.0 will make scrolling 3 times as fast.
+
+        Negative values for either rate or delay are illegal. A rate of zero
+        will disable any repeating (regardless of the value of delay).
+      </description>
+      <arg name="factor" type="fixed"/>
+    </request>
+
+    <request name="map_to_output">
+      <description summary="map input device to the given output">
+        Map the input device to the given output. Has no effect if the device is
+        not a pointer, touch, or tablet device.
+
+        If mapped to both an output and a rectangle, the rectangle has priority.
+
+        Passing null clears an existing mapping.
+      </description>
+      <arg name="output" type="object" interface="wl_output" allow-null="true"/>
+    </request>
+
+    <request name="map_to_rectangle">
+      <description summary="map input device to the given rectangle">
+        Map the input device to the given rectangle in the global compositor
+        coordinate space. Has no effect if the device is not a pointer, touch,
+        or tablet device.
+
+        If mapped to both an output and a rectangle, the rectangle has priority.
+
+        Width and height must be greater than or equal to 0.
+
+        Passing 0 for width or height clears an existing mapping.
+      </description>
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
+      <arg name="width" type="int"/>
+      <arg name="height" type="int"/>
+    </request>
+  </interface>
+</protocol>

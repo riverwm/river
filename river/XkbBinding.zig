@@ -96,6 +96,19 @@ pub fn create(
     seat.xkb_bindings.append(binding);
 }
 
+pub fn destroy(binding: *XkbBinding) void {
+    binding.object.setHandler(?*anyopaque, handleRequestInert, null, null);
+    handleDestroy(binding.object, binding);
+}
+
+fn handleRequestInert(
+    xkb_binding_v1: *river.XkbBindingV1,
+    request: river.XkbBindingV1.Request,
+    _: ?*anyopaque,
+) void {
+    if (request == .destroy) xkb_binding_v1.destroy();
+}
+
 fn handleDestroy(_: *river.XkbBindingV1, binding: *XkbBinding) void {
     {
         var it = binding.seat.keyboard_groups.iterator(.forward);

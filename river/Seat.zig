@@ -197,7 +197,6 @@ pub fn create(name: [*:0]const u8) !void {
     errdefer event_queue.deinit(util.gpa);
 
     seat.* = .{
-        // This will be automatically destroyed when the display is destroyed
         .wlr_seat = try wlr.Seat.create(server.wl_server, name),
         .event_queue = event_queue,
         .link = undefined,
@@ -229,10 +228,44 @@ pub fn create(name: [*:0]const u8) !void {
 }
 
 pub fn destroy(seat: *Seat) void {
+    while (seat.event_queue.popFront()) |event| {
+        switch (event) {
+            .keyboard_key => |data| data.keyboard.dropEvent(),
+            .keyboard_modifiers => |data| data.keyboard.dropEvent(),
+            .keyboard_keymap => |data| {
+                data.keyboard.dropEvent();
+                data.keymap.unref();
+            },
+            .pointer_motion_relative,
+            .pointer_motion_absolute,
+            .pointer_button,
+            .pointer_axis,
+            .pointer_frame,
+            .pointer_swipe_begin,
+            .pointer_swipe_update,
+            .pointer_swipe_end,
+            .pointer_pinch_begin,
+            .pointer_pinch_update,
+            .pointer_pinch_end,
+            => {},
+        }
+    }
+    {
+        var it = server.input_manager.devices.iterator(.forward);
+        while (it.next()) |device| {
+            if (device.seat == seat) {
+                device.assignToSeat(server.input_manager.defaultSeat());
+            }
+        }
+    }
     {
         var it = server.input_manager.devices.iterator(.forward);
         while (it.next()) |device| assert(device.seat != seat);
     }
+    assert(seat.keyboard_groups.empty());
+
+    while (seat.xkb_bindings.first()) |binding| binding.destroy();
+    while (seat.pointer_bindings.first()) |binding| binding.destroy();
 
     seat.link.remove();
     seat.link_sent.remove();
@@ -245,6 +278,8 @@ pub fn destroy(seat: *Seat) void {
     seat.start_drag.link.remove();
     if (seat.drag != .none) seat.drag_destroy.link.remove();
     seat.request_set_primary_selection.link.remove();
+
+    seat.wlr_seat.destroy();
 }
 
 pub fn queueEvent(seat: *Seat, event: Event) !void {
@@ -738,36 +773,68 @@ pub fn opEnd(seat: *Seat) void {
     }
 }
 
-pub fn addDevice(seat: *Seat, wlr_device: *wlr.InputDevice, virtual: bool) void {
-    seat.tryAddDevice(wlr_device, virtual) catch |err| switch (err) {
-        error.OutOfMemory => log.err("out of memory", .{}),
+pub fn attachNewDevice(seat: *Seat, wlr_device: *wlr.InputDevice, virtual: bool) void {
+    const device = seat.createDevice(wlr_device, virtual) catch |err| switch (err) {
+        error.OutOfMemory => {
+            log.err("out of memory", .{});
+            return;
+        },
     };
+    if (device) |d| {
+        seat.attachDevice(d);
+        seat.updateCapabilities();
+    }
 }
 
-fn tryAddDevice(seat: *Seat, wlr_device: *wlr.InputDevice, virtual: bool) !void {
+fn createDevice(seat: *Seat, wlr_device: *wlr.InputDevice, virtual: bool) !?*InputDevice {
     switch (wlr_device.type) {
         .keyboard => {
             const keyboard = try Keyboard.create(seat, wlr_device, virtual);
-
-            seat.wlr_seat.setKeyboard(&keyboard.group.state);
-            if (seat.wlr_seat.keyboard_state.focused_surface) |wlr_surface| {
-                seat.keyboardNotifyEnter(wlr_surface);
-            }
+            return &keyboard.device;
         },
         .pointer, .touch => {
             const device = try util.gpa.create(InputDevice);
             errdefer util.gpa.destroy(device);
-
-            try device.init(seat, wlr_device);
-
-            seat.cursor.wlr_cursor.attachInputDevice(wlr_device);
+            try device.init(seat, wlr_device, virtual);
+            return device;
         },
         .tablet => {
-            try Tablet.create(seat, wlr_device);
-            seat.cursor.wlr_cursor.attachInputDevice(wlr_device);
+            const tablet = try Tablet.create(seat, wlr_device, virtual);
+            return &tablet.device;
         },
-        // TODO Support these types of input devices.
-        .@"switch", .tablet_pad => {},
+        .@"switch", .tablet_pad => return null, // unsupported
+    }
+}
+
+pub fn attachDevice(seat: *Seat, device: *InputDevice) void {
+    device.seat = seat;
+    switch (device.wlr_device.type) {
+        .keyboard => {
+            const keyboard: *Keyboard = @fieldParentPtr("device", device);
+            keyboard.setGroup();
+            if (keyboard.group) |group| {
+                seat.wlr_seat.setKeyboard(&group.state);
+                if (seat.wlr_seat.keyboard_state.focused_surface) |wlr_surface| {
+                    seat.keyboardNotifyEnter(wlr_surface);
+                }
+            }
+        },
+        .pointer, .touch, .tablet => {
+            seat.cursor.wlr_cursor.attachInputDevice(device.wlr_device);
+        },
+        .@"switch", .tablet_pad => unreachable, // unsupported
+    }
+}
+
+pub fn detachDevice(seat: *Seat, device: *InputDevice) void {
+    seat.cursor.wlr_cursor.detachInputDevice(device.wlr_device);
+
+    if (device.wlr_device.type == .keyboard) {
+        const keyboard: *Keyboard = @fieldParentPtr("device", device);
+        if (keyboard.group) |group| {
+            group.unref();
+            keyboard.group = null;
+        }
     }
 }
 

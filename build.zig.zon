@@ -14,8 +14,8 @@
             .hash = "pixman-0.3.0-LClMnz2VAAAs7QSCGwLimV5VUYx0JFnX5xWU6HwtMuDX",
         },
         .wayland = .{
-            .url = "https://codeberg.org/ifreund/zig-wayland/archive/v0.4.0.tar.gz",
-            .hash = "wayland-0.4.0-lQa1khbMAQAsLS2eBR7M5lofyEGPIbu2iFDmoz8lPC27",
+            .url = "git+https://codeberg.org/ifreund/zig-wayland?ref=main#52b54b71f1665b1b7ba61bf71a9319726e618fb6",
+            .hash = "wayland-0.5.0-dev-lQa1ki3YAQCEdP63PCLFnVQzfXAixkrXsPavlEl8UkPe",
         },
         .wlroots = .{
             .url = "https://codeberg.org/ifreund/zig-wlroots/archive/v0.19.3.tar.gz",

@@ -126,9 +126,21 @@ fn handleSetCursor(
     }
 }
 
-pub fn axis(tool: *TabletTool, tablet: *Tablet, event: *wlr.Tablet.event.Axis) void {
+/// Must be called before moving/warping TabletTool.wlr_cursor
+/// Must call detach() after attach() is called before returning.
+fn attach(tool: *TabletTool, tablet: *Tablet) void {
     tool.wlr_cursor.attachInputDevice(tablet.device.wlr_device);
-    tool.wlr_cursor.mapInputToOutput(tablet.device.wlr_device, tablet.output_mapping);
+    tool.wlr_cursor.mapInputToOutput(tablet.device.wlr_device, tablet.device.config.map_to_output);
+    tool.wlr_cursor.mapInputToRegion(tablet.device.wlr_device, &tablet.device.config.map_to_rectangle);
+}
+
+fn detach(tool: *TabletTool, tablet: *Tablet) void {
+    tool.wlr_cursor.detachInputDevice(tablet.device.wlr_device);
+}
+
+pub fn axis(tool: *TabletTool, tablet: *Tablet, event: *wlr.Tablet.event.Axis) void {
+    tool.attach(tablet);
+    defer tool.detach(tablet);
 
     if (event.updated_axes.x or event.updated_axes.y) {
         // I don't own all these different types of tablet tools to test that this
@@ -185,8 +197,8 @@ pub fn axis(tool: *TabletTool, tablet: *Tablet, event: *wlr.Tablet.event.Axis) v
 pub fn proximity(tool: *TabletTool, tablet: *Tablet, event: *wlr.Tablet.event.Proximity) void {
     switch (event.state) {
         .in => {
-            tool.wlr_cursor.attachInputDevice(tablet.device.wlr_device);
-            tool.wlr_cursor.mapInputToOutput(tablet.device.wlr_device, tablet.output_mapping);
+            tool.attach(tablet);
+            defer tool.detach(tablet);
 
             tool.wlr_cursor.warpAbsolute(tablet.device.wlr_device, event.x, event.y);
 

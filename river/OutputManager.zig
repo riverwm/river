@@ -282,8 +282,6 @@ pub fn commitOutputState(om: *OutputManager) void {
         }
     }
 
-    server.input_manager.reconfigureDevices();
-
     const need_modeset = blk: {
         var it = wm.sent.outputs.iterator(.forward);
         while (it.next()) |output| {

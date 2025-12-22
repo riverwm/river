@@ -25,14 +25,11 @@ const util = @import("util.zig");
 
 const InputDevice = @import("InputDevice.zig");
 const Seat = @import("Seat.zig");
-const TabletTool = @import("TabletTool.zig");
 
 device: InputDevice,
 wp_tablet: *wlr.TabletV2Tablet,
 
-output_mapping: ?*wlr.Output = null,
-
-pub fn create(seat: *Seat, wlr_device: *wlr.InputDevice) !void {
+pub fn create(seat: *Seat, wlr_device: *wlr.InputDevice, virtual: bool) !*Tablet {
     assert(wlr_device.type == .tablet);
 
     const tablet = try util.gpa.create(Tablet);
@@ -44,8 +41,10 @@ pub fn create(seat: *Seat, wlr_device: *wlr.InputDevice) !void {
         .device = undefined,
         .wp_tablet = try tablet_manager.createTabletV2Tablet(seat.wlr_seat, wlr_device),
     };
-    try tablet.device.init(seat, wlr_device);
+    try tablet.device.init(seat, wlr_device, virtual);
     errdefer tablet.device.deinit();
+
+    return tablet;
 }
 
 pub fn destroy(tablet: *Tablet) void {

@@ -335,6 +335,7 @@ fn blocklist(server: *Server, global: *const wl.Global) bool {
         global == server.om.wlr_output_manager.global or
         global == server.om.power_manager.global or
         global == server.om.gamma_control_manager.global or
+        global == server.input_manager.global or
         global == server.input_manager.idle_notifier.global or
         global == server.input_manager.virtual_pointer_manager.global or
         global == server.input_manager.virtual_keyboard_manager.global or

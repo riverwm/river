@@ -25,6 +25,7 @@ const xkb = @import("xkbcommon");
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
+const Keyboard = @import("Keyboard.zig");
 const Seat = @import("Seat.zig");
 const XkbBinding = @import("XkbBinding.zig");
 
@@ -66,6 +67,8 @@ link: wl.list.Link,
 
 virtual: bool,
 
+config: Keyboard.Config,
+
 /// This is the keyboard that actually gets passed to wlr_seat functions for
 /// setting keyboard focus.
 state: wlr.Keyboard,
@@ -77,12 +80,13 @@ pressed: std.AutoArrayHashMapUnmanaged(u32, Press) = .empty,
 key: wl.Listener(*wlr.Keyboard.event.Key) = .init(handleKey),
 modifiers: wl.Listener(*wlr.Keyboard) = .init(handleModifiers),
 
-pub fn create(seat: *Seat, keymap: ?*xkb.Keymap, virtual: bool) !*KeyboardGroup {
+pub fn create(seat: *Seat, config: Keyboard.Config, virtual: bool) !*KeyboardGroup {
     const group = try util.gpa.create(KeyboardGroup);
     errdefer util.gpa.destroy(group);
     group.* = .{
         .seat = seat,
         .virtual = virtual,
+        .config = config,
         .state = undefined,
         .link = undefined,
     };
@@ -99,8 +103,8 @@ pub fn create(seat: *Seat, keymap: ?*xkb.Keymap, virtual: bool) !*KeyboardGroup 
     group.state.data = group;
 
     // wlroots will log an error on failure, there's not much we can do to recover unfortunately.
-    _ = group.state.setKeymap(keymap);
-    group.state.setRepeatInfo(server.config.repeat_rate, server.config.repeat_delay);
+    _ = group.state.setKeymap(config.keymap);
+    group.state.setRepeatInfo(config.repeat_rate, config.repeat_delay);
 
     group.state.events.key.add(&group.key);
     group.state.events.modifiers.add(&group.modifiers);
