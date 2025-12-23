@@ -23,8 +23,6 @@ const mem = std.mem;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
-const globber = @import("globber");
-
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
