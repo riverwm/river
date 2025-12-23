@@ -89,13 +89,6 @@ pub fn init(device: *InputDevice, seat: *Seat, wlr_device: *wlr.InputDevice) !vo
 
     wlr_device.events.destroy.add(&device.destroy);
 
-    // Apply all matching input device configuration.
-    for (server.input_manager.configs.items) |input_config| {
-        if (globber.match(identifier, input_config.glob)) {
-            input_config.apply(device);
-        }
-    }
-
     server.input_manager.devices.append(device);
     seat.updateCapabilities();
 

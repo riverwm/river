@@ -28,7 +28,6 @@ const globber = @import("globber");
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
-const InputConfig = @import("InputConfig.zig");
 const InputDevice = @import("InputDevice.zig");
 const InputRelay = @import("InputRelay.zig");
 const Keyboard = @import("Keyboard.zig");
@@ -51,10 +50,6 @@ pointer_constraints: *wlr.PointerConstraintsV1,
 input_method_manager: *wlr.InputMethodManagerV2,
 text_input_manager: *wlr.TextInputManagerV3,
 tablet_manager: *wlr.TabletManagerV2,
-
-/// List of input device configurations. Ordered by glob generality, with
-/// the most general towards the start and the most specific towards the end.
-configs: std.ArrayList(InputConfig) = .empty,
 
 devices: wl.list.Head(InputDevice, .link),
 seats: wl.list.Head(Seat, .link),
@@ -113,11 +108,6 @@ pub fn deinit(input_manager: *InputManager) void {
     while (input_manager.seats.first()) |seat| {
         seat.destroy();
     }
-
-    for (input_manager.configs.items) |*config| {
-        config.deinit();
-    }
-    input_manager.configs.deinit(util.gpa);
 }
 
 pub fn defaultSeat(input_manager: *InputManager) *Seat {
@@ -138,11 +128,7 @@ pub fn processEvents(input_manager: *InputManager) void {
 pub fn reconfigureDevices(input_manager: *InputManager) void {
     var it = input_manager.devices.iterator(.forward);
     while (it.next()) |device| {
-        for (input_manager.configs.items) |config| {
-            if (globber.match(device.identifier, config.glob)) {
-                config.apply(device);
-            }
-        }
+        _ = device;
     }
 }
 
