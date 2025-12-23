@@ -26,15 +26,9 @@ const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const Server = @import("Server.zig");
-const Switch = @import("Switch.zig");
 
 /// Color of background in RGBA with premultiplied alpha (alpha should only affect nested sessions)
 background_color: [4]f32 = [_]f32{ 0.0, 0.16862745, 0.21176471, 1.0 }, // Solarized base03
-
-switch_mappings: std.ArrayListUnmanaged(struct {
-    switch_type: Switch.Type,
-    switch_state: Switch.State,
-}) = .{},
 
 /// Keyboard repeat rate in characters per second
 repeat_rate: u31 = 25,

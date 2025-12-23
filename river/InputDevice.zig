@@ -30,7 +30,6 @@ const util = @import("util.zig");
 
 const Seat = @import("Seat.zig");
 const Keyboard = @import("Keyboard.zig");
-const Switch = @import("Switch.zig");
 const Tablet = @import("Tablet.zig");
 
 const log = std.log.scoped(.input);
@@ -134,11 +133,6 @@ fn handleDestroy(listener: *wl.Listener(*wlr.InputDevice), _: *wlr.InputDevice) 
             const tablet: *Tablet = @fieldParentPtr("device", device);
             tablet.destroy();
         },
-        .@"switch" => {
-            const switch_device: *Switch = @fieldParentPtr("device", device);
-            switch_device.deinit();
-            util.gpa.destroy(switch_device);
-        },
-        .tablet_pad => unreachable,
+        .@"switch", .tablet_pad => unreachable,
     }
 }

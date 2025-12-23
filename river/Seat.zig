@@ -44,7 +44,6 @@ const Output = @import("Output.zig");
 const PointerBinding = @import("PointerBinding.zig");
 const PointerConstraint = @import("PointerConstraint.zig");
 const ShellSurface = @import("ShellSurface.zig");
-const Switch = @import("Switch.zig");
 const Tablet = @import("Tablet.zig");
 const Window = @import("Window.zig");
 const XkbBinding = @import("XkbBinding.zig");
@@ -722,19 +721,6 @@ pub fn matchPointerBinding(
     return found;
 }
 
-/// Handle any user-defined mapping for switches
-pub fn handleSwitchMapping(
-    _: *Seat,
-    switch_type: Switch.Type,
-    switch_state: Switch.State,
-) void {
-    for (server.config.switch_mappings.items) |mapping| {
-        if (std.meta.eql(mapping.switch_type, switch_type) and std.meta.eql(mapping.switch_state, switch_state)) {
-            // send trigger
-        }
-    }
-}
-
 pub fn opUpdate(seat: *Seat, x: i32, y: i32) void {
     const op = &seat.op.?;
     op.x = x;
@@ -780,15 +766,8 @@ fn tryAddDevice(seat: *Seat, wlr_device: *wlr.InputDevice, virtual: bool) !void 
             try Tablet.create(seat, wlr_device);
             seat.cursor.wlr_cursor.attachInputDevice(wlr_device);
         },
-        .@"switch" => {
-            const switch_device = try util.gpa.create(Switch);
-            errdefer util.gpa.destroy(switch_device);
-
-            try switch_device.init(seat, wlr_device);
-        },
-
         // TODO Support these types of input devices.
-        .tablet_pad => {},
+        .@"switch", .tablet_pad => {},
     }
 }
 

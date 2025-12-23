@@ -34,7 +34,6 @@ const InputRelay = @import("InputRelay.zig");
 const Keyboard = @import("Keyboard.zig");
 const PointerConstraint = @import("PointerConstraint.zig");
 const Seat = @import("Seat.zig");
-const Switch = @import("Switch.zig");
 const TextInput = @import("TextInput.zig");
 
 const default_seat_name = "default";
