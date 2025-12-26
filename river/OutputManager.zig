@@ -167,6 +167,7 @@ fn handleManagerApply(_: *wl.Listener(*wlr.OutputConfigurationV1), config: *wlr.
             },
             .x = head.state.x,
             .y = head.state.y,
+            .scale = head.state.scale,
             .transform = head.state.transform,
             .adaptive_sync = head.state.adaptive_sync_enabled,
             .auto_layout = false,
