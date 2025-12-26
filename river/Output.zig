@@ -49,27 +49,27 @@ pub const State = struct {
         disabled_hard,
         /// Corresponding hardware no longer present
         destroying,
-    } = .disabled_hard,
+    },
     /// Logical coordinate space
-    x: i32 = 0,
+    x: i32,
     /// Logical coordinate space
-    y: i32 = 0,
+    y: i32,
     /// The width/height of modes is in physical pixels, not in the
     /// compositors logical coordinate space.
     mode: union(enum) {
         standard: *wlr.Output.Mode,
         custom: struct {
-            width: i32 = 0,
-            height: i32 = 0,
-            refresh: i32 = 0,
+            width: i32,
+            height: i32,
+            refresh: i32,
         },
         /// Used before the initial modeset and after the wlr_output is destroyed.
         none,
-    } = .none,
-    scale: f32 = 1,
-    transform: wl.Output.Transform = .normal,
+    },
+    scale: f32,
+    transform: wl.Output.Transform,
     adaptive_sync: bool,
-    auto_layout: bool = true,
+    auto_layout: bool,
 
     /// Width/height in the logical coordinate space
     pub fn dimensions(state: *const State) struct { u31, u31 } {
@@ -173,15 +173,24 @@ pub fn create(wlr_output: *wlr.Output) !void {
     if (!wlr_output.initRender(server.allocator, server.renderer)) return error.InitRenderFailed;
 
     const scene_output = try server.scene.wlr_scene.createSceneOutput(wlr_output);
-
     errdefer comptime unreachable;
 
+    const initial: State = .{
+        .state = .disabled_hard,
+        .x = 0,
+        .y = 0,
+        .mode = .none,
+        .scale = 1,
+        .transform = .normal,
+        .adaptive_sync = wlr_output.adaptive_sync_status == .enabled,
+        .auto_layout = true,
+    };
     output.* = .{
         .wlr_output = wlr_output,
         .scene_output = scene_output,
-        .scheduled = .{ .adaptive_sync = wlr_output.adaptive_sync_status == .enabled },
-        .sent = .{ .adaptive_sync = wlr_output.adaptive_sync_status == .enabled },
-        .current = .{ .adaptive_sync = wlr_output.adaptive_sync_status == .enabled },
+        .scheduled = initial,
+        .sent = initial,
+        .current = initial,
         .link = undefined,
         .link_sent = undefined,
     };
