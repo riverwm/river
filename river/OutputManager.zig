@@ -167,7 +167,9 @@ fn handleManagerApply(_: *wl.Listener(*wlr.OutputConfigurationV1), config: *wlr.
             },
             .x = head.state.x,
             .y = head.state.y,
-            .scale = head.state.scale,
+            // Round to nearest 1/120 to ensure the scale is exactly represented
+            // in the fractional-scale-v1 protocol.
+            .scale = @round(head.state.scale * 120) / 120,
             .transform = head.state.transform,
             .adaptive_sync = head.state.adaptive_sync_enabled,
             .auto_layout = false,
