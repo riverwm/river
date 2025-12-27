@@ -1503,6 +1503,22 @@
       <arg name="name" type="string"/>
       <arg name="size" type="uint"/>
     </request>
+
+    <event name="pointer_position" since="2">
+      <description summary="The current position of the pointer">
+        The current position of the pointer in the compositor's logical
+        coordinate space.
+
+        This state is special in that a change in pointer position alone must
+        not cause the compositor to start a manage sequence.
+
+        Assuming the seat has a pointer, this event must be sent in every manage
+        sequence unless there is no change in x/y position since the last time this
+        event was sent.
+      </description>
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
+    </event>
   </interface>
 
   <interface name="river_pointer_binding_v1" version="2">

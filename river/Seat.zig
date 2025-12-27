@@ -19,6 +19,7 @@ const Seat = @This();
 const build_options = @import("build_options");
 const std = @import("std");
 const assert = std.debug.assert;
+const math = std.math;
 const wlr = @import("wlroots");
 const wayland = @import("wayland");
 const wl = wayland.server.wl;
@@ -129,6 +130,8 @@ wm_scheduled: struct {
 wm_sent: struct {
     /// The window entered/hovered by the pointer, if any
     hovered: ?Window.Ref = null,
+    x: i32 = 0,
+    y: i32 = 0,
 } = .{},
 link_sent: wl.list.Link,
 
@@ -357,6 +360,16 @@ pub fn manageStart(seat: *Seat) void {
                         seat_v1.sendPointerEnter(window_v1);
                         seat.wm_sent.hovered = seat.wm_scheduled.hovered;
                     }
+                }
+            }
+        }
+
+        {
+            const x = math.lossyCast(i32, seat.cursor.wlr_cursor.x);
+            const y = math.lossyCast(i32, seat.cursor.wlr_cursor.y);
+            if (new or x != seat.wm_sent.x or y != seat.wm_sent.y) {
+                if (seat_v1.getVersion() >= 2) {
+                    seat_v1.sendPointerPosition(x, y);
                 }
             }
         }
