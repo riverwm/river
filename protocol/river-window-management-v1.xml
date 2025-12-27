@@ -966,6 +966,22 @@
       <arg name="width" type="int"/>
       <arg name="height" type="int"/>
     </request>
+
+    <event name="unreliable_pid" since="2">
+      <description summary="unreliable PID of the window's creator">
+        This event gives an unreliable PID of the process that created the
+        window. Obtaining this information is inherently racy due to PID reuse.
+        Therefore, this PID must not be used for anything security sensitive.
+
+        Note also that a single process may create multiple windows, so there is
+        not necessarily a 1-to-1 mapping from PID to window. Multiple windows
+        may have the same PID.
+
+        This event is sent once when the river_window_v1 is created and never
+        sent again.
+      </description>
+      <arg name="unreliable_pid" type="int"/>
+    </event>
   </interface>
 
   <interface name="river_decoration_v1" version="2">

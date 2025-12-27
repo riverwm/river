@@ -383,6 +383,12 @@ pub fn manageStart(window: *Window) void {
             };
             errdefer comptime unreachable;
 
+            if (new) {
+                if (window_v1.getVersion() >= 2) {
+                    window_v1.sendUnreliablePid(window.unreliablePid());
+                }
+            }
+
             const scheduled = &window.wm_scheduled;
             const sent = &window.wm_sent;
 
@@ -937,6 +943,17 @@ pub fn getParent(window: *Window) ?*Window {
             return parent.window;
         },
         .xwayland, .destroying => return null,
+    }
+}
+
+pub fn unreliablePid(window: *Window) i32 {
+    switch (window.impl) {
+        .toplevel => |toplevel| {
+            const client = toplevel.wlr_toplevel.base.surface.resource.getClient();
+            return client.getCredentials().pid;
+        },
+        .xwayland => |xwindow| return xwindow.xsurface.pid,
+        .destroying => unreachable,
     }
 }
 
