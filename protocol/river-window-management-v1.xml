@@ -319,6 +319,8 @@
         summary="proposed dimensions out of bounds"/>
       <entry name="invalid_border" value="2"
         summary="invalid arg to set_borders"/>
+      <entry name="invalid_clip_box" value="3"
+        summary="invalid arg to set_clip_box"/>
     </enum>
 
     <request name="destroy" type="destructor">
@@ -945,6 +947,25 @@
         state has been sent by the server.
       </description>
     </event>
+
+    <request name="set_clip_box" since="2">
+      <description summary="clip the window to a given box">
+        Clip the window, including borders and decoration surfaces, to the box
+        specified by the x, y, width, and height arguments. The x/y position of
+        the box is relative to the top left corner of the window.
+
+        The width and height arguments must be greater than or equal to 0.
+
+        Setting a clip box with 0 width or height disables clipping.
+
+        This request modifies rendering state and may only be made as part of a
+        render sequence, see the river_window_manager_v1 description.
+      </description>
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
+      <arg name="width" type="int"/>
+      <arg name="height" type="int"/>
+    </request>
   </interface>
 
   <interface name="river_decoration_v1" version="2">

@@ -223,6 +223,7 @@ rendering_requested: struct {
     y: i32 = 0,
     hidden: bool = false,
     border: Border = .{},
+    clip: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
 } = .{},
 
 /// The currently rendered position/dimensions of the window in the scene graph
@@ -621,6 +622,18 @@ fn handleRequest(
             if (!server.wm.ensureWindowing()) return;
             wm_requested.fullscreen = null;
         },
+        .set_clip_box => |args| {
+            if (!server.wm.ensureRendering()) return;
+            if (args.width < 0 or args.height < 0) {
+                window_v1.postError(.invalid_clip_box, "width/height must be greater than or equal to 0 ");
+            }
+            rendering_requested.clip = .{
+                .x = args.x,
+                .y = args.y,
+                .width = args.width,
+                .height = args.height,
+            };
+        },
     }
 }
 
@@ -788,6 +801,21 @@ pub fn renderFinish(window: *Window) void {
     window.tree.node.setPosition(window.box.x, window.box.y);
     window.popup_tree.node.setPosition(window.box.x, window.box.y);
 
+    {
+        var surface_clip = window.rendering_requested.clip;
+        switch (window.impl) {
+            .toplevel => |toplevel| {
+                surface_clip.x += toplevel.geometry.x;
+                surface_clip.y += toplevel.geometry.y;
+            },
+            .xwayland, .destroying => {},
+        }
+        // wlroots asserts that a subsurface tree is present.
+        if (!window.surfaces.tree.children.empty()) {
+            window.surfaces.tree.node.subsurfaceTreeSetClip(&surface_clip);
+        }
+    }
+
     // f32 cannot represent all u32 values exactly, therefore we must initially use f64
     // (which can) and then cast to f32, potentially losing precision.
     const border = &window.rendering_requested.border;
@@ -810,13 +838,13 @@ pub fn renderFinish(window: *Window) void {
         .width = border.width,
         .height = window.box.height,
     };
-    const top: wlr.Box = .{
+    var top: wlr.Box = .{
         .x = 0,
         .y = -@as(i32, border.width),
         .width = window.box.width,
         .height = border.width,
     };
-    const bottom: wlr.Box = .{
+    var bottom: wlr.Box = .{
         .x = 0,
         .y = window.box.height,
         .width = window.box.width,
@@ -836,11 +864,18 @@ pub fn renderFinish(window: *Window) void {
     }
 
     inline for (.{
-        .{ .name = "left", .box = left },
-        .{ .name = "right", .box = right },
-        .{ .name = "top", .box = top },
-        .{ .name = "bottom", .box = bottom },
+        .{ .name = "left", .box = &left },
+        .{ .name = "right", .box = &right },
+        .{ .name = "top", .box = &top },
+        .{ .name = "bottom", .box = &bottom },
     }) |edge| {
+        if (!window.rendering_requested.clip.empty()) {
+            if (!edge.box.intersection(edge.box, &window.rendering_requested.clip)) {
+                // TODO(wlroots): remove this redundant code after fixed upstream
+                // https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/5084
+                edge.box.* = .{ .x = 0, .y = 0, .width = 0, .height = 0 };
+            }
+        }
         const rect = @field(window.border, edge.name);
         rect.node.setEnabled(@field(border.edges, edge.name));
         rect.node.setPosition(edge.box.x, edge.box.y);
@@ -850,7 +885,13 @@ pub fn renderFinish(window: *Window) void {
 
     inline for (.{ &window.decorations_above, &window.decorations_below }) |decorations| {
         var it = decorations.iterator(.forward);
-        while (it.next()) |decoration| decoration.renderFinish();
+        while (it.next()) |decoration| {
+            decoration.renderFinish();
+            // wlroots asserts that a subsurface tree is present.
+            if (!decoration.surfaces.tree.children.empty()) {
+                decoration.surfaces.tree.node.subsurfaceTreeSetClip(&window.rendering_requested.clip);
+            }
+        }
     }
 }
 

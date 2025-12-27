@@ -356,7 +356,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
                 old_geometry.y != toplevel.geometry.y)
             {
                 // We need to update the surface clip box to reflect the geometry change.
-                // TODO actually update the clip box when clipping is supported
+                window.renderFinish();
             }
         },
         // If the client has not yet acked our configure, we need to send a
