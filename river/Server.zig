@@ -40,6 +40,7 @@ const TabletTool = @import("TabletTool.zig");
 const WindowManager = @import("WindowManager.zig");
 const XkbBindings = @import("XkbBindings.zig");
 const LayerShell = @import("LayerShell.zig");
+const LibinputConfig = @import("LibinputConfig.zig");
 const XdgDecoration = @import("XdgDecoration.zig");
 const XdgToplevel = @import("XdgToplevel.zig");
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
@@ -86,6 +87,7 @@ foreign_toplevel_list: *wlr.ExtForeignToplevelListV1,
 
 scene: Scene,
 input_manager: InputManager,
+libinput_config: LibinputConfig,
 om: OutputManager,
 config: Config,
 idle_inhibit_manager: IdleInhibitManager,
@@ -156,6 +158,7 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
         .scene = undefined,
         .om = undefined,
         .input_manager = undefined,
+        .libinput_config = undefined,
         .idle_inhibit_manager = undefined,
         .lock_manager = undefined,
         .wm = undefined,
@@ -184,6 +187,7 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
     try server.scene.init();
     try server.om.init();
     try server.input_manager.init();
+    try server.libinput_config.init();
     try server.idle_inhibit_manager.init();
     try server.lock_manager.init();
 
@@ -335,6 +339,7 @@ fn blocklist(server: *Server, global: *const wl.Global) bool {
         global == server.om.wlr_output_manager.global or
         global == server.om.power_manager.global or
         global == server.om.gamma_control_manager.global or
+        global == server.libinput_config.global or
         global == server.input_manager.global or
         global == server.input_manager.idle_notifier.global or
         global == server.input_manager.virtual_pointer_manager.global or

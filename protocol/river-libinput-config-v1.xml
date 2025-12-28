@@ -1,0 +1,885 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="river_libinput_config_v1">
+  <copyright>
+    Copyright 2025 The River Developers
+
+    Permission to use, copy, modify, and/or distribute this software for any
+    purpose with or without fee is hereby granted, provided that the above
+    copyright notice and this permission notice appear in all copies.
+
+    THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+    WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+    MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+    SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
+    OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
+    CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  </copyright>
+
+  <description summary="configure libinput devices">
+    This protocol exposes libinput device configuration APIs. The libinput
+    documentation should be referred to for detailed information on libinput's
+    behavior.
+
+    This protocol is designed so that (hopefully) any backwards compatible
+    change to libinput's API can be matched with a backwards compatible change
+    to this protocol.
+
+    Note: the libinput API uses floating point types (float and double in C)
+    which are not (yet?) natively supported by the Wayland protocol. However,
+    the Wayland protocol does support sending arbitrary bytes through the array
+    argument type. This protocol uses e.g. type="array" summary="double" to
+    indicate a native-endian IEEE-754 64-bit double value.
+
+    The key words "must", "must not", "required", "shall", "shall not",
+    "should", "should not", "recommended", "may", and "optional" in this
+    document are to be interpreted as described in IETF RFC 2119.
+
+    Warning! The protocol described in this file is currently in the testing
+    phase. Backward compatible changes may be added together with the
+    corresponding interface version bump. Backward incompatible changes can only
+    be done by creating a new major version of the extension.
+  </description>
+
+  <interface name="river_libinput_config_v1" version="1">
+    <description summary="libinput config global interface">
+      Global interface for configuring libinput devices. This global should
+      only be advertised if river_input_manager_v1 is advertised as well.
+    </description>
+
+    <enum name="error">
+      <entry name="invalid_arg" value="0"
+        summary="invalid enum value or similar"/>
+      <entry name="invalid_destroy" value="1"/>
+    </enum>
+
+    <request name="stop">
+      <description summary="stop sending events">
+        This request indicates that the client no longer wishes to receive
+        events on this object.
+
+        The Wayland protocol is asynchronous, which means the server may send
+        further events until the stop request is processed. The client must wait
+        for a river_libinput_config_v1.finished event before destroying this
+        object.
+      </description>
+    </request>
+
+    <event name="finished">
+      <description summary="the server has finished with the object">
+        This event indicates that the server will send no further events on this
+        object. The client should destroy the object. See
+        river_libinput_config_v1.destroy for more information.
+      </description>
+    </event>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the river_libinput_config_v1 object">
+        This request should be called after the finished event has been received
+        to complete destruction of the object.
+
+        It is a protocol error to make this request before the finished event
+        has been received.
+
+        If a client wishes to destroy this object it should send a
+        river_libinput_config_v1.stop request and wait for a
+        river_libinput_config_v1.finished event. Once the finished event is
+        received it is safe to destroy this object and any other objects created
+        through this interface.
+      </description>
+    </request>
+
+    <event name="libinput_device">
+      <description summary="new libinput device">
+        A new libinput device has been created. Not every river_input_device_v1
+        is necessarily a libinput device as well.
+      </description>
+      <arg name="id" type="new_id" interface="river_libinput_device_v1"/>
+    </event>
+
+    <request name="create_accel_config">
+      <description summary="create a acceleration config">
+        Create a acceleration config which can be applied
+        with river_libinput_device_v1.apply_accel_config.
+      </description>
+      <arg name="id" type="new_id"
+        interface="river_libinput_accel_config_v1"/>
+      <arg name="profile" type="uint"
+        enum="river_libinput_device_v1.accel_profile"/>
+    </request>
+  </interface>
+
+  <interface name="river_libinput_device_v1" version="1">
+    <description summary="a libinput device">
+      In general, *_support events will be sent exactly once directly after the
+      river_libinput_device_v1 is created. *_default events will be sent after
+      *_support events if the config option is supported, and *_current events
+      willl be sent after the *_default events and again whenever the config
+      option is changed.
+    </description>
+
+    <enum name="error">
+      <entry name="invalid_arg" value="0"
+        summary="invalid enum value or similar"/>
+    </enum>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the libinput device object">
+        This request indicates that the client will no longer use the input
+        device object and that it may be safely destroyed.
+      </description>
+    </request>
+
+    <event name="removed">
+      <description summary="the libinput device is removed">
+        This event indicates that the libinput device has been removed.
+
+        The server will send no further events on this object and ignore any
+        request (other than river_libinput_device_v1.destroy) made after this
+        event is sent. The client should destroy this object with the
+        river_libinput_device_v1.destroy request to free up resources.
+      </description>
+    </event>
+
+    <event name="input_device">
+      <description summary="corresponding river input device">
+        The river_input_device_v1 corresponding to this libinput device.
+        This event will always be the first event sent on the
+        river_libinput_device_v1 object, and it will be sent exactly once.
+      </description>
+      <arg name="device" type="object" interface="river_input_device_v1"/>
+    </event>
+
+    <enum name="send_events_modes" bitfield="true">
+      <entry name="enabled" value="0"/>
+      <entry name="disabled" value="1"/>
+      <entry name="disabled_on_external_mouse" value="2"/>
+    </enum>
+
+    <event name="send_events_support">
+      <description summary="supported send events modes">
+        Supported send events modes.
+      </description>
+      <arg name="modes" type="uint" enum="send_events_modes"/>
+    </event>
+
+    <event name="send_events_default">
+      <description summary="default send events mode">
+        Default send events mode.
+      </description>
+      <arg name="mode" type="uint" enum="send_events_modes"/>
+    </event>
+
+    <event name="send_events_current">
+      <description summary="current send events mode">
+        Current send events mode.
+      </description>
+      <arg name="mode" type="uint" enum="send_events_modes"/>
+    </event>
+
+    <request name="set_send_events">
+      <description summary="set send events mode">
+        Set the send events mode for the device.
+      </description>
+      <arg name="result" type="new_id" interface="river_libinput_result_v1"/>
+      <arg name="mode" type="uint" enum="send_events_modes"/>
+    </request>
+
+    <enum name="tap_state">
+      <entry name="disabled" value="0"/>
+      <entry name="enabled" value="1"/>
+    </enum>
+
+    <event name="tap_support">
+      <description summary="tap-to-click/drag support">
+        The number of fingers supported for tap-to-click/drag.
+        If finger_count is 0, tap-to-click and drag are unsupported.
+      </description>
+      <arg name="finger_count" type="int"/>
+    </event>
+
+    <event name="tap_default">
+      <description summary="default tap-to-click state">
+        Default tap-to-click state.
+      </description>
+      <arg name="state" type="uint" enum="tap_state"/>
+    </event>
+
+    <event name="tap_current">
+      <description summary="current tap-to-click state">
+        Current tap-to-click state.
+      </description>
+      <arg name="state" type="uint" enum="tap_state"/>
+    </event>
+
+    <request name="set_tap">
+      <description summary="enable/disable tap-to-click">
+        Configure tap-to-click on this device, with a default mapping of
+        1, 2, 3 finger tap mapping to left, right, middle click, respectively.
+      </description>
+      <arg name="result" type="new_id" interface="river_libinput_result_v1"/>
+      <arg name="state" type="uint" enum="tap_state"/>
+    </request>
+
+    <enum name="tap_button_map">
+      <entry name="lrm" value="0"
+        summary="1/2/3 finger tap maps to left/right/middle"/>
+      <entry name="lmr" value="1"
+        summary="1/2/3 finger tap maps to left/middle/right"/>
+    </enum>
+
+    <event name="tap_button_map_default">
+      <description summary="default tap-to-click button map">
+        Default tap-to-click button map.
+      </description>
+      <arg name="button_map" type="uint" enum="tap_button_map"/>
+    </event>
+
+    <event name="tap_button_map_current">
+      <description summary="current tap-to-click button map">
+        Current tap-to-click button map.
+      </description>
+      <arg name="button_map" type="uint" enum="tap_button_map"/>
+    </event>
+
+    <request name="set_tap_button_map">
+      <description summary="set tap-to-click button map">
+        Set the finger number to button number mapping for tap-to-click. The
+        default mapping on most devices is to have a 1, 2 and 3 finger tap to
+        map to the left, right and middle button, respectively.
+      </description>
+      <arg name="result" type="new_id" interface="river_libinput_result_v1"/>
+      <arg name="button_map" type="uint" enum="tap_button_map"/>
+    </request>
+
+    <enum name="drag_state">
+      <entry name="disabled" value="0"/>
+      <entry name="enabled" value="1"/>
+    </enum>
+
+    <event name="drag_default">
+      <description summary="default tap-and-drag state">
+        Default tap-and-drag state.
+      </description>
+      <arg name="state" type="uint" enum="drag_state"/>
+    </event>
+
+    <event name="drag_current">
+      <description summary="current tap-and-drag state">
+        Current tap-and-drag state.
+      </description>
+      <arg name="state" type="uint" enum="drag_state"/>
+    </event>
+
+    <request name="set_drag">
+      <description summary="set tap-and-drag state">
+        Configure tap-and-drag functionality on the device.
+      </description>
+      <arg name="result" type="new_id" interface="river_libinput_result_v1"/>
+      <arg name="state" type="uint" enum="drag_state"/>
+    </request>
+
+    <enum name="drag_lock_state">
+      <entry name="disabled" value="0"/>
+      <entry name="enabled_timeout" value="1"/>
+      <entry name="enabled_sticky" value="2"/>
+    </enum>
+
+    <event name="drag_lock_default">
+      <description summary="default drag lock state">
+        Default drag lock state.
+      </description>
+      <arg name="state" type="uint" enum="drag_lock_state"/>
+    </event>
+
+    <event name="drag_lock_current">
+      <description summary="current drag lock state">
+        Current drag lock state.
+      </description>
+      <arg name="state" type="uint" enum="drag_lock_state"/>
+    </event>
+
+    <request name="set_drag_lock">
+      <description summary="set drag lock state">
+        Configure drag-lock during tapping on this device. When enabled, a
+        finger may be lifted and put back on the touchpad and the drag process
+        continues. A timeout for lifting the finger is optional. When disabled,
+        lifting the finger during a tap-and-drag will immediately stop the drag.
+        See the libinput documentation for more details.
+       </description>
+      <arg name="result" type="new_id" interface="river_libinput_result_v1"/>
+      <arg name="state" type="uint" enum="drag_lock_state"/>
+    </request>
+
+    <event name="three_finger_drag_support">
+      <description summary="three finger drag support">
+        The number of fingers supported for three/four finger drag.
+        If finger_count is less than 3, three finger drag is unsupported.
+      </description>
+      <arg name="finger_count" type="int"/>
+    </event>
+
+    <enum name="three_finger_drag_state">
+      <entry name="disabled" value="0"/>
+      <entry name="enabled_3fg" value="1"/>
+      <entry name="enabled_4fg" value="2"/>
+    </enum>
+
+    <event name="three_finger_drag_default">
+      <description summary="default three finger drag state">
+        Default three finger drag state.
+      </description>
+      <arg name="state" type="uint" enum="three_finger_drag_state"/>
+    </event>
+
+    <event name="three_finger_drag_current">
+      <description summary="current three finger drag state">
+        Current three finger drag state.
+      </description>
+      <arg name="state" type="uint" enum="three_finger_drag_state"/>
+    </event>
+
+    <request name="set_three_finger_drag">
+      <description summary="set three finger drag state">
+        Configure three finger drag functionality for the device.
+      </description>
+      <arg name="result" type="new_id" interface="river_libinput_result_v1"/>
+      <arg name="state" type="uint" enum="three_finger_drag_state"/>
+    </request>
+
+    <event name="calibration_matrix_support">
+      <description summary="support for a calibration matrix">
+        A calibration matrix is supported if the supported argument is non-zero.
+      </description>
+      <arg name="supported" type="int" summary="boolean"/>
+    </event>
+
+    <event name="calibration_matrix_default">
+      <description summary="default calibration matrix">
+        Default calibration matrix.
+      </description>
+      <arg name="matrix" type="array" summary="array of 6 floats"/>
+    </event>
+
+    <event name="calibration_matrix_current">
+      <description summary="current calibration matrix">
+        Current calibration matrix.
+      </description>
+      <arg name="matrix" type="array" summary="array of 6 floats"/>
+    </event>
+
+    <request name="set_calibration_matrix">
+      <description summary="set calibration matrix">
+        Set calibration matrix.
+      </description>
+      <arg name="result" type="new_id" interface="river_libinput_result_v1"/>
+      <arg name="matrix" type="array" summary="array of 6 floats"/>
+    </request>
+
+    <enum name="accel_profile">
+      <entry name="none" value="0"/>
+      <entry name="flat" value="1"/>
+      <entry name="adaptive" value="2"/>
+      <entry name="custom" value="4"/>
+    </enum>
+
+    <enum name="accel_profiles" bitfield="true">
+      <entry name="none" value="0"/>
+      <entry name="flat" value="1"/>
+      <entry name="adaptive" value="2"/>
+      <entry name="custom" value="4"/>
+    </enum>
+
+    <event name="accel_profiles_support">
+      <description summary="supported acceleration profiles">
+        Supported acceleration profiles.
+      </description>
+      <arg name="profiles" type="uint" enum="accel_profiles"/>
+    </event>
+
+    <event name="accel_profile_default">
+      <description summary="default acceleration profile">
+        Default acceleration profile.
+      </description>
+      <arg name="profile" type="uint" enum="accel_profile"/>
+    </event>
+
+    <event name="accel_profile_current">
+      <description summary="current send events mode">
+        Current acceleration profile.
+      </description>
+      <arg name="profile" type="uint" enum="accel_profile"/>
+    </event>
+
+    <request name="set_accel_profile">
+      <description summary="set send events mode">
+        Set the acceleration profile.
+      </description>
+      <arg name="result" type="new_id" interface="river_libinput_result_v1"/>
+      <arg name="profile" type="uint" enum="accel_profile"/>
+    </request>
+
+    <event name="accel_speed_default">
+      <description summary="default acceleration speed">
+        Default acceleration speed.
+      </description>
+      <arg name="speed" type="array" summary="double"/>
+    </event>
+
+    <event name="accel_speed_current">
+      <description summary="current acceleration speed">
+        Current acceleration speed.
+      </description>
+      <arg name="speed" type="array" summary="double"/>
+    </event>
+
+    <request name="set_accel_speed">
+      <description summary="set acceleration speed">
+        Set the acceleration speed within a range of [-1, 1], where 0 is
+        the default acceleration for this device, -1 is the slowest acceleration
+        and 1 is the maximum acceleration available on this device.
+      </description>
+      <arg name="result" type="new_id" interface="river_libinput_result_v1"/>
+      <arg name="speed" type="array" summary="double"/>
+    </request>
+
+    <request name="apply_accel_config">
+      <description summary="apply acceleration config">
+        Apply a pointer accleration config.
+      </description>
+      <arg name="result" type="new_id" interface="river_libinput_result_v1"/>
+      <arg name="config" type="object" interface="river_libinput_accel_config_v1"/>
+    </request>
+
+    <event name="natural_scroll_support">
+      <description summary="support for natural scroll">
+        Natural scroll is supported if the supported argument is non-zero.
+      </description>
+      <arg name="supported" type="int" summary="boolean"/>
+    </event>
+
+    <enum name="natural_scroll_state">
+      <entry name="disabled" value="0"/>
+      <entry name="enabled" value="1"/>
+    </enum>
+
+    <event name="natural_scroll_default">
+      <description summary="default natural scroll">
+        Default natural scroll.
+      </description>
+      <arg name="state" type="uint" enum="natural_scroll_state"/>
+    </event>
+
+    <event name="natural_scroll_current">
+      <description summary="current natural scroll state">
+        Current natural scroll.
+      </description>
+      <arg name="state" type="uint" enum="natural_scroll_state"/>
+    </event>
+
+    <request name="set_natural_scroll">
+      <description summary="set natural scroll state">
+        Set natural scroll state.
+      </description>
+      <arg name="result" type="new_id" interface="river_libinput_result_v1"/>
+      <arg name="state" type="uint" enum="natural_scroll_state"/>
+    </request>
+
+    <event name="left_handed_support">
+      <description summary="support for left-handed mode">
+        Left-handed mode is supported if the supported argument is non-zero.
+      </description>
+      <arg name="supported" type="int" summary="boolean"/>
+    </event>
+
+    <enum name="left_handed_state">
+      <entry name="disabled" value="0"/>
+      <entry name="enabled" value="1"/>
+    </enum>
+
+    <event name="left_handed_default">
+      <description summary="default left-handed mode">
+        Default left-handed mode.
+      </description>
+      <arg name="state" type="uint" enum="left_handed_state"/>
+    </event>
+
+    <event name="left_handed_current">
+      <description summary="current left-handed mode state">
+        Current left-handed mode.
+      </description>
+      <arg name="state" type="uint" enum="left_handed_state"/>
+    </event>
+
+    <request name="set_left_handed">
+      <description summary="set left-handed mode state">
+        Set left-handed mode state.
+      </description>
+      <arg name="result" type="new_id" interface="river_libinput_result_v1"/>
+      <arg name="state" type="uint" enum="left_handed_state"/>
+    </request>
+
+    <enum name="click_method">
+      <entry name="none" value="0"/>
+      <entry name="button_areas" value="1"/>
+      <entry name="clickfinger" value="2"/>
+    </enum>
+
+    <enum name="click_methods" bitfield="true">
+      <entry name="none" value="0"/>
+      <entry name="button_areas" value="1"/>
+      <entry name="clickfinger" value="2"/>
+    </enum>
+
+    <event name="click_method_support">
+      <description summary="supported click methods">
+        The click methods suppported by the device.
+      </description>
+      <arg name="methods" type="uint" enum="click_methods"/>
+    </event>
+
+    <event name="click_method_default">
+      <description summary="default click method">
+        Default click method.
+      </description>
+      <arg name="method" type="uint" enum="click_method"/>
+    </event>
+
+    <event name="click_method_current">
+      <description summary="current click method">
+        Current click method.
+      </description>
+      <arg name="method" type="uint" enum="click_method"/>
+    </event>
+
+    <request name="set_click_method">
+      <description summary="set click method">
+        Set click method.
+      </description>
+      <arg name="result" type="new_id" interface="river_libinput_result_v1"/>
+      <arg name="method" type="uint" enum="click_method"/>
+    </request>
+
+    <enum name="clickfinger_button_map">
+      <entry name="lrm" value="0"/>
+      <entry name="lmr" value="1"/>
+    </enum>
+
+    <event name="clickfinger_button_map_default">
+      <description summary="default clickfinger button map">
+        Default clickfinger button map.
+        Supported if click_methods.clickfinger is supported.
+      </description>
+      <arg name="button_map" type="uint" enum="clickfinger_button_map"/>
+    </event>
+
+    <event name="clickfinger_button_map_current">
+      <description summary="current clickfinger button map">
+        Current clickfinger button map.
+        Supported if click_methods.clickfinger is supported.
+      </description>
+      <arg name="button_map" type="uint" enum="clickfinger_button_map"/>
+    </event>
+
+    <request name="set_clickfinger_button_map">
+      <description summary="set clickfinger button map">
+        Set clickfinger button map.
+        Supported if click_methods.clickfinger is supported.
+      </description>
+      <arg name="result" type="new_id" interface="river_libinput_result_v1"/>
+      <arg name="button_map" type="uint" enum="clickfinger_button_map"/>
+    </request>
+
+    <event name="middle_emulation_support">
+      <description summary="support for middle mouse button emulation">
+        Middle mouse button emulation is supported if the supported argument is
+        non-zero.
+      </description>
+      <arg name="supported" type="int" summary="boolean"/>
+    </event>
+
+    <enum name="middle_emulation_state">
+      <entry name="disabled" value="0"/>
+      <entry name="enabled" value="1"/>
+    </enum>
+
+    <event name="middle_emulation_default">
+      <description summary="default middle mouse button emulation">
+        Default middle mouse button emulation.
+      </description>
+      <arg name="state" type="uint" enum="middle_emulation_state"/>
+    </event>
+
+    <event name="middle_emulation_current">
+      <description summary="current middle mouse button emulation state">
+        Current middle mouse button emulation.
+      </description>
+      <arg name="state" type="uint" enum="middle_emulation_state"/>
+    </event>
+
+    <request name="set_middle_emulation">
+      <description summary="set middle mouse button emulation state">
+        Set middle mouse button emulation state.
+      </description>
+      <arg name="result" type="new_id" interface="river_libinput_result_v1"/>
+      <arg name="state" type="uint" enum="middle_emulation_state"/>
+    </request>
+
+    <enum name="scroll_method">
+      <entry name="no_scroll" value="0"/>
+      <entry name="two_finger" value="1"/>
+      <entry name="edge" value="2"/>
+      <entry name="on_button_down" value="4"/>
+    </enum>
+
+    <enum name="scroll_methods" bitfield="true">
+      <entry name="no_scroll" value="0"/>
+      <entry name="two_finger" value="1"/>
+      <entry name="edge" value="2"/>
+      <entry name="on_button_down" value="4"/>
+    </enum>
+
+    <event name="scroll_method_support">
+      <description summary="supported scroll methods">
+        The scroll methods suppported by the device.
+      </description>
+      <arg name="methods" type="uint" enum="scroll_methods"/>
+    </event>
+
+    <event name="scroll_method_default">
+      <description summary="default scroll method">
+        Default scroll method.
+      </description>
+      <arg name="method" type="uint" enum="scroll_method"/>
+    </event>
+
+    <event name="scroll_method_current">
+      <description summary="current scroll method">
+        Current scroll method.
+      </description>
+      <arg name="method" type="uint" enum="scroll_method"/>
+    </event>
+
+    <request name="set_scroll_method">
+      <description summary="set scroll method">
+        Set scroll method.
+      </description>
+      <arg name="result" type="new_id" interface="river_libinput_result_v1"/>
+      <arg name="method" type="uint" enum="scroll_method"/>
+    </request>
+
+    <event name="scroll_button_default">
+      <description summary="default scroll button">
+        Default scroll button.
+        Supported if scroll_methods.on_button_down is supported.
+      </description>
+      <arg name="button" type="uint"/>
+    </event>
+
+    <event name="scroll_button_current">
+      <description summary="current scroll button">
+        Current scroll button.
+        Supported if scroll_methods.on_button_down is supported.
+      </description>
+      <arg name="button" type="uint"/>
+    </event>
+
+    <request name="set_scroll_button">
+      <description summary="set scroll button">
+        Set scroll button.
+        Supported if scroll_methods.on_button_down is supported.
+      </description>
+      <arg name="result" type="new_id" interface="river_libinput_result_v1"/>
+      <arg name="button" type="uint"/>
+    </request>
+
+    <enum name="scroll_button_lock_state">
+      <entry name="disabled" value="0"/>
+      <entry name="enabled" value="1"/>
+    </enum>
+
+    <event name="scroll_button_lock_default">
+      <description summary="default scroll button lock state">
+        Default scroll button lock state.
+        Supported if scroll_methods.on_button_down is supported.
+      </description>
+      <arg name="state" type="uint" enum="scroll_button_lock_state"/>
+    </event>
+
+    <event name="scroll_button_lock_current">
+      <description summary="current scroll button lock state">
+        Current scroll button lock state.
+        Supported if scroll_methods.on_button_down is supported.
+      </description>
+      <arg name="state" type="uint" enum="scroll_button_lock_state"/>
+    </event>
+
+    <request name="set_scroll_button_lock">
+      <description summary="set scroll button lock state">
+        Set scroll button lock state.
+        Supported if scroll_methods.on_button_down is supported.
+      </description>
+      <arg name="result" type="new_id" interface="river_libinput_result_v1"/>
+      <arg name="state" type="uint" enum="scroll_button_lock_state"/>
+    </request>
+
+    <event name="dwt_support">
+      <description summary="support for disable-while-typing">
+        Disable-while-typing is supported if the supported argument is
+        non-zero.
+      </description>
+      <arg name="supported" type="int" summary="boolean"/>
+    </event>
+
+    <enum name="dwt_state">
+      <entry name="disabled" value="0"/>
+      <entry name="enabled" value="1"/>
+    </enum>
+
+    <event name="dwt_default">
+      <description summary="default disable-while-typing state">
+        Default disable-while-typing state.
+      </description>
+      <arg name="state" type="uint" enum="dwt_state"/>
+    </event>
+
+    <event name="dwt_current">
+      <description summary="current disable-while-typing state">
+        Current disable-while-typing state.
+      </description>
+      <arg name="state" type="uint" enum="dwt_state"/>
+    </event>
+
+    <request name="set_dwt">
+      <description summary="set disable-while-typing state">
+        Set disable-while-typing state.
+      </description>
+      <arg name="result" type="new_id" interface="river_libinput_result_v1"/>
+      <arg name="state" type="uint" enum="dwt_state"/>
+    </request>
+
+    <event name="dwtp_support">
+      <description summary="support for disable-while-trackpointing">
+        Disable-while-trackpointing is supported if the supported argument is
+        non-zero.
+      </description>
+      <arg name="supported" type="int" summary="boolean"/>
+    </event>
+
+    <enum name="dwtp_state">
+      <entry name="disabled" value="0"/>
+      <entry name="enabled" value="1"/>
+    </enum>
+
+    <event name="dwtp_default">
+      <description summary="default disable-while-trackpointing state">
+        Default disable-while-trackpointing state.
+      </description>
+      <arg name="state" type="uint" enum="dwtp_state"/>
+    </event>
+
+    <event name="dwtp_current">
+      <description summary="current disable-while-trackpointing state">
+        Current disable-while-trackpointing state.
+      </description>
+      <arg name="state" type="uint" enum="dwtp_state"/>
+    </event>
+
+    <request name="set_dwtp">
+      <description summary="set disable-while-trackpointing state">
+        Set disable-while-trackpointing state.
+      </description>
+      <arg name="result" type="new_id" interface="river_libinput_result_v1"/>
+      <arg name="state" type="uint" enum="dwtp_state"/>
+    </request>
+
+    <event name="rotation_support">
+      <description summary="support for rotation">
+        Rotation is supported if the supported argument is non-zero.
+      </description>
+      <arg name="supported" type="int" summary="boolean"/>
+    </event>
+
+    <event name="rotation_default">
+      <description summary="default rotation angle">
+        Default rotation angle.
+      </description>
+      <arg name="angle" type="uint"/>
+    </event>
+
+    <event name="rotation_current">
+      <description summary="current rotation angle">
+        Current rotation angle.
+      </description>
+      <arg name="angle" type="uint"/>
+    </event>
+
+    <request name="set_rotation">
+      <description summary="set rotation angle">
+        Set rotation angle in degrees clockwise off the logical neutral
+        position. Angle must be in the range [0-360).
+      </description>
+      <arg name="result" type="new_id" interface="river_libinput_result_v1"/>
+      <arg name="angle" type="uint"/>
+    </request>
+  </interface>
+
+  <interface name="river_libinput_accel_config_v1" version="1">
+    <description summary="acceleration config">
+      The result returned by libinput on setting configuration for a device.
+    </description>
+
+    <enum name="error">
+      <entry name="invalid_arg" value="0"
+        summary="invalid enum value or similar"/>
+    </enum>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the accel object">
+        This request indicates that the client will no longer use the accel
+        config object and that it may be safely destroyed.
+      </description>
+    </request>
+
+    <enum name="accel_type">
+      <entry name="fallback" value="0"/>
+      <entry name="motion" value="1"/>
+      <entry name="scroll" value="2"/>
+    </enum>
+
+    <request name="set_points">
+      <description summary="define custom acceleration function">
+        Defines the acceleration function for a given movement type
+        in an acceleration configuration with custom accel profile.
+      </description>
+      <arg name="result" type="new_id" interface="river_libinput_result_v1"/>
+      <arg name="type" type="uint" enum="accel_type"/>
+      <arg name="step" type="array" summary="double"/>
+      <arg name="points" type="array" summary="array of doubles"/>
+    </request>
+  </interface>
+
+  <interface name="river_libinput_result_v1" version="1">
+    <description summary="config application result">
+      The result returned by libinput on setting configuration for a device.
+    </description>
+
+    <event name="success" type="destructor">
+      <description summary="config success">
+        The configuration was successfully applied to the device.
+      </description>
+    </event>
+
+    <event name="unsupported" type="destructor">
+      <description summary="config unsupported">
+        The configuration is unsupported by the device and was ignored.
+      </description>
+    </event>
+
+    <event name="invalid" type="destructor">
+      <description summary="config invalid">
+        The configuration is invalid and was ignored.
+      </description>
+    </event>
+  </interface>
+</protocol>

@@ -27,8 +27,9 @@ const c = @import("c.zig").c;
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
-const Seat = @import("Seat.zig");
 const Keyboard = @import("Keyboard.zig");
+const LibinputDevice = @import("LibinputDevice.zig");
+const Seat = @import("Seat.zig");
 const Tablet = @import("Tablet.zig");
 
 const log = std.log.scoped(.input);
@@ -36,6 +37,8 @@ const log = std.log.scoped(.input);
 seat: *Seat,
 wlr_device: *wlr.InputDevice,
 objects: wl.list.Head(river.InputDeviceV1, null),
+
+libinput: LibinputDevice,
 
 remove: wl.Listener(*wlr.InputDevice) = .init(handleRemove),
 
@@ -57,6 +60,7 @@ pub fn init(
     device.* = .{
         .seat = seat,
         .wlr_device = wlr_device,
+        .libinput = undefined,
         .objects = undefined,
         .link = undefined,
     };
@@ -74,6 +78,9 @@ pub fn init(
     if (!virtual) {
         var it = server.input_manager.objects.safeIterator(.forward);
         while (it.next()) |im_v1| device.createObject(im_v1);
+    }
+    if (wlr_device.getLibinputDevice()) |handle| {
+        device.libinput.init(@ptrCast(handle));
     }
 }
 
@@ -100,6 +107,10 @@ pub fn createObject(device: *InputDevice, im_v1: *river.InputManagerV1) void {
 pub fn deinit(device: *InputDevice) void {
     assert(device.objects.empty());
     device.remove.link.remove();
+
+    if (device.wlr_device.getLibinputDevice() != null) {
+        device.libinput.deinit();
+    }
 
     device.link.remove();
     device.seat.updateCapabilities();
