@@ -16,16 +16,13 @@ on our [wiki](https://codeberg.org/river/wiki).
 > *If you are looking for the old dynamic tiling version of river, see
 [river-classic](https://codeberg.org/river/river-classic).*
 
-The main repository is on [codeberg](https://codeberg.org/river/river),
-which is where the issue tracker may be found and where contributions are accepted.
-
 ## Links
 
 - [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Issue Tracker](https://codeberg.org/river/river/issues)
 - IRC: [#river](https://web.libera.chat/?channels=#river) on irc.libera.chat
 - [Zulip](https://river-compositor.zulipchat.com) (new)
 - [Wiki](https://codeberg.org/river/wiki)
-- [Packaging Status](https://repology.org/project/river-compositor/versions)
 
 ## Features
 
