@@ -53,7 +53,7 @@ The first release supporting the
 will be 0.4.0. The protocol is implemented on river's main branch and is already
 robust/feature complete enough for me to use as my daily driver.  There are
 however missing features that need to be implemented before the 0.4.0 release,
-for example input configuration.
+for example keyboard layout configuration.
 
 Currently the only documentation for the
 [river-window-management-v1](protocol/river-window-management-v1.xml) protocol
