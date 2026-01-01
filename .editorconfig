@@ -20,7 +20,3 @@ indent_size = 2
 [*.scd]
 indent_style = tab
 indent_size = 4
-
-[completions/bash/*]
-indent_style = tab
-indent_size = 4
