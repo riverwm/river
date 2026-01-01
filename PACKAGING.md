@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2022 The River Developers
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # Packaging river for distribution
 
 First of all, I apologize for writing river in Zig. It will likely make

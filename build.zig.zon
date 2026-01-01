@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2024 The River Developers
+// SPDX-License-Identifier: GPL-3.0-only
 .{
     .name = .river,
     // While a river release is in development, this string should contain

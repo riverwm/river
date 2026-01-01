@@ -1,5 +1,8 @@
 RIVER(1)
 
+; SPDX-FileCopyrightText: © 2020 The River Developers
+; SPDX-License-Identifier: CC-BY-SA-4.0
+
 # NAME
 
 river - dynamic tiling Wayland compositor

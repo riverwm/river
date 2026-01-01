@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2020 The River Developers
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 <div align="center">
   <img src="logo/logo_text_adaptive_color.svg" width="600em">
 </div>
@@ -122,13 +127,11 @@ financially you can find donation information [here](https://isaacfreund.com/don
 
 ## Licensing
 
-River is released under the GNU General Public License v3.0 only.
+This project follows the [REUSE Specification](https://reuse.software/spec-3.3/),
+all files have SPDX copyright and license information.
 
-The protocols in the `protocol` directory are released under various licenses by
-various parties. You should refer to the copyright block of each protocol for
-the licensing information. The protocols prefixed with `river` and developed by
-this project are released under the ISC license (as stated in their copyright
-blocks).
+In overview:
 
-The river logo is licensed under the CC BY-SA 4.0 license, see the
-[license](logo/LICENSE) in the logo directory.
+- River's source code is released under the GPL-3.0-only license.
+- River's Wayland protocols are released under the MIT license.
+- River's logo and documentation are released under the CC-BY-SA-4.0 license.

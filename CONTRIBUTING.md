@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2020 The River Developers
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 ## Contributing to river
 
 Contributing is as simple as opening a pull request on

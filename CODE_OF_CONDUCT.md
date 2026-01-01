@@ -1,3 +1,7 @@
+<!--
+SPDX-FileCopyrightText: 2024 The River Developers
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
 # River Code of Conduct
 
 ## Our Pledge

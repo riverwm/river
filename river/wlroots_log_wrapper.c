@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2021 The River Developers
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include <assert.h>
 #include <stdarg.h>
 #include <stdlib.h>

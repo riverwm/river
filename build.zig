@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2020 The River Developers
+// SPDX-License-Identifier: GPL-3.0-only
+
 const std = @import("std");
 const assert = std.debug.assert;
 const Build = std.Build;
@@ -82,8 +85,8 @@ pub fn build(b: *Build) !void {
     scanner.addCustomProtocol(b.path("protocol/river-input-management-v1.xml"));
     scanner.addCustomProtocol(b.path("protocol/river-libinput-config-v1.xml"));
 
-    scanner.addCustomProtocol(b.path("protocol/wlr-layer-shell-unstable-v1.xml"));
-    scanner.addCustomProtocol(b.path("protocol/wlr-output-power-management-unstable-v1.xml"));
+    scanner.addCustomProtocol(b.path("protocol/upstream/wlr-layer-shell-unstable-v1.xml"));
+    scanner.addCustomProtocol(b.path("protocol/upstream/wlr-output-power-management-unstable-v1.xml"));
 
     // Some of these versions may be out of date with what wlroots implements.
     // This is not a problem in practice though as long as river successfully compiles.

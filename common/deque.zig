@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2025 Isaac Freund
+// SPDX-License-Identifier: 0BSD
+
 const std = @import("std");
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;

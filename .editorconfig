@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2020 The River Developers
+# SPDX-License-Identifier: 0BSD
+
 root = true
 
 [*]
