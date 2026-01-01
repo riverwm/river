@@ -21,6 +21,7 @@ packages:
   - wayland-protocols
   - xwayland-dev
   - meson
+  - reuse
   - scdoc
   - tar
   - wget
@@ -55,3 +56,6 @@ tasks:
       zig fmt --check river/
       zig fmt --check build.zig
       zig fmt --check build.zig.zon
+  - reuse: |
+      cd river
+      reuse lint
