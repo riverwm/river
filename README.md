@@ -1,5 +1,5 @@
 <!--
-SPDX-FileCopyrightText: 2020 The River Developers
+SPDX-FileCopyrightText: © 2020 The River Developers
 SPDX-License-Identifier: CC-BY-SA-4.0
 -->
 
