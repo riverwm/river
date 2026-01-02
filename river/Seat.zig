@@ -808,6 +808,8 @@ pub fn attachDevice(seat: *Seat, device: *InputDevice) void {
         },
         .pointer, .touch, .tablet => {
             seat.cursor.wlr_cursor.attachInputDevice(device.wlr_device);
+            seat.cursor.wlr_cursor.mapInputToOutput(device.wlr_device, device.config.map_to_output);
+            seat.cursor.wlr_cursor.mapInputToRegion(device.wlr_device, &device.config.map_to_rectangle);
         },
         .@"switch", .tablet_pad => unreachable, // unsupported
     }
