@@ -137,7 +137,7 @@ fn commit(wlr_surface: *wlr.Surface) callconv(.c) void {
     }
 }
 
-pub fn renderFinish(decoration: *Decoration) void {
+pub fn renderFinish(decoration: *Decoration, window_clip: *const wlr.Box) void {
     const rendering_requested = &decoration.rendering_requested;
     if (rendering_requested.sync_next_commit) {
         rendering_requested.sync_next_commit = false;
@@ -154,4 +154,12 @@ pub fn renderFinish(decoration: *Decoration) void {
     decoration.surfaces.dropSaved();
 
     decoration.tree.node.setPosition(rendering_requested.offset_x, rendering_requested.offset_y);
+
+    // wlroots asserts that a subsurface tree is present.
+    if (!decoration.surfaces.tree.children.empty()) {
+        var clip = window_clip.*;
+        clip.x -= rendering_requested.offset_x;
+        clip.y -= rendering_requested.offset_y;
+        decoration.surfaces.tree.node.subsurfaceTreeSetClip(&clip);
+    }
 }

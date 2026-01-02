@@ -879,11 +879,7 @@ pub fn renderFinish(window: *Window) void {
     inline for (.{ &window.decorations_above, &window.decorations_below }) |decorations| {
         var it = decorations.iterator(.forward);
         while (it.next()) |decoration| {
-            decoration.renderFinish();
-            // wlroots asserts that a subsurface tree is present.
-            if (!decoration.surfaces.tree.children.empty()) {
-                decoration.surfaces.tree.node.subsurfaceTreeSetClip(&window.rendering_requested.clip);
-            }
+            decoration.renderFinish(&window.rendering_requested.clip);
         }
     }
 }
