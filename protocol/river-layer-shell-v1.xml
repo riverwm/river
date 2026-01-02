@@ -50,7 +50,7 @@
 
     <enum name="error">
       <entry name="object_already_created" value="0"
-        sumary="the layer_shell_output/seat object was already created."/>
+        summary="the layer_shell_output/seat object was already created."/>
     </enum>
 
     <request name="destroy" type="destructor">

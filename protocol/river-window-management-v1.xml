@@ -117,7 +117,7 @@
 
     <enum name="error">
       <entry name="sequence_order" value="0"
-        sumary="request violates manage/render sequence ordering"/>
+        summary="request violates manage/render sequence ordering"/>
       <entry name="role" value="1"
         summary="given wl_surface already has a role"/>
     </enum>
