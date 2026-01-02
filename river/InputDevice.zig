@@ -69,6 +69,25 @@ pub fn init(
     if (wlr_device.getLibinputDevice()) |handle| {
         device.libinput.init(@ptrCast(handle));
     }
+
+    // The wlroots Wayland and X11 backends support multiple outputs
+    // exposed as multiple windows in the host session. However, this
+    // requires mapping pointer/touch devices to the outputs suggested
+    // by the backend to make input work as expected.
+    if (switch (wlr_device.type) {
+        .pointer => wlr_device.toPointer().output_name,
+        .touch => wlr_device.toTouch().output_name,
+        else => null,
+    }) |output_name| {
+        var it = server.om.outputs.iterator(.forward);
+        while (it.next()) |output| {
+            const wlr_output = output.wlr_output orelse continue;
+            if (mem.orderZ(u8, output_name, wlr_output.name) == .eq) {
+                device.config.map_to_output = wlr_output;
+                break;
+            }
+        }
+    }
 }
 
 pub fn createObject(device: *InputDevice, im_v1: *river.InputManagerV1) void {
