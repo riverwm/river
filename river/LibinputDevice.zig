@@ -50,6 +50,7 @@ pub fn createObject(device: *LibinputDevice, config_v1: *river.LibinputConfigV1)
     config_v1.sendLibinputDevice(object);
     {
         const base: *InputDevice = @fieldParentPtr("libinput", device);
+        assert(!base.virtual);
         var it = base.objects.iterator(.forward);
         while (it.next()) |input_device_v1| {
             if (object.getClient() == input_device_v1.getClient()) {

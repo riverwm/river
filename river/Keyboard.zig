@@ -37,7 +37,6 @@ device: InputDevice,
 device_destroyed: bool = false,
 queued_events: u32 = 0,
 
-virtual: bool,
 config: Config,
 /// Only null during initialization or due to allocation failure.
 group: ?*KeyboardGroup = null,
@@ -53,7 +52,6 @@ pub fn create(seat: *Seat, wlr_device: *wlr.InputDevice, virtual: bool) !*Keyboa
     errdefer util.gpa.destroy(keyboard);
 
     keyboard.* = .{
-        .virtual = virtual,
         .config = .{
             .keymap = if (virtual) wlr_keyboard.keymap else server.config.keymap,
         },
@@ -74,35 +72,27 @@ pub fn create(seat: *Seat, wlr_device: *wlr.InputDevice, virtual: bool) !*Keyboa
 pub fn setGroup(keyboard: *Keyboard) void {
     assert(keyboard.group == null);
     const seat = keyboard.device.seat;
-    if (keyboard.virtual) {
-        // Virtual keyboards set their own keymap and require independent modifier state.
-        // Therefore, they are always placed in their own group of one.
-        keyboard.group = KeyboardGroup.create(seat, keyboard.config, true) catch |err| switch (err) {
-            error.OutOfMemory => blk: {
-                log.err("out of memory", .{});
-                break :blk null;
-            },
-        };
-    } else {
+    // Virtual keyboards set their own keymap and require independent modifier state.
+    // Therefore, they are always placed in their own group of one.
+    if (!keyboard.device.virtual) {
         var it = seat.keyboard_groups.iterator(.forward);
         while (it.next()) |group| {
             if (keyboard.config.eql(&group.config)) {
                 keyboard.group = group.ref();
-                break;
+                return;
             }
-        } else {
-            keyboard.group = KeyboardGroup.create(seat, keyboard.config, false) catch |err| switch (err) {
-                error.OutOfMemory => blk: {
-                    log.err("out of memory", .{});
-                    break :blk null;
-                },
-            };
         }
     }
+    keyboard.group = KeyboardGroup.create(seat, keyboard.config, keyboard.device.virtual) catch |err| switch (err) {
+        error.OutOfMemory => {
+            log.err("out of memory", .{});
+            return;
+        },
+    };
 }
 
 pub fn setRepeatInfo(keyboard: *Keyboard, rate: u31, delay: u31) void {
-    assert(!keyboard.virtual);
+    assert(!keyboard.device.virtual);
     keyboard.config.repeat_rate = rate;
     keyboard.config.repeat_delay = delay;
     if (keyboard.group) |group| {

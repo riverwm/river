@@ -23,6 +23,7 @@ const log = std.log.scoped(.input);
 
 seat: *Seat,
 wlr_device: *wlr.InputDevice,
+virtual: bool,
 objects: wl.list.Head(river.InputDeviceV1, null),
 
 libinput: LibinputDevice,
@@ -47,6 +48,7 @@ pub fn init(
     device.* = .{
         .seat = seat,
         .wlr_device = wlr_device,
+        .virtual = virtual,
         .libinput = undefined,
         .objects = undefined,
         .link = undefined,
@@ -57,17 +59,20 @@ pub fn init(
     wlr_device.data = device;
     wlr_device.events.destroy.add(&device.remove);
 
-    log.debug("new input device: {s}-{s}", .{
+    log.debug("new {s}input device: {s}-{s}", .{
+        if (virtual) "virtual " else "",
         @tagName(wlr_device.type),
         wlr_device.name orelse "unknown",
     });
 
     if (!virtual) {
         var it = server.input_manager.objects.safeIterator(.forward);
-        while (it.next()) |im_v1| device.createObject(im_v1);
-    }
-    if (wlr_device.getLibinputDevice()) |handle| {
-        device.libinput.init(@ptrCast(handle));
+        while (it.next()) |im_v1| {
+            device.createObject(im_v1);
+        }
+        if (wlr_device.getLibinputDevice()) |handle| {
+            device.libinput.init(@ptrCast(handle));
+        }
     }
 
     // The wlroots Wayland and X11 backends support multiple outputs
@@ -91,6 +96,7 @@ pub fn init(
 }
 
 pub fn createObject(device: *InputDevice, im_v1: *river.InputManagerV1) void {
+    assert(!device.virtual);
     const device_type: river.InputDeviceV1.Type = switch (device.wlr_device.type) {
         .keyboard => .keyboard,
         .pointer => .pointer,

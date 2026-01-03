@@ -115,7 +115,11 @@ fn bind(client: *wl.Client, im: *InputManager, version: u32, id: u32) void {
     im.objects.append(im_v1);
     {
         var it = im.devices.iterator(.forward);
-        while (it.next()) |device| device.createObject(im_v1);
+        while (it.next()) |device| {
+            if (!device.virtual) {
+                device.createObject(im_v1);
+            }
+        }
     }
 }
 
