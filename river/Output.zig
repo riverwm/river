@@ -307,6 +307,7 @@ pub fn manageStart(output: *Output) void {
                 output_v1.setHandler(?*anyopaque, handleRequestInert, null, null);
                 output.layer_shell.makeInert();
                 output.object = null;
+                output.sent_wl_output = false;
             }
 
             output.sent = output.scheduled;
@@ -348,6 +349,7 @@ fn handleRequestInert(
 
 fn handleObjectDestroy(_: *river.OutputV1, output: *Output) void {
     output.object = null;
+    output.sent_wl_output = false;
 }
 
 fn handleRequest(
