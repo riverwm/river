@@ -306,8 +306,7 @@ pub fn manageStart(output: *Output) void {
                 output_v1.sendRemoved();
                 output_v1.setHandler(?*anyopaque, handleRequestInert, null, null);
                 output.layer_shell.makeInert();
-                output.object = null;
-                output.sent_wl_output = false;
+                handleObjectDestroy(output_v1, output);
             }
 
             output.sent = output.scheduled;
