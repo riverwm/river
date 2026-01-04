@@ -13,7 +13,6 @@ const wayland = @import("wayland");
 const wl = wayland.server.wl;
 const zwlr = wayland.server.zwlr;
 
-const c = @import("c.zig").c;
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
@@ -209,14 +208,9 @@ pub fn setTheme(cursor: *Cursor, theme: ?[*:0]const u8, _size: ?u32) !void {
     const xcursor_manager = try wlr.XcursorManager.create(theme, size);
     errdefer xcursor_manager.destroy();
 
-    // If this cursor belongs to the default seat, set the xcursor environment
-    // variables as well as the xwayland cursor theme.
+    // If this cursor belongs to the default seat, update the Xwayland cursor to match the theme.
+    // This cursor is communicated to Xwayland clients through the XCB_CW_CURSOR window attribute.
     if (cursor.seat == server.input_manager.defaultSeat()) {
-        const size_str = try std.fmt.allocPrintSentinel(util.gpa, "{}", .{size}, 0);
-        defer util.gpa.free(size_str);
-        if (c.setenv("XCURSOR_SIZE", size_str.ptr, 1) < 0) return error.OutOfMemory;
-        if (theme) |t| if (c.setenv("XCURSOR_THEME", t, 1) < 0) return error.OutOfMemory;
-
         if (build_options.xwayland) {
             if (server.xwayland) |xwayland| {
                 try xcursor_manager.load(1);

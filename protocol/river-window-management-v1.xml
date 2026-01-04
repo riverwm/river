@@ -1543,6 +1543,9 @@
         Set the XCursor theme for the seat. This theme is used for cursors
         rendered by the compositor, but not necessarily for cursors rendered by
         clients.
+
+        Note: The window manager may also wish to set the XCURSOR_THEME and
+        XCURSOR_SIZE environment variable for programs it starts.
       </description>
       <arg name="name" type="string"/>
       <arg name="size" type="uint"/>
