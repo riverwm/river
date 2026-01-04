@@ -50,8 +50,7 @@ pub fn createObject(
 pub fn makeInert(shell_output: *LayerShellOutput) void {
     if (shell_output.object) |object| {
         object.setHandler(?*anyopaque, handleRequestInert, null, null);
-        shell_output.object = null;
-        shell_output.sent = .{};
+        handleDestroy(object, shell_output);
     }
 }
 
@@ -65,6 +64,8 @@ fn handleRequestInert(
 
 fn handleDestroy(_: *river.LayerShellOutputV1, shell_output: *LayerShellOutput) void {
     shell_output.object = null;
+    shell_output.sent = .{};
+    shell_output.requested = .{};
 }
 
 fn handleRequest(
