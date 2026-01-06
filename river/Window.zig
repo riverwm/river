@@ -514,6 +514,7 @@ fn handleRequest(
             if (!server.wm.ensureWindowing()) return;
             if (args.width < 0 or args.height < 0) {
                 window_v1.postError(.invalid_dimensions, "dimensions must be greater than or equal to 0 ");
+                return;
             }
             wm_requested.dimensions = .{
                 .width = @intCast(args.width),
@@ -540,6 +541,7 @@ fn handleRequest(
             if (!server.wm.ensureRendering()) return;
             if (args.width < 0) {
                 window_v1.postError(.invalid_border, "border width must be greater than or equal to 0 ");
+                return;
             }
             rendering_requested.border = .{
                 .edges = args.edges,
@@ -619,6 +621,7 @@ fn handleRequest(
             if (!server.wm.ensureRendering()) return;
             if (args.width < 0 or args.height < 0) {
                 window_v1.postError(.invalid_clip_box, "width/height must be greater than or equal to 0 ");
+                return;
             }
             rendering_requested.clip = .{
                 .x = args.x,
