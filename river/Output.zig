@@ -151,6 +151,7 @@ pub fn create(wlr_output: *wlr.Output) !void {
         const title = try fmt.allocPrintSentinel(util.gpa, "river - {s}", .{wlr_output.name}, 0);
         defer util.gpa.free(title);
         if (wlr_output.isWl()) {
+            wlr_output.wlSetAppId("river");
             wlr_output.wlSetTitle(title);
         } else if (wlr.config.has_x11_backend and wlr_output.isX11()) {
             wlr_output.x11SetTitle(title);
