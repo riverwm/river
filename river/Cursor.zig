@@ -705,7 +705,6 @@ pub fn updateState(cursor: *Cursor) void {
                 @divTrunc(now.nsec, std.time.ns_per_ms));
             cursor.passthrough(msec);
         },
-        // TODO: Leave down mode if the target surface is no longer visible.
         .ignore, .down, .op => {},
     }
 }

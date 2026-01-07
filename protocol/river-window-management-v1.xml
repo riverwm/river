@@ -1594,6 +1594,21 @@
       <arg name="x" type="int"/>
       <arg name="y" type="int"/>
     </event>
+
+    <request name="pointer_warp" since="3">
+      <description summary="warp the pointer to a given position">
+        Warp the pointer to the given position in the compositor's logical
+        coordinate space.
+
+        If the given position is outside the bounds of all outputs, the pointer
+        will be warped to the closest point inside an output instead.
+
+        This request modifies window management state and may only be made as
+        part of a manage sequence, see the river_window_manager_v1 description.
+      </description>
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
+    </request>
   </interface>
 
   <interface name="river_pointer_binding_v1" version="3">

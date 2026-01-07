@@ -134,6 +134,7 @@ wm_requested: struct {
         start_pointer,
         end,
     } = .none,
+    pointer_warp: ?struct { x: i32, y: i32 } = null,
 } = .{},
 
 xkb_bindings: wl.list.Head(XkbBinding, .link),
@@ -484,7 +485,6 @@ fn handleRequest(
         .destroy => {
             seat_v1.destroy();
         },
-
         .focus_window => |args| {
             if (!server.wm.ensureWindowing()) return;
             const data = args.window.getUserData() orelse return;
@@ -507,7 +507,6 @@ fn handleRequest(
             if (!server.wm.ensureWindowing()) return;
             seat.wm_requested.op = .end;
         },
-
         .get_pointer_binding => |args| {
             PointerBinding.create(
                 seat,
@@ -522,7 +521,6 @@ fn handleRequest(
                 return;
             };
         },
-
         .set_xcursor_theme => |args| {
             seat.cursor.setTheme(args.name, args.size) catch |err| switch (err) {
                 error.OutOfMemory => {
@@ -531,6 +529,10 @@ fn handleRequest(
                     return;
                 },
             };
+        },
+        .pointer_warp => |args| {
+            if (!server.wm.ensureWindowing()) return;
+            seat.wm_requested.pointer_warp = .{ .x = args.x, .y = args.y };
         },
     }
 }
@@ -581,6 +583,12 @@ pub fn manageFinish(seat: *Seat) void {
         .end => seat.opEnd(),
     }
     seat.wm_requested.op = .none;
+
+    if (seat.wm_requested.pointer_warp) |target| {
+        seat.wm_requested.pointer_warp = null;
+        seat.cursor.wlr_cursor.warpClosest(null, @floatFromInt(target.x), @floatFromInt(target.y));
+        seat.cursor.updateState();
+    }
 }
 
 pub fn focus(seat: *Seat, new_focus: Focus) void {
