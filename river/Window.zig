@@ -59,6 +59,36 @@ pub const Border = struct {
     a: u32 = 0,
 };
 
+/// Windowing state requested by the wm.
+const WmRequested = struct {
+    dimensions: ?struct { width: u31, height: u31 },
+    ssd: bool,
+    tiled: river.WindowV1.Edges,
+    capabilities: river.WindowV1.Capabilities,
+    resizing: bool,
+    maximized: bool,
+    fullscreen: ?*Output,
+    inform_fullscreen: bool,
+    close: bool,
+
+    pub const init: WmRequested = .{
+        .dimensions = null,
+        .ssd = false,
+        .tiled = .{},
+        .capabilities = .{
+            .window_menu = true,
+            .maximize = true,
+            .fullscreen = true,
+            .minimize = true,
+        },
+        .resizing = false,
+        .maximized = false,
+        .fullscreen = null,
+        .inform_fullscreen = false,
+        .close = false,
+    };
+};
+
 pub const Configure = struct {
     width: ?u31 = null,
     height: ?u31 = null,
@@ -71,6 +101,25 @@ pub const Configure = struct {
     maximized: bool = false,
     inform_fullscreen: bool = false,
     resizing: bool = false,
+};
+
+/// Rendering state requested by the wm.
+const RenderingRequested = struct {
+    x: i32,
+    y: i32,
+    hidden: bool,
+    border: Border,
+    clip: wlr.Box,
+    content_clip: wlr.Box,
+
+    pub const init: RenderingRequested = .{
+        .x = 0,
+        .y = 0,
+        .hidden = false,
+        .border = .{},
+        .clip = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+        .content_clip = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+    };
 };
 
 pub const Ref = packed struct {
@@ -164,25 +213,7 @@ wm_sent: struct {
 } = .{},
 
 /// Windowing state requested by the wm.
-wm_requested: struct {
-    dimensions: ?struct {
-        width: u31,
-        height: u31,
-    } = null,
-    ssd: bool = false,
-    tiled: river.WindowV1.Edges = .{},
-    capabilities: river.WindowV1.Capabilities = .{
-        .window_menu = true,
-        .maximize = true,
-        .fullscreen = true,
-        .minimize = true,
-    },
-    resizing: bool = false,
-    maximized: bool = false,
-    fullscreen: ?*Output = null,
-    inform_fullscreen: bool = false,
-    close: bool = false,
-} = .{},
+wm_requested: WmRequested = .init,
 
 /// State to be sent to the window in the next configure.
 configure_scheduled: Configure = .{},
@@ -205,14 +236,7 @@ rendering_sent: struct {
 } = .{},
 
 /// Rendering state requested by the wm.
-rendering_requested: struct {
-    x: i32 = 0,
-    y: i32 = 0,
-    hidden: bool = false,
-    border: Border = .{},
-    clip: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
-    content_clip: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
-} = .{},
+rendering_requested: RenderingRequested = .init,
 
 /// The currently rendered position/dimensions of the window in the scene graph
 box: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
@@ -343,9 +367,9 @@ pub fn manageStart(window: *Window) void {
         .closing => {
             window.state = .init;
             window.wm_sent = .{};
-            window.wm_requested = .{};
+            window.wm_requested = .init;
             window.rendering_sent = .{};
-            window.rendering_requested = .{};
+            window.rendering_requested = .init;
 
             window.node.link.remove();
             window.node.link.init();
@@ -460,14 +484,9 @@ pub fn manageStart(window: *Window) void {
 
 fn makeInert(window: *Window) void {
     if (window.object) |window_v1| {
-        window.object = null;
         window_v1.sendClosed();
         window_v1.setHandler(?*anyopaque, handleRequestInert, null, null);
-        window.node.makeInert();
-        inline for (.{ &window.decorations_above, &window.decorations_below }) |decorations| {
-            var it = decorations.iterator(.forward);
-            while (it.next()) |decoration| decoration.makeInert();
-        }
+        handleDestroy(window_v1, window);
     } else {
         assert(window.node.object == null);
     }
@@ -483,6 +502,16 @@ fn handleRequestInert(
 
 fn handleDestroy(_: *river.WindowV1, window: *Window) void {
     window.object = null;
+    window.wm_requested = .init;
+    window.rendering_requested = .{
+        .x = window.rendering_requested.x,
+        .y = window.rendering_requested.y,
+        .hidden = false,
+        .border = .{},
+        .clip = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+        .content_clip = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+    };
+    server.wm.dirtyWindowing();
     window.node.makeInert();
     inline for (.{ &window.decorations_above, &window.decorations_below }) |decorations| {
         var it = decorations.iterator(.forward);
