@@ -211,6 +211,7 @@ rendering_requested: struct {
     hidden: bool = false,
     border: Border = .{},
     clip: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+    content_clip: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
 } = .{},
 
 /// The currently rendered position/dimensions of the window in the scene graph
@@ -630,6 +631,19 @@ fn handleRequest(
                 .height = args.height,
             };
         },
+        .set_content_clip_box => |args| {
+            if (!server.wm.ensureRendering()) return;
+            if (args.width < 0 or args.height < 0) {
+                window_v1.postError(.invalid_clip_box, "width/height must be greater than or equal to 0 ");
+                return;
+            }
+            rendering_requested.content_clip = .{
+                .x = args.x,
+                .y = args.y,
+                .width = args.width,
+                .height = args.height,
+            };
+        },
     }
 }
 
@@ -774,12 +788,14 @@ pub fn renderStart(window: *Window) void {
 }
 
 pub fn renderFinish(window: *Window) void {
+    const requested = &window.rendering_requested;
+
     window.tree.node.setEnabled(!window.rendering_requested.hidden);
     window.popup_tree.node.setEnabled(!window.rendering_requested.hidden);
 
     window.box = .{
-        .x = window.rendering_requested.x,
-        .y = window.rendering_requested.y,
+        .x = requested.x,
+        .y = requested.y,
         .width = window.rendering_sent.width,
         .height = window.rendering_sent.height,
     };
@@ -797,93 +813,117 @@ pub fn renderFinish(window: *Window) void {
     window.tree.node.setPosition(window.box.x, window.box.y);
     window.popup_tree.node.setPosition(window.box.x, window.box.y);
 
+    window.applySurfaceClip();
+
+    var content: wlr.Box = .{
+        .x = 0,
+        .y = 0,
+        .width = window.box.width,
+        .height = window.box.height,
+    };
+    if (requested.content_clip.empty() or
+        content.intersection(&content, &requested.content_clip))
     {
-        var surface_clip = window.rendering_requested.clip;
-        switch (window.impl) {
-            .toplevel => |toplevel| {
-                surface_clip.x += toplevel.geometry.x;
-                surface_clip.y += toplevel.geometry.y;
-            },
-            .xwayland, .destroying => {},
+        // f32 cannot represent all u32 values exactly, therefore we must initially use f64
+        // (which can) and then cast to f32, potentially losing precision.
+        const border = &requested.border;
+        const color: [4]f32 = .{
+            @floatCast(@as(f64, @floatFromInt(border.r)) / math.maxInt(u32)),
+            @floatCast(@as(f64, @floatFromInt(border.g)) / math.maxInt(u32)),
+            @floatCast(@as(f64, @floatFromInt(border.b)) / math.maxInt(u32)),
+            @floatCast(@as(f64, @floatFromInt(border.a)) / math.maxInt(u32)),
+        };
+
+        var left: wlr.Box = .{
+            .x = -@as(i32, border.width),
+            .y = 0,
+            .width = border.width,
+            .height = content.height,
+        };
+        var right: wlr.Box = .{
+            .x = content.width,
+            .y = 0,
+            .width = border.width,
+            .height = content.height,
+        };
+        var top: wlr.Box = .{
+            .x = 0,
+            .y = -@as(i32, border.width),
+            .width = content.width,
+            .height = border.width,
+        };
+        var bottom: wlr.Box = .{
+            .x = 0,
+            .y = content.height,
+            .width = content.width,
+            .height = border.width,
+        };
+
+        // Use left and right scene rects to draw the corners if needed
+        if (border.edges.top) {
+            left.y -= border.width;
+            left.height += border.width;
+            right.y -= border.width;
+            right.height += border.width;
         }
-        // wlroots asserts that a subsurface tree is present.
-        if (!window.surfaces.tree.children.empty()) {
-            window.surfaces.tree.node.subsurfaceTreeSetClip(&surface_clip);
+        if (border.edges.bottom) {
+            left.height += border.width;
+            right.height += border.width;
         }
-    }
 
-    // f32 cannot represent all u32 values exactly, therefore we must initially use f64
-    // (which can) and then cast to f32, potentially losing precision.
-    const border = &window.rendering_requested.border;
-    const color: [4]f32 = .{
-        @floatCast(@as(f64, @floatFromInt(border.r)) / math.maxInt(u32)),
-        @floatCast(@as(f64, @floatFromInt(border.g)) / math.maxInt(u32)),
-        @floatCast(@as(f64, @floatFromInt(border.b)) / math.maxInt(u32)),
-        @floatCast(@as(f64, @floatFromInt(border.a)) / math.maxInt(u32)),
-    };
-
-    var left: wlr.Box = .{
-        .x = -@as(i32, border.width),
-        .y = 0,
-        .width = border.width,
-        .height = window.box.height,
-    };
-    var right: wlr.Box = .{
-        .x = window.box.width,
-        .y = 0,
-        .width = border.width,
-        .height = window.box.height,
-    };
-    var top: wlr.Box = .{
-        .x = 0,
-        .y = -@as(i32, border.width),
-        .width = window.box.width,
-        .height = border.width,
-    };
-    var bottom: wlr.Box = .{
-        .x = 0,
-        .y = window.box.height,
-        .width = window.box.width,
-        .height = border.width,
-    };
-
-    // Use left and right scene rects to draw the corners if needed
-    if (border.edges.top) {
-        left.y -= border.width;
-        left.height += border.width;
-        right.y -= border.width;
-        right.height += border.width;
-    }
-    if (border.edges.bottom) {
-        left.height += border.width;
-        right.height += border.width;
-    }
-
-    inline for (.{
-        .{ .name = "left", .box = &left },
-        .{ .name = "right", .box = &right },
-        .{ .name = "top", .box = &top },
-        .{ .name = "bottom", .box = &bottom },
-    }) |edge| {
-        if (!window.rendering_requested.clip.empty()) {
-            if (!edge.box.intersection(edge.box, &window.rendering_requested.clip)) {
-                // TODO(wlroots): remove this redundant code after fixed upstream
-                // https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/5084
-                edge.box.* = .{ .x = 0, .y = 0, .width = 0, .height = 0 };
+        inline for (.{
+            .{ .name = "left", .box = &left },
+            .{ .name = "right", .box = &right },
+            .{ .name = "top", .box = &top },
+            .{ .name = "bottom", .box = &bottom },
+        }) |edge| {
+            if (!requested.clip.empty()) {
+                if (!edge.box.intersection(edge.box, &requested.clip)) {
+                    // TODO(wlroots): remove this redundant code after fixed upstream
+                    // https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/5084
+                    edge.box.* = .{ .x = 0, .y = 0, .width = 0, .height = 0 };
+                }
             }
+            const rect = @field(window.border, edge.name);
+            rect.node.setEnabled(@field(border.edges, edge.name));
+            rect.node.setPosition(edge.box.x, edge.box.y);
+            rect.setSize(edge.box.width, edge.box.height);
+            rect.setColor(&color);
         }
-        const rect = @field(window.border, edge.name);
-        rect.node.setEnabled(@field(border.edges, edge.name));
-        rect.node.setPosition(edge.box.x, edge.box.y);
-        rect.setSize(edge.box.width, edge.box.height);
-        rect.setColor(&color);
     }
 
     inline for (.{ &window.decorations_above, &window.decorations_below }) |decorations| {
         var it = decorations.iterator(.forward);
         while (it.next()) |decoration| {
-            decoration.renderFinish(&window.rendering_requested.clip);
+            decoration.renderFinish(&requested.clip);
         }
+    }
+}
+
+fn applySurfaceClip(window: *Window) void {
+    const requested = &window.rendering_requested;
+    var surface_clip: wlr.Box = requested.clip;
+    if (!requested.clip.empty() and !requested.content_clip.empty()) {
+        if (!surface_clip.intersection(&requested.clip, &requested.content_clip)) {
+            // Clip boxes are both non-empty but don't intersect, all window
+            // content is clipped away.
+            window.surfaces.setEnabled(false);
+            return;
+        }
+    } else if (!requested.content_clip.empty()) {
+        surface_clip = requested.content_clip;
+    }
+    window.surfaces.setEnabled(true);
+    switch (window.impl) {
+        .toplevel => |toplevel| {
+            surface_clip.x += toplevel.geometry.x;
+            surface_clip.y += toplevel.geometry.y;
+        },
+        .xwayland, .destroying => {},
+    }
+    // wlroots asserts that a subsurface tree is present.
+    if (!window.surfaces.tree.children.empty()) {
+        window.surfaces.tree.node.subsurfaceTreeSetClip(&surface_clip);
     }
 }
 

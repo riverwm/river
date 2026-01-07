@@ -148,7 +148,7 @@ pub fn renderFinish(shell_surface: *ShellSurface) void {
     if (rendering_requested.sync_next_commit) {
         rendering_requested.sync_next_commit = false;
 
-        if (!shell_surface.surfaces.saved.node.enabled) {
+        if (!shell_surface.surfaces.saved) {
             shell_surface.object.postError(.no_commit,
                 \\no wl_surface.commit after sync_next_commit and before update_rendering_finish
             );

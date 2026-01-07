@@ -142,7 +142,7 @@ pub fn renderFinish(decoration: *Decoration, window_clip: *const wlr.Box) void {
     if (rendering_requested.sync_next_commit) {
         rendering_requested.sync_next_commit = false;
 
-        if (!decoration.surfaces.saved.node.enabled) {
+        if (!decoration.surfaces.saved) {
             if (decoration.object) |object| {
                 object.postError(.no_commit,
                     \\no wl_surface.commit after sync_next_commit and before update_rendering_finish

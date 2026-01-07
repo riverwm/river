@@ -965,6 +965,8 @@
 
         Setting a clip box with 0 width or height disables clipping.
 
+        Both set_clip_box and set_content_clip_box may be enabled simultaneously.
+
         This request modifies rendering state and may only be made as part of a
         render sequence, see the river_window_manager_v1 description.
       </description>
@@ -989,6 +991,32 @@
       </description>
       <arg name="unreliable_pid" type="int"/>
     </event>
+
+    <request name="set_content_clip_box" since="3">
+      <description summary="clip the window content to a given box">
+        Clip the content of the window, excluding borders and decoration
+        surfaces, to the box specified by the x, y, width, and height arguments.
+        The x/y position of the box is relative to the top left corner of the
+        window.
+
+        Borders drawn by the compositor (see set_borders) are placed around the
+        intersection of the window content (as defined by the dimensions event)
+        and the content clip box when content clipping is enabled.
+
+        The width and height arguments must be greater than or equal to 0.
+
+        Setting a clip box with 0 width or height disables content clipping.
+
+        Both set_clip_box and set_content_clip_box may be enabled simultaneously.
+
+        This request modifies rendering state and may only be made as part of a
+        render sequence, see the river_window_manager_v1 description.
+      </description>
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
+      <arg name="width" type="int"/>
+      <arg name="height" type="int"/>
+    </request>
   </interface>
 
   <interface name="river_decoration_v1" version="3">

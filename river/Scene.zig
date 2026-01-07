@@ -133,36 +133,50 @@ pub fn layerSurfaceTree(scene: *Scene, layer: zwlr.LayerShellV1.Layer) *wlr.Scen
 }
 
 pub const SaveableSurfaces = struct {
+    enabled: bool,
+    saved: bool,
     tree: *wlr.SceneTree,
-    saved: *wlr.SceneTree,
+    saved_tree: *wlr.SceneTree,
 
     pub fn init(parent: *wlr.SceneTree) !SaveableSurfaces {
         const surfaces: SaveableSurfaces = .{
+            .enabled = true,
+            .saved = false,
             .tree = try parent.createSceneTree(),
-            .saved = try parent.createSceneTree(),
+            .saved_tree = try parent.createSceneTree(),
         };
-        surfaces.saved.node.setEnabled(false);
+        surfaces.syncEnabled();
         return surfaces;
     }
 
-    pub fn save(surfaces: SaveableSurfaces) void {
-        if (surfaces.saved.node.enabled) return;
-        assert(surfaces.tree.node.enabled);
-        assert(surfaces.saved.children.empty());
+    fn syncEnabled(surfaces: *const SaveableSurfaces) void {
+        surfaces.tree.node.setEnabled(surfaces.enabled and !surfaces.saved);
+        surfaces.saved_tree.node.setEnabled(surfaces.enabled and surfaces.saved);
+    }
 
-        surfaces.tree.node.forEachBuffer(*wlr.SceneTree, saveSurfaceTreeIter, surfaces.saved);
+    pub fn setEnabled(surfaces: *SaveableSurfaces, enabled: bool) void {
+        if (enabled == surfaces.enabled) return;
+        surfaces.enabled = enabled;
+        surfaces.syncEnabled();
+    }
 
-        surfaces.tree.node.setEnabled(false);
-        surfaces.saved.node.setEnabled(true);
+    pub fn save(surfaces: *SaveableSurfaces) void {
+        if (surfaces.saved) return;
+        assert(surfaces.tree.node.enabled == surfaces.enabled);
+        assert(!surfaces.saved_tree.node.enabled);
+        assert(surfaces.saved_tree.children.empty());
+        surfaces.tree.node.forEachBuffer(*wlr.SceneTree, saveSurfaceTreeIter, surfaces.saved_tree);
+        surfaces.saved = true;
+        surfaces.syncEnabled();
     }
 
     fn saveSurfaceTreeIter(
         buffer: *wlr.SceneBuffer,
         sx: c_int,
         sy: c_int,
-        saved: *wlr.SceneTree,
+        saved_tree: *wlr.SceneTree,
     ) void {
-        const scene_buffer = saved.createSceneBuffer(buffer.buffer) catch {
+        const scene_buffer = saved_tree.createSceneBuffer(buffer.buffer) catch {
             std.log.err("out of memory", .{});
             return;
         };
@@ -172,15 +186,15 @@ pub const SaveableSurfaces = struct {
         scene_buffer.setTransform(buffer.transform);
     }
 
-    pub fn dropSaved(surfaces: SaveableSurfaces) void {
-        if (!surfaces.saved.node.enabled) return;
-
+    pub fn dropSaved(surfaces: *SaveableSurfaces) void {
+        if (!surfaces.saved) return;
         assert(!surfaces.tree.node.enabled);
-
-        var it = surfaces.saved.children.safeIterator(.forward);
-        while (it.next()) |node| node.destroy();
-
-        surfaces.saved.node.setEnabled(false);
-        surfaces.tree.node.setEnabled(true);
+        assert(surfaces.saved_tree.node.enabled == surfaces.enabled);
+        {
+            var it = surfaces.saved_tree.children.safeIterator(.forward);
+            while (it.next()) |node| node.destroy();
+        }
+        surfaces.saved = false;
+        surfaces.syncEnabled();
     }
 };
