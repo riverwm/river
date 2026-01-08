@@ -214,7 +214,13 @@ fn handleRequestConfigure(
         return;
     }
 
-    _ = xwindow.configure();
+    xwindow.xsurface.configure(
+        math.lossyCast(i16, xwindow.window.box.x),
+        math.lossyCast(i16, xwindow.window.box.y),
+        event.width,
+        event.height,
+    );
+    xwindow.window.setDimensions(event.width, event.height);
 }
 
 fn handleSetOverrideRedirect(listener: *wl.Listener(void)) void {
