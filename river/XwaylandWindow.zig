@@ -114,7 +114,7 @@ pub fn configure(xwindow: *XwaylandWindow) bool {
         xwindow.setActivated(scheduled.activated);
     }
     if (scheduled.maximized != sent.maximized) {
-        xwindow.xsurface.setFullscreen(scheduled.maximized);
+        xwindow.xsurface.setMaximized(scheduled.maximized, scheduled.maximized);
     }
     if (scheduled.inform_fullscreen != sent.inform_fullscreen) {
         xwindow.xsurface.setFullscreen(scheduled.inform_fullscreen);
