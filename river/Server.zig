@@ -120,7 +120,7 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
 
         .security_context_manager = try wlr.SecurityContextManagerV1.create(wl_server),
 
-        .shm = try wlr.Shm.createWithRenderer(wl_server, 1, renderer),
+        .shm = try wlr.Shm.createWithRenderer(wl_server, 2, renderer),
         .single_pixel_buffer_manager = try wlr.SinglePixelBufferManagerV1.create(wl_server),
 
         .viewporter = try wlr.Viewporter.create(wl_server),
