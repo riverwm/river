@@ -601,6 +601,8 @@
         the left edge will not extend vertically beyond the top edge of the
         window.
 
+        Borders are not drawn while the window is fullscreen.
+
         The color is defined by four 32-bit RGBA values. Unless specified in
         another protocol extension, the RGBA values use pre-multiplied alpha.
 
@@ -909,6 +911,11 @@
         shall not affect the current position and dimensions of a fullscreen
         window.
 
+        The compositor will clip window content, decoration surfaces, and
+        borders to the given output's dimensions while the window is fullscreen.
+        The effects of set_clip_box and set_content_clip_box are ignored while
+        the window is fullscreen.
+
         If the output on which a window is currently fullscreen is removed, the
         windowing state is modified as if there were an exit_fullscreen request
         made in the same manage sequence as the river_output_v1.removed event.
@@ -965,6 +972,8 @@
 
         Setting a clip box with 0 width or height disables clipping.
 
+        The clip box is ignored while the window is fullscreen.
+
         Both set_clip_box and set_content_clip_box may be enabled simultaneously.
 
         This request modifies rendering state and may only be made as part of a
@@ -1005,7 +1014,9 @@
 
         The width and height arguments must be greater than or equal to 0.
 
-        Setting a clip box with 0 width or height disables content clipping.
+        Setting a box with 0 width or height disables content clipping.
+
+        The content clip box is ignored while the window is fullscreen.
 
         Both set_clip_box and set_content_clip_box may be enabled simultaneously.
 

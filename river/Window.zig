@@ -818,32 +818,42 @@ pub fn renderStart(window: *Window) void {
 
 pub fn renderFinish(window: *Window) void {
     const requested = &window.rendering_requested;
+    window.tree.node.setEnabled(!requested.hidden);
+    window.popup_tree.node.setEnabled(!requested.hidden);
 
-    window.tree.node.setEnabled(!window.rendering_requested.hidden);
-    window.popup_tree.node.setEnabled(!window.rendering_requested.hidden);
+    window.box.width = window.rendering_sent.width;
+    window.box.height = window.rendering_sent.height;
 
-    window.box = .{
-        .x = requested.x,
-        .y = requested.y,
-        .width = window.rendering_sent.width,
-        .height = window.rendering_sent.height,
-    };
-
+    var clip: wlr.Box = requested.clip;
+    var content_clip: wlr.Box = requested.content_clip;
     if (window.wm_requested.fullscreen) |output| {
         window.box.x = output.sent.x;
         window.box.y = output.sent.y;
         window.fullscreen_background.node.setEnabled(true);
         const width, const height = output.sent.dimensions();
         window.fullscreen_background.setSize(width, height);
+        clip = .{ .x = 0, .y = 0, .width = width, .height = height };
+        content_clip = .{ .x = 0, .y = 0, .width = 0, .height = 0 };
     } else {
+        window.box.x = requested.x;
+        window.box.y = requested.y;
         window.fullscreen_background.node.setEnabled(false);
+        window.drawBorders();
     }
-
     window.tree.node.setPosition(window.box.x, window.box.y);
     window.popup_tree.node.setPosition(window.box.x, window.box.y);
 
-    window.applySurfaceClip();
+    window.applySurfaceClip(&clip, &content_clip);
+    inline for (.{ &window.decorations_above, &window.decorations_below }) |decorations| {
+        var it = decorations.iterator(.forward);
+        while (it.next()) |decoration| {
+            decoration.renderFinish(&clip);
+        }
+    }
+}
 
+fn drawBorders(window: *Window) void {
+    const requested = &window.rendering_requested;
     var content: wlr.Box = .{
         .x = 0,
         .y = 0,
@@ -862,7 +872,6 @@ pub fn renderFinish(window: *Window) void {
             @floatCast(@as(f64, @floatFromInt(border.b)) / math.maxInt(u32)),
             @floatCast(@as(f64, @floatFromInt(border.a)) / math.maxInt(u32)),
         };
-
         var left: wlr.Box = .{
             .x = -@as(i32, border.width),
             .y = 0,
@@ -887,7 +896,6 @@ pub fn renderFinish(window: *Window) void {
             .width = content.width,
             .height = border.width,
         };
-
         // Use left and right scene rects to draw the corners if needed
         if (border.edges.top) {
             left.y -= border.width;
@@ -899,7 +907,6 @@ pub fn renderFinish(window: *Window) void {
             left.height += border.width;
             right.height += border.width;
         }
-
         inline for (.{
             .{ .name = "left", .box = &left },
             .{ .name = "right", .box = &right },
@@ -920,27 +927,21 @@ pub fn renderFinish(window: *Window) void {
             rect.setColor(&color);
         }
     }
-
-    inline for (.{ &window.decorations_above, &window.decorations_below }) |decorations| {
-        var it = decorations.iterator(.forward);
-        while (it.next()) |decoration| {
-            decoration.renderFinish(&requested.clip);
-        }
-    }
 }
 
-fn applySurfaceClip(window: *Window) void {
-    const requested = &window.rendering_requested;
-    var surface_clip: wlr.Box = requested.clip;
-    if (!requested.clip.empty() and !requested.content_clip.empty()) {
-        if (!surface_clip.intersection(&requested.clip, &requested.content_clip)) {
+fn applySurfaceClip(window: *Window, a: *const wlr.Box, b: *const wlr.Box) void {
+    var surface_clip: wlr.Box = undefined;
+    if (!a.empty() and !b.empty()) {
+        if (!surface_clip.intersection(a, b)) {
             // Clip boxes are both non-empty but don't intersect, all window
             // content is clipped away.
             window.surfaces.setEnabled(false);
             return;
         }
-    } else if (!requested.content_clip.empty()) {
-        surface_clip = requested.content_clip;
+    } else if (!a.empty()) {
+        surface_clip = a.*;
+    } else {
+        surface_clip = b.*;
     }
     window.surfaces.setEnabled(true);
     switch (window.impl) {
