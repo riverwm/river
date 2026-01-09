@@ -24,13 +24,6 @@ pub const Config = struct {
     repeat_rate: u31 = 80,
     /// Repeat delay in milliseconds
     repeat_delay: u31 = 300,
-
-    pub fn eql(a: *const Config, b: *const Config) bool {
-        // TODO this probably isn't a sufficient way to compare keymaps?
-        return a.keymap == b.keymap and
-            a.repeat_rate == b.repeat_rate and
-            a.repeat_delay == b.repeat_delay;
-    }
 };
 
 device: InputDevice,
@@ -53,10 +46,22 @@ pub fn create(seat: *Seat, wlr_device: *wlr.InputDevice, virtual: bool) !*Keyboa
 
     keyboard.* = .{
         .config = .{
-            .keymap = if (virtual) wlr_keyboard.keymap else server.config.keymap,
+            .keymap = blk: {
+                if (virtual) {
+                    if (wlr_keyboard.keymap) |keymap| {
+                        break :blk keymap.ref();
+                    } else {
+                        break :blk null;
+                    }
+                } else {
+                    break :blk server.xkb_config.default_keymap.ref();
+                }
+            },
         },
         .device = undefined,
     };
+    errdefer if (keyboard.config.keymap) |keymap| keymap.unref();
+
     try keyboard.device.init(seat, wlr_device, virtual);
     errdefer keyboard.device.deinit();
 
@@ -77,7 +82,7 @@ pub fn setGroup(keyboard: *Keyboard) void {
     if (!keyboard.device.virtual) {
         var it = seat.keyboard_groups.iterator(.forward);
         while (it.next()) |group| {
-            if (keyboard.config.eql(&group.config)) {
+            if (group.match(&keyboard.config)) {
                 keyboard.group = group.ref();
                 return;
             }
@@ -95,6 +100,17 @@ pub fn setRepeatInfo(keyboard: *Keyboard, rate: u31, delay: u31) void {
     assert(!keyboard.device.virtual);
     keyboard.config.repeat_rate = rate;
     keyboard.config.repeat_delay = delay;
+    if (keyboard.group) |group| {
+        group.unref();
+        keyboard.group = null;
+    }
+    keyboard.setGroup();
+}
+
+pub fn setKeymap(keyboard: *Keyboard, keymap: *xkb.Keymap) void {
+    assert(!keyboard.device.virtual);
+    if (keyboard.config.keymap) |old| old.unref();
+    keyboard.config.keymap = keymap.ref();
     if (keyboard.group) |group| {
         group.unref();
         keyboard.group = null;
@@ -120,6 +136,7 @@ fn maybeDestroy(keyboard: *Keyboard) void {
         return;
     }
 
+    if (keyboard.config.keymap) |keymap| keymap.unref();
     if (keyboard.group) |group| group.unref();
 
     util.gpa.destroy(keyboard);

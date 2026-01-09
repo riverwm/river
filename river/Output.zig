@@ -22,7 +22,6 @@ const LayerShellOutput = @import("LayerShellOutput.zig");
 const LockSurface = @import("LockSurface.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
 const Window = @import("Window.zig");
-const Config = @import("Config.zig");
 
 const log = std.log.scoped(.output);
 

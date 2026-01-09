@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="river_xkb_config_v1">
+  <copyright>
+    SPDX-FileCopyrightText: © 2026 Isaac Freund
+    SPDX-License-Identifier: MIT
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to
+    deal in the Software without restriction, including without limitation the
+    rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+    sell copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+    IN THE SOFTWARE.
+  </copyright>
+
+  <description summary="configure xkbcommon keyboard state">
+    This protocol allow a client to set the xkbcommon keymap of individual
+    keyboard input devices. It also allows switching between the layouts of a
+    keymap and toggling capslock/numlock state.
+
+    The key words "must", "must not", "required", "shall", "shall not",
+    "should", "should not", "recommended", "may", and "optional" in this
+    document are to be interpreted as described in IETF RFC 2119.
+
+    Warning! The protocol described in this file is currently in the testing
+    phase. Backward compatible changes may be added together with the
+    corresponding interface version bump. Backward incompatible changes can only
+    be done by creating a new major version of the extension.
+  </description>
+
+  <interface name="river_xkb_config_v1" version="1">
+    <description summary="xkb config global interface">
+      Global interface for configuring xkb devices.
+
+      This global should only be advertised if river_input_manager_v1 is
+      advertised as well.
+    </description>
+
+    <enum name="error">
+      <entry name="invalid_destroy" value="0"/>
+      <entry name="invalid_format" value="1"/>
+    </enum>
+
+    <request name="stop">
+      <description summary="stop sending events">
+        This request indicates that the client no longer wishes to receive
+        events on this object.
+
+        The Wayland protocol is asynchronous, which means the server may send
+        further events until the stop request is processed. The client must wait
+        for a river_xkb_config_v1.finished event before destroying this object.
+      </description>
+    </request>
+
+    <event name="finished">
+      <description summary="the server has finished with the object">
+        This event indicates that the server will send no further events on this
+        object. The client should destroy the object. See
+        river_xkb_config_v1.destroy for more information.
+      </description>
+    </event>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the river_xkb_config_v1 object">
+        This request should be called after the finished event has been received
+        to complete destruction of the object.
+
+        It is a protocol error to make this request before the finished event
+        has been received.
+
+        If a client wishes to destroy this object it should send a
+        river_xkb_config_v1.stop request and wait for a
+        river_xkb_config_v1.finished event. Once the finished event is received
+        it is safe to destroy this object and any other objects created through
+        this interface.
+      </description>
+    </request>
+
+    <enum name="keymap_format">
+      <entry name="text_v1" value="1" summary="XKB_KEYMAP_FORMAT_TEXT_V1"/>
+      <entry name="text_v2" value="2" summary="XKB_KEYMAP_FORMAT_TEXT_V2"/>
+    </enum>
+
+    <request name="create_keymap">
+      <description summary="create a keymap object">
+        The server must be able to mmap the fd with MAP_PRIVATE.
+        The server will fstat the fd to obtain the size of the keymap.
+        The client must not modify the contents of the fd after making this request.
+        The client should seal the fd with fcntl.
+      </description>
+      <arg name="id" type="new_id" interface="river_xkb_keymap_v1"/>
+      <arg name="fd" type="fd"/>
+      <arg name="format" type="uint" enum="keymap_format"/>
+    </request>
+
+    <event name="xkb_keyboard">
+      <description summary="new xkb keyboard">
+        A new xkbcommon keyboard has been created. Not every
+        river_input_device_v1 is necessarily an xkbcommon keyboard as well.
+      </description>
+      <arg name="id" type="new_id" interface="river_xkb_keyboard_v1"/>
+    </event>
+  </interface>
+
+  <interface name="river_xkb_keymap_v1" version="1">
+    <description summary="xkbcommon keymap">
+      This object is the result of attempting to create an xkbcommon keymap.
+    </description>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the keymap object">
+        This request indicates that the client will no longer use the keymap
+        object and that it may be safely destroyed.
+      </description>
+    </request>
+
+    <event name="success">
+      <description summary="keymap creation succeeded">
+        The keymap object was successfully created and may be used with the
+        river_xkb_keyboard_v1.set_keymap request.
+      </description>
+    </event>
+
+    <event name="failure">
+      <description summary="keymap creation failed">
+        The compositor failed to create a keymap from the given parameters.
+
+        It is a protocol error to use this keymap object with
+        river_xkb_keyboard_v1.set_keymap.
+      </description>
+      <arg name="error_msg" type="string"/>
+    </event>
+  </interface>
+
+  <interface name="river_xkb_keyboard_v1" version="1">
+    <description summary="xkbcommon keyboard device">
+      This object represent a physical keyboard which has its configuration and
+      state managed by xkbcommon.
+    </description>
+
+    <enum name="error">
+      <entry name="invalid_keymap" value="0"/>
+    </enum>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the xkb keyboard object">
+        This request indicates that the client will no longer use the keyboard
+        object and that it may be safely destroyed.
+      </description>
+    </request>
+
+    <event name="removed">
+      <description summary="the xkb keyboard is removed">
+        This event indicates that the xkb keyboard has been removed.
+
+        The server will send no further events on this object and ignore any
+        request (other than river_xkb_keyboard_v1.destroy) made after this event
+        is sent. The client should destroy this object with the
+        river_xkb_keyboard_v1.destroy request to free up resources.
+      </description>
+    </event>
+
+    <event name="input_device">
+      <description summary="corresponding river input device">
+        The river_input_device_v1 corresponding to this xkb keyboard. This event
+        will always be the first event sent on the river_xkb_keyboard_v1 object,
+        and it will be sent exactly once.
+      </description>
+      <arg name="device" type="object" interface="river_input_device_v1"/>
+    </event>
+
+    <request name="set_keymap">
+      <description summary="set the keymap">
+        Set the keymap for the keyboard.
+
+        It is a protocol error to pass a keymap object for which the
+        river_xkb_keymap_v1.success event was not received.
+      </description>
+      <arg name="keymap" type="object" interface="river_xkb_keymap_v1"/>
+    </request>
+
+    <request name="set_layout_by_index">
+      <description summary="set the active layout by index">
+        Set the active layout for the keyboard's keymap. Has no effect if the
+        layout index is out of bounds for the current keymap.
+      </description>
+      <arg name="index" type="int"/>
+    </request>
+
+    <request name="set_layout_by_name">
+      <description summary="set the active layout by name">
+        Set the active layout for the keyboard's keymap. Has no effect if there
+        is no layout with the give name for the keyboard's keymap.
+      </description>
+      <arg name="name" type="string"/>
+    </request>
+
+    <event name="layout">
+      <description summary="currently active layout">
+        The currently active layout index and name. The name arg may be null if
+        the active layout does not have a name.
+
+        This event is sent once when the river_xkb_keyboard_v1 is created and
+        again whenever the layout changes.
+      </description>
+      <arg name="index" type="uint"/>
+      <arg name="name" type="string" allow-null="true"/>
+    </event>
+
+    <request name="capslock_enable">
+      <description summary="enable capslock">
+        Enable capslock for the keyboard.
+      </description>
+    </request>
+
+    <request name="capslock_disable">
+      <description summary="disable capslock">
+        Disable capslock for the keyboard.
+      </description>
+    </request>
+
+    <event name="capslock_enabled">
+      <description summary="capslock is currently enabled">
+        Capslock is currently enabled for the keyboard.
+
+        This event is sent once when the river_xkb_keyboard_v1 is created and
+        again whenever the capslock state changes.
+      </description>
+    </event>
+
+    <event name="capslock_disabled">
+      <description summary="capslock is currently disabled">
+        Capslock is currently disabled for the keyboard.
+
+        This event is sent once when the river_xkb_keyboard_v1 is created and
+        again whenever the capslock state changes.
+      </description>
+    </event>
+
+    <request name="numlock_enable">
+      <description summary="enable numlock">
+        Enable numlock for the keyboard.
+      </description>
+    </request>
+
+    <request name="numlock_disable">
+      <description summary="disable numlock">
+        Disable numlock for the keyboard.
+      </description>
+    </request>
+
+    <event name="numlock_enabled">
+      <description summary="numlock is currently enabled">
+        Capslock is currently enabled for the keyboard.
+
+        This event is sent once when the river_xkb_keyboard_v1 is created and
+        again whenever the numlock state changes.
+      </description>
+    </event>
+
+    <event name="numlock_disabled">
+      <description summary="numlock is currently disabled">
+        Capslock is currently disabled for the keyboard.
+
+        This event is sent once when the river_xkb_keyboard_v1 is created and
+        again whenever the numlock state changes.
+      </description>
+    </event>
+  </interface>
+</protocol>

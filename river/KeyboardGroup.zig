@@ -15,6 +15,7 @@ const util = @import("util.zig");
 const Keyboard = @import("Keyboard.zig");
 const Seat = @import("Seat.zig");
 const XkbBinding = @import("XkbBinding.zig");
+const InputDevice = @import("InputDevice.zig");
 
 const log = std.log.scoped(.input);
 
@@ -133,6 +134,36 @@ pub fn unref(group: *KeyboardGroup) void {
     group.pressed.deinit(util.gpa);
 
     util.gpa.destroy(group);
+}
+
+pub fn match(group: *const KeyboardGroup, config: *Keyboard.Config) bool {
+    const a = &group.config;
+    const b = config;
+    if (a.repeat_rate != b.repeat_rate) return false;
+    if (a.repeat_delay != b.repeat_delay) return false;
+
+    if (a.keymap == b.keymap) return true;
+    if (a.keymap == null or b.keymap == null) return false;
+
+    // Can't get away with a cheap pointer comparison.
+    // TODO implement a non-terrible way to do this upstream in xkbcommon
+    const a_string = a.keymap.?.getAsString2(.use_original_format, .{});
+    defer std.c.free(a_string);
+    const b_string = b.keymap.?.getAsString2(.use_original_format, .{});
+    defer std.c.free(b_string);
+    if (a_string == null or b_string == null) {
+        // Ugh, no good options here, we don't know why the function failed.
+        // xkbcommon really needs a better API for this.
+        log.err("xkb_keymap_get_as_string2() failed", .{});
+        return false;
+    }
+    if (std.mem.orderZ(u8, a_string.?, b_string.?) == .eq) {
+        // Consolidate so we don't have to do this expensive/silly comparison again
+        config.keymap.?.unref();
+        config.keymap = group.config.keymap.?.ref();
+        return true;
+    }
+    return false;
 }
 
 pub fn processKey(group: *KeyboardGroup, event: *const wlr.Keyboard.event.Key) void {
@@ -266,6 +297,8 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
             group.seat.wlr_seat.keyboardNotifyKey(event.time_msec, event.keycode, event.state);
         },
     }
+
+    group.sendState();
 }
 
 fn keysymIsModifier(keysym: xkb.Keysym) bool {
@@ -325,6 +358,7 @@ fn handleModifiers(listener: *wl.Listener(*wlr.Keyboard), _: *wlr.Keyboard) void
         group.seat.wlr_seat.setKeyboard(&group.state);
         group.seat.wlr_seat.keyboardNotifyModifiers(&group.state.modifiers);
     }
+    group.sendState();
 }
 
 /// Handle any builtin, hardcoded compositor keybindings such as VT switching.
@@ -373,4 +407,23 @@ fn getInputMethodGrab(group: *KeyboardGroup) ?*wlr.InputMethodV2.KeyboardGrab {
 pub fn processKeymap(group: *KeyboardGroup, keymap: *xkb.Keymap) void {
     // wlroots will log an error on failure, there's not much we can do to recover unfortunately.
     _ = group.state.setKeymap(keymap);
+}
+
+pub fn sendState(group: *KeyboardGroup) void {
+    const keymap = group.config.keymap.?;
+    const layout_index = group.state.modifiers.group;
+    const layout_name = keymap.layoutGetName(layout_index);
+    const caps_mask = keymap.modGetMask(xkb.names.mod.caps);
+    const capslock = group.state.modifiers.locked & caps_mask != 0;
+    const num_mask = keymap.modGetMask(xkb.names.vmod.num);
+    const numlock = group.state.modifiers.locked & num_mask != 0;
+
+    var it = server.xkb_config.keyboards.iterator(.forward);
+    while (it.next()) |xkb_keyboard| {
+        const device: *InputDevice = @fieldParentPtr("xkb_keyboard", xkb_keyboard);
+        const keyboard: *Keyboard = @fieldParentPtr("device", device);
+        if (keyboard.group != group) continue;
+
+        xkb_keyboard.sendState(layout_index, layout_name, capslock, numlock);
+    }
 }

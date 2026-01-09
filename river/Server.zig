@@ -14,7 +14,6 @@ const wl = @import("wayland").server.wl;
 const c = @import("c.zig").c;
 const util = @import("util.zig");
 
-const Config = @import("Config.zig");
 const IdleInhibitManager = @import("IdleInhibitManager.zig");
 const InputManager = @import("InputManager.zig");
 const LockManager = @import("LockManager.zig");
@@ -28,6 +27,7 @@ const WindowManager = @import("WindowManager.zig");
 const XkbBindings = @import("XkbBindings.zig");
 const LayerShell = @import("LayerShell.zig");
 const LibinputConfig = @import("LibinputConfig.zig");
+const XkbConfig = @import("XkbConfig.zig");
 const XdgDecoration = @import("XdgDecoration.zig");
 const XdgToplevel = @import("XdgToplevel.zig");
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
@@ -76,8 +76,8 @@ foreign_toplevel_list: *wlr.ExtForeignToplevelListV1,
 scene: Scene,
 input_manager: InputManager,
 libinput_config: LibinputConfig,
+xkb_config: XkbConfig,
 om: OutputManager,
-config: Config,
 idle_inhibit_manager: IdleInhibitManager,
 lock_manager: LockManager,
 wm: WindowManager,
@@ -142,12 +142,11 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
 
         .foreign_toplevel_list = try wlr.ExtForeignToplevelListV1.create(wl_server, 1),
 
-        .config = try Config.init(),
-
         .scene = undefined,
         .om = undefined,
         .input_manager = undefined,
         .libinput_config = undefined,
+        .xkb_config = undefined,
         .idle_inhibit_manager = undefined,
         .lock_manager = undefined,
         .wm = undefined,
@@ -177,6 +176,7 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
     try server.om.init();
     try server.input_manager.init();
     try server.libinput_config.init();
+    try server.xkb_config.init();
     try server.idle_inhibit_manager.init();
     try server.lock_manager.init();
 
@@ -229,8 +229,6 @@ pub fn deinit(server: *Server) void {
     server.layer_shell.deinit();
 
     server.wl_server.destroy();
-
-    server.config.deinit();
 }
 
 /// Create the socket, start the backend, and setup the environment
@@ -331,6 +329,7 @@ fn blocklist(server: *Server, global: *const wl.Global) bool {
         global == server.om.power_manager.global or
         global == server.om.gamma_control_manager.global or
         global == server.libinput_config.global or
+        global == server.xkb_config.global or
         global == server.input_manager.global or
         global == server.input_manager.idle_notifier.global or
         global == server.input_manager.virtual_pointer_manager.global or

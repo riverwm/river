@@ -84,6 +84,7 @@ pub fn build(b: *Build) !void {
     scanner.addCustomProtocol(b.path("protocol/river-layer-shell-v1.xml"));
     scanner.addCustomProtocol(b.path("protocol/river-input-management-v1.xml"));
     scanner.addCustomProtocol(b.path("protocol/river-libinput-config-v1.xml"));
+    scanner.addCustomProtocol(b.path("protocol/river-xkb-config-v1.xml"));
 
     scanner.addCustomProtocol(b.path("protocol/upstream/wlr-layer-shell-unstable-v1.xml"));
     scanner.addCustomProtocol(b.path("protocol/upstream/wlr-output-power-management-unstable-v1.xml"));
@@ -115,6 +116,7 @@ pub fn build(b: *Build) !void {
     scanner.generate("river_layer_shell_v1", 1);
     scanner.generate("river_input_manager_v1", 1);
     scanner.generate("river_libinput_config_v1", 1);
+    scanner.generate("river_xkb_config_v1", 1);
 
     scanner.generate("zwlr_output_power_manager_v1", 1);
     scanner.generate("zwlr_layer_shell_v1", 4);

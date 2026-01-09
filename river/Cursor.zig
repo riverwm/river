@@ -16,7 +16,6 @@ const zwlr = wayland.server.zwlr;
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
-const Config = @import("Config.zig");
 const DragIcon = @import("DragIcon.zig");
 const InputDevice = @import("InputDevice.zig");
 const LockSurface = @import("LockSurface.zig");

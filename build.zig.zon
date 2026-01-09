@@ -24,8 +24,8 @@
             .hash = "wlroots-0.19.3-jmOlcuL_AwBHhLCwpFsXbTizE3q9BugFmGX-XIxqcPMc",
         },
         .xkbcommon = .{
-            .url = "https://codeberg.org/ifreund/zig-xkbcommon/archive/v0.3.0.tar.gz",
-            .hash = "xkbcommon-0.3.0-VDqIe3K9AQB2fG5ZeRcMC9i7kfrp5m2rWgLrmdNn9azr",
+            .url = "git+https://codeberg.org/ifreund/zig-xkbcommon?ref=main#a10651157cb1545ee3ae3818b4c7437c64d16462",
+            .hash = "xkbcommon-0.4.0-dev-VDqIe3bUAQB9reSurmSJxQjiQ6bnpekmOxIp_077GhVZ",
         },
     },
     .fingerprint = 0xf5e3672b8e8d6efc,

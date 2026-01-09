@@ -18,6 +18,7 @@ const Keyboard = @import("Keyboard.zig");
 const LibinputDevice = @import("LibinputDevice.zig");
 const Seat = @import("Seat.zig");
 const Tablet = @import("Tablet.zig");
+const XkbKeyboard = @import("XkbKeyboard.zig");
 
 const log = std.log.scoped(.input);
 
@@ -27,6 +28,7 @@ virtual: bool,
 objects: wl.list.Head(river.InputDeviceV1, null),
 
 libinput: LibinputDevice,
+xkb_keyboard: XkbKeyboard,
 
 remove: wl.Listener(*wlr.InputDevice) = .init(handleRemove),
 
@@ -50,6 +52,7 @@ pub fn init(
         .wlr_device = wlr_device,
         .virtual = virtual,
         .libinput = undefined,
+        .xkb_keyboard = undefined,
         .objects = undefined,
         .link = undefined,
     };
@@ -93,6 +96,9 @@ pub fn init(
             }
         }
     }
+    if (wlr_device.type == .keyboard) {
+        device.xkb_keyboard.init();
+    }
 }
 
 pub fn createObject(device: *InputDevice, im_v1: *river.InputManagerV1) void {
@@ -122,6 +128,9 @@ pub fn deinit(device: *InputDevice) void {
 
     if (device.wlr_device.getLibinputDevice() != null) {
         device.libinput.deinit();
+    }
+    if (device.wlr_device.type == .keyboard) {
+        device.xkb_keyboard.deinit();
     }
 
     device.link.remove();
