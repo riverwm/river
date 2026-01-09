@@ -834,6 +834,9 @@ pub fn renderFinish(window: *Window) void {
         window.fullscreen_background.setSize(width, height);
         clip = .{ .x = 0, .y = 0, .width = width, .height = height };
         content_clip = .{ .x = 0, .y = 0, .width = 0, .height = 0 };
+        inline for (.{ "left", "right", "top", "bottom" }) |edge| {
+            @field(window.border, edge).node.setEnabled(false);
+        }
     } else {
         window.box.x = requested.x;
         window.box.y = requested.y;
