@@ -249,10 +249,14 @@ pub fn commitOutputState(om: *OutputManager) void {
     {
         var it = wm.sent.outputs.iterator(.forward);
         while (it.next()) |output| {
+            assert(output.sent.state != .destroying);
+            // This may be null even when the state is not .destroying if the
+            // output is destroyed between manage start and render finish.
+            const wlr_output = output.wlr_output orelse continue;
             switch (output.sent.state) {
                 .enabled, .disabled_soft => {
                     output.scene_output.?.setPosition(output.sent.x, output.sent.y);
-                    _ = om.output_layout.add(output.wlr_output.?, output.sent.x, output.sent.y) catch {
+                    _ = om.output_layout.add(wlr_output, output.sent.x, output.sent.y) catch {
                         log.err("out of memory", .{});
                         continue; // Try again next time
                     };
@@ -261,7 +265,7 @@ pub fn commitOutputState(om: *OutputManager) void {
                     }
                 },
                 .disabled_hard => {
-                    om.output_layout.remove(output.wlr_output.?);
+                    om.output_layout.remove(wlr_output);
                 },
                 .destroying => unreachable,
             }
@@ -271,7 +275,7 @@ pub fn commitOutputState(om: *OutputManager) void {
     const need_modeset = blk: {
         var it = wm.sent.outputs.iterator(.forward);
         while (it.next()) |output| {
-            const wlr_output = output.wlr_output.?;
+            const wlr_output = output.wlr_output orelse continue;
             switch (output.sent.state) {
                 .enabled => if (!wlr_output.enabled) break :blk true,
                 .disabled_soft, .disabled_hard => if (wlr_output.enabled) break :blk true,
@@ -310,12 +314,13 @@ pub fn commitOutputState(om: *OutputManager) void {
         {
             var it = wm.sent.outputs.iterator(.forward);
             while (it.next()) |output| {
+                const wlr_output = output.wlr_output orelse continue;
                 const state = states.addOne(util.gpa) catch {
                     log.err("out of memory", .{});
                     return;
                 };
 
-                state.output = output.wlr_output.?;
+                state.output = wlr_output;
                 state.base = wlr.Output.State.init();
 
                 output.sent.applyModeset(&state.base);
@@ -390,13 +395,14 @@ pub fn commitOutputState(om: *OutputManager) void {
     {
         var it = wm.sent.outputs.safeIterator(.forward);
         while (it.next()) |output| {
+            const wlr_output = output.wlr_output orelse continue;
             switch (output.sent.state) {
                 .enabled => {
-                    assert(output.wlr_output.?.enabled);
-                    output.wlr_output.?.scheduleFrame();
+                    assert(wlr_output.enabled);
+                    wlr_output.scheduleFrame();
                 },
                 .disabled_soft, .disabled_hard => {
-                    assert(!output.wlr_output.?.enabled);
+                    assert(!wlr_output.enabled);
                     output.lock_render_state = .blanked;
                     if (output.sent.state == .disabled_hard) {
                         output.link_sent.remove();
