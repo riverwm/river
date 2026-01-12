@@ -120,6 +120,8 @@
         summary="request violates manage/render sequence ordering"/>
       <entry name="role" value="1"
         summary="given wl_surface already has a role"/>
+      <entry name="unresponsive" value="2"
+        summary="window manager unresponsive"/>
     </enum>
 
     <event name="unavailable">
