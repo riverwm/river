@@ -5,7 +5,7 @@ RIVER(1)
 
 # NAME
 
-river - dynamic tiling Wayland compositor
+river - non-monolithic Wayland compositor
 
 # SYNOPSIS
 
@@ -16,6 +16,10 @@ river - dynamic tiling Wayland compositor
 River is a non-monolithic Wayland compositor, it does not combine the compositor
 and window manager into one program. Instead, users can choose any window
 manager implementing the river-window-management-v1 protocol.
+
+This means that river is not useful without a compatible window manager. A list
+of compatible window managers can be found on the river wiki:
+https://codeberg.org/river/wiki/src/branch/main/pages/wm-list.md
 
 # OPTIONS
 
