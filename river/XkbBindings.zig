@@ -22,7 +22,7 @@ server_destroy: wl.Listener(*wl.Server) = .init(handleServerDestroy),
 
 pub fn init(bindings: *XkbBindings) !void {
     bindings.* = .{
-        .global = try wl.Global.create(server.wl_server, river.XkbBindingsV1, 1, ?*anyopaque, null, bind),
+        .global = try wl.Global.create(server.wl_server, river.XkbBindingsV1, 2, ?*anyopaque, null, bind),
     };
     server.wl_server.addDestroyListener(&bindings.server_destroy);
 }
@@ -65,6 +65,18 @@ fn handleRequest(
                 log.err("out of memory", .{});
                 return;
             };
+        },
+        .get_seat => |args| {
+            const seat_data = args.seat.getUserData() orelse return;
+            const seat: *Seat = @ptrCast(@alignCast(seat_data));
+            if (seat.xkb_bindings_seat.object != null) {
+                object.postError(
+                    .object_already_created,
+                    "river_xkb_bindings_seat_v1 already created",
+                );
+                return;
+            }
+            seat.xkb_bindings_seat.createObject(object.getClient(), object.getVersion(), args.id);
         },
     }
 }

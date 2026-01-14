@@ -34,6 +34,7 @@ const ShellSurface = @import("ShellSurface.zig");
 const Tablet = @import("Tablet.zig");
 const Window = @import("Window.zig");
 const XkbBinding = @import("XkbBinding.zig");
+const XkbBindingsSeat = @import("XkbBindingsSeat.zig");
 const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
 const log = std.log.scoped(.input);
@@ -96,6 +97,7 @@ destroying: bool = false,
 
 object: ?*river.SeatV1 = null,
 layer_shell: LayerShellSeat = .{},
+xkb_bindings_seat: XkbBindingsSeat = .{},
 
 event_queue: Deque(Event),
 
@@ -331,6 +333,7 @@ pub fn manageStart(seat: *Seat) void {
             seat_v1.sendRemoved();
             seat_v1.setHandler(?*anyopaque, handleRequestInert, null, null);
             seat.layer_shell.makeInert();
+            seat.xkb_bindings_seat.makeInert();
             seat.object = null;
         }
         seat.destroy();
@@ -338,6 +341,7 @@ pub fn manageStart(seat: *Seat) void {
     }
 
     seat.layer_shell.manageStart();
+    seat.xkb_bindings_seat.manageStart();
 
     if (server.wm.object) |wm_v1| {
         const new = seat.object == null;
@@ -538,6 +542,8 @@ fn handleRequest(
 }
 
 pub fn manageFinish(seat: *Seat) void {
+    seat.xkb_bindings_seat.manageFinish();
+
     if (server.lock_manager.state != .unlocked) return;
 
     switch (seat.layer_shell.sent.focus) {

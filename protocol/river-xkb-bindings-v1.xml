@@ -44,6 +44,10 @@
       river_window_manager_v1 global is also advertised.
     </description>
 
+    <enum name="error" since="2">
+      <entry name="object_already_created" value="0" since="2"/>
+    </enum>
+
     <request name="destroy" type="destructor">
       <description summary="destroy the river_xkb_bindings_v1 object">
         This request indicates that the client will no longer use the
@@ -63,6 +67,17 @@
       <arg name="id" type="new_id" interface="river_xkb_binding_v1"/>
       <arg name="keysym" type="uint" summary="an xkbcommon keysym"/>
       <arg name="modifiers" type="uint" enum="river_seat_v1.modifiers"/>
+    </request>
+
+    <request name="get_seat" since="2">
+      <description summary="manage seat-specific state">
+        Create an object to manage seat-specific xkb bindings state.
+
+        It is a protocol error to make this request more than once for a given
+        river_seat_v1 object.
+      </description>
+      <arg name="id" type="new_id" interface="river_xkb_bindings_seat_v1"/>
+      <arg name="seat" type="object" interface="river_seat_v1"/>
     </request>
   </interface>
 
@@ -171,6 +186,71 @@
         against future input events. The window manager should of course respond
         as soon as possible as the capacity of the compositor to buffer incoming
         input events is finite.
+      </description>
+    </event>
+  </interface>
+
+  <interface name="river_xkb_bindings_seat_v1" version="2">
+    <description summary="xkb bindings seat">
+      This object manages xkb bindings state associated with a specific seat.
+    </description>
+
+    <request name="destroy" type="destructor" since="2">
+      <description summary="destroy the object">
+        This request indicates that the client will no longer use the object and
+        that it may be safely destroyed.
+      </description>
+    </request>
+
+    <request name="ensure_next_key_eaten" since="2">
+      <description summary="ensure the next key press event is eaten">
+        Ensure that the next key press and corresponding release events for this
+        seat are not sent to the currently focused surface.
+
+        If the next key press triggers a binding, the pressed/released events are
+        sent to the river_xkb_binding_v1 object as usual.
+
+        If the next key press does not trigger a binding, the ate_unbound_key
+        event is sent instead.
+
+        Rationale: the window manager may wish to implement "chorded"
+        keybindings where triggering a binding activates a "submap" with a
+        different set of keybindings. Without a way to eat the next key
+        press event, there is no good way for the window manager to know that it
+        should error out and exit the submap when a key not bound in the submap
+        is pressed.
+
+        This request modifies window management state and may only be made as
+        part of a manage sequence, see the river_window_manager_v1 description.
+      </description>
+    </request>
+
+    <request name="cancel_ensure_next_key_eaten" since="2">
+      <description summary="cancel an ensure_next_key_eaten request">
+        This requests cancels the effect of the latest ensure_next_key_eaten
+        request if no key has been eaten due to the request yet. This request
+        has no effect if a key has already been eaten or no
+        ensure_next_key_eaten was made.
+
+        Rationale: the window manager may wish cancel an uncompleted "chorded"
+        keybinding after a timeout of a few seconds. Note that since this
+        timeout use-case requires the window manager to trigger a manage sequence
+        with the river_window_manager_v1.manage_dirty request it is possible that
+        the ate_unbound_key key event may be sent before the window manager has
+        a chance to make the cancel_ensure_next_key_eaten request.
+
+        This request modifies window management state and may only be made as
+        part of a manage sequence, see the river_window_manager_v1 description.
+      </description>
+    </request>
+
+    <event name="ate_unbound_key" since="2">
+      <description summary="an unbound key press event was eaten">
+        An unbound key press event was eaten due to the ensure_next_key_eaten
+        request.
+
+        This event will be followed by a manage_start event after all other new
+        state has been sent by the server.
       </description>
     </event>
   </interface>

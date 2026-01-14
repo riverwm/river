@@ -24,6 +24,9 @@ const KeyConsumer = union(enum) {
     /// A null value indicates that the xkb_binding_v1 was destroyed or that
     /// a press event was already sent due to a press on a different keyboard.
     binding: ?*XkbBinding,
+    /// The river_xkb_bindings_seat_v1.ensure_next_key_eaten request caused
+    /// the key to be eaten.
+    ensure_eaten,
     im_grab,
     /// Seat's focused client
     focus,
@@ -194,9 +197,14 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
         }
         if (group.seat.matchXkbBinding(xkb_keycode, modifiers, xkb_state)) |binding| {
             log.debug("matched xkb binding", .{});
+            group.seat.xkb_bindings_seat.ensure_next_key_eaten = false;
             break :blk .{
                 .binding = if (binding.sent_pressed) null else binding,
             };
+        }
+        if (group.seat.xkb_bindings_seat.ensure_next_key_eaten) {
+            group.seat.xkb_bindings_seat.ensure_next_key_eaten = false;
+            break :blk .ensure_eaten;
         }
         if (group.getInputMethodGrab() != null) {
             break :blk .im_grab;
@@ -218,6 +226,12 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
                 binding.pressed();
             } else {
                 binding.released();
+            }
+        },
+        .ensure_eaten => {
+            if (event.state == .pressed) {
+                group.seat.xkb_bindings_seat.scheduled.ate_unbound_key = true;
+                server.wm.dirtyWindowing();
             }
         },
         .im_grab => if (group.getInputMethodGrab()) |keyboard_grab| {
