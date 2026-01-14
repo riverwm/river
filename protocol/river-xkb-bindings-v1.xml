@@ -38,7 +38,7 @@
     be done by creating a new major version of the extension.
   </description>
 
-  <interface name="river_xkb_bindings_v1" version="1">
+  <interface name="river_xkb_bindings_v1" version="2">
     <description summary="xkbcommon bindings global interface">
       This global interface should only be advertised to the client if the
       river_window_manager_v1 global is also advertised.
@@ -66,7 +66,7 @@
     </request>
   </interface>
 
-  <interface name="river_xkb_binding_v1" version="1">
+  <interface name="river_xkb_binding_v1" version="2">
     <description summary="configure a xkb key binding, receive trigger events">
       This object allows the window manager to configure a xkbcommon key binding
       and receive events when the key binding is triggered.
