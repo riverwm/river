@@ -374,8 +374,8 @@ fn handleTimeout(wm: *WindowManager) c_int {
             wm.renderStart();
         },
         .manage, .render => {
-            log.err("window manager unresponsive for more than 5 seconds, disconnecting", .{});
-            wm.object.?.postError(.unresponsive, "unresponsive for more than 5 seconds");
+            log.err("window manager unresponsive for more than 3 seconds, disconnecting", .{});
+            wm.object.?.postError(.unresponsive, "unresponsive for more than 3 seconds");
             // Don't wait for the frozen client to receive the protocol error
             // and exit of its own accord.
             wm.object.?.getClient().destroy();
