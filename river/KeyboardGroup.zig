@@ -176,6 +176,17 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
         return;
     };
 
+    {
+        var it = group.seat.keyboard_groups.iterator(.forward);
+        while (it.next()) |g| {
+            for (g.pressed.values()) |press| {
+                if (press.consumer != .binding) continue;
+                const binding = press.consumer.binding orelse continue;
+                binding.stopRepeat();
+            }
+        }
+    }
+
     // Every sent press event, to a regular client or the input method, should have
     // the corresponding release event sent to the same client.
     // Similarly, no press event means no release event.

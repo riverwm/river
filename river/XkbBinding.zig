@@ -29,6 +29,7 @@ wm_scheduled: struct {
     state_change: enum {
         none,
         pressed,
+        stop_repeat,
         released,
     } = .none,
 } = .{},
@@ -136,18 +137,26 @@ fn handleRequest(
 
 pub fn pressed(binding: *XkbBinding) void {
     assert(!binding.sent_pressed);
-    // Input event processing should not continue after a press/release event
+    // Input event processing should not continue after a state_change
     // until that event is sent to the window manager in an update and acked.
     assert(binding.wm_scheduled.state_change == .none);
     binding.wm_scheduled.state_change = .pressed;
     server.wm.dirtyWindowing();
 }
 
-pub fn released(binding: *XkbBinding) void {
+pub fn stopRepeat(binding: *XkbBinding) void {
     assert(binding.sent_pressed);
-    // Input event processing should not continue after a press/release event
+    // Input event processing should not continue after a state change
     // until that event is sent to the window manager in an update and acked.
     assert(binding.wm_scheduled.state_change == .none);
+    binding.wm_scheduled.state_change = .stop_repeat;
+    server.wm.dirtyWindowing();
+}
+
+pub fn released(binding: *XkbBinding) void {
+    assert(binding.sent_pressed);
+    // stopRepeat() should always be called before released() by KeyboardGroup
+    assert(binding.wm_scheduled.state_change == .stop_repeat);
     binding.wm_scheduled.state_change = .released;
     server.wm.dirtyWindowing();
 }

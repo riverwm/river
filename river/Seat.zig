@@ -435,6 +435,12 @@ pub fn manageStart(seat: *Seat) void {
                         binding.sent_pressed = true;
                         binding.object.sendPressed();
                     },
+                    .stop_repeat => {
+                        assert(binding.sent_pressed);
+                        if (binding.object.getVersion() >= 2) {
+                            binding.object.sendStopRepeat();
+                        }
+                    },
                     .released => {
                         assert(binding.sent_pressed);
                         binding.sent_pressed = false;

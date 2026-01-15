@@ -188,6 +188,21 @@
         input events is finite.
       </description>
     </event>
+
+    <event name="stop_repeat" since="2">
+      <description summary="repeating should be stopped">
+        This event indicates that repeating should be stopped for the binding if
+        the window manager has been repeating some action since the pressed
+        event.
+
+        This event is generally sent when some other (possible unbound) key is
+        pressed after the pressed event is sent and before the released event
+        is sent for this binding.
+
+        This event will be followed by a manage_start event after all other new
+        state has been sent by the server.
+      </description>
+    </event>
   </interface>
 
   <interface name="river_xkb_bindings_seat_v1" version="2">
