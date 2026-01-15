@@ -181,6 +181,19 @@ pub fn handleMap(listener: *wl.Listener(void)) void {
     };
     surface.data = &window.tree.node;
 
+    // TODO(wlroots) update the dimensions_hint if the size hints change
+    // https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/5238
+    if (xwindow.xsurface.size_hints) |size_hints| {
+        const min_width: u31 = @max(0, size_hints.min_width);
+        const min_height: u31 = @max(0, size_hints.min_height);
+        window.setDimensionsHint(.{
+            .min_width = min_width,
+            .max_width = @max(min_width, size_hints.max_width),
+            .min_height = min_height,
+            .max_height = @max(min_height, size_hints.max_height),
+        });
+    }
+
     window.state = .initialized;
     window.map() catch {
         log.err("out of memory", .{});
