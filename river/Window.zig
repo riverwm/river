@@ -1001,7 +1001,12 @@ pub fn getParent(window: *Window) ?*Window {
             const parent: *XdgToplevel = @ptrCast(@alignCast(wlr_parent.base.data));
             return parent.window;
         },
-        .xwayland, .destroying => return null,
+        .xwayland => |xwindow| {
+            const parent_xsurface = xwindow.xsurface.parent orelse return null;
+            const parent_xwindow: *XwaylandWindow = @ptrCast(@alignCast(parent_xsurface.data));
+            return parent_xwindow.window;
+        },
+        .destroying => return null,
     }
 }
 

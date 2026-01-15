@@ -34,6 +34,7 @@ associate: wl.Listener(void) = .init(handleAssociate),
 dissociate: wl.Listener(void) = .init(handleDissociate),
 set_title: wl.Listener(void) = .init(handleSetTitle),
 set_class: wl.Listener(void) = .init(handleSetClass),
+set_parent: wl.Listener(void) = .init(handleSetParent),
 set_decorations: wl.Listener(void) = .init(handleSetDecorations),
 request_maximize: wl.Listener(void) = .init(handleRequestMaximize),
 request_fullscreen: wl.Listener(void) = .init(handleRequestFullscreen),
@@ -58,6 +59,8 @@ pub fn create(xsurface: *wlr.XwaylandSurface) error{OutOfMemory}!void {
     const xwindow = &window.impl.xwayland;
     xwindow.window = window;
 
+    xsurface.data = xwindow;
+
     // Add listeners that are active over the window's entire lifetime
     xsurface.events.destroy.add(&xwindow.destroy);
     xsurface.events.associate.add(&xwindow.associate);
@@ -66,6 +69,7 @@ pub fn create(xsurface: *wlr.XwaylandSurface) error{OutOfMemory}!void {
     xsurface.events.set_override_redirect.add(&xwindow.set_override_redirect);
     xsurface.events.set_title.add(&xwindow.set_title);
     xsurface.events.set_class.add(&xwindow.set_class);
+    xsurface.events.set_parent.add(&xwindow.set_parent);
     xsurface.events.set_decorations.add(&xwindow.set_decorations);
     xsurface.events.request_maximize.add(&xwindow.request_maximize);
     xsurface.events.request_fullscreen.add(&xwindow.request_fullscreen);
@@ -147,10 +151,13 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
     xwindow.set_override_redirect.link.remove();
     xwindow.set_title.link.remove();
     xwindow.set_class.link.remove();
+    xwindow.set_parent.link.remove();
     xwindow.set_decorations.link.remove();
     xwindow.request_maximize.link.remove();
     xwindow.request_fullscreen.link.remove();
     xwindow.request_minimize.link.remove();
+
+    xwindow.xsurface.data = null;
 
     const window = xwindow.window;
     window.impl = .destroying;
@@ -266,6 +273,10 @@ fn handleSetTitle(listener: *wl.Listener(void)) void {
 fn handleSetClass(listener: *wl.Listener(void)) void {
     const xwindow: *XwaylandWindow = @fieldParentPtr("set_class", listener);
     xwindow.window.notifyAppId();
+}
+
+fn handleSetParent(_: *wl.Listener(void)) void {
+    server.wm.dirtyWindowing();
 }
 
 fn handleSetDecorations(listener: *wl.Listener(void)) void {
