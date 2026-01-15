@@ -219,14 +219,15 @@
 
     <request name="ensure_next_key_eaten" since="2">
       <description summary="ensure the next key press event is eaten">
-        Ensure that the next key press and corresponding release events for this
-        seat are not sent to the currently focused surface.
+        Ensure that the next non-modifier key press and corresponding release
+        events for this seat are not sent to the currently focused surface.
 
-        If the next key press triggers a binding, the pressed/released events are
-        sent to the river_xkb_binding_v1 object as usual.
+        If the next non-modifier key press triggers a binding, the
+        pressed/released events are sent to the river_xkb_binding_v1 object as
+        usual.
 
-        If the next key press does not trigger a binding, the ate_unbound_key
-        event is sent instead.
+        If the next non-modifier key press does not trigger a binding, the
+        ate_unbound_key event is sent instead.
 
         Rationale: the window manager may wish to implement "chorded"
         keybindings where triggering a binding activates a "submap" with a

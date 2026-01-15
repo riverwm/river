@@ -214,8 +214,20 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
             };
         }
         if (group.seat.xkb_bindings_seat.ensure_next_key_eaten) {
-            group.seat.xkb_bindings_seat.ensure_next_key_eaten = false;
-            break :blk .ensure_eaten;
+            // This approach for filtering out modifiers feels like a hack.
+            // Open questions:
+            // - Are there keycodes that should be considered a modifier which
+            //   are not yet checked by keysymIsModifier()?
+            // - Is it possible to test whether keysymIsModifier() is complete?
+            // - Is there a way to test the effect the keycode would have on
+            //   the active modifiers of the xkb_state?
+            // - Could we add a function to libxkbcommon to make that possible?
+            for (xkb_state.keyGetSyms(xkb_keycode)) |sym| {
+                if (!keysymIsModifier(sym)) {
+                    group.seat.xkb_bindings_seat.ensure_next_key_eaten = false;
+                    break :blk .ensure_eaten;
+                }
+            }
         }
         if (group.getInputMethodGrab() != null) {
             break :blk .im_grab;
@@ -253,6 +265,50 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
             group.seat.wlr_seat.setKeyboard(&group.state);
             group.seat.wlr_seat.keyboardNotifyKey(event.time_msec, event.keycode, event.state);
         },
+    }
+}
+
+fn keysymIsModifier(keysym: xkb.Keysym) bool {
+    switch (@intFromEnum(keysym)) {
+        xkb.Keysym.Shift_L,
+        xkb.Keysym.Shift_R,
+        xkb.Keysym.Control_L,
+        xkb.Keysym.Control_R,
+        xkb.Keysym.Caps_Lock,
+        xkb.Keysym.Shift_Lock,
+
+        xkb.Keysym.Meta_L,
+        xkb.Keysym.Meta_R,
+        xkb.Keysym.Alt_L,
+        xkb.Keysym.Alt_R,
+        xkb.Keysym.Super_L,
+        xkb.Keysym.Super_R,
+        xkb.Keysym.Hyper_L,
+        xkb.Keysym.Hyper_R,
+
+        xkb.Keysym.Num_Lock,
+
+        xkb.Keysym.ISO_Lock,
+        xkb.Keysym.ISO_Level2_Latch,
+        xkb.Keysym.ISO_Level3_Shift,
+        xkb.Keysym.ISO_Level3_Latch,
+        xkb.Keysym.ISO_Level3_Lock,
+        xkb.Keysym.ISO_Level5_Shift,
+        xkb.Keysym.ISO_Level5_Latch,
+        xkb.Keysym.ISO_Level5_Lock,
+        xkb.Keysym.ISO_Group_Shift,
+        xkb.Keysym.ISO_Group_Latch,
+        xkb.Keysym.ISO_Group_Lock,
+        xkb.Keysym.ISO_Next_Group,
+        xkb.Keysym.ISO_Next_Group_Lock,
+        xkb.Keysym.ISO_Prev_Group,
+        xkb.Keysym.ISO_Prev_Group_Lock,
+        xkb.Keysym.ISO_First_Group,
+        xkb.Keysym.ISO_First_Group_Lock,
+        xkb.Keysym.ISO_Last_Group,
+        xkb.Keysym.ISO_Last_Group_Lock,
+        => return true,
+        else => return false,
     }
 }
 
