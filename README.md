@@ -25,7 +25,7 @@ on our [wiki](https://codeberg.org/river/wiki).
 
 - [Code of Conduct](CODE_OF_CONDUCT.md)
 - [Issue Tracker](https://codeberg.org/river/river/issues)
-- IRC: [#river](https://web.libera.chat/?channels=#river) on irc.libera.chat
+- IRC: [#river](https://web.libera.chat/?channels=#river) on irc.libera.chat ([logs](https://libera.catirclogs.org/river)
 - [Zulip](https://river-compositor.zulipchat.com) (new)
 - [Wiki](https://codeberg.org/river/wiki)
 
