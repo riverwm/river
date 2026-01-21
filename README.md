@@ -56,9 +56,7 @@ Why split the window manager to a separate process? I aim to:
 The first release supporting the
 [river-window-management-v1](protocol/river-window-management-v1.xml) protocol
 will be 0.4.0. The protocol is implemented on river's main branch and is already
-robust/feature complete enough for me to use as my daily driver.  There are
-however missing features that need to be implemented before the 0.4.0 release,
-for example keyboard layout configuration.
+robust/feature complete enough for me to use as my daily driver.
 
 Currently the only documentation for the
 [river-window-management-v1](protocol/river-window-management-v1.xml) protocol
