@@ -261,7 +261,7 @@
 
     <event name="numlock_enabled">
       <description summary="numlock is currently enabled">
-        Capslock is currently enabled for the keyboard.
+        Numlock is currently enabled for the keyboard.
 
         This event is sent once when the river_xkb_keyboard_v1 is created and
         again whenever the numlock state changes.
@@ -270,7 +270,7 @@
 
     <event name="numlock_disabled">
       <description summary="numlock is currently disabled">
-        Capslock is currently disabled for the keyboard.
+        Numlock is currently disabled for the keyboard.
 
         This event is sent once when the river_xkb_keyboard_v1 is created and
         again whenever the numlock state changes.

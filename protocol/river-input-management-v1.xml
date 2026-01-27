@@ -200,9 +200,6 @@
 
         For example, a factor of 0.5 will make scrolling twice as slow while a
         factor of 3.0 will make scrolling 3 times as fast.
-
-        Negative values for either rate or delay are illegal. A rate of zero
-        will disable any repeating (regardless of the value of delay).
       </description>
       <arg name="factor" type="fixed"/>
     </request>

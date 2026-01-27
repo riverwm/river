@@ -540,7 +540,7 @@
 
     <event name="click_method_support">
       <description summary="supported click methods">
-        The click methods suppported by the device.
+        The click methods supported by the device.
       </description>
       <arg name="methods" type="uint" enum="click_methods"/>
     </event>
@@ -648,7 +648,7 @@
 
     <event name="scroll_method_support">
       <description summary="supported scroll methods">
-        The scroll methods suppported by the device.
+        The scroll methods supported by the device.
       </description>
       <arg name="methods" type="uint" enum="scroll_methods"/>
     </event>
