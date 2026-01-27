@@ -200,6 +200,8 @@
 
         For example, a factor of 0.5 will make scrolling twice as slow while a
         factor of 3.0 will make scrolling 3 times as fast.
+
+        Setting a scroll factor less than 0 is a protocol error.
       </description>
       <arg name="factor" type="fixed"/>
     </request>
