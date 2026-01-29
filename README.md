@@ -58,16 +58,16 @@ The first release supporting the
 will be 0.4.0. The protocol is implemented on river's main branch and is already
 robust/feature complete enough for me to use as my daily driver.
 
+The [river-window-management-v1](protocol/river-window-management-v1.xml)
+protocol and other river protocol extensions are stable.
+We do not break window managers.
+
 Currently the only documentation for the
 [river-window-management-v1](protocol/river-window-management-v1.xml) protocol
 is the protocol specification itself. While this is all developers comfortable
 with writing Wayland clients should need, I'd like to add some more
 beginner-friendly documentation including a well-commented example window
 manager before the 0.4.0 release.
-
-The [river-window-management-v1](protocol/river-window-management-v1.xml)
-protocol and other river protocol extensions are stable.
-We do not break window managers.
 
 If everything goes well with the 0.4.0 release, I expect the following
 non-bugfix release to be river 1.0.0. After river 1.0.0, all backwards
