@@ -67,7 +67,7 @@ manager before the 0.4.0 release.
 
 The [river-window-management-v1](protocol/river-window-management-v1.xml)
 protocol and other river protocol extensions are stable.
-We don't break window managers.
+We do not break window managers.
 
 If everything goes well with the 0.4.0 release, I expect the following
 non-bugfix release to be river 1.0.0. After river 1.0.0, all backwards
