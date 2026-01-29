@@ -14,8 +14,7 @@ river does not combine the compositor and window manager into one program.
 Instead, users can choose any window manager implementing the
 [river-window-management-v1](protocol/river-window-management-v1.xml) protocol.
 
-There is a [list of window managers](https://codeberg.org/river/wiki/src/branch/main/pages/wm-list.md)
-implementing the [river-window-management-v1](protocol/river-window-management-v1.xml) protocol
+There is a [list of compatible window managers](https://codeberg.org/river/wiki/src/branch/main/pages/wm-list.md)
 on our [wiki](https://codeberg.org/river/wiki).
 
 > *If you are looking for the old dynamic tiling version of river, see
