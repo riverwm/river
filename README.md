@@ -65,15 +65,9 @@ with writing Wayland clients should need, I'd like to add some more
 beginner-friendly documentation including a well-commented example window
 manager before the 0.4.0 release.
 
-I would also like to get more feedback on the
-[river-window-management-v1](protocol/river-window-management-v1.xml) protocol
-before the 0.4.0 release. If you are working on a window manager and have
-questions/feedback I'd love to hear from you!
-
-With regards to protocol stability, my goal is to never make a backwards
-incompatible change and stay at `v1` forever. I've been iterating on this
-protocol since April 2023 and am quite confident in the design and extensibility
-of the current protocol.
+The [river-window-management-v1](protocol/river-window-management-v1.xml)
+protocol and other river protocol extensions are stable.
+We don't break window managers.
 
 If everything goes well with the 0.4.0 release, I expect the following
 non-bugfix release to be river 1.0.0. After river 1.0.0, all backwards
