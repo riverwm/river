@@ -174,7 +174,7 @@ pub fn manageStart(shell_output: *LayerShellOutput) void {
                 shell_output.scheduled.non_exclusive_area.width,
                 shell_output.scheduled.non_exclusive_area.height,
             );
+            shell_output.sent.non_exclusive_area = shell_output.scheduled.non_exclusive_area;
         }
-        shell_output.sent.non_exclusive_area = shell_output.scheduled.non_exclusive_area;
     }
 }
