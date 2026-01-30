@@ -413,7 +413,6 @@ pub fn manageStart(seat: *Seat) void {
                 seat_v1.sendShellSurfaceInteraction(shell_surface.object);
             },
         }
-        seat.wm_scheduled.interaction = .none;
 
         if (seat.op) |*op| {
             seat_v1.sendOpDelta(op.x - op.start_x, op.y - op.start_y);
@@ -470,6 +469,9 @@ pub fn manageStart(seat: *Seat) void {
             }
         }
     }
+    // Ensure we don't store an interaction that happens while no window manager
+    // is connected until a new window manager connects.
+    seat.wm_scheduled.interaction = .none;
 }
 
 fn handleRequestInert(
