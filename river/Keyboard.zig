@@ -21,9 +21,9 @@ const log = std.log.scoped(.input);
 pub const Config = struct {
     keymap: ?*xkb.Keymap,
     /// Repeat rate in characters per second
-    repeat_rate: u31 = 80,
+    repeat_rate: u31 = 40,
     /// Repeat delay in milliseconds
-    repeat_delay: u31 = 300,
+    repeat_delay: u31 = 400,
 };
 
 device: InputDevice,
