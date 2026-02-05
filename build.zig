@@ -195,6 +195,11 @@ pub fn build(b: *Build) !void {
         , .{ b.install_prefix, full_version }));
 
         b.installFile("protocol/river-window-management-v1.xml", "share/river-protocols/river-window-management-v1.xml");
+        b.installFile("protocol/river-xkb-bindings-v1.xml", "share/river-protocols/river-xkb-bindings-v1.xml");
+        b.installFile("protocol/river-layer-shell-v1.xml", "share/river-protocols/river-layer-shell-v1.xml");
+        b.installFile("protocol/river-input-management-v1.xml", "share/river-protocols/river-input-management-v1.xml");
+        b.installFile("protocol/river-libinput-config-v1.xml", "share/river-protocols/river-libinput-config-v1.xml");
+        b.installFile("protocol/river-xkb-config-v1.xml", "share/river-protocols/river-xkb-config-v1.xml");
         b.getInstallStep().dependOn(&b.addInstallFile(pc_file, "share/pkgconfig/river-protocols.pc").step);
     }
 
