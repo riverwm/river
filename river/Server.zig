@@ -78,6 +78,8 @@ output_image_capture_source_manager: *wlr.ExtOutputImageCaptureSourceManagerV1,
 
 foreign_toplevel_list: *wlr.ExtForeignToplevelListV1,
 
+tearing_control_manager: *wlr.TearingControlManagerV1,
+
 scene: Scene,
 input_manager: InputManager,
 libinput_config: LibinputConfig,
@@ -151,6 +153,8 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
         .output_image_capture_source_manager = try wlr.ExtOutputImageCaptureSourceManagerV1.create(wl_server, 1),
 
         .foreign_toplevel_list = try wlr.ExtForeignToplevelListV1.create(wl_server, 1),
+
+        .tearing_control_manager = try wlr.TearingControlManagerV1.create(wl_server, 1),
 
         .scene = undefined,
         .om = undefined,
@@ -315,6 +319,7 @@ fn allowlist(server: *Server, global: *const wl.Global) bool {
         global == server.xdg_activation.global or
         global == server.data_device_manager.global or
         global == server.primary_selection_manager.global or
+        global == server.tearing_control_manager.global or
         global == server.om.presentation.global or
         global == server.om.xdg_output_manager.global or
         global == server.input_manager.relative_pointer_manager.global or

@@ -253,6 +253,7 @@ pub fn commitOutputState(om: *OutputManager) void {
         var it = wm.sent.outputs.iterator(.forward);
         while (it.next()) |output| {
             assert(output.sent.state != .destroying);
+            output.rendering_current = output.rendering_requested;
             // This may be null even when the state is not .destroying if the
             // output is destroyed between manage start and render finish.
             const wlr_output = output.wlr_output orelse continue;

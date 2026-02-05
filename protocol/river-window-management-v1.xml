@@ -1045,6 +1045,17 @@
       <arg name="width" type="int" summary="clip box width"/>
       <arg name="height" type="int" summary="clip box height"/>
     </request>
+
+    <event name="presentation_hint" since="4">
+      <description summary="presentation hint set by the window">
+        This event communicates the window's preferred presentation mode.
+
+        This event will be followed by a render_start event after all other new
+        state has been sent by the server.
+      </description>
+      <arg name="hint" type="uint" enum="river_output_v1.presentation_mode"
+        summary="presentation hint"/>
+    </event>
   </interface>
 
   <interface name="river_decoration_v1" version="4">
@@ -1337,6 +1348,39 @@
       <arg name="width" type="int" summary="output width"/>
       <arg name="height" type="int" summary="output height"/>
     </event>
+
+    <enum name="error" since="4">
+      <entry name="invalid_presentation_mode" value="0" since="4"
+        summary="invalid presentation mode enum value"/>
+    </enum>
+
+    <enum name="presentation_mode" since="4">
+      <entry name="vsync" value="0">
+        <description summary="tearing-free presentation">
+          Output page-flips should be synchronized to the vertical blanking
+          period, eliminating tearing. This is the default presentation mode.
+        </description>
+      </entry>
+      <entry name="async" value="1">
+        <description summary="asynchronous presentation">
+          Output page-flips should not be synchronized to the vertical blanking
+          period, visual screen tearing may occur.
+        </description>
+      </entry>
+    </enum>
+
+    <request name="set_presentation_mode" since="4">
+      <description summary="set the preferred presentation mode">
+        Set the preferred presentation mode of the output. The compositor should
+        always respect the preference of the window manager if possible. If this
+        request is never made, the preferred presentation mode is vsync.
+
+        This request modifies rendering state and may only be made as part of a
+        render sequence, see the river_window_manager_v1 description.
+      </description>
+      <arg name="mode" type="uint" enum="presentation_mode"
+        summary="preferred presentation mode"/>
+    </request>
   </interface>
 
   <interface name="river_seat_v1" version="4">

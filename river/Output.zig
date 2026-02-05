@@ -123,6 +123,13 @@ pub const State = struct {
     }
 };
 
+const RenderingState = struct {
+    tearing: bool,
+    const init: RenderingState = .{
+        .tearing = false,
+    };
+};
+
 /// Set to null when the wlr_output is destroyed.
 wlr_output: ?*wlr.Output,
 scene_output: ?*wlr.SceneOutput,
@@ -160,8 +167,11 @@ scheduled: State,
 sent: State,
 link_sent: wl.list.Link,
 sent_wl_output: bool = false,
+/// Rendering state requested by the window manager.
+rendering_requested: RenderingState = .init,
 /// State applied to the wlr_output and rendered.
 current: State,
+rendering_current: RenderingState = .init,
 
 destroy: wl.Listener(*wlr.Output) = .init(handleDestroy),
 request_state: wl.Listener(*wlr.Output.event.RequestState) = .init(handleRequestState),
@@ -385,6 +395,17 @@ fn handleRequest(
     assert(output.object == output_v1);
     switch (request) {
         .destroy => output_v1.destroy(),
+        .set_presentation_mode => |args| {
+            if (!server.wm.ensureRendering()) return;
+            output.rendering_requested.tearing = switch (args.mode) {
+                .vsync => false,
+                .async => true,
+                _ => {
+                    output_v1.postError(.invalid_presentation_mode, "invalid presentation mode enum value");
+                    return;
+                },
+            };
+        },
     }
 }
 
@@ -439,6 +460,16 @@ fn renderAndCommit(output: *Output) !void {
     output.current.applyNoModeset(&state);
 
     if (!output.scene_output.?.buildState(&state, null)) return error.CommitFailed;
+
+    if (output.rendering_current.tearing) {
+        state.tearing_page_flip = true;
+        // TODO don't try this every frame if it consistently fails. Stop trying if it fails
+        // for 10 frames in a row or something.
+        if (!wlr_output.testState(&state)) {
+            log.info("tearing page flip test failed for {s}, retrying without tearing", .{wlr_output.name});
+            state.tearing_page_flip = false;
+        }
+    }
 
     if (!wlr_output.commitState(&state)) return error.CommitFailed;
 

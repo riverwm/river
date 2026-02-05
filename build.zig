@@ -78,6 +78,7 @@ pub fn build(b: *Build) !void {
     scanner.addSystemProtocol("stable/tablet/tablet-v2.xml");
     scanner.addSystemProtocol("staging/cursor-shape/cursor-shape-v1.xml");
     scanner.addSystemProtocol("staging/ext-session-lock/ext-session-lock-v1.xml");
+    scanner.addSystemProtocol("staging/tearing-control/tearing-control-v1.xml");
     scanner.addSystemProtocol("unstable/pointer-constraints/pointer-constraints-unstable-v1.xml");
     scanner.addSystemProtocol("unstable/pointer-gestures/pointer-gestures-unstable-v1.xml");
     scanner.addSystemProtocol("unstable/xdg-decoration/xdg-decoration-unstable-v1.xml");
@@ -111,6 +112,7 @@ pub fn build(b: *Build) !void {
     scanner.generate("zxdg_decoration_manager_v1", 1);
     scanner.generate("ext_session_lock_manager_v1", 1);
     scanner.generate("wp_cursor_shape_manager_v1", 1);
+    scanner.generate("wp_tearing_control_manager_v1", 1);
 
     scanner.generate("river_window_manager_v1", 4);
     scanner.generate("river_xkb_bindings_v1", 2);

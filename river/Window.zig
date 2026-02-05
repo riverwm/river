@@ -233,6 +233,7 @@ rendering_scheduled: struct {
 rendering_sent: struct {
     width: u31 = 0,
     height: u31 = 0,
+    presentation_hint: river.OutputV1.PresentationMode = .vsync,
 } = .{},
 
 /// Rendering state requested by the wm.
@@ -815,6 +816,25 @@ pub fn renderStart(window: *Window) void {
     }
     sent.width = scheduled.width;
     sent.height = scheduled.height;
+
+    const presentation_hint = window.presentationHint();
+    if (sent.presentation_hint != presentation_hint) {
+        if (window.object) |window_v1| {
+            if (window_v1.getVersion() >= 4) {
+                window_v1.sendPresentationHint(presentation_hint);
+            }
+        }
+        sent.presentation_hint = presentation_hint;
+    }
+}
+
+fn presentationHint(window: *Window) river.OutputV1.PresentationMode {
+    const root_surface = window.rootSurface() orelse return .vsync;
+    return switch (server.tearing_control_manager.hintFromSurface(root_surface)) {
+        .async => .async,
+        .vsync => .vsync,
+        _ => unreachable,
+    };
 }
 
 pub fn renderFinish(window: *Window) void {
