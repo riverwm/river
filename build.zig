@@ -185,22 +185,25 @@ pub fn build(b: *Build) !void {
         const wf = Build.Step.WriteFile.create(b);
         const pc_file = wf.add("river-protocols.pc", b.fmt(
             \\prefix={s}
-            \\datadir=${{prefix}}/share
-            \\pkgdatadir=${{datadir}}/river-protocols
+            \\datarootdir=${{prefix}}/share
+            \\pkgdatadir=${{pc_sysrootdir}}${{datarootdir}}/river-protocols
             \\
             \\Name: river-protocols
-            \\URL: https://codeberg.org/river/river
-            \\Description: protocol files for the river wayland compositor
+            \\URL: https://isaacfreund.com/software/river
+            \\Description: Protocol files for river, a non-monolithic Wayland compositor
             \\Version: {s}
         , .{ b.install_prefix, full_version }));
-
-        b.installFile("protocol/river-window-management-v1.xml", "share/river-protocols/river-window-management-v1.xml");
-        b.installFile("protocol/river-xkb-bindings-v1.xml", "share/river-protocols/river-xkb-bindings-v1.xml");
-        b.installFile("protocol/river-layer-shell-v1.xml", "share/river-protocols/river-layer-shell-v1.xml");
-        b.installFile("protocol/river-input-management-v1.xml", "share/river-protocols/river-input-management-v1.xml");
-        b.installFile("protocol/river-libinput-config-v1.xml", "share/river-protocols/river-libinput-config-v1.xml");
-        b.installFile("protocol/river-xkb-config-v1.xml", "share/river-protocols/river-xkb-config-v1.xml");
         b.getInstallStep().dependOn(&b.addInstallFile(pc_file, "share/pkgconfig/river-protocols.pc").step);
+        inline for (&.{
+            "river-window-management-v1.xml",
+            "river-xkb-bindings-v1.xml",
+            "river-layer-shell-v1.xml",
+            "river-input-management-v1.xml",
+            "river-libinput-config-v1.xml",
+            "river-xkb-config-v1.xml",
+        }) |protocol| {
+            b.installFile("protocol/" ++ protocol, "share/river-protocols/stable/" ++ protocol);
+        }
     }
 
     if (man_pages) {
