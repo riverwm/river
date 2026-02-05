@@ -112,7 +112,7 @@ pub fn build(b: *Build) !void {
     scanner.generate("ext_session_lock_manager_v1", 1);
     scanner.generate("wp_cursor_shape_manager_v1", 1);
 
-    scanner.generate("river_window_manager_v1", 3);
+    scanner.generate("river_window_manager_v1", 4);
     scanner.generate("river_xkb_bindings_v1", 2);
     scanner.generate("river_layer_shell_v1", 1);
     scanner.generate("river_input_manager_v1", 1);
