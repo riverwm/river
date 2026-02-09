@@ -692,7 +692,7 @@ pub fn manageFinish(window: *Window) bool {
     switch (window.state) {
         .init => unreachable,
         .ready => {
-            if (wm_requested.dimensions == null) {
+            if (wm_requested.dimensions == null and wm_requested.fullscreen == null) {
                 return false;
             }
             window.state = .initialized;
@@ -726,11 +726,12 @@ pub fn manageFinish(window: *Window) bool {
 
     if (wm_requested.fullscreen) |output| {
         const width, const height = output.sent.dimensions();
-        if (window.configure_sent.width != width) {
+        if (window.configure_sent.width != width or
+            window.configure_sent.height != height)
+        {
             window.configure_scheduled.width = width;
-        }
-        if (window.configure_sent.height != height) {
             window.configure_scheduled.height = height;
+            window.rendering_scheduled.resend_dimensions = true;
         }
     } else if (wm_requested.dimensions) |dimensions| {
         window.configure_scheduled.width = dimensions.width;
