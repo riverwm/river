@@ -155,11 +155,11 @@ pub fn manageStart(shell_output: *LayerShellOutput) void {
     const output: *Output = @fieldParentPtr("layer_shell", shell_output);
     assert(output.scheduled.state == .enabled or output.scheduled.state == .disabled_soft);
 
-    const scheduled_width, const scheduled_height = output.scheduled.dimensions();
-    const sent_width, const sent_height = output.sent.dimensions();
+    const scheduled_box = output.scheduled.box();
+    const sent_box = output.sent.box();
 
-    if (scheduled_width != sent_width or scheduled_height != sent_height) {
-        shell_output.scheduled.non_exclusive_area = output.scheduled.box();
+    if (!std.meta.eql(scheduled_box, sent_box)) {
+        shell_output.scheduled.non_exclusive_area = scheduled_box;
         sendConfigures(output, .exclusive);
         sendConfigures(output, .non_exclusive);
     }
