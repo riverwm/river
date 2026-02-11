@@ -65,6 +65,19 @@ const Mode = union(enum) {
 
 const default_size = 24;
 
+const Image = union(enum) {
+    /// No cursor image
+    none,
+    /// Name of the current Xcursor shape
+    xcursor: [*:0]const u8,
+    /// Cursor surface configured by the client
+    client: struct {
+        surface: *wlr.Surface,
+        hotspot_x: i32,
+        hotspot_y: i32,
+    },
+};
+
 const LayoutPoint = struct {
     lx: f64,
     ly: f64,
@@ -78,9 +91,12 @@ wlr_cursor: *wlr.Cursor,
 
 /// Xcursor manager for the currently configured Xcursor theme.
 xcursor_manager: *wlr.XcursorManager,
-/// Name of the current Xcursor shape, or null if a client has configured a
-/// surface to be used as the cursor shape instead.
-xcursor_name: ?[*:0]const u8 = null,
+/// The currently rendered cursor image
+image: Image = .none,
+image_surface_destroy: wl.Listener(*wlr.Surface) = .init(handleImageSurfaceDestroy),
+/// The most recent cursor image set by the window manager client
+wm_image: Image = .{ .xcursor = "default" },
+wm_image_surface_destroy: wl.Listener(*wlr.Surface) = .init(handleWmImageSurfaceDestroy),
 
 /// The set of currently pressed pointer buttons and the corresponding pointer mapping if any.
 pressed: std.AutoHashMapUnmanaged(u32, ?*PointerBinding) = .{},
@@ -231,39 +247,94 @@ pub fn setTheme(cursor: *Cursor, theme: ?[*:0]const u8, _size: ?u32) !void {
     cursor.xcursor_manager.destroy();
     cursor.xcursor_manager = xcursor_manager;
 
-    if (cursor.xcursor_name) |name| {
-        cursor.setXcursor(name);
+    switch (cursor.image) {
+        .none, .client => {},
+        .xcursor => |name| cursor.wlr_cursor.setXcursor(xcursor_manager, name),
     }
 }
 
-pub fn setXcursor(cursor: *Cursor, name: [*:0]const u8) void {
-    cursor.wlr_cursor.setXcursor(cursor.xcursor_manager, name);
-    cursor.xcursor_name = name;
+pub fn setImage(cursor: *Cursor, image: Image) void {
+    if (cursor.image == .client) {
+        cursor.image_surface_destroy.link.remove();
+    }
+    cursor.image = image;
+    switch (cursor.image) {
+        .none => cursor.wlr_cursor.unsetImage(),
+        .xcursor => |name| cursor.wlr_cursor.setXcursor(cursor.xcursor_manager, name),
+        .client => |client| {
+            client.surface.events.destroy.add(&cursor.image_surface_destroy);
+            cursor.wlr_cursor.setSurface(client.surface, client.hotspot_x, client.hotspot_y);
+        },
+    }
+}
+
+fn handleImageSurfaceDestroy(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
+    const cursor: *Cursor = @fieldParentPtr("image_surface_destroy", listener);
+    // wlroots calls wlr_cursor_unset_image() automatically
+    // when the cursor surface is destroyed.
+    cursor.image = .none;
+    cursor.image_surface_destroy.link.remove();
+}
+
+pub fn setWmImage(cursor: *Cursor, wm_image: Image) void {
+    if (cursor.wm_image == .client) {
+        cursor.wm_image_surface_destroy.link.remove();
+    }
+    cursor.wm_image = wm_image;
+    if (cursor.wm_image == .client) {
+        cursor.wm_image.client.surface.events.destroy.add(&cursor.wm_image_surface_destroy);
+    }
+    if (cursor.seat.wlr_seat.pointer_state.focused_client == null) {
+        cursor.setImage(wm_image);
+    }
+}
+
+fn handleWmImageSurfaceDestroy(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
+    const cursor: *Cursor = @fieldParentPtr("wm_image_surface_destroy", listener);
+    cursor.wm_image = .none;
+    cursor.wm_image_surface_destroy.link.remove();
 }
 
 fn handleRequestSetCursor(
     listener: *wl.Listener(*wlr.Seat.event.RequestSetCursor),
     event: *wlr.Seat.event.RequestSetCursor,
 ) void {
-    // This event is rasied by the seat when a client provides a cursor image
     const cursor: *Cursor = @fieldParentPtr("request_set_cursor", listener);
     const focused_client = cursor.seat.wlr_seat.pointer_state.focused_client;
 
-    // This can be sent by any client, so we check to make sure this one is
-    // actually has pointer focus first.
-    if (focused_client == event.seat_client) {
-        // Once we've vetted the client, we can tell the cursor to use the
-        // provided surface as the cursor image. It will set the hardware cursor
-        // on the output that it's currently on and continue to do so as the
-        // cursor moves between outputs.
+    // Only the client with pointer focus is allowed to set the cursor
+    if (event.seat_client == focused_client) {
         log.debug("focused client set cursor", .{});
-        cursor.wlr_cursor.setSurface(event.surface, event.hotspot_x, event.hotspot_y);
-        cursor.xcursor_name = null;
+        if (event.surface) |surface| {
+            cursor.setImage(.{ .client = .{
+                .surface = surface,
+                .hotspot_x = event.hotspot_x,
+                .hotspot_y = event.hotspot_y,
+            } });
+        } else {
+            cursor.setImage(.none);
+        }
+    }
+    // Except for the window manager client
+    if (server.wm.object) |object| {
+        if (event.seat_client.client == object.getClient() and
+            object.getVersion() >= 4)
+        {
+            if (event.surface) |surface| {
+                cursor.setWmImage(.{ .client = .{
+                    .surface = surface,
+                    .hotspot_x = event.hotspot_x,
+                    .hotspot_y = event.hotspot_y,
+                } });
+            } else {
+                cursor.setWmImage(.none);
+            }
+        }
     }
 }
 
 fn clearFocus(cursor: *Cursor) void {
-    cursor.setXcursor("default");
+    cursor.setImage(cursor.wm_image);
     cursor.seat.wlr_seat.pointerNotifyClearFocus();
 }
 

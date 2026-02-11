@@ -472,30 +472,36 @@ fn handleRequestActivate(
 }
 
 fn handleRequestSetCursorShape(
-    _: *wl.Listener(*wlr.CursorShapeManagerV1.event.RequestSetShape),
+    listener: *wl.Listener(*wlr.CursorShapeManagerV1.event.RequestSetShape),
     event: *wlr.CursorShapeManagerV1.event.RequestSetShape,
 ) void {
+    const server: *Server = @fieldParentPtr("request_set_cursor_shape", listener);
     const seat: *Seat = @ptrCast(@alignCast(event.seat_client.seat.data));
+
+    const name = wlr.CursorShapeManagerV1.shapeName(event.shape);
 
     if (event.tablet_tool) |wp_tool| {
         assert(event.device_type == .tablet_tool);
 
         const tool = TabletTool.get(event.seat_client.seat, wp_tool.wlr_tool) catch return;
-
         if (tool.allowSetCursor(event.seat_client, event.serial)) {
-            const name = wlr.CursorShapeManagerV1.shapeName(event.shape);
             tool.wlr_cursor.setXcursor(seat.cursor.xcursor_manager, name);
         }
     } else {
         assert(event.device_type == .pointer);
 
+        // Only the client with pointer focus is allowed to set the cursor
         const focused_client = event.seat_client.seat.pointer_state.focused_client;
-
-        // This can be sent by any client, so we check to make sure this one is
-        // actually has pointer focus first.
-        if (focused_client == event.seat_client) {
-            const name = wlr.CursorShapeManagerV1.shapeName(event.shape);
-            seat.cursor.setXcursor(name);
+        if (event.seat_client == focused_client) {
+            seat.cursor.setImage(.{ .xcursor = name });
+        }
+        // Except for the window manager client
+        if (server.wm.object) |object| {
+            if (event.seat_client.client == object.getClient() and
+                object.getVersion() >= 4)
+            {
+                seat.cursor.setWmImage(.{ .xcursor = name });
+            }
         }
     }
 }
