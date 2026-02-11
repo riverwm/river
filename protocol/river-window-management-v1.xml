@@ -1387,12 +1387,9 @@
     <description summary="a window management seat">
       This object represents a single user's collection of input devices. It
       allows the window manager to route keyboard input to windows, get
-      high-level information about pointer input, define keyboard and pointer
-      bindings, etc.
+      high-level information about pointer input, define pointer bindings, etc.
 
-      TODO:
-        - touch input
-        - tablet input
+      For keyboard bindings, see the river-xkb-bindings-v1 protocol.
     </description>
 
     <request name="destroy" type="destructor">
