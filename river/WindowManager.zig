@@ -67,6 +67,7 @@ rendering_scheduled: struct {
 /// The list is in rendering order, the last node in the list is rendered on top.
 rendering_requested: struct {
     list: wl.list.Head(WmNode, .link),
+    order_hash: u64 = 0,
 },
 
 dirty_idle: ?*wl.EventSource = null,
@@ -450,13 +451,42 @@ fn renderFinish(wm: *WindowManager) void {
         }
     }
 
+    // This is a hack to avoid excessive modification of the wlroots scene graph.
+    // There is currently no way to atomically apply multiple changes to the
+    // scene graph, which means that damage and visibility are re-calculated
+    // every API call, resulting in redundant events being sent to clients.
+    //
+    // TODO(wlroots) provide a way to batch changes to the scene graph.
+    const new_order_hash = blk: {
+        var hash = std.crypto.hash.Blake3.init(.{});
+        var it = wm.rendering_requested.list.iterator(.forward);
+        while (it.next()) |node| {
+            switch (node.get()) {
+                .window => |window| {
+                    hash.update(@ptrCast(&window));
+                    hash.update(&.{@intFromBool(window.wm_requested.fullscreen != null)});
+                },
+                .shell_surface => |shell_surface| {
+                    hash.update(@ptrCast(&shell_surface));
+                },
+            }
+        }
+        var final: u64 = undefined;
+        hash.final(@ptrCast(&final));
+        break :blk final;
+    };
+
     {
+        const reorder = wm.rendering_requested.order_hash != new_order_hash;
+        wm.rendering_requested.order_hash = new_order_hash;
+
         var found_fullscreen: bool = false;
         var it = wm.rendering_requested.list.iterator(.forward);
         while (it.next()) |node| {
             switch (node.get()) {
                 .window => |window| {
                     window.renderFinish();
+                    if (!reorder) continue;
                     window.popup_tree.node.reparent(server.scene.layers.popups);
                     if (window.wm_requested.fullscreen != null) {
                         window.tree.node.reparent(server.scene.layers.fullscreen);
@@ -469,6 +499,7 @@ fn renderFinish(wm: *WindowManager) void {
                 },
                 .shell_surface => |shell_surface| {
                     shell_surface.renderFinish();
+                    if (!reorder) continue;
                     shell_surface.popup_tree.node.reparent(server.scene.layers.popups);
                     if (found_fullscreen) {
                         shell_surface.tree.node.reparent(server.scene.layers.fullscreen);
