@@ -418,9 +418,16 @@ pub fn processButton(cursor: *Cursor, event: *const wlr.Pointer.event.Button) vo
         if (cursor.seat.matchPointerBinding(event.button)) |binding| {
             result.value_ptr.* = binding;
             binding.pressed();
-            log.debug("entering cursor mode ignore", .{});
-            cursor.mode = .ignore;
-            cursor.clearFocus();
+            switch (cursor.mode) {
+                .passthrough, .drag, .down => {
+                    log.debug("entering cursor mode ignore", .{});
+                    cursor.mode = .ignore;
+                    cursor.clearFocus();
+                },
+                // It is important that we do not enter ignore mode if an op is in progress,
+                // doing so would result in op_release never being sent for example.
+                .op, .ignore => {},
+            }
             return;
         }
 
