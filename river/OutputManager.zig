@@ -6,6 +6,7 @@ const OutputManager = @This();
 const build_options = @import("build_options");
 const std = @import("std");
 const assert = std.debug.assert;
+const math = std.math;
 const mem = std.mem;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
@@ -134,33 +135,12 @@ fn handleManagerApply(_: *wl.Listener(*wlr.OutputConfigurationV1), config: *wlr.
     var it = config.heads.iterator(.forward);
     while (it.next()) |head| {
         const output: *Output = @ptrCast(@alignCast(head.state.output.data));
-        if (!head.state.enabled) {
+        if (head.state.enabled) {
+            output.scheduled = .fromHeadState(&head.state);
+        } else {
             // Avoid overwriting and losing all other output state on disable.
             output.scheduled.state = .disabled_hard;
-            continue;
         }
-        output.scheduled = .{
-            .state = .enabled,
-            .mode = blk: {
-                if (head.state.mode) |mode| {
-                    break :blk .{ .standard = mode };
-                } else {
-                    break :blk .{ .custom = .{
-                        .width = head.state.custom_mode.width,
-                        .height = head.state.custom_mode.height,
-                        .refresh = head.state.custom_mode.refresh,
-                    } };
-                }
-            },
-            .x = head.state.x,
-            .y = head.state.y,
-            // Round to nearest 1/120 to ensure the scale is exactly represented
-            // in the fractional-scale-v1 protocol.
-            .scale = @round(head.state.scale * 120) / 120,
-            .transform = head.state.transform,
-            .adaptive_sync = head.state.adaptive_sync_enabled,
-            .auto_layout = false,
-        };
     }
 
     if (server.wm.scheduled.output_config) |old| {
@@ -175,16 +155,29 @@ fn handleManagerApply(_: *wl.Listener(*wlr.OutputConfigurationV1), config: *wlr.
 fn validateConfigCoordinates(config: *wlr.OutputConfigurationV1) bool {
     var it = config.heads.iterator(.forward);
     while (it.next()) |head| {
-        // Negative output coordinates currently cause Xwayland clients to not receive click events.
-        // See: https://gitlab.freedesktop.org/xorg/xserver/-/issues/899
-        if (build_options.xwayland and server.xwayland != null and
-            (head.state.x < 0 or head.state.y < 0))
-        {
-            log.err(
-                \\Attempted to set negative coordinates for output {s}.
-                \\Negative output coordinates are disallowed if Xwayland is enabled due to a limitation of Xwayland.
-            , .{head.state.output.name});
-            return false;
+        if (!head.state.enabled) continue;
+
+        const proposed: Output.State = .fromHeadState(&head.state);
+        if (build_options.xwayland and server.xwayland != null) {
+            // Negative output coordinates currently cause Xwayland clients to not receive click events.
+            // See: https://gitlab.freedesktop.org/xorg/xserver/-/issues/899
+            if (proposed.x < 0 or proposed.y < 0) {
+                log.err(
+                    \\Attempted to set negative coordinates for output {s}.
+                    \\Negative output coordinates are disallowed if Xwayland is enabled due to a limitation of Xwayland.
+                , .{head.state.output.name});
+                return false;
+            }
+            const width, const height = proposed.dimensions();
+            if (proposed.x + width > math.maxInt(i16) or
+                proposed.y + height > math.maxInt(i16))
+            {
+                log.err(
+                    \\Attempted to set too-large coordinates for output {s}.
+                    \\Coordinates greater than {d} are disallowed if Xwayland is enabled due to a limitation of X11.
+                , .{ head.state.output.name, math.maxInt(i16) });
+                return false;
+            }
         }
     }
     return true;

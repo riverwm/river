@@ -57,6 +57,32 @@ pub const State = struct {
     adaptive_sync: bool,
     auto_layout: bool,
 
+    pub fn fromHeadState(state: *const wlr.OutputHeadV1.State) State {
+        assert(state.enabled);
+        return .{
+            .state = .enabled,
+            .mode = blk: {
+                if (state.mode) |mode| {
+                    break :blk .{ .standard = mode };
+                } else {
+                    break :blk .{ .custom = .{
+                        .width = state.custom_mode.width,
+                        .height = state.custom_mode.height,
+                        .refresh = state.custom_mode.refresh,
+                    } };
+                }
+            },
+            .x = state.x,
+            .y = state.y,
+            // Round to nearest 1/120 to ensure the scale is exactly represented
+            // in the fractional-scale-v1 protocol.
+            .scale = @round(state.scale * 120) / 120,
+            .transform = state.transform,
+            .adaptive_sync = state.adaptive_sync_enabled,
+            .auto_layout = false,
+        };
+    }
+
     /// Width/height in the logical coordinate space
     pub fn dimensions(state: *const State) struct { u31, u31 } {
         var w: i32, var h: i32 = switch (state.mode) {
