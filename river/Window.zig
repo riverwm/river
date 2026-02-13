@@ -847,6 +847,11 @@ pub fn renderFinish(window: *Window) void {
     window.tree.node.setPosition(window.box.x, window.box.y);
     window.popup_tree.node.setPosition(window.box.x, window.box.y);
 
+    switch (window.impl) {
+        .xwayland => |*xwindow| _ = xwindow.configure(),
+        .toplevel, .destroying => {},
+    }
+
     window.applySurfaceClip(&clip, &content_clip);
     inline for (.{ &window.decorations_above, &window.decorations_below }) |decorations| {
         var it = decorations.iterator(.forward);

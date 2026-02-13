@@ -99,8 +99,11 @@ pub fn configure(xwindow: *XwaylandWindow) bool {
     const width = scheduled.width orelse xwindow.xsurface.width;
     const height = scheduled.height orelse xwindow.xsurface.height;
 
-    // Yes it's technically wrong to send rendering_requested state
-    // here, but we don't care about frame perfection for X11 windows.
+    // Unlike native Wayland windows, we need to tell X11 windows about their
+    // position. However, river does not necessarily know the new position
+    // until after a rendering sequence is completed. Therefore, configure()
+    // is called both on manageFinish() and renderFinish() for Xwayland windows.
+    // Frame perfection is not achievable for Xwayland windows in any case.
     if (window.rendering_requested.x != xwindow.xsurface.x or
         window.rendering_requested.y != xwindow.xsurface.y or
         width != xwindow.xsurface.width or
