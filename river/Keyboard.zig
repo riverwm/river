@@ -69,7 +69,16 @@ pub fn create(seat: *Seat, wlr_device: *wlr.InputDevice, virtual: bool) !*Keyboa
 
     wlr_keyboard.events.key.add(&keyboard.key);
     wlr_keyboard.events.modifiers.add(&keyboard.modifiers);
-    wlr_keyboard.events.keymap.add(&keyboard.keymap);
+
+    if (virtual) {
+        wlr_keyboard.events.keymap.add(&keyboard.keymap);
+    } else {
+        keyboard.keymap.link.init();
+        // We must set a keymap even though this is not the wlr_keyboard river
+        // exposes to clients. If there is no keymap set, wlroots will not emit
+        // the modifiers event when using the Wayland or X11 backend.
+        _ = wlr_keyboard.setKeymap(keyboard.config.keymap);
+    }
 
     return keyboard;
 }
@@ -109,6 +118,7 @@ pub fn setRepeatInfo(keyboard: *Keyboard, rate: u31, delay: u31) void {
 
 pub fn setKeymap(keyboard: *Keyboard, keymap: *xkb.Keymap) void {
     assert(!keyboard.device.virtual);
+    _ = keyboard.device.wlr_device.toKeyboard().setKeymap(keymap);
     if (keyboard.config.keymap) |old| old.unref();
     keyboard.config.keymap = keymap.ref();
     if (keyboard.group) |group| {
