@@ -463,7 +463,7 @@ fn renderFinish(wm: *WindowManager) void {
         while (it.next()) |node| {
             switch (node.get()) {
                 .window => |window| {
-                    hash.update(@ptrCast(&window));
+                    hash.update(@ptrCast(&window.ref));
                     hash.update(&.{@intFromBool(window.wm_requested.fullscreen != null)});
                 },
                 .shell_surface => |shell_surface| {
