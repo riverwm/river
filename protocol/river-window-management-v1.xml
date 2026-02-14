@@ -267,7 +267,7 @@
         This event will be followed by a manage_start event after all other new
         state has been sent by the server.
       </description>
-      <arg name="id" type="new_id" interface="river_window_v1"/>
+      <arg name="id" type="new_id" interface="river_window_v1" summary="new window"/>
     </event>
 
     <event name="output">
@@ -279,7 +279,7 @@
         events as well as a manage_start event after all other new state has
         been sent by the server.
       </description>
-      <arg name="id" type="new_id" interface="river_output_v1"/>
+      <arg name="id" type="new_id" interface="river_output_v1" summary="new output"/>
     </event>
 
     <event name="seat">
@@ -289,7 +289,7 @@
         This event will be followed by a manage_start event after all other new
         state has been sent by the server.
       </description>
-      <arg name="id" type="new_id" interface="river_seat_v1"/>
+      <arg name="id" type="new_id" interface="river_seat_v1" summary="new seat"/>
     </event>
 
     <request name="get_shell_surface">
@@ -300,8 +300,10 @@
         Providing a wl_surface which already has a role or already has a buffer
         attached or committed is a protocol error.
       </description>
-      <arg name="id" type="new_id" interface="river_shell_surface_v1"/>
-      <arg name="surface" type="object" interface="wl_surface"/>
+      <arg name="id" type="new_id" interface="river_shell_surface_v1"
+        summary="new river shell surface"/>
+      <arg name="surface" type="object" interface="wl_surface"
+        summary="base surface"/>
     </request>
   </interface>
 
@@ -374,7 +376,7 @@
         It is a protocol error to make this request more than once for a single
         window.
       </description>
-      <arg name="id" type="new_id" interface="river_node_v1"/>
+      <arg name="id" type="new_id" interface="river_node_v1" summary="new node"/>
     </request>
 
     <event name="dimensions_hint">
@@ -393,10 +395,10 @@
         This event will be followed by a manage_start event after all other new
         state has been sent by the server.
       </description>
-      <arg name="min_width" type="int"/>
-      <arg name="min_height" type="int"/>
-      <arg name="max_width" type="int"/>
-      <arg name="max_height" type="int"/>
+      <arg name="min_width" type="int" summary="minimum width"/>
+      <arg name="min_height" type="int" summary="minimum height"/>
+      <arg name="max_width" type="int" summary="maximum width"/>
+      <arg name="max_height" type="int" summary="maximum height"/>
     </event>
 
     <event name="dimensions">
@@ -419,8 +421,8 @@
         The window will not be displayed until the first dimensions event is
         received and the render sequence is finished.
       </description>
-      <arg name="width" type="int"/>
-      <arg name="height" type="int"/>
+      <arg name="width" type="int" summary="window content width"/>
+      <arg name="height" type="int" summary="window content height"/>
     </event>
 
     <request name="propose_dimensions">
@@ -451,8 +453,8 @@
         This request modifies window management state and may only be made as
         part of a manage sequence, see the river_window_manager_v1 description.
       </description>
-      <arg name="width" type="int"/>
-      <arg name="height" type="int"/>
+      <arg name="width" type="int" summary="proposed content width"/>
+      <arg name="height" type="int" summary="proposed content height"/>
     </request>
 
     <request name="hide">
@@ -493,7 +495,8 @@
         This event will be followed by a manage_start event after all other new
         state has been sent by the server.
       </description>
-      <arg name="app_id" type="string" allow-null="true"/>
+      <arg name="app_id" type="string" allow-null="true"
+        summary="window application ID"/>
     </event>
 
     <event name="title">
@@ -507,7 +510,7 @@
         This event will be followed by a manage_start event after all other new
         state has been sent by the server.
       </description>
-      <arg name="title" type="string" allow-null="true"/>
+      <arg name="title" type="string" allow-null="true" summary="window title"/>
     </event>
 
     <event name="parent">
@@ -527,7 +530,7 @@
         state has been sent by the server.
       </description>
       <arg name="parent" type="object" allow-null="true"
-        interface="river_window_v1"/>
+        interface="river_window_v1" summary="parent window, if any"/>
     </event>
 
     <enum name="decoration_hint">
@@ -552,7 +555,7 @@
         This event will be followed by a manage_start event after all other new
         state has been sent by the server.
       </description>
-      <arg name="hint" type="uint" enum="decoration_hint"/>
+      <arg name="hint" type="uint" enum="decoration_hint" summary="decoration hint"/>
     </event>
 
     <request name="use_csd">
@@ -618,12 +621,12 @@
         This request modifies rendering state and may only be made as part of a
         render sequence, see the river_window_manager_v1 description.
       </description>
-      <arg name="edges" type="uint" enum="edges"/>
-      <arg name="width" type="int"/>
-      <arg name="r" type="uint"/>
-      <arg name="g" type="uint"/>
-      <arg name="b" type="uint"/>
-      <arg name="a" type="uint"/>
+      <arg name="edges" type="uint" enum="edges" summary="border edges"/>
+      <arg name="width" type="int" summary="border width"/>
+      <arg name="r" type="uint" summary="32-bit red value"/>
+      <arg name="g" type="uint" summary="32-bit green value"/>
+      <arg name="b" type="uint" summary="32-bit blue value"/>
+      <arg name="a" type="uint" summary="32-bit alpha value"/>
     </request>
 
     <request name="set_tiled">
@@ -642,7 +645,7 @@
         This request modifies window management state and may only be made as
         part of a manage sequence, see the river_window_manager_v1 description.
       </description>
-      <arg name="edges" type="uint" enum="edges"/>
+      <arg name="edges" type="uint" enum="edges" summary="tiled edges"/>
     </request>
 
     <request name="get_decoration_above">
@@ -654,8 +657,10 @@
         Providing a wl_surface which already has a role or already has a buffer
         attached or committed is a protocol error.
       </description>
-      <arg name="id" type="new_id" interface="river_decoration_v1"/>
-      <arg name="surface" type="object" interface="wl_surface"/>
+      <arg name="id" type="new_id" interface="river_decoration_v1"
+        summary="new decoration surface"/>
+      <arg name="surface" type="object" interface="wl_surface"
+        summary="base surface"/>
     </request>
 
     <request name="get_decoration_below">
@@ -667,8 +672,10 @@
         Providing a wl_surface which already has a role or already has a buffer
         attached or committed is a protocol error.
       </description>
-      <arg name="id" type="new_id" interface="river_decoration_v1"/>
-      <arg name="surface" type="object" interface="wl_surface"/>
+      <arg name="id" type="new_id" interface="river_decoration_v1"
+        summary="new decoration surface"/>
+      <arg name="surface" type="object" interface="wl_surface"
+        summary="base surface"/>
     </request>
 
     <event name="pointer_move_requested">
@@ -687,7 +694,8 @@
         This event will be followed by a manage_start event after all other new
         state has been sent by the server.
       </description>
-      <arg name="seat" type="object" interface="river_seat_v1"/>
+      <arg name="seat" type="object" interface="river_seat_v1"
+        summary="requested seat"/>
     </event>
 
     <event name="pointer_resize_requested">
@@ -710,8 +718,10 @@
         This event will be followed by a manage_start event after all other new
         state has been sent by the server.
       </description>
-      <arg name="seat" type="object" interface="river_seat_v1"/>
-      <arg name="edges" type="uint" enum="edges"/>
+      <arg name="seat" type="object" interface="river_seat_v1"
+        summary="requested seat"/>
+      <arg name="edges" type="uint" enum="edges"
+        summary="requested edges"/>
     </event>
 
     <request name="inform_resize_start">
@@ -763,7 +773,8 @@
         This request modifies window management state and may only be made as
         part of a manage sequence, see the river_window_manager_v1 description.
       </description>
-      <arg name="caps" type="uint" enum="capabilities"/>
+      <arg name="caps" type="uint" enum="capabilities"
+        summary="supported capabilities"/>
     </request>
 
     <event name="show_window_menu_requested">
@@ -850,7 +861,7 @@
         state has been sent by the server.
       </description>
       <arg name="output" type="object" allow-null="true"
-        interface="river_output_v1" />
+        interface="river_output_v1" summary="fullscreen output requested"/>
     </event>
 
     <event name="exit_fullscreen_requested">
@@ -931,7 +942,8 @@
         This request modifies window management state and may only be made as
         part of a manage sequence, see the river_window_manager_v1 description.
       </description>
-      <arg name="output" type="object" interface="river_output_v1"/>
+      <arg name="output" type="object" interface="river_output_v1"
+        summary="fullscreen output"/>
     </request>
 
     <request name="exit_fullscreen">
@@ -984,10 +996,10 @@
         This request modifies rendering state and may only be made as part of a
         render sequence, see the river_window_manager_v1 description.
       </description>
-      <arg name="x" type="int"/>
-      <arg name="y" type="int"/>
-      <arg name="width" type="int"/>
-      <arg name="height" type="int"/>
+      <arg name="x" type="int" summary="x relative to top left window corner"/>
+      <arg name="y" type="int" summary="y relative to top left window corner"/>
+      <arg name="width" type="int" summary="clip box width"/>
+      <arg name="height" type="int" summary="clip box height"/>
     </request>
 
     <event name="unreliable_pid" since="2">
@@ -1003,7 +1015,7 @@
         This event is sent once when the river_window_v1 is created and never
         sent again.
       </description>
-      <arg name="unreliable_pid" type="int"/>
+      <arg name="unreliable_pid" type="int" summary="unreliable PID"/>
     </event>
 
     <request name="set_content_clip_box" since="3">
@@ -1028,10 +1040,10 @@
         This request modifies rendering state and may only be made as part of a
         render sequence, see the river_window_manager_v1 description.
       </description>
-      <arg name="x" type="int"/>
-      <arg name="y" type="int"/>
-      <arg name="width" type="int"/>
-      <arg name="height" type="int"/>
+      <arg name="x" type="int" summary="x relative to top left window corner"/>
+      <arg name="y" type="int" summary="y relative to top left window corner"/>
+      <arg name="width" type="int" summary="clip box width"/>
+      <arg name="height" type="int" summary="clip box height"/>
     </request>
   </interface>
 
@@ -1071,8 +1083,8 @@
         This request modifies rendering state and may only be made as part of a
         render sequence, see the river_window_manager_v1 description.
       </description>
-      <arg name="x" type="int"/>
-      <arg name="y" type="int"/>
+      <arg name="x" type="int" summary="x relative to top left window corner"/>
+      <arg name="y" type="int" summary="y relative to top left window corner"/>
     </request>
 
     <request name="sync_next_commit">
@@ -1119,7 +1131,7 @@
         It is a protocol error to make this request more than once for a single
         shell surface.
       </description>
-      <arg name="id" type="new_id" interface="river_node_v1"/>
+      <arg name="id" type="new_id" interface="river_node_v1" summary="new node"/>
     </request>
 
     <request name="sync_next_commit">
@@ -1172,8 +1184,8 @@
         This request modifies rendering state and may only be made as part of a
         render sequence, see the river_window_manager_v1 description.
       </description>
-      <arg name="x" type="int"/>
-      <arg name="y" type="int"/>
+      <arg name="x" type="int" summary="global x coordinate"/>
+      <arg name="y" type="int" summary="global y coordinate"/>
     </request>
 
     <request name="place_top">
@@ -1206,7 +1218,8 @@
         This request modifies rendering state and may only be made as part of a
         render sequence, see the river_window_manager_v1 description.
       </description>
-      <arg name="other" type="object" interface="river_node_v1"/>
+      <arg name="other" type="object" interface="river_node_v1"
+        summary="other node"/>
     </request>
 
     <request name="place_below">
@@ -1219,7 +1232,8 @@
         This request modifies rendering state and may only be made as part of a
         render sequence, see the river_window_manager_v1 description.
       </description>
-      <arg name="other" type="object" interface="river_node_v1"/>
+      <arg name="other" type="object" interface="river_node_v1"
+        summary="other node"/>
     </request>
   </interface>
 
@@ -1300,8 +1314,8 @@
         cause the areas of multiple logical outputs to overlap when the
         corresponding manage_start event is received.
       </description>
-      <arg name="x" type="int"/>
-      <arg name="y" type="int"/>
+      <arg name="x" type="int" summary="global x coordinate"/>
+      <arg name="y" type="int" summary="global y coordinate"/>
     </event>
 
     <event name="dimensions">
@@ -1320,8 +1334,8 @@
         cause the areas of multiple logical outputs to overlap when the
         corresponding manage_start event is received.
       </description>
-      <arg name="width" type="int"/>
-      <arg name="height" type="int"/>
+      <arg name="width" type="int" summary="output width"/>
+      <arg name="height" type="int" summary="output height"/>
     </event>
   </interface>
 
@@ -1393,7 +1407,8 @@
         This request modifies window management state and may only be made as
         part of a manage sequence, see the river_window_manager_v1 description.
       </description>
-      <arg name="window" type="object" interface="river_window_v1"/>
+      <arg name="window" type="object" interface="river_window_v1"
+        summary="window to focus"/>
     </request>
 
     <request name="focus_shell_surface">
@@ -1404,7 +1419,8 @@
         This request modifies window management state and may only be made as
         part of a manage sequence, see the river_window_manager_v1 description.
       </description>
-      <arg name="shell_surface" type="object" interface="river_shell_surface_v1"/>
+      <arg name="shell_surface" type="object" interface="river_shell_surface_v1"
+        summary="shell surface to focus"/>
     </request>
 
     <request name="clear_focus">
@@ -1433,7 +1449,8 @@
         This event will be followed by a manage_start event after all other new
         state has been sent by the server.
       </description>
-      <arg name="window" type="object" interface="river_window_v1"/>
+      <arg name="window" type="object" interface="river_window_v1"
+        summary="window entered"/>
     </event>
 
     <event name="pointer_leave">
@@ -1464,7 +1481,8 @@
         This event will be followed by a manage_start event after all other new
         state has been sent by the server.
       </description>
-      <arg name="window" type="object" interface="river_window_v1"/>
+      <arg name="window" type="object" interface="river_window_v1"
+        summary="window interacted with"/>
     </event>
 
     <event name="shell_surface_interaction">
@@ -1486,7 +1504,8 @@
         This event will be followed by a manage_start event after all other new
         state has been sent by the server.
       </description>
-      <arg name="shell_surface" type="object" interface="river_shell_surface_v1"/>
+      <arg name="shell_surface" type="object" interface="river_shell_surface_v1"
+        summary="shell surface interacted with"/>
     </event>
 
     <request name="op_start_pointer">
@@ -1568,8 +1587,8 @@
 
     <request name="get_pointer_binding">
       <description summary="define a new pointer binding">
-        Define a pointer binding in terms of a pointer button, modifiers, and
-        other configurable properties.
+        Define a pointer binding in terms of a pointer button, keyboard
+        modifiers, and other configurable properties.
 
         The button argument is a Linux input event code defined in the
         linux/input-event-codes.h header file (e.g. BTN_RIGHT).
@@ -1577,9 +1596,11 @@
         The new pointer binding is not enabled until initial configuration is
         completed and the enable request is made during a manage sequence.
       </description>
-      <arg name="id" type="new_id" interface="river_pointer_binding_v1"/>
+      <arg name="id" type="new_id" interface="river_pointer_binding_v1"
+        summary="new pointer binding"/>
       <arg name="button" type="uint" summary="a Linux input event code"/>
-      <arg name="modifiers" type="uint" enum="modifiers"/>
+      <arg name="modifiers" type="uint" enum="modifiers"
+        summary="keyboard modifiers"/>
     </request>
 
     <request name="set_xcursor_theme" since="2">
@@ -1591,8 +1612,8 @@
         Note: The window manager may also wish to set the XCURSOR_THEME and
         XCURSOR_SIZE environment variable for programs it starts.
       </description>
-      <arg name="name" type="string"/>
-      <arg name="size" type="uint"/>
+      <arg name="name" type="string" summary="xcursor theme name"/>
+      <arg name="size" type="uint" summary="cursor size"/>
     </request>
 
     <event name="pointer_position" since="2">
@@ -1607,8 +1628,8 @@
         sequence unless there is no change in x/y position since the last time this
         event was sent.
       </description>
-      <arg name="x" type="int"/>
-      <arg name="y" type="int"/>
+      <arg name="x" type="int" summary="global x coordinate"/>
+      <arg name="y" type="int" summary="global y coordinate"/>
     </event>
 
     <request name="pointer_warp" since="3">
@@ -1622,8 +1643,8 @@
         This request modifies window management state and may only be made as
         part of a manage sequence, see the river_window_manager_v1 description.
       </description>
-      <arg name="x" type="int"/>
-      <arg name="y" type="int"/>
+      <arg name="x" type="int" summary="global x coordinate"/>
+      <arg name="y" type="int" summary="global y coordinate"/>
     </request>
   </interface>
 
