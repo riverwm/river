@@ -110,8 +110,8 @@ pub fn configure(xwindow: *XwaylandWindow) bool {
         height != xwindow.xsurface.height)
     {
         xwindow.xsurface.configure(
-            math.lossyCast(i16, window.rendering_requested.x),
-            math.lossyCast(i16, window.rendering_requested.y),
+            math.lossyCast(i16, window.box.x),
+            math.lossyCast(i16, window.box.y),
             math.lossyCast(u16, width),
             math.lossyCast(u16, height),
         );
