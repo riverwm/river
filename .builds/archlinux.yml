@@ -1,6 +1,10 @@
 # SPDX-FileCopyrightText: © 2022 The River Developers
 # SPDX-License-Identifier: 0BSD
 
+submitter:
+  git.sr.ht:
+    enabled: false
+
 image: archlinux
 packages:
   - libdisplay-info
