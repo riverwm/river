@@ -104,8 +104,8 @@ pub fn configure(xwindow: *XwaylandWindow) bool {
     // until after a rendering sequence is completed. Therefore, configure()
     // is called both on manageFinish() and renderFinish() for Xwayland windows.
     // Frame perfection is not achievable for Xwayland windows in any case.
-    if (window.rendering_requested.x != xwindow.xsurface.x or
-        window.rendering_requested.y != xwindow.xsurface.y or
+    if (window.box.x != xwindow.xsurface.x or
+        window.box.y != xwindow.xsurface.y or
         width != xwindow.xsurface.width or
         height != xwindow.xsurface.height)
     {
