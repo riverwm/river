@@ -1056,6 +1056,30 @@
       <arg name="hint" type="uint" enum="river_output_v1.presentation_mode"
         summary="presentation hint"/>
     </event>
+
+    <event name="identifier" since="4">
+      <description summary="unique window identifier">
+        The identifier is a string that contains up to 32 printable ASCII bytes.
+        The identifier must not be an empty string.
+
+        It is compositor policy how the identifier is generated, but the following
+        properties must be upheld:
+
+        1. The identifier must uniquely identify the window. Two windows must not
+           share the same identifier.
+
+        2. The identifier must not be reused. This avoids races around window
+           creation/destruction when identifiers are used in out-of-band IPC.
+
+        If the compositor implements the ext-foreign-toplevel-list-v1 protocol,
+        the river_window_v1.identifier event must match the corresponding
+        ext_foreign_toplevel_handle_v1.identifier event.
+
+        This event is sent once when the river_window_v1 is created and never
+        sent again.
+      </description>
+      <arg name="identifier" type="string" summary="unique identifier"/>
+    </event>
   </interface>
 
   <interface name="river_decoration_v1" version="4">
