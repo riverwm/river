@@ -23,7 +23,7 @@
     IN THE SOFTWARE.
   </copyright>
 
-  <description summary="layer shell support for river">
+  <description summary="optional layer shell support">
     This protocol allows the river-window-management-v1 window manager to
     support the wlr-layer-shell-v1 protocol.
 
