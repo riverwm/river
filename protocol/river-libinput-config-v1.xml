@@ -28,6 +28,10 @@
     documentation should be referred to for detailed information on libinput's
     behavior.
 
+    Note that the compositor will not be able to expose libinput devices through
+    this protocol when it does not have access to the hardware, for example when
+    running nested in another Wayland compositor or X11 session.
+
     This protocol is designed so that (hopefully) any backwards compatible
     change to libinput's API can be matched with a backwards compatible change
     to this protocol.
