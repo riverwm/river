@@ -392,13 +392,29 @@ pub fn manageStart(window: *Window) void {
                 window.node.link.remove();
                 server.wm.rendering_requested.list.append(&window.node);
 
+                if (wlr.ExtForeignToplevelHandleV1.create(server.foreign_toplevel_list, &.{
+                    .title = window.getTitle(),
+                    .app_id = window.getAppId(),
+                })) |handle| {
+                    assert(window.foreign_toplevel_handle == null);
+                    window.foreign_toplevel_handle = handle;
+                } else |_| {
+                    log.err("failed to create ext foreign toplevel handle", .{});
+                }
+
                 break :blk window_v1;
             };
+
             errdefer comptime unreachable;
 
             if (new) {
                 if (window_v1.getVersion() >= 2) {
                     window_v1.sendUnreliablePid(window.unreliablePid());
+                }
+                if (window_v1.getVersion() >= 4) {
+                    if (window.foreign_toplevel_handle) |handle| {
+                        window_v1.sendIdentifier(handle.identifier);
+                    }
                 }
             }
 
@@ -1072,15 +1088,6 @@ pub fn map(window: *Window) !void {
     assert(window.impl != .destroying);
     assert(window.state == .initialized);
     window.state = .mapped;
-
-    if (wlr.ExtForeignToplevelHandleV1.create(server.foreign_toplevel_list, &.{
-        .title = window.getTitle(),
-        .app_id = window.getAppId(),
-    })) |handle| {
-        window.foreign_toplevel_handle = handle;
-    } else |_| {
-        log.err("failed to create ext foreign toplevel handle", .{});
-    }
 }
 
 /// Called by the impl when the surface will no longer be displayed
