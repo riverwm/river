@@ -23,7 +23,7 @@
     IN THE SOFTWARE.
   </copyright>
 
-  <description summary="configure xkbcommon keyboard state">
+  <description summary="configure xkbcommon keyboards">
     This protocol allow a client to set the xkbcommon keymap of individual
     keyboard input devices. It also allows switching between the layouts of a
     keymap and toggling capslock/numlock state.
