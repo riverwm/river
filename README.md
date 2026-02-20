@@ -12,7 +12,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 River is a non-monolithic Wayland compositor. Unlike other Wayland compositors,
 river does not combine the compositor and window manager into one program.
 Instead, users can choose any window manager implementing the
-[river-window-management-v1](protocol/river-window-management-v1.xml) protocol.
+[river-window-management-v1] protocol.
 
 There is a [list of compatible window managers](https://codeberg.org/river/wiki/src/branch/main/pages/wm-list.md)
 on our [wiki](https://codeberg.org/river/wiki).
@@ -22,18 +22,19 @@ on our [wiki](https://codeberg.org/river/wiki).
 
 ## Links
 
-- [Code of Conduct](CODE_OF_CONDUCT.md)
-- [Issue Tracker](https://codeberg.org/river/river/issues)
+- [Protocol Docs](https://isaacfreund.com/docs/wayland/)
+- [Wiki](https://codeberg.org/river/wiki)
 - IRC: [#river](https://web.libera.chat/?channels=#river) on irc.libera.chat ([logs](https://libera.catirclogs.org/river))
 - [Zulip](https://river-compositor.zulipchat.com) (new)
-- [Wiki](https://codeberg.org/river/wiki)
+- [Issue Tracker](https://codeberg.org/river/river/issues)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
 
 ## Features
 
 River defers all window management policy to a separate window manager
-implementing the [river-window-management-v1](protocol/river-window-management-v1.xml)
-protocol. This includes window position/size, pointer/keyboard bindings, focus
-management, window decorations, desktop shell graphics, and more.
+implementing the [river-window-management-v1] protocol. This includes window
+position/size, pointer/keyboard bindings, focus management, window decorations,
+desktop shell graphics, and more.
 
 River itself provides frame perfect rendering, good performance, support for
 many Wayland protocol extensions, robust Xwayland support, the ability to
@@ -52,17 +53,14 @@ Why split the window manager to a separate process? I aim to:
 
 ## Current Status
 
-The first release supporting the
-[river-window-management-v1](protocol/river-window-management-v1.xml) protocol
-will be 0.4.0. The protocol is implemented on river's main branch and is already
+The first release supporting the [river-window-management-v1] protocol will be
+0.4.0. The protocol is implemented on river's main branch and is already
 robust/feature complete enough for me to use as my daily driver.
 
-The [river-window-management-v1](protocol/river-window-management-v1.xml)
-protocol and other river protocol extensions are stable.
-We do not break window managers.
+The [river-window-management-v1] protocol and other river protocol extensions
+are stable.  We do not break window managers.
 
-Currently the only documentation for the
-[river-window-management-v1](protocol/river-window-management-v1.xml) protocol
+Currently the only documentation for the [river-window-management-v1] protocol
 is the protocol specification itself. While this is all developers comfortable
 with writing Wayland clients should need, I'd like to add some more
 beginner-friendly documentation including a well-commented example window
@@ -126,3 +124,5 @@ In overview:
 - River's source code is released under the GPL-3.0-only license.
 - River's Wayland protocols are released under the MIT license.
 - River's logo and documentation are released under the CC-BY-SA-4.0 license.
+
+[river-window-management-v1]: https://isaacfreund.com/docs/wayland/river-window-management-v1
