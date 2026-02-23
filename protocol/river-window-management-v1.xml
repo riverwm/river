@@ -1622,10 +1622,10 @@
 
         This request is ignored if an operation is already in progress.
 
-        The compositor must ensure that no client has pointer focus during the
-        pointer operation. This means that the window manager has control
-        over the pointer's cursor surface/shape during the pointer operation.
-        See the river_seat_v1 description.
+        The compositor must ensure that no client has pointer focus from this
+        seat during the pointer operation. This means that the window manager
+        has control over the pointer's cursor surface/shape during the pointer
+        operation. See the river_seat_v1 description.
 
         This request modifies window management state and may only be made as
         part of a manage sequence, see the river_window_manager_v1 description.
