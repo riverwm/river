@@ -1080,6 +1080,27 @@
       </description>
       <arg name="identifier" type="string" summary="unique identifier"/>
     </event>
+
+    <request name="set_dimension_bounds" since="4">
+      <description summary="recommend maximum dimensions to the window">
+        Recommend that the window keep its dimensions within a given
+        maximum width/height. This recommendation is only a hint and the window
+        may ignore it.
+
+        Setting the width and height to 0 indicates that there are no bounds
+        and is equivalent to having never made this request.
+
+        Setting width or height to a negative value is a protocol error.
+
+        The server should communicate this hint to an xdg_toplevel window with
+        the xdg_toplevel.configure_bounds event for example.
+
+        This request modifies window management state and may only be made as
+        part of a manage sequence, see the river_window_manager_v1 description.
+      </description>
+      <arg name="max_width" type="int" summary="maximum width"/>
+      <arg name="max_height" type="int" summary="maximum height"/>
+    </request>
   </interface>
 
   <interface name="river_decoration_v1" version="4">

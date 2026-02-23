@@ -28,6 +28,11 @@ const XwaylandWindow = @import("XwaylandWindow.zig");
 
 const log = std.log.scoped(.wm);
 
+pub const Dimensions = struct {
+    width: u31,
+    height: u31,
+};
+
 pub const DimensionsHint = struct {
     min_width: u31 = 0,
     max_width: u31 = 0,
@@ -61,7 +66,8 @@ pub const Border = struct {
 
 /// Windowing state requested by the wm.
 const WmRequested = struct {
-    dimensions: ?struct { width: u31, height: u31 },
+    dimensions: ?Dimensions,
+    bounds: Dimensions,
     ssd: bool,
     tiled: river.WindowV1.Edges,
     capabilities: river.WindowV1.Capabilities,
@@ -73,6 +79,7 @@ const WmRequested = struct {
 
     pub const init: WmRequested = .{
         .dimensions = null,
+        .bounds = .{ .width = 0, .height = 0 },
         .ssd = false,
         .tiled = .{},
         .capabilities = .{
@@ -90,17 +97,30 @@ const WmRequested = struct {
 };
 
 pub const Configure = struct {
-    width: ?u31 = null,
-    height: ?u31 = null,
+    width: ?u31,
+    height: ?u31,
+    bounds: Dimensions,
     /// True if the window has keyboard focus from at least one seat.
-    activated: bool = false,
-    ssd: bool = false,
-    border: Border = .{},
-    tiled: river.WindowV1.Edges = .{},
-    capabilities: river.WindowV1.Capabilities = .{},
-    maximized: bool = false,
-    inform_fullscreen: bool = false,
-    resizing: bool = false,
+    activated: bool,
+    ssd: bool,
+    tiled: river.WindowV1.Edges,
+    capabilities: river.WindowV1.Capabilities,
+    maximized: bool,
+    inform_fullscreen: bool,
+    resizing: bool,
+
+    pub const init: Configure = .{
+        .width = null,
+        .height = null,
+        .bounds = .{ .width = 0, .height = 0 },
+        .activated = false,
+        .ssd = false,
+        .tiled = .{},
+        .capabilities = .{},
+        .maximized = false,
+        .inform_fullscreen = false,
+        .resizing = false,
+    };
 };
 
 /// Rendering state requested by the wm.
@@ -216,9 +236,9 @@ wm_sent: struct {
 wm_requested: WmRequested = .init,
 
 /// State to be sent to the window in the next configure.
-configure_scheduled: Configure = .{},
+configure_scheduled: Configure = .init,
 /// State sent to the window in the latest configure.
-configure_sent: Configure = .{},
+configure_sent: Configure = .init,
 
 /// State to be sent to the wm in the next render sequence.
 rendering_scheduled: struct {
@@ -690,6 +710,17 @@ fn handleRequest(
                 .height = args.height,
             };
         },
+        .set_dimension_bounds => |args| {
+            if (!server.wm.ensureWindowing()) return;
+            if (args.max_width < 0 or args.max_height < 0) {
+                window_v1.postError(.invalid_dimensions, "dimensions must be greater than or equal to 0 ");
+                return;
+            }
+            wm_requested.bounds = .{
+                .width = @intCast(args.max_width),
+                .height = @intCast(args.max_height),
+            };
+        },
     }
 }
 
@@ -718,44 +749,52 @@ pub fn manageFinish(window: *Window) bool {
         .closing => return false,
     }
 
-    window.configure_scheduled.ssd = wm_requested.ssd;
-    window.configure_scheduled.tiled = wm_requested.tiled;
-    window.configure_scheduled.capabilities = wm_requested.capabilities;
-    window.configure_scheduled.resizing = wm_requested.resizing;
-    window.configure_scheduled.maximized = wm_requested.maximized;
-    window.configure_scheduled.inform_fullscreen = wm_requested.inform_fullscreen;
-
     if (wm_requested.close) {
         window.close();
         wm_requested.close = false;
     }
 
-    {
-        window.configure_scheduled.activated = false;
+    const activated = blk: {
         var it = server.wm.sent.seats.iterator(.forward);
         while (it.next()) |seat| {
             if (seat.focused == .window and seat.focused.window == window) {
-                window.configure_scheduled.activated = true;
-                break;
+                break :blk true;
             }
         }
-    }
+        break :blk false;
+    };
 
-    if (wm_requested.fullscreen) |output| {
-        const width, const height = output.sent.dimensions();
-        if (window.configure_sent.width != width or
-            window.configure_sent.height != height)
-        {
-            window.configure_scheduled.width = width;
-            window.configure_scheduled.height = height;
+    const width, const height = blk: {
+        if (wm_requested.fullscreen) |output| {
+            const width, const height = output.sent.dimensions();
+            if (window.configure_sent.width != width or
+                window.configure_sent.height != height)
+            {
+                window.configure_scheduled.width = width;
+                window.configure_scheduled.height = height;
+                window.rendering_scheduled.resend_dimensions = true;
+                break :blk .{ width, height };
+            }
+        } else if (wm_requested.dimensions) |dimensions| {
             window.rendering_scheduled.resend_dimensions = true;
+            break :blk .{ dimensions.width, dimensions.height };
         }
-    } else if (wm_requested.dimensions) |dimensions| {
-        window.configure_scheduled.width = dimensions.width;
-        window.configure_scheduled.height = dimensions.height;
-        window.rendering_scheduled.resend_dimensions = true;
-    }
+        break :blk .{ null, null };
+    };
     wm_requested.dimensions = null;
+
+    window.configure_scheduled = .{
+        .width = width,
+        .height = height,
+        .bounds = wm_requested.bounds,
+        .activated = activated,
+        .ssd = wm_requested.ssd,
+        .tiled = wm_requested.tiled,
+        .capabilities = wm_requested.capabilities,
+        .resizing = wm_requested.resizing,
+        .maximized = wm_requested.maximized,
+        .inform_fullscreen = wm_requested.inform_fullscreen,
+    };
 
     const track_configure = switch (window.impl) {
         .toplevel => |*toplevel| toplevel.configure(),

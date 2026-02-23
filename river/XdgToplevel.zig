@@ -120,6 +120,7 @@ pub fn configure(toplevel: *XdgToplevel) bool {
     };
 
     const scheduled = &toplevel.window.configure_scheduled;
+    const sent = &toplevel.window.configure_scheduled;
 
     if (!toplevel.needsConfigure()) {
         // If no new configure is required, continue to track a timed out configure
@@ -158,6 +159,11 @@ pub fn configure(toplevel: *XdgToplevel) bool {
     _ = wlr_toplevel.setResizing(scheduled.resizing);
     if (toplevel.decoration) |decoration| {
         _ = decoration.wlr_decoration.setMode(if (scheduled.ssd) .server_side else .client_side);
+    }
+    if (scheduled.bounds.width != sent.bounds.width or
+        scheduled.bounds.height != sent.bounds.height)
+    {
+        _ = wlr_toplevel.setBounds(scheduled.bounds.width, scheduled.bounds.height);
     }
 
     const width: u31 = scheduled.width orelse switch (toplevel.configure_state) {
@@ -201,6 +207,8 @@ fn needsConfigure(toplevel: *XdgToplevel) bool {
 
     if (scheduled.width != null and scheduled.width != sent.width) return true;
     if (scheduled.height != null and scheduled.height != sent.height) return true;
+    if (scheduled.bounds.width != sent.bounds.width or
+        scheduled.bounds.height != sent.bounds.height) return true;
     if (scheduled.activated != sent.activated) return true;
     if (scheduled.ssd != sent.ssd) return true;
     if (!std.meta.eql(scheduled.tiled, sent.tiled)) return true;
