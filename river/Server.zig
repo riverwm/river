@@ -67,7 +67,8 @@ xdg_activation: *wlr.XdgActivationV1,
 
 data_device_manager: *wlr.DataDeviceManager,
 primary_selection_manager: *wlr.PrimarySelectionDeviceManagerV1,
-data_control_manager: *wlr.DataControlManagerV1,
+data_control_manager: *wlr.ExtDataControlManagerV1,
+wlr_data_control_manager: *wlr.DataControlManagerV1,
 
 export_dmabuf_manager: *wlr.ExportDmabufManagerV1,
 screencopy_manager: *wlr.ScreencopyManagerV1,
@@ -140,7 +141,8 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
 
         .data_device_manager = try wlr.DataDeviceManager.create(wl_server),
         .primary_selection_manager = try wlr.PrimarySelectionDeviceManagerV1.create(wl_server),
-        .data_control_manager = try wlr.DataControlManagerV1.create(wl_server),
+        .data_control_manager = try wlr.ExtDataControlManagerV1.create(wl_server, 1),
+        .wlr_data_control_manager = try wlr.DataControlManagerV1.create(wl_server),
 
         .export_dmabuf_manager = try wlr.ExportDmabufManagerV1.create(wl_server),
         .screencopy_manager = try wlr.ScreencopyManagerV1.create(wl_server),
@@ -336,6 +338,7 @@ fn blocklist(server: *Server, global: *const wl.Global) bool {
         global == server.foreign_toplevel_list.global or
         global == server.export_dmabuf_manager.global or
         global == server.data_control_manager.global or
+        global == server.wlr_data_control_manager.global or
         global == server.om.wlr_output_manager.global or
         global == server.om.power_manager.global or
         global == server.om.gamma_control_manager.global or
