@@ -53,6 +53,7 @@ shm: *wlr.Shm,
 linux_dmabuf: ?*wlr.LinuxDmabufV1 = null,
 linux_drm_syncobj_manager: ?*wlr.LinuxDrmSyncobjManagerV1 = null,
 single_pixel_buffer_manager: *wlr.SinglePixelBufferManagerV1,
+alpha_modifier: *wlr.AlphaModifierV1,
 
 viewporter: *wlr.Viewporter,
 fractional_scale_manager: *wlr.FractionalScaleManagerV1,
@@ -125,6 +126,7 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
 
         .shm = try wlr.Shm.createWithRenderer(wl_server, 2, renderer),
         .single_pixel_buffer_manager = try wlr.SinglePixelBufferManagerV1.create(wl_server),
+        .alpha_modifier = try wlr.AlphaModifierV1.create(wl_server),
 
         .viewporter = try wlr.Viewporter.create(wl_server),
         .fractional_scale_manager = try wlr.FractionalScaleManagerV1.create(wl_server, 1),
@@ -300,6 +302,7 @@ fn allowlist(server: *Server, global: *const wl.Global) bool {
     // with an assertion failure.
     return global == server.shm.global or
         global == server.single_pixel_buffer_manager.global or
+        global == server.alpha_modifier.global or
         global == server.viewporter.global or
         global == server.fractional_scale_manager.global or
         global == server.compositor.global or
