@@ -75,6 +75,23 @@ pub fn create(xsurface: *wlr.XwaylandSurface) error{OutOfMemory}!void {
     xsurface.events.request_fullscreen.add(&xwindow.request_fullscreen);
     xsurface.events.request_minimize.add(&xwindow.request_minimize);
 
+    // When an override redirect window is converted to a normal Xwayland window
+    // we need to synchronize state which may have changed.
+    if (xwindow.xsurface.decorations.no_border or xwindow.xsurface.decorations.no_title) {
+        xwindow.window.wm_scheduled.decoration_hint = .prefers_csd;
+    } else {
+        xwindow.window.wm_scheduled.decoration_hint = .prefers_ssd;
+    }
+    if (xwindow.xsurface.fullscreen) {
+        xwindow.window.wm_scheduled.fullscreen_requested = .{ .fullscreen = null };
+    }
+    if (xwindow.xsurface.maximized_vert or xwindow.xsurface.maximized_horz) {
+        xwindow.window.wm_scheduled.maximize_requested = .maximize;
+    }
+    if (xwindow.xsurface.minimized) {
+        xwindow.window.wm_scheduled.minimize_requested = true;
+    }
+
     if (xsurface.surface) |surface| {
         handleAssociate(&xwindow.associate);
         if (surface.mapped) {
