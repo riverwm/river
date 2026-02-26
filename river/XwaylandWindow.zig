@@ -204,6 +204,10 @@ pub fn handleMap(listener: *wl.Listener(void)) void {
         });
     }
 
+    if (xwindow.xsurface.fullscreen) {
+        window.wm_scheduled.fullscreen_requested = .{ .fullscreen = null };
+    }
+
     window.state = .initialized;
     window.map() catch {
         log.err("out of memory", .{});
