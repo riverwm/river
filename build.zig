@@ -7,6 +7,9 @@ const Build = std.Build;
 const fs = std.fs;
 const mem = std.mem;
 
+const manifest = @import("build.zig.zon");
+const version = manifest.version;
+
 const Scanner = @import("wayland").Scanner;
 
 pub fn build(b: *Build) !void {
@@ -239,6 +242,3 @@ pub fn build(b: *Build) !void {
         test_step.dependOn(&run_deque_test.step);
     }
 }
-
-const version = manifest.version;
-const manifest = @import("build.zig.zon");
