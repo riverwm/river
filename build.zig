@@ -241,29 +241,4 @@ pub fn build(b: *Build) !void {
 }
 
 const version = manifest.version;
-/// Getting rid of this wart requires upstream zig improvements.
-/// See: https://github.com/ziglang/zig/issues/22775
-const manifest: struct {
-    name: @Type(.enum_literal),
-    version: []const u8,
-    paths: []const []const u8,
-    dependencies: struct {
-        pixman: struct {
-            url: []const u8,
-            hash: []const u8,
-        },
-        wayland: struct {
-            url: []const u8,
-            hash: []const u8,
-        },
-        wlroots: struct {
-            url: []const u8,
-            hash: []const u8,
-        },
-        xkbcommon: struct {
-            url: []const u8,
-            hash: []const u8,
-        },
-    },
-    fingerprint: u64,
-} = @import("build.zig.zon");
+const manifest = @import("build.zig.zon");
