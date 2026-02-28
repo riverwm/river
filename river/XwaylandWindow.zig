@@ -196,11 +196,19 @@ pub fn handleMap(listener: *wl.Listener(void)) void {
     if (xwindow.xsurface.size_hints) |size_hints| {
         const min_width: u31 = @max(0, size_hints.min_width);
         const min_height: u31 = @max(0, size_hints.min_height);
+        var max_width: u31 = @max(0, size_hints.max_width);
+        var max_height: u31 = @max(0, size_hints.max_height);
+        if (min_width > max_width) {
+            max_width = min_width;
+        }
+        if (min_height > max_height) {
+            max_height = min_height;
+        }
         window.setDimensionsHint(.{
             .min_width = min_width,
-            .max_width = @max(min_width, size_hints.max_width),
+            .max_width = max_width,
             .min_height = min_height,
-            .max_height = @max(min_height, size_hints.max_height),
+            .max_height = max_height,
         });
     }
 
