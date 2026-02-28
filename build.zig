@@ -153,13 +153,13 @@ pub fn build(b: *Build) !void {
         });
         river.root_module.addOptions("build_options", options);
 
-        river.linkLibC();
-        river.linkSystemLibrary("libevdev");
-        river.linkSystemLibrary("libinput");
-        river.linkSystemLibrary("wayland-server");
-        river.linkSystemLibrary(wlroots_pkgconf);
-        river.linkSystemLibrary("xkbcommon");
-        river.linkSystemLibrary("pixman-1");
+        river.root_module.link_libc = true;
+        river.root_module.linkSystemLibrary("libevdev", .{});
+        river.root_module.linkSystemLibrary("libinput", .{});
+        river.root_module.linkSystemLibrary("wayland-server", .{});
+        river.root_module.linkSystemLibrary(wlroots_pkgconf, .{});
+        river.root_module.linkSystemLibrary("xkbcommon", .{});
+        river.root_module.linkSystemLibrary("pixman-1", .{});
 
         river.root_module.addImport("wayland", wayland);
         river.root_module.addImport("xkbcommon", xkbcommon);
