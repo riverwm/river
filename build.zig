@@ -43,7 +43,9 @@ pub fn build(b: *Build) !void {
     ) orelse false;
 
     const full_version = blk: {
-        if (mem.endsWith(u8, version, "-dev")) {
+        if (b.option([]const u8, "version-string", "Override `river -version` output.")) |version_override| {
+            break :blk version_override;
+        } else if (mem.endsWith(u8, version, "-dev")) {
             var ret: u8 = undefined;
 
             const git_describe_long = b.runAllowFail(
