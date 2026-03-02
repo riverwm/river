@@ -329,11 +329,11 @@ fn handleRequest(
             }
         },
         .set_accel_speed => |args| {
-            if (args.speed.size != @sizeOf(f32)) {
+            if (args.speed.size != @sizeOf(f64)) {
                 object.postError(.invalid_arg, "invalid accel speed");
                 return;
             }
-            const speed = args.speed.slice(f32)[0];
+            const speed = args.speed.slice(f64)[0];
             const result = Result.create(object, args.result) orelse return;
             const status = c.libinput_device_config_accel_set_speed(device.libinput, speed);
             if (result.send(status)) {
