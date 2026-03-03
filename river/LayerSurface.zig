@@ -113,7 +113,7 @@ fn handleMap(listener: *wl.Listener(void)) void {
     // Beware: it is possible for arrange() to destroy this LayerSurface!
     const output: *Output = @ptrCast(@alignCast(layer_surface.wlr_layer_surface.output.?.data));
     output.layer_shell.arrange();
-    server.layer_shell.updateFocus();
+    server.layer_shell.checkExclusiveFocus();
     server.wm.dirtyWindowing();
 }
 
@@ -128,13 +128,18 @@ fn handleUnmap(listener: *wl.Listener(void)) void {
             if (seat.focused == .layer_surface and seat.focused.layer_surface == layer_surface) {
                 seat.focus(.none);
             }
+            if (seat.layer_shell.scheduled.focus == .non_exclusive and
+                seat.layer_shell.scheduled.focus.non_exclusive == layer_surface.ref)
+            {
+                seat.layer_shell.scheduled.focus = .none;
+            }
         }
     }
 
     // Beware: it is possible for arrange() to destroy this LayerSurface!
     const output: *Output = @ptrCast(@alignCast(layer_surface.wlr_layer_surface.output.?.data));
     output.layer_shell.arrange();
-    server.layer_shell.updateFocus();
+    server.layer_shell.checkExclusiveFocus();
     server.wm.dirtyWindowing();
 }
 
@@ -156,7 +161,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
         // Beware: it is possible for arrange() to destroy this LayerSurface!
         const output: *Output = @ptrCast(@alignCast(layer_surface.wlr_layer_surface.output.?.data));
         output.layer_shell.arrange();
-        server.layer_shell.updateFocus();
+        server.layer_shell.checkExclusiveFocus();
         server.wm.dirtyWindowing();
     }
 }

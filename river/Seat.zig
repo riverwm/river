@@ -558,24 +558,31 @@ pub fn manageFinish(seat: *Seat) void {
         .exclusive => |ref| if (ref.get()) |layer_surface| {
             seat.focus(.{ .layer_surface = layer_surface });
         },
-        .non_exclusive, .none => switch (seat.wm_requested.focus) {
-            .none => switch (seat.layer_shell.sent.focus) {
-                .exclusive => unreachable,
-                .non_exclusive => |ref| if (ref.get()) |layer_surface| {
-                    seat.focus(.{ .layer_surface = layer_surface });
-                    seat.layer_shell.sent.focus = .none;
-                },
-                .none => {},
-            },
-            .clear => {
-                seat.focus(.none);
-            },
-            .window => |ref| if (ref.get()) |window| {
-                seat.focus(.{ .window = window });
-            },
-            .shell_surface => |shell_surface| {
-                seat.focus(.{ .shell_surface = shell_surface });
-            },
+        .non_exclusive, .none => {
+            if (seat.wm_requested.focus == .none) {
+                switch (seat.layer_shell.sent.focus) {
+                    .exclusive => unreachable,
+                    .non_exclusive => |ref| if (ref.get()) |layer_surface| {
+                        seat.focus(.{ .layer_surface = layer_surface });
+                    },
+                    .none => {},
+                }
+            } else {
+                switch (seat.wm_requested.focus) {
+                    .none => unreachable,
+                    .clear => seat.focus(.none),
+                    .window => |ref| if (ref.get()) |window| seat.focus(.{ .window = window }),
+                    .shell_surface => |shell_surface| seat.focus(.{ .shell_surface = shell_surface }),
+                }
+                switch (seat.layer_shell.sent.focus) {
+                    .exclusive => unreachable,
+                    .non_exclusive => {
+                        seat.layer_shell.scheduled.focus = .none;
+                        server.wm.dirtyWindowing();
+                    },
+                    .none => {},
+                }
+            }
         },
     }
     seat.wm_requested.focus = .none;

@@ -90,7 +90,4 @@ pub fn manageStart(shell_seat: *LayerShellSeat) void {
         }
     }
     shell_seat.sent.focus = shell_seat.scheduled.focus;
-    if (shell_seat.scheduled.focus == .non_exclusive) {
-        shell_seat.scheduled.focus = .none;
-    }
 }

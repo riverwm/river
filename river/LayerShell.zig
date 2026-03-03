@@ -159,7 +159,7 @@ fn handleNewSurface(_: *wl.Listener(*wlr.LayerSurfaceV1), wlr_layer_surface: *wl
     };
 }
 
-pub fn updateFocus(_: *LayerShell) void {
+pub fn checkExclusiveFocus(_: *LayerShell) void {
     // Find the topmost layer surface (if any) in the top or overlay layers which
     // requests exclusive keyboard interactivity.
     const to_focus = blk: {

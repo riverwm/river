@@ -168,6 +168,10 @@
         focus during the same manage sequence in which this event is sent, the
         layer surface will not be focused.
 
+        If the layer surface with non-exclusive focus is closed or the window
+        manager chooses to move focus away from the layer surface, a focus_none
+        event will be sent in the next manage sequence.
+
         This event will be followed by a manage_start event after all other new
         state has been sent by the server.
       </description>
