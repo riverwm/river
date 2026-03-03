@@ -103,10 +103,10 @@
         This event will be followed by a manage_start event after all other new
         state has been sent by the server.
       </description>
-      <arg name="x" type="int"/>
-      <arg name="y" type="int"/>
-      <arg name="width" type="int"/>
-      <arg name="height" type="int"/>
+      <arg name="x" type="int" summary="global x coordinate"/>
+      <arg name="y" type="int" summary="global y coordinate"/>
+      <arg name="width" type="int" summary="area width"/>
+      <arg name="height" type="int" summary="area height"/>
     </event>
 
     <request name="set_default">
@@ -142,7 +142,7 @@
     </request>
 
     <event name="focus_exclusive">
-      <description summary="">
+      <description summary="layer shell surface has exclusive focus">
         A layer shell surface will be given exclusive keyboard focus at the end
         of the manage sequence in which this event is sent. The window manager
         may want to update window decorations or similar to indicate that no
@@ -157,7 +157,7 @@
     </event>
 
     <event name="focus_non_exclusive">
-      <description summary="">
+      <description summary="layer shell surface wants non-exclusive focus">
         A layer shell surface will be given non-exclusive keyboard focus at the
         end of the manage sequence in which this event is sent. The window
         manager may want to update window decorations or similar to indicate
@@ -174,7 +174,7 @@
     </event>
 
     <event name="focus_none">
-      <description summary="">
+      <description summary="no layer shell surface has focus">
         No layer shell surface will have keyboard focus at the end of the manage
         sequence in which this event is sent. The window manager may want to
         return focus to whichever window last had focus, for example.
