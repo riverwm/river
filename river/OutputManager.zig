@@ -337,23 +337,7 @@ pub fn commitOutputState(om: *OutputManager) void {
 
         if (!swapchain_manager.prepare(states.items)) {
             log.err("failed to prepare new output configuration", .{});
-            // TODO search for a working fallback
-
-            if (wm.sent.output_config) |config| {
-                config.sendFailed();
-                config.destroy();
-                wm.sent.output_config = null;
-            }
-
-            {
-                // Revert to last working state on failure
-                var it = wm.sent.outputs.iterator(.forward);
-                while (it.next()) |output| {
-                    output.scheduled = output.current;
-                    output.sent = output.current;
-                }
-                wm.dirtyWindowing();
-            }
+            om.modesetFailed();
             return;
         }
 
@@ -368,31 +352,7 @@ pub fn commitOutputState(om: *OutputManager) void {
 
         if (!server.backend.commit(states.items)) {
             log.err("failed to commit new output configuration", .{});
-
-            // If the very first modeset fails, the user's hardware/drivers are
-            // probably not compatible with river. In this case, exit rather
-            // than running forever without rendering anything.
-            if (om.first_modeset) {
-                log.err("initial modeset failed, exiting river", .{});
-                server.wl_server.terminate();
-                return;
-            }
-
-            if (wm.sent.output_config) |config| {
-                config.sendFailed();
-                config.destroy();
-                wm.sent.output_config = null;
-            }
-
-            {
-                // Revert to last working state on failure
-                var it = wm.sent.outputs.iterator(.forward);
-                while (it.next()) |output| {
-                    output.scheduled = output.current;
-                    output.sent = output.current;
-                }
-                wm.dirtyWindowing();
-            }
+            om.modesetFailed();
             return;
         }
         om.first_modeset = false;
@@ -432,6 +392,35 @@ pub fn commitOutputState(om: *OutputManager) void {
     om.sendConfig() catch {
         log.err("out of memory", .{});
     };
+}
+
+fn modesetFailed(om: *OutputManager) void {
+    const wm = &server.wm;
+
+    // If the very first modeset fails, the user's hardware/drivers are
+    // probably not compatible with river. In this case, exit rather
+    // than running forever without rendering anything.
+    if (om.first_modeset) {
+        log.err("initial modeset failed, exiting river", .{});
+        server.wl_server.terminate();
+        return;
+    }
+
+    if (wm.sent.output_config) |config| {
+        config.sendFailed();
+        config.destroy();
+        wm.sent.output_config = null;
+    }
+
+    {
+        // Revert to last working state on failure
+        var it = wm.sent.outputs.iterator(.forward);
+        while (it.next()) |output| {
+            output.scheduled = output.current;
+            output.sent = output.current;
+        }
+        wm.dirtyWindowing();
+    }
 }
 
 /// Send the current output state to all wlr-output-manager clients.
