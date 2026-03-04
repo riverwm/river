@@ -154,8 +154,6 @@ pub fn main() anyerror!void {
     log.info("running server", .{});
 
     server.wl_server.run();
-
-    log.info("shutting down", .{});
 }
 
 fn defaultInitPath() !?[:0]const u8 {

@@ -24,6 +24,9 @@ const XwaylandOverrideRedirect = @import("XwaylandOverrideRedirect.zig");
 
 const log = std.log.scoped(.output);
 
+/// The very first modeset is different in that if it fails we exit river.
+first_modeset: bool = true,
+
 new_output: wl.Listener(*wlr.Output) = .init(handleNewOutput),
 
 output_layout: *wlr.OutputLayout,
@@ -366,6 +369,15 @@ pub fn commitOutputState(om: *OutputManager) void {
         if (!server.backend.commit(states.items)) {
             log.err("failed to commit new output configuration", .{});
 
+            // If the very first modeset fails, the user's hardware/drivers are
+            // probably not compatible with river. In this case, exit rather
+            // than running forever without rendering anything.
+            if (om.first_modeset) {
+                log.err("initial modeset failed, exiting river", .{});
+                server.wl_server.terminate();
+                return;
+            }
+
             if (wm.sent.output_config) |config| {
                 config.sendFailed();
                 config.destroy();
@@ -383,6 +395,7 @@ pub fn commitOutputState(om: *OutputManager) void {
             }
             return;
         }
+        om.first_modeset = false;
 
         swapchain_manager.apply();
     }
