@@ -290,7 +290,8 @@ pub fn commitOutputState(om: *OutputManager) void {
                     if (mode.height != wlr_output.height) break :blk true;
                     if (mode.refresh != wlr_output.refresh) break :blk true;
                 },
-                .none => unreachable,
+                // This branch is reachable if we fail to enable an output.
+                .none => assert(output.sent.state == .disabled_hard),
             }
             // If an output newly exposed to river is already enabled, we
             // must modeset since the mode is otherwise undefined.
