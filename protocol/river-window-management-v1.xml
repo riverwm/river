@@ -305,6 +305,18 @@
       <arg name="surface" type="object" interface="wl_surface"
         summary="base surface"/>
     </request>
+
+    <request name="exit_session" since="4">
+      <description summary="exit the Wayland session">
+        End the current Wayland session and exit the compositor.
+        All Wayland clients running in the current session, including
+        the window manager, will be disconnected.
+
+        Window managers should only make this request if the user explicitly
+        asks to exit the Wayland session, not for example on normal window
+        manager termination.
+      </description>
+    </request>
   </interface>
 
   <interface name="river_window_v1" version="4">

@@ -187,6 +187,10 @@ fn handleRequest(
                 return;
             };
         },
+        .exit_session => {
+            log.info("window manager requested to exit session", .{});
+            server.wl_server.terminate();
+        },
     }
 }
 
