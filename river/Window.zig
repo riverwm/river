@@ -412,14 +412,16 @@ pub fn manageStart(window: *Window) void {
                 window.node.link.remove();
                 server.wm.rendering_requested.list.append(&window.node);
 
-                if (wlr.ExtForeignToplevelHandleV1.create(server.foreign_toplevel_list, &.{
-                    .title = window.getTitle(),
-                    .app_id = window.getAppId(),
-                })) |handle| {
-                    assert(window.foreign_toplevel_handle == null);
-                    window.foreign_toplevel_handle = handle;
-                } else |_| {
-                    log.err("failed to create ext foreign toplevel handle", .{});
+                // A handle may have already been created if the window manager is restarted.
+                if (window.foreign_toplevel_handle == null) {
+                    if (wlr.ExtForeignToplevelHandleV1.create(server.foreign_toplevel_list, &.{
+                        .title = window.getTitle(),
+                        .app_id = window.getAppId(),
+                    })) |handle| {
+                        window.foreign_toplevel_handle = handle;
+                    } else |_| {
+                        log.err("failed to create ext foreign toplevel handle", .{});
+                    }
                 }
 
                 break :blk window_v1;
