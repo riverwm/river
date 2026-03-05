@@ -40,14 +40,11 @@ https://codeberg.org/river/wiki/src/branch/main/pages/wm-list.md
 	verbose debug messages.
 
 *-no-xwayland*
-	Disable xwayland at runtime even if river has been built with support.
+	Disable Xwayland at runtime even if river has been built with support.
 
 # KEYBINDINGS
 
 The following keybindings are always active:
-
-*Ctrl+Alt+Delete*
-	Exit river
 
 *Ctrl+Alt+F1* - *Ctrl+Alt+F12*
 	Switch to VT 1-12

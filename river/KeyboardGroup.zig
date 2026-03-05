@@ -232,7 +232,7 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
         const xkb_keycode = event.keycode + 8;
         const modifiers = group.state.getModifiers();
         for (xkb_state.keyGetSyms(xkb_keycode)) |sym| {
-            if (handleBuiltinBinding(sym, modifiers)) {
+            if (handleBuiltinBinding(sym)) {
                 log.debug("matched builtin binding", .{});
                 break :blk .builtin;
             }
@@ -363,7 +363,7 @@ fn handleModifiers(listener: *wl.Listener(*wlr.Keyboard), _: *wlr.Keyboard) void
 
 /// Handle any builtin, hardcoded compositor keybindings such as VT switching.
 /// Returns true if the keysym was handled.
-fn handleBuiltinBinding(keysym: xkb.Keysym, modifiers: wlr.Keyboard.ModifierMask) bool {
+fn handleBuiltinBinding(keysym: xkb.Keysym) bool {
     switch (@intFromEnum(keysym)) {
         xkb.Keysym.XF86Switch_VT_1...xkb.Keysym.XF86Switch_VT_12 => {
             log.debug("switch VT keysym received", .{});
@@ -373,15 +373,6 @@ fn handleBuiltinBinding(keysym: xkb.Keysym, modifiers: wlr.Keyboard.ModifierMask
                 session.changeVt(vt) catch std.log.err("changing VT failed", .{});
             }
             return true;
-        },
-        xkb.Keysym.Delete => {
-            if (modifiers == wlr.Keyboard.ModifierMask{ .ctrl = true, .alt = true }) {
-                log.debug("ctrl+alt+delete pressed, exiting...", .{});
-                server.wl_server.terminate();
-                return true;
-            } else {
-                return false;
-            }
         },
         else => return false,
     }
