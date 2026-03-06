@@ -23,6 +23,7 @@ on our [wiki](https://codeberg.org/river/wiki).
 ## Links
 
 - [Protocol Docs](https://isaacfreund.com/docs/wayland/)
+- [Window Manager Examples](https://codeberg.org/river/tinyrwm)
 - [Wiki](https://codeberg.org/river/wiki)
 - IRC: [#river](https://web.libera.chat/?channels=#river) on irc.libera.chat ([logs](https://libera.catirclogs.org/river))
 - [Zulip](https://river-compositor.zulipchat.com) (new)
