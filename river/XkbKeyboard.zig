@@ -57,6 +57,7 @@ pub fn createObject(xkb_keyboard: *XkbKeyboard, config_v1: *river.XkbConfigV1) v
     config_v1.sendXkbKeyboard(object);
     {
         const device: *InputDevice = @fieldParentPtr("xkb_keyboard", xkb_keyboard);
+        assert(!device.virtual);
         var it = device.objects.iterator(.forward);
         while (it.next()) |input_device_v1| {
             if (object.getClient() == input_device_v1.getClient()) {

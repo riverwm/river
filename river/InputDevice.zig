@@ -76,6 +76,9 @@ pub fn init(
         if (wlr_device.getLibinputDevice()) |handle| {
             device.libinput.init(@ptrCast(handle));
         }
+        if (wlr_device.type == .keyboard) {
+            device.xkb_keyboard.init();
+        }
     }
 
     // The wlroots Wayland and X11 backends support multiple outputs
@@ -95,9 +98,6 @@ pub fn init(
                 break;
             }
         }
-    }
-    if (wlr_device.type == .keyboard) {
-        device.xkb_keyboard.init();
     }
 }
 
