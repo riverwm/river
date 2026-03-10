@@ -126,11 +126,21 @@ pub fn deinit(device: *InputDevice) void {
     assert(device.objects.empty());
     device.remove.link.remove();
 
-    if (device.wlr_device.getLibinputDevice() != null) {
-        device.libinput.deinit();
-    }
-    if (device.wlr_device.type == .keyboard) {
-        device.xkb_keyboard.deinit();
+    if (!device.virtual) {
+        {
+            var it = device.objects.iterator(.forward);
+            while (it.next()) |object| {
+                object.getLink().remove();
+                object.sendRemoved();
+                object.setHandler(?*anyopaque, handleRequestInert, null, null);
+            }
+        }
+        if (device.wlr_device.getLibinputDevice() != null) {
+            device.libinput.deinit();
+        }
+        if (device.wlr_device.type == .keyboard) {
+            device.xkb_keyboard.deinit();
+        }
     }
 
     device.link.remove();
@@ -157,15 +167,6 @@ fn handleRemove(listener: *wl.Listener(*wlr.InputDevice), _: *wlr.InputDevice) v
         @tagName(device.wlr_device.type),
         device.wlr_device.name orelse "unknown",
     });
-
-    {
-        var it = device.objects.iterator(.forward);
-        while (it.next()) |object| {
-            object.getLink().remove();
-            object.sendRemoved();
-            object.setHandler(?*anyopaque, handleRequestInert, null, null);
-        }
-    }
 
     switch (device.wlr_device.type) {
         .keyboard => {
