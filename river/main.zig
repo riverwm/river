@@ -110,6 +110,8 @@ pub fn main() anyerror!void {
         }
     };
 
+    try detectClassic(startup_command);
+
     log.info("river version {s}, initializing server", .{build_options.version});
 
     river_init_wlroots_log(switch (runtime_log_level) {
@@ -180,6 +182,52 @@ fn defaultInitPath() !?[:0]const u8 {
     };
 
     return path;
+}
+
+fn detectClassic(startup_command: ?[:0]const u8) !void {
+    const path = startup_command orelse return;
+    if (mem.indexOfScalar(u8, path, '/') == null) return;
+
+    const classic = grepRiverctl(path) catch |err| {
+        log.err("failed to detect riverctl usage in init file: {s}", .{@errorName(err)});
+        return;
+    };
+    if (classic) {
+        try stderr.print(
+            \\The init file {[path]s} contains the string "riverctl".
+            \\This river version ({[version]s}) does not support riverctl, you may
+            \\wish to install river-classic instead.
+            \\
+            \\River {[version]s} is a non-monolithic Wayland compositor and
+            \\requires a compatible window manager to be useful.
+            \\See https://isaacfreund.com/software/river for more information.
+            \\
+        , .{
+            .path = path,
+            .version = build_options.version,
+        });
+        try stderr.flush();
+        posix.exit(1);
+    }
+}
+
+fn grepRiverctl(path: [:0]const u8) !bool {
+    var file = try std.fs.openFileAbsoluteZ(path, .{});
+    defer file.close();
+    var buffer: [1024]u8 = undefined;
+    var file_reader = file.reader(&buffer);
+    const reader = &file_reader.interface;
+    while (true) {
+        _ = try reader.discardDelimiterExclusive('r');
+        const bytes = reader.peekArray("riverctl".len) catch |err| switch (err) {
+            error.EndOfStream => return false,
+            else => |e| return e,
+        };
+        if (mem.eql(u8, bytes, "riverctl")) {
+            return true;
+        }
+        reader.toss(1);
+    }
 }
 
 var stderr_buffer: [1024]u8 = undefined;
