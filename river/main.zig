@@ -212,7 +212,7 @@ fn detectClassic(startup_command: ?[:0]const u8) !void {
 }
 
 fn grepRiverctl(path: [:0]const u8) !bool {
-    var file = try std.fs.openFileAbsoluteZ(path, .{});
+    var file = try std.fs.cwd().openFileZ(path, .{});
     defer file.close();
     var buffer: [1024]u8 = undefined;
     var file_reader = file.reader(&buffer);
