@@ -42,14 +42,14 @@
 
       There are two disjoint categories of state managed by this protocol:
 
-      Window management state influences the communication between the server
-      and individual window clients (e.g. xdg_toplevels). Window management
+      Window management state influences the communication between the
+      compositor and individual windows (e.g. xdg_toplevels). Window management
       state includes window dimensions, fullscreen state, keyboard focus,
       keyboard bindings, and more.
 
       Rendering state only affects the rendered output of the compositor and
-      does not influence communication between the server and individual window
-      clients. Rendering state includes the position and rendering order of
+      does not influence communication between the compositor and individual
+      windows. Rendering state includes the position and rendering order of
       windows, shell surfaces, decoration surfaces, borders, and more.
 
       Window management state may only be modified by the window manager as part
