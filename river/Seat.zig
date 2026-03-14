@@ -54,19 +54,79 @@ pub const Event = union(enum) {
         keymap: *xkb.Keymap,
     },
 
-    pointer_motion_relative: wlr.Pointer.event.Motion,
-    pointer_motion_absolute: wlr.Pointer.event.MotionAbsolute,
-    pointer_button: wlr.Pointer.event.Button,
-    pointer_axis: wlr.Pointer.event.Axis,
+    pointer_motion_relative: PointerMotionRelative,
+    pointer_motion_absolute: PointerMotionAbsolute,
+    pointer_button: PointerButton,
+    pointer_axis: PointerAxis,
     pointer_frame: void,
 
-    pointer_swipe_begin: wlr.Pointer.event.SwipeBegin,
-    pointer_swipe_update: wlr.Pointer.event.SwipeUpdate,
-    pointer_swipe_end: wlr.Pointer.event.SwipeEnd,
+    pointer_swipe_begin: PointerSwipeBegin,
+    pointer_swipe_update: PointerSwipeUpdate,
+    pointer_swipe_end: PointerSwipeEnd,
 
-    pointer_pinch_begin: wlr.Pointer.event.PinchBegin,
-    pointer_pinch_update: wlr.Pointer.event.PinchUpdate,
-    pointer_pinch_end: wlr.Pointer.event.PinchEnd,
+    pointer_pinch_begin: PointerPinchBegin,
+    pointer_pinch_update: PointerPinchUpdate,
+    pointer_pinch_end: PointerPinchEnd,
+
+    pub const PointerMotionRelative = struct {
+        mapping: wlr.Box,
+        time_msec: u32,
+        delta_x: f64,
+        delta_y: f64,
+        unaccel_dx: f64,
+        unaccel_dy: f64,
+    };
+    pub const PointerMotionAbsolute = struct {
+        mapping: wlr.Box,
+        time_msec: u32,
+        x: f64,
+        y: f64,
+    };
+    pub const PointerButton = struct {
+        time_msec: u32,
+        button: u32,
+        state: wl.Pointer.ButtonState,
+    };
+    pub const PointerAxis = struct {
+        time_msec: u32,
+        source: wl.Pointer.AxisSource,
+        orientation: wl.Pointer.Axis,
+        relative_direction: wl.Pointer.AxisRelativeDirection,
+        delta: f64,
+        delta_discrete: i32,
+    };
+
+    pub const PointerSwipeBegin = struct {
+        time_msec: u32,
+        fingers: u32,
+    };
+    pub const PointerSwipeUpdate = struct {
+        time_msec: u32,
+        fingers: u32,
+        dx: f64,
+        dy: f64,
+    };
+    pub const PointerSwipeEnd = struct {
+        time_msec: u32,
+        cancelled: bool,
+    };
+
+    pub const PointerPinchBegin = struct {
+        time_msec: u32,
+        fingers: u32,
+    };
+    pub const PointerPinchUpdate = struct {
+        time_msec: u32,
+        fingers: u32,
+        dx: f64,
+        dy: f64,
+        scale: f64,
+        rotation: f64,
+    };
+    pub const PointerPinchEnd = struct {
+        time_msec: u32,
+        cancelled: bool,
+    };
 };
 
 pub const Focus = union(enum) {
@@ -835,7 +895,9 @@ pub fn attachDevice(seat: *Seat, device: *InputDevice) void {
                 }
             }
         },
-        .pointer, .touch, .tablet => {
+        // River implements pointer mappings without help from wlroots
+        .pointer => seat.cursor.wlr_cursor.attachInputDevice(device.wlr_device),
+        .touch, .tablet => {
             seat.cursor.wlr_cursor.attachInputDevice(device.wlr_device);
             seat.cursor.wlr_cursor.mapInputToOutput(device.wlr_device, device.config.map_to_output);
             seat.cursor.wlr_cursor.mapInputToRegion(device.wlr_device, &device.config.map_to_rectangle);

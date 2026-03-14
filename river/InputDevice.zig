@@ -160,6 +160,19 @@ pub fn assignToSeat(device: *InputDevice, new: *Seat) void {
     new.updateCapabilities();
 }
 
+/// Retuns the curretly active mapping for the device, or an empty box if
+/// the movement of the device is unrestricted.
+pub fn activeMapping(device: *const InputDevice) wlr.Box {
+    var mapping = device.config.map_to_rectangle;
+    if (!mapping.empty()) {
+        return mapping;
+    }
+    if (device.config.map_to_output) |output| {
+        server.om.output_layout.getBox(output, &mapping);
+    }
+    return mapping;
+}
+
 fn handleRemove(listener: *wl.Listener(*wlr.InputDevice), _: *wlr.InputDevice) void {
     const device: *InputDevice = @fieldParentPtr("remove", listener);
 
@@ -241,10 +254,17 @@ fn handleRequest(
             } else {
                 device.config.map_to_output = null;
             }
-            device.seat.cursor.wlr_cursor.mapInputToOutput(
-                device.wlr_device,
-                device.config.map_to_output,
-            );
+            switch (device.wlr_device.type) {
+                .touch, .tablet => {
+                    device.seat.cursor.wlr_cursor.mapInputToOutput(
+                        device.wlr_device,
+                        device.config.map_to_output,
+                    );
+                },
+                // River implements pointer mappings without help from wlroots
+                .pointer => {},
+                .keyboard, .@"switch", .tablet_pad => unreachable,
+            }
         },
         .map_to_rectangle => |args| {
             if (args.width < 0 or args.height < 0) {
@@ -261,10 +281,17 @@ fn handleRequest(
                 .width = args.width,
                 .height = args.height,
             };
-            device.seat.cursor.wlr_cursor.mapInputToRegion(
-                device.wlr_device,
-                &device.config.map_to_rectangle,
-            );
+            switch (device.wlr_device.type) {
+                .touch, .tablet => {
+                    device.seat.cursor.wlr_cursor.mapInputToRegion(
+                        device.wlr_device,
+                        &device.config.map_to_rectangle,
+                    );
+                },
+                // River implements pointer mappings without help from wlroots
+                .pointer => {},
+                .keyboard, .@"switch", .tablet_pad => unreachable,
+            }
         },
     }
 }
