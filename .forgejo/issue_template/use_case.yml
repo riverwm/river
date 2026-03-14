@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: © 2026 The River Developers
+# SPDX-License-Identifier: 0BSD
+
+name: Use Case
+description: Describe a use case not supported by river
+labels: ["use case"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Use Case Description
+      description: |
+        Please describe your use case in detail.
+
+        Do you have a suggestion for how river could support it?
+
+        Are there any workarounds you have tried?
+
+        Don't forget to search the issue tracker in case there is
+        already an open issue tracking support for your use case!
+    validations:
+      required: true
