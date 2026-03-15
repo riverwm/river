@@ -16,16 +16,16 @@
             .hash = "pixman-0.3.0-LClMnz2VAAAs7QSCGwLimV5VUYx0JFnX5xWU6HwtMuDX",
         },
         .wayland = .{
-            .url = "git+https://codeberg.org/ifreund/zig-wayland?ref=main#f2480d25764a50ed2fe29f49e4209c074a557f46",
-            .hash = "wayland-0.5.0-dev-lQa1kvTUAQCsD8AobfOXJA_-TVG-WTYXju68OZ8L85RM",
+            .url = "https://codeberg.org/ifreund/zig-wayland/archive/v0.5.0.tar.gz",
+            .hash = "wayland-0.5.0-lQa1knz8AQCh08NA8BeQrwJB9U3CfqcVAdHZYGRKIGuu",
         },
         .wlroots = .{
-            .url = "git+https://codeberg.org/ifreund/zig-wlroots?ref=master#95c4341e3afe9496331baf2156a3ee15b2cb7bc0",
-            .hash = "wlroots-0.19.4-dev-jmOlcqgMBACgOFbQ0IIFURB7HztxzXL_A_3am6rAioTA",
+            .url = "https://codeberg.org/ifreund/zig-wlroots/archive/v0.19.4.tar.gz",
+            .hash = "wlroots-0.19.4-jmOlcqQMBABhKYH6NMSnoK1sohTbhc97_JP-hGg2UZaK",
         },
         .xkbcommon = .{
-            .url = "git+https://codeberg.org/ifreund/zig-xkbcommon?ref=main#a10651157cb1545ee3ae3818b4c7437c64d16462",
-            .hash = "xkbcommon-0.4.0-dev-VDqIe3bUAQB9reSurmSJxQjiQ6bnpekmOxIp_077GhVZ",
+            .url = "https://codeberg.org/ifreund/zig-xkbcommon/archive/v0.4.0.tar.gz",
+            .hash = "xkbcommon-0.4.0-VDqIe0i2AgDRsok2GpMFYJ8SVhQS10_PI2M_CnHXsJJZ",
         },
     },
     .fingerprint = 0xf5e3672b8e8d6efc,

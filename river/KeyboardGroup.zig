@@ -302,7 +302,7 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
 }
 
 fn keysymIsModifier(keysym: xkb.Keysym) bool {
-    switch (@intFromEnum(keysym)) {
+    switch (keysym) {
         xkb.Keysym.Shift_L,
         xkb.Keysym.Shift_R,
         xkb.Keysym.Control_L,
@@ -365,10 +365,10 @@ fn handleModifiers(listener: *wl.Listener(*wlr.Keyboard), _: *wlr.Keyboard) void
 /// Returns true if the keysym was handled.
 fn handleBuiltinBinding(keysym: xkb.Keysym) bool {
     switch (@intFromEnum(keysym)) {
-        xkb.Keysym.XF86Switch_VT_1...xkb.Keysym.XF86Switch_VT_12 => {
+        @intFromEnum(xkb.Keysym.XF86Switch_VT_1)...@intFromEnum(xkb.Keysym.XF86Switch_VT_12) => {
             log.debug("switch VT keysym received", .{});
             if (server.session) |session| {
-                const vt = @intFromEnum(keysym) - xkb.Keysym.XF86Switch_VT_1 + 1;
+                const vt = @intFromEnum(keysym) - @intFromEnum(xkb.Keysym.XF86Switch_VT_1) + 1;
                 std.log.info("switching to VT {}", .{vt});
                 session.changeVt(vt) catch std.log.err("changing VT failed", .{});
             }
