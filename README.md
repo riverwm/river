@@ -14,6 +14,9 @@ river does not combine the compositor and window manager into one program.
 Instead, users can choose any window manager implementing the
 [river-window-management-v1] protocol.
 
+Read my blog post [Separating the Wayland Compositor and Window Manager](https://isaacfreund.com/blog/river-window-management/)
+for an in-depth explanation.
+
 There is a [list of compatible window managers](https://codeberg.org/river/wiki/src/branch/main/pages/wm-list.md)
 on our [wiki](https://codeberg.org/river/wiki).
 
@@ -41,6 +44,9 @@ River itself provides frame perfect rendering, good performance, support for
 many Wayland protocol extensions, robust Xwayland support, the ability to
 hot-swap window managers, and more.
 
+The [river-window-management-v1] protocol and other river protocol extensions
+are stable.  We do not break window managers.
+
 ## Motivation
 
 Why split the window manager to a separate process? I aim to:
@@ -51,25 +57,6 @@ Why split the window manager to a separate process? I aim to:
 - Allow hot-swapping between window managers without restarting the compositor
   and all Wayland programs.
 - Promote diversity and experimentation in window manager design.
-
-## Current Status
-
-The first release supporting the [river-window-management-v1] protocol will be
-0.4.0. The protocol is implemented on river's main branch and is already
-robust/feature complete enough for me to use as my daily driver.
-
-The [river-window-management-v1] protocol and other river protocol extensions
-are stable.  We do not break window managers.
-
-Currently the only documentation for the [river-window-management-v1] protocol
-is the protocol specification itself. While this is all developers comfortable
-with writing Wayland clients should need, I'd like to add some more
-beginner-friendly documentation including a well-commented example window
-manager before the 0.4.0 release.
-
-If everything goes well with the 0.4.0 release, I expect the following
-non-bugfix release to be river 1.0.0. After river 1.0.0, all backwards
-incompatible changes will be strictly avoided.
 
 ## Building
 
