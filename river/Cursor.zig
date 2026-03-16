@@ -786,15 +786,7 @@ pub fn updateState(cursor: *Cursor) void {
     switch (cursor.mode) {
         .passthrough, .drag => {
             cursor.updateHovered();
-            const now = posix.clock_gettime(.MONOTONIC) catch @panic("CLOCK_MONOTONIC not supported");
-            // 2^32-1 milliseconds is ~50 days, which is a realistic uptime.
-            // This means that we must wrap if the monotonic time is greater than
-            // 2^32-1 milliseconds and hope that clients don't get too confused.
-            const msec: u32 = @intCast(@rem(
-                now.sec *% std.time.ms_per_s +% @divTrunc(now.nsec, std.time.ns_per_ms),
-                math.maxInt(u32),
-            ));
-            cursor.passthrough(msec);
+            cursor.passthrough(util.msecTimestamp());
         },
         .ignore, .down, .op => {},
     }

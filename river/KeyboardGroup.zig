@@ -108,7 +108,16 @@ pub fn ref(group: *KeyboardGroup) *KeyboardGroup {
     return group;
 }
 
-pub fn unref(group: *KeyboardGroup) void {
+pub fn unref(group: *KeyboardGroup, to_release: []u32) void {
+    for (to_release) |keycode| {
+        group.processKey(&.{
+            .time_msec = util.msecTimestamp(),
+            .keycode = keycode,
+            .update_state = true,
+            .state = .released,
+        });
+    }
+
     group.ref_count -= 1;
     if (group.ref_count > 0) {
         return;

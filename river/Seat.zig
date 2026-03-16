@@ -912,7 +912,7 @@ pub fn detachDevice(seat: *Seat, device: *InputDevice) void {
     if (device.wlr_device.type == .keyboard) {
         const keyboard: *Keyboard = @fieldParentPtr("device", device);
         if (keyboard.group) |group| {
-            group.unref();
+            group.unref(keyboard.pressed.keys());
             keyboard.group = null;
         }
     }
