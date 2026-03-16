@@ -137,6 +137,9 @@ fn handleRequest(
 
 pub fn pressed(binding: *XkbBinding) void {
     assert(!binding.sent_pressed);
+    // Input event processing should not continue after a state change
+    // until that event is sent to the window manager in an update and acked.
+    assert(binding.wm_scheduled.state_change == .none);
     binding.wm_scheduled.state_change = .pressed;
     server.wm.dirtyWindowing();
 }
