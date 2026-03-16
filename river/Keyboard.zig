@@ -31,6 +31,11 @@ device_destroyed: bool = false,
 queued_events: u32 = 0,
 
 config: Config,
+
+/// Set of pressed keys that have been processed by processKey().
+/// Not equivalent to wlr_keyboard.keycodes.
+/// This state is necessary to handle removing keyboards from groups properly.
+pressed: std.AutoArrayHashMapUnmanaged(u32, void) = .empty,
 /// Only null during initialization or due to allocation failure.
 group: ?*KeyboardGroup = null,
 
@@ -61,6 +66,9 @@ pub fn create(seat: *Seat, wlr_device: *wlr.InputDevice, virtual: bool) !*Keyboa
         .device = undefined,
     };
     errdefer if (keyboard.config.keymap) |keymap| keymap.unref();
+
+    try keyboard.pressed.ensureTotalCapacity(util.gpa, KeyboardGroup.pressed_count_max);
+    errdefer keyboard.pressed.deinit(util.gpa);
 
     try keyboard.device.init(seat, wlr_device, virtual);
     errdefer keyboard.device.deinit();
@@ -110,7 +118,7 @@ pub fn setRepeatInfo(keyboard: *Keyboard, rate: u31, delay: u31) void {
     keyboard.config.repeat_rate = rate;
     keyboard.config.repeat_delay = delay;
     if (keyboard.group) |group| {
-        group.unref();
+        group.unref(keyboard.pressed.keys());
         keyboard.group = null;
     }
     keyboard.setGroup();
@@ -122,7 +130,7 @@ pub fn setKeymap(keyboard: *Keyboard, keymap: *xkb.Keymap) void {
     if (keyboard.config.keymap) |old| old.unref();
     keyboard.config.keymap = keymap.ref();
     if (keyboard.group) |group| {
-        group.unref();
+        group.unref(keyboard.pressed.keys());
         keyboard.group = null;
     }
     keyboard.setGroup();
@@ -147,8 +155,9 @@ fn maybeDestroy(keyboard: *Keyboard) void {
     }
 
     if (keyboard.config.keymap) |keymap| keymap.unref();
-    if (keyboard.group) |group| group.unref();
+    if (keyboard.group) |group| group.unref(keyboard.pressed.keys());
 
+    keyboard.pressed.deinit(util.gpa);
     util.gpa.destroy(keyboard);
 }
 
@@ -158,6 +167,14 @@ pub fn dropEvent(keyboard: *Keyboard) void {
 }
 
 pub fn processKey(keyboard: *Keyboard, key: *const wlr.Keyboard.event.Key) void {
+    if (key.state == .released) {
+        _ = keyboard.pressed.swapRemove(key.keycode);
+    } else {
+        assert(key.state == .pressed);
+        if (keyboard.pressed.count() < KeyboardGroup.pressed_count_max) {
+            keyboard.pressed.putAssumeCapacity(key.keycode, {});
+        }
+    }
     if (keyboard.group) |group| group.processKey(key);
     keyboard.dropEvent();
 }
