@@ -123,9 +123,6 @@ pub fn createObject(device: *InputDevice, im_v1: *river.InputManagerV1) void {
 }
 
 pub fn deinit(device: *InputDevice) void {
-    assert(device.objects.empty());
-    device.remove.link.remove();
-
     if (!device.virtual) {
         {
             var it = device.objects.iterator(.forward);
@@ -143,6 +140,7 @@ pub fn deinit(device: *InputDevice) void {
         }
     }
 
+    device.remove.link.remove();
     device.link.remove();
     device.seat.updateCapabilities();
 
