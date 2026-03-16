@@ -397,7 +397,8 @@ fn blocklist(server: *Server, global: *const wl.Global) bool {
         global == server.input_manager.global or
         global == server.input_manager.idle_notifier.global or
         global == server.input_manager.virtual_pointer_manager.global or
-        global == server.input_manager.virtual_keyboard_manager.global or
+        global == server.input_manager.wlr_virt_kb_man.global or
+        global == server.input_manager.virt_kb_man or
         global == server.input_manager.input_method_manager.global or
         global == server.lock_manager.wlr_manager.global;
 }

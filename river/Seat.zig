@@ -32,6 +32,7 @@ const PointerBinding = @import("PointerBinding.zig");
 const PointerConstraint = @import("PointerConstraint.zig");
 const Scene = @import("Scene.zig");
 const ShellSurface = @import("ShellSurface.zig");
+const SyncedVirtKb = @import("SyncedVirtKb.zig");
 const Tablet = @import("Tablet.zig");
 const TouchGesture = @import("TouchGesture.zig");
 const TouchGesturesSeat = @import("TouchGesturesSeat.zig");
@@ -168,6 +169,15 @@ pub const Event = union(enum) {
     };
 };
 
+pub const SyncedVirtKbEvent = struct {
+    synced_virt_kb: *SyncedVirtKb,
+    data: union(enum) {
+        key: wlr.Keyboard.event.Key,
+        modifiers: wlr.Keyboard.Modifiers,
+        keymap: *xkb.Keymap,
+    },
+};
+
 pub const Focus = union(enum) {
     none,
     window: *Window,
@@ -232,6 +242,9 @@ xkb_bindings_seat: XkbBindingsSeat = .{},
 touch_gestures: TouchGesturesSeat,
 
 event_queue: std.Deque(Event),
+
+synced_virt_kb_queue: std.Deque(SyncedVirtKbEvent),
+synced_virt_kbs: wl.list.Head(SyncedVirtKb, .link),
 
 /// State to be sent to the wm in the next manage sequence.
 wm_scheduled: struct {
@@ -336,10 +349,14 @@ pub fn create(name: [*:0]const u8, transient: ?*ext.TransientSeatV1) !void {
     const touch_arbitration_timer = try event_loop.addTimer(*Seat, touchArbitrationTimeout, seat);
     errdefer touch_arbitration_timer.remove();
 
+    var synced_virt_kb_queue: std.Deque(SyncedVirtKbEvent) = try .initCapacity(util.gpa, 128);
+    errdefer synced_virt_kb_queue.deinit(util.gpa);
+
     seat.* = .{
         .wlr_seat = try wlr.Seat.create(server.wl_server, name),
         .event_queue = event_queue,
         .touch_arbitration_timer = touch_arbitration_timer,
+        .synced_virt_kb_queue = synced_virt_kb_queue,
         .link = undefined,
         .link_sent = undefined,
         .xkb_bindings = undefined,
@@ -349,6 +366,7 @@ pub fn create(name: [*:0]const u8, transient: ?*ext.TransientSeatV1) !void {
         .relay = undefined,
         .keyboard_groups = undefined,
         .transient = transient,
+        .synced_virt_kbs = undefined,
     };
     errdefer seat.wlr_seat.destroy();
 
@@ -374,6 +392,7 @@ pub fn create(name: [*:0]const u8, transient: ?*ext.TransientSeatV1) !void {
     seat.relay.init();
 
     seat.keyboard_groups.init();
+    seat.synced_virt_kbs.init();
 
     seat.wlr_seat.events.request_set_selection.add(&seat.request_set_selection);
     seat.wlr_seat.events.request_start_drag.add(&seat.request_start_drag);
@@ -385,6 +404,12 @@ pub fn create(name: [*:0]const u8, transient: ?*ext.TransientSeatV1) !void {
 
 pub fn destroy(seat: *Seat) void {
     seat.makeInert();
+
+    assert(seat.xkb_bindings.empty());
+    assert(seat.pointer_bindings.empty());
+
+    assert(seat.synced_virt_kb_queue.len == 0);
+    assert(seat.synced_virt_kbs.empty());
 
     while (seat.event_queue.popFront()) |event| {
         switch (event) {
@@ -437,6 +462,8 @@ pub fn destroy(seat: *Seat) void {
     seat.touch_points.deinit(util.gpa);
     seat.touch_ops.deinit(util.gpa);
     seat.touch_arbitration_timer.remove();
+    seat.synced_virt_kb_queue.deinit(util.gpa);
+
     seat.cursor.deinit();
 
     seat.request_set_selection.link.remove();
@@ -785,6 +812,8 @@ pub fn manageStart(seat: *Seat) void {
             assert(seat.xkb_bindings_seat.object == null);
             assert(seat.xkb_bindings.empty());
             assert(seat.pointer_bindings.empty());
+            assert(seat.synced_virt_kb_queue.len == 0);
+            assert(seat.synced_virt_kbs.empty());
 
             const seat_v1 = river.SeatV1.create(wm_v1.getClient(), wm_v1.getVersion(), 0) catch {
                 log.err("out of memory", .{});
@@ -962,6 +991,8 @@ pub fn makeInert(seat: *Seat) void {
         assert(seat.xkb_bindings_seat.object == null);
         assert(seat.xkb_bindings.empty());
         assert(seat.pointer_bindings.empty());
+        assert(seat.synced_virt_kb_queue.len == 0);
+        assert(seat.synced_virt_kbs.empty());
     }
 }
 
@@ -983,6 +1014,12 @@ fn handleDestroy(_: *river.SeatV1, seat: *Seat) void {
 
     while (seat.xkb_bindings.first()) |binding| binding.destroy();
     while (seat.pointer_bindings.first()) |binding| binding.destroy();
+
+    while (seat.synced_virt_kb_queue.popFront()) |event| {
+        event.synced_virt_kb.dropEvent();
+        if (event.data == .keymap) event.data.keymap.unref();
+    }
+    while (seat.synced_virt_kbs.first()) |synced_virt_kb| synced_virt_kb.destroy();
 
     seat.object = null;
 }
@@ -1134,6 +1171,14 @@ pub fn manageFinish(seat: *Seat) void {
             },
         }
         op.requested = .none;
+    }
+
+    while (seat.synced_virt_kb_queue.popFront()) |event| {
+        switch (event.data) {
+            .key => |key| event.synced_virt_kb.processKey(&key),
+            .modifiers => |modifiers| event.synced_virt_kb.processModifiers(modifiers),
+            .keymap => |keymap| event.synced_virt_kb.processKeymap(keymap),
+        }
     }
 }
 
@@ -1395,6 +1440,15 @@ pub fn detachDevice(seat: *Seat, device: *InputDevice) void {
             keyboard.group = null;
         }
     }
+}
+
+pub fn attachSyncedVirtKb(seat: *Seat, wlr_virt_kb: *wlr.VirtualKeyboardV1) void {
+    SyncedVirtKb.create(seat, wlr_virt_kb) catch |err| switch (err) {
+        error.OutOfMemory => {
+            wlr_virt_kb.resource.postNoMemory();
+            return;
+        },
+    };
 }
 
 pub fn updateCapabilities(seat: *Seat) void {

@@ -35,12 +35,15 @@ idle_notifier: *wlr.IdleNotifierV1,
 relative_pointer_manager: *wlr.RelativePointerManagerV1,
 pointer_gestures: *wlr.PointerGesturesV1,
 virtual_pointer_manager: *wlr.VirtualPointerManagerV1,
-virtual_keyboard_manager: *wlr.VirtualKeyboardManagerV1,
+wlr_virt_kb_man: *wlr.VirtualKeyboardManagerV1,
 pointer_constraints: *wlr.PointerConstraintsV1,
 input_method_manager: *wlr.InputMethodManagerV2,
 text_input_manager: *wlr.TextInputManagerV3,
 tablet_manager: *wlr.TabletManagerV2,
 transient_seat_manager: TransientSeatManager,
+
+/// river_virtual_keyboard_manager_v1 global
+virt_kb_man: *wl.Global,
 
 devices: wl.list.Head(InputDevice, .link),
 seats: wl.list.Head(Seat, .link),
@@ -59,11 +62,13 @@ pub fn init(input_manager: *InputManager) !void {
         .relative_pointer_manager = try wlr.RelativePointerManagerV1.create(server.wl_server),
         .pointer_gestures = try wlr.PointerGesturesV1.create(server.wl_server),
         .virtual_pointer_manager = try wlr.VirtualPointerManagerV1.create(server.wl_server),
-        .virtual_keyboard_manager = try wlr.VirtualKeyboardManagerV1.create(server.wl_server),
+        .wlr_virt_kb_man = try wlr.VirtualKeyboardManagerV1.create(server.wl_server),
         .pointer_constraints = try wlr.PointerConstraintsV1.create(server.wl_server),
         .input_method_manager = try wlr.InputMethodManagerV2.create(server.wl_server),
         .text_input_manager = try wlr.TextInputManagerV3.create(server.wl_server),
         .tablet_manager = try wlr.TabletManagerV2.create(server.wl_server),
+
+        .virt_kb_man = try wl.Global.create(server.wl_server, river.VirtualKeyboardManagerV1, 1, ?*anyopaque, null, bindVirtKb),
 
         .objects = undefined,
         .devices = undefined,
@@ -85,7 +90,7 @@ pub fn init(input_manager: *InputManager) !void {
 
     server.backend.events.new_input.add(&input_manager.new_input);
     input_manager.virtual_pointer_manager.events.new_virtual_pointer.add(&input_manager.new_virtual_pointer);
-    input_manager.virtual_keyboard_manager.events.new_virtual_keyboard.add(&input_manager.new_virtual_keyboard);
+    input_manager.wlr_virt_kb_man.events.new_virtual_keyboard.add(&input_manager.new_virtual_keyboard);
     input_manager.pointer_constraints.events.new_constraint.add(&input_manager.new_constraint);
     input_manager.input_method_manager.events.new_input_method.add(&input_manager.new_input_method);
     input_manager.text_input_manager.events.new_text_input.add(&input_manager.new_text_input);
@@ -93,6 +98,7 @@ pub fn init(input_manager: *InputManager) !void {
 
 pub fn deinit(input_manager: *InputManager) void {
     input_manager.global.destroy();
+    input_manager.virt_kb_man.destroy();
 
     // This function must be called after the backend has been destroyed
     assert(input_manager.objects.empty());
@@ -235,14 +241,16 @@ fn handleNewVirtualKeyboard(
     no_keymap.* = .{
         .virtual_keyboard = virtual_keyboard,
     };
+    virtual_keyboard.keyboard.data = no_keymap;
+
     virtual_keyboard.keyboard.base.events.destroy.add(&no_keymap.destroy);
     virtual_keyboard.keyboard.events.keymap.add(&no_keymap.keymap);
 }
 
-/// Ignore virtual keyboards completely until the client sets a keymap
-/// Yes, wlroots should probably do this for us.
+/// Don't attach to a seat until the client sets a keymap.
 const NoKeymapVirtKeyboard = struct {
     virtual_keyboard: *wlr.VirtualKeyboardV1,
+    wm_sync: bool = false,
     destroy: wl.Listener(*wlr.InputDevice) = .init(handleVirtKeyboardDestroy),
     keymap: wl.Listener(*wlr.Keyboard) = .init(handleKeymap),
 
@@ -252,21 +260,60 @@ const NoKeymapVirtKeyboard = struct {
         no_keymap.destroy.link.remove();
         no_keymap.keymap.link.remove();
 
+        no_keymap.virtual_keyboard.keyboard.data = null;
         util.gpa.destroy(no_keymap);
     }
 
     fn handleKeymap(listener: *wl.Listener(*wlr.Keyboard), _: *wlr.Keyboard) void {
         const no_keymap: *NoKeymapVirtKeyboard = @fieldParentPtr("keymap", listener);
         const virtual_keyboard = no_keymap.virtual_keyboard;
+        const wm_sync = no_keymap.wm_sync;
 
         if (virtual_keyboard.keyboard.keymap == null) return;
 
         handleVirtKeyboardDestroy(&no_keymap.destroy, &virtual_keyboard.keyboard.base);
 
         const seat: *Seat = @ptrCast(@alignCast(virtual_keyboard.seat.data));
-        seat.attachNewDevice(&virtual_keyboard.keyboard.base, .{ .virtual = true });
+        if (wm_sync) {
+            seat.attachSyncedVirtKb(virtual_keyboard);
+        } else {
+            seat.attachNewDevice(&virtual_keyboard.keyboard.base, .{ .virtual = true });
+        }
     }
 };
+
+fn bindVirtKb(client: *wl.Client, _: ?*anyopaque, version: u32, id: u32) void {
+    const object = river.VirtualKeyboardManagerV1.create(client, version, id) catch {
+        client.postNoMemory();
+        log.err("out of memory", .{});
+        return;
+    };
+    object.setHandler(?*anyopaque, handleVirtKbRequest, null, null);
+}
+
+fn handleVirtKbRequest(
+    object: *river.VirtualKeyboardManagerV1,
+    request: river.VirtualKeyboardManagerV1.Request,
+    _: ?*anyopaque,
+) void {
+    switch (request) {
+        .destroy => object.destroy(),
+        .sync_keyboard => |args| {
+            const wlr_vkb = @as(?*wlr.VirtualKeyboardV1, @ptrCast(@alignCast(args.virtual_keyboard.getUserData()))) orelse return;
+            if (wlr_vkb.has_keymap) {
+                object.postError(.keymap_already_set, "virtual keyboard must be synced before setting keymap");
+                return;
+            }
+            const wm_v1 = server.wm.object orelse return;
+            if (object.getClient() != wm_v1.getClient()) {
+                log.info("ignoring river_virtual_keyboard_manager_v1.sync_keyboard request for non-active wm", .{});
+                return;
+            }
+            const no_keymap: *NoKeymapVirtKeyboard = @ptrCast(@alignCast(wlr_vkb.keyboard.data));
+            no_keymap.wm_sync = true;
+        },
+    }
+}
 
 fn handleNewConstraint(
     _: *wl.Listener(*wlr.PointerConstraintV1),
