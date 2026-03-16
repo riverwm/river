@@ -206,7 +206,6 @@ pointer_bindings: wl.list.Head(PointerBinding, .link),
 cursor: Cursor,
 
 op: ?struct {
-    dirty: bool = false,
     sent_release: bool = false,
     input: enum {
         pointer,
@@ -378,13 +377,6 @@ pub fn processEvents(seat: *Seat) void {
         }
     }
     assert(server.wm.state == .idle);
-
-    if (seat.op) |*op| {
-        if (op.dirty) {
-            op.dirty = false;
-            server.wm.dirtyWindowing();
-        }
-    }
 }
 
 pub fn manageStart(seat: *Seat) void {
@@ -836,7 +828,7 @@ pub fn opUpdate(seat: *Seat, x: i32, y: i32) void {
     const op = &seat.op.?;
     op.x = x;
     op.y = y;
-    op.dirty = true;
+    server.wm.dirtyWindowingLazy();
 }
 
 pub fn opEnd(seat: *Seat) void {
