@@ -338,12 +338,7 @@ pub fn manageStart(output: *Output) void {
             server.wm.sent.outputs.append(output);
         },
         .disabled_hard, .destroying => {
-            if (output.object) |output_v1| {
-                output_v1.sendRemoved();
-                output_v1.setHandler(?*anyopaque, handleRequestInert, null, null);
-                output.layer_shell.makeInert();
-                handleObjectDestroy(output_v1, output);
-            }
+            output.makeInert();
 
             output.sent = output.scheduled;
 
@@ -371,6 +366,15 @@ pub fn manageStart(output: *Output) void {
                 util.gpa.destroy(output);
             }
         },
+    }
+}
+
+pub fn makeInert(output: *Output) void {
+    if (output.object) |output_v1| {
+        output_v1.sendRemoved();
+        output_v1.setHandler(?*anyopaque, handleRequestInert, null, null);
+        output.layer_shell.makeInert();
+        handleObjectDestroy(output_v1, output);
     }
 }
 

@@ -51,6 +51,9 @@ fn handleRequest(
     switch (request) {
         .destroy => object.destroy(),
         .get_xkb_binding => |args| {
+            // Since we make all river_seat_v1 objects inert when the active
+            // window manager is destroyed, this check means that only the
+            // active window manager can create bindings.
             const seat_data = args.seat.getUserData() orelse return;
             const seat: *Seat = @ptrCast(@alignCast(seat_data));
             XkbBinding.create(
@@ -67,6 +70,9 @@ fn handleRequest(
             };
         },
         .get_seat => |args| {
+            // Since we make all river_seat_v1 objects inert when the active
+            // window manager is destroyed, this check means that only the
+            // active window manager can create a bindings seat.
             const seat_data = args.seat.getUserData() orelse return;
             const seat: *Seat = @ptrCast(@alignCast(seat_data));
             if (seat.xkb_bindings_seat.object != null) {

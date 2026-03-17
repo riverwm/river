@@ -521,7 +521,7 @@ pub fn manageStart(window: *Window) void {
     }
 }
 
-fn makeInert(window: *Window) void {
+pub fn makeInert(window: *Window) void {
     if (window.object) |window_v1| {
         window_v1.sendClosed();
         window_v1.setHandler(?*anyopaque, handleRequestInert, null, null);
