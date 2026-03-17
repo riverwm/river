@@ -137,6 +137,18 @@ fn handleRequestInert(
 fn handleDestroy(_: *river.WindowManagerV1, wm: *WindowManager) void {
     log.debug("active river_window_manager_v1 destroyed", .{});
     wm.object = null;
+    {
+        var it = server.om.outputs.iterator(.forward);
+        while (it.next()) |output| output.makeInert();
+    }
+    {
+        var it = server.input_manager.seats.iterator(.forward);
+        while (it.next()) |seat| seat.makeInert();
+    }
+    {
+        var it = wm.windows.iterator();
+        while (it.next()) |window| window.makeInert();
+    }
     switch (wm.state) {
         .idle => {},
         .inflight_configures => {},

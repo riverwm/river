@@ -277,6 +277,8 @@ pub fn create(name: [*:0]const u8) !void {
 }
 
 pub fn destroy(seat: *Seat) void {
+    seat.makeInert();
+
     while (seat.event_queue.popFront()) |event| {
         switch (event) {
             .keyboard_key => |data| data.keyboard.dropEvent(),
@@ -299,6 +301,7 @@ pub fn destroy(seat: *Seat) void {
             => {},
         }
     }
+
     {
         var it = server.input_manager.devices.iterator(.forward);
         while (it.next()) |device| {
@@ -312,9 +315,6 @@ pub fn destroy(seat: *Seat) void {
         while (it.next()) |device| assert(device.seat != seat);
     }
     assert(seat.keyboard_groups.empty());
-
-    while (seat.xkb_bindings.first()) |binding| binding.destroy();
-    while (seat.pointer_bindings.first()) |binding| binding.destroy();
 
     seat.link.remove();
     seat.link_sent.remove();
@@ -381,13 +381,6 @@ pub fn processEvents(seat: *Seat) void {
 
 pub fn manageStart(seat: *Seat) void {
     if (seat.destroying) {
-        if (seat.object) |seat_v1| {
-            seat_v1.sendRemoved();
-            seat_v1.setHandler(?*anyopaque, handleRequestInert, null, null);
-            seat.layer_shell.makeInert();
-            seat.xkb_bindings_seat.makeInert();
-            seat.object = null;
-        }
         seat.destroy();
         return;
     }
@@ -524,6 +517,21 @@ pub fn manageStart(seat: *Seat) void {
     // Ensure we don't store an interaction that happens while no window manager
     // is connected until a new window manager connects.
     seat.wm_scheduled.interaction = .none;
+}
+
+pub fn makeInert(seat: *Seat) void {
+    if (seat.object) |seat_v1| {
+        seat_v1.sendRemoved();
+        seat_v1.setHandler(?*anyopaque, handleRequestInert, null, null);
+
+        seat.layer_shell.makeInert();
+        seat.xkb_bindings_seat.makeInert();
+
+        while (seat.xkb_bindings.first()) |binding| binding.destroy();
+        while (seat.pointer_bindings.first()) |binding| binding.destroy();
+
+        seat.object = null;
+    }
 }
 
 fn handleRequestInert(
