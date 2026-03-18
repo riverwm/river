@@ -720,7 +720,7 @@ pub fn focus(seat: *Seat, new_focus: Focus) void {
 }
 
 /// Send keyboard enter/leave events and handle pointer constraints
-/// This should never normally be called from outside of setFocusRaw(), but we make an exception for
+/// This should never normally be called from outside of focus(), but we make an exception for
 /// XwaylandOverrideRedirect surfaces as they don't conform to the Wayland focus model.
 pub fn keyboardEnterOrLeave(seat: *Seat, target_surface: ?*wlr.Surface) void {
     if (target_surface) |wlr_surface| {

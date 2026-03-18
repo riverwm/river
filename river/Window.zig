@@ -334,9 +334,7 @@ pub fn destroy(window: *Window) void {
     {
         var it = server.input_manager.seats.iterator(.forward);
         while (it.next()) |seat| {
-            if (seat.focused == .window and seat.focused.window == window) {
-                seat.focus(.none);
-            }
+            assert(seat.focused != .window or seat.focused.window != window);
         }
     }
 
@@ -1146,6 +1144,15 @@ pub fn unmap(window: *Window) void {
     if (window.foreign_toplevel_handle) |handle| {
         handle.destroy();
         window.foreign_toplevel_handle = null;
+    }
+
+    {
+        var it = server.input_manager.seats.iterator(.forward);
+        while (it.next()) |seat| {
+            if (seat.focused == .window and seat.focused.window == window) {
+                seat.focus(.none);
+            }
+        }
     }
 }
 
