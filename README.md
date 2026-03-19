@@ -97,6 +97,12 @@ and any other long-running programs.
 
 For complete documentation see the `river(1)` man page.
 
+## Strict No LLM / No AI Policy
+
+Use of generative AI/LLMs is strictly forbidden for all contributions to river.
+
+This includes bug reports and comments on the issue tracker.
+
 ## Donate
 
 If my work on river adds value to your life and you'd like to support me
