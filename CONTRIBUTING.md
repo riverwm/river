@@ -11,6 +11,12 @@ You'll likely have more success with your contribution if you visit
 [#river](https://web.libera.chat/?channels=#river) on irc.libera.chat to discuss
 your plans first.
 
+## Strict No LLM / No AI Policy
+
+Use of generative AI/LLMs is strictly forbidden for all contributions to river.
+
+This includes bug reports and comments on the issue tracker.
+
 ## Commit messages
 
 Please take the time to write a good commit message, having a clean git
