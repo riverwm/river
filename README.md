@@ -49,7 +49,7 @@ are stable.  We do not break window managers.
 
 ## Motivation
 
-Why split the window manager to a separate process? I aim to:
+Why split the window manager to a separate process?
 
 - Significantly lower the barrier to entry for writing a Wayland window manager.
 - Allow implementing Wayland window managers in high-level garbage collected
