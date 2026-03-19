@@ -105,8 +105,12 @@ This includes bug reports and comments on the issue tracker.
 
 ## Donate
 
-If my work on river adds value to your life and you'd like to support me
-financially you can find donation information [here](https://isaacfreund.com/donate/).
+Unfortunately, the current pace of river's development is not sustainable
+without more financial support. If my work on river adds value to your life
+please consider setting up a recurring donation through [liberapay]. You can
+also support me with a one-time or monthly donation on [github sponsors] or
+[ko-fi] though I prefer liberapay as it is run by a non-profit. Thank you for
+your support!
 
 ## Licensing
 
@@ -120,3 +124,6 @@ In overview:
 - River's logo and documentation are released under the CC-BY-SA-4.0 license.
 
 [river-window-management-v1]: https://isaacfreund.com/docs/wayland/river-window-management-v1
+[liberapay]: https://liberapay.com/ifreund
+[github sponsors]: https://github.com/sponsors/ifreund
+[ko-fi]: https://ko-fi.com/ifreund
