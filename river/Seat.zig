@@ -442,6 +442,8 @@ pub fn manageStart(seat: *Seat) void {
                 if (seat_v1.getVersion() >= 2) {
                     seat_v1.sendPointerPosition(x, y);
                 }
+                seat.wm_sent.x = x;
+                seat.wm_sent.y = y;
             }
         }
 
