@@ -391,6 +391,12 @@ pub fn manageStart(seat: *Seat) void {
     if (server.wm.object) |wm_v1| {
         const new = seat.object == null;
         const seat_v1 = seat.object orelse blk: {
+            assert(seat.op == null);
+            assert(seat.layer_shell.object == null);
+            assert(seat.xkb_bindings_seat.object == null);
+            assert(seat.xkb_bindings.empty());
+            assert(seat.pointer_bindings.empty());
+
             const seat_v1 = river.SeatV1.create(wm_v1.getClient(), wm_v1.getVersion(), 0) catch {
                 log.err("out of memory", .{});
                 return; // try again next update
@@ -525,14 +531,13 @@ pub fn makeInert(seat: *Seat) void {
     if (seat.object) |seat_v1| {
         seat_v1.sendRemoved();
         seat_v1.setHandler(?*anyopaque, handleRequestInert, null, null);
-
-        seat.layer_shell.makeInert();
-        seat.xkb_bindings_seat.makeInert();
-
-        while (seat.xkb_bindings.first()) |binding| binding.destroy();
-        while (seat.pointer_bindings.first()) |binding| binding.destroy();
-
-        seat.object = null;
+        handleDestroy(seat_v1, seat);
+    } else {
+        assert(seat.op == null);
+        assert(seat.layer_shell.object == null);
+        assert(seat.xkb_bindings_seat.object == null);
+        assert(seat.xkb_bindings.empty());
+        assert(seat.pointer_bindings.empty());
     }
 }
 
@@ -547,6 +552,14 @@ fn handleRequestInert(
 fn handleDestroy(_: *river.SeatV1, seat: *Seat) void {
     seat.object = null;
     seat.opEnd();
+
+    seat.layer_shell.makeInert();
+    seat.xkb_bindings_seat.makeInert();
+
+    while (seat.xkb_bindings.first()) |binding| binding.destroy();
+    while (seat.pointer_bindings.first()) |binding| binding.destroy();
+
+    seat.object = null;
 }
 
 fn handleRequest(
