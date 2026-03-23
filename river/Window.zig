@@ -266,6 +266,7 @@ rendering_requested: RenderingRequested = .init,
 box: wlr.Box = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
 
 foreign_toplevel_handle: ?*wlr.ExtForeignToplevelHandleV1 = null,
+wlr_toplevel_handle: ?*wlr.ForeignToplevelHandleV1 = null,
 
 pub fn create(impl: Impl) error{OutOfMemory}!*Window {
     assert(impl != .destroying);
@@ -427,6 +428,16 @@ pub fn manageStart(window: *Window) void {
                         handle.data = window;
                     } else |_| {
                         log.err("failed to create ext foreign toplevel handle", .{});
+                    }
+                }
+
+                if (window.wlr_toplevel_handle == null) {
+                    if (wlr.ForeignToplevelHandleV1.create(server.wlr_foreign_toplevel_manager)) |handle| {
+                        window.wlr_toplevel_handle = handle;
+                        if (window.getTitle()) |title| handle.setTitle(title);
+                        if (window.getAppId()) |app_id| handle.setAppId(app_id);
+                    } else |_| {
+                        log.err("failed to create wlr foreign toplevel handle", .{});
                     }
                 }
 
@@ -771,6 +782,10 @@ pub fn manageFinish(window: *Window) bool {
         }
         break :blk false;
     };
+
+    if (window.wlr_toplevel_handle) |handle| {
+        handle.setActivated(activated);
+    }
 
     const width, const height = blk: {
         if (wm_requested.fullscreen) |output| {
@@ -1150,6 +1165,11 @@ pub fn unmap(window: *Window) void {
         window.foreign_toplevel_handle = null;
     }
 
+    if (window.wlr_toplevel_handle) |handle| {
+        handle.destroy();
+        window.wlr_toplevel_handle = null;
+    }
+
     {
         var it = server.input_manager.seats.iterator(.forward);
         while (it.next()) |seat| {
@@ -1170,6 +1190,9 @@ pub fn notifyTitle(window: *Window) void {
             .app_id = window.getAppId(),
         });
     }
+    if (window.wlr_toplevel_handle) |handle| {
+        if (window.getTitle()) |title| handle.setTitle(title);
+    }
 }
 
 pub fn notifyAppId(window: *Window) void {
@@ -1181,5 +1204,8 @@ pub fn notifyAppId(window: *Window) void {
             .title = window.getTitle(),
             .app_id = window.getAppId(),
         });
+    }
+    if (window.wlr_toplevel_handle) |handle| {
+        if (window.getAppId()) |app_id| handle.setAppId(app_id);
     }
 }
