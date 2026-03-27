@@ -19,10 +19,10 @@ link: wl.list.Link,
 
 wlr_text_input: *wlr.TextInputV3,
 
-enable: wl.Listener(*wlr.TextInputV3) = .init(handleEnable),
-commit: wl.Listener(*wlr.TextInputV3) = .init(handleCommit),
-disable: wl.Listener(*wlr.TextInputV3) = .init(handleDisable),
-destroy: wl.Listener(*wlr.TextInputV3) = .init(handleDestroy),
+enable: wl.Listener(void) = .init(handleEnable),
+commit: wl.Listener(void) = .init(handleCommit),
+disable: wl.Listener(void) = .init(handleDisable),
+destroy: wl.Listener(void) = .init(handleDestroy),
 
 pub fn create(wlr_text_input: *wlr.TextInputV3) !void {
     const seat: *Seat = @ptrCast(@alignCast(wlr_text_input.seat.data));
@@ -44,7 +44,7 @@ pub fn create(wlr_text_input: *wlr.TextInputV3) !void {
     wlr_text_input.events.destroy.add(&text_input.destroy);
 }
 
-fn handleEnable(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) void {
+fn handleEnable(listener: *wl.Listener(void)) void {
     const text_input: *TextInput = @fieldParentPtr("enable", listener);
     const seat: *Seat = @ptrCast(@alignCast(text_input.wlr_text_input.seat.data));
 
@@ -71,7 +71,7 @@ fn handleEnable(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) v
     }
 }
 
-fn handleCommit(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) void {
+fn handleCommit(listener: *wl.Listener(void)) void {
     const text_input: *TextInput = @fieldParentPtr("commit", listener);
     const seat: *Seat = @ptrCast(@alignCast(text_input.wlr_text_input.seat.data));
 
@@ -85,7 +85,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) v
     }
 }
 
-fn handleDisable(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) void {
+fn handleDisable(listener: *wl.Listener(void)) void {
     const text_input: *TextInput = @fieldParentPtr("disable", listener);
     const seat: *Seat = @ptrCast(@alignCast(text_input.wlr_text_input.seat.data));
 
@@ -94,7 +94,7 @@ fn handleDisable(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) 
     }
 }
 
-fn handleDestroy(listener: *wl.Listener(*wlr.TextInputV3), _: *wlr.TextInputV3) void {
+fn handleDestroy(listener: *wl.Listener(void)) void {
     const text_input: *TextInput = @fieldParentPtr("destroy", listener);
     const seat: *Seat = @ptrCast(@alignCast(text_input.wlr_text_input.seat.data));
 
