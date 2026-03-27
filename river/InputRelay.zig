@@ -32,9 +32,9 @@ input_popups: wl.list.Head(InputPopup, .link),
 /// Always null if there is no input method.
 text_input: ?*TextInput = null,
 
-input_method_commit: wl.Listener(*wlr.InputMethodV2) = .init(handleInputMethodCommit),
+input_method_commit: wl.Listener(void) = .init(handleInputMethodCommit),
 grab_keyboard: wl.Listener(*wlr.InputMethodV2.KeyboardGrab) = .init(handleInputMethodGrabKeyboard),
-input_method_destroy: wl.Listener(*wlr.InputMethodV2) = .init(handleInputMethodDestroy),
+input_method_destroy: wl.Listener(void) = .init(handleInputMethodDestroy),
 input_method_new_popup: wl.Listener(*wlr.InputPopupSurfaceV2) = .init(handleInputMethodNewPopup),
 
 grab_keyboard_destroy: wl.Listener(*wlr.InputMethodV2.KeyboardGrab) = .init(handleInputMethodGrabKeyboardDestroy),
@@ -70,12 +70,9 @@ pub fn newInputMethod(relay: *InputRelay, input_method: *wlr.InputMethodV2) void
     }
 }
 
-fn handleInputMethodCommit(
-    listener: *wl.Listener(*wlr.InputMethodV2),
-    input_method: *wlr.InputMethodV2,
-) void {
+fn handleInputMethodCommit(listener: *wl.Listener(void)) void {
     const relay: *InputRelay = @fieldParentPtr("input_method_commit", listener);
-    assert(input_method == relay.input_method);
+    const input_method = relay.input_method.?;
 
     if (!input_method.client_active) return;
     const text_input = relay.text_input orelse return;
@@ -104,12 +101,8 @@ fn handleInputMethodCommit(
     text_input.wlr_text_input.sendDone();
 }
 
-fn handleInputMethodDestroy(
-    listener: *wl.Listener(*wlr.InputMethodV2),
-    input_method: *wlr.InputMethodV2,
-) void {
+fn handleInputMethodDestroy(listener: *wl.Listener(void)) void {
     const relay: *InputRelay = @fieldParentPtr("input_method_destroy", listener);
-    assert(input_method == relay.input_method);
 
     relay.input_method_commit.link.remove();
     relay.grab_keyboard.link.remove();

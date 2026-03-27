@@ -232,10 +232,7 @@ pub fn setTheme(cursor: *Cursor, theme: ?[*:0]const u8, _size: ?u32) !void {
                 const wlr_xcursor = xcursor_manager.getXcursor("default", 1).?;
                 const image = wlr_xcursor.images[0];
                 xwayland.setCursor(
-                    image.buffer,
-                    image.width * 4,
-                    image.width,
-                    image.height,
+                    image.getBuffer(),
                     @intCast(image.hotspot_x),
                     @intCast(image.hotspot_y),
                 );

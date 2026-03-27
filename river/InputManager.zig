@@ -83,8 +83,8 @@ pub fn init(input_manager: *InputManager) !void {
     input_manager.virtual_pointer_manager.events.new_virtual_pointer.add(&input_manager.new_virtual_pointer);
     input_manager.virtual_keyboard_manager.events.new_virtual_keyboard.add(&input_manager.new_virtual_keyboard);
     input_manager.pointer_constraints.events.new_constraint.add(&input_manager.new_constraint);
-    input_manager.input_method_manager.events.input_method.add(&input_manager.new_input_method);
-    input_manager.text_input_manager.events.text_input.add(&input_manager.new_text_input);
+    input_manager.input_method_manager.events.new_input_method.add(&input_manager.new_input_method);
+    input_manager.text_input_manager.events.new_text_input.add(&input_manager.new_text_input);
 }
 
 pub fn deinit(input_manager: *InputManager) void {
