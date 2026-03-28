@@ -998,11 +998,7 @@ fn drawBorders(window: *Window) void {
             .{ .name = "bottom", .box = &bottom },
         }) |edge| {
             if (!requested.clip.empty()) {
-                if (!edge.box.intersection(edge.box, &requested.clip)) {
-                    // TODO(wlroots): remove this redundant code after fixed upstream
-                    // https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/5084
-                    edge.box.* = .{ .x = 0, .y = 0, .width = 0, .height = 0 };
-                }
+                _ = edge.box.intersection(edge.box, &requested.clip);
             }
             const rect = @field(window.border, edge.name);
             rect.node.setEnabled(@field(border.edges, edge.name));
