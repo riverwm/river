@@ -54,6 +54,7 @@ pub fn init(scene: *Scene) !void {
     errdefer wlr_scene.tree.node.destroy();
 
     if (server.linux_dmabuf) |linux_dmabuf| wlr_scene.setLinuxDmabufV1(linux_dmabuf);
+    if (server.color_manager) |color_manager| wlr_scene.setColorManagerV1(color_manager);
 
     const interactive_tree = try wlr_scene.tree.createSceneTree();
     const drag_icons = try wlr_scene.tree.createSceneTree();

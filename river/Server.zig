@@ -9,7 +9,9 @@ const assert = std.debug.assert;
 const mem = std.mem;
 const posix = std.posix;
 const wlr = @import("wlroots");
-const wl = @import("wayland").server.wl;
+const wayland = @import("wayland");
+const wl = wayland.server.wl;
+const wp = wayland.server.wp;
 
 const c = @import("c.zig").c;
 const util = @import("util.zig");
@@ -56,6 +58,9 @@ linux_dmabuf: ?*wlr.LinuxDmabufV1 = null,
 linux_drm_syncobj_manager: ?*wlr.LinuxDrmSyncobjManagerV1 = null,
 single_pixel_buffer_manager: *wlr.SinglePixelBufferManagerV1,
 alpha_modifier: *wlr.AlphaModifierV1,
+
+color_manager: ?*wlr.ColorManagerV1 = null,
+color_representation_manager: *wlr.ColorRepresentationManagerV1,
 
 viewporter: *wlr.Viewporter,
 fractional_scale_manager: *wlr.FractionalScaleManagerV1,
@@ -135,6 +140,8 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
         .single_pixel_buffer_manager = try wlr.SinglePixelBufferManagerV1.create(wl_server),
         .alpha_modifier = try wlr.AlphaModifierV1.create(wl_server),
 
+        .color_representation_manager = try wlr.ColorRepresentationManagerV1.createWithRenderer(wl_server, 1, renderer),
+
         .viewporter = try wlr.Viewporter.create(wl_server),
         .fractional_scale_manager = try wlr.FractionalScaleManagerV1.create(wl_server, 1),
         .compositor = compositor,
@@ -180,6 +187,23 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
         if (drm_fd >= 0) {
             server.linux_drm_syncobj_manager = wlr.LinuxDrmSyncobjManagerV1.create(wl_server, 1, drm_fd);
         }
+    }
+
+    if (renderer.features.input_color_transform) {
+        const render_intents: []const wp.ColorManagerV1.RenderIntent = &.{.perceptual};
+        const transfer_functions = renderer.transferFunctionList();
+        defer std.c.free(transfer_functions.ptr);
+        const primaries = renderer.primariesList();
+        defer std.c.free(primaries.ptr);
+        server.color_manager = try wlr.ColorManagerV1.create(wl_server, 2, .{
+            .features = .{
+                .parametric = true,
+                .set_mastering_display_primaries = true,
+            },
+            .render_intents = render_intents,
+            .transfer_functions = transfer_functions,
+            .primaries = primaries,
+        });
     }
 
     if (build_options.xwayland and runtime_xwayland) {
@@ -296,6 +320,9 @@ fn allowlist(server: *Server, global: *const wl.Global) bool {
     if (server.linux_drm_syncobj_manager) |linux_drm_syncobj_manager| {
         if (global == linux_drm_syncobj_manager.global) return true;
     }
+    if (server.color_manager) |color_manager| {
+        if (global == color_manager.global) return true;
+    }
 
     // We must use the getInterface() approach for dynamically created globals
     // such as wl_output and wl_seat since the wl_global_create() function will
@@ -314,6 +341,7 @@ fn allowlist(server: *Server, global: *const wl.Global) bool {
         global == server.shm.global or
         global == server.single_pixel_buffer_manager.global or
         global == server.alpha_modifier.global or
+        global == server.color_representation_manager.global or
         global == server.viewporter.global or
         global == server.fractional_scale_manager.global or
         global == server.compositor.global or

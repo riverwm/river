@@ -74,8 +74,10 @@ pub fn build(b: *Build) !void {
 
     const scanner = Scanner.create(b, .{});
 
-    scanner.addSystemProtocol("stable/xdg-shell/xdg-shell.xml");
     scanner.addSystemProtocol("stable/tablet/tablet-v2.xml");
+    scanner.addSystemProtocol("stable/xdg-shell/xdg-shell.xml");
+    scanner.addSystemProtocol("staging/color-management/color-management-v1.xml");
+    scanner.addSystemProtocol("staging/color-representation/color-representation-v1.xml");
     scanner.addSystemProtocol("staging/cursor-shape/cursor-shape-v1.xml");
     scanner.addSystemProtocol("staging/ext-session-lock/ext-session-lock-v1.xml");
     scanner.addSystemProtocol("staging/tearing-control/tearing-control-v1.xml");
@@ -114,6 +116,8 @@ pub fn build(b: *Build) !void {
     scanner.generate("ext_session_lock_manager_v1", 1);
     scanner.generate("wp_cursor_shape_manager_v1", 1);
     scanner.generate("wp_tearing_control_manager_v1", 1);
+    scanner.generate("wp_color_manager_v1", 2);
+    scanner.generate("wp_color_representation_manager_v1", 1);
 
     scanner.generate("river_window_manager_v1", 4);
     scanner.generate("river_xkb_bindings_v1", 2);
