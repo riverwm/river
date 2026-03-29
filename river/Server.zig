@@ -40,6 +40,8 @@ wl_server: *wl.Server,
 sigint_source: *wl.EventSource,
 sigterm_source: *wl.EventSource,
 
+fixes: *wlr.Fixes,
+
 backend: *wlr.Backend,
 session: ?*wlr.Session,
 
@@ -119,6 +121,8 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
         .wl_server = wl_server,
         .sigint_source = try loop.addSignal(*wl.Server, posix.SIG.INT, terminate, wl_server),
         .sigterm_source = try loop.addSignal(*wl.Server, posix.SIG.TERM, terminate, wl_server),
+
+        .fixes = try wlr.Fixes.create(wl_server, 1),
 
         .backend = backend,
         .session = session,
@@ -306,7 +310,8 @@ fn allowlist(server: *Server, global: *const wl.Global) bool {
     // For other globals I like the current pointer comparison approach as it
     // should catch river accidentally exposing multiple copies of e.g. wl_shm
     // with an assertion failure.
-    return global == server.shm.global or
+    return global == server.fixes.global or
+        global == server.shm.global or
         global == server.single_pixel_buffer_manager.global or
         global == server.alpha_modifier.global or
         global == server.viewporter.global or

@@ -20,8 +20,8 @@
             .hash = "wayland-0.5.0-lQa1knz8AQCh08NA8BeQrwJB9U3CfqcVAdHZYGRKIGuu",
         },
         .wlroots = .{
-            .url = "git+https://codeberg.org/ifreund/zig-wlroots?ref=master#149c17476ccec90b9904d6a1a8d38858d4ac925f",
-            .hash = "wlroots-0.20.0-dev-jmOlckAeBACoYWj_Hs3JdREUrmKQDTj3d_P76C1HAHgz",
+            .url = "git+https://codeberg.org/ifreund/zig-wlroots?ref=master#22180881fd3f67b2449a34dd7dd978c3291ccc15",
+            .hash = "wlroots-0.20.0-dev-jmOlcu8pBACQUTdOlveX6Evwnm4BeqEANGGwgxR-pSHn",
         },
         .xkbcommon = .{
             .url = "https://codeberg.org/ifreund/zig-xkbcommon/archive/v0.4.0.tar.gz",
