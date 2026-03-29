@@ -139,7 +139,7 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
         .fractional_scale_manager = try wlr.FractionalScaleManagerV1.create(wl_server, 1),
         .compositor = compositor,
         .subcompositor = try wlr.Subcompositor.create(wl_server),
-        .cursor_shape_manager = try wlr.CursorShapeManagerV1.create(server.wl_server, 1),
+        .cursor_shape_manager = try wlr.CursorShapeManagerV1.create(server.wl_server, 2),
 
         .xdg_shell = try wlr.XdgShell.create(wl_server, 5),
         .xdg_decoration_manager = try wlr.XdgDecorationManagerV1.create(wl_server),
