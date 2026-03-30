@@ -82,13 +82,30 @@ pub fn create(seat: *Seat, wlr_device: *wlr.InputDevice, virtual: bool) !*Keyboa
         wlr_keyboard.events.keymap.add(&keyboard.keymap);
     } else {
         keyboard.keymap.link.init();
-        // We must set a keymap even though this is not the wlr_keyboard river
-        // exposes to clients. If there is no keymap set, wlroots will not emit
-        // the modifiers event when using the Wayland or X11 backend.
-        _ = wlr_keyboard.setKeymap(keyboard.config.keymap);
+        if (shouldSetKeymap()) {
+            _ = wlr_keyboard.setKeymap(keyboard.config.keymap);
+        }
     }
 
     return keyboard;
+}
+
+// We don't want to ever set a keymap for backend-created wlr.Keyboards.
+// Setting a keymap means that modifiers will be buggy and LEDs will be out of sync.
+// However, if we don't set a keymap we don't get modifiers events from the backend
+// at all currently due to a wlroots bug. This is even worse, so set a keymap
+// despite the bugginess for backends that generate keyboard modifiers events.
+// TODO(wlroots) https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/5324
+fn shouldSetKeymap() bool {
+    var wayland_or_x11: bool = false;
+    server.backend.multiForEachBackend(*bool, shouldSetKeymapIter, &wayland_or_x11);
+    return wayland_or_x11;
+}
+
+fn shouldSetKeymapIter(backend: *wlr.Backend, wayland_or_x11: *bool) void {
+    if (backend.isWl() or (wlr.config.has_x11_backend and backend.isX11())) {
+        wayland_or_x11.* = true;
+    }
 }
 
 pub fn setGroup(keyboard: *Keyboard) void {
@@ -126,7 +143,9 @@ pub fn setRepeatInfo(keyboard: *Keyboard, rate: u31, delay: u31) void {
 
 pub fn setKeymap(keyboard: *Keyboard, keymap: *xkb.Keymap) void {
     assert(!keyboard.device.virtual);
-    _ = keyboard.device.wlr_device.toKeyboard().setKeymap(keymap);
+    if (shouldSetKeymap()) {
+        _ = keyboard.device.wlr_device.toKeyboard().setKeymap(keyboard.config.keymap);
+    }
     if (keyboard.config.keymap) |old| old.unref();
     keyboard.config.keymap = keymap.ref();
     if (keyboard.group) |group| {
