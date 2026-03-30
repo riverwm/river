@@ -201,6 +201,9 @@ decorations_above_tree: *wlr.SceneTree,
 
 popup_tree: *wlr.SceneTree,
 
+capture_scene: *wlr.Scene,
+capture_source: ?*wlr.ExtImageCaptureSourceV1 = null,
+
 /// State to be sent to the wm in the next manage sequence.
 wm_scheduled: struct {
     dimensions_hint: DimensionsHint = .{},
@@ -297,6 +300,7 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
         .decorations_above = undefined,
         .decorations_above_tree = try tree.createSceneTree(),
         .popup_tree = popup_tree,
+        .capture_scene = try wlr.Scene.create(),
     };
 
     window.node.init(.window);
@@ -307,6 +311,8 @@ pub fn create(impl: Impl) error{OutOfMemory}!*Window {
     window.tree.node.setEnabled(false);
     window.popup_tree.node.setEnabled(false);
     window.fullscreen_background.node.setEnabled(false);
+
+    window.capture_scene.restack_xwayland_surfaces = false;
 
     try SceneNodeData.attach(&window.tree.node, .{ .window = window });
     try SceneNodeData.attach(&window.popup_tree.node, .{ .window = window });
@@ -345,6 +351,7 @@ pub fn destroy(window: *Window) void {
 
     window.tree.node.destroy();
     window.popup_tree.node.destroy();
+    window.capture_scene.tree.node.destroy();
 
     window.node.deinit();
 
@@ -417,6 +424,7 @@ pub fn manageStart(window: *Window) void {
                         .app_id = window.getAppId(),
                     })) |handle| {
                         window.foreign_toplevel_handle = handle;
+                        handle.data = window;
                     } else |_| {
                         log.err("failed to create ext foreign toplevel handle", .{});
                     }

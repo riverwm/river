@@ -25,6 +25,7 @@ const Scene = @import("Scene.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
 const Seat = @import("Seat.zig");
 const TabletTool = @import("TabletTool.zig");
+const Window = @import("Window.zig");
 const WindowManager = @import("WindowManager.zig");
 const XkbBindings = @import("XkbBindings.zig");
 const LayerShell = @import("LayerShell.zig");
@@ -84,6 +85,7 @@ image_copy_capture_manager: *wlr.ExtImageCopyCaptureManagerV1,
 output_image_capture_source_manager: *wlr.ExtOutputImageCaptureSourceManagerV1,
 
 foreign_toplevel_list: *wlr.ExtForeignToplevelListV1,
+toplevel_capture_source_manager: *wlr.ExtForeignToplevelImageCaptureSourceManagerV1,
 
 tearing_control_manager: *wlr.TearingControlManagerV1,
 
@@ -107,6 +109,7 @@ new_xdg_toplevel: wl.Listener(*wlr.XdgToplevel) = .init(handleNewXdgToplevel),
 new_toplevel_decoration: wl.Listener(*wlr.XdgToplevelDecorationV1) = .init(handleNewToplevelDecoration),
 request_activate: wl.Listener(*wlr.XdgActivationV1.event.RequestActivate) = .init(handleRequestActivate),
 request_set_cursor_shape: wl.Listener(*wlr.CursorShapeManagerV1.event.RequestSetShape) = .init(handleRequestSetCursorShape),
+toplevel_capture_request: wl.Listener(*wlr.ExtForeignToplevelImageCaptureSourceManagerV1.Request) = .init(handleToplevelCaptureRequest),
 
 pub fn init(server: *Server, runtime_xwayland: bool) !void {
     // We intentionally don't try to prevent memory leaks on error in this function
@@ -164,6 +167,7 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
         .output_image_capture_source_manager = try wlr.ExtOutputImageCaptureSourceManagerV1.create(wl_server, 1),
 
         .foreign_toplevel_list = try wlr.ExtForeignToplevelListV1.create(wl_server, 1),
+        .toplevel_capture_source_manager = try wlr.ExtForeignToplevelImageCaptureSourceManagerV1.create(wl_server, 1),
 
         .tearing_control_manager = try wlr.TearingControlManagerV1.create(wl_server, 1),
 
@@ -227,6 +231,7 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
     server.xdg_decoration_manager.events.new_toplevel_decoration.add(&server.new_toplevel_decoration);
     server.xdg_activation.events.request_activate.add(&server.request_activate);
     server.cursor_shape_manager.events.request_set_shape.add(&server.request_set_cursor_shape);
+    server.toplevel_capture_source_manager.events.new_request.add(&server.toplevel_capture_request);
 
     wl_server.setGlobalFilter(*Server, globalFilter, server);
 }
@@ -241,6 +246,7 @@ pub fn deinit(server: *Server) void {
     server.new_toplevel_decoration.link.remove();
     server.request_activate.link.remove();
     server.request_set_cursor_shape.link.remove();
+    server.toplevel_capture_request.link.remove();
 
     server.input_manager.new_input.link.remove();
     server.om.new_output.link.remove();
@@ -374,6 +380,7 @@ fn blocklist(server: *Server, global: *const wl.Global) bool {
         global == server.image_copy_capture_manager.global or
         global == server.output_image_capture_source_manager.global or
         global == server.foreign_toplevel_list.global or
+        global == server.toplevel_capture_source_manager.global or
         global == server.export_dmabuf_manager.global or
         global == server.data_control_manager.global or
         global == server.wlr_data_control_manager.global or
@@ -537,4 +544,24 @@ fn handleRequestSetCursorShape(
             }
         }
     }
+}
+
+fn handleToplevelCaptureRequest(
+    listener: *wl.Listener(*wlr.ExtForeignToplevelImageCaptureSourceManagerV1.Request),
+    request: *wlr.ExtForeignToplevelImageCaptureSourceManagerV1.Request,
+) void {
+    const server: *Server = @fieldParentPtr("toplevel_capture_request", listener);
+    const window = @as(?*Window, @ptrCast(@alignCast(request.toplevel_handle.data))) orelse return;
+
+    const capture_source = window.capture_source orelse wlr.ExtImageCaptureSourceV1.createWithSceneNode(
+        &window.capture_scene.tree.node,
+        server.wl_server.getEventLoop(),
+        server.allocator,
+        server.renderer,
+    ) catch {
+        log.err("failed to create ext image capture source", .{});
+        return;
+    };
+
+    _ = request.accept(capture_source);
 }
