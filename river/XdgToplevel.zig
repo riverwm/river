@@ -84,6 +84,7 @@ pub fn create(wlr_toplevel: *wlr.XdgToplevel) error{OutOfMemory}!void {
     errdefer toplevel.unmap.link.remove();
 
     _ = try window.surfaces.tree.createSceneXdgSurface(wlr_toplevel.base);
+    _ = try window.capture_scene.tree.createSceneXdgSurface(wlr_toplevel.base);
 
     toplevel.window = window;
 
@@ -288,7 +289,12 @@ fn handleUnmap(listener: *wl.Listener(void)) void {
 fn handleNewPopup(listener: *wl.Listener(*wlr.XdgPopup), wlr_xdg_popup: *wlr.XdgPopup) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("new_popup", listener);
 
-    XdgPopup.create(wlr_xdg_popup, toplevel.window.popup_tree, toplevel.window.popup_tree) catch {
+    XdgPopup.create(
+        wlr_xdg_popup,
+        toplevel.window.popup_tree,
+        toplevel.window.popup_tree,
+        &toplevel.window.capture_scene.tree,
+    ) catch {
         wlr_xdg_popup.resource.postNoMemory();
         return;
     };

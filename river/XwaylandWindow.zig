@@ -191,6 +191,12 @@ pub fn handleMap(listener: *wl.Listener(void)) void {
     };
     surface.data = &window.tree.node;
 
+    _ = window.capture_scene.tree.createSceneSurface(surface) catch {
+        log.err("out of memory", .{});
+        surface.resource.getClient().postNoMemory();
+        return;
+    };
+
     // TODO(wlroots) update the dimensions_hint if the size hints change
     // https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/5238
     if (xwindow.xsurface.size_hints) |size_hints| {
