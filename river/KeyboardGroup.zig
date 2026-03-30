@@ -89,7 +89,7 @@ pub fn create(seat: *Seat, config: Keyboard.Config, virtual: bool) !*KeyboardGro
 
     group.state.init(&.{
         .name = "river.KeyboardGroup",
-        .led_update = null, // TODO
+        .led_update = ledUpdate,
     }, "river.KeyboardGroup");
     group.state.data = group;
 
@@ -425,5 +425,17 @@ pub fn sendState(group: *KeyboardGroup) void {
         if (keyboard.group != group) continue;
 
         xkb_keyboard.sendState(layout_index, layout_name, capslock, numlock);
+    }
+}
+
+fn ledUpdate(state: *wlr.Keyboard, leds: u32) callconv(.c) void {
+    const group: *KeyboardGroup = @fieldParentPtr("state", state);
+    var it = server.input_manager.devices.iterator(.forward);
+    while (it.next()) |device| {
+        if (device.wlr_device.type != .keyboard) continue;
+        const keyboard: *Keyboard = @fieldParentPtr("device", device);
+        if (keyboard.group != group) continue;
+        const wlr_keyboard = device.wlr_device.toKeyboard();
+        wlr_keyboard.ledUpdate(leds);
     }
 }
