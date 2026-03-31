@@ -566,5 +566,7 @@ fn handleToplevelCaptureRequest(
         return;
     };
 
+    window.capture_source = capture_source;
+
     _ = request.accept(capture_source);
 }
