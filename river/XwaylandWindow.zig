@@ -32,6 +32,7 @@ request_configure: wl.Listener(*wlr.XwaylandSurface.event.Configure) = .init(han
 set_override_redirect: wl.Listener(void) = .init(handleSetOverrideRedirect),
 associate: wl.Listener(void) = .init(handleAssociate),
 dissociate: wl.Listener(void) = .init(handleDissociate),
+set_size_hints: wl.Listener(void) = .init(handleSetSizeHints),
 set_title: wl.Listener(void) = .init(handleSetTitle),
 set_class: wl.Listener(void) = .init(handleSetClass),
 set_parent: wl.Listener(void) = .init(handleSetParent),
@@ -67,6 +68,7 @@ pub fn create(xsurface: *wlr.XwaylandSurface) error{OutOfMemory}!void {
     xsurface.events.dissociate.add(&xwindow.dissociate);
     xsurface.events.request_configure.add(&xwindow.request_configure);
     xsurface.events.set_override_redirect.add(&xwindow.set_override_redirect);
+    xsurface.events.set_size_hints.add(&xwindow.set_size_hints);
     xsurface.events.set_title.add(&xwindow.set_title);
     xsurface.events.set_class.add(&xwindow.set_class);
     xsurface.events.set_parent.add(&xwindow.set_parent);
@@ -152,6 +154,7 @@ fn handleDestroy(listener: *wl.Listener(void)) void {
     xwindow.dissociate.link.remove();
     xwindow.request_configure.link.remove();
     xwindow.set_override_redirect.link.remove();
+    xwindow.set_size_hints.link.remove();
     xwindow.set_title.link.remove();
     xwindow.set_class.link.remove();
     xwindow.set_parent.link.remove();
@@ -196,24 +199,6 @@ pub fn handleMap(listener: *wl.Listener(void)) void {
         surface.resource.getClient().postNoMemory();
         return;
     };
-
-    // TODO(wlroots) update the dimensions_hint if the size hints change
-    // https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/5238
-    if (xwindow.xsurface.size_hints) |size_hints| {
-        const min_width: u31 = @max(0, size_hints.min_width);
-        const min_height: u31 = @max(0, size_hints.min_height);
-        // Don't trust X11 clients not to set a min_width greater than their max_width.
-        const max_width: u31 =
-            if (size_hints.max_width <= 0) 0 else @max(min_width, size_hints.max_width);
-        const max_height: u31 =
-            if (size_hints.max_height <= 0) 0 else @max(min_height, size_hints.max_height);
-        window.setDimensionsHint(.{
-            .min_width = min_width,
-            .max_width = max_width,
-            .min_height = min_height,
-            .max_height = max_height,
-        });
-    }
 
     if (xwindow.xsurface.fullscreen) {
         window.wm_scheduled.fullscreen_requested = .{ .fullscreen = null };
@@ -281,6 +266,25 @@ fn handleSetOverrideRedirect(listener: *wl.Listener(void)) void {
         log.err("out of memory", .{});
         return;
     };
+}
+
+fn handleSetSizeHints(listener: *wl.Listener(void)) void {
+    const xwindow: *XwaylandWindow = @fieldParentPtr("set_size_hints", listener);
+    if (xwindow.xsurface.size_hints) |size_hints| {
+        const min_width: u31 = @max(0, size_hints.min_width);
+        const min_height: u31 = @max(0, size_hints.min_height);
+        // Don't trust X11 clients not to set a min_width greater than their max_width.
+        const max_width: u31 =
+            if (size_hints.max_width <= 0) 0 else @max(min_width, size_hints.max_width);
+        const max_height: u31 =
+            if (size_hints.max_height <= 0) 0 else @max(min_height, size_hints.max_height);
+        xwindow.window.setDimensionsHint(.{
+            .min_width = min_width,
+            .max_width = max_width,
+            .min_height = min_height,
+            .max_height = max_height,
+        });
+    }
 }
 
 fn handleSetTitle(listener: *wl.Listener(void)) void {
