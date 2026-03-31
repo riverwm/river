@@ -14,14 +14,26 @@ body:
         Don't forget to search the issue tracker in case there is
         already an open issue for the bug you found.
   - type: input
-    id: version
+    id: river-version
     attributes:
-      label: river Version
+      label: River Version
       description: |
         The output of `river -version`.
         If the version starts with 0.3, please open an issue on the
         [river-classic](https://codeberg.org/river/river-classic/) repository instead.
       placeholder: "0.4.0-dev.247+a050b8b"
+    validations:
+      required: true
+  - type: input
+    id: wm
+    attributes:
+      label: Window Manager
+    validations:
+      required: true
+  - type: input
+    id: wm-version
+    attributes:
+      label: Window Manager Version
     validations:
       required: true
   - type: textarea
