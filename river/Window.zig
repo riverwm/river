@@ -1103,7 +1103,10 @@ pub fn getParent(window: *Window) ?*Window {
         },
         .xwayland => |xwindow| {
             const parent_xsurface = xwindow.xsurface.parent orelse return null;
-            const parent_xwindow: *XwaylandWindow = @ptrCast(@alignCast(parent_xsurface.data));
+            // It seems that the parent may be an Override Redirect window, which
+            // have null data.
+            const parent_data = parent_xsurface.data orelse return null;
+            const parent_xwindow: *XwaylandWindow = @ptrCast(@alignCast(parent_data));
             return parent_xwindow.window;
         },
         .destroying => return null,
