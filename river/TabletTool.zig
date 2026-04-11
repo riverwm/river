@@ -78,8 +78,6 @@ fn create(wlr_seat: *wlr.Seat, wlr_tool: *wlr.TabletTool) error{OutOfMemory}!*Ta
 fn handleDestroy(listener: *wl.Listener(*wlr.TabletTool), _: *wlr.TabletTool) void {
     const tool: *TabletTool = @fieldParentPtr("destroy", listener);
 
-    tool.wp_tool.wlr_tool.data = null;
-
     tool.wlr_cursor.destroy();
 
     tool.destroy.link.remove();
