@@ -201,7 +201,8 @@ pub fn proximity(tool: *TabletTool, tablet: *Tablet, event: *wlr.Tablet.event.Pr
 pub fn tip(tool: *TabletTool, tablet: *Tablet, event: *wlr.Tablet.event.Tip) void {
     switch (event.state) {
         .down => {
-            assert(!tool.wp_tool.is_down);
+            // There have been reports of libinput emitting inconsistent down/up events.
+            if (tool.wp_tool.is_down) return;
 
             tool.wp_tool.notifyDown();
 
@@ -219,7 +220,8 @@ pub fn tip(tool: *TabletTool, tablet: *Tablet, event: *wlr.Tablet.event.Tip) voi
             }
         },
         .up => {
-            assert(tool.wp_tool.is_down);
+            // There have been reports of libinput emitting inconsistent down/up events.
+            if (!tool.wp_tool.is_down) return;
 
             tool.wp_tool.notifyUp();
             tool.maybeExitDown(tablet);
