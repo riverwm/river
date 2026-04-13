@@ -68,6 +68,9 @@ pub const Event = union(enum) {
     pointer_pinch_update: PointerPinchUpdate,
     pointer_pinch_end: PointerPinchEnd,
 
+    pointer_hold_begin: PointerHoldBegin,
+    pointer_hold_end: PointerHoldEnd,
+
     pub const PointerMotionRelative = struct {
         mapping: wlr.Box,
         time_msec: u32,
@@ -124,6 +127,14 @@ pub const Event = union(enum) {
         rotation: f64,
     };
     pub const PointerPinchEnd = struct {
+        time_msec: u32,
+        cancelled: bool,
+    };
+    pub const PointerHoldBegin = struct {
+        time_msec: u32,
+        fingers: u32,
+    };
+    pub const PointerHoldEnd = struct {
         time_msec: u32,
         cancelled: bool,
     };
@@ -298,6 +309,8 @@ pub fn destroy(seat: *Seat) void {
             .pointer_pinch_begin,
             .pointer_pinch_update,
             .pointer_pinch_end,
+            .pointer_hold_begin,
+            .pointer_hold_end,
             => {},
         }
     }
@@ -374,6 +387,9 @@ pub fn processEvents(seat: *Seat) void {
             .pointer_pinch_begin => |ev| pg.sendPinchBegin(seat.wlr_seat, ev.time_msec, ev.fingers),
             .pointer_pinch_update => |ev| pg.sendPinchUpdate(seat.wlr_seat, ev.time_msec, ev.dx, ev.dy, ev.scale, ev.rotation),
             .pointer_pinch_end => |ev| pg.sendPinchEnd(seat.wlr_seat, ev.time_msec, ev.cancelled),
+
+            .pointer_hold_begin => |ev| pg.sendHoldBegin(seat.wlr_seat, ev.time_msec, ev.fingers),
+            .pointer_hold_end => |ev| pg.sendHoldEnd(seat.wlr_seat, ev.time_msec, ev.cancelled),
         }
     }
     assert(server.wm.state == .idle);
