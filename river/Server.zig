@@ -128,8 +128,8 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
 
     server.* = .{
         .wl_server = wl_server,
-        .sigint_source = try loop.addSignal(*wl.Server, posix.SIG.INT, terminate, wl_server),
-        .sigterm_source = try loop.addSignal(*wl.Server, posix.SIG.TERM, terminate, wl_server),
+        .sigint_source = try loop.addSignal(*wl.Server, @intFromEnum(posix.SIG.INT), terminate, wl_server),
+        .sigterm_source = try loop.addSignal(*wl.Server, @intFromEnum(posix.SIG.TERM), terminate, wl_server),
 
         .fixes = try wlr.Fixes.create(wl_server, 1),
 
@@ -279,20 +279,6 @@ pub fn deinit(server: *Server) void {
     server.layer_shell.deinit();
 
     server.wl_server.destroy();
-}
-
-/// Create the socket, start the backend, and setup the environment
-pub fn start(server: Server) !void {
-    var buf: [11]u8 = undefined;
-    const socket = try server.wl_server.addSocketAuto(&buf);
-    try server.backend.start();
-    // TODO: don't use libc's setenv
-    if (c.setenv("WAYLAND_DISPLAY", socket.ptr, 1) < 0) return error.SetenvError;
-    if (build_options.xwayland) {
-        if (server.xwayland) |xwayland| {
-            if (c.setenv("DISPLAY", xwayland.display_name, 1) < 0) return error.SetenvError;
-        }
-    }
 }
 
 fn globalFilter(client: *const wl.Client, global: *const wl.Global, server: *Server) bool {
@@ -507,7 +493,7 @@ fn handleRequestActivate(
 ) void {
     const node_data = SceneNodeData.fromSurface(event.surface) orelse return;
     switch (node_data.data) {
-        .window => |_| {}, // TODO support xdg-activation with a rwm extension protocol
+        .window => {}, // TODO support xdg-activation with a rwm extension protocol
         else => |tag| {
             log.info("ignoring xdg-activation-v1 activate request of {s} surface", .{@tagName(tag)});
         },

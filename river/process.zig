@@ -4,8 +4,6 @@
 const std = @import("std");
 const posix = std.posix;
 
-const c = @import("c.zig").c;
-
 var original_rlimit: ?posix.rlimit = null;
 
 pub fn setup() void {
@@ -47,7 +45,7 @@ pub fn setup() void {
 }
 
 pub fn cleanupChild() void {
-    if (c.setsid() < 0) unreachable;
+    if (std.c.setsid() < 0) unreachable;
     if (posix.system.sigprocmask(posix.SIG.SETMASK, &posix.sigemptyset(), null) < 0) unreachable;
 
     const sig_dfl = posix.Sigaction{

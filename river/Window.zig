@@ -1083,7 +1083,7 @@ pub fn sendFrameDone(window: Window) void {
     assert(window.state == .mapped);
     assert(window.impl != .destroying);
 
-    var now = posix.clock_gettime(posix.CLOCK.MONOTONIC) catch @panic("CLOCK_MONOTONIC not supported");
+    var now = util.timestamp();
     window.rootSurface().?.sendFrameDone(&now);
 }
 

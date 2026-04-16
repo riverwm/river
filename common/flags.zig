@@ -1,71 +1,51 @@
 // SPDX-FileCopyrightText: © 2023 Isaac Freund
 // SPDX-License-Identifier: 0BSD
 
-//! Zero allocation argument parsing for unix-like systems.
-
 const std = @import("std");
 const mem = std.mem;
 
 pub const Flag = struct {
-    name: [:0]const u8,
+    name: []const u8,
     kind: enum { boolean, arg },
 };
 
-pub fn parser(comptime Arg: type, comptime flags: []const Flag) type {
-    switch (Arg) {
-        // TODO consider allowing []const u8
-        [:0]const u8, [*:0]const u8 => {}, // ok
-        else => @compileError("invalid argument type: " ++ @typeName(Arg)),
-    }
+pub fn parser(comptime flags: []const Flag) type {
     return struct {
         pub const Result = struct {
             /// Remaining args after the recognized flags
-            args: []const Arg,
+            args: []const [:0]const u8,
             /// Data obtained from parsed flags
             flags: Flags,
 
             pub const Flags = flags_type: {
-                var fields: []const std.builtin.Type.StructField = &.{};
-                for (flags) |flag| {
-                    const field: std.builtin.Type.StructField = switch (flag.kind) {
-                        .boolean => .{
-                            .name = flag.name,
-                            .type = bool,
-                            .default_value_ptr = &false,
-                            .is_comptime = false,
-                            .alignment = @alignOf(bool),
+                const Attributes = std.builtin.Type.StructField.Attributes;
+                var names: [flags.len][]const u8 = undefined;
+                var types: [flags.len]type = undefined;
+                var attrs: [flags.len]Attributes = undefined;
+                for (flags, &names, &types, &attrs) |flag, *name, *ty, *attr| {
+                    name.* = flag.name;
+                    switch (flag.kind) {
+                        .boolean => {
+                            ty.* = bool;
+                            attr.* = .{ .default_value_ptr = &false };
                         },
-                        .arg => .{
-                            .name = flag.name,
-                            .type = ?[:0]const u8,
-                            .default_value_ptr = &@as(?[:0]const u8, null),
-                            .is_comptime = false,
-                            .alignment = @alignOf(?[:0]const u8),
+                        .arg => {
+                            ty.* = ?[:0]const u8;
+                            attr.* = .{ .default_value_ptr = &@as(ty.*, null) };
                         },
-                    };
-                    fields = fields ++ [_]std.builtin.Type.StructField{field};
+                    }
                 }
-                break :flags_type @Type(.{ .@"struct" = .{
-                    .layout = .auto,
-                    .fields = fields,
-                    .decls = &.{},
-                    .is_tuple = false,
-                } });
+                break :flags_type @Struct(.auto, null, &names, &types, &attrs);
             };
         };
 
-        pub fn parse(args: []const Arg) !Result {
+        pub fn parse(args: []const [:0]const u8) error{MissingFlagArgument}!Result {
             var result_flags: Result.Flags = .{};
 
             var i: usize = 0;
             outer: while (i < args.len) : (i += 1) {
-                const arg = switch (Arg) {
-                    [*:0]const u8 => mem.sliceTo(args[i], 0),
-                    [:0]const u8 => args[i],
-                    else => unreachable,
-                };
                 inline for (flags) |flag| {
-                    if (mem.eql(u8, "-" ++ flag.name, arg)) {
+                    if (mem.eql(u8, "-" ++ flag.name, args[i])) {
                         switch (flag.kind) {
                             .boolean => @field(result_flags, flag.name) = true,
                             .arg => {
@@ -75,11 +55,7 @@ pub fn parser(comptime Arg: type, comptime flags: []const Flag) type {
                                         "' requires an argument but none was provided!", .{});
                                     return error.MissingFlagArgument;
                                 }
-                                @field(result_flags, flag.name) = switch (Arg) {
-                                    [*:0]const u8 => mem.sliceTo(args[i], 0),
-                                    [:0]const u8 => args[i],
-                                    else => unreachable,
-                                };
+                                @field(result_flags, flag.name) = args[i];
                             },
                         }
                         continue :outer;
