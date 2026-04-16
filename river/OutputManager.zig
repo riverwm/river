@@ -264,6 +264,13 @@ pub fn commitOutputState(om: *OutputManager) void {
                         log.err("out of memory", .{});
                         continue; // Try again next time
                     };
+                    // Adding the output to the layout creates the wl_output global
+                    if (!output.sent_wl_output) {
+                        if (output.object) |output_v1| {
+                            output_v1.sendWlOutput(wlr_output.global.?.getName(output_v1.getClient()));
+                            output.sent_wl_output = true;
+                        }
+                    }
                     if (server.lock_manager.lockSurfaceFromOutput(output)) |lock_surface| {
                         lock_surface.tree.node.setPosition(output.sent.x, output.sent.y);
                     }
