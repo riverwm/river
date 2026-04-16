@@ -125,14 +125,13 @@ fn handleRequest(
 fn createKeymap(object: *river.XkbConfigV1, id: u32, format: xkb.Keymap.Format, fd: i32) !void {
     defer _ = std.c.close(fd);
 
-    var stat: std.c.Stat = std.mem.zeroes(std.c.Stat);
-    switch (std.posix.errno(std.c.fstat(fd, &stat))) {
-        .SUCCESS => {},
-        else => |e| {
-            log.err("failed to fstat() keymap fd: E{s}", .{@tagName(e)});
-            return XkbKeymap.createFailed(object.getClient(), object.getVersion(), id, "failed to fstat() keymap fd");
-        },
-    }
+    const io = std.Io.Threaded.global_single_threaded.io();
+    var file: std.Io.File = .{ .handle = fd, .flags = .{ .nonblocking = false } };
+    const stat = file.stat(io) catch |err| {
+        log.err("failed to stat keymap fd: {}", .{err});
+        return XkbKeymap.createFailed(object.getClient(), object.getVersion(), id, "failed to stat keymap fd");
+    };
+
     // Must be zero terminated
     if (stat.size < 1) {
         log.err("keymap too small", .{});
@@ -144,7 +143,7 @@ fn createKeymap(object: *river.XkbConfigV1, id: u32, format: xkb.Keymap.Format, 
     }
     const keymap_len: usize = @intCast(stat.size - 1);
 
-    const keymap_ptr = std.c.mmap(null, keymap_len, std.c.PROT.READ, .{ .TYPE = .PRIVATE }, fd, 0);
+    const keymap_ptr = std.c.mmap(null, keymap_len, .{ .READ = true }, .{ .TYPE = .PRIVATE }, fd, 0);
     if (keymap_ptr == std.c.MAP_FAILED) {
         log.err("failed to mmap() keymap fd: {s}", .{@tagName(@as(std.c.E, @enumFromInt(std.c._errno().*)))});
         return XkbKeymap.createFailed(object.getClient(), object.getVersion(), id, "failed to mmap() keymap fd");
