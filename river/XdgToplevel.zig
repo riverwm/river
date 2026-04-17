@@ -189,7 +189,8 @@ pub fn configure(toplevel: *XdgToplevel) bool {
     // change in size involved. If the configure state is not idle, we are
     // currently tracking a timed out configure and should instead track the
     // new one even if there is no change in size involved.
-    if (width == toplevel.geometry.width and height == toplevel.geometry.height and
+    if (width != 0 and height != 0 and
+        width == toplevel.geometry.width and height == toplevel.geometry.height and
         toplevel.configure_state == .idle)
     {
         return false;
