@@ -882,8 +882,8 @@ pub fn renderStart(window: *Window) void {
     const sent = &window.rendering_sent;
     const scheduled = &window.rendering_scheduled;
 
-    // The check for 0 width/height is necessary to handle timeout of the first configure sent.
-    if (scheduled.width != 0 and scheduled.height != 0 and
+    // Check if mapped to handle timeout of the first configure sent.
+    if (window.state == .mapped and
         (scheduled.resend_dimensions or
             scheduled.width != sent.width or scheduled.height != sent.height))
     {
@@ -917,8 +917,16 @@ fn presentationHint(window: *Window) river.OutputV1.PresentationMode {
 
 pub fn renderFinish(window: *Window) void {
     const requested = &window.rendering_requested;
-    window.tree.node.setEnabled(!requested.hidden);
-    window.popup_tree.node.setEnabled(!requested.hidden);
+
+    // Keep the scene nodes disabled until the render sequence in which the first
+    // dimensions event was sent is completed. If we enable the nodes before the
+    // window is mapped, there may be an imperfect frame rendered after the window
+    // commits its initial buffer and before the render sequence with the first
+    // dimensions event is completed.
+    // Keeping the nodes enabled while closing is necessary for frame perfection.
+    const enabled = !requested.hidden and (window.state == .mapped or window.state == .closing);
+    window.tree.node.setEnabled(enabled);
+    window.popup_tree.node.setEnabled(enabled);
 
     window.box.width = window.rendering_sent.width;
     window.box.height = window.rendering_sent.height;
