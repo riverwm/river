@@ -118,6 +118,9 @@ pub fn main() anyerror!void {
     try detectClassic(startup_command);
 
     log.info("initializing river version {s}", .{full_version});
+    if (build_options.xwayland and !runtime_xwayland) {
+        log.info("Xwayland disabled at runtime with -no-xwayland", .{});
+    }
 
     river_init_wlroots_log(switch (runtime_log_level) {
         .debug => .debug,
