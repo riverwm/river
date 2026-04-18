@@ -29,6 +29,11 @@ const usage: []const u8 =
     \\
 ;
 
+const full_version = std.fmt.comptimePrint("{s} {c}xwayland", .{
+    build_options.version,
+    if (build_options.xwayland) '+' else '-',
+});
+
 pub var server: Server = undefined;
 
 pub fn main() anyerror!void {
@@ -57,7 +62,7 @@ pub fn main() anyerror!void {
     }
 
     if (result.flags.version) {
-        try stdout.writeAll(build_options.version ++ "\n");
+        try stdout.writeAll(full_version ++ "\n");
         try stdout.flush();
         posix.exit(0);
     }
@@ -112,7 +117,7 @@ pub fn main() anyerror!void {
 
     try detectClassic(startup_command);
 
-    log.info("river version {s}, initializing server", .{build_options.version});
+    log.info("initializing river version {s}", .{full_version});
 
     river_init_wlroots_log(switch (runtime_log_level) {
         .debug => .debug,
