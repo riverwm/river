@@ -27,6 +27,10 @@
             .url = "https://codeberg.org/ifreund/zig-xkbcommon/archive/v0.4.0.tar.gz",
             .hash = "xkbcommon-0.4.0-VDqIe0i2AgDRsok2GpMFYJ8SVhQS10_PI2M_CnHXsJJZ",
         },
+        .translate_c = .{
+            .url = "git+https://codeberg.org/ifreund/translate-c?ref=fix-shift-assign#fdf30e6298cd1184ae6da5602aff0cb5d4cde4cb",
+            .hash = "translate_c-0.0.0-Q_BUWrT0BgDOFSyiz0UVBIpBe3-CiEqx9ej2EecgKcBD",
+        },
     },
     .fingerprint = 0xf5e3672b8e8d6efc,
 }
