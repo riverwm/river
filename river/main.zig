@@ -14,7 +14,6 @@ const builtin = @import("builtin");
 const wlr = @import("wlroots");
 const flags = @import("flags");
 
-const c = @import("c.zig").c;
 const util = @import("util.zig");
 const process = @import("process.zig");
 

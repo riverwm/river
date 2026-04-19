@@ -13,7 +13,6 @@ const wayland = @import("wayland");
 const wl = wayland.server.wl;
 const wp = wayland.server.wp;
 
-const c = @import("c.zig").c;
 const util = @import("util.zig");
 
 const IdleInhibitManager = @import("IdleInhibitManager.zig");
