@@ -11,6 +11,7 @@ const manifest = @import("build.zig.zon");
 const version = manifest.version;
 
 const Scanner = @import("wayland").Scanner;
+const Translator = @import("translate_c").Translator;
 
 pub fn build(b: *Build) !void {
     const target = b.standardTargetOptions(.{});
@@ -149,8 +150,9 @@ pub fn build(b: *Build) !void {
     const flags = b.createModule(.{ .root_source_file = b.path("common/flags.zig") });
     const slotmap = b.createModule(.{ .root_source_file = b.path("common/slotmap.zig") });
 
-    const translate_c = b.addTranslateC(.{
-        .root_source_file = b.path("river/c.h"),
+    const translate_c: Translator = .init(b.dependency("translate_c", .{}), .{
+        .name = "c",
+        .c_source_file = b.path("river/c.h"),
         .target = target,
         .optimize = optimize,
     });
@@ -184,7 +186,7 @@ pub fn build(b: *Build) !void {
         river.root_module.addImport("wlroots", wlroots);
         river.root_module.addImport("flags", flags);
         river.root_module.addImport("slotmap", slotmap);
-        river.root_module.addImport("c", translate_c.createModule());
+        river.root_module.addImport("c", translate_c.mod);
 
         river.root_module.addCSourceFile(.{
             .file = b.path("river/wlroots_log_wrapper.c"),
