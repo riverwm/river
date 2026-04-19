@@ -148,7 +148,6 @@ pub fn build(b: *Build) !void {
 
     const flags = b.createModule(.{ .root_source_file = b.path("common/flags.zig") });
     const slotmap = b.createModule(.{ .root_source_file = b.path("common/slotmap.zig") });
-    const deque = b.createModule(.{ .root_source_file = b.path("common/deque.zig") });
 
     {
         const river = b.addExecutable(.{
@@ -177,7 +176,6 @@ pub fn build(b: *Build) !void {
         river.root_module.addImport("wlroots", wlroots);
         river.root_module.addImport("flags", flags);
         river.root_module.addImport("slotmap", slotmap);
-        river.root_module.addImport("deque", deque);
 
         river.root_module.addCSourceFile(.{
             .file = b.path("river/wlroots_log_wrapper.c"),
@@ -238,17 +236,7 @@ pub fn build(b: *Build) !void {
         });
         const run_slotmap_test = b.addRunArtifact(slotmap_test);
 
-        const deque_test = b.addTest(.{
-            .root_module = b.createModule(.{
-                .root_source_file = b.path("common/deque.zig"),
-                .target = target,
-                .optimize = optimize,
-            }),
-        });
-        const run_deque_test = b.addRunArtifact(deque_test);
-
         const test_step = b.step("test", "Run the tests");
         test_step.dependOn(&run_slotmap_test.step);
-        test_step.dependOn(&run_deque_test.step);
     }
 }

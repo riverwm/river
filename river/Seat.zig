@@ -12,7 +12,6 @@ const wayland = @import("wayland");
 const wl = wayland.server.wl;
 const river = wayland.server.river;
 const xkb = @import("xkbcommon");
-const Deque = @import("deque").Deque;
 
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
@@ -170,7 +169,7 @@ object: ?*river.SeatV1 = null,
 layer_shell: LayerShellSeat = .{},
 xkb_bindings_seat: XkbBindingsSeat = .{},
 
-event_queue: Deque(Event),
+event_queue: std.Deque(Event),
 
 /// State to be sent to the wm in the next manage sequence.
 wm_scheduled: struct {
@@ -253,7 +252,7 @@ pub fn create(name: [*:0]const u8) !void {
 
     // Empirically, this limit is not hit in practice unless the window manager hangs.
     // TODO have better reasoning for choosing this capacity.
-    var event_queue: Deque(Event) = try .initCapacity(util.gpa, 1024);
+    var event_queue: std.Deque(Event) = try .initCapacity(util.gpa, 1024);
     errdefer event_queue.deinit(util.gpa);
 
     seat.* = .{
