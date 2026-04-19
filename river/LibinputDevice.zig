@@ -10,7 +10,7 @@ const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 const river = @import("wayland").server.river;
 
-const c = @import("c.zig").c;
+const c = @import("c");
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 

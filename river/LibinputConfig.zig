@@ -8,7 +8,7 @@ const assert = std.debug.assert;
 const wl = @import("wayland").server.wl;
 const river = @import("wayland").server.river;
 
-const c = @import("c.zig").c;
+const c = @import("c");
 const server = &@import("main.zig").server;
 
 const LibinputAccelConfig = @import("LibinputAccelConfig.zig");
