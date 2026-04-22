@@ -48,10 +48,12 @@ tasks:
       sudo mv zig-x86_64-linux-0.16.0/lib /usr/lib/zig
   - build: |
       cd river
-      zig build --summary all
+      # Arch's glibc version has SFrame sections in crt objects, force llvm/lld usage as a workaround
+      # https://codeberg.org/ziglang/zig/issues/31272
+      zig build -Dllvm --summary all
   - build_xwayland: |
       cd river
-      zig build --summary all -Dxwayland
+      zig build -Dllvm --summary all -Dxwayland
   - fmt: |
       cd river
       zig fmt --check river/
