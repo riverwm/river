@@ -33,7 +33,7 @@
     document are to be interpreted as described in IETF RFC 2119.
   </description>
 
-  <interface name="river_xkb_bindings_v1" version="2">
+  <interface name="river_xkb_bindings_v1" version="3">
     <description summary="xkbcommon bindings global interface">
       This global interface should only be advertised to the client if the
       river_window_manager_v1 global is also advertised.
@@ -76,7 +76,7 @@
     </request>
   </interface>
 
-  <interface name="river_xkb_binding_v1" version="2">
+  <interface name="river_xkb_binding_v1" version="3">
     <description summary="configure a xkb key binding, receive trigger events">
       This object allows the window manager to configure a xkbcommon key binding
       and receive events when the key binding is triggered.
@@ -200,7 +200,7 @@
     </event>
   </interface>
 
-  <interface name="river_xkb_bindings_seat_v1" version="2">
+  <interface name="river_xkb_bindings_seat_v1" version="3">
     <description summary="xkb bindings seat">
       This object manages xkb bindings state associated with a specific seat.
     </description>
@@ -263,6 +263,52 @@
         This event will be followed by a manage_start event after all other new
         state has been sent by the server.
       </description>
+    </event>
+
+    <request name="modifiers_watch" since="3">
+      <description summary="watch for change in active modifiers">
+        Request that the server send the modifiers_update event whenever a state
+        change occurs for at least one of the modifiers specified by the
+        modifiers argument.
+
+        The window manager should make this request with the modifiers argument
+        set to 0 when it no longer wishes to take action based on a change in
+        modifiers.
+
+        This request modifies window management state and may only be made as
+        part of a manage sequence, see the river_window_manager_v1 description.
+      </description>
+      <arg name="modifiers" type="uint" enum="river_seat_v1.modifiers"/>
+    </request>
+
+    <event name="modifiers_update" since="3">
+      <description summary="active modifiers for the seat changed">
+        The set of currently active modifiers for the seat changed. This event
+        is only sent when there is a change in state for modifiers marked as
+        watched using the modifiers_watch request.
+
+        The old and new arguments convey the set of modifiers active before and
+        after the change. All modifiers are included in the old and new
+        arguments, including modifiers that are not watched.
+
+        Since this event is only sent when there is a change in state for
+        watched modifiers, it follows that at least one watched modifier is
+        active in old but inactive in new or vice-versa.
+
+        This event will be followed by a manage_start event after all other new
+        state has been sent by the server.
+
+        The compositor should wait for the manage sequence to complete before
+        processing further input events. This allows the window manager client
+        to, for example, modify key bindings and keyboard focus without racing
+        against future input events. The window manager should of course respond
+        as soon as possible as the capacity of the compositor to buffer incoming
+        input events is finite.
+      </description>
+      <arg name="old" type="uint" enum="river_seat_v1.modifiers"
+        summary="previously active modifiers"/>
+      <arg name="new" type="uint" enum="river_seat_v1.modifiers"
+        summary="currently active modifiers"/>
     </event>
   </interface>
 </protocol>

@@ -22,7 +22,7 @@ server_destroy: wl.Listener(*wl.Server) = .init(handleServerDestroy),
 
 pub fn init(bindings: *XkbBindings) !void {
     bindings.* = .{
-        .global = try wl.Global.create(server.wl_server, river.XkbBindingsV1, 2, ?*anyopaque, null, bind),
+        .global = try wl.Global.create(server.wl_server, river.XkbBindingsV1, 3, ?*anyopaque, null, bind),
     };
     server.wl_server.addDestroyListener(&bindings.server_destroy);
 }

@@ -21,14 +21,24 @@ object: ?*river.XkbBindingsSeatV1 = null,
 
 scheduled: struct {
     ate_unbound_key: bool = false,
+    mods_update: ?struct {
+        old: river.SeatV1.Modifiers,
+        new: river.SeatV1.Modifiers,
+    } = null,
 } = .{},
 requested: struct {
     next_key_change: enum {
         none,
         ensure_eaten,
         cancel_ensure_eaten,
-    } = .none,
-} = .{},
+    },
+    mods_watched: river.SeatV1.Modifiers,
+
+    const init: @This() = .{
+        .next_key_change = .none,
+        .mods_watched = .{},
+    };
+} = .init,
 
 ensure_next_key_eaten: bool = false,
 
@@ -49,7 +59,7 @@ pub fn createObject(
 pub fn makeInert(bindings_seat: *XkbBindingsSeat) void {
     if (bindings_seat.object) |object| {
         object.setHandler(?*anyopaque, handleRequestInert, null, null);
-        bindings_seat.object = null;
+        handleDestroy(object, bindings_seat);
     }
 }
 
@@ -63,6 +73,7 @@ fn handleRequestInert(
 
 fn handleDestroy(_: *river.XkbBindingsSeatV1, bindings_seat: *XkbBindingsSeat) void {
     bindings_seat.object = null;
+    bindings_seat.requested = .init;
 }
 
 fn handleRequest(
@@ -81,6 +92,10 @@ fn handleRequest(
             if (!server.wm.ensureWindowing()) return;
             bindings_seat.requested.next_key_change = .cancel_ensure_eaten;
         },
+        .modifiers_watch => |args| {
+            if (!server.wm.ensureWindowing()) return;
+            bindings_seat.requested.mods_watched = args.modifiers;
+        },
     }
 }
 
@@ -92,6 +107,14 @@ pub fn manageStart(bindings_seat: *XkbBindingsSeat) void {
             }
         }
         bindings_seat.scheduled.ate_unbound_key = false;
+    }
+    if (bindings_seat.scheduled.mods_update) |mods| {
+        if (bindings_seat.object) |object| {
+            if (object.getVersion() >= 3) {
+                object.sendModifiersUpdate(mods.old, mods.new);
+            }
+        }
+        bindings_seat.scheduled.mods_update = null;
     }
 }
 
