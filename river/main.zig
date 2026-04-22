@@ -237,7 +237,7 @@ fn detectClassic(startup_command: ?[:0]const u8) !void {
     if (mem.indexOfScalar(u8, path, '/') == null) return;
 
     const classic = grepRiverctl(path) catch |err| {
-        log.err("failed to detect riverctl usage in init file: {s}", .{@errorName(err)});
+        log.debug("failed to detect riverctl usage in init file: {s}", .{@errorName(err)});
         return;
     };
     if (classic) {
