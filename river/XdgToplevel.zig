@@ -321,6 +321,9 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     const toplevel: *XdgToplevel = @fieldParentPtr("commit", listener);
     const window = toplevel.window;
 
+    // NB: the subsurface tree is never empty here
+    window.capture_scene.tree.node.subsurfaceTreeSetClip(&toplevel.wlr_toplevel.base.geometry);
+
     window.setDimensionsHint(.{
         .min_width = @intCast(toplevel.wlr_toplevel.current.min_width),
         .min_height = @intCast(toplevel.wlr_toplevel.current.min_height),
