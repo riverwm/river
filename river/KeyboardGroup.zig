@@ -63,6 +63,7 @@ config: Keyboard.Config,
 /// This is the keyboard that actually gets passed to wlr_seat functions for
 /// setting keyboard focus.
 state: wlr.Keyboard,
+modifiers_old: wlr.Keyboard.ModifierMask = .{},
 
 /// Maps from pressed libinput keycode (not xkb keycode) to information
 /// about where the press event has been sent.
@@ -360,6 +361,21 @@ pub fn processModifiers(group: *KeyboardGroup, modifiers: wlr.Keyboard.Modifiers
 
 fn handleModifiers(listener: *wl.Listener(*wlr.Keyboard), _: *wlr.Keyboard) void {
     const group: *KeyboardGroup = @fieldParentPtr("modifiers", listener);
+
+    {
+        const old: u32 = @bitCast(group.modifiers_old);
+        const new: u32 = @bitCast(group.state.getModifiers());
+        const watched: u32 = @bitCast(group.seat.xkb_bindings_seat.requested.mods_watched);
+        if (old & watched != new & watched) {
+            group.seat.xkb_bindings_seat.scheduled.mods_update = .{
+                .old = @bitCast(old),
+                .new = @bitCast(new),
+            };
+            server.wm.dirtyWindowing();
+        }
+        group.modifiers_old = @bitCast(new);
+    }
+
     if (group.getInputMethodGrab()) |keyboard_grab| {
         keyboard_grab.setKeyboard(&group.state);
         keyboard_grab.sendModifiers(&group.state.modifiers);
