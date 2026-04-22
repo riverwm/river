@@ -19,6 +19,7 @@ pub fn build(b: *Build) !void {
 
     const strip = b.option(bool, "strip", "Omit debug information") orelse false;
     const pie = b.option(bool, "pie", "Build a Position Independent Executable") orelse false;
+    const use_llvm = b.option(bool, "llvm", "Force use of Zig's LLVM backend and the lld linker") orelse false;
 
     const omit_frame_pointer = switch (optimize) {
         .Debug, .ReleaseSafe => false,
@@ -166,10 +167,11 @@ pub fn build(b: *Build) !void {
                 .root_source_file = b.path("river/main.zig"),
                 .target = target,
                 .optimize = optimize,
-
                 .strip = strip,
                 .link_libc = true,
             }),
+            .use_llvm = use_llvm,
+            .use_lld = use_llvm,
         });
         river.root_module.addOptions("build_options", options);
 
@@ -244,6 +246,8 @@ pub fn build(b: *Build) !void {
                 .target = target,
                 .optimize = optimize,
             }),
+            .use_llvm = use_llvm,
+            .use_lld = use_llvm,
         });
         const run_slotmap_test = b.addRunArtifact(slotmap_test);
 
