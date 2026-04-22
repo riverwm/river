@@ -624,10 +624,12 @@ fn interact(cursor: Cursor, result: Scene.AtResult) void {
         .layer_surface => |layer_surface| {
             switch (cursor.seat.layer_shell.scheduled.focus) {
                 .none, .non_exclusive => {
-                    cursor.seat.layer_shell.scheduled.focus = .{
-                        .non_exclusive = layer_surface.ref,
-                    };
-                    server.wm.dirtyWindowing();
+                    if (layer_surface.wlr_layer_surface.current.keyboard_interactive == .on_demand) {
+                        cursor.seat.layer_shell.scheduled.focus = .{
+                            .non_exclusive = layer_surface.ref,
+                        };
+                        server.wm.dirtyWindowing();
+                    }
                 },
                 .exclusive => {},
             }
