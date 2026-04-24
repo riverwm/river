@@ -264,13 +264,6 @@ pub fn commitOutputState(om: *OutputManager) void {
                         log.err("out of memory", .{});
                         continue; // Try again next time
                     };
-                    // Adding the output to the layout creates the wl_output global
-                    if (!output.sent_wl_output) {
-                        if (output.object) |output_v1| {
-                            output_v1.sendWlOutput(wlr_output.global.?.getName(output_v1.getClient()));
-                            output.sent_wl_output = true;
-                        }
-                    }
                     if (server.lock_manager.lockSurfaceFromOutput(output)) |lock_surface| {
                         lock_surface.tree.node.setPosition(output.sent.x, output.sent.y);
                     }
@@ -378,6 +371,20 @@ pub fn commitOutputState(om: *OutputManager) void {
         var it = wm.sent.outputs.safeIterator(.forward);
         while (it.next()) |output| {
             const wlr_output = output.wlr_output orelse continue;
+
+            // The wl_output global is created by wlroots when the output is
+            // added to the wlr_output_layout and a mode is committed.
+            // Wlroots does not directly notify us when the wl_output global is created.
+            // However, we want send the river_output_v1.wl_output event as soon as
+            // possible and therefore need to check after committing a mode.
+            if (!output.sent_wl_output) {
+                if (wlr_output.global) |global| {
+                    if (output.object) |output_v1| {
+                        output_v1.sendWlOutput(global.getName(output_v1.getClient()));
+                        output.sent_wl_output = true;
+                    }
+                }
+            }
             switch (output.sent.state) {
                 .enabled => {
                     assert(wlr_output.enabled);
