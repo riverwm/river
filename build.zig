@@ -85,6 +85,7 @@ pub fn build(b: *Build) !void {
     scanner.addSystemProtocol("unstable/pointer-constraints/pointer-constraints-unstable-v1.xml");
     scanner.addSystemProtocol("unstable/pointer-gestures/pointer-gestures-unstable-v1.xml");
     scanner.addSystemProtocol("unstable/xdg-decoration/xdg-decoration-unstable-v1.xml");
+    scanner.addSystemProtocol("unstable/xdg-foreign/xdg-foreign-unstable-v2.xml");
 
     scanner.addCustomProtocol(b.path("protocol/river-window-management-v1.xml"));
     scanner.addCustomProtocol(b.path("protocol/river-xkb-bindings-v1.xml"));
@@ -100,7 +101,7 @@ pub fn build(b: *Build) !void {
     // Some of these versions may be out of date with what wlroots implements.
     // This is not a problem in practice though as long as river successfully compiles.
     // These versions control Zig code generation and have no effect on anything internal
-    // to wlroots. Therefore, the only thnig that can happen due to a version being too
+    // to wlroots. Therefore, the only thing that can happen due to a version being too
     // old is that river fails to compile.
     scanner.generate("wl_compositor", 4);
     scanner.generate("wl_subcompositor", 1);
@@ -114,6 +115,8 @@ pub fn build(b: *Build) !void {
     scanner.generate("zwp_pointer_constraints_v1", 1);
     scanner.generate("zwp_tablet_manager_v2", 1);
     scanner.generate("zxdg_decoration_manager_v1", 1);
+    scanner.generate("zxdg_importer_v2", 1);
+    scanner.generate("zxdg_exporter_v2", 1);
     scanner.generate("ext_session_lock_manager_v1", 1);
     scanner.generate("wp_cursor_shape_manager_v1", 1);
     scanner.generate("wp_tearing_control_manager_v1", 1);

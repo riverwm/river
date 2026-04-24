@@ -71,6 +71,8 @@ cursor_shape_manager: *wlr.CursorShapeManagerV1,
 xdg_shell: *wlr.XdgShell,
 xdg_decoration_manager: *wlr.XdgDecorationManagerV1,
 xdg_activation: *wlr.XdgActivationV1,
+xdg_foreign_registry: *wlr.XdgForeignRegistry,
+xdg_foreign_v2: *wlr.XdgForeignV2,
 
 data_device_manager: *wlr.DataDeviceManager,
 primary_selection_manager: *wlr.PrimarySelectionDeviceManagerV1,
@@ -125,6 +127,8 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
 
     const compositor = try wlr.Compositor.create(wl_server, 6, renderer);
 
+    const xdg_foreign_registry = try wlr.XdgForeignRegistry.create(wl_server);
+
     server.* = .{
         .wl_server = wl_server,
         .sigint_source = try loop.addSignal(*wl.Server, @intFromEnum(posix.SIG.INT), terminate, wl_server),
@@ -154,6 +158,8 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
         .xdg_shell = try wlr.XdgShell.create(wl_server, 5),
         .xdg_decoration_manager = try wlr.XdgDecorationManagerV1.create(wl_server),
         .xdg_activation = try wlr.XdgActivationV1.create(wl_server),
+        .xdg_foreign_registry = xdg_foreign_registry,
+        .xdg_foreign_v2 = try wlr.XdgForeignV2.create(wl_server, xdg_foreign_registry),
 
         .data_device_manager = try wlr.DataDeviceManager.create(wl_server),
         .primary_selection_manager = try wlr.PrimarySelectionDeviceManagerV1.create(wl_server),
@@ -343,6 +349,8 @@ fn allowlist(server: *Server, global: *const wl.Global) bool {
         global == server.xdg_shell.global or
         global == server.xdg_decoration_manager.global or
         global == server.xdg_activation.global or
+        global == server.xdg_foreign_v2.exporter.global or
+        global == server.xdg_foreign_v2.importer.global or
         global == server.data_device_manager.global or
         global == server.primary_selection_manager.global or
         global == server.tearing_control_manager.global or
