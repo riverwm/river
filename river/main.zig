@@ -193,7 +193,6 @@ pub fn main(init: std.process.Init.Minimal) anyerror!void {
                 posix.system.exit(1);
             }
         }
-        util.gpa.free(cmd);
         // Since the child has called setsid, the pid is the pgid
         break :blk pid;
     } else null;
