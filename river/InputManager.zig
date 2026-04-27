@@ -51,7 +51,7 @@ new_text_input: wl.Listener(*wlr.TextInputV3) = .init(handleNewTextInput),
 
 pub fn init(input_manager: *InputManager) !void {
     input_manager.* = .{
-        .global = try wl.Global.create(server.wl_server, river.InputManagerV1, 1, *InputManager, input_manager, bind),
+        .global = try wl.Global.create(server.wl_server, river.InputManagerV1, 2, *InputManager, input_manager, bind),
         // These are automatically freed when the display is destroyed
         .idle_notifier = try wlr.IdleNotifierV1.create(server.wl_server),
         .relative_pointer_manager = try wlr.RelativePointerManagerV1.create(server.wl_server),

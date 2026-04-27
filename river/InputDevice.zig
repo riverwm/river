@@ -120,6 +120,9 @@ pub fn createObject(device: *InputDevice, im_v1: *river.InputManagerV1) void {
     object.setHandler(*InputDevice, handleRequest, handleDestroy, device);
     object.sendType(device_type);
     object.sendName(device.wlr_device.name orelse "");
+    if (object.getVersion() >= 2) {
+        object.sendDone();
+    }
 }
 
 pub fn deinit(device: *InputDevice) void {

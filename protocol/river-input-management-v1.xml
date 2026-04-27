@@ -32,7 +32,7 @@
     document are to be interpreted as described in IETF RFC 2119.
   </description>
 
-  <interface name="river_input_manager_v1" version="1">
+  <interface name="river_input_manager_v1" version="2">
     <description summary="input manager global interface">
       Input manager global interface.
     </description>
@@ -110,7 +110,7 @@
     </event>
   </interface>
 
-  <interface name="river_input_device_v1" version="1">
+  <interface name="river_input_device_v1" version="2">
     <description summary="an input device">
       An input device represents a physical keyboard, mouse, touchscreen, or
       drawing tablet tool. It is assigned to exactly one seat at a time.
@@ -230,5 +230,15 @@
       <arg name="width" type="int"/>
       <arg name="height" type="int"/>
     </request>
+
+    <event name="done" since="2">
+      <description summary="all information has been sent">
+        This event is sent after all information about the input device has
+        been sent.
+
+        This allows changes to one or more river_input_device_v1 properties to
+        be seen as atomic, even if they happen via multiple events.
+      </description>
+    </event>
   </interface>
 </protocol>

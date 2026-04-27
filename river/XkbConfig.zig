@@ -36,7 +36,7 @@ pub fn init(config: *XkbConfig) !void {
     defer default_keymap.unref();
 
     config.* = .{
-        .global = try wl.Global.create(server.wl_server, river.XkbConfigV1, 1, *XkbConfig, config, bind),
+        .global = try wl.Global.create(server.wl_server, river.XkbConfigV1, 2, *XkbConfig, config, bind),
         .context = context.ref(),
         .default_keymap = default_keymap.ref(),
         .objects = undefined,

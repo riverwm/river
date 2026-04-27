@@ -168,6 +168,9 @@ pub fn createObject(device: *LibinputDevice, config_v1: *river.LibinputConfigV1)
         object.sendRotationDefault(c.libinput_device_config_rotation_get_default_angle(device.libinput));
         object.sendRotationCurrent(c.libinput_device_config_rotation_get_angle(device.libinput));
     }
+    if (object.getVersion() >= 2) {
+        object.sendDone();
+    }
 }
 
 pub fn deinit(device: *LibinputDevice) void {
@@ -200,6 +203,7 @@ fn handleRequest(
     request: river.LibinputDeviceV1.Request,
     device: *LibinputDevice,
 ) void {
+    var send_done = false;
     switch (request) {
         .destroy => object.destroy(),
         .set_send_events => |args| {
@@ -209,6 +213,7 @@ fn handleRequest(
                 const current = c.libinput_device_config_send_events_get_mode(device.libinput);
                 var it = device.objects.iterator(.forward);
                 while (it.next()) |o| o.sendSendEventsCurrent(@bitCast(current));
+                send_done = true;
             }
         },
         .set_tap => |args| {
@@ -225,6 +230,7 @@ fn handleRequest(
                 const current = c.libinput_device_config_tap_get_enabled(device.libinput);
                 var it = device.objects.iterator(.forward);
                 while (it.next()) |o| o.sendTapCurrent(@enumFromInt(current));
+                send_done = true;
             }
         },
         .set_tap_button_map => |args| {
@@ -241,6 +247,7 @@ fn handleRequest(
                 const current = c.libinput_device_config_tap_get_button_map(device.libinput);
                 var it = device.objects.iterator(.forward);
                 while (it.next()) |o| o.sendTapButtonMapCurrent(@enumFromInt(current));
+                send_done = true;
             }
         },
         .set_drag => |args| {
@@ -257,6 +264,7 @@ fn handleRequest(
                 const current = c.libinput_device_config_tap_get_drag_enabled(device.libinput);
                 var it = device.objects.iterator(.forward);
                 while (it.next()) |o| o.sendDragCurrent(@enumFromInt(current));
+                send_done = true;
             }
         },
         .set_drag_lock => |args| {
@@ -274,6 +282,7 @@ fn handleRequest(
                 const current = c.libinput_device_config_tap_get_drag_lock_enabled(device.libinput);
                 var it = device.objects.iterator(.forward);
                 while (it.next()) |o| o.sendDragLockCurrent(@enumFromInt(current));
+                send_done = true;
             }
         },
         .set_three_finger_drag => |args| {
@@ -291,6 +300,7 @@ fn handleRequest(
                 const current = c.libinput_device_config_3fg_drag_get_enabled(device.libinput);
                 var it = device.objects.iterator(.forward);
                 while (it.next()) |o| o.sendThreeFingerDragCurrent(@enumFromInt(current));
+                send_done = true;
             }
         },
         .set_calibration_matrix => |args| {
@@ -308,6 +318,7 @@ fn handleRequest(
                 _ = c.libinput_device_config_calibration_get_matrix(device.libinput, &current);
                 var it = device.objects.iterator(.forward);
                 while (it.next()) |o| o.sendCalibrationMatrixCurrent(&array);
+                send_done = true;
             }
         },
         .set_accel_profile => |args| {
@@ -326,6 +337,7 @@ fn handleRequest(
                 const current = c.libinput_device_config_accel_get_profile(device.libinput);
                 var it = device.objects.iterator(.forward);
                 while (it.next()) |o| o.sendAccelProfileCurrent(@enumFromInt(current));
+                send_done = true;
             }
         },
         .set_accel_speed => |args| {
@@ -342,6 +354,7 @@ fn handleRequest(
                 var array: wl.Array = .{ .size = bytes.len, .alloc = bytes.len, .data = bytes.ptr };
                 var it = device.objects.iterator(.forward);
                 while (it.next()) |o| o.sendAccelSpeedCurrent(&array);
+                send_done = true;
             }
         },
         .apply_accel_config => |args| {
@@ -356,6 +369,7 @@ fn handleRequest(
                 const current = c.libinput_device_config_accel_get_profile(device.libinput);
                 var it = device.objects.iterator(.forward);
                 while (it.next()) |o| o.sendAccelProfileCurrent(@enumFromInt(current));
+                send_done = true;
             }
         },
         .set_natural_scroll => |args| {
@@ -372,6 +386,7 @@ fn handleRequest(
                 const current = c.libinput_device_config_scroll_get_natural_scroll_enabled(device.libinput);
                 var it = device.objects.iterator(.forward);
                 while (it.next()) |o| o.sendNaturalScrollCurrent(if (current != 0) .enabled else .disabled);
+                send_done = true;
             }
         },
         .set_left_handed => |args| {
@@ -388,6 +403,7 @@ fn handleRequest(
                 const current = c.libinput_device_config_left_handed_get(device.libinput);
                 var it = device.objects.iterator(.forward);
                 while (it.next()) |o| o.sendLeftHandedCurrent(if (current != 0) .enabled else .disabled);
+                send_done = true;
             }
         },
         .set_click_method => |args| {
@@ -405,6 +421,7 @@ fn handleRequest(
                 const current = c.libinput_device_config_click_get_method(device.libinput);
                 var it = device.objects.iterator(.forward);
                 while (it.next()) |o| o.sendClickMethodCurrent(@enumFromInt(current));
+                send_done = true;
             }
         },
         .set_clickfinger_button_map => |args| {
@@ -421,6 +438,7 @@ fn handleRequest(
                 const current = c.libinput_device_config_click_get_clickfinger_button_map(device.libinput);
                 var it = device.objects.iterator(.forward);
                 while (it.next()) |o| o.sendClickfingerButtonMapCurrent(@enumFromInt(current));
+                send_done = true;
             }
         },
         .set_middle_emulation => |args| {
@@ -437,6 +455,7 @@ fn handleRequest(
                 const current = c.libinput_device_config_middle_emulation_get_enabled(device.libinput);
                 var it = device.objects.iterator(.forward);
                 while (it.next()) |o| o.sendMiddleEmulationCurrent(@enumFromInt(current));
+                send_done = true;
             }
         },
         .set_scroll_method => |args| {
@@ -455,6 +474,7 @@ fn handleRequest(
                 const current = c.libinput_device_config_scroll_get_method(device.libinput);
                 var it = device.objects.iterator(.forward);
                 while (it.next()) |o| o.sendScrollMethodCurrent(@enumFromInt(current));
+                send_done = true;
             }
         },
         .set_scroll_button => |args| {
@@ -464,6 +484,7 @@ fn handleRequest(
                 const current = c.libinput_device_config_scroll_get_button(device.libinput);
                 var it = device.objects.iterator(.forward);
                 while (it.next()) |o| o.sendScrollButtonCurrent(current);
+                send_done = true;
             }
         },
         .set_scroll_button_lock => |args| {
@@ -480,6 +501,7 @@ fn handleRequest(
                 const current = c.libinput_device_config_scroll_get_button_lock(device.libinput);
                 var it = device.objects.iterator(.forward);
                 while (it.next()) |o| o.sendScrollButtonLockCurrent(@enumFromInt(current));
+                send_done = true;
             }
         },
         .set_dwt => |args| {
@@ -496,6 +518,7 @@ fn handleRequest(
                 const current = c.libinput_device_config_dwt_get_enabled(device.libinput);
                 var it = device.objects.iterator(.forward);
                 while (it.next()) |o| o.sendDwtCurrent(if (current != 0) .enabled else .disabled);
+                send_done = true;
             }
         },
         .set_dwtp => |args| {
@@ -512,6 +535,7 @@ fn handleRequest(
                 const current = c.libinput_device_config_dwtp_get_enabled(device.libinput);
                 var it = device.objects.iterator(.forward);
                 while (it.next()) |o| o.sendDwtpCurrent(if (current != 0) .enabled else .disabled);
+                send_done = true;
             }
         },
         .set_rotation => |args| {
@@ -521,8 +545,18 @@ fn handleRequest(
                 const current = c.libinput_device_config_rotation_get_angle(device.libinput);
                 var it = device.objects.iterator(.forward);
                 while (it.next()) |o| o.sendRotationCurrent(current);
+                send_done = true;
             }
         },
+    }
+
+    if (send_done) {
+        var it = device.objects.iterator(.forward);
+        while (it.next()) |o| {
+            if (o.getVersion() >= 2) {
+                o.sendDone();
+            }
+        }
     }
 }
 

@@ -24,7 +24,7 @@ server_destroy: wl.Listener(*wl.Server) = .init(handleServerDestroy),
 
 pub fn init(config: *LibinputConfig) !void {
     config.* = .{
-        .global = try wl.Global.create(server.wl_server, river.LibinputConfigV1, 1, *LibinputConfig, config, bind),
+        .global = try wl.Global.create(server.wl_server, river.LibinputConfigV1, 2, *LibinputConfig, config, bind),
         .objects = undefined,
         .devices = undefined,
     };
