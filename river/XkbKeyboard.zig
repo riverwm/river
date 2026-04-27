@@ -83,6 +83,9 @@ pub fn createObject(xkb_keyboard: *XkbKeyboard, config_v1: *river.XkbConfigV1) v
             object.sendNumlockDisabled();
         }
     }
+    if (object.getVersion() >= 2) {
+        object.sendDone();
+    }
 }
 
 pub fn deinit(xkb_keyboard: *XkbKeyboard) void {
@@ -179,11 +182,13 @@ pub fn sendState(
     const sent = &xkb_keyboard.sent;
     var it = xkb_keyboard.objects.iterator(.forward);
     while (it.next()) |object| {
+        var send_done = false;
         if (sent.layout_index != layout_index or
             (sent.layout_name == null) != (layout_name == null) or
             (layout_name != null and mem.orderZ(u8, layout_name.?, sent.layout_name.?) != .eq))
         {
             object.sendLayout(layout_index, layout_name);
+            send_done = true;
         }
         if (sent.capslock != capslock) {
             if (capslock) {
@@ -191,6 +196,7 @@ pub fn sendState(
             } else {
                 object.sendCapslockDisabled();
             }
+            send_done = true;
         }
         if (sent.numlock != numlock) {
             if (numlock) {
@@ -198,6 +204,10 @@ pub fn sendState(
             } else {
                 object.sendNumlockDisabled();
             }
+            send_done = true;
+        }
+        if (send_done and object.getVersion() >= 2) {
+            object.sendDone();
         }
     }
     sent.layout_index = layout_index;

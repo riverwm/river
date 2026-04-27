@@ -33,7 +33,7 @@
     document are to be interpreted as described in IETF RFC 2119.
   </description>
 
-  <interface name="river_xkb_config_v1" version="1">
+  <interface name="river_xkb_config_v1" version="2">
     <description summary="xkb config global interface">
       Global interface for configuring xkb devices.
 
@@ -107,7 +107,7 @@
     </event>
   </interface>
 
-  <interface name="river_xkb_keymap_v1" version="1">
+  <interface name="river_xkb_keymap_v1" version="2">
     <description summary="xkbcommon keymap">
       This object is the result of attempting to create an xkbcommon keymap.
     </description>
@@ -137,7 +137,7 @@
     </event>
   </interface>
 
-  <interface name="river_xkb_keyboard_v1" version="1">
+  <interface name="river_xkb_keyboard_v1" version="2">
     <description summary="xkbcommon keyboard device">
       This object represent a physical keyboard which has its configuration and
       state managed by xkbcommon.
@@ -271,6 +271,16 @@
 
         This event is sent once when the river_xkb_keyboard_v1 is created and
         again whenever the numlock state changes.
+      </description>
+    </event>
+
+    <event name="done" since="2">
+      <description summary="all information has been sent">
+        This event is sent after all information about the keyboard has been
+        sent.
+
+        This allows changes to one or more river_xkb_keyboard_v1 properties to
+        be seen as atomic, even if they happen via multiple events.
       </description>
     </event>
   </interface>
