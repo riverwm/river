@@ -9,6 +9,7 @@ const Io = std.Io;
 const log = std.log;
 const posix = std.posix;
 const exit = std.process.exit;
+const fatal = std.process.fatal;
 
 const builtin = @import("builtin");
 const wlr = @import("wlroots");
@@ -85,8 +86,7 @@ pub fn main(init: std.process.Init.Minimal) anyerror!void {
         } else if (mem.eql(u8, level, "debug")) {
             runtime_log_level = .debug;
         } else {
-            log.err("invalid log level '{s}'", .{level});
-            exit(1);
+            fatal("invalid log level '{s}'", .{level});
         }
     }
     if (result.flags.@"log-scopes") |scopes| {
@@ -102,14 +102,12 @@ pub fn main(init: std.process.Init.Minimal) anyerror!void {
                 // I'd rather use an exclamation mark than a tilde but the
                 // former requires quoting in most shells.
                 const scope = std.meta.stringToEnum(LogScope, raw[1..]) orelse {
-                    log.err("invalid log scope '{s}'", .{raw});
-                    exit(1);
+                    fatal("invalid log scope '{s}'", .{raw});
                 };
                 log_scopes.remove(scope);
             } else {
                 const scope = std.meta.stringToEnum(LogScope, raw) orelse {
-                    log.err("invalid log scope '{s}'", .{raw});
-                    exit(1);
+                    fatal("invalid log scope '{s}'", .{raw});
                 };
                 log_scopes.insert(scope);
             }
@@ -219,8 +217,7 @@ fn defaultInitPath(environ: std.process.Environ) !?[:0]const u8 {
     Io.Dir.cwd().access(io, path, .{ .execute = true }) catch |err| {
         if (err == error.PermissionDenied) {
             if (Io.Dir.cwd().access(io, path, .{})) {
-                log.err("failed to run init executable {s}: the file is not executable", .{path});
-                exit(1);
+                fatal("failed to run init executable {s}: the file is not executable", .{path});
             } else |_| {}
         }
         log.err("failed to run init executable {s}: {s}", .{ path, @errorName(err) });
@@ -240,7 +237,7 @@ fn detectClassic(startup_command: ?[:0]const u8) !void {
         return;
     };
     if (classic) {
-        try stderr.print(
+        fatal(
             \\The init file {[path]s} contains the string "riverctl".
             \\This river version ({[version]s}) does not support riverctl, you may
             \\wish to install river-classic instead.
@@ -253,8 +250,6 @@ fn detectClassic(startup_command: ?[:0]const u8) !void {
             .path = path,
             .version = build_options.version,
         });
-        try stderr.flush();
-        exit(1);
     }
 }
 
