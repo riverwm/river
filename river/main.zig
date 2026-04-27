@@ -322,10 +322,7 @@ pub fn logFn(
 
     if (scope != .default and !log_scopes.contains(scope)) return;
 
-    const scope_prefix = if (scope == .default) ": " else "(" ++ @tagName(scope) ++ "): ";
-
-    stderr.print(level.asText() ++ scope_prefix ++ format ++ "\n", args) catch return;
-    stderr.flush() catch return;
+    log.defaultLog(level, scope, format, args);
 }
 
 /// See wlroots_log_wrapper.c
