@@ -45,6 +45,14 @@ pub fn main(init: std.process.Init.Minimal) anyerror!void {
     defer arena_alloc.deinit();
     const arena = arena_alloc.allocator();
 
+    var stdout_buffer: [64]u8 = undefined;
+    var stdout_writer = Io.File.stdout().writer(io, &stdout_buffer);
+    const stdout = &stdout_writer.interface;
+
+    var stderr_buffer: [64]u8 = undefined;
+    var stderr_writer = Io.File.stderr().writer(io, &stderr_buffer);
+    const stderr = &stderr_writer.interface;
+
     const args = try init.args.toSlice(arena);
 
     const result = flags.parser(&.{
@@ -271,14 +279,6 @@ fn grepRiverctl(path: [:0]const u8) !bool {
         reader.toss(1);
     }
 }
-
-var stderr_buffer: [1024]u8 = undefined;
-var stderr_writer = Io.File.stderr().writer(io, &stderr_buffer);
-const stderr = &stderr_writer.interface;
-
-var stdout_buffer: [1024]u8 = undefined;
-var stdout_writer = Io.File.stdout().writer(io, &stdout_buffer);
-const stdout = &stdout_writer.interface;
 
 // Scopes should be added to this list sparingly.
 // Only add new scopes if filtering based on them would be meaningful.
