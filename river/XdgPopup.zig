@@ -16,9 +16,6 @@ const SceneNodeData = @import("SceneNodeData.zig");
 const log = std.log.scoped(.xdg_popup);
 
 wlr_popup: *wlr.XdgPopup,
-/// The root of the surface tree, i.e. the Window's popup_tree
-root: *wlr.SceneTree,
-
 tree: *wlr.SceneTree,
 capture_tree: ?*wlr.SceneTree = null,
 
@@ -30,7 +27,6 @@ reposition: wl.Listener(void) = .init(handleReposition),
 // TODO check if popup is set_reactive and reposition on parent movement.
 pub fn create(
     wlr_popup: *wlr.XdgPopup,
-    root: *wlr.SceneTree,
     parent: *wlr.SceneTree,
     capture_parent: ?*wlr.SceneTree,
 ) error{OutOfMemory}!void {
@@ -39,7 +35,6 @@ pub fn create(
 
     xdg_popup.* = .{
         .wlr_popup = wlr_popup,
-        .root = root,
         .tree = try parent.createSceneXdgSurface(wlr_popup.base),
     };
     if (capture_parent) |p| {
@@ -76,7 +71,6 @@ fn handleNewPopup(listener: *wl.Listener(*wlr.XdgPopup), wlr_popup: *wlr.XdgPopu
 
     XdgPopup.create(
         wlr_popup,
-        xdg_popup.root,
         xdg_popup.tree,
         xdg_popup.capture_tree,
     ) catch {
@@ -87,21 +81,22 @@ fn handleNewPopup(listener: *wl.Listener(*wlr.XdgPopup), wlr_popup: *wlr.XdgPopu
 
 fn handleReposition(listener: *wl.Listener(void)) void {
     const xdg_popup: *XdgPopup = @fieldParentPtr("reposition", listener);
+    const wlr_popup = xdg_popup.wlr_popup;
 
-    var root_lx: c_int = undefined;
-    var root_ly: c_int = undefined;
-    _ = xdg_popup.root.node.coords(&root_lx, &root_ly);
+    var parent_lx: c_int = undefined;
+    var parent_ly: c_int = undefined;
+    _ = xdg_popup.tree.node.parent.?.node.coords(&parent_lx, &parent_ly);
 
-    var anchor = xdg_popup.wlr_popup.scheduled.rules.anchor_rect;
-    anchor.x += root_lx;
-    anchor.y += root_ly;
+    var anchor = wlr_popup.scheduled.rules.anchor_rect;
+    anchor.x += parent_lx;
+    anchor.y += parent_ly;
     const wlr_output = server.om.maxOverlapOutput(&anchor) orelse return;
 
-    var box: wlr.Box = undefined;
-    server.om.output_layout.getBox(wlr_output, &box);
+    var constraint: wlr.Box = undefined;
+    server.om.output_layout.getBox(wlr_output, &constraint);
+    constraint.x -= parent_lx;
+    constraint.y -= parent_ly;
 
-    box.x -= root_lx;
-    box.y -= root_ly;
-
-    xdg_popup.wlr_popup.unconstrainFromBox(&box);
+    wlr_popup.scheduled.rules.unconstrainBox(&constraint, &wlr_popup.scheduled.geometry);
+    _ = wlr_popup.base.scheduleConfigure();
 }
