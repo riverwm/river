@@ -172,7 +172,6 @@ fn handleNewPopup(listener: *wl.Listener(*wlr.XdgPopup), wlr_xdg_popup: *wlr.Xdg
     XdgPopup.create(
         wlr_xdg_popup,
         layer_surface.popup_tree,
-        layer_surface.popup_tree,
         null,
     ) catch {
         wlr_xdg_popup.resource.postNoMemory();
