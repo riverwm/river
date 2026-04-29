@@ -411,14 +411,14 @@
     </event>
 
     <event name="accel_profile_current">
-      <description summary="current send events mode">
+      <description summary="current acceleration profile">
         Current acceleration profile.
       </description>
       <arg name="profile" type="uint" enum="accel_profile"/>
     </event>
 
     <request name="set_accel_profile">
-      <description summary="set send events mode">
+      <description summary="set acceleration profile">
         Set the acceleration profile.
       </description>
       <arg name="result" type="new_id" interface="river_libinput_result_v1"/>
