@@ -341,6 +341,7 @@ pub fn destroy(seat: *Seat) void {
     seat.request_set_primary_selection.link.remove();
 
     seat.wlr_seat.destroy();
+    util.gpa.destroy(seat);
 }
 
 pub fn queueEvent(seat: *Seat, event: Event) !void {
