@@ -92,10 +92,10 @@ fn handleReposition(listener: *wl.Listener(void)) void {
     var root_ly: c_int = undefined;
     _ = xdg_popup.root.node.coords(&root_lx, &root_ly);
 
-    const wlr_output = server.om.outputAt(
-        @floatFromInt(root_lx + xdg_popup.wlr_popup.scheduled.geometry.x),
-        @floatFromInt(root_ly + xdg_popup.wlr_popup.scheduled.geometry.y),
-    ) orelse return;
+    var anchor = xdg_popup.wlr_popup.scheduled.rules.anchor_rect;
+    anchor.x += root_lx;
+    anchor.y += root_ly;
+    const wlr_output = server.om.maxOverlapOutput(&anchor) orelse return;
 
     var box: wlr.Box = undefined;
     server.om.output_layout.getBox(wlr_output, &box);

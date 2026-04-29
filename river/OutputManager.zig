@@ -466,3 +466,23 @@ fn sendConfig(om: *OutputManager) !void {
     // compared to the last config set.
     om.wlr_output_manager.setConfiguration(config);
 }
+
+// Returning a wlr.Output rather than Output is more convenient at the callsites.
+pub fn maxOverlapOutput(om: *OutputManager, box: *const wlr.Box) ?*wlr.Output {
+    var max_overlap_area: i32 = 0;
+    var max_overlap_output: ?*wlr.Output = null;
+    var it = om.outputs.iterator(.forward);
+    while (it.next()) |output| {
+        const wlr_output = output.wlr_output orelse continue;
+        var overlap: wlr.Box = undefined;
+        om.output_layout.getBox(wlr_output, &overlap);
+        if (overlap.empty()) continue; // output not in layout
+        _ = overlap.intersection(&overlap, box);
+        const overlap_area = overlap.width * overlap.height;
+        if (overlap_area > max_overlap_area) {
+            max_overlap_area = overlap_area;
+            max_overlap_output = wlr_output;
+        }
+    }
+    return max_overlap_output;
+}
