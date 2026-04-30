@@ -573,6 +573,14 @@ fn handleDestroy(_: *river.WindowV1, window: *Window) void {
         var it = decorations.iterator(.forward);
         while (it.next()) |decoration| decoration.makeInert();
     }
+    {
+        var it = server.input_manager.seats.iterator(.forward);
+        while (it.next()) |seat| {
+            if (seat.focused == .window and seat.focused.window == window) {
+                seat.focus(.none);
+            }
+        }
+    }
 }
 
 fn handleRequest(
@@ -1179,15 +1187,6 @@ pub fn unmap(window: *Window) void {
     if (window.wlr_toplevel_handle) |handle| {
         handle.destroy();
         window.wlr_toplevel_handle = null;
-    }
-
-    {
-        var it = server.input_manager.seats.iterator(.forward);
-        while (it.next()) |seat| {
-            if (seat.focused == .window and seat.focused.window == window) {
-                seat.focus(.none);
-            }
-        }
     }
 }
 
