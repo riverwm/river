@@ -495,7 +495,7 @@ fn renderFinish(wm: *WindowManager) void {
             switch (node.get()) {
                 .window => |window| {
                     hash.update(@ptrCast(&window.ref));
-                    hash.update(&.{@intFromBool(window.wm_requested.fullscreen != null)});
+                    hash.update(&.{@intFromBool(renderedFullscreen(window))});
                 },
                 .shell_surface => |shell_surface| {
                     hash.update(@ptrCast(&shell_surface));
@@ -519,7 +519,7 @@ fn renderFinish(wm: *WindowManager) void {
                     window.renderFinish();
                     if (!reorder) continue;
                     window.popup_tree.node.reparent(server.scene.layers.popups);
-                    if (window.wm_requested.fullscreen != null) {
+                    if (renderedFullscreen(window)) {
                         window.tree.node.reparent(server.scene.layers.fullscreen);
                         window.tree.node.raiseToTop();
                         found_fullscreen = true;
@@ -559,4 +559,8 @@ fn renderFinish(wm: *WindowManager) void {
     }
 
     server.input_manager.processEvents();
+}
+
+fn renderedFullscreen(window: *Window) bool {
+    return window.wm_requested.fullscreen != null and !window.rendering_requested.hidden;
 }
