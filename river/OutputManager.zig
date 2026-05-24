@@ -139,14 +139,16 @@ fn handleManagerApply(_: *wl.Listener(*wlr.OutputConfigurationV1), config: *wlr.
     while (it.next()) |head| {
         const output: *Output = @ptrCast(@alignCast(head.state.output.data));
         if (head.state.enabled) {
-            const previous = output.scheduled.state;
+            const previous = output.scheduled;
             output.scheduled = .fromHeadState(&head.state);
             // Maintain power management state set with wlr-output-power-management-v1
-            if (previous == .disabled_soft) {
+            if (previous.state == .disabled_soft) {
                 output.scheduled.state = .disabled_soft;
             } else {
                 assert(output.scheduled.state == .enabled);
             }
+            // Maintain capture_session_count
+            output.scheduled.capture_session_count = previous.capture_session_count;
         } else {
             // Avoid overwriting and losing all other output state on disable.
             output.scheduled.state = .disabled_hard;

@@ -57,6 +57,8 @@ pub const State = struct {
     adaptive_sync: bool,
     auto_layout: bool,
 
+    capture_session_count: u32,
+
     pub fn fromHeadState(state: *const wlr.OutputHeadV1.State) State {
         assert(state.enabled);
         return .{
@@ -80,6 +82,7 @@ pub const State = struct {
             .transform = state.transform,
             .adaptive_sync = state.adaptive_sync_enabled,
             .auto_layout = false,
+            .capture_session_count = 0,
         };
     }
 
@@ -207,6 +210,7 @@ pub fn create(wlr_output: *wlr.Output) !void {
         .transform = .normal,
         .adaptive_sync = wlr_output.adaptive_sync_status == .enabled,
         .auto_layout = true,
+        .capture_session_count = 0,
     };
     output.* = .{
         .wlr_output = wlr_output,
@@ -323,6 +327,12 @@ pub fn manageStart(output: *Output) void {
                 }
                 if (new or scheduled.x != sent.x or scheduled.y != sent.y) {
                     output_v1.sendPosition(scheduled.x, scheduled.y);
+                }
+
+                if (new or scheduled.capture_session_count != sent.capture_session_count) {
+                    if (output_v1.getVersion() >= 5) {
+                        output_v1.sendCaptureSessions(scheduled.capture_session_count);
+                    }
                 }
             }
 
