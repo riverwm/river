@@ -224,6 +224,7 @@ wm_scheduled: struct {
         seat: *Seat,
         edges: river.WindowV1.Edges,
     } = null,
+    capture_session_count: u32 = 0,
 } = .{},
 
 /// State sent to the wm in the latest manage sequence.
@@ -233,6 +234,7 @@ wm_sent: struct {
     dimensions_hint: DimensionsHint = .{},
     decoration_hint: river.WindowV1.DecorationHint = .only_supports_csd,
     parent: ?Window.Ref = null,
+    capture_session_count: u32 = 0,
 } = .{},
 
 /// Windowing state requested by the wm.
@@ -534,6 +536,13 @@ pub fn manageStart(window: *Window) void {
                 }
             }
             scheduled.pointer_resize_requested = null;
+
+            if (new or scheduled.capture_session_count != sent.capture_session_count) {
+                if (window_v1.getVersion() >= 5) {
+                    window_v1.sendCaptureSessions(scheduled.capture_session_count);
+                }
+                sent.capture_session_count = scheduled.capture_session_count;
+            }
         },
     }
 }

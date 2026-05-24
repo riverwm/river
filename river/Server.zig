@@ -112,6 +112,7 @@ new_toplevel_decoration: wl.Listener(*wlr.XdgToplevelDecorationV1) = .init(handl
 request_activate: wl.Listener(*wlr.XdgActivationV1.event.RequestActivate) = .init(handleRequestActivate),
 request_set_cursor_shape: wl.Listener(*wlr.CursorShapeManagerV1.event.RequestSetShape) = .init(handleRequestSetCursorShape),
 toplevel_capture_request: wl.Listener(*wlr.ExtForeignToplevelImageCaptureSourceManagerV1.Request) = .init(handleToplevelCaptureRequest),
+new_capture_session: wl.Listener(*wlr.ExtImageCopyCaptureSessionV1) = .init(handleNewImageCopyCaptureSession),
 
 pub fn init(server: *Server, runtime_xwayland: bool) !void {
     // We intentionally don't try to prevent memory leaks on error in this function
@@ -239,6 +240,7 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
     server.xdg_activation.events.request_activate.add(&server.request_activate);
     server.cursor_shape_manager.events.request_set_shape.add(&server.request_set_cursor_shape);
     server.toplevel_capture_source_manager.events.new_request.add(&server.toplevel_capture_request);
+    server.image_copy_capture_manager.events.new_session.add(&server.new_capture_session);
 
     wl_server.setGlobalFilter(*Server, globalFilter, server);
 }
@@ -254,6 +256,7 @@ pub fn deinit(server: *Server) void {
     server.request_activate.link.remove();
     server.request_set_cursor_shape.link.remove();
     server.toplevel_capture_request.link.remove();
+    server.new_capture_session.link.remove();
 
     server.input_manager.new_input.link.remove();
     server.om.new_output.link.remove();
@@ -562,4 +565,83 @@ fn handleToplevelCaptureRequest(
     window.capture_source = capture_source;
 
     _ = request.accept(capture_source);
+}
+
+const CaptureSession = struct {
+    wlr_capture_session: *wlr.ExtImageCopyCaptureSessionV1,
+    server: *Server,
+
+    destroy: wl.Listener(void) = wl.Listener(void).init(handleSessionDestroy),
+
+    fn handleSessionDestroy(listener: *wl.Listener(void)) void {
+        const session: *CaptureSession = @fieldParentPtr("destroy", listener);
+        const server = session.server;
+        const wlr_capture_session = session.wlr_capture_session;
+
+        if (wlr_capture_session.source.toOutput()) |wlr_output| {
+            var it = server.om.outputs.iterator(.forward);
+            while (it.next()) |output| {
+                if (output.wlr_output == wlr_output) {
+                    output.scheduled.capture_session_count -= 1;
+                    break;
+                }
+            } else unreachable;
+        } else {
+            // TODO wlroots 0.21: store window in user data, remove iteration
+            // https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/5383
+            var it = server.wm.windows.iterator();
+            while (it.next()) |window| {
+                if (wlr_capture_session.source == window.capture_source) {
+                    window.wm_scheduled.capture_session_count -= 1;
+                    break;
+                }
+            } else unreachable;
+        }
+
+        server.wm.dirtyWindowing();
+
+        listener.link.remove();
+        util.gpa.destroy(session);
+    }
+};
+
+fn handleNewImageCopyCaptureSession(
+    listener: *wl.Listener(*wlr.ExtImageCopyCaptureSessionV1),
+    wlr_capture_session: *wlr.ExtImageCopyCaptureSessionV1,
+) void {
+    const server: *Server = @fieldParentPtr("new_capture_session", listener);
+
+    const session = util.gpa.create(CaptureSession) catch {
+        log.err("out of memory", .{});
+        return;
+    };
+
+    session.* = .{
+        .wlr_capture_session = wlr_capture_session,
+        .server = server,
+    };
+
+    wlr_capture_session.events.destroy.add(&session.destroy);
+
+    if (wlr_capture_session.source.toOutput()) |wlr_output| {
+        var it = server.om.outputs.iterator(.forward);
+        while (it.next()) |output| {
+            if (output.wlr_output == wlr_output) {
+                output.scheduled.capture_session_count += 1;
+                break;
+            }
+        } else unreachable;
+    } else {
+        // TODO wlroots 0.21: store window in user data, remove iteration
+        // https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/5383
+        var it = server.wm.windows.iterator();
+        while (it.next()) |window| {
+            if (wlr_capture_session.source == window.capture_source) {
+                window.wm_scheduled.capture_session_count += 1;
+                break;
+            }
+        } else unreachable;
+    }
+
+    server.wm.dirtyWindowing();
 }
