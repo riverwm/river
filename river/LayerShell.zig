@@ -35,6 +35,8 @@ surfaces: SlotMap(*LayerSurface) = .empty,
 
 new_surface: wl.Listener(*wlr.LayerSurfaceV1) = .init(handleNewSurface),
 
+destroy_surfaces: ?*wl.EventSource = null,
+
 pub fn init(layer_shell: *LayerShell) !void {
     layer_shell.* = .{
         .global = try wl.Global.create(server.wl_server, river.LayerShellV1, 1, *LayerShell, layer_shell, bind),
@@ -190,4 +192,37 @@ pub fn checkExclusiveFocus(_: *LayerShell) void {
             seat.layer_shell.scheduled.focus = .none;
         }
     }
+}
+
+/// This exists to workaround a terribly subtle wlroots bug that can happen if
+/// wlr_layer_surface.destroy() is called directly in Output.handleDestroy().
+/// I intend to fix this bug upstream in wlroots if possible, but the root cause
+/// is the complexity of wlr_scene and I want river to use wlr_scene in the
+/// simplest way possible to avoid regressions in the future. Therefore this
+/// workaround should be kept even if the specific bug is fixed upstream.
+pub fn destroySurfaces(layer_shell: *LayerShell, output: *Output) void {
+    var it = layer_shell.surfaces.iterator();
+    while (it.next()) |surface| {
+        if (surface.wlr_layer_surface.output == output.wlr_output) {
+            surface.wlr_layer_surface.output = null;
+        }
+    }
+
+    if (layer_shell.destroy_surfaces == null) {
+        const event_loop = server.wl_server.getEventLoop();
+        layer_shell.destroy_surfaces = event_loop.addIdle(*LayerShell, destroySurfacesIdle, layer_shell) catch {
+            log.err("out of memory", .{});
+            return;
+        };
+    }
+}
+
+fn destroySurfacesIdle(layer_shell: *LayerShell) void {
+    var it = layer_shell.surfaces.iterator();
+    while (it.next()) |surface| {
+        if (surface.wlr_layer_surface.output == null) {
+            surface.wlr_layer_surface.destroy();
+        }
+    }
+    layer_shell.destroy_surfaces = null;
 }
