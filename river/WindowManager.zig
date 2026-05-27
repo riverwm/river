@@ -165,7 +165,7 @@ fn handleRequest(
     assert(wm.object == wm_v1);
     switch (request) {
         .stop => {
-            wm.object = null;
+            handleDestroy(wm_v1, wm);
             wm_v1.sendFinished();
             wm_v1.setHandler(?*anyopaque, handleRequestInert, null, null);
         },
