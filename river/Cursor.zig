@@ -51,16 +51,7 @@ const Mode = union(enum) {
         sx: f64,
         sy: f64,
     },
-    op: struct {
-        /// Window coordinates are stored as i32s as they are in logical pixels.
-        /// However, it is possible to move the cursor by a fraction of a
-        /// logical pixel and this happens in practice with low dpi, high
-        /// polling rate mice. Therefore we must accumulate the current
-        /// fractional offset of the mouse to avoid rounding down tiny
-        /// motions to 0.
-        delta_x: f64 = 0,
-        delta_y: f64 = 0,
-    },
+    op,
 };
 
 const default_size = 24;
@@ -349,7 +340,7 @@ pub fn opStartPointer(cursor: *Cursor) void {
     }
 
     log.debug("entering cursor mode op", .{});
-    cursor.mode = .{ .op = .{} };
+    cursor.mode = .op;
 
     cursor.clearFocus();
 }
@@ -387,10 +378,10 @@ pub fn processMotionRelative(cursor: *Cursor, event: *const Seat.Event.PointerMo
         }
     }
 
+    cursor.move(&event.mapping, dx, dy);
+
     switch (cursor.mode) {
         .passthrough, .drag, .ignore, .down => {
-            cursor.move(&event.mapping, dx, dy);
-
             switch (cursor.mode) {
                 .passthrough, .drag => {
                     cursor.updateHovered();
@@ -413,13 +404,7 @@ pub fn processMotionRelative(cursor: *Cursor, event: *const Seat.Event.PointerMo
                 constraint.maybeActivate();
             }
         },
-        .op => |*data| {
-            dx += data.delta_x;
-            dy += data.delta_y;
-            data.delta_x = dx - @trunc(dx);
-            data.delta_y = dy - @trunc(dy);
-
-            cursor.move(&event.mapping, dx, dy);
+        .op => {
             cursor.seat.opUpdate(@intFromFloat(cursor.wlr_cursor.x), @intFromFloat(cursor.wlr_cursor.y));
         },
     }
