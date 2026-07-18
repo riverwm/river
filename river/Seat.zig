@@ -678,6 +678,12 @@ pub fn manageFinish(seat: *Seat) void {
     }
     seat.wm_requested.focus = .none;
 
+    if (seat.wm_requested.pointer_warp) |target| {
+        seat.wm_requested.pointer_warp = null;
+        seat.cursor.wlr_cursor.warpClosest(null, @floatFromInt(target.x), @floatFromInt(target.y));
+        seat.cursor.updateState();
+    }
+
     switch (seat.wm_requested.op) {
         .none => {},
         .start_pointer,
@@ -695,12 +701,6 @@ pub fn manageFinish(seat: *Seat) void {
         .end => seat.opEnd(),
     }
     seat.wm_requested.op = .none;
-
-    if (seat.wm_requested.pointer_warp) |target| {
-        seat.wm_requested.pointer_warp = null;
-        seat.cursor.wlr_cursor.warpClosest(null, @floatFromInt(target.x), @floatFromInt(target.y));
-        seat.cursor.updateState();
-    }
 }
 
 pub fn focus(seat: *Seat, new_focus: Focus) void {
