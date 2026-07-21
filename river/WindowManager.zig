@@ -137,6 +137,7 @@ fn handleRequestInert(
 fn handleDestroy(_: *river.WindowManagerV1, wm: *WindowManager) void {
     log.debug("active river_window_manager_v1 destroyed", .{});
     wm.object = null;
+    wm.sent.session_locked = false;
     {
         var it = server.om.outputs.iterator(.forward);
         while (it.next()) |output| output.makeInert();
