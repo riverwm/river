@@ -253,6 +253,8 @@ const NoKeymapVirtKeyboard = struct {
         const no_keymap: *NoKeymapVirtKeyboard = @fieldParentPtr("keymap", listener);
         const virtual_keyboard = no_keymap.virtual_keyboard;
 
+        if (virtual_keyboard.keyboard.keymap == null) return;
+
         handleVirtKeyboardDestroy(&no_keymap.destroy, &virtual_keyboard.keyboard.base);
 
         const seat: *Seat = @ptrCast(@alignCast(virtual_keyboard.seat.data));
