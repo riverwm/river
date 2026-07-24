@@ -153,13 +153,12 @@ pub fn match(group: *const KeyboardGroup, config: *Keyboard.Config) bool {
     if (a.repeat_delay != b.repeat_delay) return false;
 
     if (a.keymap == b.keymap) return true;
-    if (a.keymap == null or b.keymap == null) return false;
 
     // Can't get away with a cheap pointer comparison.
     // TODO implement a non-terrible way to do this upstream in xkbcommon
-    const a_string = a.keymap.?.getAsString2(.use_original_format, .{});
+    const a_string = a.keymap.getAsString2(.use_original_format, .{});
     defer std.c.free(a_string);
-    const b_string = b.keymap.?.getAsString2(.use_original_format, .{});
+    const b_string = b.keymap.getAsString2(.use_original_format, .{});
     defer std.c.free(b_string);
     if (a_string == null or b_string == null) {
         // Ugh, no good options here, we don't know why the function failed.
@@ -169,8 +168,8 @@ pub fn match(group: *const KeyboardGroup, config: *Keyboard.Config) bool {
     }
     if (std.mem.orderZ(u8, a_string.?, b_string.?) == .eq) {
         // Consolidate so we don't have to do this expensive/silly comparison again
-        config.keymap.?.unref();
-        config.keymap = group.config.keymap.?.ref();
+        config.keymap.unref();
+        config.keymap = group.config.keymap.ref();
         return true;
     }
     return false;
@@ -426,7 +425,7 @@ pub fn processKeymap(group: *KeyboardGroup, keymap: *xkb.Keymap) void {
 }
 
 pub fn sendState(group: *KeyboardGroup) void {
-    const keymap = group.config.keymap.?;
+    const keymap = group.config.keymap;
     const layout_index = group.state.modifiers.group;
     const layout_name = keymap.layoutGetName(layout_index);
     const caps_mask = keymap.modGetMask(xkb.names.mod.caps);

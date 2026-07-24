@@ -19,7 +19,7 @@ const Seat = @import("Seat.zig");
 const log = std.log.scoped(.input);
 
 pub const Config = struct {
-    keymap: ?*xkb.Keymap,
+    keymap: *xkb.Keymap,
     /// Repeat rate in characters per second
     repeat_rate: u31 = 40,
     /// Repeat delay in milliseconds
@@ -53,11 +53,8 @@ pub fn create(seat: *Seat, wlr_device: *wlr.InputDevice, virtual: bool) !*Keyboa
         .config = .{
             .keymap = blk: {
                 if (virtual) {
-                    if (wlr_keyboard.keymap) |keymap| {
-                        break :blk keymap.ref();
-                    } else {
-                        break :blk null;
-                    }
+                    // Non-null thanks to the NoKeymapVirtKeyboard workaround.
+                    break :blk wlr_keyboard.keymap.?.ref();
                 } else {
                     break :blk server.xkb_config.default_keymap.ref();
                 }
@@ -65,7 +62,7 @@ pub fn create(seat: *Seat, wlr_device: *wlr.InputDevice, virtual: bool) !*Keyboa
         },
         .device = undefined,
     };
-    errdefer if (keyboard.config.keymap) |keymap| keymap.unref();
+    errdefer keyboard.config.keymap.unref();
 
     try keyboard.pressed.ensureTotalCapacity(util.gpa, KeyboardGroup.pressed_count_max);
     errdefer keyboard.pressed.deinit(util.gpa);
@@ -146,7 +143,7 @@ pub fn setKeymap(keyboard: *Keyboard, keymap: *xkb.Keymap) void {
     if (shouldSetKeymap()) {
         _ = keyboard.device.wlr_device.toKeyboard().setKeymap(keyboard.config.keymap);
     }
-    if (keyboard.config.keymap) |old| old.unref();
+    keyboard.config.keymap.unref();
     keyboard.config.keymap = keymap.ref();
     if (keyboard.group) |group| {
         group.unref(keyboard.pressed.keys());
@@ -173,7 +170,7 @@ fn maybeDestroy(keyboard: *Keyboard) void {
         return;
     }
 
-    if (keyboard.config.keymap) |keymap| keymap.unref();
+    keyboard.config.keymap.unref();
     if (keyboard.group) |group| group.unref(keyboard.pressed.keys());
 
     keyboard.pressed.deinit(util.gpa);
