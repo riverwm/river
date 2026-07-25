@@ -209,6 +209,13 @@ pub fn processKeymap(keyboard: *Keyboard, keymap: *xkb.Keymap) void {
 fn queueKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboard.event.Key) void {
     const keyboard: *Keyboard = @fieldParentPtr("key", listener);
     assert(!keyboard.device_destroyed);
+
+    if (keyboard.group) |group| {
+        if (group.processKeyBuiltin(event)) {
+            return;
+        }
+    }
+
     keyboard.queued_events += 1;
     keyboard.device.seat.queueEvent(.{ .keyboard_key = .{
         .keyboard = keyboard,
@@ -222,6 +229,9 @@ fn queueModifiers(listener: *wl.Listener(*wlr.Keyboard), _: *wlr.Keyboard) void 
     const keyboard: *Keyboard = @fieldParentPtr("modifiers", listener);
     assert(!keyboard.device_destroyed);
     const wlr_keyboard = keyboard.device.wlr_device.toKeyboard();
+    if (keyboard.group) |group| {
+        group.processModifiersBuiltin(wlr_keyboard.modifiers);
+    }
     keyboard.queued_events += 1;
     keyboard.device.seat.queueEvent(.{ .keyboard_modifiers = .{
         .keyboard = keyboard,

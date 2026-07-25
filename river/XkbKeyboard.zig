@@ -136,38 +136,44 @@ fn handleRequest(
             if (args.index < 0 or args.index >= group.config.keymap.numLayouts()) return;
             var modifiers = group.state.modifiers;
             modifiers.group = @intCast(args.index);
-            group.state.notifyModifiers(modifiers);
+            group.processModifiers(modifiers);
+            group.processModifiersBuiltin(modifiers);
         },
         .set_layout_by_name => |args| {
             const index = group.config.keymap.layoutGetIndex(args.name);
             if (index == xkb.layout_invalid) return;
             var modifiers = group.state.modifiers;
             modifiers.group = index;
-            group.state.notifyModifiers(modifiers);
+            group.processModifiers(modifiers);
+            group.processModifiersBuiltin(modifiers);
         },
         .numlock_enable => {
             const mask = group.config.keymap.modGetMask(xkb.names.vmod.num);
             var modifiers = group.state.modifiers;
             modifiers.locked |= mask;
-            group.state.notifyModifiers(modifiers);
+            group.processModifiers(modifiers);
+            group.processModifiersBuiltin(modifiers);
         },
         .numlock_disable => {
             const mask = group.config.keymap.modGetMask(xkb.names.vmod.num);
             var modifiers = group.state.modifiers;
             modifiers.locked &= ~mask;
-            group.state.notifyModifiers(modifiers);
+            group.processModifiers(modifiers);
+            group.processModifiersBuiltin(modifiers);
         },
         .capslock_enable => {
             const mask = group.config.keymap.modGetMask(xkb.names.mod.caps);
             var modifiers = group.state.modifiers;
             modifiers.locked |= mask;
-            group.state.notifyModifiers(modifiers);
+            group.processModifiers(modifiers);
+            group.processModifiersBuiltin(modifiers);
         },
         .capslock_disable => {
             const mask = group.config.keymap.modGetMask(xkb.names.mod.caps);
             var modifiers = group.state.modifiers;
             modifiers.locked &= ~mask;
-            group.state.notifyModifiers(modifiers);
+            group.processModifiers(modifiers);
+            group.processModifiersBuiltin(modifiers);
         },
     }
 }
