@@ -343,7 +343,6 @@ fn manageStart(wm: *WindowManager) void {
 
     if (wm.object) |wm_v1| {
         wm_v1.sendManageStart();
-        wm.startTimeoutTimer(3000);
     } else {
         wm.manageFinish();
     }
@@ -351,7 +350,6 @@ fn manageStart(wm: *WindowManager) void {
 
 pub fn manageFinish(wm: *WindowManager) void {
     assert(wm.state == .manage);
-    wm.cancelTimeoutTimer();
 
     log.debug("manage sequence finish", .{});
 
@@ -398,23 +396,11 @@ fn cancelTimeoutTimer(wm: *WindowManager) void {
 }
 
 fn handleTimeout(wm: *WindowManager) c_int {
-    switch (wm.state) {
-        .inflight_configures => {
-            log.err("timeout occurred, some imperfect frames may be shown", .{});
-            assert(wm.state.inflight_configures > 0);
-            wm.state.inflight_configures = 0;
+    assert(wm.state.inflight_configures > 0);
+    log.err("timeout occurred, some imperfect frames may be shown", .{});
+    wm.state.inflight_configures = 0;
 
-            wm.renderStart();
-        },
-        .manage, .render => if (wm.object) |wm_v1| {
-            log.err("window manager unresponsive for more than 3 seconds, disconnecting", .{});
-            wm_v1.postError(.unresponsive, "unresponsive for more than 3 seconds");
-            // Don't wait for the frozen client to receive the protocol error
-            // and exit of its own accord.
-            wm_v1.getClient().destroy();
-        },
-        .idle => unreachable,
-    }
+    wm.renderStart();
 
     return 0;
 }
@@ -447,7 +433,6 @@ fn renderStart(wm: *WindowManager) void {
 
     if (wm.object) |wm_v1| {
         wm_v1.sendRenderStart();
-        wm.startTimeoutTimer(3000);
     } else {
         wm.renderFinish();
     }
@@ -458,8 +443,6 @@ fn renderStart(wm: *WindowManager) void {
 fn renderFinish(wm: *WindowManager) void {
     assert(wm.state == .render);
     wm.state = .idle;
-
-    wm.cancelTimeoutTimer();
 
     log.debug("render sequence finish", .{});
 
