@@ -1057,7 +1057,6 @@ fn drawBorders(window: *Window) void {
                 rect.setSize(0, 0);
             }
             rect.node.setPosition(edge.box.x, edge.box.y);
-            rect.setSize(edge.box.width, edge.box.height);
             rect.setColor(&color);
         }
     }
