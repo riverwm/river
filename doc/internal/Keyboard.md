@@ -36,6 +36,39 @@ the same keyboard layout and repeat info for all the physical keyboards in the
 "keyboard group." This is very important for some hardware such as split
 keyboards.
 
+## Modifiers with "nested" backends
+
+Modifiers are handled very differently with the "bare metal" libinput backend
+compared to the "nested" Wayland/X11 backends. However, I have unfortunately
+never seen this rather confusing detail actually documented.
+
+With the bare metal backend, the compositor receives only key press and
+release events from the hardware. That means that the wlroots `wlr_keyboard`
+`modifiers` event is never actually emitted when using the bare metal backend.
+The modifiers sent by the compositor to Wayland clients are obtained from the
+xkbcommon state machine, which has its modifier state updated every key
+press/release event using the `xkb_state_update_key()` API.
+
+Additionally, the compositor may choose to change the modifiers state in
+response to some out-of-band information rather than a keyboard event. For
+example, the user may have used a GUI to change the active keyboard layout. In
+this case, the server directly mutates the xkbcommon state machine using the
+`xkb_state_update_mask()` API (which is documented as client-only, but all
+servers seem to use it anyways...). Supporting out-of-band modifier updates
+like this is in fact why the Wayland `wl_keyboard.modifiers` event exists in the
+first place, the `wl_keyboard.key` event alone would be insufficient to handle
+this case.
+
+With nested backends, the compositor receives both key press/release and
+modifiers events from the host session (i.e. the `wl_keyboard.key` and
+`wl_keyboard.modifiers` events with the Wayland backend). In this case,
+the compositor only uses the `xkb_state_update_mask()` API to update its
+xkbcommon state machine and relies entirely on the `modifiers` events sent
+by the host.
+
+These different code paths make it important to test with both bare metal and
+nested backends when modifying keyboard code.
+
 ## River's extra needs
 
 River requires more flexibility than other compositors here due to the
