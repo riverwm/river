@@ -18,7 +18,7 @@ pub fn parser(comptime flags: []const Flag) type {
             flags: Flags,
 
             pub const Flags = flags_type: {
-                const Attributes = std.builtin.Type.StructField.Attributes;
+                const Attributes = std.builtin.Type.Struct.FieldAttributes;
                 var names: [flags.len][]const u8 = undefined;
                 var types: [flags.len]type = undefined;
                 var attrs: [flags.len]Attributes = undefined;
