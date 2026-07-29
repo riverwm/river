@@ -704,10 +704,20 @@ pub fn manageFinish(seat: *Seat) void {
 }
 
 pub fn focus(seat: *Seat, new_focus: Focus) void {
-    // If the target is already focused, do nothing
-    if (std.meta.eql(new_focus, seat.focused)) return;
+    var target = new_focus;
+    if (target == .window) {
+        switch (target.window.state) {
+            .init => unreachable,
+            .ready, .initialized, .mapped => {},
+            // This branch can be hit if e.g. the river_window_v1 outlives the xdg_toplevel
+            .closing => target = .none,
+        }
+    }
 
-    const target_surface = new_focus.surface();
+    // If the target is already focused, do nothing
+    if (std.meta.eql(target, seat.focused)) return;
+
+    const target_surface = target.surface();
 
     // First clear the current focus
     switch (seat.focused) {
@@ -717,12 +727,12 @@ pub fn focus(seat: *Seat, new_focus: Focus) void {
     }
 
     // Set the new focus
-    switch (new_focus) {
+    switch (target) {
         .window, .shell_surface, .layer_surface => assert(server.lock_manager.state != .locked),
         .lock_surface => assert(server.lock_manager.state != .unlocked),
         .override_redirect, .none => {},
     }
-    seat.focused = new_focus;
+    seat.focused = target;
 
     if (seat.cursor.constraint) |constraint| {
         if (constraint.wlr_constraint.surface != target_surface) {
