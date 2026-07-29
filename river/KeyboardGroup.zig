@@ -192,6 +192,7 @@ pub fn processKeyBuiltin(group: *KeyboardGroup, event: *const wlr.Keyboard.event
     const xkb_keycode = event.keycode + 8;
     if (group.builtin_pressed.getPtr(xkb_keycode)) |key| {
         assert(key.count > 0);
+        const consumed = key.consumed;
         if (event.state == .pressed) {
             key.count += 1;
         } else {
@@ -203,7 +204,7 @@ pub fn processKeyBuiltin(group: *KeyboardGroup, event: *const wlr.Keyboard.event
                 }
             }
         }
-        return key.consumed;
+        return consumed;
     } else if (event.state == .pressed) {
         if (group.builtin_pressed.count() < pressed_count_max) {
             const consumed = group.matchBuiltinBinding(xkb_keycode);
