@@ -111,12 +111,22 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for information on submitting patches.
 
 ## Donate
 
-Unfortunately, the current pace of river's development is not sustainable
-without more financial support. If my work on river adds value to your life
-please consider setting up a recurring donation through [liberapay]. You can
-also support me with a one-time or monthly donation on [github sponsors] or
-[ko-fi] though I prefer liberapay as it is run by a non-profit. Thank you for
-your support!
+If my work on river adds value to your life please consider setting up a
+recurring donation through [liberapay]. This is the best way to make river's
+development sustainable in the long term.
+
+You can also support me with a one-time or monthly donation on [github sponsors]
+or [ko-fi] though I prefer liberapay as it is run by a non-profit.
+
+Thank you for your support!
+
+## Funding
+
+River is funded in part through the [NGI0 Commons Fund](https://nlnet.nl/commonsfund),
+a fund established by NLnet with financial support from the European
+Commission's [Next Generation Internet](https://ngi.eu/) programme.
+
+Learn more at the [NLnet project page](https://nlnet.nl/project/River-protocol/).
 
 ## Licensing
 
