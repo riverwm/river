@@ -1041,7 +1041,21 @@ fn drawBorders(window: *Window) void {
                 _ = edge.box.intersection(edge.box, &requested.clip);
             }
             const rect = @field(window.border, edge.name);
-            rect.node.setEnabled(@field(border.edges, edge.name));
+            // Workaround a Zig 0.16 LLVM backend miscompilation when passing a boolean member
+            // of a packed struct to an extern function:
+            // https://codeberg.org/ziglang/zig/issues/35373
+            //
+            // The only "safe" option in the presence of optimizations appears to be calling
+            // the extern function with a constant value that does not depend on the bool we
+            // actually want to pass. Luckily, we can use setSize(0,0) as a substitute for
+            // disabling the node.
+            // TODO(zig) remove workaround when updating to Zig 0.17
+            rect.node.setEnabled(true);
+            if (@field(border.edges, edge.name)) {
+                rect.setSize(edge.box.width, edge.box.height);
+            } else {
+                rect.setSize(0, 0);
+            }
             rect.node.setPosition(edge.box.x, edge.box.y);
             rect.setSize(edge.box.width, edge.box.height);
             rect.setColor(&color);
