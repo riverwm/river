@@ -11,7 +11,6 @@ const manifest = @import("build.zig.zon");
 const version = manifest.version;
 
 const Scanner = @import("wayland").Scanner;
-const Translator = @import("translate_c").Translator;
 
 pub fn build(b: *Build) !void {
     const target = b.standardTargetOptions(.{});
@@ -22,20 +21,16 @@ pub fn build(b: *Build) !void {
     const use_llvm = b.option(bool, "llvm", "Force use of Zig's LLVM backend and the lld linker");
 
     const omit_frame_pointer = switch (optimize) {
-        .Debug, .ReleaseSafe => false,
-        .ReleaseFast, .ReleaseSmall => true,
+        .debug, .safe => false,
+        .fast, .small => true,
     };
 
     const man_pages = b.option(
         bool,
         "man-pages",
         "Set to true to build man pages. Requires scdoc. Defaults to true if scdoc is found.",
-    ) orelse scdoc_found: {
-        _ = b.findProgram(&.{"scdoc"}, &.{}) catch |err| switch (err) {
-            error.FileNotFound => break :scdoc_found false,
-        };
-        break :scdoc_found true;
-    };
+    ) orelse
+        (b.findProgram(.{ .names = &.{"scdoc"} }) != null);
 
     const xwayland = b.option(
         bool,
@@ -50,7 +45,7 @@ pub fn build(b: *Build) !void {
             var ret: u8 = undefined;
 
             const git_describe_long = b.runAllowFail(
-                &.{ "git", "-C", b.build_root.path orelse ".", "describe", "--long" },
+                &.{ "git", "-C", b.fmt("{f}", .{b.root}), "describe", "--long" },
                 &ret,
                 .ignore,
             ) catch break :blk version;
@@ -152,19 +147,11 @@ pub fn build(b: *Build) !void {
     wlroots.addImport("xkbcommon", xkbcommon);
     wlroots.addImport("pixman", pixman);
 
-    // We need to ensure the wlroots include path obtained from pkg-config is
-    // exposed to the wlroots module for @cImport() to work. This seems to be
-    // the best way to do so with the current std.Build API.
-    wlroots.resolved_target = target;
-    const wlroots_pkgconf = "wlroots-0.20";
-    wlroots.linkSystemLibrary(wlroots_pkgconf, .{});
-
     const flags = b.createModule(.{ .root_source_file = b.path("common/flags.zig") });
     const slotmap = b.createModule(.{ .root_source_file = b.path("common/slotmap.zig") });
 
-    const translate_c: Translator = .init(b.dependency("translate_c", .{}), .{
-        .name = "c",
-        .c_source_file = b.path("river/c.h"),
+    const translate_c = b.addTranslateC(.{
+        .root_source_file = b.path("river/c.h"),
         .target = target,
         .optimize = optimize,
     });
@@ -189,7 +176,7 @@ pub fn build(b: *Build) !void {
         river.root_module.linkSystemLibrary("libevdev", .{});
         river.root_module.linkSystemLibrary("libinput", .{});
         river.root_module.linkSystemLibrary("wayland-server", .{});
-        river.root_module.linkSystemLibrary(wlroots_pkgconf, .{});
+        river.root_module.linkSystemLibrary("wlroots-0.20", .{});
         river.root_module.linkSystemLibrary("xkbcommon", .{});
         river.root_module.linkSystemLibrary("pixman-1", .{});
 
@@ -199,7 +186,7 @@ pub fn build(b: *Build) !void {
         river.root_module.addImport("wlroots", wlroots);
         river.root_module.addImport("flags", flags);
         river.root_module.addImport("slotmap", slotmap);
-        river.root_module.addImport("c", translate_c.mod);
+        river.root_module.addImport("c", translate_c.createModule());
 
         river.root_module.addCSourceFile(.{
             .file = b.path("river/wlroots_log_wrapper.c"),
@@ -213,17 +200,17 @@ pub fn build(b: *Build) !void {
     }
 
     {
-        const wf = Build.Step.WriteFile.create(b);
-        const pc_file = wf.add("river-protocols.pc", b.fmt(
-            \\prefix={s}
-            \\datarootdir=${{prefix}}/share
-            \\pkgdatadir=${{pc_sysrootdir}}${{datarootdir}}/river-protocols
-            \\
-            \\Name: river-protocols
-            \\URL: https://isaacfreund.com/software/river
-            \\Description: Protocol files for river, a non-monolithic Wayland compositor
-            \\Version: {s}
-        , .{ b.install_prefix, full_version }));
+        const write_pc_exe = b.addExecutable(.{
+            .name = "write_pkgconfig",
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("build/write_pkgconfig.zig"),
+                .target = b.graph.host,
+            }),
+        });
+        const write_pc_run = b.addRunArtifact(write_pc_exe);
+        write_pc_run.addDirectoryArg(.{ .relative = .{ .base = .deployed_prefix } });
+        write_pc_run.addArg(full_version);
+        const pc_file = write_pc_run.captureStdOut(.{});
         b.getInstallStep().dependOn(&b.addInstallFile(pc_file, "share/pkgconfig/river-protocols.pc").step);
         inline for (&.{
             "river-window-management-v1.xml",

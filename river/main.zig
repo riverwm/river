@@ -101,11 +101,11 @@ pub fn main(init: std.process.Init.Minimal) anyerror!void {
         // Examples:
         // -log-scopes input,wm     (only default, input, and wm scopes)
         // -log-scopes all,~wlroots (all scopes except wlroots)
-        log_scopes = std.EnumSet(LogScope).initEmpty();
+        log_scopes = .empty;
         var it = mem.splitScalar(u8, scopes, ',');
         while (it.next()) |raw| {
             if (mem.eql(u8, raw, "all")) {
-                log_scopes = std.EnumSet(LogScope).initFull();
+                log_scopes = .full;
             } else if (raw.len > 0 and raw[0] == '~') {
                 // I'd rather use an exclamation mark than a tilde but the
                 // former requires quoting in most shells.
@@ -124,7 +124,7 @@ pub fn main(init: std.process.Init.Minimal) anyerror!void {
     const runtime_xwayland = !result.flags.@"no-xwayland";
     const startup_command = blk: {
         if (result.flags.c) |command| {
-            break :blk try util.gpa.dupeZ(u8, command);
+            break :blk try util.gpa.dupeSentinel(u8, command, 0);
         } else {
             break :blk try defaultInitPath(init.environ);
         }
@@ -292,7 +292,7 @@ const LogScope = enum {
     xwayland,
 };
 
-var log_scopes: std.EnumSet(LogScope) = std.EnumSet(LogScope).initFull();
+var log_scopes: std.EnumSet(LogScope) = .full;
 
 /// Set the default log level based on the build mode.
 var runtime_log_level: log.Level = switch (builtin.mode) {
