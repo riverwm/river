@@ -103,6 +103,12 @@ Use of generative AI/LLMs is strictly forbidden for all contributions to river.
 
 This includes bug reports and comments on the issue tracker.
 
+## Hacking
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for an overview of the code base.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for information on submitting patches.
+
 ## Donate
 
 Unfortunately, the current pace of river's development is not sustainable

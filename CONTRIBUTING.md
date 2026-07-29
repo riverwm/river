@@ -11,6 +11,8 @@ You'll likely have more success with your contribution if you visit
 [#river](https://web.libera.chat/?channels=#river) on irc.libera.chat to discuss
 your plans first.
 
+See [ARCHITECTURE.md](ARCHITECTURE.md) for an overview of the code base.
+
 ## Strict No LLM / No AI Policy
 
 Use of generative AI/LLMs is strictly forbidden for all contributions to river.
