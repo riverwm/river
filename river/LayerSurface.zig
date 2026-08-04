@@ -147,8 +147,7 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     const layer_surface: *LayerSurface = @fieldParentPtr("commit", listener);
     const wlr_layer_surface = layer_surface.wlr_layer_surface;
 
-    // Output is being destroyed, see LayerShell.destroySurfaces()
-    if (wlr_layer_surface.output == null) return;
+    assert(wlr_layer_surface.output != null);
 
     // If the layer was changed, move the LayerSurface to the proper tree.
     if (wlr_layer_surface.current.committed.layer) {
