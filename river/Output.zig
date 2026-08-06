@@ -262,15 +262,23 @@ fn handleDestroy(listener: *wl.Listener(*wlr.Output), wlr_output: *wlr.Output) v
 
     log.debug("wlr_output '{s}' destroyed", .{wlr_output.name});
 
-    // Ensure that the wlr_scene_output is destroyed before any possible modifications
-    // to the scene graph that might result in output enter/leave events being sent
-    // can be made. It is sufficient to call wlr_scene_output_destroy() at the start
-    // of this function since we have guaranteed in create() that our handleDestroy()
-    // listener is first in the wlr_output's destroy listener list.
+    // Ensure that the wlr_scene_output is destroyed before any possible
+    // modifications to the scene graph that might result in output enter/leave
+    // events being sent can be made.
+    //
+    // Furthermore, ensure that the output is removed from the wlr_output_layout
+    // to ensure that no output enter events for cursor surfaces will be sent by
+    // wlroots during destruction.
+    //
+    // We have guaranteed in Output.create() that our handleDestroy() listener
+    // is first in the wlr_output's destroy listener list, so this workaround
+    // is always applied before any other destroy listeners are called.
+    //
     // This is part of a workaround for an upstream wlroots bug where certain valid
     // destroy orderings result in assertion failure.
     // TODO(wlroots) https://gitlab.freedesktop.org/wlroots/wlroots/-/work_items/4096
     output.scene_output.?.destroy();
+    server.om.output_layout.remove(wlr_output);
 
     {
         var it = server.layer_shell.surfaces.iterator();
