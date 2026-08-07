@@ -59,7 +59,8 @@ seat: *Seat,
 /// Seat.keyboard_groups
 link: wl.list.Link,
 
-virtual: bool,
+/// If this is the group for a virtual keyboard created by the input method client.
+input_method: bool,
 
 config: Keyboard.Config,
 
@@ -80,12 +81,12 @@ builtin_pressed: std.AutoArrayHashMapUnmanaged(u32, BuiltinPress) = .empty,
 key: wl.Listener(*wlr.Keyboard.event.Key) = .init(handleKey),
 modifiers: wl.Listener(*wlr.Keyboard) = .init(handleModifiers),
 
-pub fn create(seat: *Seat, config: Keyboard.Config, virtual: bool) !*KeyboardGroup {
+pub fn create(seat: *Seat, config: Keyboard.Config, input_method: bool) !*KeyboardGroup {
     const group = try util.gpa.create(KeyboardGroup);
     errdefer util.gpa.destroy(group);
     group.* = .{
         .seat = seat,
-        .virtual = virtual,
+        .input_method = input_method,
         .config = config,
         .state = undefined,
         .builtin_state = xkb.State.new(config.keymap) orelse return error.OutOfMemory,
@@ -449,13 +450,15 @@ fn matchBuiltinBinding(group: *KeyboardGroup, xkb_keycode: u32) bool {
     return false;
 }
 
+fn inputMethodKeyboard(group: *KeyboardGroup) bool {
+    if (group.virtual) {}
+    return false;
+}
+
 /// Returns null if the keyboard is not grabbed by an input method,
-/// or if the group is for a virtual keyboard.
-/// TODO: it would be good if virtual keyboards that are not associated with the
-/// input method client would pass through the input method grab.
-/// See https://gitlab.freedesktop.org/wlroots/wlroots/-/issues/2322
+/// or if the group is for a virtual keyboard created by the input method.
 fn getInputMethodGrab(group: *KeyboardGroup) ?*wlr.InputMethodV2.KeyboardGrab {
-    if (group.virtual) {
+    if (group.input_method) {
         return null;
     }
     if (group.seat.relay.input_method) |input_method| {
