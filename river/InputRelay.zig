@@ -9,11 +9,13 @@ const mem = std.mem;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
 
+const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
 const TextInput = @import("TextInput.zig");
 const InputPopup = @import("InputPopup.zig");
 const Seat = @import("Seat.zig");
+const Keyboard = @import("Keyboard.zig");
 
 const log = std.log.scoped(.input);
 
@@ -64,6 +66,20 @@ pub fn newInputMethod(relay: *InputRelay, input_method: *wlr.InputMethodV2) void
     input_method.events.grab_keyboard.add(&relay.grab_keyboard);
     input_method.events.destroy.add(&relay.input_method_destroy);
     input_method.events.new_popup_surface.add(&relay.input_method_new_popup);
+
+    {
+        var it = server.input_manager.devices.iterator(.forward);
+        while (it.next()) |device| {
+            if (device.seat != seat) continue;
+            const vkb = device.wlr_device.getVirtualKeyboard() orelse continue;
+            if (vkb.resource.getClient() == input_method.resource.getClient()) {
+                const keyboard: *Keyboard = @fieldParentPtr("device", device);
+                if (keyboard.group) |group| {
+                    group.input_method = true;
+                }
+            }
+        }
+    }
 
     if (seat.focused.surface()) |surface| {
         relay.focus(surface);

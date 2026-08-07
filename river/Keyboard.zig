@@ -30,6 +30,8 @@ device: InputDevice,
 device_destroyed: bool = false,
 queued_events: u32 = 0,
 
+input_method: bool = false,
+
 config: Config,
 
 /// Set of pressed keys that have been processed by processKey().
@@ -119,7 +121,12 @@ pub fn setGroup(keyboard: *Keyboard) void {
             }
         }
     }
-    keyboard.group = KeyboardGroup.create(seat, keyboard.config, keyboard.device.virtual) catch |err| switch (err) {
+    const input_method = keyboard.device.virtual and blk: {
+        const vkb = keyboard.device.wlr_device.getVirtualKeyboard().?;
+        const input_method = keyboard.device.seat.relay.input_method orelse break :blk false;
+        break :blk vkb.resource.getClient() == input_method.resource.getClient();
+    };
+    keyboard.group = KeyboardGroup.create(seat, keyboard.config, input_method) catch |err| switch (err) {
         error.OutOfMemory => {
             log.err("out of memory", .{});
             return;
