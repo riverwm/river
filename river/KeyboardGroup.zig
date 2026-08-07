@@ -406,7 +406,7 @@ pub fn processModifiers(group: *KeyboardGroup, modifiers: wlr.Keyboard.Modifiers
 fn handleModifiers(listener: *wl.Listener(*wlr.Keyboard), _: *wlr.Keyboard) void {
     const group: *KeyboardGroup = @fieldParentPtr("modifiers", listener);
 
-    {
+    if (!group.input_method) {
         const old: u32 = @bitCast(group.modifiers_old);
         const new: u32 = @bitCast(group.state.getModifiers());
         const watched: u32 = @bitCast(group.seat.xkb_bindings_seat.requested.mods_watched);
