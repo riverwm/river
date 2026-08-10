@@ -1140,6 +1140,56 @@
       </description>
       <arg name="count" type="uint" summary="count of screen capture sessions"/>
     </event>
+
+    <event name="touch_move_requested" since="6">
+      <description summary="window requested interactive touch move">
+        This event informs the window manager that the window has requested to
+        be interactively moved using touch input. The seat argument indicates
+        the seat for the move and the touch point argument indicates the
+        transient ID of the touch point used.
+
+        The xdg-shell protocol for example allows windows to request that an
+        interactive move be started, perhaps when a client-side rendered
+        titlebar is dragged.
+
+        The window manager may use the river_seat_v1.op_start_touch request to
+        interactively move the window or ignore this event entirely.
+
+        This event will be followed by a manage_start event after all other new
+        state has been sent by the server.
+      </description>
+      <arg name="seat" type="object" interface="river_seat_v1"
+        summary="requested seat"/>
+      <arg name="touch_point" type="int" summary="transient touch point ID"/>
+    </event>
+
+    <event name="touch_resize_requested" since="6">
+      <description summary="window requested interactive touch resize">
+        This event informs the window manager that the window has requested to
+        be interactively resized using touch input. The seat argument indicates
+        the seat for the resize and the touch point argument indicates the
+        transient ID of the touch point used.
+
+        The edges argument indicates which edges the window has requested to be
+        resized from. The edges argument will never be none and will never have
+        both top and bottom or both left and right edges set.
+
+        The xdg-shell protocol for example allows windows to request that an
+        interactive resize be started, perhaps when the corner of client-side
+        rendered decorations is dragged.
+
+        The window manager may use the river_seat_v1.op_start_touch request to
+        interactively resize the window or ignore this event entirely.
+
+        This event will be followed by a manage_start event after all other new
+        state has been sent by the server.
+      </description>
+      <arg name="seat" type="object" interface="river_seat_v1"
+        summary="requested seat"/>
+      <arg name="touch_point" type="int" summary="transient touch point ID"/>
+      <arg name="edges" type="uint" enum="edges"
+        summary="requested edges"/>
+    </event>
   </interface>
 
   <interface name="river_decoration_v1" version="6">
@@ -1689,7 +1739,7 @@
         move/resize of windows by setting the position of windows and proposing
         dimensions based off of the op_delta events.
 
-        This request is ignored if an operation is already in progress.
+        This request is ignored if a pointer operation is already in progress.
 
         The compositor must ensure that no client has pointer focus from this
         seat during the pointer operation. This means that the window manager
@@ -1704,7 +1754,7 @@
     <event name="op_delta">
       <description summary="total cumulative motion since op start">
         This event indicates the total change in position since the start of the
-        operation of the pointer/touch point/etc.
+        pointer operation.
 
         This event will be followed by a manage_start event after all other new
         state has been sent by the server.
@@ -1714,14 +1764,14 @@
     </event>
 
     <event name="op_release">
-      <description summary="operation input has been released">
-        The input driving the current interactive operation has been released.
-        For a pointer op for example, all pointer buttons have been released.
+      <description summary="all pointer buttors have been released">
+        All pointer buttons on the pointer device driving the operation have
+        been released.
 
-        Depending on the op type, op_delta events may continue to be sent until
-        the op is ended with the op_end request.
+        The compositor will continue to send op_delta events until the op is
+        ended with the op_end request.
 
-        This event is sent at most once during an interactive operation.
+        This event is sent at most once during a pointer operation.
 
         This event will be followed by a manage_start event after all other new
         state has been sent by the server.
@@ -1729,10 +1779,10 @@
     </event>
 
     <request name="op_end">
-      <description summary="end an interactive operation">
-        End an interactive operation.
+      <description summary="end an interactive pointer operation">
+        End an interactive pointer operation.
 
-        This request is ignored if there is no operation in progress.
+        This request is ignored if there is no pointer operation in progress.
 
         This request modifies window management state and may only be made as
         part of a manage sequence, see the river_window_manager_v1 description.
@@ -1821,6 +1871,72 @@
       </description>
       <arg name="x" type="int" summary="global x coordinate"/>
       <arg name="y" type="int" summary="global y coordinate"/>
+    </request>
+
+
+    <request name="op_start_touch" since="6">
+      <description summary="start an interactive touch operation">
+        Start an interactive touch operation. During the operation,
+        op_delta_touch events will be sent based movement of the given touch
+        point.
+
+        When the touch point is released, the op_release_touch event is sent and
+        the operation is automatically ended.
+
+        The window manager may end the operation before the touch point is released
+        using the op_end_touch request.
+
+        The window manager may use this operation to implement interactive
+        move/resize of windows by setting the position of windows and proposing
+        dimensions based off of the op_delta_touch events.
+
+        This request is ignored if a touch operation is already in progress for
+        the given touch point.
+
+        This request modifies window management state and may only be made as
+        part of a manage sequence, see the river_window_manager_v1 description.
+      </description>
+      <arg name="touch_point" type="int" summary="transient touch point ID"/>
+    </request>
+
+    <event name="op_delta_touch" since="6">
+      <description summary="total cumulative motion since op start">
+        This event indicates the total change in position since the start of the
+        operation for the given touch point.
+
+        This event will be followed by a manage_start event after all other new
+        state has been sent by the server.
+      </description>
+      <arg name="touch_point" type="int" summary="transient touch point ID"/>
+      <arg name="dx" type="int" summary="total change in x"/>
+      <arg name="dy" type="int" summary="total change in y"/>
+    </event>
+
+    <event name="op_release_touch" since="6">
+      <description summary="operation touch point has been released">
+        The touch point for the operation has been released and the operation is
+        ended.
+
+        No further op_delta_touch events will be sent for the operation.
+
+        This event will be followed by a manage_start event after all other new
+        state has been sent by the server.
+      </description>
+      <arg name="touch_point" type="int" summary="transient touch point ID"/>
+    </event>
+
+    <request name="op_end_touch" since="6">
+      <description summary="end an touch operation">
+        End a touch operation for the given touch point.
+
+        This request is ignored if there is no operation in progress for the
+        given touch point or if the operation has already been ended by the
+        op_release_touch event.
+
+        This request modifies window management state and may only be made as
+        part of a manage sequence, see the river_window_manager_v1 description.
+      </description>
+      <arg name="touch_point" type="int" summary="transient touch point ID"/>
     </request>
   </interface>
 
