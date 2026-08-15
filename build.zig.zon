@@ -28,8 +28,8 @@
             .hash = "xkbcommon-0.4.0-VDqIe0i2AgDRsok2GpMFYJ8SVhQS10_PI2M_CnHXsJJZ",
         },
         .translate_c = .{
-            .url = "git+https://codeberg.org/ziglang/translate-c/#57c559cf581b1fcad90494eda219f98abeb155ce",
-            .hash = "translate_c-0.0.0-Q_BUWlX1BgCD1wo6uo97prlp9VJ4gxAjwN_vZ7nsSjGN",
+            .url = "git+https://codeberg.org/ifreund/translate-c?ref=0.16.x#64570104eeed461dc221e77574cd3f1c5b7eb974",
+            .hash = "translate_c-0.0.0-Q_BUWlL1BgD7PmL27vTsccyNCOvKb-B65O5Ki1ZKm-ED",
         },
     },
     .fingerprint = 0xf5e3672b8e8d6efc,
