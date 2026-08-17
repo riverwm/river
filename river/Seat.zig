@@ -58,7 +58,7 @@ pub const Event = union(enum) {
     pointer_motion_absolute: PointerMotionAbsolute,
     pointer_button: PointerButton,
     pointer_axis: PointerAxis,
-    pointer_frame: void,
+    pointer_frame,
 
     pointer_swipe_begin: PointerSwipeBegin,
     pointer_swipe_update: PointerSwipeUpdate,
@@ -70,6 +70,12 @@ pub const Event = union(enum) {
 
     pointer_hold_begin: PointerHoldBegin,
     pointer_hold_end: PointerHoldEnd,
+
+    touch_down: TouchDown,
+    touch_motion: TouchMotion,
+    touch_up: TouchUp,
+    touch_cancel,
+    touch_frame,
 
     pub const PointerMotionRelative = struct {
         mapping: wlr.Box,
@@ -137,6 +143,25 @@ pub const Event = union(enum) {
     pub const PointerHoldEnd = struct {
         time_msec: u32,
         cancelled: bool,
+    };
+
+    pub const TouchDown = struct {
+        mapping: wlr.Box,
+        time_msec: u32,
+        touch_id: i32,
+        x: f64,
+        y: f64,
+    };
+    pub const TouchMotion = struct {
+        mapping: wlr.Box,
+        time_msec: u32,
+        touch_id: i32,
+        x: f64,
+        y: f64,
+    };
+    pub const TouchUp = struct {
+        time_msec: u32,
+        touch_id: i32,
     };
 };
 
@@ -315,6 +340,11 @@ pub fn destroy(seat: *Seat) void {
             .pointer_pinch_end,
             .pointer_hold_begin,
             .pointer_hold_end,
+            .touch_down,
+            .touch_motion,
+            .touch_up,
+            .touch_cancel,
+            .touch_frame,
             => {},
         }
     }
@@ -395,6 +425,12 @@ pub fn processEvents(seat: *Seat) void {
 
             .pointer_hold_begin => |ev| pg.sendHoldBegin(seat.wlr_seat, ev.time_msec, ev.fingers),
             .pointer_hold_end => |ev| pg.sendHoldEnd(seat.wlr_seat, ev.time_msec, ev.cancelled),
+
+            .touch_down => |ev| seat.cursor.processTouchDown(&ev),
+            .touch_motion => |ev| seat.cursor.processTouchMotion(&ev),
+            .touch_up => |ev| seat.cursor.processTouchUp(&ev),
+            .touch_cancel => seat.cursor.processTouchCancel(),
+            .touch_frame => seat.wlr_seat.touchNotifyFrame(),
         }
     }
     assert(server.wm.state == .idle);
