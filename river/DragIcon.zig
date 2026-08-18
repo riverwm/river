@@ -10,7 +10,7 @@ const wl = @import("wayland").server.wl;
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
 
-const Cursor = @import("Cursor.zig");
+const Seat = @import("Seat.zig");
 const SceneNodeData = @import("SceneNodeData.zig");
 
 wlr_drag_icon: *wlr.Drag.Icon,
@@ -18,7 +18,7 @@ scene_drag_icon: *wlr.SceneTree,
 
 destroy: wl.Listener(*wlr.Drag.Icon) = .init(handleDestroy),
 
-pub fn create(wlr_drag_icon: *wlr.Drag.Icon, cursor: *Cursor) error{OutOfMemory}!void {
+pub fn create(wlr_drag_icon: *wlr.Drag.Icon, seat: *Seat) error{OutOfMemory}!void {
     const scene_drag_icon = try server.scene.drag_icons.createSceneDragIcon(wlr_drag_icon);
     errdefer scene_drag_icon.node.destroy();
 
@@ -31,23 +31,23 @@ pub fn create(wlr_drag_icon: *wlr.Drag.Icon, cursor: *Cursor) error{OutOfMemory}
     };
     scene_drag_icon.node.data = drag_icon;
 
-    drag_icon.updatePosition(cursor);
+    drag_icon.updatePosition(seat);
 
     wlr_drag_icon.events.destroy.add(&drag_icon.destroy);
 }
 
-pub fn updatePosition(drag_icon: *DragIcon, cursor: *Cursor) void {
+pub fn updatePosition(drag_icon: *DragIcon, seat: *Seat) void {
     switch (drag_icon.wlr_drag_icon.drag.grab_type) {
         .keyboard => unreachable,
         .keyboard_pointer => {
             drag_icon.scene_drag_icon.node.setPosition(
-                @intFromFloat(cursor.wlr_cursor.x),
-                @intFromFloat(cursor.wlr_cursor.y),
+                @intFromFloat(seat.cursor.wlr_cursor.x),
+                @intFromFloat(seat.cursor.wlr_cursor.y),
             );
         },
         .keyboard_touch => {
             const touch_id = drag_icon.wlr_drag_icon.drag.touch_id;
-            if (cursor.touch_points.get(touch_id)) |point| {
+            if (seat.touch_points.get(touch_id)) |point| {
                 drag_icon.scene_drag_icon.node.setPosition(
                     @intFromFloat(point.lx),
                     @intFromFloat(point.ly),

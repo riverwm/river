@@ -3,6 +3,9 @@
 
 const std = @import("std");
 const posix = std.posix;
+const wlr = @import("wlroots");
+
+const server = &@import("main.zig").server;
 
 /// The global general-purpose allocator used throughout river's code
 pub const gpa = std.heap.c_allocator;
@@ -24,4 +27,16 @@ pub fn msecTimestamp() u32 {
         now.sec *% std.time.ms_per_s +% @divTrunc(now.nsec, std.time.ns_per_ms),
         std.math.maxInt(u32),
     ));
+}
+
+/// Converts absolute coordinates in range 0.0 - 1.0 into output layout coordinates.
+pub fn absoluteToLayout(mapping: wlr.Box, abs_x: f64, abs_y: f64) struct { f64, f64 } {
+    var m = mapping;
+    if (m.empty()) {
+        server.om.output_layout.getBox(null, &m);
+    }
+    return .{
+        @as(f64, @floatFromInt(m.x)) + @as(f64, @floatFromInt(m.width)) * abs_x,
+        @as(f64, @floatFromInt(m.y)) + @as(f64, @floatFromInt(m.height)) * abs_y,
+    };
 }

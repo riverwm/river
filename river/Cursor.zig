@@ -22,7 +22,6 @@ const LockSurface = @import("LockSurface.zig");
 const Output = @import("Output.zig");
 const PointerBinding = @import("PointerBinding.zig");
 const PointerConstraint = @import("PointerConstraint.zig");
-const Scene = @import("Scene.zig");
 const Seat = @import("Seat.zig");
 const Tablet = @import("Tablet.zig");
 const TabletTool = @import("TabletTool.zig");
@@ -69,11 +68,6 @@ const Image = union(enum) {
     },
 };
 
-const LayoutPoint = struct {
-    lx: f64,
-    ly: f64,
-};
-
 /// Current cursor mode as well as any state needed to implement that mode
 mode: Mode = .passthrough,
 
@@ -96,10 +90,6 @@ pressed: std.AutoHashMapUnmanaged(u32, ?*PointerBinding) = .{},
 /// This constraint is not necessarily active, activation only occurs once the cursor
 /// has been moved inside the constraint region.
 constraint: ?*PointerConstraint = null,
-
-/// Keeps track of the last known location of all touch points in layout coordinates.
-/// This information is necessary for proper touch dnd support if there are multiple touch points.
-touch_points: std.AutoHashMapUnmanaged(i32, LayoutPoint) = .{},
 
 request_set_cursor: wl.Listener(*wlr.Seat.event.RequestSetCursor) = .init(handleRequestSetCursor),
 
@@ -210,7 +200,6 @@ pub fn deinit(cursor: *Cursor) void {
     cursor.xcursor_manager.destroy();
     cursor.wlr_cursor.destroy();
     cursor.pressed.deinit(util.gpa);
-    cursor.touch_points.deinit(util.gpa);
 }
 
 /// Set the cursor theme for the given seat, as well as the xwayland theme if
@@ -398,7 +387,7 @@ pub fn processMotionRelative(cursor: *Cursor, event: *const Seat.Event.PointerMo
                 else => unreachable,
             }
 
-            cursor.updateDragIcons();
+            cursor.seat.updateDragIcons();
 
             if (cursor.constraint) |constraint| {
                 constraint.maybeActivate();
@@ -458,7 +447,7 @@ fn updateHovered(cursor: *Cursor) void {
 }
 
 pub fn processMotionAbsolute(cursor: *Cursor, event: *const Seat.Event.PointerMotionAbsolute) void {
-    const lx, const ly = absoluteToLayout(event.mapping, event.x, event.y);
+    const lx, const ly = util.absoluteToLayout(event.mapping, event.x, event.y);
     const dx = lx - cursor.wlr_cursor.x;
     const dy = ly - cursor.wlr_cursor.y;
     cursor.processMotionRelative(&.{
@@ -469,17 +458,6 @@ pub fn processMotionAbsolute(cursor: *Cursor, event: *const Seat.Event.PointerMo
         .unaccel_dx = dx,
         .unaccel_dy = dy,
     });
-}
-
-fn absoluteToLayout(mapping: wlr.Box, abs_x: f64, abs_y: f64) struct { f64, f64 } {
-    var m = mapping;
-    if (m.empty()) {
-        server.om.output_layout.getBox(null, &m);
-    }
-    return .{
-        @as(f64, @floatFromInt(m.x)) + @as(f64, @floatFromInt(m.width)) * abs_x,
-        @as(f64, @floatFromInt(m.y)) + @as(f64, @floatFromInt(m.height)) * abs_y,
-    };
 }
 
 pub fn processButton(cursor: *Cursor, event: *const Seat.Event.PointerButton) void {
@@ -514,7 +492,7 @@ pub fn processButton(cursor: *Cursor, event: *const Seat.Event.PointerButton) vo
         switch (cursor.mode) {
             .passthrough => {
                 if (server.scene.at(cursor.wlr_cursor.x, cursor.wlr_cursor.y)) |at| {
-                    cursor.interact(at);
+                    cursor.seat.interact(at);
 
                     if (at.surface != null) {
                         _ = cursor.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
@@ -538,7 +516,7 @@ pub fn processButton(cursor: *Cursor, event: *const Seat.Event.PointerButton) vo
             },
             .drag => {
                 if (server.scene.at(cursor.wlr_cursor.x, cursor.wlr_cursor.y)) |at| {
-                    cursor.interact(at);
+                    cursor.seat.interact(at);
                     if (at.surface != null) {
                         _ = cursor.seat.wlr_seat.pointerNotifyButton(event.time_msec, event.button, event.state);
                         return;
@@ -596,95 +574,6 @@ pub fn processAxis(cursor: *Cursor, event: *const Seat.Event.PointerAxis) void {
         event.source,
         event.relative_direction,
     );
-}
-
-fn interact(cursor: Cursor, result: Scene.AtResult) void {
-    switch (result.data) {
-        .window => |window| {
-            cursor.seat.wm_scheduled.interaction = .{ .window = window.ref };
-            server.wm.dirtyWindowing();
-        },
-        .shell_surface => |shell_surface| {
-            cursor.seat.wm_scheduled.interaction = .{ .shell_surface = shell_surface };
-            server.wm.dirtyWindowing();
-        },
-        .lock_surface => |lock_surface| {
-            assert(server.lock_manager.state != .unlocked);
-            cursor.seat.focus(.{ .lock_surface = lock_surface });
-        },
-        .layer_surface => |layer_surface| {
-            switch (cursor.seat.layer_shell.scheduled.focus) {
-                .none, .non_exclusive => {
-                    if (layer_surface.wlr_layer_surface.current.keyboard_interactive == .on_demand) {
-                        cursor.seat.layer_shell.scheduled.focus = .{
-                            .non_exclusive = layer_surface.ref,
-                        };
-                        server.wm.dirtyWindowing();
-                    }
-                },
-                .exclusive => {},
-            }
-        },
-        .override_redirect => |override_redirect| {
-            assert(server.lock_manager.state != .locked);
-            override_redirect.focusIfDesired();
-        },
-    }
-}
-
-pub fn processTouchDown(cursor: *Cursor, event: *const Seat.Event.TouchDown) void {
-    const lx, const ly = absoluteToLayout(event.mapping, event.x, event.y);
-
-    cursor.touch_points.putNoClobber(util.gpa, event.touch_id, .{ .lx = lx, .ly = ly }) catch {
-        log.err("out of memory", .{});
-        return;
-    };
-
-    if (server.scene.at(lx, ly)) |result| {
-        cursor.interact(result);
-
-        if (result.surface) |surface| {
-            _ = cursor.seat.wlr_seat.touchNotifyDown(
-                surface,
-                event.time_msec,
-                event.touch_id,
-                result.sx,
-                result.sy,
-            );
-        }
-    }
-}
-
-pub fn processTouchMotion(cursor: *Cursor, event: *const Seat.Event.TouchMotion) void {
-    if (cursor.touch_points.getPtr(event.touch_id)) |point| {
-        point.lx, point.ly = absoluteToLayout(event.mapping, event.x, event.y);
-
-        cursor.updateDragIcons();
-
-        if (server.scene.at(point.lx, point.ly)) |result| {
-            cursor.seat.wlr_seat.touchNotifyMotion(event.time_msec, event.touch_id, result.sx, result.sy);
-        }
-    }
-}
-
-pub fn processTouchUp(cursor: *Cursor, event: *const Seat.Event.TouchUp) void {
-    if (cursor.touch_points.remove(event.touch_id)) {
-        _ = cursor.seat.wlr_seat.touchNotifyUp(event.time_msec, event.touch_id);
-    }
-}
-
-pub fn processTouchCancel(cursor: *Cursor) void {
-    // XXX I believe this should be handled similarly to (exactly like?) Up.
-    // Question: when does the kernel/hardware actually emit touch cancel events
-    // and what do they mean? Reading libinput source suggests that it's something
-    // to do with hardware palm detection.
-
-    cursor.touch_points.clearRetainingCapacity();
-
-    const wlr_seat = cursor.seat.wlr_seat;
-    while (wlr_seat.touch_state.touch_points.first()) |touch_point| {
-        wlr_seat.touchNotifyCancel(touch_point.client);
-    }
 }
 
 fn handleTabletToolAxis(
@@ -776,17 +665,6 @@ fn passthrough(cursor: *Cursor, time: u32) void {
     }
 
     cursor.clearFocus();
-}
-
-fn updateDragIcons(cursor: *Cursor) void {
-    var it = server.scene.drag_icons.children.iterator(.forward);
-    while (it.next()) |node| {
-        const icon = @as(*DragIcon, @ptrCast(@alignCast(node.data)));
-
-        if (icon.wlr_drag_icon.drag.seat == cursor.seat.wlr_seat) {
-            icon.updatePosition(cursor);
-        }
-    }
 }
 
 fn queueMotionRelative(listener: *wl.Listener(*wlr.Pointer.event.Motion), event: *wlr.Pointer.event.Motion) void {

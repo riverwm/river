@@ -30,6 +30,7 @@ const LockSurface = @import("LockSurface.zig");
 const Output = @import("Output.zig");
 const PointerBinding = @import("PointerBinding.zig");
 const PointerConstraint = @import("PointerConstraint.zig");
+const Scene = @import("Scene.zig");
 const ShellSurface = @import("ShellSurface.zig");
 const Tablet = @import("Tablet.zig");
 const Window = @import("Window.zig");
@@ -185,6 +186,11 @@ pub const Focus = union(enum) {
     }
 };
 
+const LayoutPoint = struct {
+    lx: f64,
+    ly: f64,
+};
+
 wlr_seat: *wlr.Seat,
 
 link: wl.list.Link,
@@ -258,6 +264,10 @@ relay: InputRelay,
 keyboard_groups: wl.list.Head(KeyboardGroup, .link),
 
 focused: Focus = .none,
+
+/// Keeps track of the last known location of all touch points in layout coordinates.
+/// This information is necessary for proper touch dnd support if there are multiple touch points.
+touch_points: std.AutoHashMapUnmanaged(i32, LayoutPoint) = .{},
 
 /// The currently in progress drag operation type.
 drag: enum {
@@ -367,6 +377,7 @@ pub fn destroy(seat: *Seat) void {
     seat.link_sent.remove();
 
     seat.event_queue.deinit(util.gpa);
+    seat.touch_points.deinit(util.gpa);
     seat.cursor.deinit();
 
     seat.request_set_selection.link.remove();
@@ -426,14 +437,103 @@ pub fn processEvents(seat: *Seat) void {
             .pointer_hold_begin => |ev| pg.sendHoldBegin(seat.wlr_seat, ev.time_msec, ev.fingers),
             .pointer_hold_end => |ev| pg.sendHoldEnd(seat.wlr_seat, ev.time_msec, ev.cancelled),
 
-            .touch_down => |ev| seat.cursor.processTouchDown(&ev),
-            .touch_motion => |ev| seat.cursor.processTouchMotion(&ev),
-            .touch_up => |ev| seat.cursor.processTouchUp(&ev),
-            .touch_cancel => seat.cursor.processTouchCancel(),
+            .touch_down => |ev| seat.processTouchDown(&ev),
+            .touch_motion => |ev| seat.processTouchMotion(&ev),
+            .touch_up => |ev| seat.processTouchUp(&ev),
+            .touch_cancel => seat.processTouchCancel(),
             .touch_frame => seat.wlr_seat.touchNotifyFrame(),
         }
     }
     assert(server.wm.state == .idle);
+}
+
+pub fn processTouchDown(seat: *Seat, event: *const Seat.Event.TouchDown) void {
+    const lx, const ly = util.absoluteToLayout(event.mapping, event.x, event.y);
+
+    seat.touch_points.putNoClobber(util.gpa, event.touch_id, .{ .lx = lx, .ly = ly }) catch {
+        log.err("out of memory", .{});
+        return;
+    };
+
+    if (server.scene.at(lx, ly)) |result| {
+        seat.interact(result);
+
+        if (result.surface) |surface| {
+            _ = seat.wlr_seat.touchNotifyDown(
+                surface,
+                event.time_msec,
+                event.touch_id,
+                result.sx,
+                result.sy,
+            );
+        }
+    }
+}
+
+pub fn processTouchMotion(seat: *Seat, event: *const Seat.Event.TouchMotion) void {
+    if (seat.touch_points.getPtr(event.touch_id)) |point| {
+        point.lx, point.ly = util.absoluteToLayout(event.mapping, event.x, event.y);
+
+        seat.updateDragIcons();
+
+        if (server.scene.at(point.lx, point.ly)) |result| {
+            seat.wlr_seat.touchNotifyMotion(event.time_msec, event.touch_id, result.sx, result.sy);
+        }
+    }
+}
+
+pub fn processTouchUp(seat: *Seat, event: *const Seat.Event.TouchUp) void {
+    if (seat.touch_points.remove(event.touch_id)) {
+        _ = seat.wlr_seat.touchNotifyUp(event.time_msec, event.touch_id);
+    }
+}
+
+pub fn processTouchCancel(seat: *Seat) void {
+    // XXX I believe this should be handled similarly to (exactly like?) Up.
+    // Question: when does the kernel/hardware actually emit touch cancel events
+    // and what do they mean? Reading libinput source suggests that it's something
+    // to do with hardware palm detection.
+
+    seat.touch_points.clearRetainingCapacity();
+
+    const wlr_seat = seat.wlr_seat;
+    while (wlr_seat.touch_state.touch_points.first()) |touch_point| {
+        wlr_seat.touchNotifyCancel(touch_point.client);
+    }
+}
+
+pub fn interact(seat: *Seat, result: Scene.AtResult) void {
+    switch (result.data) {
+        .window => |window| {
+            seat.wm_scheduled.interaction = .{ .window = window.ref };
+            server.wm.dirtyWindowing();
+        },
+        .shell_surface => |shell_surface| {
+            seat.wm_scheduled.interaction = .{ .shell_surface = shell_surface };
+            server.wm.dirtyWindowing();
+        },
+        .lock_surface => |lock_surface| {
+            assert(server.lock_manager.state != .unlocked);
+            seat.focus(.{ .lock_surface = lock_surface });
+        },
+        .layer_surface => |layer_surface| {
+            switch (seat.layer_shell.scheduled.focus) {
+                .none, .non_exclusive => {
+                    if (layer_surface.wlr_layer_surface.current.keyboard_interactive == .on_demand) {
+                        seat.layer_shell.scheduled.focus = .{
+                            .non_exclusive = layer_surface.ref,
+                        };
+                        server.wm.dirtyWindowing();
+                    }
+                },
+                .exclusive => {},
+            }
+        },
+        .override_redirect => |override_redirect| {
+            assert(server.lock_manager.state != .locked);
+            override_redirect.focusIfDesired();
+        },
+    }
 }
 
 pub fn manageStart(seat: *Seat) void {
@@ -1072,11 +1172,22 @@ fn handleStartDrag(listener: *wl.Listener(*wlr.Drag), wlr_drag: *wlr.Drag) void 
     wlr_drag.events.destroy.add(&seat.drag_destroy);
 
     if (wlr_drag.icon) |wlr_drag_icon| {
-        DragIcon.create(wlr_drag_icon, &seat.cursor) catch {
+        DragIcon.create(wlr_drag_icon, seat) catch {
             log.err("out of memory", .{});
             wlr_drag.seat_client.client.postNoMemory();
             return;
         };
+    }
+}
+
+pub fn updateDragIcons(seat: *Seat) void {
+    var it = server.scene.drag_icons.children.iterator(.forward);
+    while (it.next()) |node| {
+        const icon = @as(*DragIcon, @ptrCast(@alignCast(node.data)));
+
+        if (icon.wlr_drag_icon.drag.seat == seat.wlr_seat) {
+            icon.updatePosition(seat);
+        }
     }
 }
 
