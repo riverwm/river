@@ -489,11 +489,8 @@ pub fn processTouchUp(seat: *Seat, event: *const Seat.Event.TouchUp) void {
 }
 
 pub fn processTouchCancel(seat: *Seat) void {
-    // XXX I believe this should be handled similarly to (exactly like?) Up.
-    // Question: when does the kernel/hardware actually emit touch cancel events
-    // and what do they mean? Reading libinput source suggests that it's something
-    // to do with hardware palm detection.
-
+    // Cancel events are emitted by libinput when, for example, it is determined
+    // that the touch input is actually from a palm and should be ignored.
     seat.touch_points.clearRetainingCapacity();
 
     const wlr_seat = seat.wlr_seat;
