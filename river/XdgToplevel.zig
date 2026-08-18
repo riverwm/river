@@ -439,9 +439,15 @@ fn handleRequestMove(
     const toplevel: *XdgToplevel = @fieldParentPtr("request_move", listener);
     const seat: *Seat = @ptrCast(@alignCast(event.seat.seat.data));
 
-    // Moving windows with touch or tablet tool is not yet supported.
+    // Moving windows with tablet tools is not yet supported.
     if (seat.wlr_seat.validatePointerGrabSerial(null, event.serial)) {
         toplevel.window.wm_scheduled.pointer_move_requested = seat;
+        server.wm.dirtyWindowing();
+    } else if (seat.validateTouchSerial(event.serial)) |touch_id| {
+        toplevel.window.wm_scheduled.touch_move_requested = .{
+            .seat = seat,
+            .touch_id = touch_id,
+        };
         server.wm.dirtyWindowing();
     }
 }
@@ -450,10 +456,17 @@ fn handleRequestResize(listener: *wl.Listener(*wlr.XdgToplevel.event.Resize), ev
     const toplevel: *XdgToplevel = @fieldParentPtr("request_resize", listener);
     const seat: *Seat = @ptrCast(@alignCast(event.seat.seat.data));
 
-    // Resizing windows with touch or tablet tool is not yet supported.
+    // Resizing windows with tablet tools is not yet supported.
     if (seat.wlr_seat.validatePointerGrabSerial(null, event.serial)) {
         toplevel.window.wm_scheduled.pointer_resize_requested = .{
             .seat = seat,
+            .edges = @bitCast(event.edges),
+        };
+        server.wm.dirtyWindowing();
+    } else if (seat.validateTouchSerial(event.serial)) |touch_id| {
+        toplevel.window.wm_scheduled.touch_resize_requested = .{
+            .seat = seat,
+            .touch_id = touch_id,
             .edges = @bitCast(event.edges),
         };
         server.wm.dirtyWindowing();

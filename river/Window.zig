@@ -224,6 +224,15 @@ wm_scheduled: struct {
         seat: *Seat,
         edges: river.WindowV1.Edges,
     } = null,
+    touch_move_requested: ?struct {
+        seat: *Seat,
+        touch_id: i32,
+    } = null,
+    touch_resize_requested: ?struct {
+        seat: *Seat,
+        touch_id: i32,
+        edges: river.WindowV1.Edges,
+    } = null,
     capture_session_count: u32 = 0,
 } = .{},
 
@@ -524,18 +533,29 @@ pub fn manageStart(window: *Window) void {
 
             if (scheduled.pointer_move_requested) |seat| {
                 if (seat.object) |seat_v1| {
-                    log.debug("send pointer move requested", .{});
                     window_v1.sendPointerMoveRequested(seat_v1);
                 }
             }
             scheduled.pointer_move_requested = null;
             if (scheduled.pointer_resize_requested) |data| {
                 if (data.seat.object) |seat_v1| {
-                    log.debug("send pointer resize requested", .{});
                     window_v1.sendPointerResizeRequested(seat_v1, data.edges);
                 }
             }
             scheduled.pointer_resize_requested = null;
+
+            if (scheduled.touch_move_requested) |data| {
+                if (data.seat.object) |seat_v1| {
+                    window_v1.sendTouchMoveRequested(seat_v1, data.touch_id);
+                }
+            }
+            scheduled.touch_move_requested = null;
+            if (scheduled.touch_resize_requested) |data| {
+                if (data.seat.object) |seat_v1| {
+                    window_v1.sendTouchResizeRequested(seat_v1, data.touch_id, data.edges);
+                }
+            }
+            scheduled.touch_resize_requested = null;
 
             if (new or scheduled.capture_session_count != sent.capture_session_count) {
                 if (window_v1.getVersion() >= 5) {

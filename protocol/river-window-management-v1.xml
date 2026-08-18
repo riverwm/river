@@ -1891,7 +1891,7 @@
         dimensions based off of the op_delta_touch events.
 
         This request is ignored if a touch operation is already in progress for
-        the given touch point.
+        the given touch point or if the given touch point does not exist.
 
         This request modifies window management state and may only be made as
         part of a manage sequence, see the river_window_manager_v1 description.
@@ -1916,6 +1916,23 @@
       <description summary="operation touch point has been released">
         The touch point for the operation has been released and the operation is
         ended.
+
+        No further op_delta_touch events will be sent for the operation.
+
+        This event will be followed by a manage_start event after all other new
+        state has been sent by the server.
+      </description>
+      <arg name="touch_point" type="int" summary="transient touch point ID"/>
+    </event>
+
+    <event name="op_cancel_touch" since="6">
+      <description summary="operation touch point has been canceled">
+        The touch point for the operation has been canceled. For example, this
+        might happen due to palm detection determining that the touch point was
+        actually a accidental palm contact point all along and should have been
+        ignored from the start.
+
+        The client should ideally behave as if this operation was never started.
 
         No further op_delta_touch events will be sent for the operation.
 

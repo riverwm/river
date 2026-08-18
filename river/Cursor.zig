@@ -335,6 +335,9 @@ pub fn opStartPointer(cursor: *Cursor) void {
 }
 
 pub fn opEndPointer(cursor: *Cursor) void {
+    if (cursor.seat.op == null) return;
+    log.debug("end seat op pointer", .{});
+    cursor.seat.op = null;
     if (cursor.pressed.count() == 0) {
         log.debug("entering cursor mode passthrough", .{});
         cursor.mode = .passthrough;
@@ -393,9 +396,7 @@ pub fn processMotionRelative(cursor: *Cursor, event: *const Seat.Event.PointerMo
                 constraint.maybeActivate();
             }
         },
-        .op => {
-            cursor.seat.opUpdate(@intFromFloat(cursor.wlr_cursor.x), @intFromFloat(cursor.wlr_cursor.y));
-        },
+        .op => server.wm.dirtyWindowingLazy(),
     }
 }
 

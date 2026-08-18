@@ -186,10 +186,30 @@ pub const Focus = union(enum) {
     }
 };
 
-const LayoutPoint = struct {
+const TouchPoint = struct {
     lx: f64,
     ly: f64,
+    /// Serial sent with the wl_touch.down event, if any.
+    serial: ?u32,
+    scheduled: enum {
+        none,
+        release,
+        cancel,
+    } = .none,
+    requested: struct {
+        op: enum {
+            none,
+            start,
+            end,
+        } = .none,
+    } = .{},
+    op: ?struct {
+        /// Coordinates at the start of the operation.
+        start_x: i32,
+        start_y: i32,
+    } = null,
 };
+const touch_points_max = 10;
 
 wlr_seat: *wlr.Seat,
 
@@ -247,16 +267,12 @@ pointer_bindings: wl.list.Head(PointerBinding, .link),
 /// Multiple physical mice are handled by the same Cursor
 cursor: Cursor,
 
+/// Pointer operation
 op: ?struct {
     sent_release: bool = false,
-    input: enum {
-        pointer,
-    },
-    /// Coordinates of the cursor/touch point/etc. at the start of the operation.
+    /// Coordinates of the pointer cursor at the start of the operation.
     start_x: i32,
     start_y: i32,
-    x: i32,
-    y: i32,
 } = null,
 
 relay: InputRelay,
@@ -265,9 +281,8 @@ keyboard_groups: wl.list.Head(KeyboardGroup, .link),
 
 focused: Focus = .none,
 
-/// Keeps track of the last known location of all touch points in layout coordinates.
-/// This information is necessary for proper touch dnd support if there are multiple touch points.
-touch_points: std.AutoHashMapUnmanaged(i32, LayoutPoint) = .{},
+/// Fixed capacity of touch_points_max
+touch_points: std.array_hash_map.Auto(i32, TouchPoint) = .empty,
 
 /// The currently in progress drag operation type.
 drag: enum {
@@ -304,6 +319,8 @@ pub fn create(name: [*:0]const u8, transient: ?*ext.TransientSeatV1) !void {
         .keyboard_groups = undefined,
         .transient = transient,
     };
+    errdefer seat.wlr_seat.destroy();
+
     seat.wlr_seat.data = seat;
 
     server.input_manager.seats.append(seat);
@@ -313,7 +330,12 @@ pub fn create(name: [*:0]const u8, transient: ?*ext.TransientSeatV1) !void {
     seat.xkb_bindings.init();
     seat.pointer_bindings.init();
 
+    try seat.touch_points.ensureTotalCapacity(util.gpa, touch_points_max);
+    errdefer seat.touch_points.deinit(util.gpa);
+
     try seat.cursor.init(seat);
+    errdefer comptime unreachable;
+
     seat.relay.init();
 
     seat.keyboard_groups.init();
@@ -450,16 +472,17 @@ pub fn processEvents(seat: *Seat) void {
 pub fn processTouchDown(seat: *Seat, event: *const Seat.Event.TouchDown) void {
     const lx, const ly = util.absoluteToLayout(event.mapping, event.x, event.y);
 
-    seat.touch_points.putNoClobber(util.gpa, event.touch_id, .{ .lx = lx, .ly = ly }) catch {
-        log.err("out of memory", .{});
+    if (seat.touch_points.count() >= touch_points_max) {
+        log.err("maximum {d} touch points supported", .{touch_points_max});
         return;
-    };
+    }
 
+    var serial: ?u32 = null;
     if (server.scene.at(lx, ly)) |result| {
         seat.interact(result);
 
         if (result.surface) |surface| {
-            _ = seat.wlr_seat.touchNotifyDown(
+            serial = seat.wlr_seat.touchNotifyDown(
                 surface,
                 event.time_msec,
                 event.touch_id,
@@ -468,22 +491,39 @@ pub fn processTouchDown(seat: *Seat, event: *const Seat.Event.TouchDown) void {
             );
         }
     }
+
+    seat.touch_points.putAssumeCapacityNoClobber(event.touch_id, .{
+        .lx = lx,
+        .ly = ly,
+        .serial = serial,
+    });
 }
 
 pub fn processTouchMotion(seat: *Seat, event: *const Seat.Event.TouchMotion) void {
     if (seat.touch_points.getPtr(event.touch_id)) |point| {
         point.lx, point.ly = util.absoluteToLayout(event.mapping, event.x, event.y);
 
-        seat.updateDragIcons();
+        if (point.op != null) {
+            server.wm.dirtyWindowingLazy();
+        } else {
+            seat.updateDragIcons();
 
-        if (server.scene.at(point.lx, point.ly)) |result| {
-            seat.wlr_seat.touchNotifyMotion(event.time_msec, event.touch_id, result.sx, result.sy);
+            if (server.scene.at(point.lx, point.ly)) |result| {
+                seat.wlr_seat.touchNotifyMotion(event.time_msec, event.touch_id, result.sx, result.sy);
+            }
         }
     }
 }
 
 pub fn processTouchUp(seat: *Seat, event: *const Seat.Event.TouchUp) void {
-    if (seat.touch_points.remove(event.touch_id)) {
+    const i = seat.touch_points.getIndex(event.touch_id) orelse return;
+    const touch_point = &seat.touch_points.values()[i];
+    if (touch_point.op != null) {
+        assert(touch_point.scheduled == .none);
+        touch_point.scheduled = .release;
+        server.wm.dirtyWindowing();
+    } else {
+        seat.touch_points.swapRemoveAt(i);
         _ = seat.wlr_seat.touchNotifyUp(event.time_msec, event.touch_id);
     }
 }
@@ -491,12 +531,34 @@ pub fn processTouchUp(seat: *Seat, event: *const Seat.Event.TouchUp) void {
 pub fn processTouchCancel(seat: *Seat) void {
     // Cancel events are emitted by libinput when, for example, it is determined
     // that the touch input is actually from a palm and should be ignored.
-    seat.touch_points.clearRetainingCapacity();
+
+    var i: usize = 0;
+    while (i < seat.touch_points.count()) {
+        const touch_point = &seat.touch_points.values()[i];
+        if (touch_point.op == null) {
+            seat.touch_points.swapRemoveAt(i);
+            continue; // Don't increment i
+        }
+        assert(touch_point.scheduled == .none);
+        touch_point.scheduled = .cancel;
+        server.wm.dirtyWindowing();
+        i += 1;
+    }
 
     const wlr_seat = seat.wlr_seat;
     while (wlr_seat.touch_state.touch_points.first()) |touch_point| {
         wlr_seat.touchNotifyCancel(touch_point.client);
     }
+}
+
+/// Returns the ID of the matching touch point or null if invalid.
+pub fn validateTouchSerial(seat: *Seat, serial: u32) ?i32 {
+    for (seat.touch_points.keys(), seat.touch_points.values()) |touch_id, touch_point| {
+        if (touch_point.serial == serial) {
+            return touch_id;
+        }
+    }
+    return null;
 }
 
 pub fn interact(seat: *Seat, result: Scene.AtResult) void {
@@ -624,12 +686,39 @@ pub fn manageStart(seat: *Seat) void {
         }
 
         if (seat.op) |*op| {
-            seat_v1.sendOpDelta(op.x - op.start_x, op.y - op.start_y);
+            const x: i32 = @intFromFloat(seat.cursor.wlr_cursor.x);
+            const y: i32 = @intFromFloat(seat.cursor.wlr_cursor.y);
+            seat_v1.sendOpDelta(x - op.start_x, y - op.start_y);
 
             if (seat.wm_scheduled.op_release and !op.sent_release) {
                 seat_v1.sendOpRelease();
                 seat.wm_scheduled.op_release = false;
                 op.sent_release = true;
+            }
+        }
+
+        if (seat_v1.getVersion() >= 6) {
+            var i: usize = 0;
+            while (i < seat.touch_points.count()) {
+                const touch_id = seat.touch_points.keys()[i];
+                const touch_point = seat.touch_points.values()[i];
+                if (touch_point.op) |op| {
+                    const x: i32 = @intFromFloat(touch_point.lx);
+                    const y: i32 = @intFromFloat(touch_point.ly);
+                    seat_v1.sendOpDeltaTouch(touch_id, x - op.start_x, y - op.start_y);
+                    switch (touch_point.scheduled) {
+                        .none => {},
+                        .release => seat_v1.sendOpReleaseTouch(touch_id),
+                        .cancel => seat_v1.sendOpCancelTouch(touch_id),
+                    }
+                    if (touch_point.scheduled != .none) {
+                        seat.touch_points.swapRemoveAt(i);
+                        continue; // Don't increment i
+                    }
+                } else {
+                    assert(touch_point.scheduled == .none);
+                }
+                i += 1;
             }
         }
 
@@ -707,7 +796,7 @@ fn handleRequestInert(
 
 fn handleDestroy(_: *river.SeatV1, seat: *Seat) void {
     seat.object = null;
-    seat.opEnd();
+    seat.cursor.opEndPointer();
 
     seat.layer_shell.makeInert();
     seat.xkb_bindings_seat.makeInert();
@@ -777,6 +866,16 @@ fn handleRequest(
             if (!server.wm.ensureWindowing()) return;
             seat.wm_requested.pointer_warp = .{ .x = args.x, .y = args.y };
         },
+        .op_start_touch => |args| {
+            if (!server.wm.ensureWindowing()) return;
+            const touch_point = seat.touch_points.getPtr(args.touch_point) orelse return;
+            touch_point.requested.op = .start;
+        },
+        .op_end_touch => |args| {
+            if (!server.wm.ensureWindowing()) return;
+            const touch_point = seat.touch_points.getPtr(args.touch_point) orelse return;
+            touch_point.requested.op = .end;
+        },
     }
 }
 
@@ -826,21 +925,41 @@ pub fn manageFinish(seat: *Seat) void {
 
     switch (seat.wm_requested.op) {
         .none => {},
-        .start_pointer,
-        => if (seat.op == null) {
+        .start_pointer => if (seat.op == null) {
             log.debug("start seat op pointer", .{});
             seat.op = .{
-                .input = .pointer,
                 .start_x = @intFromFloat(seat.cursor.wlr_cursor.x),
                 .start_y = @intFromFloat(seat.cursor.wlr_cursor.y),
-                .x = @intFromFloat(seat.cursor.wlr_cursor.x),
-                .y = @intFromFloat(seat.cursor.wlr_cursor.y),
             };
             seat.cursor.opStartPointer();
         },
-        .end => seat.opEnd(),
+        .end => seat.cursor.opEndPointer(),
     }
     seat.wm_requested.op = .none;
+
+    {
+        var i: usize = 0;
+        while (i < seat.touch_points.count()) {
+            const touch_id = seat.touch_points.keys()[i];
+            const touch_point = &seat.touch_points.values()[i];
+            switch (touch_point.requested.op) {
+                .none => {},
+                .start => if (touch_point.op == null) {
+                    touch_point.op = .{
+                        .start_x = @intFromFloat(touch_point.lx),
+                        .start_y = @intFromFloat(touch_point.ly),
+                    };
+                    _ = seat.wlr_seat.touchNotifyUp(util.msecTimestamp(), touch_id);
+                },
+                .end => if (touch_point.op != null) {
+                    seat.touch_points.swapRemoveAt(i);
+                    continue; // Don't increment i
+                },
+            }
+            touch_point.requested.op = .none;
+            i += 1;
+        }
+    }
 }
 
 pub fn focus(seat: *Seat, new_focus: Focus) void {
@@ -1011,23 +1130,6 @@ pub fn matchPointerBinding(
     }
 
     return found;
-}
-
-pub fn opUpdate(seat: *Seat, x: i32, y: i32) void {
-    const op = &seat.op.?;
-    op.x = x;
-    op.y = y;
-    server.wm.dirtyWindowingLazy();
-}
-
-pub fn opEnd(seat: *Seat) void {
-    if (seat.op) |op| {
-        log.debug("end seat op", .{});
-        seat.op = null;
-        switch (op.input) {
-            .pointer => seat.cursor.opEndPointer(),
-        }
-    }
 }
 
 pub fn attachNewDevice(seat: *Seat, wlr_device: *wlr.InputDevice, options: InputDevice.Options) void {
