@@ -125,7 +125,7 @@ fn handleRequest(
 fn clientCommit(wlr_surface: *wlr.Surface) callconv(.c) void {
     if (wlr_surface.role != &role) return;
     const resource = wlr_surface.role_resource orelse return;
-    const decoration: *Decoration = @ptrCast(@alignCast(resource.getUserData()));
+    const decoration: *Decoration = @ptrCast(@alignCast(resource.getUserData() orelse return));
     if (decoration.rendering_requested.sync_next_commit) {
         decoration.surfaces.save();
     }
