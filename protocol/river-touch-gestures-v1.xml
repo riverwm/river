@@ -1,0 +1,287 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="river_touch_gestures_v1">
+  <copyright>
+    SPDX-FileCopyrightText: © 2026 Isaac Freund
+    SPDX-License-Identifier: MIT
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to
+    deal in the Software without restriction, including without limitation the
+    rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+    sell copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+    IN THE SOFTWARE.
+  </copyright>
+
+  <description summary="">
+    This protocol allows the river-window-management-v1 window manager to
+
+    - A gesture must define conditions under which it should be triggered.
+        - start region
+        - number of fingers
+        - movement threshold
+        - hold timer
+
+    - When triggered, the compositor will send wl_touch.cancel to the focused
+      surface.
+
+
+    The key words "must", "must not", "required", "shall", "shall not",
+    "should", "should not", "recommended", "may", and "optional" in this
+    document are to be interpreted as described in IETF RFC 2119.
+  </description>
+
+  <interface name="river_touch_gestures_v1" version="1">
+    <description summary="touch gestures global interface">
+      This global interface should only be advertised to the client if the
+      river_window_manager_v1 global is also advertised.
+    </description>
+
+    <enum name="error">
+      <entry name="object_already_created" value="0"/>
+    </enum>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the river_touch_gestures_v1 object">
+        This request indicates that the client will no longer use the
+        river_touch_gestures_v1 object.
+      </description>
+    </request>
+
+    <request name="get_seat">
+      <description summary="get the seat extension object">
+        Create an object to manage seat-specific touch gestures state.
+
+        It is a protocol error to make this request more than once for a given
+        river_seat_v1 object.
+      </description>
+      <arg name="id" type="new_id" interface="river_touch_gestures_seat_v1"/>
+      <arg name="seat" type="object" interface="river_seat_v1"/>
+    </request>
+  </interface>
+
+  <interface name="river_touch_gestures_seat_v1" version="1">
+    <description summary="touch gestures seat">
+      This object manages touch gesture state associated with a specific seat.
+    </description>
+
+    <enum name="error">
+      <entry name="invalid_finger_count" value="0"/>
+    </enum>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the gestures seat object">
+        This request indicates that the client will no longer use the gestures
+        seat object and that it may be safely destroyed.
+      </description>
+    </request>
+
+    <request name="get_gesture">
+      <description summary="define a new gesture">
+        Define a new touch gesture.
+
+        The finger_count argument defines the number of simultaneous touch
+        points necessary to trigger the gesture. The finger_count must be
+        greater than 0.
+
+        The maximum finger count supported is limited by touchscreen hardware.
+        If the requested finger count is greater than the maximum supported,
+        the gesture will never be triggered.
+
+        The new gesture is not enabled until the river_touch_gesture_v1.enable
+        request is made during a manage sequence.
+      </description>
+      <arg name="id" type="new_id" interface="river_touch_gesture_v1"/>
+      <arg name="finger_count" type="uint" summary="number of touch points"/>
+    </request>
+  </interface>
+
+  <interface name="river_touch_gesture_v1" version="1">
+    <description summary="define a touch gesture, receive trigger events">
+
+      TODO:
+        - edge/region
+        - delta rotation?
+
+    </description>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the touch gesture object">
+        This request indicates that the client will no longer use the object and
+        that it may be safely destroyed.
+      </description>
+    </request>
+
+    <request name="enable">
+      <description summary="enable the gesture">
+        This request should be made after all initial configuration has been
+        completed and the window manager wishes the gesture to be able to be
+        triggered.
+
+        This request modifies window management state and may only be made as
+        part of a manage sequence, see the river_window_manager_v1 description.
+      </description>
+    </request>
+
+    <request name="disable">
+      <description summary="disable the gesture">
+        This request may be used to temporarily disable the gesture. It may
+        be later re-enabled with the enable request.
+
+        This request does not affect an in progress gesture that has already
+        been started. It will prevent the gesture from being triggered again.
+
+        This request modifies window management state and may only be made as
+        part of a manage sequence, see the river_window_manager_v1 description.
+      </description>
+    </request>
+
+    <event name="start">
+      <description summary="gesture started">
+        This event is sent when the required finger_count number of touch points
+        are active and all threshold requirements are met. After this event is
+        sent, no other gesture will be triggered until all touch points are
+        released and the river_touch_gesture_v1.end event is sent.
+
+        If the threshold requirements for multiple river_touch_gesture_v1
+        objects are met at the same time, it is compositor policy which gesture
+        is triggered.
+
+        The wl_touch.cancel event is sent to all surfaces with touch focus, all
+        touch input is eaten till end of gesture.
+
+        This event will be followed by a manage_start event after all other new
+        state has been sent by the server.
+      </description>
+    </event>
+
+    <event name="end">
+      <description summary="gesture ended">
+        This event will be followed by a manage_start event after all other new
+        state has been sent by the server.
+      </description>
+    </event>
+
+    <event name="cancel">
+      <description summary="gesture canceled">
+        This event will be followed by a manage_start event after all other new
+        state has been sent by the server.
+      </description>
+    </event>
+
+    <event name="finger_count">
+      <description summary="number of touch points changed">
+        The number of touch points changed after the gesture has been triggered.
+
+        This event will be followed by a manage_start event after all other new
+        state has been sent by the server.
+      </description>
+      <arg name="finger_count" type="uint" summary="number of touch points"/>
+    </event>
+
+    <event name="delta_motion">
+      <description summary="total change in centroid position">
+        The total change in centroid position since gesture start.
+
+        The centroid is defined as the mean position of all touch points.
+
+        This event will be followed by a manage_start event after all other new
+        state has been sent by the server.
+      </description>
+      <arg name="dx" type="int" summary="centroid change in x"/>
+      <arg name="dy" type="int" summary="centroid change in y"/>
+    </event>
+
+    <event name="scale">
+      <description summary="current pinch scale">
+        The scale is defined as the ratio of the current distance between touch
+        points to the distance at gesture start. The distance between touch
+        points is defined as the sum of the distance between each point and the
+        centroid.
+
+        Thus, the scale is initially 1.0. If the touch points are moved closer
+        together, the scale decreases and if the touch points are moved further
+        apart it increases.
+
+        This event is only sent if there are 2 or more touch points.
+
+        This event will be followed by a manage_start event after all other new
+        state has been sent by the server.
+      </description>
+      <arg name="scale" type="fixed" summary="current scale"/>
+    </event>
+
+<!--
+    <event name="delta_angle">
+      <description summary="total change in angle">
+        The mean change in angle of the line connecting each touch point to the
+        centroid since gesture start.
+
+        Initially, the angle is 0 degrees. Rotation clockwise increases the
+        angle while rotation counterclockwise decreases the angle.
+
+        This event is only sent if there are two or more touch points.
+
+        This event will be followed by a manage_start event after all other new
+        state has been sent by the server.
+      </description>
+      <arg name="angle" type="fixed" summary="angle in degrees"/>
+    </event>
+-->
+
+    <request name="set_threshold_motion">
+      <description summary="set centroid motion threshold to trigger">
+        XXX update docs
+
+        Set the x/y centroid motion thresholds required to trigger the gesture.
+        The threshold_dx and threshold_dy arguments may be positive or negative.
+
+        For example, a threshold_dx=10 and threshold_dy=-10 would require the
+        centroid to move at least 10 units to the right and at least 10 units up
+        in the compositor's logical coordinate space. With threshold_dx=0 and
+        threshold_dy=10, the centroid would need to move at least 10 units down
+        and horizontal movement would be irrelevant.
+
+        If this request is never made, both threshold_dx and threshold_dy are
+        considered to be 0.
+
+        This request modifies window management state and may only be made as
+        part of a manage sequence, see the river_window_manager_v1 description.
+      </description>
+      <arg name="up" type="int" summary="negative y motion threshold"/>
+      <arg name="down" type="int" summary="positive y motion threshold"/>
+      <arg name="left" type="int" summary="negative x motion threshold"/>
+      <arg name="right" type="int" summary="positive x motion threshold"/>
+    </request>
+
+    <request name="set_threshold_scale">
+      <description summary="set pinch scale threshold to trigger">
+        Set the pinch scale threshold required to trigger the gesture.
+
+        If threshold_scale is less than 1.0 then the scale must be less than
+        threshold_scale for the gesture to be triggered. If threshold_scale is
+        greater than 1.0 then the scale must be greater than threshold_scale for
+        the gesture to be triggered.
+
+        If this request is never made, threshold_scale is considered to be 1.0.
+
+        This request is ignored if the gesture's finger_count is less than 2.
+
+        This request modifies window management state and may only be made as
+        part of a manage sequence, see the river_window_manager_v1 description.
+      </description>
+      <arg name="in" type="fixed" summary="inward pinch scale threshold"/>
+      <arg name="out" type="fixed" summary="outward pinch scale threshold"/>
+    </request>
+  </interface>
+</protocol>
