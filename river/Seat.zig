@@ -196,29 +196,20 @@ const TouchPoint = struct {
     ly_down: f64,
     /// Serial sent with the wl_touch.down event, if any.
     serial: ?u32,
-    scheduled: struct {
-        op: enum {
-            none,
-            release,
-            cancel,
-        } = .none,
-    } = .{},
-    requested: struct {
-        op: enum {
-            none,
-            start,
-            end,
-        } = .none,
-    } = .{},
-    op: ?struct {
-        /// Coordinates at the start of the operation.
-        start_x: i32,
-        start_y: i32,
-    } = null,
-    /// The input device has emitted the up or cancel event and
-    /// this touch point should be removed by manageStart().
-    to_remove: bool = false,
 };
+
+const TouchOp = struct {
+    scheduled: enum {
+        none,
+        release,
+        cancel,
+    } = .none,
+    requested: enum {
+        none,
+        start,
+    },
+};
+
 const touch_points_max = 10;
 
 wlr_seat: *wlr.Seat,
@@ -294,6 +285,8 @@ focused: Focus = .none,
 
 /// Fixed capacity of touch_points_max
 touch_points: std.array_hash_map.Auto(i32, TouchPoint) = .empty,
+/// Fixed capacity of touch_points_max
+touch_ops: std.array_hash_map.Auto(i32, TouchOp) = .empty,
 
 /// The currently in progress drag operation type.
 drag: enum {
@@ -345,6 +338,9 @@ pub fn create(name: [*:0]const u8, transient: ?*ext.TransientSeatV1) !void {
 
     try seat.touch_points.ensureTotalCapacity(util.gpa, touch_points_max);
     errdefer seat.touch_points.deinit(util.gpa);
+
+    try seat.touch_ops.ensureTotalCapacity(util.gpa, touch_points_max);
+    errdefer seat.touch_ops.deinit(util.gpa);
 
     try seat.cursor.init(seat);
     errdefer comptime unreachable;
@@ -413,6 +409,7 @@ pub fn destroy(seat: *Seat) void {
 
     seat.event_queue.deinit(util.gpa);
     seat.touch_points.deinit(util.gpa);
+    seat.touch_ops.deinit(util.gpa);
     seat.cursor.deinit();
 
     seat.request_set_selection.link.remove();
@@ -526,7 +523,7 @@ pub fn processTouchMotion(seat: *Seat, event: *const Seat.Event.TouchMotion) voi
             return;
         }
 
-        if (point.op != null) {
+        if (seat.touch_ops.contains(event.touch_id)) {
             server.wm.dirtyWindowingLazy();
         } else {
             seat.updateDragIcons();
@@ -539,21 +536,20 @@ pub fn processTouchMotion(seat: *Seat, event: *const Seat.Event.TouchMotion) voi
 }
 
 pub fn processTouchUp(seat: *Seat, event: *const Seat.Event.TouchUp) void {
-    const i = seat.touch_points.getIndex(event.touch_id) orelse return;
-    const touch_point = &seat.touch_points.values()[i];
+    if (!seat.touch_points.swapRemove(event.touch_id)) return;
 
-    if (touch_point.op != null) {
-        assert(seat.touch_gestures.active == .none);
-        assert(touch_point.scheduled.op == .none);
-        touch_point.scheduled.op = .release;
-        touch_point.to_remove = true;
-        server.wm.dirtyWindowing();
-    } else {
-        seat.touch_points.swapRemoveAt(i);
-        if (!seat.touch_gestures.update()) {
-            _ = seat.wlr_seat.touchNotifyUp(event.time_msec, event.touch_id);
-        }
+    if (seat.touch_gestures.update()) {
+        return;
     }
+
+    if (seat.touch_ops.getPtr(event.touch_id)) |op| {
+        assert(seat.touch_gestures.active == .none);
+        assert(op.scheduled == .none);
+        op.scheduled = .release;
+        server.wm.dirtyWindowing();
+    }
+
+    _ = seat.wlr_seat.touchNotifyUp(event.time_msec, event.touch_id);
 }
 
 pub fn processTouchCancel(seat: *Seat) void {
@@ -565,34 +561,18 @@ pub fn processTouchCancel(seat: *Seat) void {
         .gesture => |gesture| gesture.cancel(),
     }
 
-    var i: usize = 0;
-    while (i < seat.touch_points.count()) {
-        const touch_point = &seat.touch_points.values()[i];
-        if (touch_point.op == null) {
-            seat.touch_points.swapRemoveAt(i);
-            continue; // Don't increment i
-        }
-        assert(touch_point.scheduled.op == .none);
-        touch_point.scheduled.op = .cancel;
-        touch_point.to_remove = true;
-        server.wm.dirtyWindowing();
-        i += 1;
-    }
+    seat.touch_points.clearRetainingCapacity();
 
-    seat.touchSendCancel();
+    seat.touchOpCancel();
 }
 
 pub fn touchOpCancel(seat: *Seat) void {
-    for (seat.touch_points.values()) |*touch_point| {
-        if (touch_point.op == null) continue;
-        assert(touch_point.scheduled.op == .none);
-        touch_point.scheduled.op = .cancel;
+    for (seat.touch_ops.values()) |*op| {
+        assert(op.scheduled == .none);
+        op.scheduled = .cancel;
         server.wm.dirtyWindowing();
     }
-    seat.touchSendCancel();
-}
 
-fn touchSendCancel(seat: *Seat) void {
     const wlr_seat = seat.wlr_seat;
     while (wlr_seat.touch_state.touch_points.first()) |touch_point| {
         wlr_seat.touchNotifyCancel(touch_point.client);
@@ -651,6 +631,7 @@ pub fn manageStart(seat: *Seat) void {
 
     seat.layer_shell.manageStart();
     seat.xkb_bindings_seat.manageStart();
+    seat.touch_gestures.manageStart();
 
     if (server.wm.object) |wm_v1| {
         const new = seat.object == null;
@@ -747,30 +728,29 @@ pub fn manageStart(seat: *Seat) void {
 
         {
             var i: usize = 0;
-            while (i < seat.touch_points.count()) {
-                const touch_id = seat.touch_points.keys()[i];
-                const touch_point = &seat.touch_points.values()[i];
-                if (touch_point.op) |op| {
-                    assert(seat_v1.getVersion() >= 6);
-                    const x: i32 = @intFromFloat(touch_point.lx);
-                    const y: i32 = @intFromFloat(touch_point.ly);
-                    seat_v1.sendOpDeltaTouch(touch_id, x - op.start_x, y - op.start_y);
-                    switch (touch_point.scheduled.op) {
-                        .none => {},
-                        .release => seat_v1.sendOpReleaseTouch(touch_id),
-                        .cancel => seat_v1.sendOpCancelTouch(touch_id),
-                    }
-                    // We may cancel the op due to a gesture being matched,
-                    // in which chase the touch point should not be removed.
-                    if (touch_point.to_remove) {
-                        seat.touch_points.swapRemoveAt(i);
+            while (i < seat.touch_ops.count()) {
+                const touch_id = seat.touch_ops.keys()[i];
+                const op = seat.touch_ops.values()[i];
+                assert(seat_v1.getVersion() >= 6);
+                if (seat.touch_points.get(touch_id)) |touch_point| {
+                    seat_v1.sendOpDeltaTouch(
+                        touch_id,
+                        @intFromFloat(touch_point.lx - touch_point.lx_down),
+                        @intFromFloat(touch_point.ly - touch_point.ly_down),
+                    );
+                }
+                switch (op.scheduled) {
+                    .none => {},
+                    .release => {
+                        seat_v1.sendOpReleaseTouch(touch_id);
+                        seat.touch_ops.swapRemoveAt(i);
                         continue; // Don't increment i
-                    } else {
-                        touch_point.op = null;
-                    }
-                } else {
-                    assert(touch_point.scheduled.op == .none);
-                    assert(!touch_point.to_remove);
+                    },
+                    .cancel => {
+                        seat_v1.sendOpCancelTouch(touch_id);
+                        seat.touch_ops.swapRemoveAt(i);
+                        continue; // Don't increment i
+                    },
                 }
                 i += 1;
             }
@@ -820,8 +800,6 @@ pub fn manageStart(seat: *Seat) void {
                 binding.wm_scheduled.state_change = .none;
             }
         }
-
-        seat.touch_gestures.manageStart();
     }
 
     // Ensure we don't store an interaction that happens while no window manager
@@ -926,13 +904,14 @@ fn handleRequest(
         },
         .op_start_touch => |args| {
             if (!server.wm.ensureWindowing()) return;
-            const touch_point = seat.touch_points.getPtr(args.touch_point) orelse return;
-            touch_point.requested.op = .start;
+            if (!seat.touch_points.contains(args.touch_point)) return;
+            const gop = seat.touch_ops.getOrPutAssumeCapacity(args.touch_point);
+            if (gop.found_existing) return;
+            gop.value_ptr.* = .{ .requested = .start };
         },
         .op_end_touch => |args| {
             if (!server.wm.ensureWindowing()) return;
-            const touch_point = seat.touch_points.getPtr(args.touch_point) orelse return;
-            touch_point.requested.op = .end;
+            _ = seat.touch_ops.swapRemove(args.touch_point);
         },
     }
 }
@@ -995,28 +974,20 @@ pub fn manageFinish(seat: *Seat) void {
     }
     seat.wm_requested.op = .none;
 
-    {
-        var i: usize = 0;
-        while (i < seat.touch_points.count()) {
-            const touch_id = seat.touch_points.keys()[i];
-            const touch_point = &seat.touch_points.values()[i];
-            switch (touch_point.requested.op) {
-                .none => {},
-                .start => if (touch_point.op == null) {
-                    touch_point.op = .{
-                        .start_x = @intFromFloat(touch_point.lx),
-                        .start_y = @intFromFloat(touch_point.ly),
-                    };
+    for (seat.touch_ops.keys(), seat.touch_ops.values()) |touch_id, *op| {
+        switch (op.requested) {
+            .none => {},
+            .start => {
+                if (seat.touch_gestures.active == .none) {
                     _ = seat.wlr_seat.touchNotifyUp(util.msecTimestamp(), touch_id);
-                },
-                .end => if (touch_point.op != null) {
-                    seat.touch_points.swapRemoveAt(i);
-                    continue; // Don't increment i
-                },
-            }
-            touch_point.requested.op = .none;
-            i += 1;
+                } else {
+                    // Gestures have priority over ops, cancel the op
+                    assert(op.scheduled == .none);
+                    op.scheduled = .cancel;
+                }
+            },
         }
+        op.requested = .none;
     }
 }
 
