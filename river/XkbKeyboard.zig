@@ -28,6 +28,7 @@ sent: struct {
     layout_name: ?[*:0]const u8 = null,
     capslock: ?bool = null,
     numlock: ?bool = null,
+    scrolllock: ?bool = null,
 } = .{},
 
 /// XkbConfig.keyboards
@@ -81,6 +82,15 @@ pub fn createObject(xkb_keyboard: *XkbKeyboard, config_v1: *river.XkbConfigV1) v
             object.sendNumlockEnabled();
         } else {
             object.sendNumlockDisabled();
+        }
+    }
+    if (object.getVersion() >= 3) {
+        if (sent.scrolllock) |scrolllock| {
+            if (scrolllock) {
+                object.sendScrolllockEnabled();
+            } else {
+                object.sendScrolllockDisabled();
+            }
         }
     }
     if (object.getVersion() >= 2) {
@@ -175,6 +185,20 @@ fn handleRequest(
             group.processModifiers(modifiers);
             group.processModifiersBuiltin(modifiers);
         },
+        .scrolllock_enable => {
+            const mask = group.config.keymap.modGetMask(xkb.names.vmod.scroll);
+            var modifiers = group.state.modifiers;
+            modifiers.locked |= mask;
+            group.processModifiers(modifiers);
+            group.processModifiersBuiltin(modifiers);
+        },
+        .scrolllock_disable => {
+            const mask = group.config.keymap.modGetMask(xkb.names.vmod.scroll);
+            var modifiers = group.state.modifiers;
+            modifiers.locked &= ~mask;
+            group.processModifiers(modifiers);
+            group.processModifiersBuiltin(modifiers);
+        },
     }
 }
 
@@ -184,6 +208,7 @@ pub fn sendState(
     layout_name: ?[*:0]const u8,
     capslock: bool,
     numlock: bool,
+    scrolllock: bool,
 ) void {
     const sent = &xkb_keyboard.sent;
     var it = xkb_keyboard.objects.iterator(.forward);
@@ -212,6 +237,14 @@ pub fn sendState(
             }
             send_done = true;
         }
+        if (object.getVersion() >= 3 and sent.scrolllock != scrolllock) {
+            if (scrolllock) {
+                object.sendScrolllockEnabled();
+            } else {
+                object.sendScrolllockDisabled();
+            }
+            send_done = true;
+        }
         if (send_done and object.getVersion() >= 2) {
             object.sendDone();
         }
@@ -220,4 +253,5 @@ pub fn sendState(
     sent.layout_name = layout_name;
     sent.capslock = capslock;
     sent.numlock = numlock;
+    sent.scrolllock = scrolllock;
 }

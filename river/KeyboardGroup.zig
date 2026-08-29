@@ -482,6 +482,8 @@ pub fn sendState(group: *KeyboardGroup) void {
     const capslock = group.state.modifiers.locked & caps_mask != 0;
     const num_mask = keymap.modGetMask(xkb.names.vmod.num);
     const numlock = group.state.modifiers.locked & num_mask != 0;
+    const scroll_mask = keymap.modGetMask(xkb.names.vmod.scroll);
+    const scrolllock = group.state.modifiers.locked & scroll_mask != 0;
 
     var it = server.xkb_config.keyboards.iterator(.forward);
     while (it.next()) |xkb_keyboard| {
@@ -489,7 +491,7 @@ pub fn sendState(group: *KeyboardGroup) void {
         const keyboard: *Keyboard = @fieldParentPtr("device", device);
         if (keyboard.group != group) continue;
 
-        xkb_keyboard.sendState(layout_index, layout_name, capslock, numlock);
+        xkb_keyboard.sendState(layout_index, layout_name, capslock, numlock, scrolllock);
     }
 }
 

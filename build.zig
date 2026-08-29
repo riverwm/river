@@ -128,7 +128,7 @@ pub fn build(b: *Build) !void {
     scanner.generate("river_layer_shell_v1", 1);
     scanner.generate("river_input_manager_v1", 2);
     scanner.generate("river_libinput_config_v1", 2);
-    scanner.generate("river_xkb_config_v1", 2);
+    scanner.generate("river_xkb_config_v1", 3);
 
     scanner.generate("zwlr_output_power_manager_v1", 1);
     scanner.generate("zwlr_layer_shell_v1", 4);
