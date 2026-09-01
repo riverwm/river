@@ -23,12 +23,7 @@ object: ?*river.TouchGesturesSeatV1 = null,
 
 gestures: wl.list.Head(TouchGesture, .link),
 
-active: union(enum) {
-    none,
-    gesture: *TouchGesture,
-    /// Active gesture was destroyed by the wm.
-    inert,
-} = .none,
+active: ?*TouchGesture = null,
 
 pub fn init(gseat: *TouchGesturesSeat) void {
     gseat.* = .{
@@ -100,81 +95,59 @@ fn handleRequest(
     }
 }
 
-/// Returns true if touch input is eaten by an active gesture.
-pub fn update(gseat: *TouchGesturesSeat) bool {
-    const seat: *Seat = @fieldParentPtr("touch_gestures", gseat);
-    switch (gseat.active) {
-        .none => {
-            const values = gseat.computeValues();
+/// Returns true if a gesture was activated and touch input should be eaten.
+pub fn activate(gseat: *TouchGesturesSeat) bool {
+    assert(gseat.active == null);
 
-            var it = gseat.gestures.iterator(.forward);
-            const gesture = while (it.next()) |gesture| {
-                if (!gesture.requested.enabled) continue;
-                if (gesture.finger_count != values.finger_count) continue;
-                if (-values.dx < gesture.requested.threshold_left and values.dx < gesture.requested.threshold_right) continue;
-                if (-values.dy < gesture.requested.threshold_up and values.dy < gesture.requested.threshold_down) continue;
-                if (values.scale) |scale| {
-                    if (scale > gesture.requested.threshold_in and scale < gesture.requested.threshold_out) continue;
-                }
-                break gesture;
-            } else {
-                return false;
-            };
+    const values = gseat.computeValues();
 
-            gesture.start();
-            gseat.active = .{ .gesture = gesture };
+    var it = gseat.gestures.iterator(.forward);
+    const gesture = while (it.next()) |gesture| {
+        if (!gesture.requested.enabled) continue;
+        if (gesture.finger_count != values.finger_count) continue;
+        if (-values.dx < gesture.requested.threshold_left and values.dx < gesture.requested.threshold_right) continue;
+        if (-values.dy < gesture.requested.threshold_up and values.dy < gesture.requested.threshold_down) continue;
+        if (values.scale) |scale| {
+            if (scale > gesture.requested.threshold_in and scale < gesture.requested.threshold_out) continue;
+        }
+        break gesture;
+    } else {
+        return false;
+    };
 
-            seat.touchOpCancel();
+    gesture.start();
+    gseat.active = gesture;
 
-            return true;
-        },
-        .gesture => |gesture| {
-            if (seat.touch_points.count() == 0) {
-                gesture.end();
-            } else if (seat.touch_points.count() != gesture.sent.finger_count) {
-                server.wm.dirtyWindowing();
-            } else {
-                server.wm.dirtyWindowingLazy();
-            }
-            return true;
-        },
-        .inert => {
-            if (seat.touch_points.count() == 0) {
-                gseat.active = .none;
-            }
-            return true;
-        },
-    }
+    log.debug("touch gesture activated", .{});
+
+    return true;
 }
 
 pub fn manageStart(gseat: *TouchGesturesSeat) void {
-    switch (gseat.active) {
-        .none, .inert => {},
-        .gesture => |gesture| {
-            switch (gesture.scheduled.state_change) {
-                .none, .start => {
-                    if (gesture.scheduled.state_change == .start) {
-                        gesture.object.sendStart();
-                    }
-                    const values = gseat.computeValues();
-                    if (gesture.sent.finger_count != values.finger_count) {
-                        gesture.object.sendFingerCount(values.finger_count);
-                        gesture.sent.finger_count = values.finger_count;
-                    }
-                    gesture.object.sendDeltaMotion(@intFromFloat(values.dx), @intFromFloat(values.dy));
-                    if (values.scale) |scale| gesture.object.sendScale(.fromDouble(scale));
-                },
-                .cancel, .end => {
-                    switch (gesture.scheduled.state_change) {
-                        .none, .start => unreachable,
-                        .end => gesture.object.sendEnd(),
-                        .cancel => gesture.object.sendCancel(),
-                    }
-                    gseat.active = .none;
-                },
-            }
-            gesture.scheduled.state_change = .none;
-        },
+    if (gseat.active) |gesture| {
+        switch (gesture.scheduled.state_change) {
+            .none, .start => {
+                if (gesture.scheduled.state_change == .start) {
+                    gesture.object.sendStart();
+                }
+                const values = gseat.computeValues();
+                if (gesture.sent.finger_count != values.finger_count) {
+                    gesture.object.sendFingerCount(values.finger_count);
+                    gesture.sent.finger_count = values.finger_count;
+                }
+                gesture.object.sendDeltaMotion(@intFromFloat(values.dx), @intFromFloat(values.dy));
+                if (values.scale) |scale| gesture.object.sendScale(.fromDouble(scale));
+            },
+            .cancel, .end => {
+                switch (gesture.scheduled.state_change) {
+                    .none, .start => unreachable,
+                    .end => gesture.object.sendEnd(),
+                    .cancel => gesture.object.sendCancel(),
+                }
+                gseat.active = null;
+            },
+        }
+        gesture.scheduled.state_change = .none;
     }
 }
 

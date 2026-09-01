@@ -163,7 +163,7 @@ fn handleRequest(
                 }
             } else {
                 Seat.create(args.name, null) catch |err| switch (err) {
-                    error.OutOfMemory => {
+                    error.OutOfMemory, error.AddTimerFailed => {
                         im_v1.getClient().postNoMemory();
                         log.err("out of memory", .{});
                         return;

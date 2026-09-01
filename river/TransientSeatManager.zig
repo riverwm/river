@@ -75,7 +75,7 @@ fn handleRequest(object: *ext.TransientSeatManagerV1, req: ext.TransientSeatMana
             };
 
             Seat.create(name, transient) catch |err| switch (err) {
-                error.OutOfMemory => {
+                error.OutOfMemory, error.AddTimerFailed => {
                     object.postNoMemory();
                     log.err("out of memory", .{});
                     return;

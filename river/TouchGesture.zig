@@ -85,11 +85,8 @@ fn handleRequestInert(
 
 fn handleDestroy(_: *river.TouchGestureV1, gesture: *TouchGesture) void {
     gesture.link.remove();
-    switch (gesture.seat.touch_gestures.active) {
-        .none, .inert => {},
-        .gesture => |active| if (gesture == active) {
-            gesture.seat.touch_gestures.active = .inert;
-        },
+    if (gesture.seat.touch_gestures.active == gesture) {
+        gesture.seat.touch_gestures.active = null;
     }
     util.gpa.destroy(gesture);
 }
