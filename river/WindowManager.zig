@@ -449,12 +449,6 @@ fn renderFinish(wm: *WindowManager) void {
     {
         var it = wm.windows.iterator();
         while (it.next()) |window| {
-            // If a window is unmapped during a render sequence, we need to retain the saved
-            // buffers until after the next manage sequence (in which the closed event will
-            // be sent) for frame perfection.
-            if (window.state != .closing) {
-                window.surfaces.dropSaved();
-            }
             // Ensure windows that are closed but not yet destroyed don't have
             // their borders/decorations rendered.
             if (window.state == .init) {
@@ -523,6 +517,24 @@ fn renderFinish(wm: *WindowManager) void {
                     }
                     shell_surface.tree.node.raiseToTop();
                 },
+            }
+        }
+    }
+
+    {
+        var it = wm.windows.iterator();
+        while (it.next()) |window| {
+            // Drop the saved surfaces only after renderFinish() has applied all changes.
+            // Dropping before renderFinish() can show a client that already committed a
+            // buffer of a new size at the old position, which could overlap an adjacent
+            // output. That overlap would cause clients to react to intermediate surface
+            // enter/leave and scale events before all changes to a window have been applied.
+            //
+            // If a window is unmapped during a render sequence, we need to retain the saved
+            // buffers until after the next manage sequence (in which the closed event will
+            // be sent) for frame perfection.
+            if (window.state != .closing) {
+                window.surfaces.dropSaved();
             }
         }
     }
