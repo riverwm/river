@@ -577,8 +577,9 @@ const CaptureSession = struct {
         const session: *CaptureSession = @fieldParentPtr("destroy", listener);
 
         if (session.wlr_capture_session.source.toOutput()) |wlr_output| {
-            const output: *Output = @ptrCast(@alignCast(wlr_output.data));
-            output.scheduled.capture_session_count -= 1;
+            if (@as(?*Output, @ptrCast(@alignCast(wlr_output.data)))) |output| {
+                output.scheduled.capture_session_count -= 1;
+            }
         } else {
             // TODO wlroots 0.21: store window in user data, remove iteration
             // https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/5383
