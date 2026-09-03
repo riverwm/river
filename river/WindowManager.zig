@@ -525,10 +525,11 @@ fn renderFinish(wm: *WindowManager) void {
         var it = wm.windows.iterator();
         while (it.next()) |window| {
             // Drop the saved surfaces only after renderFinish() has applied all changes.
-            // Dropping before renderFinish() can show a client that already committed a
-            // buffer of a new size at the old position, which could overlap an adjacent
-            // output. That overlap would cause clients to react to intermediate surface
-            // enter/leave and scale events before all changes to a window have been applied.
+            // Dropping before renderFinish() temporarily places the new buffer at the
+            // old position, causing wlr_scene to send unwanted output enter/leave and
+            // scale events for the intermediate state that will never actually be rendered.
+            //
+            // TODO(wlroots) provide a way to batch changes to the scene graph.
             //
             // If a window is unmapped during a render sequence, we need to retain the saved
             // buffers until after the next manage sequence (in which the closed event will

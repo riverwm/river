@@ -927,12 +927,11 @@ fn presentationHint(window: *Window) river.OutputV1.PresentationMode {
 pub fn renderFinish(window: *Window) void {
     const requested = &window.rendering_requested;
 
-    // Disable the scene nodes to avoid excessive modification of the wlroots
-    // scene graph. This is necessary to account for systems with multiple outputs
-    // which may not use the same scale. On such systems, multiple changes may
-    // produce intermediate surface.enter/leave events with different preferred
-    // scales.
-    // See: https://codeberg.org/river/river/pulls/1523
+    // Disable the scene nodes to avoid temporary, intermediate wlroots scene
+    // graph states that may cause wlroots to send unwanted output enter/leave
+    // scale events for a temporary state that will never be rendered.
+    //
+    // TODO(wlroots) provide a way to batch changes to the scene graph.
     window.tree.node.setEnabled(false);
     window.popup_tree.node.setEnabled(false);
 
