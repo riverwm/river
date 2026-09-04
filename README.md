@@ -17,8 +17,7 @@ Instead, users can choose any window manager implementing the
 Read my blog post, [Separating the Wayland Compositor and Window Manager](https://isaacfreund.com/blog/river-window-management/),
 for an in-depth explanation.
 
-There is a [list of compatible window managers](https://codeberg.org/river/wiki/src/branch/main/pages/wm-list.md)
-on our [wiki](https://codeberg.org/river/wiki).
+There is a [list of compatible window managers] on our [wiki](https://codeberg.org/river/wiki).
 
 > *If you are looking for the old dynamic tiling version of river, see
 [river-classic](https://codeberg.org/river/river-classic).*
@@ -95,7 +94,12 @@ if such an executable exists. If `$XDG_CONFIG_HOME` is not set,
 Usually this executable is a shell script which starts the user's window manager
 and any other long-running programs.
 
-For complete documentation see the `river(1)` man page.
+See also:
+
+- The `river(1)` man page
+- The [wiki FAQ](https://codeberg.org/river/wiki)
+- The [list of compatible window managers]
+- The [list of useful companion software]
 
 ## Strict No LLM / No AI Policy
 
@@ -143,3 +147,5 @@ In overview:
 [liberapay]: https://liberapay.com/ifreund
 [github sponsors]: https://github.com/sponsors/ifreund
 [ko-fi]: https://ko-fi.com/ifreund
+[list of compatible window managers]: https://codeberg.org/river/wiki/src/branch/main/pages/wm-list.md
+[list of useful companion software]: https://codeberg.org/river/wiki/src/branch/main/pages/useful-software.md
