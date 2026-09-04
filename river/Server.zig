@@ -604,17 +604,15 @@ fn handleNewCaptureSession(
     wlr_capture_session: *wlr.ExtImageCopyCaptureSessionV1,
 ) void {
     const server: *Server = @fieldParentPtr("new_capture_session", listener);
-
-    const session = util.gpa.create(CaptureSession) catch {
-        log.err("out of memory", .{});
-        return;
+    server.newCaptureSession(wlr_capture_session) catch |err| switch (err) {
+        error.OutOfMemory => log.err("out of memory", .{}),
+        error.NotOutputOrToplevel => {}, // Presumably a cursor session
     };
+}
 
-    session.* = .{
-        .wlr_capture_session = wlr_capture_session,
-    };
-
-    wlr_capture_session.events.destroy.add(&session.destroy);
+fn newCaptureSession(server: *Server, wlr_capture_session: *wlr.ExtImageCopyCaptureSessionV1) !void {
+    const session = try util.gpa.create(CaptureSession);
+    errdefer util.gpa.destroy(session);
 
     if (wlr_capture_session.source.toOutput()) |wlr_output| {
         const output: *Output = @ptrCast(@alignCast(wlr_output.data));
@@ -628,8 +626,17 @@ fn handleNewCaptureSession(
                 window.wm_scheduled.capture_session_count += 1;
                 break;
             }
-        } else unreachable;
+        } else {
+            return error.NotOutputOrToplevel;
+        }
     }
+    errdefer comptime unreachable;
+
+    session.* = .{
+        .wlr_capture_session = wlr_capture_session,
+    };
+
+    wlr_capture_session.events.destroy.add(&session.destroy);
 
     server.wm.dirtyWindowing();
 }
