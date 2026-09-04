@@ -223,12 +223,11 @@ fn defaultInitPath(environ: std.process.Environ) !?[:0]const u8 {
     };
 
     Io.Dir.cwd().access(io, path, .{ .execute = true }) catch |err| {
-        if (err == error.PermissionDenied) {
-            if (Io.Dir.cwd().access(io, path, .{})) {
-                fatal("failed to run init executable {s}: the file is not executable", .{path});
-            } else |_| {}
+        switch (err) {
+            error.FileNotFound => log.debug("no init file found at path {s}", .{path}),
+            error.PermissionDenied, error.AccessDenied => fatal("failed to run init executable {s}: the file is not executable", .{path}),
+            else => fatal("failed to run init executable {s}: {t}", .{ path, err }),
         }
-        log.err("failed to run init executable {s}: {s}", .{ path, @errorName(err) });
         util.gpa.free(path);
         return null;
     };
