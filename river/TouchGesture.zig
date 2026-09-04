@@ -41,6 +41,8 @@ requested: struct {
     threshold_right: i32 = 0,
     threshold_in: f64 = 1.0,
     threshold_out: f64 = 1.0,
+    edge: river.TouchGestureV1.Edge = .none,
+    edge_max_distance: i32 = 0,
 } = .{},
 
 /// Seat.gestures
@@ -109,6 +111,10 @@ fn handleRequest(
         },
         .set_threshold_motion => |args| {
             if (!server.wm.ensureWindowing()) return;
+            if (args.up < 0 or args.down < 0 or args.left < 0 or args.right < 0) {
+                object.postError(.invalid_threshold_value, "threshold_motion args must be >= 0");
+                return;
+            }
             gesture.requested.threshold_up = args.up;
             gesture.requested.threshold_down = args.down;
             gesture.requested.threshold_left = args.left;
@@ -118,6 +124,22 @@ fn handleRequest(
             if (!server.wm.ensureWindowing()) return;
             gesture.requested.threshold_in = args.in.toDouble();
             gesture.requested.threshold_out = args.out.toDouble();
+        },
+        .set_edge => |args| {
+            if (!server.wm.ensureWindowing()) return;
+            switch (args.edge) {
+                .none, .top, .bottom, .left, .right => {},
+                _ => {
+                    object.postError(.invalid_edge, "invalid river_touch_gesture_v1.edge enum value");
+                    return;
+                },
+            }
+            if (args.max_distance < 0) {
+                object.postError(.invalid_threshold_value, "edge max_distance must be >= 0");
+                return;
+            }
+            gesture.requested.edge = args.edge;
+            gesture.requested.edge_max_distance = args.max_distance;
         },
     }
 }

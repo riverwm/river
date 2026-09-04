@@ -23,18 +23,11 @@
     IN THE SOFTWARE.
   </copyright>
 
-  <description summary="">
-    This protocol allows the river-window-management-v1 window manager to
-
-    - A gesture must define conditions under which it should be triggered.
-        - start region
-        - number of fingers
-        - movement threshold
-        - hold timer
-
-    - When triggered, the compositor will send wl_touch.cancel to the focused
-      surface.
-
+  <description summary="define touchscreen gestures">
+    This protocol allows the river-window-management-v1 window manager to define
+    touchscreen gestures and the conditions under which they should be triggered,
+    as well as receive continuous updates on e.g. motion while a gesture is in
+    progress.
 
     The key words "must", "must not", "required", "shall", "shall not",
     "should", "should not", "recommended", "may", and "optional" in this
@@ -108,12 +101,14 @@
 
   <interface name="river_touch_gesture_v1" version="1">
     <description summary="define a touch gesture, receive trigger events">
-
-      TODO:
-        - edge/region
-        - delta rotation?
-
+      Define the requirements for a gesture to be triggered and receive
+      information on e.g. motion and pinch scale when triggered.
     </description>
+
+    <enum name="error">
+      <entry name="invalid_threshold_value" value="0"/>
+      <entry name="invalid_edge" value="1"/>
+    </enum>
 
     <request name="destroy" type="destructor">
       <description summary="destroy the touch gesture object">
@@ -221,39 +216,13 @@
       <arg name="scale" type="fixed" summary="current scale"/>
     </event>
 
-<!--
-    <event name="delta_angle">
-      <description summary="total change in angle">
-        The mean change in angle of the line connecting each touch point to the
-        centroid since gesture start.
-
-        Initially, the angle is 0 degrees. Rotation clockwise increases the
-        angle while rotation counterclockwise decreases the angle.
-
-        This event is only sent if there are two or more touch points.
-
-        This event will be followed by a manage_start event after all other new
-        state has been sent by the server.
-      </description>
-      <arg name="angle" type="fixed" summary="angle in degrees"/>
-    </event>
--->
-
     <request name="set_threshold_motion">
       <description summary="set centroid motion threshold to trigger">
-        XXX update docs
+        Set the centroid motion threshold in the up, down, left, and right
+        directions required to trigger the gesture. All arguments must be
+        greater than or equal to zero.
 
-        Set the x/y centroid motion thresholds required to trigger the gesture.
-        The threshold_dx and threshold_dy arguments may be positive or negative.
-
-        For example, a threshold_dx=10 and threshold_dy=-10 would require the
-        centroid to move at least 10 units to the right and at least 10 units up
-        in the compositor's logical coordinate space. With threshold_dx=0 and
-        threshold_dy=10, the centroid would need to move at least 10 units down
-        and horizontal movement would be irrelevant.
-
-        If this request is never made, both threshold_dx and threshold_dy are
-        considered to be 0.
+        If this request is never made, all arguments are considered to be 0.
 
         This request modifies window management state and may only be made as
         part of a manage sequence, see the river_window_manager_v1 description.
@@ -282,6 +251,31 @@
       </description>
       <arg name="in" type="fixed" summary="inward pinch scale threshold"/>
       <arg name="out" type="fixed" summary="outward pinch scale threshold"/>
+    </request>
+
+    <enum name="edge">
+      <entry name="none" value="0"/>
+      <entry name="top" value="1"/>
+      <entry name="bottom" value="2"/>
+      <entry name="left" value="3"/>
+      <entry name="right" value="4"/>
+    </enum>
+
+    <request name="set_edge">
+      <description summary="set edge from which the gesture must start">
+        Set the touchscreen edge from which the gesture must start and the
+        maximum allowed distance from that edge.
+
+        If edge is none, then there is no required edge to start from and the
+        max_distance argument is ignored.
+
+        If this request is never made, the edge is considered to be none.
+
+        This request modifies window management state and may only be made as
+        part of a manage sequence, see the river_window_manager_v1 description.
+      </description>
+      <arg name="edge" type="uint" enum="edge" summary="edge to start from"/>
+      <arg name="max_distance" type="int" summary="max distance from edge"/>
     </request>
   </interface>
 </protocol>

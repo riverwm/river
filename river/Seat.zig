@@ -538,12 +538,12 @@ pub fn processTouchDown(seat: *Seat, event: *const Seat.Event.TouchDown) void {
             continue :state seat.touch_state;
         },
         .arbitration => {
-            if (seat.touch_gestures.activate()) {
+            if (seat.touch_gestures.activate(&event.mapping)) {
                 seat.touchEat();
             }
         },
         .passthrough => {
-            if (seat.touch_gestures.activate()) {
+            if (seat.touch_gestures.activate(&event.mapping)) {
                 seat.touchEat();
             } else {
                 seat.touchPointSendDown(event.touch_id, touch_point);
@@ -565,12 +565,12 @@ pub fn processTouchMotion(seat: *Seat, event: *const Seat.Event.TouchMotion) voi
         switch (seat.touch_state) {
             .init => unreachable,
             .arbitration => {
-                if (seat.touch_gestures.activate()) {
+                if (seat.touch_gestures.activate(&event.mapping)) {
                     seat.touchEat();
                 }
             },
             .passthrough => {
-                if (seat.touch_gestures.activate()) {
+                if (seat.touch_gestures.activate(&event.mapping)) {
                     seat.touchEat();
                 } else if (seat.touch_ops.contains(event.touch_id)) {
                     server.wm.dirtyWindowingLazy();

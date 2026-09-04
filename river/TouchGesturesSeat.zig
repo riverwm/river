@@ -96,8 +96,13 @@ fn handleRequest(
 }
 
 /// Returns true if a gesture was activated and touch input should be eaten.
-pub fn activate(gseat: *TouchGesturesSeat) bool {
+pub fn activate(gseat: *TouchGesturesSeat, mapping: *const wlr.Box) bool {
     assert(gseat.active == null);
+
+    var touchscreen = mapping.*;
+    if (touchscreen.empty()) {
+        server.om.output_layout.getBox(null, &touchscreen);
+    }
 
     const values = gseat.computeValues();
 
@@ -109,6 +114,26 @@ pub fn activate(gseat: *TouchGesturesSeat) bool {
         if (-values.dy < gesture.requested.threshold_up and values.dy < gesture.requested.threshold_down) continue;
         if (values.scale) |scale| {
             if (scale > gesture.requested.threshold_in and scale < gesture.requested.threshold_out) continue;
+        }
+        switch (gesture.requested.edge) {
+            .none => {},
+            .top => {
+                if (values.cy_down < touchscreen.y or
+                    values.cy_down > touchscreen.y + gesture.requested.edge_max_distance) continue;
+            },
+            .bottom => {
+                if (values.cy_down > touchscreen.y + touchscreen.height or
+                    values.cy_down < touchscreen.y + touchscreen.height - gesture.requested.edge_max_distance) continue;
+            },
+            .left => {
+                if (values.cx_down < touchscreen.x or
+                    values.cx_down > touchscreen.x + gesture.requested.edge_max_distance) continue;
+            },
+            .right => {
+                if (values.cx_down > touchscreen.x + touchscreen.width or
+                    values.cx_down < touchscreen.x + touchscreen.width - gesture.requested.edge_max_distance) continue;
+            },
+            _ => unreachable,
         }
         break gesture;
     } else {
@@ -153,6 +178,10 @@ pub fn manageStart(gseat: *TouchGesturesSeat) void {
 
 const GestureValues = struct {
     finger_count: u32,
+    /// Mean x coordinate of touch down events
+    cx_down: f64,
+    /// Mean y coordinate of touch down events
+    cy_down: f64,
     dx: f64,
     dy: f64,
     scale: ?f64,
@@ -197,6 +226,8 @@ fn computeValues(gseat: *TouchGesturesSeat) GestureValues {
 
     return .{
         .finger_count = finger_count,
+        .cx_down = cx_down,
+        .cy_down = cy_down,
         .dx = cx - cx_down,
         .dy = cy - cy_down,
         .scale = scale,
