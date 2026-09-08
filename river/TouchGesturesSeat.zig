@@ -25,6 +25,11 @@ gestures: wl.list.Head(TouchGesture, .link),
 
 active: ?*TouchGesture = null,
 
+requested: struct {
+    /// Arbitration timeout in milliseconds
+    arbitration_timeout: u32 = 100,
+} = .{},
+
 pub fn init(gseat: *TouchGesturesSeat) void {
     gseat.* = .{
         .gestures = undefined,
@@ -51,6 +56,7 @@ pub fn makeInert(gseat: *TouchGesturesSeat) void {
         object.setHandler(?*anyopaque, handleRequestInert, null, null);
         handleDestroy(object, gseat);
     }
+    gseat.requested = .{};
 }
 
 fn handleRequestInert(
@@ -74,6 +80,9 @@ fn handleRequest(
     assert(gseat.object == object);
     switch (request) {
         .destroy => object.destroy(),
+        .set_arbitration_timeout => |args| {
+            gseat.requested.arbitration_timeout = args.msec;
+        },
         .get_gesture => |args| {
             const seat: *Seat = @fieldParentPtr("touch_gestures", gseat);
             if (args.finger_count == 0) {

@@ -79,6 +79,29 @@
       </description>
     </request>
 
+    <request name="set_arbitration_timeout">
+      <description summary="define a new gesture">
+        The arbitration timeout defines the maximum time after the first touch
+        down event the compositor should wait before deciding that the touch
+        sequence is not a gesture and instead routing the touch input to the
+        respective clients through the wl_touch interface.
+
+        This timeout should be short enough that it subjectively does not
+        negatively impact the responsiveness. The default if this request is
+        never made for the river_touch_gestures_seat_v1 is 100 milliseconds.
+
+        Setting the timeout to 0 milliseconds effectively disables all gestures
+        with e.g. a finger count greater than 1 or with a non-zero motion
+        threshold. However, a gesture with finger count 1 and edge trigger area
+        defined with the river_touch_gesture_v1.set_edge request could still be
+        triggered even with a 0 millisecond arbitration timeout.
+
+        This request may be made at any time but will only take effect on the
+        next touch sequence to be started.
+      </description>
+      <arg name="msec" type="uint" summary="arbitration timeout in milliseconds"/>
+    </request>
+
     <request name="get_gesture">
       <description summary="define a new gesture">
         Define a new touch gesture.
@@ -103,6 +126,7 @@
     <description summary="define a touch gesture, receive trigger events">
       Define the requirements for a gesture to be triggered and receive
       information on e.g. motion and pinch scale when triggered.
+
     </description>
 
     <enum name="error">

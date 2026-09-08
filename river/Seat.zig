@@ -529,9 +529,13 @@ pub fn processTouchDown(seat: *Seat, event: *const Seat.Event.TouchDown) void {
 
     state: switch (seat.touch_state) {
         .init => {
-            log.debug("touch arbitration started", .{});
-            // This value is quite arbitrary, 100ms seems to work well in practice
-            seat.touch_arbitration_timer.timerUpdate(100) catch {
+            const timeout = seat.touch_gestures.requested.arbitration_timeout;
+            if (seat.touch_gestures.gestures.empty() or timeout == 0) {
+                seat.touch_state = .passthrough;
+                continue :state seat.touch_state;
+            }
+            log.debug("touch arbitration starting, timeout={d}", .{timeout});
+            seat.touch_arbitration_timer.timerUpdate(math.lossyCast(c_int, timeout)) catch {
                 log.err("failed to set touch arbitration timer", .{});
             };
             seat.touch_state = .arbitration;
