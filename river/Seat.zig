@@ -1371,23 +1371,30 @@ pub fn detachDevice(seat: *Seat, device: *InputDevice) void {
 }
 
 pub fn updateCapabilities(seat: *Seat) void {
-    // Currently a cursor is always drawn even if there are no pointer input devices.
-    // TODO Don't draw a cursor if there are no input devices.
-    var capabilities: wl.Seat.Capability = .{ .pointer = true };
+    const previous = seat.wlr_seat.capabilities;
+    var current: wl.Seat.Capability = .{};
 
     var it = server.input_manager.devices.iterator(.forward);
     while (it.next()) |device| {
         if (device.seat == seat) {
             switch (device.wlr_device.type) {
-                .keyboard => capabilities.keyboard = true,
-                .touch => capabilities.touch = true,
-                .pointer, .@"switch", .tablet => {},
+                .keyboard => current.keyboard = true,
+                .touch => current.touch = true,
+                .pointer => current.pointer = true,
+                .@"switch", .tablet => {},
                 .tablet_pad => unreachable,
             }
         }
     }
 
-    seat.wlr_seat.setCapabilities(capabilities);
+    // setImage() is a noop when the seat lacks the pointer capability
+    if (!current.pointer) {
+        seat.cursor.setImage(.none);
+    }
+    seat.wlr_seat.setCapabilities(current);
+    if (current.pointer and !previous.pointer) {
+        seat.cursor.setImage(seat.cursor.wm_image);
+    }
 }
 
 fn handleRequestSetSelection(

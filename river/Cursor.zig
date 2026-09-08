@@ -239,6 +239,9 @@ pub fn setTheme(cursor: *Cursor, theme: ?[*:0]const u8, _size: ?u32) !void {
 }
 
 pub fn setImage(cursor: *Cursor, image: Image) void {
+    if (!cursor.seat.wlr_seat.capabilities.pointer) {
+        return;
+    }
     if (cursor.image == .client) {
         cursor.image_surface_destroy.link.remove();
     }
