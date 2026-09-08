@@ -543,11 +543,7 @@ pub fn processTouchDown(seat: *Seat, event: *const Seat.Event.TouchDown) void {
             }
         },
         .passthrough => {
-            if (seat.touch_gestures.activate(&event.mapping)) {
-                seat.touchEat();
-            } else {
-                seat.touchPointSendDown(event.touch_id, touch_point);
-            }
+            seat.touchPointSendDown(event.touch_id, touch_point);
         },
         .eat => {
             if (seat.touch_gestures.active != null) {
@@ -570,9 +566,7 @@ pub fn processTouchMotion(seat: *Seat, event: *const Seat.Event.TouchMotion) voi
                 }
             },
             .passthrough => {
-                if (seat.touch_gestures.activate(&event.mapping)) {
-                    seat.touchEat();
-                } else if (seat.touch_ops.contains(event.touch_id)) {
+                if (seat.touch_ops.contains(event.touch_id)) {
                     server.wm.dirtyWindowingLazy();
                 } else {
                     if (touch_point.sent_down) |down| {
