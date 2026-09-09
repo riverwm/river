@@ -227,14 +227,33 @@ fn computeValues(gseat: *TouchGesturesSeat) GestureValues {
 
     const scale = scale: {
         if (count < 2) break :scale null;
-        var sum: f64 = 0;
-        var sum_down: f64 = 0;
-        for (seat.touch_points.values()) |touch_point| {
-            sum += math.hypot(touch_point.lx - cx, touch_point.ly - cy);
-            sum_down += math.hypot(touch_point.lx_down - cx_down, touch_point.ly_down - cy_down);
+
+        const points = seat.touch_points.values();
+        var xmin: f64 = points[0].lx;
+        var xmax: f64 = points[0].lx;
+        var ymin: f64 = points[0].ly;
+        var ymax: f64 = points[0].ly;
+
+        var xmin_down: f64 = points[0].lx_down;
+        var xmax_down: f64 = points[0].lx_down;
+        var ymin_down: f64 = points[0].ly_down;
+        var ymax_down: f64 = points[0].ly_down;
+
+        for (points) |touch_point| {
+            xmin = @min(xmin, touch_point.lx);
+            ymin = @min(ymin, touch_point.ly);
+            xmax = @max(xmax, touch_point.lx);
+            ymax = @max(ymax, touch_point.ly);
+
+            xmin_down = @min(xmin_down, touch_point.lx_down);
+            ymin_down = @min(ymin_down, touch_point.ly_down);
+            xmax_down = @max(xmax_down, touch_point.lx_down);
+            ymax_down = @max(ymax_down, touch_point.ly_down);
         }
-        const d = sum / count;
-        const d_down = sum_down / count;
+
+        // Diagonal of the bounding box of all touch points
+        const d = math.hypot(xmax - xmin, ymax - ymin);
+        const d_down = math.hypot(xmax_down - xmin_down, ymax_down - ymin_down);
         break :scale d / d_down;
     };
 

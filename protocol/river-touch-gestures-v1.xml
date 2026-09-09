@@ -223,10 +223,9 @@
 
     <event name="scale">
       <description summary="current pinch scale">
-        The scale is defined as the ratio of the current distance between touch
-        points to the distance at gesture start. The distance between touch
-        points is defined as the sum of the distance between each point and the
-        centroid.
+        The pinch distance is defined as the diagonal of the bounding box of all
+        touch points. The pinch scale is defined as the ratio of the current
+        pinch distance to the distance at gesture start.
 
         Thus, the scale is initially 1.0. If the touch points are moved closer
         together, the scale decreases and if the touch points are moved further
