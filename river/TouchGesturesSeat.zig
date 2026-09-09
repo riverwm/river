@@ -119,8 +119,13 @@ pub fn activate(gseat: *TouchGesturesSeat, mapping: *const wlr.Box) bool {
     const gesture = while (it.next()) |gesture| {
         if (!gesture.requested.enabled) continue;
         if (gesture.finger_count != values.finger_count) continue;
-        if (-values.dx < gesture.requested.threshold_left and values.dx < gesture.requested.threshold_right) continue;
-        if (-values.dy < gesture.requested.threshold_up and values.dy < gesture.requested.threshold_down) continue;
+        if (-values.dx < gesture.requested.threshold_left and
+            values.dx < gesture.requested.threshold_right and
+            -values.dy < gesture.requested.threshold_up and
+            values.dy < gesture.requested.threshold_down)
+        {
+            continue;
+        }
         if (values.scale) |scale| {
             if (scale > gesture.requested.threshold_in and scale < gesture.requested.threshold_out) continue;
         }
