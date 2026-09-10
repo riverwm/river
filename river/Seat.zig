@@ -531,8 +531,13 @@ pub fn processTouchDown(seat: *Seat, event: *const Seat.Event.TouchDown) void {
         .init => {
             const timeout = seat.touch_gestures.requested.arbitration_timeout;
             if (seat.touch_gestures.gestures.empty() or timeout == 0) {
-                seat.touch_state = .passthrough;
-                continue :state seat.touch_state;
+                if (seat.touch_gestures.activate(&event.mapping)) {
+                    seat.touch_state = .eat;
+                    continue :state seat.touch_state;
+                } else {
+                    seat.touch_state = .passthrough;
+                    continue :state seat.touch_state;
+                }
             }
             log.debug("touch arbitration starting, timeout={d}", .{timeout});
             seat.touch_arbitration_timer.timerUpdate(math.lossyCast(c_int, timeout)) catch {
