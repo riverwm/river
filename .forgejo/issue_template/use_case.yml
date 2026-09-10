@@ -12,6 +12,8 @@ body:
       description: |
         Please describe your use case in detail.
 
+        Note: Use of generative AI/LLMs is strictly forbidden on the river issue tracker.
+
         Do you have a suggestion for how river could support it?
 
         Are there any workarounds you have tried?

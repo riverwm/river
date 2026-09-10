@@ -11,6 +11,8 @@ body:
         Please provide as many details as possible, we must be able to
         understand the bug in order to fix it.
 
+        Note: Use of generative AI/LLMs is strictly forbidden on the river issue tracker.
+
         Don't forget to search the issue tracker in case there is
         already an open issue for the bug you found.
   - type: input
