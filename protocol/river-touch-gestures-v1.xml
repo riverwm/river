@@ -130,8 +130,9 @@
     </description>
 
     <enum name="error">
-      <entry name="invalid_threshold_value" value="0"/>
-      <entry name="invalid_edge" value="1"/>
+      <entry name="invalid_distance" value="0"/>
+      <entry name="invalid_direction" value="1"/>
+      <entry name="invalid_edge" value="2"/>
     </enum>
 
     <request name="destroy" type="destructor">
@@ -241,19 +242,46 @@
 
     <request name="set_threshold_motion">
       <description summary="set centroid motion threshold to trigger">
-        Set the centroid motion threshold in the up, down, left, and right
-        directions required to trigger the gesture. All arguments must be
-        greater than or equal to zero.
+        Set the minimum centroid motion required to trigger the gesture.
 
-        If this request is never made, all arguments are considered to be 0.
+        Distance is measured between the current centroid and the centroid of
+        the touch down events.
+
+        If this request is never made, the threshold is considered to be 0.
+
+        The threshold argument must be greater than or equal to 0.
 
         This request modifies window management state and may only be made as
         part of a manage sequence, see the river_window_manager_v1 description.
       </description>
-      <arg name="up" type="int" summary="negative y motion threshold"/>
-      <arg name="down" type="int" summary="positive y motion threshold"/>
-      <arg name="left" type="int" summary="negative x motion threshold"/>
-      <arg name="right" type="int" summary="positive x motion threshold"/>
+      <arg name="min_distance" type="int" summary="minimum distance to trigger"/>
+    </request>
+
+    <enum name="direction">
+      <entry name="none" value="0"/>
+      <entry name="up" value="1"/>
+      <entry name="down" value="2"/>
+      <entry name="left" value="3"/>
+      <entry name="right" value="4"/>
+    </enum>
+
+    <request name="set_direction">
+      <description summary="set centroid motion direction to trigger">
+        Set the direction and minimum centroid motion distance required to
+        trigger the gesture.
+
+        If direction is none, there is no directional motion required to trigger
+        the gesture and the min_distance argument is ignored.
+
+        If this request is never made, the direction is considered to be none.
+
+        The min_distance argument must be greater than or equal to 0.
+
+        This request modifies window management state and may only be made as
+        part of a manage sequence, see the river_window_manager_v1 description.
+      </description>
+      <arg name="direction" type="uint" enum="direction" summary="motion direction"/>
+      <arg name="min_distance" type="int" summary="minimum distance to trigger"/>
     </request>
 
     <request name="set_threshold_scale">
@@ -293,6 +321,8 @@
         max_distance argument is ignored.
 
         If this request is never made, the edge is considered to be none.
+
+        The max_distance argument must be greater than or equal to 0.
 
         This request modifies window management state and may only be made as
         part of a manage sequence, see the river_window_manager_v1 description.

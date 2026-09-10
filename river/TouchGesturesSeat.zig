@@ -119,12 +119,14 @@ pub fn activate(gseat: *TouchGesturesSeat, mapping: *const wlr.Box) bool {
     const gesture = while (it.next()) |gesture| {
         if (!gesture.requested.enabled) continue;
         if (gesture.finger_count != values.finger_count) continue;
-        if (-values.dx < gesture.requested.threshold_left and
-            values.dx < gesture.requested.threshold_right and
-            -values.dy < gesture.requested.threshold_up and
-            values.dy < gesture.requested.threshold_down)
-        {
-            continue;
+        if (values.distance < gesture.requested.threshold_motion) continue;
+        switch (gesture.requested.dir) {
+            .none => {},
+            .up => if (-values.dy < gesture.requested.dir_min_distance) continue,
+            .down => if (values.dy < gesture.requested.dir_min_distance) continue,
+            .left => if (-values.dx < gesture.requested.dir_min_distance) continue,
+            .right => if (values.dx < gesture.requested.dir_min_distance) continue,
+            _ => unreachable,
         }
         if (values.scale) |scale| {
             if (scale > gesture.requested.threshold_in and scale < gesture.requested.threshold_out) continue;
@@ -192,6 +194,7 @@ pub fn manageStart(gseat: *TouchGesturesSeat) void {
 
 const GestureValues = struct {
     finger_count: u32,
+    distance: f64,
     /// Mean x coordinate of touch down events
     cx_down: f64,
     /// Mean y coordinate of touch down events
@@ -259,6 +262,7 @@ fn computeValues(gseat: *TouchGesturesSeat) GestureValues {
 
     return .{
         .finger_count = finger_count,
+        .distance = math.hypot(cx - cx_down, cy - cy_down),
         .cx_down = cx_down,
         .cy_down = cy_down,
         .dx = cx - cx_down,

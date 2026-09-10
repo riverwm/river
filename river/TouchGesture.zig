@@ -35,10 +35,9 @@ sent: struct {
 } = .{},
 requested: struct {
     enabled: bool = false,
-    threshold_up: i32 = 0,
-    threshold_down: i32 = 0,
-    threshold_left: i32 = 0,
-    threshold_right: i32 = 0,
+    threshold_motion: i32 = 0,
+    dir: river.TouchGestureV1.Direction = .none,
+    dir_min_distance: i32 = 0,
     threshold_in: f64 = 1.0,
     threshold_out: f64 = 1.0,
     edge: river.TouchGestureV1.Edge = .none,
@@ -111,14 +110,27 @@ fn handleRequest(
         },
         .set_threshold_motion => |args| {
             if (!server.wm.ensureWindowing()) return;
-            if (args.up < 0 or args.down < 0 or args.left < 0 or args.right < 0) {
-                object.postError(.invalid_threshold_value, "threshold_motion args must be >= 0");
+            if (args.min_distance < 0) {
+                object.postError(.invalid_distance, "min_distance arg must be >= 0");
                 return;
             }
-            gesture.requested.threshold_up = args.up;
-            gesture.requested.threshold_down = args.down;
-            gesture.requested.threshold_left = args.left;
-            gesture.requested.threshold_right = args.right;
+            gesture.requested.threshold_motion = args.min_distance;
+        },
+        .set_direction => |args| {
+            if (!server.wm.ensureWindowing()) return;
+            switch (args.direction) {
+                .none, .up, .down, .left, .right => {},
+                _ => {
+                    object.postError(.invalid_direction, "invalid river_touch_gesture_v1.direction enum value");
+                    return;
+                },
+            }
+            if (args.min_distance < 0) {
+                object.postError(.invalid_distance, "min_distance arg must be >= 0");
+                return;
+            }
+            gesture.requested.dir = args.direction;
+            gesture.requested.dir_min_distance = args.min_distance;
         },
         .set_threshold_scale => |args| {
             if (!server.wm.ensureWindowing()) return;
@@ -135,7 +147,7 @@ fn handleRequest(
                 },
             }
             if (args.max_distance < 0) {
-                object.postError(.invalid_threshold_value, "edge max_distance must be >= 0");
+                object.postError(.invalid_distance, "max_distance arg must be >= 0");
                 return;
             }
             gesture.requested.edge = args.edge;
