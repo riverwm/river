@@ -24,10 +24,10 @@
   </copyright>
 
   <description summary="define touchscreen gestures">
-    This protocol allows the river-window-management-v1 window manager to define
-    touchscreen gestures and the conditions under which they should be triggered,
-    as well as receive continuous updates on e.g. motion while a gesture is in
-    progress.
+    This protocol allows the river-window-management-v1 window manager to
+    define touchscreen gestures and the conditions under which they should be
+    triggered. It also provides continuous updates on e.g. motion and pinch
+    scale while a gesture is in progress.
 
     The key words "must", "must not", "required", "shall", "shall not",
     "should", "should not", "recommended", "may", and "optional" in this
@@ -126,7 +126,6 @@
     <description summary="define a touch gesture, receive trigger events">
       Define the requirements for a gesture to be triggered and receive
       information on e.g. motion and pinch scale when triggered.
-
     </description>
 
     <enum name="error">
@@ -187,6 +186,8 @@
 
     <event name="end">
       <description summary="gesture ended">
+        All touch points have been released and the gesture is ended.
+
         This event will be followed by a manage_start event after all other new
         state has been sent by the server.
       </description>
@@ -194,6 +195,9 @@
 
     <event name="cancel">
       <description summary="gesture canceled">
+        The gesture is canceled, for example because the hardware palm detection
+        decided that the touch input should have been ignored.
+
         This event will be followed by a manage_start event after all other new
         state has been sent by the server.
       </description>
@@ -201,7 +205,7 @@
 
     <event name="finger_count">
       <description summary="number of touch points changed">
-        The number of touch points changed after the gesture has been triggered.
+        The number of active touch points changed since the gesture was started.
 
         This event will be followed by a manage_start event after all other new
         state has been sent by the server.
