@@ -70,7 +70,11 @@ pub fn maybeActivate(constraint: *PointerConstraint) void {
 
     const sx: i32 = @intFromFloat(result.sx);
     const sy: i32 = @intFromFloat(result.sy);
-    if (!constraint.wlr_constraint.region.containsPoint(sx, sy, null)) return;
+    if (constraint.wlr_constraint.region.notEmpty() and
+        !constraint.wlr_constraint.region.containsPoint(sx, sy, null))
+    {
+        return;
+    }
 
     assert(constraint.state == .inactive);
     constraint.state = .{
