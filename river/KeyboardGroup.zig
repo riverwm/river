@@ -427,6 +427,7 @@ fn handleModifiers(listener: *wl.Listener(*wlr.Keyboard), _: *wlr.Keyboard) void
         group.seat.wlr_seat.setKeyboard(&group.state);
         group.seat.wlr_seat.keyboardNotifyModifiers(&group.state.modifiers);
     }
+    group.seat.sendModsToPointerFocus();
     group.sendState();
 }
 

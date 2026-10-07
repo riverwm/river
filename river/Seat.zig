@@ -1225,6 +1225,30 @@ fn keyboardNotifyEnter(seat: *Seat, wlr_surface: *wlr.Surface) void {
     }
 }
 
+pub fn sendModsToPointerFocus(seat: *Seat) void {
+    const wlr_seat = seat.wlr_seat;
+    const wlr_surface = wlr_seat.pointer_state.focused_surface orelse return;
+    const wlr_keyboard = wlr_seat.keyboard_state.keyboard orelse return;
+    const seat_client = wlr_seat.clientForWlClient(wlr_surface.resource.getClient()) orelse return;
+
+    // Client has keyboard focus and is already being notified of keyboard modifiers.
+    if (seat_client == wlr_seat.keyboard_state.focused_client) return;
+
+    const serial = seat_client.nextSerial();
+    {
+        var it = seat_client.keyboards.iterator(.forward);
+        while (it.next()) |wl_keyboard| {
+            wl_keyboard.sendModifiers(
+                serial,
+                wlr_keyboard.modifiers.depressed,
+                wlr_keyboard.modifiers.latched,
+                wlr_keyboard.modifiers.locked,
+                wlr_keyboard.modifiers.group,
+            );
+        }
+    }
+}
+
 pub fn handleActivity(seat: Seat) void {
     server.input_manager.idle_notifier.notifyActivity(seat.wlr_seat);
 }

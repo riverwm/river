@@ -662,7 +662,10 @@ fn passthrough(cursor: *Cursor, time: u32) void {
         }
 
         if (result.surface) |surface| {
-            cursor.seat.wlr_seat.pointerNotifyEnter(surface, result.sx, result.sy);
+            if (cursor.seat.wlr_seat.pointer_state.focused_surface != surface) {
+                cursor.seat.wlr_seat.pointerNotifyEnter(surface, result.sx, result.sy);
+                cursor.seat.sendModsToPointerFocus();
+            }
             cursor.seat.wlr_seat.pointerNotifyMotion(time, result.sx, result.sy);
             return;
         }
