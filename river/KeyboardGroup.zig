@@ -450,11 +450,6 @@ fn matchBuiltinBinding(group: *KeyboardGroup, xkb_keycode: u32) bool {
     return false;
 }
 
-fn inputMethodKeyboard(group: *KeyboardGroup) bool {
-    if (group.virtual) {}
-    return false;
-}
-
 /// Returns null if the keyboard is not grabbed by an input method,
 /// or if the group is for a virtual keyboard created by the input method.
 fn getInputMethodGrab(group: *KeyboardGroup) ?*wlr.InputMethodV2.KeyboardGrab {
