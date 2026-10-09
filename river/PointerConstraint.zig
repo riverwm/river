@@ -7,6 +7,7 @@ const std = @import("std");
 const assert = std.debug.assert;
 const wlr = @import("wlroots");
 const wl = @import("wayland").server.wl;
+const pixman = @import("pixman");
 
 const server = &@import("main.zig").server;
 const util = @import("util.zig");
@@ -46,6 +47,17 @@ pub fn create(wlr_constraint: *wlr.PointerConstraintV1) error{OutOfMemory}!void 
 
     wlr_constraint.events.destroy.add(&constraint.destroy);
     wlr_constraint.surface.events.commit.add(&constraint.commit);
+
+    // Workaround upstream wlroots bug
+    // See: https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/5473
+    // TODO(wlroots) remove once river depends on a new enough release
+    if (!wlr_constraint.current.region.notEmpty()) {
+        var region: pixman.Region32 = undefined;
+        region.init();
+        _ = region.copy(&wlr_constraint.surface.input_region);
+        wlr_constraint.region.deinit();
+        wlr_constraint.region = region;
+    }
 
     if (seat.wlr_seat.keyboard_state.focused_surface) |surface| {
         if (surface == wlr_constraint.surface) {
