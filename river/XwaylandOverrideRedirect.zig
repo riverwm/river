@@ -85,6 +85,13 @@ fn handleAssociate(listener: *wl.Listener(void)) void {
 
     override_redirect.xsurface.surface.?.events.map.add(&override_redirect.map);
     override_redirect.xsurface.surface.?.events.unmap.add(&override_redirect.unmap);
+
+    // Workaround a race in the upstream wlroots xwm.
+    // TODO(wlroots) remove the workaround.
+    // See: https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/5479
+    if (override_redirect.xsurface.surface.?.hasBuffer()) {
+        override_redirect.xsurface.surface.?.map();
+    }
 }
 
 fn handleDissociate(listener: *wl.Listener(void)) void {
