@@ -174,6 +174,13 @@ fn handleAssociate(listener: *wl.Listener(void)) void {
 
     xwindow.xsurface.surface.?.events.map.add(&xwindow.map);
     xwindow.xsurface.surface.?.events.unmap.add(&xwindow.unmap);
+
+    // Workaround a race in the upstream wlroots xwm.
+    // TODO(wlroots) remove the workaround.
+    // See: https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/5479
+    if (xwindow.xsurface.surface.?.hasBuffer()) {
+        xwindow.xsurface.surface.?.map();
+    }
 }
 
 fn handleDissociate(listener: *wl.Listener(void)) void {
