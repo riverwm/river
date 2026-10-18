@@ -33,6 +33,7 @@ ref: Ref,
 wlr_layer_surface: *wlr.LayerSurfaceV1,
 scene_layer_surface: *wlr.SceneLayerSurfaceV1,
 popup_tree: *wlr.SceneTree,
+configurable: bool = false,
 
 destroy: wl.Listener(*wlr.LayerSurfaceV1) = wl.Listener(*wlr.LayerSurfaceV1).init(handleDestroy),
 map: wl.Listener(void) = wl.Listener(void).init(handleMap),
@@ -121,6 +122,7 @@ fn handleUnmap(listener: *wl.Listener(void)) void {
     const layer_surface: *LayerSurface = @fieldParentPtr("unmap", listener);
 
     log.debug("layer surface '{s}' unmapped", .{layer_surface.wlr_layer_surface.namespace});
+    layer_surface.configurable = false;
 
     {
         var it = server.input_manager.seats.iterator(.forward);
@@ -148,6 +150,8 @@ fn handleCommit(listener: *wl.Listener(*wlr.Surface), _: *wlr.Surface) void {
     const wlr_layer_surface = layer_surface.wlr_layer_surface;
 
     assert(wlr_layer_surface.output != null);
+
+    if (wlr_layer_surface.initial_commit) layer_surface.configurable = true;
 
     // If the layer was changed, move the LayerSurface to the proper tree.
     if (wlr_layer_surface.current.committed.layer) {
