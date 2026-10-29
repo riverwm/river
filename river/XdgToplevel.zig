@@ -121,7 +121,7 @@ pub fn configure(toplevel: *XdgToplevel) bool {
     };
 
     const scheduled = &toplevel.window.configure_scheduled;
-    const sent = &toplevel.window.configure_scheduled;
+    const sent = &toplevel.window.configure_sent;
 
     if (!toplevel.needsConfigure()) {
         // If no new configure is required, continue to track a timed out configure
