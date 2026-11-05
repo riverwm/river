@@ -64,20 +64,20 @@ pub fn createObject(device: *LibinputDevice, config_v1: *river.LibinputConfigV1)
     const tap_finger_count = c.libinput_device_config_tap_get_finger_count(device.libinput);
     object.sendTapSupport(tap_finger_count);
     if (tap_finger_count > 0) {
-        object.sendTapDefault(@enumFromInt(c.libinput_device_config_tap_get_default_enabled(device.libinput)));
-        object.sendTapCurrent(@enumFromInt(c.libinput_device_config_tap_get_enabled(device.libinput)));
-        object.sendTapButtonMapDefault(@enumFromInt(c.libinput_device_config_tap_get_default_button_map(device.libinput)));
-        object.sendTapButtonMapCurrent(@enumFromInt(c.libinput_device_config_tap_get_button_map(device.libinput)));
-        object.sendDragDefault(@enumFromInt(c.libinput_device_config_tap_get_default_drag_enabled(device.libinput)));
-        object.sendDragCurrent(@enumFromInt(c.libinput_device_config_tap_get_drag_enabled(device.libinput)));
-        object.sendDragLockDefault(@enumFromInt(c.libinput_device_config_tap_get_default_drag_lock_enabled(device.libinput)));
-        object.sendDragLockCurrent(@enumFromInt(c.libinput_device_config_tap_get_drag_lock_enabled(device.libinput)));
+        object.sendTapDefault(@fromBackingInt(@intCast(c.libinput_device_config_tap_get_default_enabled(device.libinput))));
+        object.sendTapCurrent(@fromBackingInt(@intCast(c.libinput_device_config_tap_get_enabled(device.libinput))));
+        object.sendTapButtonMapDefault(@fromBackingInt(@intCast(c.libinput_device_config_tap_get_default_button_map(device.libinput))));
+        object.sendTapButtonMapCurrent(@fromBackingInt(@intCast(c.libinput_device_config_tap_get_button_map(device.libinput))));
+        object.sendDragDefault(@fromBackingInt(@intCast(c.libinput_device_config_tap_get_default_drag_enabled(device.libinput))));
+        object.sendDragCurrent(@fromBackingInt(@intCast(c.libinput_device_config_tap_get_drag_enabled(device.libinput))));
+        object.sendDragLockDefault(@fromBackingInt(@intCast(c.libinput_device_config_tap_get_default_drag_lock_enabled(device.libinput))));
+        object.sendDragLockCurrent(@fromBackingInt(@intCast(c.libinput_device_config_tap_get_drag_lock_enabled(device.libinput))));
     }
     const three_finger_drag_finger_count = c.libinput_device_config_3fg_drag_get_finger_count(device.libinput);
     object.sendThreeFingerDragSupport(three_finger_drag_finger_count);
     if (three_finger_drag_finger_count >= 3) {
-        object.sendThreeFingerDragDefault(@enumFromInt(c.libinput_device_config_3fg_drag_get_default_enabled(device.libinput)));
-        object.sendThreeFingerDragCurrent(@enumFromInt(c.libinput_device_config_3fg_drag_get_enabled(device.libinput)));
+        object.sendThreeFingerDragDefault(@fromBackingInt(@intCast(c.libinput_device_config_3fg_drag_get_default_enabled(device.libinput))));
+        object.sendThreeFingerDragCurrent(@fromBackingInt(@intCast(c.libinput_device_config_3fg_drag_get_enabled(device.libinput))));
     }
     const has_matrix = c.libinput_device_config_calibration_has_matrix(device.libinput);
     object.sendCalibrationMatrixSupport(has_matrix);
@@ -93,8 +93,8 @@ pub fn createObject(device: *LibinputDevice, config_v1: *river.LibinputConfigV1)
     const profiles = c.libinput_device_config_accel_get_profiles(device.libinput);
     object.sendAccelProfilesSupport(@bitCast(profiles));
     if (profiles != 0) {
-        object.sendAccelProfileDefault(@enumFromInt(c.libinput_device_config_accel_get_default_profile(device.libinput)));
-        object.sendAccelProfileCurrent(@enumFromInt(c.libinput_device_config_accel_get_profile(device.libinput)));
+        object.sendAccelProfileDefault(@fromBackingInt(@intCast(c.libinput_device_config_accel_get_default_profile(device.libinput))));
+        object.sendAccelProfileCurrent(@fromBackingInt(@intCast(c.libinput_device_config_accel_get_profile(device.libinput))));
         var speed: [1]f64 = .{c.libinput_device_config_accel_get_default_speed(device.libinput)};
         const bytes: []u8 = @ptrCast(&speed);
         var array: wl.Array = .{ .size = bytes.len, .alloc = bytes.len, .data = bytes.ptr };
@@ -121,29 +121,29 @@ pub fn createObject(device: *LibinputDevice, config_v1: *river.LibinputConfigV1)
     const click_methods = c.libinput_device_config_click_get_methods(device.libinput);
     object.sendClickMethodSupport(@bitCast(click_methods));
     if (click_methods != 0) {
-        object.sendClickMethodDefault(@enumFromInt(c.libinput_device_config_click_get_default_method(device.libinput)));
-        object.sendClickMethodCurrent(@enumFromInt(c.libinput_device_config_click_get_method(device.libinput)));
+        object.sendClickMethodDefault(@fromBackingInt(@intCast(c.libinput_device_config_click_get_default_method(device.libinput))));
+        object.sendClickMethodCurrent(@fromBackingInt(@intCast(c.libinput_device_config_click_get_method(device.libinput))));
         if (click_methods & c.LIBINPUT_CONFIG_CLICK_METHOD_CLICKFINGER != 0) {
-            object.sendClickfingerButtonMapDefault(@enumFromInt(c.libinput_device_config_click_get_default_clickfinger_button_map(device.libinput)));
-            object.sendClickfingerButtonMapCurrent(@enumFromInt(c.libinput_device_config_click_get_clickfinger_button_map(device.libinput)));
+            object.sendClickfingerButtonMapDefault(@fromBackingInt(@intCast(c.libinput_device_config_click_get_default_clickfinger_button_map(device.libinput))));
+            object.sendClickfingerButtonMapCurrent(@fromBackingInt(@intCast(c.libinput_device_config_click_get_clickfinger_button_map(device.libinput))));
         }
     }
     const middle_emulation = c.libinput_device_config_middle_emulation_is_available(device.libinput);
     object.sendMiddleEmulationSupport(middle_emulation);
     if (middle_emulation != 0) {
-        object.sendMiddleEmulationDefault(@enumFromInt(c.libinput_device_config_middle_emulation_get_default_enabled(device.libinput)));
-        object.sendMiddleEmulationCurrent(@enumFromInt(c.libinput_device_config_middle_emulation_get_enabled(device.libinput)));
+        object.sendMiddleEmulationDefault(@fromBackingInt(@intCast(c.libinput_device_config_middle_emulation_get_default_enabled(device.libinput))));
+        object.sendMiddleEmulationCurrent(@fromBackingInt(@intCast(c.libinput_device_config_middle_emulation_get_enabled(device.libinput))));
     }
     const scroll_methods = c.libinput_device_config_scroll_get_methods(device.libinput);
     object.sendScrollMethodSupport(@bitCast(scroll_methods));
     if (scroll_methods != 0) {
-        object.sendScrollMethodDefault(@enumFromInt(c.libinput_device_config_scroll_get_default_method(device.libinput)));
-        object.sendScrollMethodCurrent(@enumFromInt(c.libinput_device_config_scroll_get_method(device.libinput)));
+        object.sendScrollMethodDefault(@fromBackingInt(@intCast(c.libinput_device_config_scroll_get_default_method(device.libinput))));
+        object.sendScrollMethodCurrent(@fromBackingInt(@intCast(c.libinput_device_config_scroll_get_method(device.libinput))));
         if (scroll_methods & c.LIBINPUT_CONFIG_SCROLL_ON_BUTTON_DOWN != 0) {
             object.sendScrollButtonDefault(c.libinput_device_config_scroll_get_default_button(device.libinput));
             object.sendScrollButtonCurrent(c.libinput_device_config_scroll_get_button(device.libinput));
-            object.sendScrollButtonLockDefault(@enumFromInt(c.libinput_device_config_scroll_get_default_button_lock(device.libinput)));
-            object.sendScrollButtonLockCurrent(@enumFromInt(c.libinput_device_config_scroll_get_button_lock(device.libinput)));
+            object.sendScrollButtonLockDefault(@fromBackingInt(@intCast(c.libinput_device_config_scroll_get_default_button_lock(device.libinput))));
+            object.sendScrollButtonLockCurrent(@fromBackingInt(@intCast(c.libinput_device_config_scroll_get_button_lock(device.libinput))));
         }
     }
     const dwt = c.libinput_device_config_dwt_is_available(device.libinput);
@@ -229,7 +229,7 @@ fn handleRequest(
             if (result.send(status)) {
                 const current = c.libinput_device_config_tap_get_enabled(device.libinput);
                 var it = device.objects.iterator(.forward);
-                while (it.next()) |o| o.sendTapCurrent(@enumFromInt(current));
+                while (it.next()) |o| o.sendTapCurrent(@fromBackingInt(@intCast(current)));
                 send_done = true;
             }
         },
@@ -246,7 +246,7 @@ fn handleRequest(
             if (result.send(status)) {
                 const current = c.libinput_device_config_tap_get_button_map(device.libinput);
                 var it = device.objects.iterator(.forward);
-                while (it.next()) |o| o.sendTapButtonMapCurrent(@enumFromInt(current));
+                while (it.next()) |o| o.sendTapButtonMapCurrent(@fromBackingInt(@intCast(current)));
                 send_done = true;
             }
         },
@@ -263,7 +263,7 @@ fn handleRequest(
             if (result.send(status)) {
                 const current = c.libinput_device_config_tap_get_drag_enabled(device.libinput);
                 var it = device.objects.iterator(.forward);
-                while (it.next()) |o| o.sendDragCurrent(@enumFromInt(current));
+                while (it.next()) |o| o.sendDragCurrent(@fromBackingInt(@intCast(current)));
                 send_done = true;
             }
         },
@@ -281,7 +281,7 @@ fn handleRequest(
             if (result.send(status)) {
                 const current = c.libinput_device_config_tap_get_drag_lock_enabled(device.libinput);
                 var it = device.objects.iterator(.forward);
-                while (it.next()) |o| o.sendDragLockCurrent(@enumFromInt(current));
+                while (it.next()) |o| o.sendDragLockCurrent(@fromBackingInt(@intCast(current)));
                 send_done = true;
             }
         },
@@ -299,7 +299,7 @@ fn handleRequest(
             if (result.send(status)) {
                 const current = c.libinput_device_config_3fg_drag_get_enabled(device.libinput);
                 var it = device.objects.iterator(.forward);
-                while (it.next()) |o| o.sendThreeFingerDragCurrent(@enumFromInt(current));
+                while (it.next()) |o| o.sendThreeFingerDragCurrent(@fromBackingInt(@intCast(current)));
                 send_done = true;
             }
         },
@@ -336,7 +336,7 @@ fn handleRequest(
             if (result.send(status)) {
                 const current = c.libinput_device_config_accel_get_profile(device.libinput);
                 var it = device.objects.iterator(.forward);
-                while (it.next()) |o| o.sendAccelProfileCurrent(@enumFromInt(current));
+                while (it.next()) |o| o.sendAccelProfileCurrent(@fromBackingInt(@intCast(current)));
                 send_done = true;
             }
         },
@@ -368,7 +368,7 @@ fn handleRequest(
             if (result.send(status)) {
                 const current = c.libinput_device_config_accel_get_profile(device.libinput);
                 var it = device.objects.iterator(.forward);
-                while (it.next()) |o| o.sendAccelProfileCurrent(@enumFromInt(current));
+                while (it.next()) |o| o.sendAccelProfileCurrent(@fromBackingInt(@intCast(current)));
                 send_done = true;
             }
         },
@@ -420,7 +420,7 @@ fn handleRequest(
             if (result.send(status)) {
                 const current = c.libinput_device_config_click_get_method(device.libinput);
                 var it = device.objects.iterator(.forward);
-                while (it.next()) |o| o.sendClickMethodCurrent(@enumFromInt(current));
+                while (it.next()) |o| o.sendClickMethodCurrent(@fromBackingInt(@intCast(current)));
                 send_done = true;
             }
         },
@@ -437,7 +437,7 @@ fn handleRequest(
             if (result.send(status)) {
                 const current = c.libinput_device_config_click_get_clickfinger_button_map(device.libinput);
                 var it = device.objects.iterator(.forward);
-                while (it.next()) |o| o.sendClickfingerButtonMapCurrent(@enumFromInt(current));
+                while (it.next()) |o| o.sendClickfingerButtonMapCurrent(@fromBackingInt(@intCast(current)));
                 send_done = true;
             }
         },
@@ -454,7 +454,7 @@ fn handleRequest(
             if (result.send(status)) {
                 const current = c.libinput_device_config_middle_emulation_get_enabled(device.libinput);
                 var it = device.objects.iterator(.forward);
-                while (it.next()) |o| o.sendMiddleEmulationCurrent(@enumFromInt(current));
+                while (it.next()) |o| o.sendMiddleEmulationCurrent(@fromBackingInt(@intCast(current)));
                 send_done = true;
             }
         },
@@ -473,7 +473,7 @@ fn handleRequest(
             if (result.send(status)) {
                 const current = c.libinput_device_config_scroll_get_method(device.libinput);
                 var it = device.objects.iterator(.forward);
-                while (it.next()) |o| o.sendScrollMethodCurrent(@enumFromInt(current));
+                while (it.next()) |o| o.sendScrollMethodCurrent(@fromBackingInt(@intCast(current)));
                 send_done = true;
             }
         },
@@ -500,7 +500,7 @@ fn handleRequest(
             if (result.send(status)) {
                 const current = c.libinput_device_config_scroll_get_button_lock(device.libinput);
                 var it = device.objects.iterator(.forward);
-                while (it.next()) |o| o.sendScrollButtonLockCurrent(@enumFromInt(current));
+                while (it.next()) |o| o.sendScrollButtonLockCurrent(@fromBackingInt(@intCast(current)));
                 send_done = true;
             }
         },

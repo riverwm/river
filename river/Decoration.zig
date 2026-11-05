@@ -47,7 +47,7 @@ pub fn create(
 ) !*Decoration {
     const decoration_v1 = try river.DecorationV1.create(client, version, id);
 
-    if (!surface.setRole(&role, @ptrCast(decoration_v1), @intFromEnum(river.WindowManagerV1.Error.role))) {
+    if (!surface.setRole(&role, @ptrCast(decoration_v1), @backingInt(river.WindowManagerV1.Error.role))) {
         return error.AlreadyHasRole;
     }
     surface.setRoleObject(@ptrCast(decoration_v1));

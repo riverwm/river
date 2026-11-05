@@ -61,7 +61,7 @@ fn handleRequest(
                 object.getClient(),
                 object.getVersion(),
                 args.id,
-                @enumFromInt(args.keysym),
+                @fromBackingInt(@intCast(args.keysym)),
                 args.modifiers,
             ) catch {
                 object.getClient().postNoMemory();
