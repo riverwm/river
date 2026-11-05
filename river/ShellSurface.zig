@@ -50,7 +50,7 @@ pub fn create(
 
     const shell_surface_v1 = try river.ShellSurfaceV1.create(client, version, id);
 
-    if (!surface.setRole(&role, @ptrCast(shell_surface_v1), @intFromEnum(river.WindowManagerV1.Error.role))) {
+    if (!surface.setRole(&role, @ptrCast(shell_surface_v1), @backingInt(river.WindowManagerV1.Error.role))) {
         return;
     }
     surface.setRoleObject(@ptrCast(shell_surface_v1));

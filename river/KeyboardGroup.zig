@@ -435,11 +435,11 @@ fn handleModifiers(listener: *wl.Listener(*wlr.Keyboard), _: *wlr.Keyboard) void
 /// Returns true if the key press was consumed.
 fn matchBuiltinBinding(group: *KeyboardGroup, xkb_keycode: u32) bool {
     for (group.builtin_state.keyGetSyms(xkb_keycode)) |keysym| {
-        switch (@intFromEnum(keysym)) {
-            @intFromEnum(xkb.Keysym.XF86Switch_VT_1)...@intFromEnum(xkb.Keysym.XF86Switch_VT_12) => {
+        switch (@backingInt(keysym)) {
+            @backingInt(xkb.Keysym.XF86Switch_VT_1)...@backingInt(xkb.Keysym.XF86Switch_VT_12) => {
                 log.debug("switch VT keysym received", .{});
                 if (server.session) |session| {
-                    const vt = @intFromEnum(keysym) - @intFromEnum(xkb.Keysym.XF86Switch_VT_1) + 1;
+                    const vt = @backingInt(keysym) - @backingInt(xkb.Keysym.XF86Switch_VT_1) + 1;
                     std.log.info("switching to VT {}", .{vt});
                     session.changeVt(vt) catch std.log.err("changing VT failed", .{});
                 }

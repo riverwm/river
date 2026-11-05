@@ -145,7 +145,7 @@ fn createKeymap(object: *river.XkbConfigV1, id: u32, format: xkb.Keymap.Format, 
 
     const keymap_ptr = std.c.mmap(null, keymap_len, .{ .READ = true }, .{ .TYPE = .PRIVATE }, fd, 0);
     if (keymap_ptr == std.c.MAP_FAILED) {
-        log.err("failed to mmap() keymap fd: {s}", .{@tagName(@as(std.c.E, @enumFromInt(std.c._errno().*)))});
+        log.err("failed to mmap() keymap fd: {s}", .{@tagName(@as(std.c.E, @fromBackingInt(@intCast(std.c._errno().*))))});
         return XkbKeymap.createFailed(object.getClient(), object.getVersion(), id, "failed to mmap() keymap fd");
     }
     defer _ = std.c.munmap(@alignCast(keymap_ptr), keymap_len);

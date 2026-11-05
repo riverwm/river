@@ -93,7 +93,7 @@ pub const State = struct {
             .custom => |mode| .{ mode.width, mode.height },
             .none => .{ 0, 0 },
         };
-        if (@mod(@intFromEnum(state.transform), 2) != 0) {
+        if (@mod(@backingInt(state.transform), 2) != 0) {
             mem.swap(i32, &w, &h);
         }
         return .{
