@@ -61,6 +61,9 @@ link: wl.list.Link,
 
 /// If this is the group for a virtual keyboard created by the input method client.
 input_method: bool,
+/// If this is the group for a virtual keyboard. Virtual keyboards are always
+/// in their own group of one.
+virtual: bool,
 
 config: Keyboard.Config,
 
@@ -81,12 +84,13 @@ builtin_pressed: std.AutoArrayHashMapUnmanaged(u32, BuiltinPress) = .empty,
 key: wl.Listener(*wlr.Keyboard.event.Key) = .init(handleKey),
 modifiers: wl.Listener(*wlr.Keyboard) = .init(handleModifiers),
 
-pub fn create(seat: *Seat, config: Keyboard.Config, input_method: bool) !*KeyboardGroup {
+pub fn create(seat: *Seat, config: Keyboard.Config, virtual: bool, input_method: bool) !*KeyboardGroup {
     const group = try util.gpa.create(KeyboardGroup);
     errdefer util.gpa.destroy(group);
     group.* = .{
         .seat = seat,
         .input_method = input_method,
+        .virtual = virtual,
         .config = config,
         .state = undefined,
         .builtin_state = xkb.State.new(config.keymap) orelse return error.OutOfMemory,
@@ -161,6 +165,7 @@ pub fn unref(group: *KeyboardGroup, to_release: []u32) void {
 }
 
 pub fn match(group: *const KeyboardGroup, config: *Keyboard.Config) bool {
+    if (group.virtual) return false;
     const a = &group.config;
     const b = config;
     if (a.repeat_rate != b.repeat_rate) return false;
@@ -279,6 +284,17 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
         }
     }
 
+    // Virtual keyboards are excluded so that e.g. clicking an on-screen keyboard
+    // doesn't count as typing. Input method keys were already counted on the
+    // physical keyboard.
+    if (event.state == .pressed and group.seat.wm_requested.notify_next_keyboard_input and
+        !group.virtual and !keyIsModifier(xkb_state, event.keycode + 8))
+    {
+        group.seat.wm_requested.notify_next_keyboard_input = false;
+        group.seat.wm_scheduled.keyboard_input = true;
+        server.wm.dirtyWindowing();
+    }
+
     // Every sent press event, to a regular client or the input method, should have
     // the corresponding release event sent to the same client.
     // Similarly, no press event means no release event.
@@ -308,11 +324,9 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
             // - Is there a way to test the effect the keycode would have on
             //   the active modifiers of the xkb_state?
             // - Could we add a function to libxkbcommon to make that possible?
-            for (xkb_state.keyGetSyms(xkb_keycode)) |sym| {
-                if (!keysymIsModifier(sym)) {
-                    group.seat.xkb_bindings_seat.ensure_next_key_eaten = false;
-                    break :blk .ensure_eaten;
-                }
+            if (!keyIsModifier(xkb_state, xkb_keycode)) {
+                group.seat.xkb_bindings_seat.ensure_next_key_eaten = false;
+                break :blk .ensure_eaten;
             }
         }
         if (group.getInputMethodGrab() != null) {
@@ -353,6 +367,13 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
     }
 
     group.sendState();
+}
+
+fn keyIsModifier(xkb_state: *xkb.State, xkb_keycode: xkb.Keycode) bool {
+    for (xkb_state.keyGetSyms(xkb_keycode)) |sym| {
+        if (!keysymIsModifier(sym)) return false;
+    }
+    return true;
 }
 
 fn keysymIsModifier(keysym: xkb.Keysym) bool {

@@ -257,6 +257,7 @@ wm_scheduled: struct {
         shell_surface: *ShellSurface,
     } = .none,
     op_release: bool = false,
+    keyboard_input: bool = false,
 } = .{},
 
 /// State sent to the wm in the latest manage sequence.
@@ -282,6 +283,8 @@ wm_requested: struct {
         end,
     } = .none,
     pointer_warp: ?struct { x: i32, y: i32 } = null,
+    /// Send keyboard_input to the wm on the next non-modifier key press.
+    notify_next_keyboard_input: bool = false,
 } = .{},
 
 xkb_bindings: wl.list.Head(XkbBinding, .link),
@@ -887,6 +890,11 @@ pub fn manageStart(seat: *Seat) void {
             },
         }
 
+        if (seat.wm_scheduled.keyboard_input) {
+            assert(seat_v1.getVersion() >= 7);
+            seat_v1.sendKeyboardInput();
+        }
+
         if (seat.op) |*op| {
             const x: i32 = @intFromFloat(seat.cursor.wlr_cursor.x);
             const y: i32 = @intFromFloat(seat.cursor.wlr_cursor.y);
@@ -978,6 +986,7 @@ pub fn manageStart(seat: *Seat) void {
     // Ensure we don't store an interaction that happens while no window manager
     // is connected until a new window manager connects.
     seat.wm_scheduled.interaction = .none;
+    seat.wm_scheduled.keyboard_input = false;
 }
 
 pub fn makeInert(seat: *Seat) void {
@@ -1020,6 +1029,9 @@ fn handleDestroy(_: *river.SeatV1, seat: *Seat) void {
         if (event.data == .keymap) event.data.keymap.unref();
     }
     while (seat.synced_virt_kbs.first()) |synced_virt_kb| synced_virt_kb.destroy();
+
+    seat.wm_requested = .{};
+    seat.wm_scheduled.keyboard_input = false;
 
     seat.object = null;
 }
@@ -1093,6 +1105,10 @@ fn handleRequest(
         .op_end_touch => |args| {
             if (!server.wm.ensureWindowing()) return;
             _ = seat.touch_ops.swapRemove(args.touch_point);
+        },
+        .notify_next_keyboard_input => {
+            if (!server.wm.ensureWindowing()) return;
+            seat.wm_requested.notify_next_keyboard_input = true;
         },
     }
 }

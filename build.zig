@@ -123,7 +123,7 @@ pub fn build(b: *Build) !void {
     scanner.generate("wp_color_manager_v1", 2);
     scanner.generate("wp_color_representation_manager_v1", 1);
 
-    scanner.generate("river_window_manager_v1", 6);
+    scanner.generate("river_window_manager_v1", 7);
     scanner.generate("river_xkb_bindings_v1", 3);
     scanner.generate("river_layer_shell_v1", 1);
     scanner.generate("river_touch_gestures_v1", 1);
