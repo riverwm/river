@@ -286,17 +286,6 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
         }
     }
 
-    // Virtual keyboards are excluded so that e.g. clicking an on-screen keyboard
-    // doesn't count as typing. Input method keys were already counted on the
-    // physical keyboard.
-    if (event.state == .pressed and group.seat.wm_requested.notify_next_keyboard_input and
-        !group.virtual and !keyIsModifier(xkb_state, event.keycode + 8))
-    {
-        group.seat.wm_requested.notify_next_keyboard_input = false;
-        group.seat.wm_scheduled.keyboard_input = true;
-        server.wm.dirtyWindowing();
-    }
-
     // Every sent press event, to a regular client or the input method, should have
     // the corresponding release event sent to the same client.
     // Similarly, no press event means no release event.
@@ -309,6 +298,16 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
         }
         // Translate libinput keycode -> xkbcommon
         const xkb_keycode = event.keycode + 8;
+        // Virtual keyboards are excluded so that e.g. clicking an on-screen keyboard
+        // doesn't count as typing. Input method keys were already counted on the
+        // physical keyboard.
+        if (group.seat.wm_requested.notify_next_keyboard_input and
+            !group.flags.virtual and !keyIsModifier(xkb_state, xkb_keycode))
+        {
+            group.seat.wm_requested.notify_next_keyboard_input = false;
+            group.seat.wm_scheduled.keyboard_input = true;
+            server.wm.dirtyWindowing();
+        }
         const modifiers = group.state.getModifiers();
         if (group.seat.matchXkbBinding(xkb_keycode, modifiers, xkb_state)) |binding| {
             log.debug("matched xkb binding", .{});
