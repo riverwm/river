@@ -19,6 +19,14 @@ const InputDevice = @import("InputDevice.zig");
 
 const log = std.log.scoped(.input);
 
+pub const Flags = packed struct {
+    /// If this is the group for a virtual keyboard. Virtual keyboards are always
+    /// in their own group of one.
+    virtual: bool,
+    /// If this is the group for a virtual keyboard created by the input method client.
+    input_method: bool,
+};
+
 const KeyConsumer = union(enum) {
     /// A null value indicates that the xkb_binding_v1 was destroyed or that
     /// a press event was already sent due to a press on a different keyboard.
@@ -59,12 +67,7 @@ seat: *Seat,
 /// Seat.keyboard_groups
 link: wl.list.Link,
 
-/// If this is the group for a virtual keyboard created by the input method client.
-input_method: bool,
-/// If this is the group for a virtual keyboard. Virtual keyboards are always
-/// in their own group of one.
-virtual: bool,
-
+flags: Flags,
 config: Keyboard.Config,
 
 /// This is the keyboard that actually gets passed to wlr_seat functions for
@@ -84,13 +87,12 @@ builtin_pressed: std.AutoArrayHashMapUnmanaged(u32, BuiltinPress) = .empty,
 key: wl.Listener(*wlr.Keyboard.event.Key) = .init(handleKey),
 modifiers: wl.Listener(*wlr.Keyboard) = .init(handleModifiers),
 
-pub fn create(seat: *Seat, config: Keyboard.Config, virtual: bool, input_method: bool) !*KeyboardGroup {
+pub fn create(seat: *Seat, config: Keyboard.Config, flags: Flags) !*KeyboardGroup {
     const group = try util.gpa.create(KeyboardGroup);
     errdefer util.gpa.destroy(group);
     group.* = .{
         .seat = seat,
-        .input_method = input_method,
-        .virtual = virtual,
+        .flags = flags,
         .config = config,
         .state = undefined,
         .builtin_state = xkb.State.new(config.keymap) orelse return error.OutOfMemory,
@@ -165,7 +167,7 @@ pub fn unref(group: *KeyboardGroup, to_release: []u32) void {
 }
 
 pub fn match(group: *const KeyboardGroup, config: *Keyboard.Config) bool {
-    if (group.virtual) return false;
+    if (group.flags.virtual) return false;
     const a = &group.config;
     const b = config;
     if (a.repeat_rate != b.repeat_rate) return false;
@@ -427,7 +429,7 @@ pub fn processModifiers(group: *KeyboardGroup, modifiers: wlr.Keyboard.Modifiers
 fn handleModifiers(listener: *wl.Listener(*wlr.Keyboard), _: *wlr.Keyboard) void {
     const group: *KeyboardGroup = @fieldParentPtr("modifiers", listener);
 
-    if (!group.input_method) {
+    if (!group.flags.input_method) {
         const old: u32 = @bitCast(group.modifiers_old);
         const new: u32 = @bitCast(group.state.getModifiers());
         const watched: u32 = @bitCast(group.seat.xkb_bindings_seat.requested.mods_watched);
@@ -475,7 +477,7 @@ fn matchBuiltinBinding(group: *KeyboardGroup, xkb_keycode: u32) bool {
 /// Returns null if the keyboard is not grabbed by an input method,
 /// or if the group is for a virtual keyboard created by the input method.
 fn getInputMethodGrab(group: *KeyboardGroup) ?*wlr.InputMethodV2.KeyboardGrab {
-    if (group.input_method) {
+    if (group.flags.input_method) {
         return null;
     }
     if (group.seat.relay.input_method) |input_method| {

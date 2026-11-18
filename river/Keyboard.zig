@@ -126,7 +126,10 @@ pub fn setGroup(keyboard: *Keyboard) void {
         const input_method = keyboard.device.seat.relay.input_method orelse break :blk false;
         break :blk vkb.resource.getClient() == input_method.resource.getClient();
     };
-    keyboard.group = KeyboardGroup.create(seat, keyboard.config, keyboard.device.virtual, input_method) catch |err| switch (err) {
+    keyboard.group = KeyboardGroup.create(seat, keyboard.config, .{
+        .virtual = keyboard.device.virtual,
+        .input_method = input_method,
+    }) catch |err| switch (err) {
         error.OutOfMemory => {
             log.err("out of memory", .{});
             return;

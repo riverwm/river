@@ -75,7 +75,7 @@ pub fn newInputMethod(relay: *InputRelay, input_method: *wlr.InputMethodV2) void
             if (vkb.resource.getClient() == input_method.resource.getClient()) {
                 const keyboard: *Keyboard = @fieldParentPtr("device", device);
                 if (keyboard.group) |group| {
-                    group.input_method = true;
+                    group.flags.input_method = true;
                 }
             }
         }
